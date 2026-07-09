@@ -454,7 +454,7 @@ easyParcelIntegration: {
 |---|---|---|
 | **B-0** | Buyer shipping-address form **reuse cascade F14** (State → City → Postcode `<Select>` × 3, `/api/geo/*` + `CheckoutForm`) — KHÔNG dựng form/endpoint mới. | US-F36-05 |
 | **B-1** | `calculate-shipping` nhận thêm `items` → tính tổng weight (sum `Products.weight` × qty; product = 0/thiếu → hằng số hệ thống `DEFAULT_PARCEL`). `DEFAULT_PARCEL` contains **both** fallback weight (kg) **and** default box dimensions (width, length, height in cm integer). `EPRateCheckingBulk` call **MUST send weight + the `DEFAULT_PARCEL` dims** so volumetric basis at rate-check matches label creation. | US-F36-04 |
-| **B-1b** | **Snapshot `parcelWeight` (gram) lên order lúc checkout** (= tổng weight đã tính ở B-1) — để modal Ready-to-Ship đọc lại khớp đúng cước đã báo, KHÔNG re-join Products. | US-F36-04 |
+| **B-1b** | **Snapshot `parcelWeight` (kg — updated 2026-07-06, GH-1458; was previously documented as gram) lên order lúc checkout** (= tổng weight đã tính ở B-1) — để modal Ready-to-Ship đọc lại khớp đúng cước đã báo, KHÔNG re-join Products. | US-F36-04 |
 | **B-2** | Tenant EasyParcel ON → rate `selectedCourier` (1 courier shop chọn), trả `{ courier, serviceId, fee(sen), eta }` đơn; OFF → trả flat fee đơn (shape cũ tương thích). | US-F36-04 |
 | **B-3** | Checkout UI: phí ship hiển thị **1 dòng "Shipping" trong Order Summary** — KHÔNG có section vận chuyển (shop chốt 1 courier, buyer không chọn), KHÔNG có dòng SST. Fallback → giữ UI fee đơn hiện tại. | US-F36-05 |
 | **B-4** | Lưu `shippingCourier`, `shippingServiceId`, `shippingFee` vào order. `shippingFee` lưu **RM-float** (compute bằng sen rồi `/100` khi lưu — KHÔNG lưu sen vào cột này). Wire ở nhánh `/api/orders/checkout` + `/api/orders/stripe-checkout`. | US-F36-04 |
@@ -462,7 +462,7 @@ easyParcelIntegration: {
 | **B-6** | Giá hiển thị = **raw EasyParcel** (RM→sen ×100), KHÔNG markup. | US-F36-04 |
 | **B-7** | Free-shipping threshold (`freeAbove`) vẫn áp được lên phí ship nếu merchant bật. | US-F36-05 |
 | **B-8** | **Buyer checkout đã thu đủ 8 receiver fields** (name, phone, email, addr1, addr2, city, state, postcode) — KHÔNG cần thêm input field mới. Backend transform `mapState()` + `normalizePhone()` + `buildAddress()` trước khi gửi EasyParcel. | US-F36-04 |
-| **B-9** | **Product weight/dimensions snapshot vào order** tại checkout (grams); aggregated thành `parcelWeight` (grams) trên order để rate call và modal "Ready to Ship" dùng lại. Default `DEFAULT_PARCEL` khi product weight = 0. `DEFAULT_PARCEL` carries both fallback weight and box dims (W/L/H cm); both sent in `EPRateCheckingBulk` so checkout rate is volumetrically consistent with label creation. | US-F36-04 |
+| **B-9** | **Product weight/dimensions snapshot vào order** tại checkout (kg — updated 2026-07-06, GH-1458; was previously documented as grams); aggregated thành `parcelWeight` (kg) trên order để rate call và modal "Ready to Ship" dùng lại. Default `DEFAULT_PARCEL` khi product weight = 0. `DEFAULT_PARCEL` carries both fallback weight and box dims (W/L/H cm); both sent in `EPRateCheckingBulk` so checkout rate is volumetrically consistent with label creation. | US-F36-04 |
 | **B-10** | **EasyParcel normalize per-courier differences** — cùng 1 field set cho mọi courier (J&T, Pos Laju, Flash, Ninja Van, etc.). Backend gửi cùng field set bất kể `selectedCourier`. | US-F36-04 |
 
 **Data Model (Orders — new fields)**
@@ -471,7 +471,7 @@ easyParcelIntegration: {
 // Orders collection — shipping fields (extended)
 shippingCourier?: string,    // e.g. 'J&T' (from EasyParcel selectedCourier.courier_name; wave 7+)
 shippingServiceId?: string,  // e.g. 'EP-CS0I' (from EPRateCheckingBulk; wave 7+)
-parcelWeight?: number,       // gram; snapshot at checkout; wave 7+
+parcelWeight?: number,       // kg (updated 2026-07-06, GH-1458 — was previously gram); snapshot at checkout; wave 7+
 // existing:
 shippingFee: number,         // RM-float; wave 6+
 shippingAddress: { line1, line2, city, state, postcode, country }

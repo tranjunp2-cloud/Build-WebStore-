@@ -48,7 +48,6 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     const [eastRateWarning, setEastRateWarning] = useState('')
     const [freeAboveWarning, setFreeAboveWarning] = useState('')
     const [isSaving, setIsSaving] = useState(false)
-    const [lastSaveSucceeded, setLastSaveSucceeded] = useState(false)
     const savingRef = useRef(false)
 
     const snapshotRef = useRef<Snapshot>(snap(
@@ -174,7 +173,6 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
             setWestRateWarning(wR.warning ?? '')
             setEastRateWarning(eR.warning ?? '')
             snapshotRef.current = snap(savedWest, savedEast, freeEnabled, freeAboveRm)
-            setLastSaveSucceeded(true)
             toast.success(s.savedSuccess)
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : s.saveError)
@@ -220,7 +218,6 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
             <SettingsFooter
                 isDirty={isDirty}
                 isSaving={isSaving}
-                lastSaveSucceeded={lastSaveSucceeded}
                 onReset={handleReset}
                 onSave={handleSave}
             />

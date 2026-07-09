@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 // through Payload, which comfortably exceeds 60s in practice. Same root cause
 // as generate-site 504s. Keeping parity to avoid another latency surprise.
 export const maxDuration = 300
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { getPayload } from 'payload'
 import { sql } from 'drizzle-orm'
 import config from '@payload-config'
@@ -650,9 +651,16 @@ export const POST = withAuth(async (user, req) => {
         }
 
         // Notify SSO Hub: user picked a template (step 1)
-        import('@/lib/sso/sso-api-client')
-            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-            .catch((err) => console.error('[ApplyTemplate] SSO step 1 import failed:', err))
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _notifyStep1 = () =>
+            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                console.error('[ApplyTemplate] SSO step 1 notify failed:', err),
+            )
+        try {
+            after(_notifyStep1)
+        } catch {
+            void _notifyStep1()
+        }
 
         return NextResponse.json({
             success: true,

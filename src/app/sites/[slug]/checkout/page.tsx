@@ -8,6 +8,9 @@ import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-re
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
 
+// Functional/transactional page — keep out of the search index.
+export const metadata = { robots: { index: false, follow: false } }
+
 type ShippingConfig = {
     westRate: number | null
     eastRate: number | null

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical, Mail } from 'lucide-react'
 import type { EmailTemplateType } from '@/lib/email/types'
 import type { EmailTemplateConfig } from '@/lib/email/types'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 interface Props {
     templateType: EmailTemplateType
@@ -20,6 +23,17 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
     const [fetchError, setFetchError] = useState(false)
     const abortRef = useRef<AbortController | null>(null)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // GH-1499 issue 4: only true desktop (≥1280px, xl) gets to pick Desktop vs Mobile —
+    // on phone AND tablet/iPad (mobile through iPad Pro, all <1280px) there's no real
+    // "view the desktop layout" use case, so hide the toggle entirely and just show the
+    // (mobile-sized) preview. Re-forced on any resize INTO the <xl range (e.g. shrinking
+    // a resizable window) so it never gets stuck showing the desktop toggle/frame at a
+    // width where switching to it wouldn't make sense.
+    const isBelowDesktop = useMediaQuery('(max-width: 1279px)')
+    useEffect(() => {
+        if (isBelowDesktop) setPreviewMode('mobile')
+    }, [isBelowDesktop])
 
     function doFetch(signal: AbortSignal) {
         setLoading(true)
@@ -81,32 +95,62 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         Live Preview
                     </span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={() => setPreviewMode('desktop')}
-                        title="Desktop"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                    >
-                        <Monitor className="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setPreviewMode('mobile')}
-                        title="Mobile"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                    >
-                        <Smartphone className="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleRefresh}
-                        title="Refresh"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors"
-                    >
-                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
+                <TooltipProvider>
+                    <div className="flex items-center gap-1">
+                        {/* GH-1499 issue 4: below xl (desktop), only mobile preview makes sense —
+                            no toggle needed, and no replacement label either (redundant UI
+                            noise) — mode is force-set to 'mobile' above, Refresh stays visible. */}
+                        {isBelowDesktop ? null : (
+                            <>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setPreviewMode('desktop')}
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Desktop"
+                                            className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                        >
+                                            <Monitor className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Desktop</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setPreviewMode('mobile')}
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Mobile"
+                                            className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                        >
+                                            <Smartphone className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Mobile</TooltipContent>
+                                </Tooltip>
+                            </>
+                        )}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={handleRefresh}
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Refresh"
+                                    className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white"
+                                >
+                                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Refresh</TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
             </div>
 
             {/* Mock inbox subject bar — styled as an inbox preview row */}
@@ -119,7 +163,12 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             </div>
 
             {/* Preview canvas */}
-            <div className="relative flex min-h-[540px] items-start justify-center bg-slate-100 dark:bg-[hsl(var(--background))] p-6">
+            {/* Self-contained scroll — DESKTOP split-view only (md+). The iframe auto-grows to its
+                content height; on desktop we cap this wrapper so it scrolls internally and
+                overscroll-contain keeps the scroll from shifting the form/header next to it.
+                On mobile the layout is stacked (grid-cols-1), so let the preview grow naturally
+                and the page scroll — no cramped inner box. */}
+            <div className="relative flex min-h-[360px] items-start justify-center bg-slate-100 dark:bg-[hsl(var(--background))] p-3 sm:p-6 md:max-h-[calc(100vh-500px)] md:overflow-y-auto md:overscroll-contain">
                 {/* Subtle loading overlay — keeps iframe visible to avoid flash */}
                 {loading && (
                     <div className="absolute inset-0 flex items-start justify-center pt-8 bg-slate-100/70 dark:bg-[hsl(var(--background)/0.7)] z-10 pointer-events-none">
@@ -130,13 +179,14 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                 {fetchError ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-400">
                         <span className="text-xs text-destructive">Preview unavailable — check console for details</span>
-                        <button
+                        <Button
                             type="button"
                             onClick={handleRefresh}
-                            className="text-xs text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.8)] underline"
+                            variant="link"
+                            className="text-xs h-auto p-0"
                         >
                             Retry
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <iframe
@@ -145,6 +195,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         title="Email preview"
                         style={{
                             width: previewMode === 'desktop' ? '560px' : '360px',
+                            maxWidth: '100%',
                             minHeight: '480px',
                             border: 'none',
                             borderRadius: '8px',
@@ -188,14 +239,15 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-white/[0.06] bg-[hsl(var(--card))] px-4 py-2.5 text-xs text-slate-500">
                 <span>Rendered with sample data · won&apos;t be sent to real customers</span>
-                <button
+                <Button
                     type="button"
                     onClick={onReset}
-                    className="flex items-center gap-1.5 text-xs text-slate-300 underline underline-offset-2 hover:text-white transition-colors"
+                    variant="link"
+                    className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white h-auto p-0"
                 >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset to default
-                </button>
+                </Button>
             </div>
         </div>
     )

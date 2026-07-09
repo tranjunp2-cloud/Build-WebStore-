@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { compressImage } from '@/lib/media/compress-image'
+import { checkUploadSize, uploadLimitLabel } from '@/lib/media/upload-limits'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
@@ -183,6 +184,13 @@ export function MediaUploadOverlay({
             parentToast.error('Only MP4 and WebM videos are supported')
             return
         }
+        // GH-1284 — reject oversized videos up front so the user gets an instant,
+        // clear error instead of a spinner that runs into the 120s upload timeout.
+        const sizeError = checkUploadSize(file.type, file.size)
+        if (sizeError) {
+            parentToast.error(sizeError)
+            return
+        }
         if (!videoField) return
         try {
             const formData = new FormData()
@@ -248,6 +256,7 @@ export function MediaUploadOverlay({
                                 <button
                                     type="button"
                                     onClick={() => videoFileRef.current?.click()}
+                                    title={`MP4 or WebM, max ${uploadLimitLabel('video')}`}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
                                 >
                                     <Film className="w-4 h-4" />

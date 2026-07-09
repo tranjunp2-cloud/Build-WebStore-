@@ -9,6 +9,7 @@ import { useI18n, type Translations } from '@/i18n'
 import { profilePatchSchema } from '@/lib/profile/schemas'
 import type { PlatformUser } from '@/types/user'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { PhoneInput } from './phone-input'
 import { SsoGuardBox } from './sso-guard-box'
@@ -86,11 +87,11 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 w-full">
             {/* Name row — 2 columns */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
-                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
+                    <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.firstName}
-                    </label>
+                    </Label>
                     <Input
                         {...register('firstName')}
                         className={inputCls}
@@ -100,9 +101,9 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     )}
                 </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
+                    <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.lastName}
-                    </label>
+                    </Label>
                     <Input
                         {...register('lastName')}
                         className={inputCls}
@@ -111,11 +112,11 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
             </div>
 
             {/* Email + Phone row */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
-                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
+                    <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.email}
-                    </label>
+                    </Label>
                     <Input
                         type="email"
                         value={user.email}
@@ -127,9 +128,9 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
+                    <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.phone}
-                    </label>
+                    </Label>
                     <PhoneInput
                         value={phoneValue}
                         onChange={val => setValue('phone', val, { shouldDirty: true })}

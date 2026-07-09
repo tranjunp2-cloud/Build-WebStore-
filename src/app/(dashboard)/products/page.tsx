@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2 } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter } from 'lucide-react'
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
@@ -16,20 +17,27 @@ import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
+import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
+import { AiReviewIndicator } from '@/components/dashboard/AiReviewIndicator'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { TablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
+import { getMissingFields } from '@/lib/products/missing-fields'
+import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
     url?: string
@@ -70,6 +78,7 @@ type Product = {
     variants?: Variant[]
     attributes?: Array<{ key: string; value: string }>
     descText?: string
+    aiReviewPending?: boolean
 }
 
 function formatPrice(price: number, currency: string) {
@@ -94,6 +103,31 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     return url
 }
 
+// Publishing gate (GH-1458) — missingFields keys from productPublishBlocks map to the same
+// labels already used by the create/edit form (t.dashboard.products.form.fields.*).
+const PUBLISH_GATE_FIELD_KEYS: Record<string, 'basePrice' | 'baseSku' | 'baseInventory' | 'variants' | 'weight'> = {
+    price: 'basePrice',
+    sku: 'baseSku',
+    inventory: 'baseInventory',
+    variants: 'variants',
+    weight: 'weight',
+}
+
+// Server throws Error(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields })) — parse it back
+// out so the client can show the same modal as the (redundant) client-side check.
+function parsePublishBlockedError(e: unknown): string[] | null {
+    if (!(e instanceof Error)) return null
+    try {
+        const parsed = JSON.parse(e.message)
+        if (parsed?.code === 'PUBLISH_BLOCKED' && Array.isArray(parsed.missingFields)) {
+            return parsed.missingFields
+        }
+    } catch {
+        // Not JSON — a normal error message, fall through to generic handling.
+    }
+    return null
+}
+
 export default function ProductsPage() {
     const { t } = useI18n()
     const sub = t.common.subscriptionErrors
@@ -106,6 +140,8 @@ export default function ProductsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
+    const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
+    useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
     const [sortBy, setSortBy] = useState('Latest')
     const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -230,17 +266,39 @@ export default function ProductsPage() {
         setShowBulkCreate(true)
     }
 
+    const [publishGateFields, setPublishGateFields] = useState<string[] | null>(null)
+
     const handleUpdateStatus = async (prod: Product | DetailedProduct, e: React.MouseEvent) => {
         e.stopPropagation()
         const newStatus = prod.status === 'active' ? 'archived' : 'active'
-        // Optimistic update
-        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
+
+        // Soft validation publishing gate (GH-1458) — block Draft/Archived -> Active when core
+        // fields are missing, before any optimistic update or server call.
+        if (newStatus === 'active') {
+            const gate = productPublishBlocks(prod)
+            if (!gate.ok) {
+                setPublishGateFields(gate.missingFields)
+                return
+            }
+        }
+
+        // Capture the pre-update flag from list state (not `prod`, which may be a DetailedProduct
+        // without this field) so a failed activation restores the correct prior value on rollback.
+        const prevAiReviewPending = products.find(p => p.id === prod.id)?.aiReviewPending
+
+        // Optimistic update — activating a product means it's been reviewed, so also drop the AI-review dot.
+        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus, aiReviewPending: newStatus === 'active' ? false : p.aiReviewPending } : p))
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
         } catch (e: unknown) {
-            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
-            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
+            const blockedFields = parsePublishBlockedError(e)
+            if (blockedFields) {
+                setPublishGateFields(blockedFields)
+            } else {
+                toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
+            }
+            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status, aiReviewPending: prevAiReviewPending } : p))
         }
     }
 
@@ -308,12 +366,11 @@ export default function ProductsPage() {
             <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <AlertCircle className="mx-auto h-12 w-12 text-[hsl(var(--destructive))]/60" />
-                    <h2 className="mt-4 text-lg font-semibold text-white">{t.dashboard.products.list.failedToLoad}</h2>
-                    <p className="mt-1 text-sm text-gray-500">{error}</p>
-                    <button onClick={loadProducts}
-                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 py-2.5 text-sm font-medium !text-white hover:bg-[hsl(var(--primary))] transition-colors">
+                    <h2 className="mt-4 text-lg font-semibold text-foreground">{t.dashboard.products.list.failedToLoad}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                    <Button onClick={loadProducts} className="mt-4">
                         <RefreshCw className="h-4 w-4" /> {t.dashboard.products.list.retry}
-                    </button>
+                    </Button>
                 </div>
             </div>
         )
@@ -331,25 +388,66 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-[12px]">
-                        <div className="w-full md:flex-1 flex items-center bg-[hsl(var(--secondary))] border border-white/[0.08] rounded-[16px] px-4 h-[50px] min-h-[50px] shrink-0 focus-within:border-white focus-within:ring-1 focus-within:ring-white transition-all duration-200">
-                            <input
-                                value={aiPrompt}
-                                onChange={e => setAiPrompt(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
-                                }}
-                                placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                                className="w-full bg-transparent text-[16px] text-foreground outline-none border-none focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none placeholder:text-slate-400"
-                            />
-                        </div>
-                        <button
-                            onClick={() => {
-                                if (aiPrompt.trim()) handleCreateAi()
+                    <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
+                    {/* Command shell — textarea + footer (hint + Generate button) share one bordered
+                        box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
+                    <div className="w-full rounded-xl border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))] transition-colors">
+                        <textarea
+                            ref={aiTextareaRef}
+                            value={aiPrompt}
+                            onChange={e => setAiPrompt(e.target.value)}
+                            onKeyDown={e => {
+                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && aiPrompt.trim()) {
+                                    e.preventDefault()
+                                    handleCreateAi()
+                                }
                             }}
-                            className="rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 md:w-[100px] w-full h-[48px] md:h-[50px] flex items-center justify-center text-[16px] font-semibold text-white shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity border-none outline-none focus:outline-none focus:ring-0 focus:ring-offset-0">
-                            {t.dashboard.products.list.aiChatBtn}
-                        </button>
+                            placeholder={t.dashboard.products.list.aiChatPlaceholder}
+                            rows={1}
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
+                        />
+                        <div className="flex items-center justify-between gap-3 border-t border-[hsl(var(--input-border))]/60 px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
+                                <span>·</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <span>+</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
+                            </div>
+                            {/* Generate Drafts — shared dashboard primary button (size="dash") */}
+                            <Button
+                                variant="dashPrimary"
+                                size="dash"
+                                onClick={handleCreateAi}
+                                disabled={!aiPrompt.trim()}
+                                className="shrink-0 justify-center"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                {t.dashboard.products.list.aiChatBtn}
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] text-muted-foreground">{t.dashboard.products.list.aiChatSuggestionsLabel}</span>
+                        {[
+                            { label: t.dashboard.products.list.aiChatSuggestion1Label, fill: t.dashboard.products.list.aiChatSuggestion1 },
+                            { label: t.dashboard.products.list.aiChatSuggestion2Label, fill: t.dashboard.products.list.aiChatSuggestion2 },
+                            { label: t.dashboard.products.list.aiChatSuggestion3Label, fill: t.dashboard.products.list.aiChatSuggestion3 },
+                        ].map((suggestion, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                    setAiPrompt(suggestion.fill)
+                                    aiTextareaRef.current?.focus()
+                                }}
+                                className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
+                            >
+                                {suggestion.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -364,13 +462,14 @@ export default function ProductsPage() {
                             <h1 className="text-[24px] font-bold leading-none text-foreground">{t.dashboard.products.title}</h1>
                             <span className="block text-[14px] leading-none text-foreground/60">{t.dashboard.products.subtitle}</span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-                            <Button asChild variant="dashSecondary" size="dash" className="w-full sm:w-auto justify-center">
+                        <div className="flex flex-row items-center gap-2 w-full md:w-auto">
+                            <Button asChild variant="dashSecondary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/categories">
+                                    <Tag className="w-3.5 h-3.5" />
                                     {t.dashboard.products.list.category}
                                 </Link>
                             </Button>
-                            <Button asChild variant="dashPrimary" size="dash" className="w-full sm:w-auto justify-center">
+                            <Button asChild variant="dashPrimary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/new">
                                     <Image src="/images/figma/add-product.svg" alt="Add" width={16} height={16} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
                                 </Link>
@@ -378,120 +477,93 @@ export default function ProductsPage() {
                         </div>
                     </div>
 
-                    {/* Status Tabs */}
-                    <div className="flex items-center md:gap-4 border-b border-white/[0.08] overflow-x-auto no-scrollbar">
-                        {/* All tab */}
-                        <button onClick={() => setFilterStatus('all')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'all' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                    {/* Status filter — shared <Tabs variant="underline"> (same component everywhere) */}
+                    <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+                        <TabsList variant="underline">
+                            <TabsTrigger variant="underline" value="all">
                                 {t.dashboard.products.list.filterAll}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'all' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.all}
-                            </span>
-                            {filterStatus === 'all' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.all}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="active">
 
-                        {/* Active tab */}
-                        <button onClick={() => setFilterStatus('active')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))] shrink-0" />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'active' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
                                 {t.dashboard.products.list.filterActive}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'active' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.active}
-                            </span>
-                            {filterStatus === 'active' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-
-                        {/* Draft tab */}
-                        <button onClick={() => setFilterStatus('draft')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'draft' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.active}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="draft">
+                                <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
                                 {t.dashboard.products.list.filterDraft}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'draft' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.draft}
-                            </span>
-                            {filterStatus === 'draft' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-
-                        {/* Archived tab */}
-                        <button onClick={() => setFilterStatus('archived')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'archived' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.draft}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="archived">
+                                <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
                                 {t.dashboard.products.list.filterArchived}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'archived' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.archived}
-                            </span>
-                            {filterStatus === 'archived' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-                    </div>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.archived}
+                                </span>
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
-                        <div className="relative w-full h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
+                        <div className="relative w-full h-9">
+                            <Image src="/images/figma/search-icon.svg" width={16} height={16} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
-                            <input
+                            <Input
                                 type="text"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
                                 style={{ background: 'transparent', color: 'var(--dash-text)' }}
-                                className="w-full h-full rounded-[16px] border border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-9 pr-4 text-[13px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                             />
                         </div>
 
-                        {/* Row 2: Sort — shadcn Select (design system, themed) */}
-                        <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-full h-[50px] rounded-[16px] border-[var(--dash-border)] px-4 text-[16px] font-medium text-[var(--dash-text)] shadow-none">
-                                <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SORT_OPTIONS.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {sortTranslateMap[option]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {/* Row 2: Sort + Filter — merged into one row (GH-1492) */}
+                        <div className="flex flex-row items-center gap-2 w-full">
+                            {/* Sort — shadcn Select (design system, themed) */}
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                                <SelectTrigger className="h-9 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
+                                    <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {SORT_OPTIONS.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {sortTranslateMap[option]}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                        {/* Row 3: Filter Button — full-width, centered */}
-                        <button
-                            onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={{ background: 'transparent', border: isAdvancedFiltersOpen ? '1px solid hsl(var(--primary)/0.5)' : '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                            className="w-full h-[50px] flex items-center justify-center gap-2 rounded-[16px] text-[16px] font-medium transition-colors outline-none"
-                        >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
-                            <span>
-                                {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                    ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
-                                    : ''}
-                            </span>
-                        </button>
+                            {/* Filter Button */}
+                            <Button
+                                variant="dashSecondary"
+                                size="dash"
+                                onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+                                style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                    ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                    : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
+                                className="shrink-0 rounded-[16px]"
+                            >
+                                <Filter size={16} className="shrink-0" />
+                                <span>
+                                    {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                        ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
+                                        : ''}
+                                </span>
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}
-                    <div className="hidden md:flex items-center gap-[17px] w-full">
+                    <div className="hidden md:flex items-center gap-2 w-full">
                         {/* Search Input — shared <TableSearch> (GH-1222 DS) */}
                         <TableSearch
                             value={searchQuery}
@@ -510,14 +582,19 @@ export default function ProductsPage() {
 
                         {/* Filter Button — trigger styled to match DS chips (transparent);
                             the advanced filters panel below is kept as-is. */}
-                        <button
+                        {/* Active (teal) khi đang có filter áp dụng — khớp trạng thái active của chip Sort. */}
+                        <Button
+                            variant="dashSecondary"
+                            size="dash"
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                            className="flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-[13px] font-medium transition-colors whitespace-nowrap outline-none"
+                            className="whitespace-nowrap"
+                            style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                : { background: 'hsl(var(--card))' }}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
+                            <Filter size={16} className="shrink-0" />
                             {t.dashboard.products.list.filterBtn}
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Advanced Filters Panel */}
@@ -531,15 +608,16 @@ export default function ProductsPage() {
                                     </svg>
                                     <div className="text-foreground text-[16px] md:text-[18px] font-semibold leading-[28px]">{t.dashboard.products.list.advancedFilters}</div>
                                 </div>
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={() => { setSelectedCategories([]); setSaleStatus('All Products'); setShowLowStock(false); setIsAdvancedFiltersOpen(false); }}
-                                    className="flex items-center gap-[8px] bg-transparent border-none outline-none text-foreground/50 hover:text-foreground transition-colors"
+                                    className="flex items-center gap-[8px] text-foreground/50 hover:text-foreground h-auto px-1 py-0"
                                 >
                                     <span className="text-[13px] font-medium leading-[20px]">{t.dashboard.products.list.clearAll}</span>
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                </button>
+                                </Button>
                             </div>
 
                             {/* Filter Sections — stacked on mobile, 3-col on desktop */}
@@ -565,7 +643,7 @@ export default function ProductsPage() {
                                                             <rect x="1" y="1" width="18" height="18" rx="3" fill="transparent" strokeWidth="2" />
                                                         </svg>
                                                     )}
-                                                    <span className={cn("text-[14px] font-medium leading-[20px] truncate", isSelected ? "text-foreground" : "text-foreground/80")}>{cat}</span>
+                                                    <span className={cn("text-[14px] font-medium leading-[20px] truncate", isSelected ? "text-[hsl(var(--primary))] font-semibold" : "text-foreground/80")}>{cat}</span>
                                                 </label>
                                             );
                                         })}
@@ -573,7 +651,7 @@ export default function ProductsPage() {
                                 </div>
 
                                 {/* Divider (mobile only) */}
-                                <div className="md:hidden w-full h-[1px] bg-white/10" />
+                                <div className="md:hidden w-full h-[1px] bg-border" />
 
                                 {/* ── Sale Status ── */}
                                 <div className="flex flex-col gap-[10px] min-w-0">
@@ -593,7 +671,7 @@ export default function ProductsPage() {
                                                         <circle cx="10" cy="10" r="9" fill="transparent" stroke="var(--dash-border)" strokeWidth="2" className="group-hover:stroke-[hsl(var(--primary))]/50 transition-colors" />
                                                     )}
                                                 </svg>
-                                                <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-foreground" : "text-foreground/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
+                                                <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-[hsl(var(--primary))] font-semibold" : "text-foreground/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
                                                 {status === 'On Sale' && <span className="bg-[#FB2C36]/20 border border-[#FB2C36]/30 text-[hsl(var(--destructive))] rounded-[4px] px-[6px] py-[2px] text-[12px] font-medium leading-[16px]">🔥</span>}
                                             </label>
                                         ))}
@@ -601,7 +679,7 @@ export default function ProductsPage() {
                                 </div>
 
                                 {/* Divider (mobile only) */}
-                                <div className="md:hidden w-full h-[1px] bg-white/10" />
+                                <div className="md:hidden w-full h-[1px] bg-border" />
 
                                 {/* ── Stock Status ── */}
                                 <div className="flex flex-col gap-[10px] min-w-0">
@@ -619,7 +697,7 @@ export default function ProductsPage() {
                                             </svg>
                                             <span className={cn("text-[14px] font-medium leading-[20px] transition-colors", showLowStock ? "text-[hsl(var(--warning))]" : "text-foreground")}>{t.dashboard.products.list.showLowStock}</span>
                                         </div>
-                                        <div className={cn("w-[44px] h-[24px] rounded-full flex items-center p-[4px] shrink-0 transition-colors duration-300", showLowStock ? "bg-[hsl(var(--warning))]" : "bg-white/10")}>
+                                        <div className={cn("w-[44px] h-[24px] rounded-full flex items-center p-[4px] shrink-0 transition-colors duration-300", showLowStock ? "bg-[hsl(var(--warning))]" : "bg-muted")}>
                                             <div className={cn("w-[16px] h-[16px] bg-white rounded-full shrink-0 transition-transform duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.1)]", showLowStock ? "translate-x-[20px]" : "translate-x-0")} />
                                         </div>
                                     </div>
@@ -669,12 +747,15 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table (GH-1222 DS migration) --- */}
+                        {/* --- Table (iPad Air >=820 and up) — matches orders/blog dash-table-compact
+                            convention: below xl the shared `.dash-table-compact` (globals.css) shrinks
+                            font + padding so the columns fit; no minWidth floor → table-fixed w-full
+                            always fits the pane (no horizontal scroll on iPad Pro with sidebar open).
+                            At >=1280 the compact class is a no-op → desktop byte-identical. --- */}
                         {filteredAndSortedProducts.length > 0 && (
-                            <div className="hidden md:block">
+                            <div className="hidden min-[820px]:block">
                                 <Table
-                                    className="table-fixed w-full"
-                                    minWidth={860}
+                                    className="table-fixed w-full dash-table-compact"
                                     footer={
                                         <TablePagination
                                             page={currentPage}
@@ -715,6 +796,7 @@ export default function ProductsPage() {
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                             const inv = product.inventory || 0
+                                            const missing = getMissingFields(product)
 
                                             return (
                                                 <TableRow
@@ -723,18 +805,22 @@ export default function ProductsPage() {
                                                     onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                                 >
                                                     {/* Thumbnail */}
-                                                    <TableCell>
+                                                    <TableCell style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}>
                                                         <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="40px" />
+                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="sm" sizes="40px" />
                                                         </div>
                                                     </TableCell>
 
                                                     {/* Name + SKU */}
                                                     <TableCell>
                                                         <div className="flex flex-col min-w-0">
-                                                            <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
-                                                                {product.name}
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
+                                                                    {product.name}
+                                                                </span>
+                                                                <MissingInfoIndicator missing={missing} t={t} />
+                                                                <AiReviewIndicator pending={product.aiReviewPending} t={t} />
+                                                            </div>
                                                             {product.sku && (
                                                                 <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
                                                                     {t.dashboard.products.list.sku} {product.sku}
@@ -800,31 +886,38 @@ export default function ProductsPage() {
                             </div>
                         )}
 
-                        {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
-                        <div className="md:hidden flex flex-col gap-3">
+                        {/* --- Card View (mobile + iPad mini, < 820px) (Figma Node 30945:1017).
+                            1 col on mobile, 2 cols from md; the table takes over from iPad Air (>=820). --- */}
+                        <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
+                                const missing = getMissingFields(product)
 
                                 return (
                                     <div
                                         key={product.id}
                                         onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                         className="flex flex-col gap-[12px] rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary))]/70 p-[16px] relative group overflow-hidden"
+                                        style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}
                                     >
                                         {/* Section 1: Thumbnail + Name/Category/Variants/SKU */}
                                         <div className="flex items-start gap-[12px]">
                                             {/* Thumbnail 64×64 */}
                                             <div className="relative h-[64px] w-[64px] shrink-0 rounded-[12px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="md" sizes="64px" />
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="md" sizes="64px" />
                                             </div>
 
                                             {/* Text Information Block */}
                                             <div className="flex flex-col flex-1 min-w-0 pt-[2px] gap-[2px]">
-                                                <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
-                                                    {product.name}
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
+                                                        {product.name}
+                                                    </div>
+                                                    <MissingInfoIndicator missing={missing} t={t} />
+                                                    <AiReviewIndicator pending={product.aiReviewPending} t={t} />
                                                 </div>
                                                 {product.category && product.category.length > 0 && (
                                                     <div className="text-[12px] text-[hsl(var(--primary))] font-medium leading-[16px] truncate">
@@ -842,21 +935,20 @@ export default function ProductsPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Price column (right) — level with the name; keeps name/category tight in the middle column */}
+                                            <div className="flex flex-col items-end shrink-0 pt-[2px]">
+                                                <span className="text-[11px] font-medium text-foreground/50 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
+                                                <span className="text-[16px] font-bold text-foreground leading-[20px] whitespace-nowrap">{priceDisplay}</span>
+                                            </div>
                                         </div>
 
-                                        {/* Section 2: Price + Stock/Status */}
-                                        <div className="flex items-end justify-between">
-                                            {/* Price (Left Aligned) */}
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
-                                                <span className="text-[18px] font-bold text-foreground leading-[22px]">{priceDisplay}</span>
-                                            </div>
-
-                                            {/* Stock + Status Toggle (Right Aligned) */}
-                                            <div className="flex items-end gap-3">
-                                                <div className="flex flex-col items-end gap-0.5">
-                                                    <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                    {inv === 0 ? (
+                                        {/* Section 2: Stock (left) + Status toggle (right) — price moved up next to name */}
+                                        <div className="flex items-center justify-between gap-3">
+                                            {/* Stock (Left) */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
+                                                {inv === 0 ? (
                                                         <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
                                                             <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
                                                         </div>
@@ -875,7 +967,7 @@ export default function ProductsPage() {
                                                 {/* Status Toggle - Compacted */}
                                                 <div
                                                     onClick={(e) => handleUpdateStatus(product, e)}
-                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
+                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden"
                                                     style={{
                                                         border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)" : "var(--dash-secondary-bg)",
@@ -887,7 +979,6 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "translate-x-[20px]" : "translate-x-0"
                                                     )} />
                                                 </div>
-                                            </div>
                                         </div>
 
                                         {/* Section 3: Action Row */}
@@ -902,12 +993,14 @@ export default function ProductsPage() {
                                                 {t.dashboard.products.list.edit}
                                             </Link>
 
-                                            {/* Delete Button */}
+                                            {/* Delete Button — plain <button> mirroring the Edit <Link> classes so both are exactly equal size */}
                                             <button
+                                                type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="flex items-center justify-center w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 active:scale-[0.95] hover:bg-[hsl(var(--destructive))]/20 transition-all"
+                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
+                                                {t.dashboard.products.list.delete}
                                             </button>
                                         </div>
                                     </div>
@@ -923,9 +1016,10 @@ export default function ProductsPage() {
                             />
                         )}
 
-                        {/* Mobile Pagination */}
+                        {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
+                            pager lives in its footer slot from iPad Air up. */}
                         {totalPages > 1 && (
-                            <div className="md:hidden py-4">
+                            <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
@@ -946,6 +1040,8 @@ export default function ProductsPage() {
                     onClose={() => setShowBulkCreate(false)}
                     onSuccess={() => {
                         setAiPrompt('')
+                        setFilterStatus('draft')
+                        setSortBy('Latest')
                         loadProducts()
                     }}
                 />
@@ -953,23 +1049,40 @@ export default function ProductsPage() {
 
             {quickViewProduct && (
                 <>
-                    <div className="hidden md:block">
+                    {/* Desktop 2-col QuickView only from xl (needs ~1024px; overflows on iPad).
+                        Tablet + iPad Pro (≤1279) use the fullscreen mobile detail → fits, no overflow. */}
+                    <div className="hidden xl:block">
                         <ProductQuickViewModal
                             isOpen={!!quickViewProduct}
                             onClose={() => setQuickViewProduct(null)}
                             product={quickViewProduct}
-                            onDelete={handleDelete}
+                            // Close this z-[9999] modal first, then open the confirm popup — otherwise
+                            // the ConfirmModal (z-50) renders BEHIND this overlay and is invisible.
+                            onDelete={(prod) => { setQuickViewProduct(null); handleDelete(prod) }}
                         />
                     </div>
                     {mounted && typeof document !== 'undefined' && createPortal(
-                        <div className="block md:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
-                            <ProductDetailsMobile
-                                product={quickViewProduct}
-                                onClose={() => setQuickViewProduct(null)}
-                                onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
-                                onDelete={() => handleDelete(quickViewProduct)}
+                        <>
+                            {/* Backdrop — dim + blur, tap to close. Mirrors the order detail panel. */}
+                            <div
+                                className="xl:hidden fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+                                onClick={() => setQuickViewProduct(null)}
                             />
-                        </div>,
+                            {/* Product detail panel (< xl / iPad + mobile) — slides in from the right
+                                exactly like the order panel: full-width on phones, 488px side panel from
+                                md up so the list stays visible (dimmed) behind it. */}
+                            <div
+                                className="xl:hidden fixed right-0 top-0 z-[9999] h-[100dvh] w-full md:w-[488px] overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
+                                style={{ background: 'hsl(var(--background))', borderLeft: '1px solid var(--dash-border)' }}
+                            >
+                                <ProductDetailsMobile
+                                    product={quickViewProduct}
+                                    onClose={() => setQuickViewProduct(null)}
+                                    onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
+                                    onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
+                                />
+                            </div>
+                        </>,
                         document.body
                     )}
                 </>
@@ -981,6 +1094,32 @@ export default function ProductsPage() {
                 onConfirm={confirmDelete}
                 productName={productToDelete?.name || ''}
                 isDeleting={isDeletingProduct}
+            />
+
+            {/* Publishing gate (GH-1458) — alert-style: single acknowledge button, no destructive
+                action to confirm/cancel between. See ConfirmModal's `hideCancel` prop. */}
+            <ConfirmModal
+                open={!!publishGateFields}
+                onConfirm={() => setPublishGateFields(null)}
+                onCancel={() => setPublishGateFields(null)}
+                title={t.dashboard.products.form.publishGateTitle}
+                description={publishGateFields && (
+                    <span className="flex flex-col gap-2 text-left">
+                        <span>{t.dashboard.products.form.checkFields}</span>
+                        <ul className="list-disc pl-5">
+                            {publishGateFields.map(field => (
+                                <li key={field}>
+                                    {PUBLISH_GATE_FIELD_KEYS[field]
+                                        ? t.dashboard.products.form.fields[PUBLISH_GATE_FIELD_KEYS[field]]
+                                        : field}
+                                </li>
+                            ))}
+                        </ul>
+                    </span>
+                )}
+                confirmLabel={t.dashboard.products.form.publishGateAck}
+                hideCancel
+                variant="default"
             />
         </div>
     )

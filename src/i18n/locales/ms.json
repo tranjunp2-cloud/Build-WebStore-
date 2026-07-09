@@ -85,7 +85,7 @@
             "label": "Platform",
             "title": "Satu platform untuk menjalankan perniagaan anda",
             "titleHighlight": "dari hujung ke hujung",
-            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — PrimeWeb membantu anda mengurus segalanya dalam satu sistem.",
+            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — Web Store membantu anda mengurus segalanya dalam satu sistem.",
             "pillars": {
                 "website": {
                     "title": "Laman Web & Jualan",
@@ -100,7 +100,7 @@
                     "desc": "Pengurusan tugasan mengikut jabatan, aliran kerja piawai, dan pemantauan prestasi operasi."
                 }
             },
-            "cta": "Terokai ekosistem PrimeWeb"
+            "cta": "Terokai ekosistem Web Store"
         },
         "product": {
             "label": "Produk",
@@ -175,11 +175,18 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Borang pendaftaran", "Jadual kelas", "Galeri kursus..."]
+                        "items": [
+                            "Borang pendaftaran",
+                            "Jadual kelas",
+                            "Galeri kursus..."
+                        ]
                     },
                     "block2": {
                         "title": "Borang Hubungi",
-                        "items": ["Tajuk, Mesej", "Hantar e-mel perundingan"]
+                        "items": [
+                            "Tajuk, Mesej",
+                            "Hantar e-mel perundingan"
+                        ]
                     }
                 },
                 "training": {
@@ -193,11 +200,18 @@
                     ],
                     "block1": {
                         "title": "Blok Kursus",
-                        "items": ["Senarai kursus", "Jadual kelas", "Pengajar..."]
+                        "items": [
+                            "Senarai kursus",
+                            "Jadual kelas",
+                            "Pengajar..."
+                        ]
                     },
                     "block2": {
                         "title": "Pendaftaran & Pembayaran",
-                        "items": ["Borang pendaftaran", "Jadual pembayaran"]
+                        "items": [
+                            "Borang pendaftaran",
+                            "Jadual pembayaran"
+                        ]
                     }
                 },
                 "retail": {
@@ -211,11 +225,18 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Produk", "Troli", "Penapis..."]
+                        "items": [
+                            "Produk",
+                            "Troli",
+                            "Penapis..."
+                        ]
                     },
                     "block2": {
                         "title": "Daftar Keluar",
-                        "items": ["Maklumat penghantaran", "Pembayaran"]
+                        "items": [
+                            "Maklumat penghantaran",
+                            "Pembayaran"
+                        ]
                     }
                 },
                 "fnb": {
@@ -229,11 +250,18 @@
                     ],
                     "block1": {
                         "title": "Blok Menu",
-                        "items": ["Kategori hidangan", "Kombo", "Tempahan meja..."]
+                        "items": [
+                            "Kategori hidangan",
+                            "Kombo",
+                            "Tempahan meja..."
+                        ]
                     },
                     "block2": {
                         "title": "Pesanan & Penghantaran",
-                        "items": ["Troli", "Alamat penghantaran"]
+                        "items": [
+                            "Troli",
+                            "Alamat penghantaran"
+                        ]
                     }
                 },
                 "events": {
@@ -247,11 +275,18 @@
                     ],
                     "block1": {
                         "title": "Blok Acara",
-                        "items": ["Pemasa undur", "Borang pendaftaran tiket", "Jadual..."]
+                        "items": [
+                            "Pemasa undur",
+                            "Borang pendaftaran tiket",
+                            "Jadual..."
+                        ]
                     },
                     "block2": {
                         "title": "Pengesahan Kehadiran",
-                        "items": ["Hantar e-mel", "Daftar masuk QR"]
+                        "items": [
+                            "Hantar e-mel",
+                            "Daftar masuk QR"
+                        ]
                     }
                 },
                 "other": {
@@ -265,48 +300,88 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Hero, Borang", "Galeri", "Butang..."]
+                        "items": [
+                            "Hero, Borang",
+                            "Galeri",
+                            "Butang..."
+                        ]
                     },
                     "block2": {
                         "title": "Borang Hubungi",
-                        "items": ["Tajuk, Mesej", "Hantar e-mel"]
+                        "items": [
+                            "Tajuk, Mesej",
+                            "Hantar e-mel"
+                        ]
                     }
                 }
             }
         },
         "why": {
-            "title": "Mengapa memilih PrimeWeb?",
+            "title": "Mengapa memilih Web Store?",
             "subtitle": "Platform laman web AI terkemuka — pelopor laman web bina AI dengan pemasaran & jualan serba lengkap.",
             "stats": {
-                "customers": { "value": "10,000+", "label": "Pelanggan aktif" },
-                "published": { "value": "50,000+", "label": "Laman web diterbitkan" },
-                "blocks": { "value": "900+", "label": "Templat blok sedia" },
-                "speed": { "value": "5 minit", "label": "Bina laman web dengan AI" }
+                "customers": {
+                    "value": "10,000+",
+                    "label": "Pelanggan aktif"
+                },
+                "published": {
+                    "value": "50,000+",
+                    "label": "Laman web diterbitkan"
+                },
+                "blocks": {
+                    "value": "900+",
+                    "label": "Templat blok sedia"
+                },
+                "speed": {
+                    "value": "5 minit",
+                    "label": "Bina laman web dengan AI"
+                }
             },
             "cards": {
                 "easyToUse": {
                     "title": "Mudah digunakan — pantas dilancarkan",
-                    "points": ["Reka bentuk dengan seret & lepas yang mudah", "Tiada pengetahuan pengkodan diperlukan", "Mengurangkan masa pemasangan dengan ketara"]
+                    "points": [
+                        "Reka bentuk dengan seret & lepas yang mudah",
+                        "Tiada pengetahuan pengkodan diperlukan",
+                        "Mengurangkan masa pemasangan dengan ketara"
+                    ]
                 },
                 "dataSync": {
                     "title": "Ketersambungan data yang lancar",
-                    "points": ["Pusatkan data dari pelbagai saluran", "Sambungkan borang, e-mel, dan banyak lagi"]
+                    "points": [
+                        "Pusatkan data dari pelbagai saluran",
+                        "Sambungkan borang, e-mel, dan banyak lagi"
+                    ]
                 },
                 "security": {
                     "title": "Keselamatan tinggi, operasi stabil",
-                    "points": ["Infrastruktur selamat, dioptimumkan prestasi", "Antara muka mesra di semua peranti"]
+                    "points": [
+                        "Infrastruktur selamat, dioptimumkan prestasi",
+                        "Antara muka mesra di semua peranti"
+                    ]
                 },
                 "yourContent": {
                     "title": "Kandungan anda",
-                    "points": ["Editor visual, penyuntingan pantas", "Cadangan deskripsi dan SEO oleh AI"]
+                    "points": [
+                        "Editor visual, penyuntingan pantas",
+                        "Cadangan deskripsi dan SEO oleh AI"
+                    ]
                 },
                 "automation": {
                     "title": "Penglibatan & automasi",
-                    "points": ["Penglibatan pelanggan berbilang saluran", "Asuhan sepanjang perjalanan pelanggan", "Automatikkan tugasan berulang"]
+                    "points": [
+                        "Penglibatan pelanggan berbilang saluran",
+                        "Asuhan sepanjang perjalanan pelanggan",
+                        "Automatikkan tugasan berulang"
+                    ]
                 },
                 "fullAi": {
                     "title": "Keupayaan AI penuh",
-                    "points": ["Bina laman web melalui sembang", "AI menulis deskripsi, optimumkan SEO", "Automatikkan penciptaan kandungan"]
+                    "points": [
+                        "Bina laman web melalui sembang",
+                        "AI menulis deskripsi, optimumkan SEO",
+                        "Automatikkan penciptaan kandungan"
+                    ]
                 }
             }
         },
@@ -344,7 +419,7 @@
         },
         "heroDemo": {
             "appSuite": "Suite aplikasi",
-            "homeCrumb": "PrimeWeb · Laman Utama",
+            "homeCrumb": "Web Store · Laman Utama",
             "experienceTitle": "Pengalaman laman web profesional",
             "experienceDesc": "Dibina oleh AI dalam 5 minit. Sunting seret & lepas, terbitkan serta-merta.",
             "viewDetails": "Lihat butiran",
@@ -420,7 +495,7 @@
         "step3Title": "Sesuaikan laman anda",
         "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda.",
         "welcome": {
-            "title": "Selamat datang ke PrimeWeb",
+            "title": "Selamat datang ke Web Store",
             "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
             "createStore": "Cipta Kedai Saya dengan AI",
             "skip": "Langkau & Pergi ke Papan Pemuka",
@@ -588,49 +663,49 @@
     },
     "email": {
         "welcome": {
-            "subject": "Selamat Datang ke PrimeWeb! 🎉",
+            "subject": "Selamat Datang ke Web Store! 🎉",
             "heading": "Selamat Datang! 🎉",
-            "subheading": "Selamat datang ke PrimeWeb",
+            "subheading": "Selamat datang ke Web Store",
             "greeting": "Hai {userName}",
-            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan PrimeWeb! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
+            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan Web Store! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
             "stepsTitle": "Mula dalam 3 langkah",
             "step1": "Huraikan laman web yang anda mahu cipta",
             "step2": "Sesuaikan kandungan dan reka bentuk",
             "step3": "Terbitkan dan kongsi!",
             "cta": "Mula Sekarang →",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia"
         },
         "forgotPassword": {
-            "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
+            "subject": "Tetapkan semula kata laluan Web Store anda 🔐",
             "heading": "Tetapan Semula Kata Laluan",
             "subheading": "Kami menerima permintaan tetapan semula anda",
             "greeting": "Hai {userName}",
-            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
+            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun Web Store anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
             "cta": "Tetapkan Semula Kata Laluan →",
             "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
             "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia",
             "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
         },
         "otp": {
-            "subject": "Kod pengesahan PrimeWeb anda 🔐",
+            "subject": "Kod pengesahan Web Store anda 🔐",
             "heading": "Pengesahan E-mel",
             "subheading": "Sahkan identiti anda untuk meneruskan",
             "greeting": "Hai <strong>{userName}</strong>",
             "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
             "expiry": "Kod ini tamat tempoh dalam 5 minit",
             "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
-            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia",
+            "copyright": "© 2026 Web Store · Kuala Lumpur, Malaysia"
         },
         "passwordChanged": {
-            "subject": "Kata laluan PrimeWeb anda telah ditukar 🔐",
+            "subject": "Kata laluan Web Store anda telah ditukar 🔐",
             "heading": "Kata Laluan Ditukar",
             "subheading": "Kata laluan akaun anda telah dikemas kini",
             "greeting": "Hai {userName}",
-            "body": "Kata laluan akaun PrimeWeb anda telah berjaya ditukar.",
+            "body": "Kata laluan akaun Web Store anda telah berjaya ditukar.",
             "warning": "Jika anda tidak membuat perubahan ini, hubungi pentadbir ruang kerja anda dengan segera dan tetapkan semula kata laluan anda.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia"
         },
         "order": {
             "subject": "Pesanan Disahkan",
@@ -646,7 +721,7 @@
             "sst": "SST (6%)",
             "total": "Jumlah Besar",
             "shippingAddress": "Alamat Penghantaran",
-            "footer": "Dikuasakan oleh PrimeWeb",
+            "footer": "Dikuasakan oleh Web Store",
             "recipientInfoHeading": "Maklumat penerima",
             "fullName": "Nama penuh",
             "phone": "Telefon",
@@ -786,7 +861,7 @@
             "morning": "pagi",
             "afternoon": "petang",
             "evening": "malam",
-            "welcomeTitle": "Selamat datang ke Papan Pemuka PrimeWeb",
+            "welcomeTitle": "Selamat datang ke Papan Pemuka Web Store",
             "welcomeSubtitle": "Pantau prestasi kedai anda dan urus perniagaan dalam talian anda dari satu tempat.",
             "pendingLabel": "Tertangguh",
             "itemsLabel": "item",
@@ -1128,12 +1203,12 @@
             "status": {
                 "pending": "Menunggu",
                 "confirmed": "Disahkan",
-                "readyToShip": "Sedia untuk Dihantar",
-                "shipped": "Sedang Dihantar",
+                "readyToShip": "Sedia Dihantar",
+                "shipped": "Dihantar",
                 "completed": "Selesai",
                 "cancelled": "Dibatalkan",
                 "refunded": "Dikembalikan",
-                "processing": "Sedang Diproses",
+                "processing": "Diproses",
                 "paid": "Telah Dibayar"
             },
             "toast": {
@@ -1319,8 +1394,8 @@
                 "description": "Penerangan",
                 "attributes": "Atribut",
                 "deleteConfirm": "Adakah anda pasti?",
-                "deleteProduct": "PADAM PRODUK",
-                "editProduct": "SUNTING PRODUK"
+                "deleteProduct": "Padam Produk",
+                "editProduct": "Sunting Produk"
             },
             "title": "Produk",
             "addProduct": "Tambah Produk",
@@ -1375,11 +1450,26 @@
                 "sku": "SKU:",
                 "fromPrefix": "Dari ",
                 "filterBtn": "Tapis",
+                "missingInfoTitle": "Maklumat tidak lengkap",
+                "missingAlt": "Teks alt imej",
+                "missingCategory": "Kategori",
                 "failedToLoad": "Gagal memuatkan produk",
                 "retry": "Cuba Lagi",
                 "aiChatTitle": "Sembang AI: Cipta pelbagai produk dengan pantas",
-                "aiChatPlaceholder": "Cth: jaket kulit 500k, topi 50k",
-                "aiChatBtn": "Cipta"
+                "aiChatSubtitle": "Terangkan produk anda dalam teks biasa — AI akan menyediakan draf untuk semakan anda sebelum diterbitkan.",
+                "aiChatPlaceholder": "Senaraikan beberapa produk, satu setiap baris — cth: Jaket kulit RM250, Topi kapas RM39",
+                "aiChatHintNewLine": "baris baru",
+                "aiChatHintGenerate": "untuk menjana",
+                "aiChatSuggestionsLabel": "💡 Cuba salah satu:",
+                "aiChatSuggestion1Label": "+ 3 gaun musim panas, RM 120 setiap satu",
+                "aiChatSuggestion1": "Cipta 3 gaun musim panas, RM 120 setiap satu, 10 dalam stok setiap gaya",
+                "aiChatSuggestion2Label": "+ Set pakaian sukan",
+                "aiChatSuggestion2": "Set sukan: kemeja-T RM 80, seluar pendek RM 60, 20 dalam stok setiap satu",
+                "aiChatSuggestion3Label": "+ Kosmetik pukal",
+                "aiChatSuggestion3": "Kosmetik pukal: gincu RM 35, krim muka RM 90, 15 dalam stok setiap satu",
+                "aiChatBtn": "Jana Draf",
+                "aiReviewTooltip": "Dicipta oleh AI — perlu semakan",
+                "aiReviewAriaLabel": "Draf ciptaan AI menunggu semakan"
             },
             "messages": {
                 "nameRequired": "Sila masukkan nama produk terlebih dahulu!",
@@ -1462,6 +1552,7 @@
                     "uniqueTiers": "Nama pilihan mesti unik (tiada kategori pendua)",
                     "weightMin": "Berat mesti lebih dari 0",
                     "weightMax": "Berat terlalu besar",
+                    "weightRequired": "Berat diperlukan",
                     "dimMin": "Dimensi mesti 0 atau lebih",
                     "dimMax": "Dimensi terlalu besar",
                     "maxTiers": "Maksimum 2 tahap variasi dibenarkan",
@@ -1516,6 +1607,8 @@
                 "restored": "Produk dipulihkan",
                 "failedRestore": "Gagal memulihkan produk",
                 "failedUpdateStatus": "Gagal mengemas kini status",
+                "publishGateTitle": "Belum boleh diaktifkan",
+                "publishGateAck": "Faham",
                 "failedDelete": "Gagal memadam produk",
                 "productDeleted": "Produk dipadamkan.",
                 "size": "Saiz:",
@@ -1532,6 +1625,7 @@
                 "fillInfo": "Isi maklumat produk yang lengkap",
                 "saving": "Menyimpan...",
                 "saveChanges": "Simpan Perubahan",
+                "unsavedChanges": "Perubahan belum disimpan",
                 "fields": {
                     "name": "Nama Produk",
                     "categoryIds": "Kategori",
@@ -1540,7 +1634,8 @@
                     "tiers": "Pilihan Varian",
                     "basePrice": "Harga",
                     "baseSku": "Kod SKU",
-                    "baseInventory": "Stok"
+                    "baseInventory": "Stok",
+                    "weight": "Berat"
                 },
                 "sections": {
                     "general": "Maklumat Umum",
@@ -1548,6 +1643,7 @@
                     "productNamePlaceholder": "Masukkan nama produk",
                     "category": "Kategori",
                     "images": "Imej (Hingga 5 imej, setiap < 5MB)",
+                    "imagesAltHint": "Menambah teks Alt meningkatkan SEO dan capaian pembeli.",
                     "variants": "Varian & Inventori",
                     "hasVariants": "Produk mempunyai pelbagai Pilihan/Varian",
                     "hasVariantsExample": "Contoh: warna, saiz, gaya",
@@ -1609,8 +1705,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Sahkan Pembuatan Produk (Pratonton AI)",
-                "subtitle": "Semak dan sunting sebelum menyimpan",
+                "title": "Semak draf AI",
+                "subtitle": "Sunting apa-apa sebelum menambah ke kedai anda. Belum ada yang diterbitkan.",
                 "promptLabel": "Gesaan / Senarai Item",
                 "promptPlaceholder": "Contoh: 2 capybara coklat rantai kunci $15, 1 selipar merah saiz M $5...",
                 "parseEmptyError": "Sila masukkan penerangan senarai produk",
@@ -1636,23 +1732,25 @@
                 "unsavedWarning": "Anda mempunyai data yang belum disimpan. Menutup akan membuang semua perubahan. Adakah anda pasti?",
                 "stayButton": "Kekal",
                 "exitButton": "Keluar",
-                "saveButton": "Simpan",
-                "productsItem": "Produk",
-                "saveEmptyError": "Sila pilih sekurang-kurangnya 1 produk untuk disunting",
-                "saveSuccess": "Telah dibina {count} produk draf. Sila isikan imej sebelum menyiarkannya.",
+                "discard": "Buang",
+                "approveAll": "Luluskan Semua",
+                "draftCountOne": "1 draf",
+                "draftCountMany": "{count} draf",
+                "saveEmptyError": "Tiada draf untuk disimpan",
+                "saveSuccessOne": "Telah dibina 1 produk draf. Sila isikan imej sebelum menyiarkannya.",
+                "saveSuccessMany": "Telah dibina {count} produk draf. Sila isikan imej sebelum menyiarkannya.",
                 "saveFailed": "Gagal melakar produk",
                 "saveError": "Kesalahan menyimpan produk",
                 "aiWorking": "AI sedang memproses...",
                 "table": {
-                    "name": "NAMA",
-                    "price": "HARGA",
-                    "variants": "VARIAN",
+                    "name": "Nama produk",
+                    "price": "Harga (RM)",
+                    "stock": "Stok",
+                    "stockFromVariants": "Menyunting menetapkan nilai ini kepada setiap varian",
+                    "variants": "Varian",
+                    "removeDraft": "Buang draf",
                     "empty": "Senarai produk kosong.",
                     "defaultVariant": "Lalai"
-                },
-                "note": {
-                    "label": "Nota: ",
-                    "description": "Produk akan disimpan sebagai Draf"
                 },
                 "toast": {
                     "invalidFormat": "Format produk yang diterima daripada AI tidak sah",
@@ -1722,6 +1820,15 @@
             },
             "subtitle": "Urus produk kedai"
         },
+        "imageUploader": {
+            "addAltText": "+ Tambah teks Alt",
+            "editAltText": "Edit teks Alt",
+            "label": "Teks Alt",
+            "placeholder": "Terangkan ringkas imej ini…",
+            "helperText": "Terangkan ringkas imej untuk tingkatkan skor SEO anda di Google.",
+            "cancel": "Batal",
+            "save": "Simpan"
+        },
         "customers": {
             "title": "Kenalan",
             "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
@@ -1748,7 +1855,7 @@
             "viewDetails": "Lihat butiran",
             "close": "Tutup",
             "update": "Kemas Kini",
-            "timeline": "Garis Masa Aktiviti",
+            "timeline": "Sejarah Mesej",
             "noTimeline": "Tiada penghantaran sebelum ini",
             "statusRead": "Dibaca",
             "tooltipNew": "Permintaan perundingan baharu dari Borang Hubungi. Penjual perlu menghubungi dalam masa 24 jam untuk keberkesanan penukaran tertinggi.",
@@ -1762,7 +1869,8 @@
             "deleteConfirmPost": "dan tidak boleh dibatalkan.",
             "cancel": "Batal",
             "deleteButton": "Padam",
-            "colProfile": "Profil Pelanggan",
+            "colCustomer": "Pelanggan",
+            "colProfile": "Profil",
             "colEmail": "E-mel",
             "colSource": "Sumber & Laman",
             "colMessage": "Mesej",
@@ -1774,7 +1882,7 @@
             "fieldName": "Nama",
             "fieldEmail": "E-mel",
             "fieldLatestDate": "Tarikh Terkini",
-            "timelineEntry": "Penghantaran Hubungi",
+            "timelineEntry": "Mesej",
             "loadDetailsFailed": "Gagal memuatkan butiran",
             "sourceBadgeContact": "Borang Hubungi",
             "sourceBadgeNewsletter": "Langganan Newsletter",
@@ -1830,10 +1938,10 @@
                 "tabOrders": "Pesanan",
                 "unsavedBanner": "Anda mempunyai perubahan yang belum disimpan.",
                 "revert": "Batal Perubahan",
+                "cancel": "Batal",
                 "saveChanges": "Simpan perubahan",
                 "upToDate": "Terkini",
                 "unsaved": "Perubahan belum disimpan",
-                "lastSaved": "Disimpan terakhir",
                 "saved": "Pelanggan disimpan",
                 "saveFailed": "Gagal menyimpan pelanggan",
                 "fieldEmail": "E-mel",
@@ -1910,6 +2018,8 @@
                 "bankTransferSubtitle": "Terima pembayaran melalui pindahan bank dengan kod QR",
                 "active": "Aktif",
                 "inactive": "Tidak Aktif",
+                "seeMore": "Lihat lagi",
+                "seeLess": "Lihat kurang",
                 "uploadQrTitle": "Muat Naik Imej Kod QR",
                 "uploadQrSub": "Klik untuk muat naik Kod QR",
                 "uploadHint": "JPG atau PNG. Saiz maks: 2MB",
@@ -1922,7 +2032,7 @@
                 "failSaveSettings": "Gagal menyimpan tetapan pembayaran.",
                 "failClearQR": "Gagal memadam tetapan imej QR.",
                 "stripeConnectTitle": "Sambungkan akaun Stripe untuk mula menerima Kad & FPX",
-                "stripeConnectDesc": "Dana terus masuk ke akaun bank anda — Prime Web tidak menyentuhnya. Kaedah manual di bawah terus berfungsi semasa anda menyediakan ini.",
+                "stripeConnectDesc": "Dana terus masuk ke akaun bank anda — Web Store tidak menyentuhnya. Kaedah manual di bawah terus berfungsi semasa anda menyediakan ini.",
                 "stripeConnectCta": "Sambungkan Akaun Stripe",
                 "stripeStep1": "Klik \"Sambung Akaun Stripe\"",
                 "stripeStep2": "Masukkan kelayakan Stripe anda",
@@ -1993,7 +2103,7 @@
                 "xenditSectionTitle": "Kaedah Pembayaran Xendit",
                 "xenditPoweredBy": "Dikuasakan oleh Xendit Checkout",
                 "xenditConnectTitle": "Sambungkan akaun Xendit untuk terima pembayaran Malaysia",
-                "xenditConnectDesc": "Dana terus masuk ke akaun bank anda — Prime Web tidak menyentuhnya. Kaedah manual di bawah kekal berfungsi semasa persediaan.",
+                "xenditConnectDesc": "Dana terus masuk ke akaun bank anda — Web Store tidak menyentuhnya. Kaedah manual di bawah kekal berfungsi semasa persediaan.",
                 "xenditConnectCta": "Sambungkan Akaun Xendit",
                 "xenditConnecting": "Mengalih ke Xendit...",
                 "xenditStep1": "Klik \"Sambungkan Akaun Xendit\"",
@@ -2016,7 +2126,7 @@
                 "xenditCallbackTokenStep3": "Salin token dan tampal di sini",
                 "xenditSaveBtn": "Simpan sambungan Xendit",
                 "xenditModalTitle": "Sambungkan Akaun Xendit Anda",
-                "xenditModalSubtitle": "Tampal kelayakan Xendit anda di bawah untuk menghubungkan akaun dengan Prime Web. Kad, FPX & E-Wallet aktif sebaik pengesahan.",
+                "xenditModalSubtitle": "Tampal kelayakan Xendit anda di bawah untuk menghubungkan akaun dengan Web Store. Kad, FPX & E-Wallet aktif sebaik pengesahan.",
                 "xenditConnectAccountBtn": "Sambungkan Akaun",
                 "xenditWebhookConfirmTitle": "Daftarkan ECH sebagai penerima webhook anda",
                 "xenditWebhookConfirmDesc": "ECH akan mendaftarkan dirinya sebagai endpoint webhook Invoice pada akaun Xendit anda. Jika sistem lain sedang menerima webhook Invoice Xendit daripada akaun ini, ia akan berhenti menerimanya.",
@@ -2085,6 +2195,7 @@
                 "liveAddMore": "Tambah {amount} lagi untuk penghantaran PERCUMA",
                 "liveBuyerPays": "Pembeli bayar",
                 "allSaved": "Semua perubahan disimpan",
+                "unsavedChanges": "Perubahan belum disimpan",
                 "resetToDefaults": "Set Semula ke Lalai",
                 "saving": "Menyimpan…",
                 "saveChanges": "Simpan Perubahan",
@@ -2155,7 +2266,9 @@
                     "disabled": "Templat dilumpuhkan",
                     "updateFailed": "Gagal mengemas kini templat",
                     "testSent": "E-mel ujian dihantar ke {email}",
-                    "testFailed": "Gagal menghantar e-mel ujian"
+                    "testFailed": "Gagal menghantar e-mel ujian",
+                    "popupBlocked": "Pop timbul disekat — benarkan pop timbul untuk membuka pratonton",
+                    "previewFailed": "Gagal membuka pratonton"
                 },
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",
@@ -2283,20 +2396,16 @@
                 "duplicateCodeField": "Kod ini sudah digunakan untuk penyewa anda. Cuba kod yang berbeza atau tambah nombor.",
                 "saveFailed": "Gagal menyimpan",
                 "created": "Diskaun dicipta",
-                "saved": "Diskaun disimpan",
-                "deleted": "Diskaun dipadamkan",
-                "deleteFailed": "Gagal memadamkan"
+                "saved": "Diskaun disimpan"
             },
             "header": {
                 "createTitle": "Cipta diskaun",
                 "defaultTitle": "Diskaun",
                 "backTitle": "Kembali ke diskaun",
-                "deleteBtn": "Padam",
                 "newCode": "Kod baru · {tenantName}",
                 "createdOn": "Dicipta {date}",
                 "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan.",
-                "revert": "Kembalikan",
-                "save": "Simpan"
+                "revert": "Kembalikan"
             },
             "saveBar": {
                 "unsavedChanges": "Perubahan belum disimpan",
@@ -2422,12 +2531,11 @@
             "loadFailed": "Gagal memuatkan kiriman blog",
             "tryAgain": "Cuba Lagi",
             "editor": {
-                "home": "Laman Utama",
-                "blog": "Blog",
                 "newPost": "Kiriman Baru",
                 "editPrefix": "Sunting:",
                 "createTitle": "Cipta Kiriman Blog",
                 "editTitle": "Sunting Kiriman Blog",
+                "headerSubtitle": "Isi maklumat catatan blog yang lengkap",
                 "untitled": "Tanpa Tajuk",
                 "aiAssistant": "Pembantu AI",
                 "saveDraft": "Simpan Draf",
@@ -2442,7 +2550,7 @@
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
                 "clickToUpload": "Klik untuk memuat naik lakaran pribit",
-                "uploadHint": "PNG, JPG sehingga 10MB",
+                "uploadHint": "PNG, JPG sehingga 10MB — nisbah 4:3, lebar ≥1200px",
                 "startWriting": "Mula menulis...",
                 "postSettings": "Tetapan Kiriman",
                 "category": "Kategori",
@@ -2578,6 +2686,159 @@
             "accountSuspendedBody": "Akaun anda telah digantung. Sila hubungi sokongan. Anda akan dilog keluar sekarang.",
             "acknowledge": "Akui",
             "loggingOut": "Melog keluar..."
+        },
+        "revamp": {
+            "title": "Papan Pemuka",
+            "periodSub": {
+                "today": "Setiap jam · {range}",
+                "daily": "Harian · {range}"
+            },
+            "glance": {
+                "title": "Sekilas pandang",
+                "views": "Paparan halaman",
+                "leads": "Prospek",
+                "engagement": "Penglibatan",
+                "revenue": "Hasil",
+                "viewsTip": "Jumlah lawatan pelanggan ke semua halaman di laman web anda.",
+                "leadsTip": "Bakal pelanggan yang meninggalkan maklumat hubungan (e-mel, telefon) melalui borang pendaftaran di laman web anda.",
+                "engagementTip": "Tindakan pelanggan bernilai tinggi — seperti klik Beli Sekarang, Tambah ke Troli, atau pautan media sosial.",
+                "revenueSoonTip": "Penjejakan hasil akan datang. Kad ini akan mengira metrik daripada pesanan yang telah dibayar dan selesai.",
+                "noteToday": "vs semalam",
+                "note7d": "vs 7h lepas",
+                "note30d": "vs 30h lepas"
+            },
+            "comingSoon": "Akan Datang",
+            "soon": "Akan datang",
+            "onboarding": {
+                "title": "Lengkapkan persediaan kedai anda",
+                "subtitle": {
+                    "one": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda.",
+                    "other": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda."
+                },
+                "steps": {
+                    "products": {
+                        "name": "Sahkan produk anda",
+                        "desc": "AI telah menambah item demo. Sila semak inventori, harga dan variasi.",
+                        "cta": "Semak"
+                    },
+                    "design": {
+                        "name": "Sesuaikan reka bentuk anda",
+                        "desc": "Kemas kini imej, teks dan warna untuk sepadan dengan jenama anda.",
+                        "cta": "Sunting"
+                    },
+                    "shipping": {
+                        "name": "Tetapkan kadar penghantaran",
+                        "desc": "Lalai semasa ialah COD & penghantaran percuma. Kemas kini kadar untuk mengelak kerugian penghantaran.",
+                        "cta": "Sediakan"
+                    },
+                    "launch": {
+                        "name": "Terbitkan laman web anda",
+                        "desc": "Sedia untuk menjual? Lancarkan kedai anda dan mula menerima pesanan hari ini.",
+                        "cta": "Terbitkan"
+                    }
+                }
+            },
+            "traffic": {
+                "title": "Trafik & prestasi",
+                "subtitle": "Paparan halaman harian dan punca yang mendorongnya",
+                "totalPageviews": "jumlah paparan halaman · {period}",
+                "topPerforming": "Prestasi terbaik",
+                "tabs": {
+                    "pages": "Halaman",
+                    "blogs": "Blog",
+                    "referrers": "Perujuk",
+                    "products": "Produk"
+                },
+                "productsSoonTip": "Analitik produk — akan datang",
+                "emptyChartTitle": "Tiada trafik dalam tempoh ini",
+                "emptyChartDesc": "Sebaik pelawat tiba di laman anda, paparan halaman harian akan dipaparkan di sini.",
+                "emptyListTitle": "Tiada apa untuk disenaraikan lagi",
+                "emptyListDesc": "Halaman, blog dan perujuk teratas akan muncul sebaik anda mempunyai trafik.",
+                "periodToday": "hari ini",
+                "period7d": "7 hari lepas",
+                "period30d": "30 hari lepas"
+            },
+            "seo": {
+                "title": "Kesihatan SEO",
+                "subtitle": "Sejauh mana kedai anda mudah ditemui di enjin carian",
+                "scoreHistory": "Sejarah skor SEO",
+                "scoreHistoryTip": "Kami akan merekod skor anda setiap minggu supaya anda boleh menjejaki trend — akan datang.",
+                "scoreHistoryMsg": "Sedang dibangunkan — kami akan mencatat skor anda setiap minggu supaya anda boleh melihatnya meningkat.",
+                "gaugeHealthy": "Sihat",
+                "gaugeNeedsImprovement": "Perlu penambahbaikan",
+                "gaugeAtRisk": "Berisiko",
+                "breakdownMeta": "Tag Meta",
+                "breakdownContent": "Kualiti Kandungan",
+                "breakdownTechnical": "SEO Teknikal",
+                "criticalIssue": "Isu paling kritikal: {count} {text}. Membaikinya akan meningkatkan skor anda.",
+                "fixAll": "AI Baiki Semua Isu",
+                "issuesTitle": "Isu SEO",
+                "open": "{count} terbuka",
+                "allClear": "Semua selesai",
+                "allResolvedTitle": "Semua isu telah diselesaikan",
+                "allResolvedDesc": "Tiada isu SEO yang tertangguh — kedai anda dioptimumkan sepenuhnya. Kami akan menandakan isu baharu di sini apabila ia muncul.",
+                "fix": "Baiki",
+                "edit": "Sunting",
+                "altEditTip": "Penyuntingan teks Alt automatik dengan AI akan datang. Buat masa ini, klik untuk mengemas kini penerangan imej terus dalam pengurus produk anda.",
+                "issueAlt": {
+                    "one": "produk tiada teks Alt imej",
+                    "other": "produk tiada teks Alt imej"
+                },
+                "issueDescription": {
+                    "one": "halaman tiada penerangan meta",
+                    "other": "halaman tiada penerangan meta"
+                },
+                "issueTitle": {
+                    "one": "item tiada tajuk meta",
+                    "other": "item tiada tajuk meta"
+                }
+            },
+            "tools": {
+                "title": "Alat tindakan SEO",
+                "subtitle": "AI bekerja secara senyap di latar belakang supaya pelanggan dapat menemui kedai anda di Google",
+                "sitemap": "Peta laman",
+                "sitemapTip": "Peta laman menyenaraikan setiap halaman dalam kedai anda. Kami menyerahkannya kepada Google supaya ia dapat mencari dan menyenaraikan semua produk anda.",
+                "sitemapDesc": "Serahkan peta laman anda supaya Google dapat menemui dan mengindeks semua halaman anda.",
+                "resubmit": "Serah semula ke Google",
+                "autoMeta": "Tulis tajuk & penerangan carian secara automatik",
+                "autoMetaTip": "Inilah tajuk yang pelanggan lihat di Google. AI menulis tajuk yang ringkas dan menarik untuk setiap halaman secara automatik.",
+                "autoMetaDesc": "AI menulis tajuk ringkas dan menarik yang memikat pelanggan apabila mereka mencari di Google.",
+                "active": "Aktif",
+                "sitemapDone": "Peta laman diserahkan — {count} URL dihantar ke Google",
+                "sitemapRegenerated": "Peta laman dijana semula",
+                "sitemapError": "Tidak dapat menjana peta laman",
+                "metaOn": "Tag meta automatik dihidupkan",
+                "metaOff": "Tag meta automatik dimatikan",
+                "metaError": "Tidak dapat mengemas kini tetapan"
+            },
+            "orders": {
+                "title": "Pesanan belum selesai",
+                "subtitle": "Pesanan menunggu pemenuhan",
+                "awaiting": "Menunggu",
+                "mockOrder": "Pesanan pelanggan · {count} item",
+                "soonTip": "Baris gilir pemenuhan pesanan sedang dibangunkan — akan datang."
+            },
+            "customize": {
+                "button": "Sesuaikan",
+                "title": "Sesuaikan papan pemuka",
+                "description": "Seret untuk susun semula, atau togol blok hidup dan mati. Disimpan untuk akaun anda.",
+                "reset": "Set semula kepada lalai",
+                "cancel": "Batal",
+                "save": "Simpan susun atur",
+                "saving": "Menyimpan…",
+                "saved": "Susun atur papan pemuka disimpan",
+                "saveError": "Gagal menyimpan susun atur",
+                "dragToReorder": "Seret untuk susun semula",
+                "moveUp": "Alih ke atas",
+                "moveDown": "Alih ke bawah",
+                "close": "Tutup",
+                "blockOnboarding": "Senarai semak permulaan",
+                "blockGlance": "Statistik sekilas pandang",
+                "blockTraffic": "Trafik & prestasi",
+                "blockSeo": "Kesihatan SEO",
+                "blockTools": "Alat tindakan SEO",
+                "blockOrders": "Pesanan belum selesai"
+            }
         }
     },
     "auth": {
@@ -2852,7 +3113,7 @@
                                 "Buka tab <strong>AI CHAT</strong> di bar sisi kiri Editor.",
                                 "Taip apa yang anda mahu ubah — cth., <strong>\"Boleh tukar warna ke merah jambu?\"</strong> atau <strong>\"Tambah bahagian baru\"</strong>.",
                                 "AI akan memproses permintaan anda dan menunjukkan <strong>\"Menyediakan perubahan untuk pratonton...\"</strong> semasa mengemas kini.",
-                                "Gunakan <strong>cip cadangan pantas</strong> di bawah (cth., \"Tukar warna\", \"+ Tambah bahagian\") untuk tindakan biasa.",
+                                "Tekan <strong>Enter</strong> untuk hantar, atau <strong>Shift+Enter</strong> untuk baris baru — kotak input membesar mengikut taipan anda.",
                                 "Perubahan diterapkan secara masa nyata pada pratonton — semak dan simpan atau minta penyesuaian lanjut."
                             ]
                         },
@@ -3266,6 +3527,27 @@
         "imageTooLarge": "Imej mestilah lebih kecil daripada 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "Chat AI",
+            "components": "Komponen",
+            "pages": "Halaman",
+            "settings": "Tetapan"
+        },
+        "advisoryBanner": {
+            "title": "Pengalaman lebih baik di Desktop",
+            "description": "Alat penyuntingan lanjutan berfungsi paling baik pada skrin yang lebih besar. Sesetengah alat mungkin terhad pada peranti mudah alih.",
+            "copyLink": "Salin Pautan",
+            "dismiss": "Tutup"
+        },
+        "compactLayout": {
+            "aiEditing": "AI sedang mengedit reka bentuk anda…",
+            "openAIChat": "Buka Chat AI",
+            "openChatAndTools": "Buka Chat AI & Alatan",
+            "moveUp": "Alih Ke Atas",
+            "moveDown": "Alih Ke Bawah",
+            "deleteBlock": "Padam Blok",
+            "deletedBlock": "{type} dipadam"
+        },
         "toolbar": {
             "publish": "Terbitkan",
             "publishing": "Menerbitkan",
@@ -3421,11 +3703,10 @@
             "failedToEdit": "Gagal mengedit laman web",
             "outOfScope": "Saya hanya boleh membantu mengedit laman web anda.",
             "undo": "Buat Asal",
-            "changeColorPrompt": "Tukar warna",
-            "addSectionPrompt": "+ Tambah bahagian",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
-            "newLine": "baris baru"
+            "newLine": "baris baru",
+            "stopAI": "Hentikan AI"
         },
         "menu": {
             "dashboard": "Papan Pemuka",
@@ -3684,6 +3965,53 @@
             "invalidEmail": "Sila masukkan alamat e-mel yang sah",
             "address": "Alamat",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
+            "localBusinessInfo": "Maklumat Perniagaan Tempatan",
+            "addressGroupLabel": "Alamat",
+            "streetAddress": "Alamat Jalan",
+            "streetAddressPlaceholder": "123 Jalan Bukit Bintang",
+            "city": "Bandar / Daerah",
+            "cityPlaceholder": "Kuala Lumpur",
+            "postcode": "Poskod",
+            "postcodePlaceholder": "55100",
+            "state": "Negeri / Wilayah Persekutuan",
+            "selectState": "-- Pilih negeri --",
+            "country": "Negara",
+            "countryMalaysia": "Malaysia",
+            "coordinatesGroupLabel": "Lokasi (Koordinat)",
+            "pasteMapsLink": "Tampal pautan Google Maps anda",
+            "mapsLinkPlaceholder": "https://maps.app.goo.gl/xxxxx",
+            "pasteMapsLinkHint": "Tampal pautan kongsi dari Google Maps — sistem akan mengekstrak koordinat secara automatik",
+            "extractCoordinates": "Ekstrak",
+            "extracting": "Sedang mengekstrak...",
+            "coordinatesExtracted": "✓ Koordinat berjaya diekstrak",
+            "latitude": "Latitud",
+            "longitude": "Longitud",
+            "manualCoordinates": "Masukkan koordinat secara manual (lanjutan)",
+            "manualCoordinatesHint": "Gunakan ini apabila tampalan pautan tidak dapat mengesan koordinat secara automatik",
+            "geoExtractFailed": "Tidak dapat mengekstrak koordinat daripada pautan itu — cuba pilihan manual di bawah",
+            "mapsPreviewTitle": "Pratonton peta lokasi perniagaan",
+            "categoryOfferGroupLabel": "Kategori & Tawaran",
+            "businessCategory": "Kategori Perniagaan",
+            "selectCategory": "-- Pilih kategori --",
+            "priceRange": "Julat Harga",
+            "selectPriceRange": "-- Pilih julat harga --",
+            "serviceAreaDescription": "Kawasan Perkhidmatan",
+            "serviceAreaPlaceholder": "cth: Petaling Jaya, Shah Alam, Selangor",
+            "openingHoursGroupLabel": "Waktu Operasi",
+            "openingHoursClosed": "Ditutup",
+            "openingHoursOpens": "Buka",
+            "openingHoursCloses": "Tutup",
+            "openingHoursDayMo": "Isn",
+            "openingHoursDayTu": "Sel",
+            "openingHoursDayWe": "Rab",
+            "openingHoursDayTh": "Kha",
+            "openingHoursDayFr": "Jum",
+            "openingHoursDaySa": "Sab",
+            "openingHoursDaySu": "Ahd",
+            "checklistTitle": "Asas SEO Tempatan",
+            "checklistAddressSaved": "Alamat disimpan",
+            "checklistHoursSaved": "Waktu operasi disimpan",
+            "checklistCategorySaved": "Kategori perniagaan disimpan",
             "socialLinks": "Pautan Sosial",
             "socialPlatforms": {
                 "facebook": {
@@ -3980,32 +4308,6 @@
             "blog": "Blog",
             "travel": "Pelancongan"
         },
-        "addSection": {
-            "testimonials": "Tambah testimoni",
-            "testimonialsCompact": "💬 Tambah testimoni",
-            "testimonialsPrompt": "Tambah bahagian testimoni dengan 3 ulasan pelanggan",
-            "faq": "Tambah Soalan Lazim",
-            "faqCompact": "❓ Tambah Soalan Lazim",
-            "faqPrompt": "Tambah bahagian soalan lazim dengan 3 soalan pelanggan biasa",
-            "gallery": "Tambah galeri",
-            "galleryCompact": "🖼️ Tambah galeri",
-            "galleryPrompt": "Tambah bahagian galeri dengan 6 imej pemegang tempat",
-            "features": "Tambah ciri",
-            "featuresCompact": "✨ Tambah ciri",
-            "featuresPrompt": "Tambah bahagian ciri dengan 3 sorotan perkhidmatan utama",
-            "team": "Tambah pasukan",
-            "teamCompact": "👥 Tambah pasukan",
-            "teamPrompt": "Tambah bahagian pasukan dengan 3 ahli pasukan",
-            "newsletter": "Tambah surat berita",
-            "newsletterCompact": "✉️ Tambah surat berita",
-            "newsletterPrompt": "Tambah bahagian pendaftaran surat berita",
-            "banner": "Tambah sepanduk",
-            "bannerCompact": "📣 Tambah sepanduk",
-            "bannerPrompt": "Tambah bahagian sepanduk untuk kempen promosi",
-            "cta": "Tambah CTA",
-            "ctaCompact": "🚀 Tambah CTA",
-            "ctaPrompt": "Tambah bahagian seruan tindakan dengan tawaran yang kuat"
-        },
         "inlineEditComponent": {
             "clickToEdit": "Klik untuk sunting",
             "defaultPlaceholder": "Klik untuk sunting...",
@@ -4051,7 +4353,10 @@
             "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
             "primaryColorLabel": "Pemilih warna utama",
             "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?",
-            "phoneRequired": "Nombor telefon diperlukan"
+            "phoneRequired": "Nombor telefon diperlukan",
+            "invalidPostcode": "Poskod Malaysia mesti tepat 5 digit",
+            "invalidLatitude": "Latitud mesti di antara -90 dan 90",
+            "invalidLongitude": "Longitud mesti di antara -180 dan 180"
         },
         "menuDrawer": {
             "defaultUserName": "Pengguna"
@@ -4295,10 +4600,10 @@
             "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
             "manageButton": "Urus Akaun dalam SSO",
             "urlMissing": "URL portal SSO tidak dikonfigurasi. Hubungi pentadbir.",
-            "generalTitle": "🔒 Maklumat diuruskan oleh SSO",
+            "generalTitle": " Maklumat diuruskan oleh SSO",
             "generalNotice": "Medan maklumat peribadi disegerakkan daripada sistem SSO. Anda tidak boleh mengeditnya di sini.",
             "generalLink": "Untuk membuat perubahan, sila lawati portal SSO",
-            "securityTitle": "🛡️ Akaun Dilindungi SSO",
+            "securityTitle": "Akaun Dilindungi SSO",
             "securityNotice": "Kata laluan dan tetapan keselamatan anda diuruskan oleh sistem Single Sign-On (SSO). Untuk menukar kata laluan, mendayakan pengesahan dua faktor (2FA), atau mengemas kini sebarang tetapan keselamatan, sila lawati portal pengurusan SSO.",
             "securityLink": "Urus Akaun SSO"
         },

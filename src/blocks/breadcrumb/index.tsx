@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 import type { BlockProps } from '../types'
 import type { BreadcrumbConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
@@ -58,12 +59,12 @@ export function BreadcrumbBlock({ block }: BlockProps<BreadcrumbConfig>) {
                                             {item.label}
                                         </span>
                                     ) : (
-                                        <a
+                                        <SmartLink
                                             href={resolveHref(item.url)}
                                             className={`opacity-70 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} inline-flex items-center`}
                                         >
                                             {item.label}
-                                        </a>
+                                        </SmartLink>
                                     )}
                                 </li>
                             )

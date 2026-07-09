@@ -255,6 +255,17 @@ const MIGRATIONS = [
   { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
   { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
   { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
+  // ── Sites: Local Business Info (F37 US-01) ──
+  { name: 'sites.local_business_street_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_street_address varchar;' },
+  { name: 'sites.local_business_city', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_city varchar;' },
+  { name: 'sites.local_business_state', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_state varchar;' },
+  { name: 'sites.local_business_postcode', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_postcode varchar;' },
+  { name: 'sites.local_business_country', sql: "ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_country varchar DEFAULT 'MY';" },
+  { name: 'sites.local_business_latitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_latitude numeric;' },
+  { name: 'sites.local_business_longitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_longitude numeric;' },
+  { name: 'sites.local_business_business_category', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_business_category varchar;' },
+  { name: 'sites.local_business_price_range', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_price_range varchar;' },
+  { name: 'sites.local_business_service_area_description', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_service_area_description varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -274,6 +285,7 @@ const MIGRATIONS = [
   { name: 'products.dimensions_length', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_length numeric DEFAULT 0;` },
   { name: 'products.dimensions_width', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_width numeric DEFAULT 0;` },
   { name: 'products.dimensions_height', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_height numeric DEFAULT 0;` },
+  { name: 'products.ai_review_pending', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS ai_review_pending boolean DEFAULT false;` },
   // ── Orders: Stripe fields ──
   {
     name: 'orders.stripe_session_id',
@@ -434,6 +446,24 @@ const MIGRATIONS = [
   {
     name: 'sites_seo_tracked_keywords.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS sites_seo_tracked_keywords_parent_idx ON sites_seo_tracked_keywords (_parent_id);`,
+  },
+  // ── Sites: Local Business Opening Hours array table (F37 US-01) ──
+  {
+    name: 'sites_local_business_opening_hours.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS sites_local_business_opening_hours (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      day_of_week varchar,
+      opens varchar,
+      closes varchar,
+      is_closed boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'sites_local_business_opening_hours.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS sites_local_business_opening_hours_parent_idx ON sites_local_business_opening_hours (_parent_id);`,
   },
   // ── Products: Array tables ──
   {
@@ -4811,6 +4841,25 @@ const MIGRATIONS = [
     name: 'sso_step_events.idx_status_retry_created',
     sql: `CREATE INDEX IF NOT EXISTS sso_step_events_status_retry_created ON sso_step_events (status, retry_count, created_at);`,
   },
+  // GH-1293: dedupe pre-existing (user_id, step) duplicates before adding the unique
+  // index below — keeps 'completed' first if present in the group, else latest updated_at.
+  // Must run before sso_step_events.user_step_uniq (order matters in this array).
+  {
+    name: 'sso_step_events.dedupe_user_step',
+    sql: `DELETE FROM sso_step_events WHERE id IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY user_id, step
+          ORDER BY (status = 'completed') DESC, updated_at DESC, id DESC
+        ) AS rn
+        FROM sso_step_events
+      ) ranked WHERE rn > 1
+    );`,
+  },
+  {
+    name: 'sso_step_events.user_step_uniq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS sso_step_events_user_step_uniq ON sso_step_events (user_id, step);`,
+  },
   {
     name: 'media.thumbnail',
     sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS thumbnail varchar;`,
@@ -4832,6 +4881,14 @@ const MIGRATIONS = [
     name: 'orders.locale',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
   },
+  // ── F37: analytics.event enum was missing the 'local_business_data_saved'
+  // value used by traffic-data.ts/analytics-summary's not_in filters, crashing
+  // getTrafficData() with a Postgres "invalid input value for enum" error for
+  // any tenant with real analytics rows ──
+  {
+    name: 'enum_analytics_event.add_local_business_data_saved',
+    sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4845,6 +4902,28 @@ async function runMigrations(pool) {
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
+}
+
+/**
+ * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
+ * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
+ * `ON CONFLICT (user_id, step)` upsert has a hard runtime dependency on
+ * sso_step_events_user_step_uniq actually existing — if the dedupe DELETE or the
+ * CREATE UNIQUE INDEX silently failed (e.g. a duplicate row written by old-code
+ * traffic mid-deploy), every future persistStepEvent call would throw, get
+ * swallowed by its own caller's .catch(console.error), and step-event bookkeeping
+ * would silently stop working entirely. Fail the build loudly instead of at runtime.
+ */
+async function verifyCriticalIndexes(pool) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'sso_step_events_user_step_uniq'`
+  );
+  if (rows.length === 0) {
+    throw new Error(
+      'sso_step_events_user_step_uniq index missing after migrations — persistStepEvent() upsert would fail at runtime. Check dedupe migration for duplicate (user_id, step) rows that survived it.'
+    );
+  }
+  console.log('[db-setup] ✅ verified sso_step_events_user_step_uniq exists');
 }
 
 /**
@@ -4873,6 +4952,7 @@ const COLLECTION_SLUGS = [
   'plan-features',
   'discounts',
   'discount_usage_history',
+  'sso-step-events',
 
 ];
 
@@ -5182,6 +5262,7 @@ async function main() {
 
       if (tableCount > 0) {
         await runMigrations(pool);
+        await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);
       }

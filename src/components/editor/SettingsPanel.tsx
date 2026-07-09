@@ -24,6 +24,7 @@ import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
+import { FontSelect } from './FontSelect'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config'
@@ -40,6 +41,15 @@ import { toast } from 'sonner'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
+import { StateSelect } from './local-business/state-select'
+import { GeoLinkInput } from './local-business/geo-link-input'
+import { OpeningHoursTable } from './local-business/opening-hours-table'
+import { MapsEmbedPreview } from './local-business/maps-embed-preview'
+import { CompletionChecklist } from './local-business/completion-checklist'
+import type { LocalBusinessData } from './local-business/types'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -50,6 +60,20 @@ function stripHtmlForDisplay(value: unknown): string {
 /** Strip HTML tags from input to prevent XSS */
 function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
+}
+
+/** F37 US-01: analytics `fields_completed_count` — address parts + category +
+ *  "has ≥1 open day" flag (phase-03 plan architecture note). Deliberately NOT
+ *  the same as the 3-row completion checklist (that's presence-per-group). */
+function countCompletedLocalBusinessFields(data: LocalBusinessData): number {
+    let count = 0
+    if (data.streetAddress?.trim()) count++
+    if (data.city?.trim()) count++
+    if (data.state?.trim()) count++
+    if (data.postcode?.trim()) count++
+    if (data.businessCategory?.trim()) count++
+    if (data.openingHours?.some(row => !row.isClosed && row.opens?.trim() && row.closes?.trim())) count++
+    return count
 }
 
 /** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
@@ -234,6 +258,8 @@ interface SettingsPanelProps {
             email?: string
             address?: string
         }
+        /** F37 US-01: structured address/geo/hours for Local SEO — see `./local-business/types.ts`. */
+        localBusiness?: LocalBusinessData
         socialLinks?: {
             facebook?: string
             instagram?: string
@@ -263,11 +289,12 @@ interface SettingsPanelProps {
         name?: string
         branding?: { logo?: string; favicon?: string }
         contactInfo?: { phone?: string; email?: string; address?: string }
+        localBusiness?: LocalBusinessData
         socialLinks?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; tiktok?: string }
         seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null }
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
-    }) => void | Promise<void>
+    }) => void | boolean | Promise<void | boolean>
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
@@ -284,6 +311,20 @@ interface SettingsPanelProps {
     onAddLanguage?: (locale: string) => void
     onRemoveLanguage?: () => void
     onMakePrimary?: (locale: string) => void
+    /**
+     * F05 compact Tools sheet: stretch to the host's full width instead of the
+     * fixed `SETTINGS_PANEL_WIDTH` (320px) desktop right-panel width. Optional,
+     * additive — desktop callers omit this and keep the exact 320px panel.
+     */
+    fullWidth?: boolean
+    /**
+     * F05 compact block-tap sheet (`CompactEditorLayout`'s bsBlock): hides this
+     * panel's own Global/SEO/Menu/Block tab strip + title/description header —
+     * F05's bsBlock shows block fields directly, no tab bar (that lives only in
+     * the Tools sheet's Settings tab). Optional, additive — every other caller
+     * (desktop, Tools sheet Settings tab) omits this and is unaffected.
+     */
+    hideChrome?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -296,6 +337,8 @@ function SettingsPanelInner({
     generationLocale, primaryLocale, secondaryLocale, pendingLocale,
     navShowLanguageSwitcher = false, navMultilingualEnabled = false,
     onNavLanguageSwitcherChange, onAddLanguage, onRemoveLanguage, onMakePrimary,
+    fullWidth = false,
+    hideChrome = false,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -350,10 +393,15 @@ function SettingsPanelInner({
         return normalizeNavLinkItems(navLinks, pages)
     }, [headerBlock, pages, storeBlocks, getDisplayBlock, activeLocale])
 
+    // GH-1279: CTA button is only available for the default nav variant.
+    const navVariant = (headerBlock as Record<string, unknown> | null | undefined)?.variant as string | undefined
+    const isDefaultNavVariant = !navVariant || navVariant === 'default' || navVariant === 'simple'
+
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
         brand: true,
         contact: true,
+        localBusiness: true,
         social: true,
         theme: true,
         seo: true,
@@ -399,6 +447,7 @@ function SettingsPanelInner({
     const footerSectionRef = React.useRef<HTMLDivElement>(null)
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
+    const [localBusinessPostcodeError, setLocalBusinessPostcodeError] = useState<string | null>(null)
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -429,9 +478,29 @@ function SettingsPanelInner({
     }, [block, requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}
+    const siteLocalBusiness = site?.localBusiness || {}
     const siteSocialLinks = site?.socialLinks || {}
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
+
+    // F37 US-01: merge a localBusiness patch into current state, save, then fire
+    // the completion analytics event on success (architecture: "on successful
+    // save: trackEvent(...)"). Shared by every field in the accordion below so
+    // the merge-then-track sequence lives in exactly one place (DRY).
+    const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
+        const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
+        const result = await onSiteSettingsChange?.({ localBusiness: merged })
+        // Only track on a confirmed successful save — onSiteSettingsChange resolves
+        // even on failure (errors are caught/toasted upstream), so `result === true`
+        // is the only reliable success signal.
+        if (site?.id && result === true) {
+            trackEvent({
+                siteId: site.id,
+                event: 'local_business_data_saved',
+                metadata: { fields_completed_count: countCompletedLocalBusinessFields(merged) },
+            })
+        }
+    }
 
     const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
     const globalAccordionBodyCls = 'rounded-b-xl border border-t-0 border-white/[0.08] bg-[var(--editor-surface)] px-4 py-4'
@@ -485,17 +554,23 @@ function SettingsPanelInner({
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.headingFont}</label>
-                <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
-                    {HEADING_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <FontSelect
+                    role="heading"
+                    label={s.headingFont}
+                    value={(theme.fontHeading as string) || 'Outfit'}
+                    onChange={v => onThemeChange('fontHeading', v)}
+                    options={HEADING_FONT_OPTIONS}
+                />
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.bodyFont}</label>
-                <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
-                    {BODY_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <FontSelect
+                    role="body"
+                    label={s.bodyFont}
+                    value={(theme.fontBody as string) || 'Inter'}
+                    onChange={v => onThemeChange('fontBody', v)}
+                    options={BODY_FONT_OPTIONS}
+                />
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.colorMode}</label>
@@ -532,37 +607,41 @@ function SettingsPanelInner({
                             placeholder={s.businessNamePlaceholder}
                         />
                     </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
-                        <div className="mt-2">
-                            <LogoEditor
-                                currentLogo={
-                                    (siteBranding.logo as string | undefined) ||
-                                    (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
-                                        ? ((headerBlock as Record<string, unknown>)?.logo as string)
-                                        : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
-                                    null
-                                }
-                                onLogoChange={(logoUrl) => {
-                                    // Save logo directly via branding (no draft/publish step).
-                                    // handleSiteSettingsChange syncs header/footer blocks in DB.
-                                    void onSiteSettingsChange?.({ branding: { ...siteBranding, logo: logoUrl } })
-                                    if (onLogoChange) onLogoChange(logoUrl)
-                                }}
-                            />
+                    {/* 2026-07-03 (chị): tablet-only (compact, ≥768) puts Logo + Favicon side
+                        by side in 1 row; phone (<768) and desktop (fullWidth=false) unchanged. */}
+                    <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
+                            <div className="mt-2">
+                                <LogoEditor
+                                    currentLogo={
+                                        (siteBranding.logo as string | undefined) ||
+                                        (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
+                                            ? ((headerBlock as Record<string, unknown>)?.logo as string)
+                                            : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
+                                        null
+                                    }
+                                    onLogoChange={(logoUrl) => {
+                                        // Save logo directly via branding (no draft/publish step).
+                                        // handleSiteSettingsChange syncs header/footer blocks in DB.
+                                        void onSiteSettingsChange?.({ branding: { ...siteBranding, logo: logoUrl } })
+                                        if (onLogoChange) onLogoChange(logoUrl)
+                                    }}
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                            {s.uploadFavicon}
-                        </label>
-                        <div className="mt-2">
-                            <FaviconEditor
-                                currentFavicon={(siteBranding.favicon as string | undefined) || null}
-                                onFaviconChange={(faviconUrl) => {
-                                    void onSiteSettingsChange?.({ branding: { ...siteBranding, favicon: faviconUrl } })
-                                }}
-                            />
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                                {s.uploadFavicon}
+                            </label>
+                            <div className="mt-2">
+                                <FaviconEditor
+                                    currentFavicon={(siteBranding.favicon as string | undefined) || null}
+                                    onFaviconChange={(faviconUrl) => {
+                                        void onSiteSettingsChange?.({ branding: { ...siteBranding, favicon: faviconUrl } })
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -570,41 +649,46 @@ function SettingsPanelInner({
 
             {renderGlobalAccordion('contact', s.contactInfo, (
                 <div className="space-y-4">
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
-                        <Input
-                            defaultValue={siteContactInfo.phone || ''}
-                            key={`contact-phone-${siteContactInfo.phone || ''}`}
-                            onBlur={(e: FieldBlurEvent) => {
-                                const v = e.target.value.trim()
-                                if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
-                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
-                                } else {
-                                    toast.error(t.editor.settingsValidation.invalidPhone)
-                                }
-                            }}
-                            variant="editor"
-                            className={editorInputClassName}
-                            placeholder={s.phonePlaceholder}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
-                        <Input
-                            type="email"
-                            defaultValue={siteContactInfo.email || ''}
-                            key={`contact-email-${siteContactInfo.email || ''}`}
-                            onBlur={(e: FieldBlurEvent) => {
-                                if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
-                                } else {
-                                    toast.error(s.invalidEmail)
-                                }
-                            }}
-                            variant="editor"
-                            className={editorInputClassName}
-                            placeholder={s.emailPlaceholder}
-                        />
+                    {/* 2026-07-03 (chị): tablet-only (compact, ≥768) puts Phone + Email side by
+                        side in 1 row, same as Logo/Favicon above; phone (<768) and desktop
+                        (fullWidth=false) unchanged. */}
+                    <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
+                            <Input
+                                defaultValue={siteContactInfo.phone || ''}
+                                key={`contact-phone-${siteContactInfo.phone || ''}`}
+                                onBlur={(e: FieldBlurEvent) => {
+                                    const v = e.target.value.trim()
+                                    if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
+                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
+                                    } else {
+                                        toast.error(t.editor.settingsValidation.invalidPhone)
+                                    }
+                                }}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.phonePlaceholder}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
+                            <Input
+                                type="email"
+                                defaultValue={siteContactInfo.email || ''}
+                                key={`contact-email-${siteContactInfo.email || ''}`}
+                                onBlur={(e: FieldBlurEvent) => {
+                                    if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
+                                    } else {
+                                        toast.error(s.invalidEmail)
+                                    }
+                                }}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.emailPlaceholder}
+                            />
+                        </div>
                     </div>
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
@@ -620,8 +704,193 @@ function SettingsPanelInner({
                 </div>
             ))}
 
+            {/* F37 US-01: Local Business Info — structured address/geo/hours for Local SEO.
+                Field order follows the approved wireframe (docs/design/F37-local-business-form.md
+                §2): address → coordinates (+ map preview) → category/offer → opening hours → checklist. */}
+            {renderGlobalAccordion('localBusiness', s.localBusinessInfo, (
+                <div className="space-y-5">
+                    <div className="space-y-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.streetAddress}</label>
+                            <Input
+                                defaultValue={siteLocalBusiness.streetAddress || ''}
+                                key={`lb-street-${siteLocalBusiness.streetAddress || ''}`}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ streetAddress: sanitizeInput(e.target.value) })}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.streetAddressPlaceholder}
+                            />
+                        </div>
+                        <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                            <div>
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.city}</label>
+                                <Input
+                                    defaultValue={siteLocalBusiness.city || ''}
+                                    key={`lb-city-${siteLocalBusiness.city || ''}`}
+                                    onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ city: sanitizeInput(e.target.value) })}
+                                    variant="editor"
+                                    className={editorInputClassName}
+                                    placeholder={s.cityPlaceholder}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.postcode}</label>
+                                <Input
+                                    defaultValue={siteLocalBusiness.postcode || ''}
+                                    key={`lb-postcode-${siteLocalBusiness.postcode || ''}`}
+                                    onBlur={(e: FieldBlurEvent) => {
+                                        const v = e.target.value.trim()
+                                        if (!v || /^\d{5}$/.test(v)) {
+                                            setLocalBusinessPostcodeError(null)
+                                            void handleLocalBusinessChange({ postcode: v })
+                                        } else {
+                                            setLocalBusinessPostcodeError(t.editor.settingsValidation.invalidPostcode)
+                                            toast.error(t.editor.settingsValidation.invalidPostcode)
+                                        }
+                                    }}
+                                    variant="editor"
+                                    className={cn(editorInputClassName, localBusinessPostcodeError && 'border-red-500/50')}
+                                    placeholder={s.postcodePlaceholder}
+                                />
+                                {localBusinessPostcodeError ? <p className="mt-1 text-[11px] text-red-400">{localBusinessPostcodeError}</p> : null}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.state}</label>
+                            <StateSelect
+                                value={siteLocalBusiness.state}
+                                onChange={value => void handleLocalBusinessChange({ state: value })}
+                                placeholder={s.selectState}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
+                            <Input
+                                value={s.countryMalaysia}
+                                disabled
+                                readOnly
+                                variant="editor"
+                                className={editorInputClassName}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.coordinatesGroupLabel}</p>
+                        <GeoLinkInput
+                            latitude={siteLocalBusiness.latitude}
+                            longitude={siteLocalBusiness.longitude}
+                            streetAddress={siteLocalBusiness.streetAddress}
+                            city={siteLocalBusiness.city}
+                            fullWidth={fullWidth}
+                            onCoordinatesChange={coords => void handleLocalBusinessChange(coords)}
+                            labels={{
+                                pasteMapsLink: s.pasteMapsLink,
+                                mapsLinkPlaceholder: s.mapsLinkPlaceholder,
+                                pasteMapsLinkHint: s.pasteMapsLinkHint,
+                                extractCoordinates: s.extractCoordinates,
+                                extracting: s.extracting,
+                                coordinatesExtracted: s.coordinatesExtracted,
+                                latitude: s.latitude,
+                                longitude: s.longitude,
+                                manualCoordinates: s.manualCoordinates,
+                                manualCoordinatesHint: s.manualCoordinatesHint,
+                                invalidLatitude: t.editor.settingsValidation.invalidLatitude,
+                                invalidLongitude: t.editor.settingsValidation.invalidLongitude,
+                                geoExtractFailed: s.geoExtractFailed,
+                            }}
+                        />
+                        <MapsEmbedPreview
+                            latitude={siteLocalBusiness.latitude}
+                            longitude={siteLocalBusiness.longitude}
+                            fullWidth={fullWidth}
+                            title={s.mapsPreviewTitle}
+                        />
+                    </div>
+
+                    <div className="space-y-4 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.categoryOfferGroupLabel}</p>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessCategory}</label>
+                            <Select
+                                value={siteLocalBusiness.businessCategory || undefined}
+                                onValueChange={value => void handleLocalBusinessChange({ businessCategory: value })}
+                            >
+                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                    <SelectValue placeholder={s.selectCategory} />
+                                </SelectTrigger>
+                                <SelectContent side="bottom" align="start">
+                                    {BUSINESS_CATEGORY_OPTIONS.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.priceRange}</label>
+                            <Select
+                                value={siteLocalBusiness.priceRange || undefined}
+                                onValueChange={value => void handleLocalBusinessChange({ priceRange: value })}
+                            >
+                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                    <SelectValue placeholder={s.selectPriceRange} />
+                                </SelectTrigger>
+                                <SelectContent side="bottom" align="start">
+                                    {PRICE_RANGE_OPTIONS.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.serviceAreaDescription}</label>
+                            <Textarea
+                                defaultValue={siteLocalBusiness.serviceAreaDescription || ''}
+                                key={`lb-service-area-${siteLocalBusiness.serviceAreaDescription || ''}`}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: e.target.value })}
+                                variant="editor"
+                                className={editorTextareaClassName}
+                                placeholder={s.serviceAreaPlaceholder}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.openingHoursGroupLabel}</p>
+                        <OpeningHoursTable
+                            rows={siteLocalBusiness.openingHours}
+                            fullWidth={fullWidth}
+                            onChange={rows => void handleLocalBusinessChange({ openingHours: rows })}
+                            dayLabels={{
+                                Mo: s.openingHoursDayMo,
+                                Tu: s.openingHoursDayTu,
+                                We: s.openingHoursDayWe,
+                                Th: s.openingHoursDayTh,
+                                Fr: s.openingHoursDayFr,
+                                Sa: s.openingHoursDaySa,
+                                Su: s.openingHoursDaySu,
+                            }}
+                            closedLabel={s.openingHoursClosed}
+                            opensLabel={s.openingHoursOpens}
+                            closesLabel={s.openingHoursCloses}
+                        />
+                    </div>
+
+                    <CompletionChecklist
+                        data={siteLocalBusiness}
+                        labels={{
+                            title: s.checklistTitle,
+                            addressSaved: s.checklistAddressSaved,
+                            hoursSaved: s.checklistHoursSaved,
+                            categorySaved: s.checklistCategorySaved,
+                        }}
+                    />
+                </div>
+            ))}
+
             {renderGlobalAccordion('social', s.socialLinks, (
-                <div className="space-y-3">
+                <div className={cn('grid gap-3', fullWidth && 'min-[768px]:grid-cols-2')}>
                     {(['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] as const).map(platform => (
                         <Input
                             key={`social-${platform}-${(siteSocialLinks as Record<string, string>)[platform] || ''}`}
@@ -972,8 +1241,8 @@ function SettingsPanelInner({
                     />
                 </div>
 
-                {/* 4. Nav CTA Button */}
-                <div className={sectionCls}>
+                {/* 4. Nav CTA Button — hidden on non-default variants (GH-1279) */}
+                {isDefaultNavVariant && <div className={sectionCls}>
                     <label className={labelCls}>{s.navCta}</label>
                     <div className="mt-2 space-y-2">
                         <label className="flex items-center gap-2 text-xs text-slate-400">
@@ -1029,7 +1298,7 @@ function SettingsPanelInner({
                             )
                         })()}
                     </div>
-                </div>
+                </div>}
 
                 {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
                 <div ref={breadcrumbSectionRef} className={sectionCls}>
@@ -1355,20 +1624,37 @@ function SettingsPanelInner({
         handleBlockUpdate({ [field]: cats })
     }
 
-    const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
+    const allTabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
         { id: 'global', label: s.tabGlobal, icon: <Settings className="h-4 w-4" aria-hidden /> },
         { id: 'seo', label: s.tabSeo, icon: <Search className="h-4 w-4" aria-hidden /> },
         { id: 'menu', label: s.tabMenu, icon: <Compass className="h-4 w-4" aria-hidden /> },
         { id: 'block', label: s.tabBlock, icon: <Palette className="h-4 w-4" aria-hidden />, disabled: !block },
     ]
+    // F05 compact Tools sheet Settings tab never hosts block editing (own bsBlock sheet
+    // handles that) — hide the Block pill and lay the remaining 3 out in a single row.
+    const tabs = fullWidth ? allTabs.filter(tab => tab.id !== 'block') : allTabs
 
     return (
         <div
-            className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[var(--editor-surface)]"
-            style={{ width: SETTINGS_PANEL_WIDTH }}
+            className={cn(
+                // GH-1511 #45.2 (PR #1522 review): panel cố ý KHÔNG paint bg — kế thừa nền shell
+                // (--editor-bg), y hệt EditorToolbar (nav) nên 2 surface liền một khối. Trước đây
+                // dùng `bg-[var(--editor-surface)]/90` nhưng Tailwind v3 không compile alpha trên
+                // var đục (class chết) — visual này là look QA đã duyệt, giờ code nói thật.
+                'flex h-full flex-col',
+                // border-l bỏ theo cùng lý do: thiếu border-solid nên chưa từng paint (class chết).
+                fullWidth ? 'w-full flex-1' : 'shrink-0',
+            )}
+            style={fullWidth ? undefined : { width: SETTINGS_PANEL_WIDTH }}
         >
-            <div className="border-b border-white/5 px-4 py-4">
-                <div className="grid grid-cols-2 gap-2">
+            {!hideChrome && (
+            <div className={cn(
+                // Bỏ đường kẻ quanh hàng tab (design call 07/07, PR #1522): panel liền khối với
+                // nav nên kẻ ngăn thừa — xóa hẳn border classes thay vì chỉ bỏ border-solid
+                // (preflight off: border không style sẽ thành class chết gây hiểu lầm).
+                'px-4 py-4',
+            )}>
+                <div className={cn('grid gap-2', fullWidth ? 'grid-cols-3' : 'grid-cols-2')}>
                     {tabs.map(tab => (
                         <Tooltip.Provider key={tab.id} delayDuration={150}>
                             <Tooltip.Root>
@@ -1409,8 +1695,10 @@ function SettingsPanelInner({
                     ))}
                 </div>
             </div>
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+                {!hideChrome && (
                 <div className="mb-6">
                     <div className="flex items-start gap-4">
                         <div>
@@ -1433,6 +1721,7 @@ function SettingsPanelInner({
                         </div>
                     </div>
                 </div>
+                )}
 
                 <div className="space-y-5">
                     {activeTab === 'global' ? renderGlobalContent() : null}

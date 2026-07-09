@@ -66,6 +66,8 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 | **TC-F03.26** | `US-02/AC-2` | `UX` | **[Empty Logic]** Khoảng thời gian không có dữ liệu | 1. Chọn bộ lọc thời gian không có record trong DB. | - Thay biểu đồ bằng thông báo "Chưa có dữ liệu trong kỳ này".<br>- 4 thẻ Card hiển thị giá trị 0. | High | [x] |
 | **TC-F03.27** | `US-02/AC-3` | `Failover` | **[API Crash]** Xử lý timeout khi API analytics lỗi | 1. Dùng DevTools block request `/api/analytics/`. | - Không treo toàn bộ trang.<br>- Hiển thị thông báo lỗi và nút "Thử Lại". | Blocker | [x] |
 | **TC-F03.28** | `BR-02/Sec` | `Privacy` | **[Data Crypto]** Mã hóa IP người dùng trong log | 1. Kiểm tra log backend khi có user thao tác. | - Địa chỉ IP được mã hóa SHA-256.<br>- Không lưu plaintext IP trong DB. | Blocker | [x] |
+| **TC-F03.66** | `US-02/AC-1` | `Func` | **[Top Blogs — Happy Path]** Widget hiển thị blog kèm view count khi có traffic thực tế (GH-1386) | 1. Đăng nhập Owner có ≥1 blog đã publish.<br>2. Đảm bảo có visitor (non-owner) đã truy cập blog post trong 7 ngày qua.<br>3. Vào Dashboard → Analytics → tab Top Blogs.<br>4. Chọn range 7 Days. | - Widget liệt kê blog posts kèm view count, sort descending.<br>- Số liệu nhất quán với Traffic Overview chart (cùng range).<br>- Click vào blog row → mở đúng blog post. | Blocker | [ ] |
+| **TC-F03.67** | `US-02/AC-1` | `Boundary` | **[Top Blogs — Empty State]** Empty state chỉ hiển thị khi thực sự không có blog pageview (GH-1386) | 1. Dùng tài khoản Owner có site published nhưng chưa có ai (non-owner) truy cập blog trong range đã chọn.<br>2. Vào tab Top Blogs. | - Hiển thị empty state "No data available for this period."<br>- Traffic Overview có thể có data (non-blog pages) nhưng Top Blogs rỗng = expected.<br>- Nếu có blog traffic → phải hiển thị (không được rỗng giả). | High | [ ] |
 
 ---
 
@@ -139,6 +141,22 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 | **TC-F03.63** | `F03/SetupBanner` | `Func` | **[Banner Hidden]** SetupAlertBanner trả về null (không render) khi hasPaymentConfigured=true | 1. Render SetupAlertBanner với hasPaymentConfigured=true. | - Component không render gì (return null). | High | [x] |
 | **TC-F03.64** | `F03/SetupBanner` | `UX` | **[Dismiss Action]** Nút "I'll do this later" ghi sessionStorage + ẩn banner | 1. Render SetupAlertBanner, sessionStorage trống.<br>2. Click nút "I'll do this later".<br>3. Render lại component. | - Sau click: sessionStorage.getItem('onboarding_banner_dismissed') = 'true'.<br>- Banner ẩn ngay sau click.<br>- Re-render không hiển thị banner (đã dismissed). | High | [x] |
 | **TC-F03.65** | `F03/SetupBanner` | `Link` | **[Complete Setup Link]** Nút "Complete Setup" link đến /settings/payments | 1. Render SetupAlertBanner. | - Nút "Complete Setup" có href="/settings/payments". | High | [x] |
+
+---
+
+### GH-1491: Dashboard Responsive Fixes (Welcome popup scroll, at-a-glance layout, top tabs wrap)
+
+> Unit tests below verify the JS/DOM-level behavior (hook logic, scroll-lock lifecycle). The
+> CSS breakpoint layout itself (2-row wrap, tab scroll, value+delta 1-row) isn't verifiable
+> in jsdom — no real media-query evaluation — so those parts rely on manual/QA visual check
+> at 375/768/1280 per the issue's test matrix, not automated coverage here.
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.68** | `GH-1491/Issue1` | `Unit` | **[Scroll Lock]** `useLockBodyScroll(true)` sets `body.style.overflow=hidden`; unmount restores it | 1. Render hook với `locked=true`.<br>2. Unmount. | - Overflow = `hidden` khi mount.<br>- Overflow = `''` sau unmount. | Blocker | [x] |
+| **TC-F03.69** | `GH-1491/Issue1` | `Unit` | **[Scroll Lock Toggle]** Toggle `locked` false→true→false lock rồi restore đúng lúc | 1. Render hook `locked=false`.<br>2. Rerender `locked=true`.<br>3. Rerender `locked=false`. | - Ban đầu `''`.<br>- Sau true: `hidden`.<br>- Sau false: `''` lại. | High | [x] |
+| **TC-F03.70** | `GH-1491/Issue1` | `Unit` | **[Overlapping Locks]** 2 modal cùng lock — đóng 1 cái không mở khóa scroll khi cái kia còn mở | 1. Mount 2 instance `useLockBodyScroll(true)` độc lập.<br>2. Unmount instance A.<br>3. Unmount instance B. | - Sau unmount A: vẫn `hidden` (B còn mở).<br>- Sau unmount B: restore `''`. | High | [x] |
+| **TC-F03.71** | `GH-1491/Issue1` | `Integrate` | **[Welcome Popup = Customize Modal]** Mở Customize dashboard modal lock scroll nền; đóng (Cancel) hoặc unmount restore lại | 1. Render `CustomizeModal`.<br>2. Click nút mở modal.<br>3. Click Cancel. | - Mở: `document.body.style.overflow === 'hidden'`.<br>- Đóng: restore `''`. | Blocker | [x] |
 
 ---
 

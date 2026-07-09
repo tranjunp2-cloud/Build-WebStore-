@@ -14,6 +14,7 @@ const mockCookiesSet = vi.hoisted(() => vi.fn())
 const mockCheckRateLimit = vi.hoisted(() =>
     vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetAt: 0 }),
 )
+const mockDrizzleExecute = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 
 // ── Module mocks (top-level) ──────────────────────────────────────────────────
 
@@ -37,6 +38,10 @@ vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: mockCheckRateLimit,
 }))
 
+vi.mock('drizzle-orm', () => ({
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
+}))
+
 vi.mock('jose', () => ({
     SignJWT: vi.fn().mockImplementation(() => ({
         setProtectedHeader: vi.fn().mockReturnThis(),
@@ -52,6 +57,7 @@ let mockPayload: {
     findByID: ReturnType<typeof vi.fn>
     find: ReturnType<typeof vi.fn>
     update: ReturnType<typeof vi.fn>
+    db?: { drizzle: { execute: ReturnType<typeof vi.fn> } }
 }
 
 vi.mock('payload', () => ({
@@ -247,8 +253,9 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
         })
 
-        it('TC-SSOPW2-07: tenant-owner who has seen wizard → /dashboard (wizard gate wins)', async () => {
+        it('TC-SSOPW2-07: tenant-owner who has seen wizard + all steps done → /dashboard', async () => {
             mockPayload.findByID.mockResolvedValue({ ...BASE_USER, has_seen_ai_wizard: true })
+            mockPayload.db = { drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }, { step: 2 }, { step: 3 }] }) } }
             const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
@@ -259,11 +266,12 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
 
-        it('TC-SSOPW2-09: tenant-owner with completed onboarding → /dashboard', async () => {
+        it('TC-SSOPW2-09: tenant-owner with completed onboarding + all steps done → /dashboard', async () => {
             mockPayload.findByID.mockResolvedValue({
                 ...BASE_USER,
                 tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
             })
+            mockPayload.db = { drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }, { step: 2 }, { step: 3 }] }) } }
             const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
@@ -306,6 +314,73 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             // CQ-05: prevent proxy/CDN caching of Set-Cookie responses
             const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
             expect(res.headers['Cache-Control']).toBe('no-store')
+        })
+    })
+
+    // ── Web Store step-based deeplink ─────────────────────────────────────────
+
+    describe('Web Store step-based deeplink', () => {
+        const ONBOARDED_USER = {
+            ...BASE_USER,
+            has_seen_ai_wizard: true,
+            tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
+        }
+
+        function withSteps(completedSteps: number[]) {
+            mockPayload.db = {
+                drizzle: {
+                    execute: mockDrizzleExecute.mockResolvedValue({
+                        rows: completedSteps.map((step) => ({ step })),
+                    }),
+                },
+            }
+        }
+
+        beforeEach(() => {
+            mockPayload.findByID.mockResolvedValue(structuredClone(ONBOARDED_USER))
+        })
+
+        it('TC-SSOPW2-14: 0 steps completed → /onboarding (start Web Store setup)', async () => {
+            withSteps([])
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
+        })
+
+        it('TC-SSOPW2-15: step 1 done → /settings/shipping (setup shipping next)', async () => {
+            withSteps([1])
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/settings/shipping' })
+        })
+
+        it('TC-SSOPW2-16: steps 1+2 done → /products/new (add first product next)', async () => {
+            withSteps([1, 2])
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/products/new' })
+        })
+
+        it('TC-SSOPW2-17: all 3 steps done → /dashboard (Web Store setup complete)', async () => {
+            withSteps([1, 2, 3])
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+        })
+
+        it('TC-SSOPW2-18: DB throws → fail-open /dashboard (SSO not blocked)', async () => {
+            mockPayload.db = {
+                drizzle: { execute: mockDrizzleExecute.mockRejectedValue(new Error('DB error')) },
+            }
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+        })
+
+        it('TC-SSOPW2-19: hasSeenAiWizard=false + onboarding done + 0 steps → /onboarding', async () => {
+            mockPayload.findByID.mockResolvedValue({
+                ...BASE_USER,
+                has_seen_ai_wizard: false,
+                tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
+            })
+            withSteps([])
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
         })
     })
 })

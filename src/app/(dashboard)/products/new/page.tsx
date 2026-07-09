@@ -43,14 +43,16 @@ export default function NewProductPage() {
             compareAtPrice: data.hasVariants ? undefined : data.compareAtPrice || undefined,
             category: data.categoryIds,
             inventory: data.hasVariants ? (data.variants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0) : (data.baseInventory || 0),
-            sku: data.hasVariants ? '' : data.baseSku || '',
+            sku: data.baseSku || '',
             weight: data.shippingWeight || 0,
             dimensions: {
                 length: data.shippingLength || 0,
                 width: data.shippingWidth || 0,
                 height: data.shippingHeight || 0,
             },
-            images: data.images?.map(img => ({ image: img.id, alt: data.name })) || [],
+            // Alt fallback ("{name} - {store}") is computed server-side (saveProductAction),
+            // which has the tenant's store name — send the raw trimmed alt only (GH-1458).
+            images: data.images?.map(img => ({ image: img.id, alt: img.alt?.trim() || '' })) || [],
             hasVariants: data.hasVariants,
             variantConfigs: data.hasVariants ? data.tiers?.map((t) => ({
                 name: t.name,

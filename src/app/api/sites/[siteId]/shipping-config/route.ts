@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX } from '@/lib/shipping'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 
 export const maxDuration = 60
 
@@ -133,9 +134,16 @@ export const PATCH = withFeatureGuard('shipping_fee_configuration')(withAuth<Rou
         })
 
         // Notify SSO Hub: user configured shipping (step 2)
-        import('@/lib/sso/sso-api-client')
-            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 2))
-            .catch((err) => console.error('[ShippingConfig] SSO step 2 import failed:', err))
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _notifyStep2 = () =>
+            notifyStepComplete(payload, user.id, 2).catch((err) =>
+                console.error('[ShippingConfig] SSO step 2 notify failed:', err),
+            )
+        try {
+            after(_notifyStep2)
+        } catch {
+            void _notifyStep2()
+        }
 
         return NextResponse.json({
             success: true,

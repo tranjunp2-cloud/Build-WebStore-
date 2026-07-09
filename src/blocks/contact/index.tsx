@@ -155,6 +155,13 @@ type ContactFormProps = {
     inline?: boolean
 }
 
+const DEFAULT_FORM_FIELDS: FormField[] = [
+    { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
+    { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
+    { fieldName: 'phone', label: 'Phone', fieldType: 'phone', required: false },
+    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
+]
+
 /**
  * Plan 260415 contact-bugfix — Standard form wired vào useContactForm hook.
  * - POST tới /api/contact-submit
@@ -166,7 +173,8 @@ type ContactFormProps = {
  * - Honeypot field (name="website") ẩn cho bot
  */
 function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →', inline = false }: ContactFormProps) {
-    const requiredFieldNames = formFields
+    const fields = formFields.length > 0 ? formFields : DEFAULT_FORM_FIELDS
+    const requiredFieldNames = fields
         .filter(f => f.required)
         .map(f => f.fieldName || f.fieldType || 'message')
 
@@ -202,7 +210,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 
     return (
         <form className={className} onSubmit={handleSubmit} noValidate>
-            {formFields.map((field, i) => {
+            {fields.map((field, i) => {
                 const fieldName = field.fieldName || field.fieldType || `field-${i}`
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
@@ -255,7 +263,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 // (focus-visible chỉ hiện khi keyboard nav, không khi click chuột).
 
 const INPUT_BASE_CLASS =
-    'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
+    'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-muted)] bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
 
 function FormFieldInput({ field, error, errorId, inlineRows }: { field: FormField; error?: boolean; errorId?: string; inlineRows?: number }) {
     const name = field.fieldName || field.fieldType || 'field'
@@ -391,64 +399,6 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
         )
     }
 
-    // ── Map Split variant ─────────────────────────────────────────────────
-    if (variant === 'map-split') {
-        return (
-            <ContactSection>
-                <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
-
-                {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
-                    {/* Map + Contact Info — mt-8 = CARD_PADDING.lg so card border aligns with "Name *" in GlassCard */}
-                    <div
-                        className="rounded-xl flex flex-col px-8 pb-8 overflow-hidden mt-8"
-                        style={{
-                            background: `rgba(var(--brand-primary-rgb), 0.04)`,
-                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                        }}
-                    >
-                        {address ? (
-                            <iframe
-                                title="Location map"
-                                src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-                                className="w-full rounded-b-lg mb-4 border-0 -mx-8"
-                                style={{ width: 'calc(100% + 4rem)', minHeight: '240px' }}
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                            />
-                        ) : (
-                            <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4 mt-8"
-                                style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
-                                aria-hidden="true"
-                            >
-                                <MapPin size={28} />
-                            </div>
-                        )}
-                        {address && <Body size="small" className="font-medium opacity-70">{address}</Body>}
-                        {email && (
-                            <Body size="small" className="opacity-50 mt-2">
-                                <Mail size={12} className="inline mr-1" style={{ color: 'var(--brand-primary)' }} aria-hidden="true" />
-                                {email}
-                            </Body>
-                        )}
-                        {phone && (
-                            <Body size="small" className="opacity-50 mt-1">
-                                <Phone size={12} className="inline mr-1" style={{ color: 'var(--brand-primary)' }} aria-hidden="true" />
-                                {phone}
-                            </Body>
-                        )}
-                    </div>
-
-                    {/* Contact form — GlassCard unchanged */}
-                    <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
-                    </GlassCard>
-                </div>
-            </ContactSection>
-        )
-    }
-
     // ── Minimal Inline variant ────────────────────────────────────────────
     // Compact py-8 layout, skip blob. Inline Send button gets TOUCH_TARGET.min.
     if (variant === 'minimal-inline') {
@@ -494,7 +444,8 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     }
 
     // ── Split variant ────────────────────────────────────────────────────
-    if (variant === 'split') {
+    // GH-1465: legacy map-split renders as split (Google Maps embed removed)
+    if (variant === 'split' || variant === 'map-split') {
         return (
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />

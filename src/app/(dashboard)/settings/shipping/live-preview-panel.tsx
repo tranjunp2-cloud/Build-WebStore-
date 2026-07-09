@@ -33,9 +33,12 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
     const isFree = cfg.freeAbove != null && SIM_CART_SEN >= cfg.freeAbove
     const gapSen = cfg.freeAbove != null && !isFree ? cfg.freeAbove - SIM_CART_SEN : null
 
+    // GH-1511 #39: border-solid required (preflight OFF) so the panel frame actually paints;
+    // solid --background (alpha dropped) per design. Header divider: border-0 first — plain
+    // border-solid would expose the UA 3px default on the un-widthed sides.
     return (
-        <div className="mt-1 rounded-[12px] border border-white/[0.08] bg-[hsl(var(--background)/0.7)] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="mt-1 rounded-[12px] border border-solid border-white/[0.08] bg-[hsl(var(--background))] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-0 border-b border-solid border-white/[0.06] bg-white/[0.02]">
                 <span className="text-[11px] font-semibold tracking-widest text-[var(--dash-text-muted)] uppercase">
                     {s.livePreview}
                 </span>

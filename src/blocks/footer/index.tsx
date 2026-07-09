@@ -9,6 +9,7 @@ import { GradientLine } from '../shared/decorative'
 import { getSocialIcon } from '../shared/social-icons'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body, Caption } from '../shared/Typography'
 import {
@@ -176,7 +177,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
                     const ext = resolveStyle(link) === 'external'
                     return (
                         <li key={`${link?.label || 'link'}-${j}`}>
-                            <a
+                            <SmartLink
                                 href={resolveHref(link?.url)}
                                 target={ext ? '_blank' : undefined}
                                 rel={ext ? 'noopener noreferrer' : undefined}
@@ -184,7 +185,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
                             >
                                 <Body size="small" as="span">{link.label}</Body>
                                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-                            </a>
+                            </SmartLink>
                         </li>
                     )
                 })}
@@ -242,7 +243,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                             {(col.links || []).map((link, j) => {
                                                 const ext = resolveStyle(link) === 'external'
                                                 return (
-                                                    <a
+                                                    <SmartLink
                                                         key={`${link?.label || 'link'}-${j}`}
                                                         href={resolveHref(link?.url)}
                                                         target={ext ? '_blank' : undefined}
@@ -251,7 +252,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                                     >
                                                         <Body size="small" as="span">{link.label}</Body>
                                                         {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-                                                    </a>
+                                                    </SmartLink>
                                                 )
                                             })}
                                         </div>
@@ -347,7 +348,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                 {firstColLinks.slice(0, 6).map((link, i) => {
                                     const ext = resolveStyle(link) === 'external'
                                     return (
-                                    <a
+                                    <SmartLink
                                         key={`${link?.label || 'link'}-${i}`}
                                         href={resolveHref(link?.url)}
                                         target={ext ? '_blank' : undefined}
@@ -356,7 +357,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                     >
                                         <Body size="small" as="span">{link.label}</Body>
                                         {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-                                    </a>
+                                    </SmartLink>
                                     )
                                 })}
                             </div>

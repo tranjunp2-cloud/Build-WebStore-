@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Clock, CheckCircle2 } from 'lucide-react'
 import { SetupAlertBanner } from './SetupAlertBanner'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 
 interface OnboardingStep {
@@ -112,12 +113,9 @@ export function DashboardOnboarding({
                                         <p className="text-xs text-dash-text-muted">{step.description}</p>
                                     </div>
                                 </div>
-                                <Link
-                                    href={step.href}
-                                    className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3 text-xs font-medium !text-white transition-opacity hover:opacity-90"
-                                >
-                                    {o.continueBtn}
-                                </Link>
+                                <Button asChild variant="dashPrimary" size="sm" className="ml-3 shrink-0">
+                                    <Link href={step.href}>{o.continueBtn}</Link>
+                                </Button>
                             </div>
                         )
                     })}

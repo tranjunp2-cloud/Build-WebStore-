@@ -9,10 +9,15 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
+                // Unified primary (design-system): blue→teal gradient (was blue→purple).
+                // `!text-white` survives the `.dash-shell .text-white` legacy remap so the
+                // label stays white on the gradient in both themes.
                 default:
-                    'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 focus-visible:ring-blue-500',
+                    'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white shadow-lg shadow-blue-500/25 hover:opacity-90 focus-visible:ring-cyan-500',
+                // `!text-white` keeps the label white on the red fill in BOTH themes —
+                // plain text-white gets remapped to --dash-text (dark) inside .dash-shell (GH-1192).
                 destructive:
-                    'bg-red-600 text-white shadow-sm hover:bg-red-500 focus-visible:ring-red-500',
+                    'bg-red-600 !text-white shadow-sm hover:bg-red-500 focus-visible:ring-red-500',
                 outline:
                     'border border-white/10 bg-transparent text-white hover:bg-white/5 focus-visible:ring-zinc-400',
                 secondary:
@@ -30,14 +35,20 @@ const buttonVariants = cva(
                     'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
                 dashSecondary:
                     '[border:1px_solid_hsl(var(--input-border))] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
+                // GH-1192 dash ghost: subtle action inside .dash-shell (pairs with size="dash"/"sm").
+                // Mirrors the revamp `.btn-ghost` (transparent + muted ink, hover surface + full ink).
+                // Token colors survive the `.dash-shell` legacy remap, so no `!` needed here.
+                dashGhost:
+                    'bg-transparent text-[var(--dash-text-muted)] font-medium hover:bg-white/[0.05] hover:text-[var(--dash-text)] focus-visible:ring-zinc-400',
             },
             size: {
+                // Unified radius: all sizes inherit base `rounded-lg` (8px). Height scale only.
                 default: 'h-10 px-5 py-2',
-                sm: 'h-8 rounded-md px-3 text-xs',
-                lg: 'h-12 rounded-xl px-8 text-base',
+                sm: 'h-8 px-3 text-xs',
+                lg: 'h-12 px-8 text-base',
                 icon: 'h-9 w-9',
                 // F33 action-button metrics (pairs with dashPrimary / dashSecondary).
-                dash: 'h-[36px] px-4 rounded-[8px] text-[13px]',
+                dash: 'h-9 px-4 text-[13px]',
             },
         },
         defaultVariants: {

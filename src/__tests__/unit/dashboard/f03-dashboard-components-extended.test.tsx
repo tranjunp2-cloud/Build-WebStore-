@@ -33,7 +33,7 @@ vi.mock('@/i18n', () => ({
                     morning: 'Morning',
                     afternoon: 'Afternoon',
                     evening: 'Evening',
-                    welcomeTitle: 'Welcome to PrimeWeb Dashboard',
+                    welcomeTitle: 'Welcome to Web Store Dashboard',
                     welcomeSubtitle: 'Monitor your store performance and manage your online business from one place.',
                     stats: {
                         views: 'Views',
@@ -149,7 +149,7 @@ import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 describe('DashboardGreeting', () => {
     it('[TC-F03.03] renders dashboard title', () => {
         render(<DashboardGreeting />)
-        expect(screen.getByText(/Welcome to PrimeWeb Dashboard/i)).toBeTruthy()
+        expect(screen.getByText(/Welcome to Web Store Dashboard/i)).toBeTruthy()
     })
 
     it('displays greeting subtitle', () => {
@@ -308,7 +308,8 @@ describe('PeriodSelector', () => {
     it('defaults to 7d when URL param is 7d', () => {
         render(<PeriodSelector />)
         const selectedBtn = screen.getByText('Last 7 days')
-        expect(selectedBtn.className).toContain('bg-[hsl(var(--card))]')
+        // Revamp: segmented control marks the active tab with the `active` class
+        expect(selectedBtn.className).toContain('active')
     })
 
     it('renders all period labels', () => {

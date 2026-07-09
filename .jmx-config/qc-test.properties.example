@@ -1,0 +1,56 @@
+# JMeter properties template for QC test environment
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy to `qc-test.properties` (gitignored) and fill in real values from
+# 1Password vault "PrimeWeb QC". Referenced from JMeter .jmx test plans as
+# ${__P(base.url)}, ${__P(owner1.email)}, etc.
+# ─────────────────────────────────────────────────────────────────────────────
+# NEVER commit qc-test.properties (only this .example file).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Base URL (custom domain or Vercel-generated) ────────────────────────────
+base.url=https://qc-test.web-v2.dev.ecommercehub.my
+base.protocol=https
+base.host=qc-test.web-v2.dev.ecommercehub.my
+
+# ── Test accounts (fetch passwords from 1Password vault "PrimeWeb QC") ──────
+admin1.email=qc-admin-1@primeweb.local
+admin1.password=REPLACE_FROM_VAULT
+
+admin2.email=qc-admin-2@primeweb.local
+admin2.password=REPLACE_FROM_VAULT
+
+owner1.email=qc-owner-1@primeweb.local
+owner1.password=REPLACE_FROM_VAULT
+
+owner2.email=qc-owner-2@primeweb.local
+owner2.password=REPLACE_FROM_VAULT
+
+owner3.email=qc-owner-3@primeweb.local
+owner3.password=REPLACE_FROM_VAULT
+
+owner4.email=qc-owner-4@primeweb.local
+owner4.password=REPLACE_FROM_VAULT
+
+owner5.email=qc-owner-5@primeweb.local
+owner5.password=REPLACE_FROM_VAULT
+
+staff1.email=qc-staff-1@primeweb.local
+staff1.password=REPLACE_FROM_VAULT
+
+# ── Load test parameters (tweak per test plan) ──────────────────────────────
+# Concurrent virtual users
+threads.count=100
+# Ramp-up seconds (spread the thread start over this many seconds)
+ramp.up.seconds=60
+# Hold at peak concurrency for this many seconds
+duration.seconds=300
+# Think time between requests (ms)
+think.time.ms=1000
+
+# ── Endpoints under test (adjust per plan) ──────────────────────────────────
+path.home=/
+path.login=/login
+path.login.api=/api/auth/login
+path.dashboard=/dashboard
+path.health=/api/health
+path.public.tenant=/                    # host swapped to qc-shop-N subdomain

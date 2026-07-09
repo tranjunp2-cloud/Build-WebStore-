@@ -9,13 +9,13 @@
 
 ## Phasing (timeline-driven)
 
-> F37 chia 2 phase. Phase 1 KHÔNG phụ thuộc OAuth Google — ship sớm. Phase 2 cần hạ tầng Google OAuth (hiện **chưa tồn tại** trong codebase — xem note ở US-F37-05).
+> F37 chia 2 phase. Phase 1 không phụ thuộc Google Business Profile connection — ship sớm. Phase 2 cần GBP-only Google authorization (hiện **chưa tồn tại** trong codebase — xem note ở US-F37-05). Analytics dùng PostHog, không dùng GA4/GSC.
 
 
 | Phase             | Stories                       | Điều kiện                                                                             |
 | ----------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
-| **Phase 1 (P0)**  | US-F37-01, 02, 03, 04, 08, 09 | Không cần OAuth. Reuse nhiều thành phần đã có                                         |
-| **Phase 2 (P1)**  | US-F37-05, 06, 07             | Cần build Google OAuth từ đầu (GBP + GSC) + Google verification (~4–6 tuần lead time) |
+| **Phase 1 (P0)**  | US-F37-01, 02, 03, 04, 08, 09 | Không cần Google connection. Reuse nhiều thành phần đã có, thêm PostHog nếu thiếu     |
+| **Phase 2 (P1)**  | US-F37-05, 06, 07             | Cần build GBP-only Google authorization + Google verification (~4–6 tuần lead time)   |
 | **Deferred (P2)** | hreflang (trong US-F37-09)    | Blocked bởi i18n client-side; chờ F21 URL-based locale routing                        |
 
 
@@ -26,7 +26,7 @@
 > **Áp dụng cho mọi User Story dashboard-facing trong file này.**
 
 ```gherkin
-GIVEN user truy cập tab/tính năng trang quản trị (Dashboard → Local SEO)
+GIVEN user truy cập tab/tính năng trang quản trị (Dashboard → SEO)
 THEN  nội dung render gọn bên trong Main Content Area (tuân thủ F18-03)
   AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) giữ nguyên, không re-render toàn trang
 ```
@@ -224,7 +224,7 @@ THEN  response là text/plain, HTTP 200, format Markdown
 
 **Wave 4** | **P0** | **L** | **Status:** Draft
 
-> **Reality note:** F03 đã có general SEO score (`SEOView.tsx`). Local SEO Score là điểm **riêng biệt**, không thay thế. **RESOLVED (CF-4):** score normalize trên bucket đang áp dụng. Phase 1 (Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15%) đạt 100; bucket GBP/Reviews/NAP/Citations hiển thị "🔒 unlock Phase 2" từ đầu → không tụt điểm. Công thức đầy đủ ở PRD §13.8.
+> **Reality note:** F03 đã có general SEO score. Local SEO Score là điểm **riêng biệt**, không thay thế. **RESOLVED (CF-4):** score normalize trên bucket đang áp dụng. Phase 1 (Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15%) đạt 100; Google Business Profile/Reviews/Business Info/Citations unlock ở Phase 2 và không làm tụt điểm Phase 1.
 
 ### Story
 
@@ -239,10 +239,10 @@ So that tôi biết chính xác phải làm gì tiếp theo để khách tìm th
 #### AC-1: Happy Path — Score phản ánh completeness
 
 ```gherkin
-GIVEN site chưa có local business data, chưa kết nối GBP
-WHEN  vào tab Local SEO trong dashboard
+GIVEN site chưa có local business data, chưa kết nối Google Business Profile
+WHEN  vào `Dashboard > SEO`
 THEN  Local SEO Score hiển thị ≤ 30/100
-  AND checklist hiển thị ≥ 4 items "Việc cần làm" priority High
+  AND checklist hiển thị tối đa 3 items "Việc cần làm" priority High
 
 GIVEN seller hoàn thành địa chỉ cấu trúc + giờ mở cửa + bật AI crawlers (Phase 1)
 WHEN  hệ thống tính lại score
@@ -262,9 +262,9 @@ THEN  toggle "Cho phép AI crawlers" tự động bật
 
 ### Additional Criteria
 
-- [ ] Công thức Phase 1: Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15% (normalize, đạt 100). Phase 2 thêm GBP/Reviews/NAP/Citations — xem PRD §13.8
-- [ ] Score tính lại khi save site settings hoặc khi GBP Insights refresh (max 1 lần/24h) — BR-07
-- [ ] Checklist tối đa 10 items, ẩn item đã done (BR-10)
+- [ ] Công thức Phase 1: Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15% (normalize, đạt 100). Phase 2 thêm Google Business Profile/Reviews/Business Info/Citations — xem PRD §13.8
+- [ ] Score tính lại khi save site settings hoặc khi GBP metrics refresh (max 1 lần/24h) — BR-07. PostHog website analytics không ảnh hưởng Local SEO Score
+- [ ] Checklist tối đa 3 items, ẩn item đã done (BR-10)
 - [ ] Pure function `src/lib/seo/local-seo-score.ts` (mới)
 - [ ] Mỗi item: mô tả seller-friendly, impact label, nút action
 
@@ -279,12 +279,11 @@ THEN  toggle "Cho phép AI crawlers" tự động bật
 
 ---
 
-## US-F37-05: Google Business Profile OAuth & Sync
+## US-F37-05: Google Business Profile Connect & Sync
 
 **Wave 4** | **P1** | **XL** | **Status:** Draft — **PHASE 2**
 
-> **⚠️ Reality note (quan trọng nhất):** Codebase **KHÔNG có hạ tầng Google OAuth nào** — không có `src/app/api/google/`, không có token Google trên Tenants (chỉ Stripe/Xendit). US-F03-08 mới chỉ là *story plan*, chưa implement. Cái gọi là "GSC OAuth của F03" thực chất chỉ là 2 text field nhập tay (`googleAnalyticsId`, `googleVerificationToken`) — KHÔNG phải OAuth.
-> **→ Phải build Google OAuth từ đầu:** consent URL builder, callback handler, encrypted token store, auto-refresh, CSRF state. Hạ tầng này dùng chung cho cả **GBP** (story này) và **GSC** (F03-08). Cần submit Google verification sớm (~4–6 tuần lead time).
+> **Reality note:** Codebase **chưa có GBP authorization** — không có `src/app/api/google/`, không có token GBP trên Sites. Build GBP-only authorization từ đầu: consent URL builder, callback handler, encrypted token store, auto-refresh, CSRF state. Không thêm GA4/GSC scopes. Cần submit Google verification sớm (~4–6 tuần lead time).
 
 ### Story
 
@@ -296,47 +295,46 @@ So that tôi xem được số liệu thực (cuộc gọi, chỉ đường) và
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — OAuth connect thành công
+#### AC-1: Happy Path — Google Business Profile connect thành công
 
 ```gherkin
-GIVEN seller click "Kết nối Google Business Profile" (chưa connect)
-WHEN  hoàn thành Google OAuth flow với account có GBP listing (scope business.manage)
+GIVEN seller click "Connect Google Business Profile" trong `Settings > Business Info`
+WHEN  hoàn thành Google authorization flow với account có GBP listing (scope business.manage)
 THEN  hệ thống lưu access_token + refresh_token vào Sites.gbpIntegration (per-site)
-  AND dashboard hiển thị badge "GBP: Đã kết nối ✓"
-  AND hệ thống tự động pull GBP Insights trong vòng 30 giây
+  AND `Settings > Business Info` hiển thị trạng thái "Connected"
+  AND hệ thống tự động pull Google Business Profile info trong vòng 30 giây
 ```
 
 #### AC-2: Sync giờ mở cửa lên GBP
 
 ```gherkin
-GIVEN seller đã connect GBP và đã thiết lập giờ mở cửa trên platform
-WHEN  click "Đồng bộ giờ mở cửa lên GBP"
+GIVEN seller đã connect Google Business Profile và đã thiết lập giờ mở cửa trên platform
+WHEN  click "Sync to Google"
 THEN  hệ thống gọi GBP API cập nhật opening hours trên GBP listing (one-way push)
   AND hiện toast "Đồng bộ thành công" sau khi API confirm
   AND nếu API lỗi → toast lỗi cụ thể (không nuốt lỗi)
 ```
 
-#### AC-3: Wizard cho seller chưa có GBP
+#### AC-3: Seller chưa có GBP
 
 ```gherkin
 GIVEN seller chưa có Google Business Profile
-WHEN  mở wizard "Kết nối GBP"
-THEN  bước 1 hỏi "Bạn đã có GBP chưa?", chọn "Chưa"
-  AND hiển thị link + hướng dẫn tạo GBP tại business.google.com
-  AND nút "Tôi đã tạo xong → Tiếp tục" để quay lại OAuth flow
+WHEN  mở card Google Business Profile trong `Settings > Business Info`
+THEN  UI hiển thị link tạo GBP tại business.google.com
+  AND seller có thể quay lại bấm "Connect Google" sau khi tạo xong
 ```
 
 ### Additional Criteria
 
-- [ ] Token GBP lưu **per-Site** (`Sites.gbpIntegration`), tách biệt token GSC/GA (BR-05)
+- [ ] Token GBP lưu **per-Site** (`Sites.gbpIntegration`), không tạo GSC/GA token (BR-05)
 - [ ] access_token KHÔNG bao giờ expose ra client; mọi GBP call qua server-side (NFR Security)
-- [ ] OAuth redirect URI match chính xác GCP console; CSRF state param bắt buộc
-- [ ] Hạ tầng OAuth dùng chung cho GBP + GSC (build once)
+- [ ] Google redirect URI match chính xác GCP console; CSRF state param bắt buộc
+- [ ] Authorization scope chỉ có `business.manage`
 - [ ] GCP prerequisite: enable "My Business Business Information API" + "My Business Account Management API"
 
 ### Market Notes
 
-- <40% SME SE Asia có GBP → wizard tạo mới là bắt buộc.
+- <40% SME SE Asia có GBP → link tạo mới phải rõ, nhưng không tạo wizard nhiều bước trong MVP.
 
 ### Analytics / Tracking Notes
 
@@ -345,22 +343,22 @@ THEN  bước 1 hỏi "Bạn đã có GBP chưa?", chọn "Chưa"
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] GBP OAuth flow tested end-to-end với real Google account
+- [ ] GBP authorization flow tested end-to-end với real Google account
 - [ ] Token encrypt at rest; auto-refresh hoạt động
 
 ---
 
-## US-F37-06: GBP Insights Dashboard
+## US-F37-06: Google Activity in SEO Dashboard
 
 **Wave 4** | **P1** | **L** | **Status:** Draft — **PHASE 2**
 
-> **Reality note:** Reuse `DashboardStats.tsx` (card pattern) + Recharts (đã dùng ở `AnalyticsChart.tsx`). Tab dùng **client-side tab system** (`TabId` union + `<TabPanel>` + `?tab=`), KHÔNG phải route file riêng — thêm `'local-seo'` vào `TabId` + `LocalSEOView`, không tạo `dashboard/local-seo/page.tsx`.
+> **Reality note:** Không tạo tab Local SEO mới. Reuse `Dashboard > SEO` hiện có. Website analytics dùng PostHog trong `Dashboard > Analytics`; Google local actions dùng GBP trong `Dashboard > SEO`. Không dùng GA4/GSC, không build chart dashboard trong SEO MVP.
 
 ### Story
 
 ```
 As a   chủ shop SME
-I want xem số liệu Local Search gắn với doanh thu (cuộc gọi, chỉ đường, clicks)
+I want xem số liệu dễ hiểu từ Google Business Profile
 So that tôi biết Local SEO mang lại bao nhiêu khách thực mỗi tuần
 ```
 
@@ -369,20 +367,19 @@ So that tôi biết Local SEO mang lại bao nhiêu khách thực mỗi tuần
 #### AC-1: Happy Path — Hiển thị metric cards
 
 ```gherkin
-GIVEN seller đã connect GBP và chọn khoảng 7 ngày
-WHEN  vào tab Local SEO trong dashboard
-THEN  hiển thị ≥ 4 metric cards (Cuộc gọi, Chỉ đường, Clicks từ GBP, Lượt xem GBP)
-  AND mỗi card: số liệu tuyệt đối + % change + mũi tên xu hướng
+GIVEN seller đã connect Google Business Profile và chọn khoảng 7 ngày
+WHEN  vào `Dashboard > SEO`
+THEN  hiển thị Google activity từ GBP: Calls, Directions, Website visits
+  AND mỗi card hiển thị số liệu tuyệt đối
   AND timestamp "Cập nhật: X giờ trước" hiển thị dưới cards
   AND loading state là skeleton shimmer (không phải spinner)
-  AND line chart Recharts trend 3 metrics chính theo 7/30 ngày
 ```
 
 #### AC-2: Cache và graceful fallback
 
 ```gherkin
-GIVEN GBP Insights API trả về lỗi hoặc timeout
-WHEN  seller vào tab Local SEO
+GIVEN GBP metrics API trả về lỗi hoặc timeout
+WHEN  seller vào `Dashboard > SEO`
 THEN  hiển thị data từ cache (nếu cache < 6h) + banner "Đang dùng dữ liệu cache từ X giờ trước"
   AND nếu không có cache → empty state với nút "Thử tải lại"
   AND dashboard KHÔNG crash
@@ -392,18 +389,17 @@ THEN  hiển thị data từ cache (nếu cache < 6h) + banner "Đang dùng dữ
 
 ```gherkin
 GIVEN screen width < 768px
-WHEN  seller vào tab Local SEO
-THEN  GBP Insights cards hiển thị 2x3 grid
-  AND trend chart thu nhỏ phù hợp viewport
+WHEN  seller vào `Dashboard > SEO`
+THEN  Google activity cards xếp 1 cột hoặc 2 cột theo pattern dashboard hiện có
   AND checklist items full width, touch target ≥ 44px
   AND không có horizontal overflow
 ```
 
 ### Additional Criteria
 
-- [ ] Tối đa 6 cards; card "AI appearances" chỉ render nếu API trả về field, ẩn nếu không (không block launch)
-- [ ] GBP Insights cache 6h, cache key `gbp_insights_{siteId}_{period}` (BR-08)
-- [ ] GBP Insights API throttle: max 5 requests/tenant/giờ (NFR Quota)
+- [ ] Không quá 3 metrics trong SEO: Calls/Directions/Website visits từ GBP
+- [ ] GBP metrics cache 6h, cache key `gbp_metrics_{siteId}_{period}` (BR-08)
+- [ ] GBP metrics API throttle: max 5 requests/tenant/giờ (NFR Quota)
 - [ ] Tab load < 2s (NFR)
 
 ### Definition of Done
@@ -413,11 +409,11 @@ THEN  GBP Insights cards hiển thị 2x3 grid
 
 ---
 
-## US-F37-07: NAP Consistency Checker
+## US-F37-07: Business Info Difference Checker
 
 **Wave 4** | **P1** | **M** | **Status:** Draft — **PHASE 2**
 
-> **Reality note:** Chỉ chạy được khi GBP đã connected (cần GBP data để so sánh) → phụ thuộc US-F37-05.
+> **Reality note:** Chỉ chạy được khi GBP đã connected (cần GBP data để so sánh) → phụ thuộc US-F37-05. Seller-facing UI không dùng chữ NAP.
 
 ### Story
 
@@ -433,9 +429,9 @@ So that thông tin doanh nghiệp nhất quán, tăng độ tin cậy với Goog
 
 ```gherkin
 GIVEN seller đã connect GBP và GBP listing có SĐT khác Sites.contactInfo.phone
-WHEN  hệ thống chạy NAP check (sau khi GBP connected hoặc sau khi save site settings)
-THEN  dashboard hiển thị badge "NAP: Có sự khác biệt ⚠"
-  AND checklist có item cụ thể: giá trị trên website vs trên GBP
+WHEN  hệ thống chạy business info difference check (sau khi GBP connected hoặc sau khi save site settings)
+THEN  `Settings > Business Info` hiển thị "Phone number is different"
+  AND checklist trong `Dashboard > SEO` có item dẫn về Business Info
   AND Local SEO Score trừ 10 điểm cho inconsistency
 ```
 
@@ -443,21 +439,21 @@ THEN  dashboard hiển thị badge "NAP: Có sự khác biệt ⚠"
 
 ```gherkin
 GIVEN Name/Address/Phone khớp giữa Sites record và GBP
-WHEN  NAP check chạy
-THEN  badge "NAP: Khớp ✓" hiển thị
-  AND không có checklist item NAP nào
+WHEN  business info difference check chạy
+THEN  không hiển thị warning trong `Settings > Business Info`
+  AND không có checklist item về business info differences
 ```
 
 ### Additional Criteria
 
-- [ ] Pure comparison util `src/lib/seo/nap-checker.ts` (mới)
-- [ ] Modal "Xem chi tiết" so sánh 2 cột Website vs GBP, highlight dòng lệch
+- [ ] Pure comparison util `src/lib/seo/business-info-diff-checker.ts` (mới)
+- [ ] Inline review panel so sánh từng field Website vs Google, highlight dòng lệch
 - [ ] Chỉ check khi GBP connected (FR-20)
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] NAP mismatch surfaces đúng trong checklist
+- [ ] Business info differences surface đúng trong Business Info và checklist
 
 ---
 
@@ -626,4 +622,3 @@ THEN  hreflang chưa implement; unblock khi F21 có URL-based locale routing /en
 Không còn — tất cả đã chốt thành decision.
 
 > Đã chốt: thị trường MY duy nhất (không scope VN), Local SEO Score Phase 1/2 (PRD §13.8), Geocoding paste-link 3 lớp (PRD §13.9).
-

@@ -20,9 +20,10 @@
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe } from 'lucide-react'
+import { Globe, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { AppSwitcher } from './AppSwitcher'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { NAV_SECTIONS, filterNavSections, type NavLeaf, type SidebarBadgeKey } from '@/config/sidebar-nav'
 import { isPathActive } from '@/lib/sidebar/is-path-active'
@@ -46,6 +47,8 @@ type SidebarProps = {
     badgeCounts?: Partial<Record<SidebarBadgeKey, number>>
     /** Desktop mini mode (64px icon-only). Mobile drawer ignores this and always renders full. */
     collapsed?: boolean
+    /** Expand the rail from mini mode — rendered as the » button at the top of the collapsed rail. */
+    onToggleCollapsed?: () => void
     /** Enable the width transition only after the persisted state has painted (anti hydration-flash). */
     animateCollapse?: boolean
     /**
@@ -57,7 +60,7 @@ type SidebarProps = {
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false, onToggleCollapsed }: SidebarProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
 
@@ -109,8 +112,9 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 key={leaf.href}
                 href={leaf.href}
                 className={cn(
-                    // Responsive height: 34px on large screens (≥1536px / 1920), tighter on smaller laptops
-                    'no-underline flex items-center rounded-[12px] h-[32px] 2xl:h-[34px] text-[13px] font-medium leading-[1.43] transition-colors',
+                    // Responsive height: 34px on large screens (≥1536px / 1920), tighter on smaller laptops.
+                    // Label is 12px on the mobile/tablet drawer (< lg) and 13px on the desktop sidebar (lg+).
+                    'no-underline flex items-center rounded-[12px] h-[32px] 2xl:h-[34px] text-[12px] lg:text-[13px] font-medium leading-[1.43] transition-colors',
                     mini ? 'justify-center px-0' : 'gap-3 px-4',
                     isActive
                         ? 'bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))] shadow-[0_0_16px_hsl(var(--primary)/0.25)]'
@@ -166,9 +170,30 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
     // ─── Sidebar Content (mini = desktop collapsed; mobile drawer always full) ─
     const renderSidebarContent = (mini: boolean) => (
         <>
+            {/* Mini rail: expand toggle » sits at the top, directly under the logo icon in the header
+                (collapsed-state brand placement). Hidden in the full/mobile drawer (« lives in the header). */}
+            {mini && onToggleCollapsed && (
+                <div className="flex justify-center pt-1 pb-0 shrink-0">
+                    <button
+                        onClick={onToggleCollapsed}
+                        aria-label="Expand sidebar"
+                        aria-expanded={false}
+                        aria-controls="dashboard-sidebar"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent border-none outline-none text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer transition-colors"
+                    >
+                        <ChevronsRight className="h-5 w-5" />
+                    </button>
+                </div>
+            )}
+
             {/* Flat nav — scrolls as one column; section headers are static labels (no accordion) */}
             <nav
-                className="sidebar-scroll flex-1 flex flex-col gap-1 px-3 pt-6 overflow-y-auto"
+                className={cn(
+                    'sidebar-scroll flex-1 flex flex-col gap-1 px-3 overflow-y-auto',
+                    // Mini rail: tighter top gap so the » toggle sits close to the first icon
+                    // (full/mobile keep the original pt-6 rhythm).
+                    mini ? 'pt-2' : 'pt-6',
+                )}
                 aria-label="Main navigation"
             >
                 {visibleSections.map((section, idx) => (
@@ -192,10 +217,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
 
             {/* Footer — language switch; icon-only when collapsed (phase-02) */}
             {mini ? (
-                <div
-                    className="flex flex-col items-center gap-3 px-3 py-[17px]"
-                    style={{ borderTop: '1px solid var(--dash-divider)' }}
-                >
+                <div className="dash-sidebar-footer flex flex-col items-center gap-3 px-3 py-[17px]">
                     <button
                         onClick={toggleLocale}
                         aria-label={locale === 'ms' ? 'Switch to English' : 'Switch to Malay'}
@@ -205,10 +227,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     </button>
                 </div>
             ) : (
-            <div
-                className="flex flex-col gap-3 px-3 py-[17px]"
-                style={{ borderTop: '1px solid var(--dash-divider)' }}
-            >
+            <div className="dash-sidebar-footer flex flex-col gap-3 px-3 py-[17px]">
                 <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
             </div>
             )}
@@ -220,15 +239,50 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
             {/* Mobile overlay + drawer — slides in BELOW the header; every item is a leaf so any
                 click navigates and the route-change effect closes the drawer (design §1.3) */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-40 md:hidden">
+                // z above the top-bar (z-50): the drawer runs from top-0 and OVERLAYS the header's
+                // ☰ + logo so they don't show twice — it reads as one black bar from the very top.
+                <div className="fixed inset-0 z-[60] lg:hidden">
                     <div
-                        className="absolute inset-0 top-[56px] bg-black/60"
+                        className="absolute inset-0 bg-black/60"
                         onClick={() => setMobileOpen(false)}
                     />
                     <aside
-                        className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
+                        // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
+                        className="dark sb-dark absolute left-0 top-0 bottom-0 z-10 flex w-[246px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
+                        {/* Drawer header — replaces the top-bar's ☰ + logo (same 56px band):
+                            SSO app-switcher (⊞) LEFT of the logo (design §3.7), close (« ) on the right. */}
+                        <div
+                            className="flex h-[56px] shrink-0 items-center justify-between pl-4 pr-2"
+                            style={{ borderBottom: '1px solid var(--dash-col-divider-color)' }}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <AppSwitcher />
+                                <Link
+                                    href="/dashboard"
+                                    onClick={() => setMobileOpen(false)}
+                                    className="flex items-center gap-2 no-underline outline-none"
+                                >
+                                    <img
+                                        src="/images/logo-icon-3c4d76.png"
+                                        alt="Web Store Logo"
+                                        className="h-[28px] w-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                                    />
+                                    <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
+                                        <span className="text-dash-text">Web </span>
+                                        <span className="text-[#06B6D4]">Store</span>
+                                    </div>
+                                </Link>
+                            </div>
+                            <button
+                                onClick={() => setMobileOpen(false)}
+                                aria-label="Close menu"
+                                className="flex h-10 w-10 items-center justify-center rounded-lg border-none bg-transparent text-dash-text-muted outline-none transition-colors hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer"
+                            >
+                                <ChevronsLeft className="h-5 w-5" />
+                            </button>
+                        </div>
                         {renderSidebarContent(false)}
                     </aside>
                 </div>
@@ -238,9 +292,11 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
             <aside
                 id="dashboard-sidebar"
                 className={cn(
-                    'fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
+                    // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
+                    'dark sb-dark fixed left-0 top-[56px] z-40 hidden lg:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
                     animateCollapse && 'transition-[width] duration-200',
-                    collapsed ? 'w-[64px]' : 'w-[250px]'
+                    // 246px on iPad Pro / smaller laptops (< 2xl), 250px on true desktop (>= 1536px).
+                    collapsed ? 'w-[64px]' : 'w-[246px] 2xl:w-[250px]'
                 )}
                 style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
             >

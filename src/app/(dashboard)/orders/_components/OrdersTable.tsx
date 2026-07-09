@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
@@ -15,6 +16,7 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
 
 // ───────── TYPES ─────────
@@ -41,17 +43,17 @@ const STATUS_BADGE: Record<OrderStatus, {
     bg?: string
     borderColor?: string
 }> = {
-    pending:         { variant: 'warning',     dotColor: 'hsl(var(--warning))',          textColor: 'hsl(var(--warning))',          bg: 'hsl(var(--warning)/0.1)',          borderColor: 'hsl(var(--warning)/0.3)' },
-    new:             { variant: 'warning',     dotColor: 'hsl(var(--warning))',          textColor: 'hsl(var(--warning))',          bg: 'hsl(var(--warning)/0.1)',          borderColor: 'hsl(var(--warning)/0.3)' },
-    confirmed:       { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
-    ready_to_ship:   { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
-    shipped:         { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
-    completed:       { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
-    cancelled:       { variant: 'destructive', dotColor: 'hsl(var(--destructive))',      textColor: 'hsl(var(--destructive))',      bg: 'hsl(var(--destructive)/0.1)',      borderColor: 'hsl(var(--destructive)/0.3)' },
-    refunded:        { variant: 'secondary',   dotColor: 'hsl(var(--muted-foreground))', textColor: 'hsl(var(--muted-foreground))', bg: 'hsl(var(--muted-foreground)/0.1)', borderColor: 'hsl(var(--muted-foreground)/0.3)' },
-    paid:            { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
-    processing:      { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
-    payment_failed:  { variant: 'destructive', dotColor: 'hsl(var(--destructive))',      textColor: 'hsl(var(--destructive))',      bg: 'hsl(var(--destructive)/0.1)',      borderColor: 'hsl(var(--destructive)/0.3)' },
+    pending: { variant: 'warning', dotColor: 'hsl(var(--warning))', textColor: 'hsl(var(--warning))', bg: 'hsl(var(--warning)/0.1)', borderColor: 'hsl(var(--warning)/0.3)' },
+    new: { variant: 'warning', dotColor: 'hsl(var(--warning))', textColor: 'hsl(var(--warning))', bg: 'hsl(var(--warning)/0.1)', borderColor: 'hsl(var(--warning)/0.3)' },
+    confirmed: { variant: 'default', dotColor: 'hsl(var(--info))', textColor: 'hsl(var(--info))', bg: 'hsl(var(--info)/0.1)', borderColor: 'hsl(var(--info)/0.3)' },
+    ready_to_ship: { variant: 'default', dotColor: 'hsl(var(--info))', textColor: 'hsl(var(--info))', bg: 'hsl(var(--info)/0.1)', borderColor: 'hsl(var(--info)/0.3)' },
+    shipped: { variant: 'success', dotColor: 'hsl(var(--success))', textColor: 'hsl(var(--success))', bg: 'hsl(var(--success)/0.1)', borderColor: 'hsl(var(--success)/0.3)' },
+    completed: { variant: 'success', dotColor: 'hsl(var(--success))', textColor: 'hsl(var(--success))', bg: 'hsl(var(--success)/0.1)', borderColor: 'hsl(var(--success)/0.3)' },
+    cancelled: { variant: 'destructive', dotColor: 'hsl(var(--destructive))', textColor: 'hsl(var(--destructive))', bg: 'hsl(var(--destructive)/0.1)', borderColor: 'hsl(var(--destructive)/0.3)' },
+    refunded: { variant: 'secondary', dotColor: 'hsl(var(--muted-foreground))', textColor: 'hsl(var(--muted-foreground))', bg: 'hsl(var(--muted-foreground)/0.1)', borderColor: 'hsl(var(--muted-foreground)/0.3)' },
+    paid: { variant: 'success', dotColor: 'hsl(var(--success))', textColor: 'hsl(var(--success))', bg: 'hsl(var(--success)/0.1)', borderColor: 'hsl(var(--success)/0.3)' },
+    processing: { variant: 'default', dotColor: 'hsl(var(--info))', textColor: 'hsl(var(--info))', bg: 'hsl(var(--info)/0.1)', borderColor: 'hsl(var(--info)/0.3)' },
+    payment_failed: { variant: 'destructive', dotColor: 'hsl(var(--destructive))', textColor: 'hsl(var(--destructive))', bg: 'hsl(var(--destructive)/0.1)', borderColor: 'hsl(var(--destructive)/0.3)' },
 }
 
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
@@ -67,13 +69,13 @@ function formatOrderDate(iso?: string | null): string {
 // ───────── STATUS BADGE ─────────
 // Uses the shared Badge component; colors preserved via inline style overrides
 // so the exact hex values from the original STATUS_STYLE map are kept.
-function StatusBadge({ status, label }: { status: OrderStatus; label: string }) {
+function StatusBadge({ status, label, className }: { status: OrderStatus; label: string; className?: string }) {
     const cfg = STATUS_BADGE[status] ?? STATUS_BADGE['pending']
     return (
         <Badge
             variant={cfg.variant}
             dot
-            className="rounded-full px-2.5 py-0.5 border-solid whitespace-nowrap"
+            className={cn("rounded-full px-2.5 py-0.5 border-solid whitespace-nowrap", className)}
             style={{
                 background: cfg.bg,
                 borderColor: cfg.borderColor,
@@ -83,76 +85,6 @@ function StatusBadge({ status, label }: { status: OrderStatus; label: string }) 
         >
             {label}
         </Badge>
-    )
-}
-
-// ───────── CHECKBOX (row selection with indeterminate support) ─────────
-// Kept as a checkbox (not Switch) because it needs indeterminate state for
-// "select all" semantics which Switch does not model.
-function Checkbox({
-    checked,
-    indeterminate,
-    onChange,
-    inputRef,
-    'aria-label': ariaLabel,
-}: {
-    checked: boolean
-    indeterminate?: boolean
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-    inputRef?: React.Ref<HTMLInputElement>
-    'aria-label'?: string
-}) {
-    return (
-        <label className="relative flex items-center justify-center cursor-pointer" style={{ width: 18, height: 18 }}>
-            <input
-                ref={inputRef}
-                type="checkbox"
-                checked={checked}
-                onChange={onChange}
-                aria-label={ariaLabel}
-                className="peer sr-only"
-            />
-            <div
-                style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 6,
-                    border: checked || indeterminate ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--input-border))',
-                    background: checked || indeterminate ? 'hsl(var(--primary))' : 'transparent',
-                    transition: 'background 0.2s, border 0.2s'
-                }}
-            />
-            {checked && !indeterminate && (
-                <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                >
-                    <path
-                        d="M10 3L4.5 8.5L2 6"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
-            )}
-            {indeterminate && (
-                <svg
-                    width="10"
-                    height="2"
-                    viewBox="0 0 10 2"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                >
-                    <rect width="10" height="2" rx="1" fill="currentColor" />
-                </svg>
-            )}
-        </label>
     )
 }
 
@@ -173,27 +105,6 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
     const o = t.dashboard.orders
     const statusLabels = o.status
     const methodLabels = (o.detail as Record<string, unknown>).paymentMethods as Record<string, string>
-    const allSelected = orders.length > 0 && orders.every(ord => selectedRows.has(ord.id))
-    const someSelected = orders.some(ord => selectedRows.has(ord.id)) && !allSelected
-    const allCheckboxRef = useRef<HTMLInputElement>(null)
-
-    useEffect(() => {
-        if (allCheckboxRef.current) {
-            allCheckboxRef.current.indeterminate = someSelected
-        }
-    }, [someSelected])
-
-    function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-        if (e.target.checked) {
-            const next = new Set(selectedRows)
-            orders.forEach(ord => next.add(ord.id))
-            onSelectionChange(next)
-        } else {
-            const next = new Set(selectedRows)
-            orders.forEach(ord => next.delete(ord.id))
-            onSelectionChange(next)
-        }
-    }
 
     function toggleRow(id: string) {
         const next = new Set(selectedRows)
@@ -209,10 +120,12 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
 
     return (
         <div className="w-full">
-            {/* Mobile View: Stacked Cards */}
-            <div className="flex flex-col md:hidden w-full gap-4">
+            {/* Card View (mobile + iPad mini, < 820px). 1 col on mobile, 2 cols from md.
+                The table takes over from iPad Air (>=820) — matches blog + the
+                dash-table-compact convention. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 min-[820px]:hidden w-full gap-4 content-start">
                 {loading ? (
-                    <div className="p-8 text-center text-slate-400">{o.tableHeaders.loading}</div>
+                    <div className="p-8 text-center text-slate-400 md:col-span-2">{o.tableHeaders.loading}</div>
                 ) : (
                     orders.map((order) => {
                         const isSelected = selectedRows.has(order.id)
@@ -228,7 +141,7 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
                                         checked={isSelected}
-                                        onChange={() => toggleRow(order.id)}
+                                        onCheckedChange={() => toggleRow(order.id)}
                                         aria-label={`Select order ${order.id}`}
                                     />
                                 </div>
@@ -237,7 +150,13 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                         <span className="text-[14px] font-semibold leading-[1.4285714285714286em] text-slate-50 tracking-tight">
                                             {order.orderNumber}
                                         </span>
-                                        <StatusBadge status={order.status} label={getStatusLabel(order.status, statusLabels)} />
+                                        {/* Card (mobile/tablet) badge is a touch smaller than the
+                                            desktop table badge: 11px text, tighter padding + gap. */}
+                                        <StatusBadge
+                                            status={order.status}
+                                            label={getStatusLabel(order.status, statusLabels)}
+                                            className="text-[11px] px-2 py-0.5 gap-1"
+                                        />
                                     </div>
                                     <span className="text-[14px] font-medium leading-[1.4285714285714286em] text-slate-400 truncate max-w-[200px]">
                                         {order.customerName || 'N/A'}
@@ -247,9 +166,9 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                             {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-[12px]">
-                                        <span className="text-[12px] text-slate-400">{order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}</span>
-                                        <span className="text-[12px] text-slate-500">{formatOrderDate(order.createdAt)}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[12px] text-slate-400 truncate">{order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}</span>
+                                        <span className="text-[12px] text-slate-500 shrink-0">{formatOrderDate(order.createdAt)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -258,22 +177,32 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                 )}
             </div>
 
-            {/* Mobile pager (the desktop pager lives in the Table card footer slot) */}
-            {footer && <div className="md:hidden">{footer}</div>}
+            {/* Card pager — shown with the cards (< 820px). From iPad Air up the pager
+                lives inside the Table card footer, so hide this one at the same 820px
+                cutoff to avoid rendering two pagers in the 820–1279 range. */}
+            {footer && <div className="min-[820px]:hidden mt-4">{footer}</div>}
 
-            {/* Desktop View: Table — base primitives; pager sits in the card footer slot */}
-            <div className="hidden md:block w-full">
-                <Table minWidth={1100} className="table-fixed w-full" footer={footer}>
-                    {/* table-fixed + % colgroup: 4 middle columns (customer, total, payment,
-                        date) equal width (17%); edge columns (order #, status) 16%. All columns
-                        left-aligned for an even left-to-right rhythm. */}
+            {/* Table view (iPad Air >=820 and up). dash-table-compact (globals.css) shrinks
+                font + padding below xl so the 6 columns fit the tablet width. No min-width:
+                the table is always w-full so it fits whatever the content area is — this
+                avoids a horizontal scrollbar on iPad Pro when the sidebar is open (the
+                content shrinks below 1100px there). On real desktops the area is wider than
+                1100px anyway, so dropping the floor is a no-op → desktop unchanged. */}
+            <div className="hidden min-[820px]:block w-full">
+                <Table className="table-fixed w-full dash-table-compact" footer={footer}>
+                    {/* table-fixed + % colgroup. Desktop (>=1280): edges 16%, middle at
+                        17% (Total 16%) → sums to 100%. Below 1280 (iPad Air compact): Total
+                        stays narrow (13%, short content), Customer + Payment get 18% each.
+                        Tablet sum is 99% (not 100) on purpose — a 1% buffer so the table
+                        never exceeds its container and no horizontal scrollbar appears even
+                        when the sidebar is open (which shrinks the content area). */}
                     <colgroup>
                         <col style={{ width: '16%' }} />
-                        <col style={{ width: '17%' }} />
-                        <col style={{ width: '17%' }} />
-                        <col style={{ width: '17%' }} />
-                        <col style={{ width: '17%' }} />
+                        <col className="w-[18%] min-[1280px]:w-[17%]" />
+                        <col className="w-[13%] min-[1280px]:w-[16%]" />
+                        <col className="w-[18%] min-[1280px]:w-[17%]" />
                         <col style={{ width: '16%' }} />
+                        <col style={{ width: '18%' }} />
                     </colgroup>
 
                     <TableHeader>

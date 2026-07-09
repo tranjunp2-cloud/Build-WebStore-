@@ -22,7 +22,7 @@ export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
             .then((data) => {
                 if (data?.ok) {
                     // Whitelist-guard: only allow known relative paths to prevent open redirect
-                    const ALLOWED = new Set(['/dashboard', '/onboarding'])
+                    const ALLOWED = new Set(['/dashboard', '/onboarding', '/settings/shipping', '/products/new'])
                     const dest = ALLOWED.has(data.redirectTo) ? data.redirectTo : '/dashboard'
                     window.location.href = dest
                 } else {
@@ -41,15 +41,15 @@ export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
                 <div className="flex items-center justify-center gap-3">
                     <Image
                         src="/assets/builder/builder-logo.png"
-                        alt="PrimeWeb Logo"
+                        alt="Web Store Logo"
                         width={48}
                         height={48}
                         priority
                         className="w-[48px] h-[48px] object-contain drop-shadow-[0_0_24px_rgba(59,130,246,0.6)] !p-0 !m-0"
                     />
                     <span className="text-[30px] font-bold tracking-tight leading-[1.2]">
-                        <span className="text-[#F8FAFC]">Prime</span>
-                        <span className="bg-gradient-to-br from-blue-500 to-teal-400 bg-clip-text text-transparent">Web</span>
+                        <span className="text-[#F8FAFC]">Web </span>
+                        <span className="bg-gradient-to-br from-blue-500 to-teal-400 bg-clip-text text-transparent">Store</span>
                     </span>
                 </div>
 

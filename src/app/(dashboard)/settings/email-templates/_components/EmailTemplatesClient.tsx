@@ -5,10 +5,10 @@ import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
+import type { ContentFields } from '@/lib/email/template-default-fields'
 import {
     saveEmailTemplateConfig,
     resetEmailTemplateConfig,
-    type ContentFields,
 } from '../actions'
 import { EmailTemplateListView } from './email-template-list-view'
 import { EmailTemplateEditView } from './email-template-edit-view'
@@ -26,6 +26,7 @@ export interface TemplateRow {
 export interface EmailTemplatesClientProps {
     tenantId?: string
     initialRows: any[]
+    defaultsByType: Record<EmailTemplateType, { contentEn: ContentFields; contentMs: ContentFields }>
 }
 
 function normalizeRows(raw: any[]): TemplateRow[] {
@@ -47,7 +48,21 @@ const EMPTY_CONTENT: ContentFields = {
     closing: '',
 }
 
-export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps) {
+/**
+ * Merges a saved CMS row's content with template defaults.
+ * Per-field: uses the saved row value if non-empty, otherwise falls back to the default.
+ * Returns empty string if neither exists, so inputs never show undefined.
+ */
+function withDefaults(rowContent: ContentFields | undefined, defaults: ContentFields): ContentFields {
+    return {
+        subject: rowContent?.subject || defaults.subject || '',
+        greeting: rowContent?.greeting || defaults.greeting || '',
+        ctaLabel: rowContent?.ctaLabel || defaults.ctaLabel || '',
+        closing: rowContent?.closing || defaults.closing || '',
+    }
+}
+
+export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTemplatesClientProps) {
     const { t, ti } = useI18n()
     const et = t.dashboard.settings.emailTemplates
     const sub = t.common.subscriptionErrors
@@ -71,12 +86,13 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
 
     function handleSelectTemplate(templateType: EmailTemplateType, recipient: EmailRecipient) {
         const row = findRow(templateType, recipient)
+        const typeDefaults = defaultsByType[templateType]
         setSelectedTemplateId(templateType)
         setSelectedRecipient(recipient)
         setLocale('en')
         setDraft({
-            contentEn: row ? { ...row.contentEn } : { ...EMPTY_CONTENT },
-            contentMs: row ? { ...row.contentMs } : { ...EMPTY_CONTENT },
+            contentEn: withDefaults(row?.contentEn, typeDefaults.contentEn),
+            contentMs: withDefaults(row?.contentMs, typeDefaults.contentMs),
             enabled: row ? row.enabled : true,
         })
         setIsDirty(false)
@@ -107,9 +123,10 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
     function handleRevert() {
         if (!selectedTemplateId || !selectedRecipient) return
         const row = findRow(selectedTemplateId, selectedRecipient)
+        const typeDefaults = defaultsByType[selectedTemplateId]
         setDraft({
-            contentEn: row ? { ...row.contentEn } : { ...EMPTY_CONTENT },
-            contentMs: row ? { ...row.contentMs } : { ...EMPTY_CONTENT },
+            contentEn: withDefaults(row?.contentEn, typeDefaults.contentEn),
+            contentMs: withDefaults(row?.contentMs, typeDefaults.contentMs),
             enabled: row ? row.enabled : true,
         })
         setIsDirty(false)
@@ -164,15 +181,22 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
 
     function handleReset() {
         if (!selectedTemplateId || !selectedRecipient) return
+        // Capture before async so closure sees the correct template id
+        const typeId = selectedTemplateId
         startSaving(async () => {
-            const result = await resetEmailTemplateConfig(selectedTemplateId, selectedRecipient)
+            const result = await resetEmailTemplateConfig(typeId, selectedRecipient)
             if (result.success) {
                 setRows((prev) =>
                     prev.filter(
-                        (r) => !(r.templateType === selectedTemplateId && r.recipient === selectedRecipient)
+                        (r) => !(r.templateType === typeId && r.recipient === selectedRecipient)
                     )
                 )
-                setDraft({ contentEn: { ...EMPTY_CONTENT }, contentMs: { ...EMPTY_CONTENT }, enabled: true })
+                const typeDefaults = defaultsByType[typeId]
+                setDraft({
+                    contentEn: { ...typeDefaults.contentEn },
+                    contentMs: { ...typeDefaults.contentMs },
+                    enabled: true,
+                })
                 setIsDirty(false)
                 toast.success(et.toast.reset)
             } else {
@@ -213,6 +237,16 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
 
     const handleOpenInNewTab = useCallback(async () => {
         if (!selectedTemplateId) return
+        // Open the tab SYNCHRONOUSLY inside the click gesture so popup blockers (Safari) allow it,
+        // and WITHOUT `noopener` — `window.open(..., 'noopener')` returns null, which previously left
+        // a blank about:blank tab because the document.write block never ran.
+        const win = window.open('', '_blank')
+        if (!win) {
+            toast.error(et.toast.popupBlocked)
+            return
+        }
+        win.opener = null // sever opener access without relying on the noopener flag
+        win.document.write('<!DOCTYPE html><title>Loading…</title><body style="margin:0;font-family:sans-serif;padding:24px;color:#64748b">Loading preview…</body>')
         try {
             const draftConfig = {
                 enabled: draft.enabled,
@@ -223,19 +257,20 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ templateType: selectedTemplateId, locale, draftConfig }),
             })
-            if (!res.ok) return
+            if (!res.ok) throw new Error(`Preview API ${res.status}`)
             const { subject, html } = await res.json()
-            const win = window.open('', '_blank', 'noopener,noreferrer')
-            if (win) {
-                const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-                win.document.open()
-                win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
-                win.document.close()
-            }
+            const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            win.document.open()
+            win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
+            win.document.close()
         } catch (err) {
             console.error('[OpenInNewTab] error:', err)
+            win.document.open()
+            win.document.write('<!DOCTYPE html><title>Preview failed</title><body style="margin:0;font-family:sans-serif;padding:24px;color:#ef4444">Failed to load preview. Please close this tab and try again.</body>')
+            win.document.close()
+            toast.error(et.toast.previewFailed)
         }
-    }, [selectedTemplateId, draft, locale])
+    }, [selectedTemplateId, draft, locale, et])
 
     function handleListToggle(
         templateType: EmailTemplateType,

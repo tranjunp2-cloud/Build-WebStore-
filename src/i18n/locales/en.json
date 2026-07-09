@@ -85,7 +85,7 @@
             "label": "Platform",
             "title": "One platform to run your business",
             "titleHighlight": "end-to-end",
-            "subtitle": "From attracting customers and closing sales to running internal operations — PrimeWeb helps you manage everything on a single system.",
+            "subtitle": "From attracting customers and closing sales to running internal operations — Web Store helps you manage everything on a single system.",
             "pillars": {
                 "website": {
                     "title": "Website & Sales",
@@ -100,7 +100,7 @@
                     "desc": "Department task management, standardised workflows, and operational performance monitoring."
                 }
             },
-            "cta": "Explore the PrimeWeb ecosystem"
+            "cta": "Explore the Web Store ecosystem"
         },
         "product": {
             "label": "Products",
@@ -175,11 +175,18 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Registration form", "Course schedule", "Course gallery..."]
+                        "items": [
+                            "Registration form",
+                            "Course schedule",
+                            "Course gallery..."
+                        ]
                     },
                     "block2": {
                         "title": "Contact Form",
-                        "items": ["Subject, Message", "Send consultation email"]
+                        "items": [
+                            "Subject, Message",
+                            "Send consultation email"
+                        ]
                     }
                 },
                 "training": {
@@ -193,11 +200,18 @@
                     ],
                     "block1": {
                         "title": "Course Blocks",
-                        "items": ["Course list", "Class schedule", "Instructors..."]
+                        "items": [
+                            "Course list",
+                            "Class schedule",
+                            "Instructors..."
+                        ]
                     },
                     "block2": {
                         "title": "Registration & Payment",
-                        "items": ["Registration form", "Payment schedule"]
+                        "items": [
+                            "Registration form",
+                            "Payment schedule"
+                        ]
                     }
                 },
                 "retail": {
@@ -211,11 +225,18 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Products", "Cart", "Filters..."]
+                        "items": [
+                            "Products",
+                            "Cart",
+                            "Filters..."
+                        ]
                     },
                     "block2": {
                         "title": "Checkout",
-                        "items": ["Delivery information", "Payment"]
+                        "items": [
+                            "Delivery information",
+                            "Payment"
+                        ]
                     }
                 },
                 "fnb": {
@@ -229,11 +250,18 @@
                     ],
                     "block1": {
                         "title": "Menu Blocks",
-                        "items": ["Dish categories", "Combos", "Table booking..."]
+                        "items": [
+                            "Dish categories",
+                            "Combos",
+                            "Table booking..."
+                        ]
                     },
                     "block2": {
                         "title": "Order & Delivery",
-                        "items": ["Cart", "Delivery address"]
+                        "items": [
+                            "Cart",
+                            "Delivery address"
+                        ]
                     }
                 },
                 "events": {
@@ -247,11 +275,18 @@
                     ],
                     "block1": {
                         "title": "Event Blocks",
-                        "items": ["Countdown", "Ticket registration form", "Schedule..."]
+                        "items": [
+                            "Countdown",
+                            "Ticket registration form",
+                            "Schedule..."
+                        ]
                     },
                     "block2": {
                         "title": "Attendance Confirmation",
-                        "items": ["Send email", "QR check-in"]
+                        "items": [
+                            "Send email",
+                            "QR check-in"
+                        ]
                     }
                 },
                 "other": {
@@ -265,48 +300,88 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Hero, Form", "Gallery", "Button..."]
+                        "items": [
+                            "Hero, Form",
+                            "Gallery",
+                            "Button..."
+                        ]
                     },
                     "block2": {
                         "title": "Contact Form",
-                        "items": ["Subject, Message", "Send email"]
+                        "items": [
+                            "Subject, Message",
+                            "Send email"
+                        ]
                     }
                 }
             }
         },
         "why": {
-            "title": "Why choose PrimeWeb?",
+            "title": "Why choose Web Store?",
             "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
             "stats": {
-                "customers": { "value": "10,000+", "label": "Active customers" },
-                "published": { "value": "50,000+", "label": "Websites published" },
-                "blocks": { "value": "900+", "label": "Block templates ready" },
-                "speed": { "value": "5 min", "label": "Build a website with AI" }
+                "customers": {
+                    "value": "10,000+",
+                    "label": "Active customers"
+                },
+                "published": {
+                    "value": "50,000+",
+                    "label": "Websites published"
+                },
+                "blocks": {
+                    "value": "900+",
+                    "label": "Block templates ready"
+                },
+                "speed": {
+                    "value": "5 min",
+                    "label": "Build a website with AI"
+                }
             },
             "cards": {
                 "easyToUse": {
                     "title": "Easy to use — fast to deploy",
-                    "points": ["Design with simple drag & drop", "No coding knowledge required", "Dramatically reduces deployment time"]
+                    "points": [
+                        "Design with simple drag & drop",
+                        "No coding knowledge required",
+                        "Dramatically reduces deployment time"
+                    ]
                 },
                 "dataSync": {
                     "title": "Seamless data connectivity",
-                    "points": ["Centralise data from multiple channels", "Connect forms, email, and more"]
+                    "points": [
+                        "Centralise data from multiple channels",
+                        "Connect forms, email, and more"
+                    ]
                 },
                 "security": {
                     "title": "High security, stable operations",
-                    "points": ["Secure infrastructure, performance-optimised", "Friendly interface across all devices"]
+                    "points": [
+                        "Secure infrastructure, performance-optimised",
+                        "Friendly interface across all devices"
+                    ]
                 },
                 "yourContent": {
                     "title": "Your content",
-                    "points": ["Visual editor, fast editing", "AI description and SEO suggestions"]
+                    "points": [
+                        "Visual editor, fast editing",
+                        "AI description and SEO suggestions"
+                    ]
                 },
                 "automation": {
                     "title": "Engagement & automation",
-                    "points": ["Multi-channel customer engagement", "Nurture throughout the customer journey", "Automate repetitive tasks"]
+                    "points": [
+                        "Multi-channel customer engagement",
+                        "Nurture throughout the customer journey",
+                        "Automate repetitive tasks"
+                    ]
                 },
                 "fullAi": {
                     "title": "Full AI capabilities",
-                    "points": ["Build websites via chat", "AI writes descriptions, optimises SEO", "Automate content creation"]
+                    "points": [
+                        "Build websites via chat",
+                        "AI writes descriptions, optimises SEO",
+                        "Automate content creation"
+                    ]
                 }
             }
         },
@@ -344,7 +419,7 @@
         },
         "heroDemo": {
             "appSuite": "App suite",
-            "homeCrumb": "PrimeWeb · Home",
+            "homeCrumb": "Web Store · Home",
             "experienceTitle": "A professional website experience",
             "experienceDesc": "Built by AI in 5 minutes. Drag-and-drop edits, publish instantly.",
             "viewDetails": "View details",
@@ -420,7 +495,7 @@
         "step3Title": "Customize your site",
         "step3Subtitle": "Add your brand details to make it yours.",
         "welcome": {
-            "title": "Welcome to PrimeWeb",
+            "title": "Welcome to Web Store",
             "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
             "createStore": "Create My Store with AI",
             "skip": "Skip & Go to Dashboard",
@@ -588,49 +663,49 @@
     },
     "email": {
         "welcome": {
-            "subject": "Welcome to PrimeWeb! 🎉",
+            "subject": "Welcome to Web Store! 🎉",
             "heading": "Welcome! 🎉",
-            "subheading": "Welcome to PrimeWeb",
+            "subheading": "Welcome to Web Store",
             "greeting": "Hi {userName}",
-            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "body": "You're ready to create your first website with Web Store! Just describe your idea, and AI will help you build a professional website in minutes.",
             "stepsTitle": "Get started in 3 steps",
             "step1": "Describe the website you want to create",
             "step2": "Customize the content and design",
             "step3": "Publish and share!",
             "cta": "Get Started →",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "forgotPassword": {
-            "subject": "Reset your PrimeWeb password 🔐",
+            "subject": "Reset your Web Store password 🔐",
             "heading": "Password Reset",
             "subheading": "We received your reset request",
             "greeting": "Hi {userName}",
-            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "body": "We received a request to reset the password for your Web Store account. Click the button below to set a new password. This link will expire in 1 hour.",
             "cta": "Reset Password →",
             "fallback": "If the button doesn't work, copy and paste this link into your browser:",
             "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
             "ignore": "If you didn't request a password reset, no action is needed."
         },
         "otp": {
-            "subject": "Your PrimeWeb verification code 🔐",
+            "subject": "Your Web Store verification code 🔐",
             "heading": "Email Verification",
             "subheading": "Verify your identity to continue",
             "greeting": "Hi <strong>{userName}</strong>",
             "body": "Enter this code to verify your identity:",
             "expiry": "This code expires in 5 minutes",
             "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
-            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
+            "copyright": "© 2026 Web Store · Kuala Lumpur, Malaysia"
         },
         "passwordChanged": {
-            "subject": "Your PrimeWeb password has been changed 🔐",
+            "subject": "Your Web Store password has been changed 🔐",
             "heading": "Password Changed",
             "subheading": "Your account password was updated",
             "greeting": "Hi {userName}",
-            "body": "Your PrimeWeb account password has been successfully changed.",
+            "body": "Your Web Store account password has been successfully changed.",
             "warning": "If you didn't make this change, contact your workspace admin immediately and reset your password.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "order": {
             "subject": "Order Confirmed",
@@ -646,7 +721,7 @@
             "sst": "SST (6%)",
             "total": "Total",
             "shippingAddress": "Shipping Address",
-            "footer": "Powered by PrimeWeb",
+            "footer": "Powered by Web Store",
             "recipientInfoHeading": "Recipient Information",
             "fullName": "Full name",
             "phone": "Phone",
@@ -786,7 +861,7 @@
             "morning": "morning",
             "afternoon": "afternoon",
             "evening": "evening",
-            "welcomeTitle": "Welcome to PrimeWeb Dashboard",
+            "welcomeTitle": "Welcome to Web Store Dashboard",
             "welcomeSubtitle": "Monitor your store performance and manage your online business from one place.",
             "pendingLabel": "Pending",
             "itemsLabel": "items",
@@ -1319,8 +1394,8 @@
                 "description": "Description",
                 "attributes": "Attributes",
                 "deleteConfirm": "Are you certain?",
-                "deleteProduct": "DELETE PRODUCT",
-                "editProduct": "EDIT PRODUCT"
+                "deleteProduct": "Delete Product",
+                "editProduct": "Edit Product"
             },
             "title": "Products",
             "addProduct": "Add Product",
@@ -1375,11 +1450,26 @@
                 "sku": "SKU:",
                 "fromPrefix": "From ",
                 "filterBtn": "Filter",
+                "missingInfoTitle": "Missing information",
+                "missingAlt": "Image alt text",
+                "missingCategory": "Category",
                 "failedToLoad": "Failed to load products",
                 "retry": "Retry",
                 "aiChatTitle": "AI Chat: Quickly create multiple products",
-                "aiChatPlaceholder": "Enter leather jacket 500k, hat 50k",
-                "aiChatBtn": "Create"
+                "aiChatSubtitle": "Describe your products in plain text — AI will draft them for you to review before publishing.",
+                "aiChatPlaceholder": "List several products, one per line — e.g. Leather jacket RM250, Cotton cap RM39",
+                "aiChatHintNewLine": "new line",
+                "aiChatHintGenerate": "to generate",
+                "aiChatSuggestionsLabel": "💡 Try one of these:",
+                "aiChatSuggestion1Label": "+ 3 summer dresses, RM 120 each",
+                "aiChatSuggestion1": "Create 3 summer dresses, RM 120 each, 10 in stock per style",
+                "aiChatSuggestion2Label": "+ Sports set bundle",
+                "aiChatSuggestion2": "Sports set: t-shirt RM 80, shorts RM 60, 20 in stock each",
+                "aiChatSuggestion3Label": "+ Bulk cosmetics",
+                "aiChatSuggestion3": "Bulk cosmetics: lipstick RM 35, face cream RM 90, 15 in stock each",
+                "aiChatBtn": "Generate Drafts",
+                "aiReviewTooltip": "Created by AI — needs review",
+                "aiReviewAriaLabel": "AI-created draft pending review"
             },
             "messages": {
                 "nameRequired": "Please enter a product name first!",
@@ -1462,6 +1552,7 @@
                     "uniqueTiers": "Option names must be unique (no duplicate categories)",
                     "weightMin": "Weight must be greater than 0",
                     "weightMax": "Weight is too large",
+                    "weightRequired": "Weight is required",
                     "dimMin": "Dimension must be 0 or greater",
                     "dimMax": "Dimension is too large",
                     "maxTiers": "Maximum 2 variant tiers allowed",
@@ -1516,6 +1607,8 @@
                 "restored": "Product restored",
                 "failedRestore": "Failed to restore product",
                 "failedUpdateStatus": "Failed to update status",
+                "publishGateTitle": "Cannot activate yet",
+                "publishGateAck": "Got it",
                 "failedDelete": "Failed to delete product",
                 "productDeleted": "Product deleted.",
                 "size": "Size:",
@@ -1532,6 +1625,7 @@
                 "fillInfo": "Fill in complete product information",
                 "saving": "Saving...",
                 "saveChanges": "Save Changes",
+                "unsavedChanges": "Unsaved changes",
                 "fields": {
                     "name": "Product Name",
                     "categoryIds": "Category",
@@ -1540,7 +1634,8 @@
                     "tiers": "Variant Options",
                     "basePrice": "Price",
                     "baseSku": "SKU Code",
-                    "baseInventory": "Inventory"
+                    "baseInventory": "Inventory",
+                    "weight": "Weight"
                 },
                 "sections": {
                     "general": "General Information",
@@ -1548,6 +1643,7 @@
                     "productNamePlaceholder": "Enter product name",
                     "category": "Category",
                     "images": "Images (Up to 5 images, each < 5MB)",
+                    "imagesAltHint": "Adding Alt text improves SEO and buyer reachability.",
                     "variants": "Variants & Inventory",
                     "hasVariants": "Product has multiple Options/Variants",
                     "hasVariantsExample": "Example: color, size, style",
@@ -1609,8 +1705,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Confirm Create Products (AI Preview)",
-                "subtitle": "Review and edit before saving",
+                "title": "Review AI drafts",
+                "subtitle": "Edit anything before adding these to your store. Nothing is published yet.",
                 "promptLabel": "Prompt / Item List",
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
@@ -1636,23 +1732,25 @@
                 "unsavedWarning": "You have unsaved data. Closing will discard all changes. Are you sure?",
                 "stayButton": "Stay",
                 "exitButton": "Exit",
-                "saveButton": "Save",
-                "productsItem": "Products",
-                "saveEmptyError": "Please select at least 1 product to save",
-                "saveSuccess": "Created {count} draft products. Please add images before publishing.",
+                "discard": "Discard",
+                "approveAll": "Approve All",
+                "draftCountOne": "1 draft",
+                "draftCountMany": "{count} drafts",
+                "saveEmptyError": "No drafts to save",
+                "saveSuccessOne": "Created 1 draft product. Please add images before publishing.",
+                "saveSuccessMany": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
                 "saveError": "Error saving products",
                 "aiWorking": "AI magic is working...",
                 "table": {
-                    "name": "NAME",
-                    "price": "PRICE",
-                    "variants": "VARIANTS",
+                    "name": "Product name",
+                    "price": "Price (RM)",
+                    "stock": "Stock",
+                    "stockFromVariants": "Editing applies this value to every variant",
+                    "variants": "Variants",
+                    "removeDraft": "Remove draft",
                     "empty": "Product list is empty.",
                     "defaultVariant": "Default"
-                },
-                "note": {
-                    "label": "Note: ",
-                    "description": "Products will be saved as Draft"
                 },
                 "toast": {
                     "invalidFormat": "Invalid products format received from AI",
@@ -1722,6 +1820,15 @@
             },
             "subtitle": "Manage store products"
         },
+        "imageUploader": {
+            "addAltText": "+ Add Alt text",
+            "editAltText": "Edit Alt text",
+            "label": "Alt text",
+            "placeholder": "Briefly describe this image…",
+            "helperText": "Briefly describe the image to improve your SEO score on Google.",
+            "cancel": "Cancel",
+            "save": "Save"
+        },
         "customers": {
             "title": "Contact Leads",
             "subtitle": "Contact form submissions & newsletter subscribers",
@@ -1748,7 +1855,7 @@
             "viewDetails": "View details",
             "close": "Close",
             "update": "Update",
-            "timeline": "Activity Timeline",
+            "timeline": "Message History",
             "noTimeline": "No previous submissions",
             "statusRead": "Read",
             "tooltipNew": "New consultation request from Contact Form. Seller needs to contact within 24 hours for the highest conversion effectiveness.",
@@ -1762,7 +1869,8 @@
             "deleteConfirmPost": "and cannot be undone.",
             "cancel": "Cancel",
             "deleteButton": "Delete",
-            "colProfile": "Customer Profile",
+            "colCustomer": "Customer",
+            "colProfile": "Profile",
             "colEmail": "Email",
             "colSource": "Source & Site",
             "colMessage": "Message",
@@ -1774,7 +1882,7 @@
             "fieldName": "Name",
             "fieldEmail": "Email",
             "fieldLatestDate": "Latest Date",
-            "timelineEntry": "Contact Submission",
+            "timelineEntry": "Message",
             "loadDetailsFailed": "Failed to load details",
             "sourceBadgeContact": "Contact Forms",
             "sourceBadgeNewsletter": "Newsletter Subscriptions",
@@ -1830,10 +1938,10 @@
                 "tabOrders": "Orders",
                 "unsavedBanner": "You have unsaved changes.",
                 "revert": "Revert",
+                "cancel": "Cancel",
                 "saveChanges": "Save changes",
                 "upToDate": "Up to date",
                 "unsaved": "Unsaved changes",
-                "lastSaved": "Last saved",
                 "saved": "Customer saved",
                 "saveFailed": "Failed to save customer",
                 "fieldEmail": "Email",
@@ -1910,6 +2018,8 @@
                 "bankTransferSubtitle": "Accept payments via bank transfer with QR code",
                 "active": "Active",
                 "inactive": "Inactive",
+                "seeMore": "See more",
+                "seeLess": "See less",
                 "uploadQrTitle": "Upload QR Code Image",
                 "uploadQrSub": "Click to upload QR Code",
                 "uploadHint": "JPG or PNG. Max size: 2MB",
@@ -1922,7 +2032,7 @@
                 "failSaveSettings": "Failed to save settings",
                 "failClearQR": "Failed to clear QR image setting.",
                 "stripeConnectTitle": "Connect a Stripe account to start accepting Card & FPX",
-                "stripeConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "stripeConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "stripeConnectCta": "Connect Stripe Account",
                 "stripeStep1": "Click \"Connect Stripe Account\"",
                 "stripeStep2": "Enter your Stripe credentials",
@@ -1993,7 +2103,7 @@
                 "xenditSectionTitle": "Xendit Payment Methods",
                 "xenditPoweredBy": "Powered by Xendit Checkout",
                 "xenditConnectTitle": "Connect a Xendit account to accept Malaysian payments",
-                "xenditConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "xenditConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "xenditConnectCta": "Connect Xendit Account",
                 "xenditConnecting": "Redirecting to Xendit...",
                 "xenditStep1": "Click \"Connect Xendit Account\"",
@@ -2016,7 +2126,7 @@
                 "xenditCallbackTokenStep3": "Copy the token and paste here",
                 "xenditSaveBtn": "Save Xendit connection",
                 "xenditModalTitle": "Connect your Xendit Account",
-                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Prime Web. Card, FPX & E-Wallets unlock as soon as we verify.",
+                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Web Store. Card, FPX & E-Wallets unlock as soon as we verify.",
                 "xenditConnectAccountBtn": "Connect Account",
                 "xenditWebhookConfirmTitle": "Register ECH as your webhook receiver",
                 "xenditWebhookConfirmDesc": "ECH will register itself as the Invoice webhook endpoint on your Xendit account. If another system is currently receiving Xendit Invoice webhooks from this account, it will stop receiving them.",
@@ -2085,6 +2195,7 @@
                 "liveAddMore": "Add {amount} more for FREE shipping",
                 "liveBuyerPays": "Buyer pays",
                 "allSaved": "All changes saved",
+                "unsavedChanges": "Unsaved changes",
                 "resetToDefaults": "Reset to Defaults",
                 "saving": "Saving…",
                 "saveChanges": "Save Changes",
@@ -2155,7 +2266,9 @@
                     "disabled": "Template disabled",
                     "updateFailed": "Failed to update template",
                     "testSent": "Test email sent to {email}",
-                    "testFailed": "Failed to send test email"
+                    "testFailed": "Failed to send test email",
+                    "popupBlocked": "Popup blocked — allow popups to open the preview",
+                    "previewFailed": "Failed to open preview"
                 },
                 "descriptions": {
                     "welcome": "First-touch hello when a buyer signs up or places their first order.",
@@ -2283,20 +2396,16 @@
                 "duplicateCodeField": "This code is already in use for your tenant. Try a different code or append a number.",
                 "saveFailed": "Failed to save",
                 "created": "Discount created",
-                "saved": "Discount saved",
-                "deleted": "Discount deleted",
-                "deleteFailed": "Failed to delete"
+                "saved": "Discount saved"
             },
             "header": {
                 "createTitle": "Create discount",
                 "defaultTitle": "Discount",
                 "backTitle": "Back to discounts",
-                "deleteBtn": "Delete",
                 "newCode": "New code · {tenantName}",
                 "createdOn": "Created {date}",
                 "unsavedChanges": "You have unsaved changes.",
-                "revert": "Revert",
-                "save": "Save"
+                "revert": "Revert"
             },
             "saveBar": {
                 "unsavedChanges": "Unsaved changes",
@@ -2422,12 +2531,11 @@
             "loadFailed": "Failed to load blog posts",
             "tryAgain": "Try Again",
             "editor": {
-                "home": "Home",
-                "blog": "Blog",
                 "newPost": "New Post",
                 "editPrefix": "Edit:",
                 "createTitle": "Create Blog Post",
                 "editTitle": "Edit Blog Post",
+                "headerSubtitle": "Fill in complete blog post information",
                 "untitled": "Untitled",
                 "aiAssistant": "AI Assistant",
                 "saveDraft": "Save Draft",
@@ -2442,7 +2550,7 @@
                 "thumbnailLabel": "Featured Thumbnail",
                 "replace": "Replace",
                 "clickToUpload": "Click to upload thumbnail",
-                "uploadHint": "PNG, JPG up to 10MB",
+                "uploadHint": "PNG, JPG up to 10MB — 4:3 ratio, ≥1200px",
                 "startWriting": "Start writing...",
                 "postSettings": "Post Settings",
                 "category": "Category",
@@ -2578,6 +2686,159 @@
             "accountSuspendedBody": "Your account has been suspended. Please contact support. You will now be logged out.",
             "acknowledge": "Acknowledge",
             "loggingOut": "Logging out..."
+        },
+        "revamp": {
+            "title": "Dashboard",
+            "periodSub": {
+                "today": "Hourly · {range}",
+                "daily": "Daily · {range}"
+            },
+            "glance": {
+                "title": "At a glance",
+                "views": "Page views",
+                "leads": "Leads",
+                "engagement": "Engagement",
+                "revenue": "Revenue",
+                "viewsTip": "Total visits from customers across all pages on your website.",
+                "leadsTip": "Potential customers who left their contact details (email, phone) via signup forms on your website.",
+                "engagementTip": "High-value customer actions — like clicking Buy Now, Add to Cart, or social media links.",
+                "revenueSoonTip": "Revenue tracking is coming soon. This card will calculate metrics from paid and completed orders.",
+                "noteToday": "vs yesterday",
+                "note7d": "vs prev 7d",
+                "note30d": "vs prev 30d"
+            },
+            "comingSoon": "Coming Soon",
+            "soon": "Soon",
+            "onboarding": {
+                "title": "Finish setting up your store",
+                "subtitle": {
+                    "one": "Complete {count} more step to launch your website.",
+                    "other": "Complete {count} more steps to launch your website."
+                },
+                "steps": {
+                    "products": {
+                        "name": "Verify your products",
+                        "desc": "AI added demo items. Please check inventory, prices, and variations.",
+                        "cta": "Review"
+                    },
+                    "design": {
+                        "name": "Customize your design",
+                        "desc": "Update images, text, and colors to match your personal brand.",
+                        "cta": "Edit"
+                    },
+                    "shipping": {
+                        "name": "Set up shipping fees",
+                        "desc": "Current default is COD & Free delivery. Update rates to avoid shipping losses.",
+                        "cta": "Set up"
+                    },
+                    "launch": {
+                        "name": "Publish your website",
+                        "desc": "Ready to sell? Make your store live and start accepting orders today.",
+                        "cta": "Publish"
+                    }
+                }
+            },
+            "traffic": {
+                "title": "Traffic & performance",
+                "subtitle": "Daily pageviews and what's driving them",
+                "totalPageviews": "total pageviews · {period}",
+                "topPerforming": "Top performing",
+                "tabs": {
+                    "pages": "Pages",
+                    "blogs": "Blogs",
+                    "referrers": "Referrers",
+                    "products": "Products"
+                },
+                "productsSoonTip": "Product analytics — coming soon",
+                "emptyChartTitle": "No traffic in this period",
+                "emptyChartDesc": "Once visitors land on your site, daily pageviews will show up here.",
+                "emptyListTitle": "Nothing to rank yet",
+                "emptyListDesc": "Top pages, blogs and referrers appear once you have traffic.",
+                "periodToday": "today",
+                "period7d": "last 7 days",
+                "period30d": "last 30 days"
+            },
+            "seo": {
+                "title": "SEO health",
+                "subtitle": "How discoverable your store is on search engines",
+                "scoreHistory": "SEO score history",
+                "scoreHistoryTip": "We'll record your score weekly so you can track trends — coming soon.",
+                "scoreHistoryMsg": "In development — we'll log your score every week so you can watch it climb.",
+                "gaugeHealthy": "Healthy",
+                "gaugeNeedsImprovement": "Needs improvement",
+                "gaugeAtRisk": "At risk",
+                "breakdownMeta": "Meta Tags",
+                "breakdownContent": "Content Quality",
+                "breakdownTechnical": "Technical SEO",
+                "criticalIssue": "Most critical issue: {count} {text}. Fixing these will lift your score.",
+                "fixAll": "AI Fix All Issues",
+                "issuesTitle": "SEO issues",
+                "open": "{count} open",
+                "allClear": "All clear",
+                "allResolvedTitle": "All issues resolved",
+                "allResolvedDesc": "No outstanding SEO issues — your store is fully optimised. We'll flag new ones here as they appear.",
+                "fix": "Fix",
+                "edit": "Edit",
+                "altEditTip": "Automatic AI alt-text editing is coming soon. For now, click to update image descriptions directly in your product manager.",
+                "issueAlt": {
+                    "one": "product missing image Alt text",
+                    "other": "products missing image Alt text"
+                },
+                "issueDescription": {
+                    "one": "page without a meta description",
+                    "other": "pages without a meta description"
+                },
+                "issueTitle": {
+                    "one": "item missing a meta title",
+                    "other": "items missing a meta title"
+                }
+            },
+            "tools": {
+                "title": "SEO action tools",
+                "subtitle": "AI works quietly in the background so customers can find your store on Google",
+                "sitemap": "Sitemap",
+                "sitemapTip": "A sitemap lists every page in your store. We hand it to Google so it can find and list all your products.",
+                "sitemapDesc": "Submit your sitemap so Google can discover and index all your pages.",
+                "resubmit": "Resubmit to Google",
+                "autoMeta": "Auto-write search titles & descriptions",
+                "autoMetaTip": "This is the headline customers see on Google. AI writes a short, tempting one for every page automatically.",
+                "autoMetaDesc": "AI writes short, catchy titles that draw customers in when they search on Google.",
+                "active": "Active",
+                "sitemapDone": "Sitemap submitted — {count} URLs sent to Google",
+                "sitemapRegenerated": "Sitemap regenerated",
+                "sitemapError": "Could not generate sitemap",
+                "metaOn": "Auto meta tags turned on",
+                "metaOff": "Auto meta tags turned off",
+                "metaError": "Could not update setting"
+            },
+            "orders": {
+                "title": "Pending orders",
+                "subtitle": "Orders awaiting fulfilment",
+                "awaiting": "Awaiting",
+                "mockOrder": "Customer order · {count} items",
+                "soonTip": "Order fulfilment queue is in development — coming soon."
+            },
+            "customize": {
+                "button": "Customize",
+                "title": "Customize dashboard",
+                "description": "Drag to reorder, or toggle blocks on and off. Saved for your account.",
+                "reset": "Reset to default",
+                "cancel": "Cancel",
+                "save": "Save layout",
+                "saving": "Saving…",
+                "saved": "Dashboard layout saved",
+                "saveError": "Failed to save layout",
+                "dragToReorder": "Drag to reorder",
+                "moveUp": "Move up",
+                "moveDown": "Move down",
+                "close": "Close",
+                "blockOnboarding": "Onboarding checklist",
+                "blockGlance": "At-a-glance stats",
+                "blockTraffic": "Traffic & performance",
+                "blockSeo": "SEO health",
+                "blockTools": "SEO action tools",
+                "blockOrders": "Pending orders"
+            }
         }
     },
     "auth": {
@@ -2852,7 +3113,7 @@
                                 "Open the <strong>AI CHAT</strong> tab in the left sidebar of the Editor.",
                                 "Type what you want to change — e.g., <strong>\"Can you change the color to pink?\"</strong> or <strong>\"Add a new section\"</strong>.",
                                 "AI will process your request and show <strong>\"Preparing changes for preview...\"</strong> while updating.",
-                                "Use the <strong>quick suggestion chips</strong> at the bottom (e.g., \"Change color\", \"+ Add section\") for common actions.",
+                                "Press <strong>Enter</strong> to send, or <strong>Shift+Enter</strong> for a new line — the input box grows as you type.",
                                 "Changes are applied in real-time to the preview — review and keep or ask for further adjustments."
                             ]
                         },
@@ -3266,6 +3527,27 @@
         "imageTooLarge": "Image must be smaller than 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "AI Chat",
+            "components": "Components",
+            "pages": "Pages",
+            "settings": "Settings"
+        },
+        "advisoryBanner": {
+            "title": "Better experience on Desktop",
+            "description": "Advanced editing tools work best on a larger screen. Some tools may be limited on mobile devices.",
+            "copyLink": "Copy Link",
+            "dismiss": "Dismiss"
+        },
+        "compactLayout": {
+            "aiEditing": "AI is editing your design…",
+            "openAIChat": "Open AI Chat",
+            "openChatAndTools": "Open AI Chat & Tools",
+            "moveUp": "Move Up",
+            "moveDown": "Move Down",
+            "deleteBlock": "Delete Block",
+            "deletedBlock": "Deleted {type}"
+        },
         "toolbar": {
             "publish": "Publish",
             "publishing": "Publishing",
@@ -3421,11 +3703,10 @@
             "failedToEdit": "Failed to edit website",
             "outOfScope": "I can only help with editing your website.",
             "undo": "Undo",
-            "changeColorPrompt": "Change color",
-            "addSectionPrompt": "+ Add section",
             "inputPlaceholder": "Tell AI what to change...",
             "send": "send",
-            "newLine": "new line"
+            "newLine": "new line",
+            "stopAI": "Stop AI"
         },
         "menu": {
             "dashboard": "Dashboard",
@@ -3684,6 +3965,53 @@
             "invalidEmail": "Please enter a valid email address",
             "address": "Address",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
+            "localBusinessInfo": "Local Business Info",
+            "addressGroupLabel": "Address",
+            "streetAddress": "Street Address",
+            "streetAddressPlaceholder": "123 Jalan Bukit Bintang",
+            "city": "City / District",
+            "cityPlaceholder": "Kuala Lumpur",
+            "postcode": "Postcode",
+            "postcodePlaceholder": "55100",
+            "state": "State / Federal Territory",
+            "selectState": "-- Select state --",
+            "country": "Country",
+            "countryMalaysia": "Malaysia",
+            "coordinatesGroupLabel": "Location (Coordinates)",
+            "pasteMapsLink": "Paste your Google Maps link",
+            "mapsLinkPlaceholder": "https://maps.app.goo.gl/xxxxx",
+            "pasteMapsLinkHint": "Paste a share link from Google Maps — we'll extract the coordinates automatically",
+            "extractCoordinates": "Extract",
+            "extracting": "Extracting...",
+            "coordinatesExtracted": "✓ Coordinates extracted",
+            "latitude": "Latitude",
+            "longitude": "Longitude",
+            "manualCoordinates": "Enter coordinates manually (advanced)",
+            "manualCoordinatesHint": "Use this when pasting a link doesn't auto-detect the coordinates",
+            "geoExtractFailed": "Couldn't extract coordinates from that link — try the manual option below",
+            "mapsPreviewTitle": "Business location map preview",
+            "categoryOfferGroupLabel": "Category & Offer",
+            "businessCategory": "Business Category",
+            "selectCategory": "-- Select category --",
+            "priceRange": "Price Range",
+            "selectPriceRange": "-- Select price range --",
+            "serviceAreaDescription": "Service Area",
+            "serviceAreaPlaceholder": "e.g. Petaling Jaya, Shah Alam, Selangor",
+            "openingHoursGroupLabel": "Opening Hours",
+            "openingHoursClosed": "Closed",
+            "openingHoursOpens": "Opens",
+            "openingHoursCloses": "Closes",
+            "openingHoursDayMo": "Mon",
+            "openingHoursDayTu": "Tue",
+            "openingHoursDayWe": "Wed",
+            "openingHoursDayTh": "Thu",
+            "openingHoursDayFr": "Fri",
+            "openingHoursDaySa": "Sat",
+            "openingHoursDaySu": "Sun",
+            "checklistTitle": "Local SEO essentials",
+            "checklistAddressSaved": "Address saved",
+            "checklistHoursSaved": "Opening hours saved",
+            "checklistCategorySaved": "Business category saved",
             "socialLinks": "Social Links",
             "socialPlatforms": {
                 "facebook": {
@@ -3980,32 +4308,6 @@
             "blog": "Blog",
             "travel": "Travel"
         },
-        "addSection": {
-            "testimonials": "Add testimonials",
-            "testimonialsCompact": "💬 Add testimonials",
-            "testimonialsPrompt": "Add a testimonials section with 3 customer reviews",
-            "faq": "Add FAQ",
-            "faqCompact": "❓ Add FAQ",
-            "faqPrompt": "Add an FAQ section with 3 common customer questions",
-            "gallery": "Add gallery",
-            "galleryCompact": "🖼️ Add gallery",
-            "galleryPrompt": "Add a gallery section with 6 placeholder images",
-            "features": "Add features",
-            "featuresCompact": "✨ Add features",
-            "featuresPrompt": "Add a features section with 3 key service highlights",
-            "team": "Add team",
-            "teamCompact": "👥 Add team",
-            "teamPrompt": "Add a team section with 3 team members",
-            "newsletter": "Add newsletter",
-            "newsletterCompact": "✉️ Add newsletter",
-            "newsletterPrompt": "Add a newsletter signup section",
-            "banner": "Add banner",
-            "bannerCompact": "📣 Add banner",
-            "bannerPrompt": "Add a banner section for a promotion campaign",
-            "cta": "Add CTA",
-            "ctaCompact": "🚀 Add CTA",
-            "ctaPrompt": "Add a call to action section with a strong offer"
-        },
         "inlineEditComponent": {
             "clickToEdit": "Click to edit",
             "defaultPlaceholder": "Click to edit...",
@@ -4051,7 +4353,10 @@
             "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
             "primaryColorLabel": "Primary color picker",
             "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
-            "phoneRequired": "Phone number is required"
+            "phoneRequired": "Phone number is required",
+            "invalidPostcode": "Malaysia postcode must be exactly 5 digits",
+            "invalidLatitude": "Latitude must be between -90 and 90",
+            "invalidLongitude": "Longitude must be between -180 and 180"
         },
         "menuDrawer": {
             "defaultUserName": "User"
@@ -4295,10 +4600,10 @@
             "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
             "manageButton": "Manage Account in SSO",
             "urlMissing": "SSO portal URL is not configured. Contact admin.",
-            "generalTitle": "🔒 Information managed by SSO",
+            "generalTitle": " Information managed by SSO",
             "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
             "generalLink": "To make changes, please visit the SSO portal",
-            "securityTitle": "🛡️ SSO Protected Account",
+            "securityTitle": " SSO Protected Account",
             "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
             "securityLink": "Manage SSO Account"
         },

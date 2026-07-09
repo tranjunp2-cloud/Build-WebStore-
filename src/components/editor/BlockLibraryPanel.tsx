@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
@@ -67,6 +68,10 @@ interface BlockLibraryPanelProps {
     onEditGlobalBlock?: (blockType: string) => void
     /** F26-04: Called when user clicks "✨ AI" auto-translate button for a block type */
     onAutoTranslate?: (blockType: string) => Promise<void>
+    /** F05 compact Tools sheet: touch has no hover/drag, so the desktop "click or drag"
+     * hover hint is replaced with an always-visible "+" affordance. Desktop omits this
+     * (defaults false) and keeps its existing hover-hint text unchanged. */
+    isCompact?: boolean
 }
 
 export function BlockLibraryPanel({
@@ -75,6 +80,7 @@ export function BlockLibraryPanel({
     onAIAction,
     onEditGlobalBlock,
     onAutoTranslate,
+    isCompact = false,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
@@ -187,14 +193,15 @@ export function BlockLibraryPanel({
         <TooltipProvider delayDuration={200}>
         <div className="flex h-full flex-col bg-[var(--editor-surface)]">
             <div className="border-b border-white/[0.06] px-4 py-3">
+                {/* Shared <Input> mặc định — bg theo --card (trắng ở light, tối ở dark) + viền --input-border. */}
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-                    <input
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+                    <Input
                         type="text"
                         value={query}
-                        onChange={event => setQuery(event.target.value)}
+                        onChange={e => setQuery(e.target.value)}
                         placeholder={bl.searchPlaceholder}
-                        className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[var(--editor-surface-elevated)] focus:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]"
+                        className="pl-9 pr-3 text-[13px]"
                     />
                 </div>
             </div>
@@ -289,9 +296,13 @@ export function BlockLibraryPanel({
                                                     <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>
                                                 </div>
                                                 {!isAlreadyGlobal && (
-                                                    <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                        {bl.dragHint}
-                                                    </span>
+                                                    isCompact ? (
+                                                        <Plus className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                                                    ) : (
+                                                        <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                            {bl.dragHint}
+                                                        </span>
+                                                    )
                                                 )}
                                             </button>
                                             </TooltipTrigger>
@@ -312,11 +323,13 @@ export function BlockLibraryPanel({
                 </div>
             </div>
 
-            <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
-                <p className="text-center text-[11px] text-slate-500">
-                    {bl.footerHint}
-                </p>
-            </div>
+            {!isCompact && (
+                <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
+                    <p className="text-center text-[11px] text-slate-500">
+                        {bl.footerHint}
+                    </p>
+                </div>
+            )}
         </div>
         </TooltipProvider>
     )

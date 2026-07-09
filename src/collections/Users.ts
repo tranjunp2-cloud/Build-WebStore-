@@ -5,6 +5,7 @@ import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
+import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/otp/qc-bypass'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
@@ -136,7 +137,7 @@ export const Users: CollectionConfig = {
                 return html
             },
             generateEmailSubject: () => {
-                return 'Reset your PrimeWeb password \uD83D\uDD10'
+                return 'Reset your Web Store password \uD83D\uDD10'
             },
         },
     },
@@ -821,8 +822,17 @@ export const Users: CollectionConfig = {
                     const testEmail = process.env.TEST_EMAIL
                     const useDevBypass = isDev && !!testOtpCode
                     const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
+                    // QC domain bypass — triple-guarded in qc-bypass.ts
+                    // (APP_ENV=qc-test + QC_OTP_BYPASS_ENABLED=true + email
+                    // ends with QC_OTP_BYPASS_DOMAIN). Skips SES for the
+                    // whole @primeweb.local test-account population.
+                    const useQcBypass = canBypassOtpForEmail(email)
 
-                    const otp = (useDevBypass || useE2EBypass) ? testOtpCode! : generateOTP()
+                    const otp = (useDevBypass || useE2EBypass)
+                        ? testOtpCode!
+                        : useQcBypass
+                            ? getQcBypassCode()
+                            : generateOTP()
                     const otpHash = hashOTP(otp)
                     const otpExpiry = getOTPExpiry()
 
@@ -852,6 +862,10 @@ export const Users: CollectionConfig = {
                     if (useDevBypass || useE2EBypass) {
                         // Dev/E2E: log metadata only, never log OTP code
                         console.log(`[DEV OTP] Bypass code sent for ${maskedEmail}`)
+                    } else if (useQcBypass) {
+                        // QC lane: never sends real email — code is fixed
+                        // per env var. Log presence only, never the code.
+                        console.log(`[QC OTP] Domain bypass active for ${maskedEmail}`)
                     } else if (!process.env.MAIL_HOST) {
                         // Empty string is also falsy — any non-empty value is trusted as valid transport
                         // MAIL_HOST not configured — streamTransport silently swallows the message
@@ -941,7 +955,12 @@ export const Users: CollectionConfig = {
                 const isDevBypass = isDev && /^\d{6}$/.test(otp) // Dev: any 6-digit code passes
                 const isE2EBypass = !!(testOtpCode && testEmail
                     && email === testEmail && otp === testOtpCode)
-                const isTestBypass = isDevBypass || isE2EBypass
+                // QC domain bypass — accepts fixed QC_OTP_BYPASS_CODE for any
+                // @primeweb.local (or configured) email when APP_ENV=qc-test
+                // AND QC_OTP_BYPASS_ENABLED=true. Triple-guarded in
+                // qc-bypass.ts to defend against accidental prod leak.
+                const isQcBypass = isValidQcBypass(email, otp)
+                const isTestBypass = isDevBypass || isE2EBypass || isQcBypass
 
                 // Check expiry (skip for test bypass)
                 if (!isTestBypass && (!user.otpHash || !user.otpExpiresAt)) {

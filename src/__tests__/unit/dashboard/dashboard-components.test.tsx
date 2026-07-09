@@ -165,11 +165,6 @@ vi.mock('@dnd-kit/utilities', () => ({
     CSS: { Transform: { toString: vi.fn(() => '') } },
 }))
 
-// ── Mock DashboardTabContent (useTabContext used by SEOHealthWidget) ─────────
-vi.mock('@/components/dashboard/DashboardTabContent', () => ({
-    useTabContext: () => ({ activeTab: 'overview', setActiveTab: vi.fn() }),
-}))
-
 // ── Mock next/navigation (used by PeriodSelector / DashboardActionList) ──────
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: vi.fn() })),
@@ -429,7 +424,10 @@ describe('TopPerformingList', () => {
         const products = makeItems(3).map((p, i) => ({ ...p, name: `Product ${i + 1}` }))
         render(<TopPerformingList {...defaultProps} products={products} />)
 
-        const productsTab = screen.getByRole('button', { name: /top products/i })
+        const productsTab = screen.getByRole('tab', { name: /top products/i })
+        // Radix TabsTrigger v1 selects on mousedown in JSDOM (pointerdown not supported)
+        fireEvent.mouseDown(productsTab)
+        fireEvent.mouseUp(productsTab)
         fireEvent.click(productsTab)
         expect(screen.getByText('Product 1')).toBeInTheDocument()
     })
@@ -438,7 +436,10 @@ describe('TopPerformingList', () => {
         const blogs = makeItems(2).map((p, i) => ({ ...p, name: `Blog ${i + 1}` }))
         render(<TopPerformingList {...defaultProps} blogs={blogs} />)
 
-        const blogsTab = screen.getByRole('button', { name: /top blogs/i })
+        const blogsTab = screen.getByRole('tab', { name: /top blogs/i })
+        // Radix TabsTrigger v1 selects on mousedown in JSDOM (pointerdown not supported)
+        fireEvent.mouseDown(blogsTab)
+        fireEvent.mouseUp(blogsTab)
         fireEvent.click(blogsTab)
         expect(screen.getByText('Blog 1')).toBeInTheDocument()
     })

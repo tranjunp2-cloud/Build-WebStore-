@@ -24,7 +24,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
     const showHelper = freeEnabled && freeAboveRm !== '' && !isNaN(parsedAmount)
 
     return (
-        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
+        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[hsl(var(--card))] overflow-hidden">
             {/* Card header: icon + title + subtitle + toggle — separated by border-b */}
             <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
                 <div className="flex items-start gap-4">
@@ -59,7 +59,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                         aria-invalid={freeAboveError ? true : undefined}
                         aria-describedby={freeAboveError ? 'ship-free-threshold-err' : undefined}
                         className={cn(
-                            "min-h-[44px] rounded-[10px] pl-10 pr-3 text-[15px]",
+                            "h-9 rounded-lg pl-10 pr-3 text-[13px]",
                             freeAboveError && "border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))] focus-visible:ring-[hsl(var(--destructive)/0.3)]"
                         )}
                         placeholder="100.00"

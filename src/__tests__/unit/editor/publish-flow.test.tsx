@@ -28,6 +28,12 @@ vi.mock('@/i18n', () => ({
                 publish: {},
                 save: {},
                 unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'desc' },
+                sidebar: {
+                    aiChat: 'AI Chat',
+                    components: 'Components',
+                    pages: 'Pages',
+                    settings: 'Settings',
+                },
                 toast: {
                     publishSuccess: 'Website đã live!',
                     publishSuccessDomain: 'Live at {domain}',

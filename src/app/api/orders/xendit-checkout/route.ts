@@ -13,6 +13,7 @@ import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementOrderStock, restockAll } from './decrement-stock'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { getShippingRate } from '@/lib/shipping'
 
 interface XenditTenantDoc {
     id: string | number
@@ -85,7 +86,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'No valid products' } }, { status: 422 })
         }
 
-        const shippingFee = 10
+        const subtotalSen = Math.round(subtotal * 100)
+        // Xendit has no discount support; effectiveSubtotalSen(subtotalSen, 0) === subtotalSen.
+        // If discounts are added to this route, switch to effectiveSubtotalSen(subtotalSen, discountSen).
+        const shippingFeeSen = getShippingRate(customer.address?.state, (site as any).shippingConfig, subtotalSen)
+        const shippingFee = shippingFeeSen / 100
         const tax = 0
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`

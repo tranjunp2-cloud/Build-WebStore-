@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 // Override vercel.json's 60s default — AI site generation runs:
-//   OpenAI GPT-4.1-mini → Unsplash pipeline (5-10 images) → Payload create
+//   OpenAI GPT-4.1-mini → Pixabay pipeline (5-10 images) → Payload create
 // Real-world timing sits around 60-120s, previous 60s cap produced 504
 // Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
 // Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
@@ -8,10 +8,11 @@ export const maxDuration = 300
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -29,22 +30,24 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
-import { translateProductTerm } from '@/lib/ai/product-translator'
-import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
+import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
+import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
-import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
+import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -332,7 +335,7 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         // Image sourcing strategy — feature flag
         // ────────────────────────────────────────────────────────────────────
-        // Default: Unsplash pipeline (free, 8+ images per gen). Runs AFTER AI
+        // Default: Pixabay pipeline (free, 8+ images per gen). Runs AFTER AI
         // returns blocks so we know exactly which fields need images.
         //
         // Legacy: DALL-E hero-only ($0.04/gen). Enable via ENABLE_DALLE_HERO=true.
@@ -434,20 +437,11 @@ export async function POST(req: NextRequest) {
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
-            // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
-            // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
-            const translateKeywordsPromise: Promise<string[]> = !ENABLE_DALLE_HERO
-                ? translateToEnglishKeywords({
-                    industry: businessInfo.industry,
-                    products: businessInfo.products,
-                }).then((r): string[] => r ?? []).catch((): string[] => [])
-                : Promise.resolve([] as string[])
-
-            // O1: pre-compute sync values and chain imagePool build off translation
-            // so the 2 Unsplash search calls run during AI generation (GH-1190).
-            // translateKeywordsPromise resolves in ~3-5s → buildImagePool starts at ~t=3s
-            // → finishes at ~t=5s — well before AI (~10-30s) completes.
-            // await below costs ~0ms in the common case.
+            // GH-1185: keywords are sent to Pixabay RAW (user input language, no
+            // GPT/dict translation). Pixabay q is AND-matched on tags with default
+            // lang=en; translation was producing off-industry generic terms.
+            // O1: pre-compute sync values so the Pixabay search calls run during
+            // AI generation (GH-1190). await below costs ~0ms in the common case.
             const _parsedProductsForPool = !ENABLE_DALLE_HERO
                 ? parseProductsString(businessInfo.products) : []
             const _presetCategoryForPool = !ENABLE_DALLE_HERO
@@ -456,40 +450,87 @@ export async function POST(req: NextRequest) {
             const _themeMoodForPool = !ENABLE_DALLE_HERO
                 ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
 
+            // NOTE: field keeps the historical name `englishKeywords` — it now carries
+            // the RAW user-language keywords (see plan 260702-1607-GH-1185).
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
-                ? translateKeywordsPromise.then(async (aiKeywords): Promise<_PoolResult> => {
-                    const topProd = _parsedProductsForPool[0]
-                    let kws = aiKeywords.length > 0 ? [...aiKeywords] : []
-                    if (kws.length === 0) {
-                        const dictKw = translateProductTerm(topProd || '')
-                        if (dictKw) kws = [dictKw]
+                ? (async (): Promise<_PoolResult> => {
+                    const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // Translate raw user-language keywords → English before the
+                    // Pixabay POOL search (better stock-photo coverage than raw
+                    // VN/MS terms). Default ON — set GEN_TRANSLATE_POOL_KEYWORDS=false
+                    // to fall back to the raw-keyword + VN-relevance-gate path (GH-1185).
+                    // English keywords auto-skip the VN gate (detectQueryLang → undefined),
+                    // no image-pool change needed. Only the pool query is translated;
+                    // `englishKeywords` (legacy per-block search) stays RAW below.
+                    let poolKeywords = rawKeywords
+                    if (process.env.GEN_TRANSLATE_POOL_KEYWORDS !== 'false' && rawKeywords.length > 0) {
+                        const translated = await translateToEnglishKeywords({
+                            industry: businessInfo.industry,
+                            products: rawKeywords,
+                        }).catch(() => null)
+                        if (translated && translated.length > 0) {
+                            poolKeywords = translated
+                            console.info(`[image-pool] keyword translate: raw=[${rawKeywords.join(', ')}] → en=[${translated.join(', ')}]`)
+                        } else {
+                            console.warn('[image-pool] keyword translate failed/null — using raw keywords')
+                        }
                     }
-                    // Isolate buildImagePool failure so kws (englishKeywords) is always
-                    // preserved for the fulfillImageNeeds legacy search path even when
-                    // pool build fails (e.g. Unsplash 429 on demo key).
+                    // Isolate buildImagePool failure so rawKeywords is always
+                    // preserved for the fulfillImageNeeds legacy search path even
+                    // when pool build fails (e.g. Pixabay 429 / missing key).
                     let pool: ImagePool | null = null
                     try {
+                        // Size the pool to what the enabled image blocks can
+                        // actually consume (default hero-only → ~3 landscape, 0
+                        // square) instead of a fixed 12+6 — cuts speculative
+                        // download + pre-upload and the orphan media it left.
+                        const poolSizes = computePoolBucketSizes()
                         pool = await buildImagePool({
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
-                            topProduct: kws[0] || translateProductTerm(topProd || ''),
-                            products: kws.length > 0
-                                ? kws
-                                : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
+                            topProduct: poolKeywords[0],
+                            products: poolKeywords,
                             seed: _themeSeedForPool,
+                            landscapeSize: poolSizes.landscape,
+                            squareSize: poolSizes.square,
                         })
                     } catch {
-                        // pool stays null; kws still returned below for legacy search
+                        // pool stays null; rawKeywords still returned for legacy search
                     }
-                    return { pool, englishKeywords: kws }
-                }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
+                    return { pool, englishKeywords: rawKeywords }
+                })().catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
 
+            // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
+            // photos to Payload `media` DURING the GPT window instead of after
+            // it (Wave 2b). Chained directly off imagePoolPromise (not awaited
+            // here) so it runs concurrently with the GPT call below. Post-GPT,
+            // fulfillImageNeeds/batchFetchFromPool consumes the resolved map
+            // and only assigns pre-uploaded Media IDs — no re-download/upload.
+            // Default ON — set GEN_POOL_PREUPLOAD=false to disable (emergency
+            // rollback). When off, resolves an empty Map immediately so the
+            // downstream pool path is byte-identical to pre-Phase-06 behavior.
+            const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
+            const preUploadedPoolPromise: Promise<Map<string, number>> = GEN_POOL_PREUPLOAD
+                ? imagePoolPromise
+                    .then(({ pool }) =>
+                        pool
+                            ? preUploadPool(
+                                pool,
+                                String(resolvedTenantId),
+                                businessInfo.businessName,
+                                payload as unknown as Parameters<typeof preUploadPool>[3],
+                            )
+                            : new Map<string, number>(),
+                    )
+                    .catch((): Map<string, number> => new Map())
+                : Promise.resolve(new Map<string, number>())
+
             // Start sample product generation AFTER imagePool completes to avoid competing
-            // for Unsplash rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
+            // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
             // sample products (~7-12s) then run during AI (~30-77s) so await below still
-            // costs ~0ms in the common case. Both phases use separate Unsplash search calls.
+            // costs ~0ms in the common case. Both phases use separate Pixabay search calls.
             // Note: siteId intentionally omitted — products run before site row is created so site.id
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
@@ -509,6 +550,26 @@ export async function POST(req: NextRequest) {
                     generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
                 ),
             )
+
+            // gen-perf blog-inline: prepare 3 blog posts (AI seed topics + full
+            // article bodies + thumbnails). Kicked AFTER the site GPT resolves,
+            // NOT during it — the site's parallel split calls own the OpenAI
+            // budget in that window; blog's ~4 GPT calls competing there
+            // inflated the `ai` phase (measured 2026-07-08). It now overlaps the
+            // remaining media + db + persist-grace window (~25s), still landing
+            // the 3 posts before `done` in the common case; if it drags past the
+            // grace race below it falls back to post-response after() seeding.
+            // Never rejects: null = prep failed → legacy seeding at the persist site.
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+                payload,
+                tenantId: resolvedTenantId,
+                category: resolveComposerCategory(businessInfo.industry),
+                businessName: businessInfo.businessName,
+                products: parseProductsString(businessInfo.products),
+                industry: businessInfo.industry,
+                seed: computeGenSeed(businessInfo),
+                pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
+            }).catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -540,7 +601,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // Unsplash media pipeline — default path (ENABLE_DALLE_HERO=false)
+        // Pixabay media pipeline — default path (ENABLE_DALLE_HERO=false)
         // ────────────────────────────────────────────────────────────────────
         // Fetches 5-10 real stock images (hero, gallery, team, testimonials, about)
         // and injects Media IDs into block fields before sanitizer runs.
@@ -554,8 +615,8 @@ export async function POST(req: NextRequest) {
         // survive into payload.create and crash with:
         //   "The following field is invalid: Page Blocks > Block N (…) > Image"
         // Staging log 2026-04-14 21:06:15 confirmed this path after the
-        // Unsplash fallback chain failed to upgrade the object to a numeric
-        // Media ID (UNSPLASH_ACCESS_KEY missing on staging env + mkdir
+        // stock-image fallback chain failed to upgrade the object to a numeric
+        // Media ID (image API key missing on staging env + mkdir
         // 'public' ENOENT on Vercel read-only fs).
         const collectAllBlockBuckets = (): Record<string, unknown>[][] => {
             const buckets: Record<string, unknown>[][] = []
@@ -591,24 +652,35 @@ export async function POST(req: NextRequest) {
                         )
                     }
 
+                    // Phase 06 — await the pre-upload map kicked off alongside
+                    // imagePoolPromise above. Flag off / pool-build failed / no
+                    // pool needs = resolves an already-empty Map (0ms wait),
+                    // and batchFetchFromPool treats an empty map exactly like
+                    // an absent one (legacy inline download+upload path).
+                    const preUploadedPool = await preUploadedPoolPromise
+
                     await trackPhase('media', () =>
                         fulfillImageNeeds(
                             needs,
                             {
                                 businessName: businessInfo.businessName,
                                 tenantId: String(resolvedTenantId),
-                                category: businessInfo.industry,
+                                // GH-1185: pass the RESOLVED composer category (not raw
+                                // industry) so the no-keyword fallback path can hit
+                                // CATEGORY_BASE_KEYWORDS instead of 'modern business'.
+                                category: _presetCategoryForPool,
                                 language: resolvedLang,
                                 products: _parsedProductsForPool.length > 0 ? _parsedProductsForPool : undefined,
                                 mood: _themeMoodForPool,
                                 pool: imagePool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
+                                preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
                     )
                 }
-                // Strip any slot still holding a URL/object (Unsplash failed or missing) —
+                // Strip any slot still holding a URL/object (Pixabay failed or missing) —
                 // Payload upload fields are optional; better empty than reject.
                 // Run over every bucket so multi-page subpages get cleaned too.
                 for (const bucket of allBuckets) {
@@ -642,8 +714,8 @@ export async function POST(req: NextRequest) {
                         )
                     }
                 }
-            } catch (unsplashErr) {
-                console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
+            } catch (pixabayErr) {
+                console.error('[AI Generate] Pixabay pipeline error (non-fatal):', pixabayErr)
                 // Best-effort cleanup on any unexpected throw — still run
                 // cleanup on every bucket so a partial failure can't leak
                 // raw image objects into payload.create.
@@ -867,10 +939,20 @@ export async function POST(req: NextRequest) {
                 '/contact': seedNavLabels.contact,
             }
             : null
-        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => {
-            const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
-            return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
-        })
+        // Dedupe by URL — a duplicate slug (should not happen after
+        // canonicalizePageSlug trusts canonical slugs, but keep as a guard)
+        // must never render two identical nav links / a phantom entry.
+        const _seenNavUrls = new Set<string>()
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions
+            .map((p) => {
+                const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
+                return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
+            })
+            .filter((link) => {
+                if (_seenNavUrls.has(link.url)) return false
+                _seenNavUrls.add(link.url)
+                return true
+            })
 
         // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
         // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
@@ -1140,19 +1222,10 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
-        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
-        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
-        if (resolvedTenantId) {
-            const _seedCategory = safeSiteType
-            import('@/lib/images/image-library-seeder')
-                .then(({ seedImageLibraryForSite }) =>
-                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
-                )
-                .catch(err =>
-                    console.error('[generate-site] image-library seed failed',
-                        err instanceof Error ? err.message : err),
-                )
-        }
+        // GH-727 imglib seeding moved to after() — scheduled next to the blog
+        // seed below (gen-perf plan 260703 phase-02). Raw fire-and-forget here
+        // was killed on Vercel function freeze and its ~15 media creates
+        // contended with critical-path uploads before `done`.
 
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
@@ -1190,6 +1263,42 @@ export async function POST(req: NextRequest) {
         try {
             const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             productImageStats = imgStats
+            // Best-effort: resolve/create a category for sample products now that site.id is available.
+            // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
+            let sampleCategoryId: number | undefined
+            try {
+                const composerCategory = resolveComposerCategory(
+                    `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+                )
+                const { docs: catDocs } = await payload.find({
+                    collection: 'categories',
+                    where: { tenant: { equals: resolvedTenantId }, site: { equals: site.id }, deletedAt: { exists: false } },
+                    limit: 20,
+                    depth: 0,
+                })
+                if (catDocs.length === 0) {
+                    const created = await payload.create({
+                        collection: 'categories',
+                        data: {
+                            name: composerCategory.charAt(0).toUpperCase() + composerCategory.slice(1),
+                            slug: `${composerCategory}-${site.id}`,
+                            tenant: resolvedTenantId,
+                            site: site.id,
+                        },
+                    })
+                    sampleCategoryId = created.id as number
+                } else {
+                    const want = composerCategory.toLowerCase()
+                    const hit = catDocs.find(c => {
+                        const slug = String((c as any).slug ?? '').toLowerCase()
+                        const name = String((c as any).name ?? '').toLowerCase()
+                        return slug.includes(want) || name.includes(want)
+                    }) ?? catDocs[0]
+                    sampleCategoryId = hit!.id as number
+                }
+            } catch (err) {
+                console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
+            }
             for (const product of sampleProducts) {
                 // Guard: name must be at least 3 chars (Products schema minLength)
                 const name = product.name?.trim()
@@ -1216,14 +1325,36 @@ export async function POST(req: NextRequest) {
                     description: product.description,
                     ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
                     price: product.price,
+                    sku: product.sku,
+                    inventory: product.inventory,
+                    ...(sampleCategoryId ? { category: [sampleCategoryId] } : {}),
                     status: 'active' as const,
+                    // Publishing gate (GH-1458) requires weight > 0. Tier-1 AI estimates weight/
+                    // dimensions per product (generate-sample-products.ts prompt, mirrors
+                    // products-bulk-parse); Tier-2 curated fallback never sets these. `||` fallback
+                    // constants (matching BulkCreateModal.buildSavePayload() exactly, NOT `??`) apply
+                    // when the AI omitted a value OR hallucinated weight:0 — publish-guard.ts treats
+                    // 0 as invalid too. This create is now also gated by the collection-level
+                    // publishGateHook (src/collections/Products.ts) same as every other write path,
+                    // so this `||` fallback is defense-in-depth, not the only enforcement point.
+                    weight: product.weight || 1,
+                    dimensions: {
+                        length: product.length || 0,
+                        width: product.width || 0,
+                        height: product.height || 0,
+                    },
                 }
+                // Persisted alt fallback (GH-1458) — mirrors saveProductAction's buildProductAlt()
+                // call, but result.siteName is already in scope here so no extra query is needed.
+                // Re-capped at 500 (matches saveProductAction's cap, actions.ts) since `name` here
+                // is unbounded AI output, unlike the form's client-validated 120-char product name.
+                const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
                     await payload.create({
                         collection: 'products',
                         data: {
                             ...baseData,
-                            ...(safeImageId ? { images: [{ image: safeImageId }] } : {}),
+                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                         },
                     })
                     productsCreatedCount++
@@ -1249,7 +1380,7 @@ export async function POST(req: NextRequest) {
                                 try {
                                     await payload.create({
                                         collection: 'products',
-                                        data: { ...baseData, images: [{ image: retryImageId }] },
+                                        data: { ...baseData, images: [{ image: retryImageId, alt: fallbackAlt }] },
                                     })
                                     productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
@@ -1286,24 +1417,86 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
         }
 
-        // Seed 3 blog posts after response is sent (non-fatal, skips on regenerate).
-        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
-        const _blogSeedTask = () =>
-            seedBlogPosts(
-                payload,
-                resolvedTenantId,
-                site.id as string | number,
-                resolveComposerCategory(businessInfo.industry),
-                businessInfo.businessName,
-                user.id,
-                parseProductsString(businessInfo.products),
-                businessInfo.industry,
-                computeGenSeed(businessInfo),
-            ).catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
-        try {
-            after(_blogSeedTask)
-        } catch {
-            void _blogSeedTask()
+        // gen-perf blog-inline: blog prep overlapped the GPT window (kicked
+        // pre-AI above) — persist the 3 prepared posts BEFORE `done` so the
+        // blog page ships complete. The grace race bounds the worst case: if
+        // prep is still running (Pixabay/GPT drag) or failed (null), fall back
+        // to post-response seeding via after() exactly like the old path.
+        // Internal tuning knob (tests use a tiny value to exercise the
+        // pending branch deterministically) — not required in production env.
+        // `|| 15_000` (not `?? `) so an empty-string env (the .env.*.example ship
+        // `GEN_BLOG_PREP_GRACE_MS=`) or a non-numeric value → default, not 0ms
+        // (grace 0 disables inline-persist entirely, always falling to after()).
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 15_000
+        let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
+        const preparedBlogs = await Promise.race([
+            blogPrepPromise,
+            new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
+        ])
+        if (blogGraceTimer) clearTimeout(blogGraceTimer)
+        if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
+            const blogsCreated = await persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id)
+                .catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
+            console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
+        } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
+            // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+            const _blogSeedTask = () =>
+                blogPrepPromise
+                    .then((prepared) => {
+                        if (Array.isArray(prepared) && prepared.length > 0) {
+                            return persistBlogPosts(payload, prepared, resolvedTenantId, site.id as string | number, user.id)
+                        }
+                        if (prepared === null) {
+                            // Prep failed entirely — legacy full seeding (skips on regenerate).
+                            return seedBlogPosts(
+                                payload,
+                                resolvedTenantId,
+                                site.id as string | number,
+                                resolveComposerCategory(businessInfo.industry),
+                                businessInfo.businessName,
+                                user.id,
+                                parseProductsString(businessInfo.products),
+                                businessInfo.industry,
+                                computeGenSeed(businessInfo),
+                            )
+                        }
+                        return 0
+                    })
+                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+            try {
+                after(_blogSeedTask)
+            } catch {
+                void _blogSeedTask()
+            }
+        }
+        // preparedBlogs === [] → tenant already has posts (regenerate) — nothing to seed.
+
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
+        // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
+        // fire-and-forget) so it runs reliably post-response on Vercel and
+        // its media creates never contend with critical-path uploads.
+        // Use safeSiteType (same key used by storefront blocks) so seeder
+        // alt keys match resolver lookups. Seeder is idempotent + never
+        // throws; until rows land, blocks fall back to static CDN images.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            const _imglibSeedTask = () => {
+                const t = Date.now()
+                console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
+                return import('@/lib/images/image-library-seeder')
+                    .then(({ seedImageLibraryForSite }) =>
+                        seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                    )
+                    .catch(err =>
+                        console.error('[generate-site] image-library seed failed',
+                            err instanceof Error ? err.message : err),
+                    )
+            }
+            try {
+                after(_imglibSeedTask)
+            } catch {
+                void _imglibSeedTask()
+            }
         }
 
             const timeMs = Date.now() - startTime
@@ -1368,9 +1561,16 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(_encoder.encode(doneData))
 
                         // Notify SSO Hub: user created their first site (step 1)
-                        import('@/lib/sso/sso-api-client')
-                            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-                            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+                        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+                        const _notifyStep1Stream = () =>
+                            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+                            )
+                        try {
+                            after(_notifyStep1Stream)
+                        } catch {
+                            void _notifyStep1Stream()
+                        }
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
@@ -1421,9 +1621,16 @@ export async function POST(req: NextRequest) {
         await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
-        import('@/lib/sso/sso-api-client')
-            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _notifyStep1 = () =>
+            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+            )
+        try {
+            after(_notifyStep1)
+        } catch {
+            void _notifyStep1()
+        }
 
         return NextResponse.json({
             success: true,
@@ -1500,41 +1707,6 @@ function cloneBlockData<T>(value: T): T {
     return JSON.parse(JSON.stringify(value))
 }
 
-function normalizeInternalUrl(url: unknown): string {
-    if (typeof url !== 'string') return '#'
-    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
-    if (url === '#about' || url === 'about') return '/about'
-    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
-    if (url === '#contact' || url === 'contact') return '/contact'
-    return url
-}
-
-/**
- * Map a CTA URL to a canonical page slug from the generated site's page list.
- * Returns '' when no matching internal page exists.
- * External URLs (https, mailto, tel, etc.) are passed through unchanged.
- */
-function resolveCtaSlugFromLinks(
-    rawUrl: unknown,
-    canonicalLinks: Array<{ url: string }>,
-): string {
-    const normalized = normalizeInternalUrl(rawUrl)
-    if (normalized === '') return ''
-    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
-    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
-    // Exact match (most common case — canonical slugs already align)
-    if (canonicalLinks.some(l => l.url === normalized)) return normalized
-    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
-    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
-    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
-    for (const kw of segments) {
-        if (kw.length < 3) continue
-        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
-        if (match) return match.url
-    }
-    return ''
-}
-
 /**
  * Fix hero and cta block CTA URLs across all page definitions to use
  * canonical slugs from the generated site. Runs after buildGeneratedPages
@@ -1566,6 +1738,10 @@ function patchPageCtaUrls(
                 } else {
                     block.ctaButton = undefined
                 }
+            }
+            if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
+                block.plans = (block.plans as Array<Record<string, unknown>>)
+                    .map(p => resolvePricingPlanCta(p, canonicalLinks))
             }
         }
     }
@@ -1692,11 +1868,26 @@ function createPageHero(baseHero: AIBlock | null, options: {
 // GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
 // for well-known pages (e.g. slug "free-trial" instead of "contact").
 // Detection priority: block content (structural) > title keyword match.
-function canonicalizePageSlug(
+// The known-good sub-page slugs — a page already carrying one of these is
+// trusted verbatim (see canonicalizePageSlug).
+const CANONICAL_SUBPAGE_SLUGS: ReadonlySet<string> = new Set(['/about', '/services', '/contact', '/blog'])
+
+export function canonicalizePageSlug(
     page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
     index: number,
 ): string {
     if (page.isHomepage === true || index === 0) return '/'
+    // Trust an ALREADY-canonical incoming slug and skip title/content re-derivation.
+    // The parallel-split path (gen-page-split.ts) validates + rewrites each sub-page
+    // slug against a fixed plan; re-deriving from title here could flip a correct
+    // "/contact" back to "/about" when the page's content resembles About (nano
+    // sometimes fills the contact slot with About-ish content) — producing a
+    // duplicate "/about" that fails the unique (site, slug) create and drops
+    // /contact, leaving a duped "Giới Thiệu" nav entry (live 2026-07-08, dental).
+    // GH-820's target (arbitrary invented slugs like "free-trial") are NOT in this
+    // set, so they still get normalized below.
+    const incoming = (page.slug || '').startsWith('/') ? (page.slug || '') : `/${page.slug || ''}`
+    if (CANONICAL_SUBPAGE_SLUGS.has(incoming)) return incoming
     // Title is authoritative — AI titles are reliable signals and checked first to
     // avoid misclassifying pages that include secondary structural blocks (e.g. a
     // Services page with a contact form at the bottom must not become slug 'contact').
@@ -2003,6 +2194,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                         title: item.title || item.role || item.position || '',
                         company: item.company || item.organization || '',
                         rating: item.rating || 5,
+                        // GH-1185 follow-up: preserve the Media ID assigned by the
+                        // media injector — this whitelist rebuild silently dropped
+                        // `avatar`, leaving EVERY generated site with 0/N
+                        // testimonial avatars (confirmed sites 116/174/178).
+                        // Numeric-only guard: URL/object values must stay out so
+                        // cleanupNonNumericImageFields semantics are unchanged.
+                        ...(typeof item.avatar === 'number' && Number.isFinite(item.avatar)
+                            ? { avatar: item.avatar }
+                            : {}),
                     }
                 })
                 : []

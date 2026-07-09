@@ -7,6 +7,8 @@ import { useI18n } from '@/i18n'
 import type { PlatformUser } from '@/types/user'
 import { AVATAR_MAX_BYTES, AVATAR_ALLOWED_MIME } from '@/lib/profile/schemas'
 import { useUserAvatar } from '@/providers/UserAvatarContext'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 type Props = {
     currentAvatar: PlatformUser['avatar']
@@ -68,7 +70,7 @@ export function AvatarUpload({ currentAvatar, onUserUpdate }: Props) {
 
     return (
         <>
-            <input
+            <Input
                 ref={inputRef}
                 type="file"
                 accept="image/jpeg,image/png"
@@ -76,11 +78,13 @@ export function AvatarUpload({ currentAvatar, onUserUpdate }: Props) {
                 onChange={handleChange}
                 aria-label={t.profile.banner.uploadAvatar}
             />
-            <button
+            <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => inputRef.current?.click()}
                 disabled={uploading}
-                className="absolute bottom-0 right-0 z-20 bg-[hsl(var(--primary))] rounded-[12px] p-2 flex items-center justify-center shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] disabled:opacity-50 transition-opacity hover:opacity-90"
+                className="absolute bottom-0 right-0 z-20 bg-[hsl(var(--primary))] rounded-[12px] p-2 h-auto w-auto flex items-center justify-center shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] disabled:opacity-50 transition-opacity hover:opacity-90 hover:bg-[hsl(var(--primary))]"
                 aria-label={t.profile.banner.uploadAvatar}
             >
                 {uploading ? (
@@ -88,7 +92,7 @@ export function AvatarUpload({ currentAvatar, onUserUpdate }: Props) {
                 ) : (
                     <Camera className="size-[11px] text-[hsl(var(--primary-foreground))]" />
                 )}
-            </button>
+            </Button>
         </>
     )
 }

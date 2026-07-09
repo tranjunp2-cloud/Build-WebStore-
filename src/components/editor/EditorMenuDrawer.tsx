@@ -172,20 +172,21 @@ export function EditorMenuDrawer({
         <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-            <aside className="absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
-                <div className="flex h-[65px] items-center justify-between border-b border-dash-border px-4">
+            {/* `dark`: sidebar editor luôn dark bất kể theme app (light/dark) — yêu cầu cố định. */}
+            <aside className="dark sb-dark absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
+                <div className="flex h-[65px] items-center justify-between px-4">
                     {/* Logo — matches the dashboard header (TopHeader): real logo image + Prime/Web split */}
                     <div className="flex items-center gap-2">
                         <Image
                             src="/images/logo-icon-3c4d76.png"
-                            alt="PrimeWeb Logo"
+                            alt="Web Store Logo"
                             width={28}
                             height={28}
-                            className="object-contain drop-shadow-[0px_0px_12px_hsl(var(--primary)/0.6)]"
+                            className="object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                         />
                         <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
-                            <span className="text-dash-text">Prime</span>
-                            <span className="text-[hsl(var(--primary))]">Web</span>
+                            <span className="text-dash-text">Web </span>
+                            <span className="text-[#06B6D4]">Store</span>
                         </div>
                     </div>
                     <button

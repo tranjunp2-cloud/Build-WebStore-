@@ -37,7 +37,7 @@ export function ProfileBanner({ user, role, onUserUpdate }: Props) {
     const initial = getInitial(user.firstName, user.email)
 
     return (
-        <div className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-[24px] p-[33px] flex gap-8 items-center overflow-hidden w-full">
+        <div className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-[24px] p-6 sm:p-[33px] flex flex-col sm:flex-row items-center gap-5 sm:gap-8 overflow-hidden w-full">
             {/* Avatar container */}
             <div className="relative flex-shrink-0">
                 <div className="relative size-[128px] rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_0_4px_hsl(var(--info)/0.3)]" style={{ backgroundColor: 'hsl(var(--info))' }}>
@@ -58,9 +58,9 @@ export function ProfileBanner({ user, role, onUserUpdate }: Props) {
             </div>
 
             {/* User info */}
-            <div className="flex flex-col gap-1 items-start min-w-0">
+            <div className="flex flex-col gap-1 items-center sm:items-start text-center sm:text-left min-w-0">
                 {/* Name + role badge */}
-                <div className="flex gap-3 items-center flex-wrap">
+                <div className="flex gap-3 items-center flex-wrap justify-center sm:justify-start">
                     <span className="text-[30px] font-bold text-[hsl(var(--foreground))] tracking-[-0.75px] leading-9">
                         {displayName}
                     </span>
@@ -75,7 +75,7 @@ export function ProfileBanner({ user, role, onUserUpdate }: Props) {
                 <span className="text-[16px] text-[hsl(var(--muted-foreground))]">{user.email}</span>
 
                 {/* Status row — and phone for owner */}
-                <div className="flex gap-4 items-center pt-3 flex-wrap">
+                <div className="flex gap-4 items-center pt-3 flex-wrap justify-center sm:justify-start">
                     <div className="flex flex-col items-start">
                         <span className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-[-0.5px] leading-[15px]">
                             {t.profile.banner.status}
@@ -95,7 +95,7 @@ export function ProfileBanner({ user, role, onUserUpdate }: Props) {
                                 <span className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-[-0.5px] leading-[15px]">
                                     {t.profile.general.phone}
                                 </span>
-                                <span className="text-[14px] text-white leading-5">{user.phone}</span>
+                                <span className="text-[14px] text-foreground leading-5">{user.phone}</span>
                             </div>
                         </>
                     )}

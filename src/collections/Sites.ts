@@ -1,10 +1,22 @@
 import type { CollectionConfig } from 'payload'
+import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
+import { THEME_ENUMS } from '../lib/theme/enums'
+import { MY_STATES } from '../lib/shipping/constants'
+import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS } from '../lib/seo/local-business-constants'
+
+const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
+const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
 
 export const Sites: CollectionConfig = {
     slug: 'sites',
     admin: {
         useAsTitle: 'name',
         description: 'Each tenant can have one or more websites.',
+    },
+    hooks: {
+        // Bust the storefront data cache on any site write (admin edits included).
+        afterChange: [revalidateSiteAfterChange],
+        afterDelete: [revalidateSiteAfterDelete],
     },
     access: {
         // Authenticated users can create sites
@@ -157,26 +169,13 @@ export const Sites: CollectionConfig = {
                     name: 'fontHeading',
                     type: 'select',
                     defaultValue: 'Outfit',
-                    options: [
-                        { label: 'Outfit', value: 'Outfit' },
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'Playfair Display', value: 'Playfair Display' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Poppins', value: 'Poppins' },
-                        { label: 'Raleway', value: 'Raleway' },
-                    ],
+                    options: HEADING_FONT_OPTIONS,
                 },
                 {
                     name: 'fontBody',
                     type: 'select',
                     defaultValue: 'Inter',
-                    options: [
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Lato', value: 'Lato' },
-                        { label: 'Open Sans', value: 'Open Sans' },
-                        { label: 'Nunito', value: 'Nunito' },
-                    ],
+                    options: BODY_FONT_OPTIONS,
                 },
                 {
                     name: 'borderRadius',
@@ -313,6 +312,62 @@ export const Sites: CollectionConfig = {
                 { name: 'phone', type: 'text' },
                 { name: 'email', type: 'text' },
                 { name: 'address', type: 'textarea' },
+            ],
+        },
+        {
+            name: 'localBusiness',
+            type: 'group',
+            label: 'Local Business Info',
+            admin: { description: 'Structured address, hours, and category for Local SEO (F37) — used for LocalBusiness JSON-LD and Google Maps/AI discoverability.' },
+            fields: [
+                { name: 'streetAddress', type: 'text' },
+                { name: 'city', type: 'text' },
+                {
+                    name: 'state',
+                    type: 'select',
+                    options: MY_STATES.map((s) => ({ label: s, value: s })),
+                    admin: { description: 'Malaysia state / federal territory' },
+                },
+                { name: 'postcode', type: 'text', admin: { description: 'Malaysia postcode — 5 digits' } },
+                { name: 'country', type: 'text', defaultValue: 'MY' },
+                {
+                    name: 'latitude',
+                    type: 'number',
+                    min: -90,
+                    max: 90,
+                    admin: { description: 'Range: -90 to 90' },
+                },
+                {
+                    name: 'longitude',
+                    type: 'number',
+                    min: -180,
+                    max: 180,
+                    admin: { description: 'Range: -180 to 180' },
+                },
+                {
+                    name: 'businessCategory',
+                    type: 'select',
+                    options: BUSINESS_CATEGORY_OPTIONS,
+                    admin: { description: 'Maps to a Schema.org LocalBusiness sub-type' },
+                },
+                {
+                    name: 'priceRange',
+                    type: 'select',
+                    options: PRICE_RANGE_OPTIONS,
+                },
+                { name: 'serviceAreaDescription', type: 'textarea' },
+                {
+                    name: 'openingHours',
+                    type: 'array',
+                    maxRows: 7,
+                    admin: { description: 'Up to 7 rows (Mon-Sun)' },
+                    fields: [
+                        { name: 'dayOfWeek', type: 'select', options: DAY_OF_WEEK_OPTIONS },
+                        { name: 'opens', type: 'text', admin: { description: 'HH:MM' } },
+                        { name: 'closes', type: 'text', admin: { description: 'HH:MM' } },
+                        { name: 'isClosed', type: 'checkbox', defaultValue: false },
+                    ],
+                },
             ],
         },
         {

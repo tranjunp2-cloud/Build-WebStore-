@@ -40,6 +40,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             collection: 'sites',
             id: siteId,
             depth: 1,
+            disableErrors: true,
         })
 
         if (!site) {
@@ -156,6 +157,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 generationLocale: ((site as Record<string, unknown>).generationLocale as string) || site.locale || 'ms',
                 pendingLocaleConfirm: (site as Record<string, unknown>).pendingLocaleConfirm === true,
                 contactInfo: site.contactInfo || {},
+                // F37 US-01: structured local-business address/geo/hours for Local SEO.
+                localBusiness: site.localBusiness || {},
                 socialLinks: site.socialLinks || {},
                 branding: site.branding || {},
                 seo: site.seo || {},

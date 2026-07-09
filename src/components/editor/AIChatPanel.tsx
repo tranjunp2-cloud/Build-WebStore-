@@ -3,9 +3,7 @@
 
 import React, { memo, useEffect, useRef, useState } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
-import { RotateCcw, Send, Sparkles, X, WandSparkles } from 'lucide-react'
-import { AddSectionPromptChips } from './AddSectionPromptChips'
-import { Button } from '@/components/ui/button'
+import { RotateCcw, Send, Sparkles, Square, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
 import { useI18n } from '@/i18n'
@@ -41,7 +39,42 @@ interface AIChatPanelProps {
     blockContext?: { blockIndex: number; blockType: string } | null
     onBlockContextDismiss?: () => void
     compact?: boolean
+    /**
+     * Phase 03 (F05 compact Tools sheet): reports request-in-flight state so a host
+     * (e.g. `EditorToolsSheet`/`CompactEditorLayout`) can show a canvas "AI is editing…"
+     * overlay + "Stop AI" affordance. Optional, additive — no-op for existing callers.
+     */
+    onProcessingChange?: (isProcessing: boolean) => void
+    /**
+     * Phase 03: receives an abort function while a request is in flight (null when idle)
+     * so the host's "Stop AI" control can cancel the current AI edit request.
+     */
+    onStopHandlerChange?: (stop: (() => void) | null) => void
+    /**
+     * PR #1485 review fix (C1): called when a request is aborted mid-stream, with the
+     * count of AI actions that were already applied (and DB-saved) before the abort.
+     * The host is responsible for fully reverting those `appliedCount` actions (undo
+     * loop + re-save) so no partial edit survives the stop — compact hides the global
+     * undo/redo pill, so this is the only recovery path.
+     */
+    onAbortRollback?: (appliedCount: number) => void
+    /**
+     * PR #1485 review fix (C2): host-level "is an AI request running" flag (e.g. `page.tsx`'s
+     * `aiRunning`, already passed to `EditorToolbar`). Gates sending in addition to the
+     * panel's own local `isProcessing` so a freshly remounted panel (sheet close/tab switch
+     * mid-stream) can't fire a second concurrent request while the host still reports one
+     * in flight.
+     */
+    externalProcessing?: boolean
+    /**
+     * PR #1485 review fix (C1): renders an in-panel "Stop" control reachable without
+     * closing the host sheet (the bottom-bar Stop control sits under the Tools sheet).
+     */
+    onRequestStop?: () => void
 }
+
+// Auto-grow textarea cap: ~6 lines of 13px/leading-5 (20px) text + py-1.5 before scrolling.
+const MAX_TEXTAREA_HEIGHT = 132
 
 function formatChatTime(date = new Date()) {
     return date.toLocaleTimeString([], {
@@ -64,6 +97,11 @@ function AIChatPanelInner({
     blockContext,
     onBlockContextDismiss,
     compact = false,
+    onProcessingChange,
+    onStopHandlerChange,
+    onAbortRollback,
+    externalProcessing = false,
+    onRequestStop,
 }: AIChatPanelProps) {
 
     const { t } = useI18n()
@@ -82,6 +120,11 @@ function AIChatPanelInner({
         content: ac.welcomeMessage,
     }])
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    // PR #1485 review fix (C1): counts AI actions successfully applied (and DB-saved)
+    // during the current streaming request, so an abort mid-stream can report how many
+    // to roll back. Reset to 0 at the start of each send and after handling an abort.
+    const appliedActionsRef = useRef(0)
     // Skip the save effect's first run per chatStorageKey.
     // Root cause: effects run in declaration order within the same render cycle.
     // Hydration effect (1st) calls setMessages — state hasn't updated yet when
@@ -129,6 +172,17 @@ function AIChatPanelInner({
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
+
+    // Auto-resize textarea to fit content: grows from 1 line up to MAX_TEXTAREA_HEIGHT,
+    // then scrolls internally. Runs on typing and on programmatic clears (after send).
+    useEffect(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.style.height = 'auto'
+        const next = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)
+        el.style.height = `${next}px`
+        el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden'
+    }, [input])
 
     useEffect(() => {
         if (!externalActivity) return
@@ -214,6 +268,7 @@ function AIChatPanelInner({
                     return
                 }
                 await onAIAction(payload as AIAction)
+                appliedActionsRef.current += 1
                 return
             }
 
@@ -252,8 +307,9 @@ function AIChatPanelInner({
     }
 
     const handleSendChat = async () => {
-        if (!input.trim() || isProcessing) return
+        if (!input.trim() || isProcessing || externalProcessing) return
 
+        appliedActionsRef.current = 0
         const blockLabel = blockContext ? blockContext.blockType.replace(/-/g, ' ') : null
         const userMsg = blockLabel
             ? `[${blockLabel}] ${input.trim()}`
@@ -274,6 +330,11 @@ function AIChatPanelInner({
             },
         ])
         setIsProcessing(true)
+        onProcessingChange?.(true)
+        // Phase 03: lets a host (compact Tools sheet) offer a "Stop AI" control that
+        // cancels this in-flight request via the shared fetch/stream AbortController.
+        const abortController = new AbortController()
+        onStopHandlerChange?.(() => abortController.abort())
 
         try {
             const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
@@ -288,6 +349,7 @@ function AIChatPanelInner({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
+                signal: abortController.signal,
                 body: JSON.stringify({
                     instruction: userMsg,
                     block: currentBlock,
@@ -332,10 +394,23 @@ function AIChatPanelInner({
                 })
             }
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Unknown error'
-            handleAIError(assistantMessageId, message)
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                const appliedCount = appliedActionsRef.current
+                onAbortRollback?.(appliedCount)
+                updateAssistantMessage(assistantMessageId, {
+                    content: appliedCount > 0 ? `⏹️ Stopped — reverted ${appliedCount} change${appliedCount === 1 ? '' : 's'}` : '⏹️ Stopped',
+                    isStreaming: false,
+                    undoable: false,
+                })
+                appliedActionsRef.current = 0
+            } else {
+                const message = err instanceof Error ? err.message : 'Unknown error'
+                handleAIError(assistantMessageId, message)
+            }
         } finally {
             setIsProcessing(false)
+            onProcessingChange?.(false)
+            onStopHandlerChange?.(null)
         }
     }
 
@@ -358,7 +433,7 @@ function AIChatPanelInner({
                                         <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
                                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                             {msg.createdAt ? (
-                                                <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
+                                                <p className="mt-1.5 text-right text-[10px] text-white/80">{msg.createdAt}</p>
                                             ) : null}
                                         </div>
                                     </div>
@@ -397,7 +472,7 @@ function AIChatPanelInner({
                                                     {ac.undo}
                                                 </button>
                                                 {msg.createdAt ? (
-                                                    <span className="text-[10px] text-white/40">{msg.createdAt}</span>
+                                                    <span className="text-[10px] text-white/65">{msg.createdAt}</span>
                                                 ) : null}
                                             </div>
                                         </div>
@@ -413,7 +488,7 @@ function AIChatPanelInner({
                                     )}>
                                         <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                         {msg.createdAt ? (
-                                            <p className="mt-1.5 text-[10px] text-white/40">{msg.createdAt}</p>
+                                            <p className="mt-1.5 text-[10px] text-white/65">{msg.createdAt}</p>
                                         ) : null}
                                     </div>
                                 </div>
@@ -425,27 +500,34 @@ function AIChatPanelInner({
                 </div>
 
                 <div className={cn('border-t border-white/[0.06] bg-[rgb(var(--editor-bg-rgb)/0.8)] backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
-                    <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
-                        <button
-                            type="button"
-                            onClick={() => setInput('Change web color to mint green')}
-                            className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
-                        >
-                            {ac.changeColorPrompt}
-                        </button>
-                        <AddSectionPromptChips
-                            compact={compact}
-                            desktopMinimal={!compact}
-                            desktopLabelOverride={ac.addSectionPrompt}
-                            onPromptSelect={prompt => setInput(prompt)}
-                        />
-                    </div>
-
-                    <div className={cn(
-                        'group relative rounded-xl border border-white/[0.08] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[var(--editor-surface-elevated)] focus-within:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]',
-                        compact && 'px-4 py-3',
-                        blockContext && 'pt-2',
-                    )}>
+                    {/* PR #1485 review fix (C1): in-panel Stop control — reachable without closing
+                        the host Tools sheet (unlike the bottom bar's Stop AI, which sits under it).
+                        Re-review N-minor: gate on externalProcessing too, not just local isProcessing,
+                        so it still shows after a remount mid-stream (close/reopen sheet, tab switch). */}
+                    {(isProcessing || externalProcessing) && (
+                        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5">
+                            <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
+                                <span className="flex gap-1">
+                                    <span className="h-1 w-1 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:0ms]" />
+                                    <span className="h-1 w-1 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:150ms]" />
+                                    <span className="h-1 w-1 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:300ms]" />
+                                </span>
+                                {ac.thinking}
+                            </span>
+                            {onRequestStop && (
+                                <button
+                                    type="button"
+                                    onClick={onRequestStop}
+                                    aria-label={ac.stopAI}
+                                    className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] px-2 py-1 text-[11px] font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)]"
+                                >
+                                    <Square className="h-3 w-3 fill-current" aria-hidden />
+                                    {ac.stopAI}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    <div className="group rounded-xl border border-white/[0.08] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] px-3 py-2.5 transition-all focus-within:border-cyan-400/40 focus-within:bg-[var(--editor-surface-elevated)] focus-within:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]">
                         {blockContext && (
                             <div className="mb-2 flex items-center gap-1.5">
                                 <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/20">
@@ -462,36 +544,39 @@ function AIChatPanelInner({
                                 </button>
                             </div>
                         )}
-                        <textarea
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    void handleSendChat()
-                                }
-                            }}
-                            placeholder={ac.inputPlaceholder}
-                            aria-label="Chat message"
-                            rows={1}
-                            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
-                            style={{ minHeight: '24px', maxHeight: '120px' }}
-                            disabled={isProcessing}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => void handleSendChat()}
-                            disabled={!input.trim() || isProcessing}
-                            className={cn(
-                                'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
-                                input.trim() && !isProcessing
-                                    ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
-                                    : 'bg-white/[0.06] text-slate-500',
-                                isProcessing && 'cursor-not-allowed',
-                            )}
-                        >
-                            <Send className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-end gap-2">
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        void handleSendChat()
+                                    }
+                                }}
+                                placeholder={ac.inputPlaceholder}
+                                aria-label="Chat message"
+                                rows={1}
+                                className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-5 text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                                disabled={isProcessing || externalProcessing}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => void handleSendChat()}
+                                disabled={!input.trim() || isProcessing || externalProcessing}
+                                aria-label={ac.send}
+                                className={cn(
+                                    'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
+                                    input.trim() && !isProcessing && !externalProcessing
+                                        ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                        : 'bg-white/[0.06] text-slate-500',
+                                    (isProcessing || externalProcessing) && 'cursor-not-allowed',
+                                )}
+                            >
+                                <Send className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between px-0.5">

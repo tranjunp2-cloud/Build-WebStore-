@@ -9,6 +9,7 @@ import type { TemplateRow } from './EmailTemplatesClient'
 import { EmailTemplateFormCard } from './email-template-form-card'
 import { EmailPreviewPane } from './EmailPreviewPane'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
@@ -82,67 +83,90 @@ export function EmailTemplateEditView({
 
     return (
         <div className="w-full">
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.06] text-slate-400 hover:bg-white/10 hover:text-white transition-colors shrink-0"
-                    title={et.backToList}
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                </button>
+            {/* Header — mobile (<md): info row + action buttons stack as 2 explicit rows
+                (buttons full-width) instead of relying on flex-wrap, which could crush the
+                title/badge/metadata column when both action buttons demand their own space
+                on the same line (GH-1499 issue 3). md+: back to a single row, unchanged. */}
+            <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center">
+                <div className="flex items-center gap-3 min-w-0">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={onBack}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="shrink-0"
+                                >
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{et.backToList}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shrink-0">
-                    <Mail className="h-5 w-5 text-white" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-lg font-bold text-white">{toLabel(templateType)}</h2>
-                        {isCustomized && (
-                            <span className="bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))] text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded">
-                                {et.customized}
-                            </span>
-                        )}
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shrink-0">
+                        <Mail className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-                        <span>{recipient === 'buyer' ? et.buyerFacing : et.sellerFacing}</span>
-                        <span>·</span>
-                        <span>{relTime(existingRow?.updatedAt, et.neverEdited, et.lastEdited, ti)}</span>
-                        <span>·</span>
-                        <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-slate-400">
-                            tpl_{templateType}
-                        </code>
+
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-lg font-bold text-white">{toLabel(templateType)}</h2>
+                            {isCustomized && (
+                                <span className="bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))] text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded">
+                                    {et.customized}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                            <span>{recipient === 'buyer' ? et.buyerFacing : et.sellerFacing}</span>
+                            <span>·</span>
+                            <span>{relTime(existingRow?.updatedAt, et.neverEdited, et.lastEdited, ti)}</span>
+                            <span>·</span>
+                            <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-slate-400">
+                                tpl_{templateType}
+                            </code>
+                        </div>
                     </div>
                 </div>
 
-                {/* Header action buttons */}
-                <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                        type="button"
-                        onClick={onSendTest}
-                        disabled={isSendingTest}
-                        variant="dashSecondary"
-                        size="dash"
-                        className="text-xs"
-                        title={et.sendTestTitle}
-                    >
-                        <Send className="h-3.5 w-3.5" />
-                        {isSendingTest ? et.sending : et.sendTest}
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={onOpenInNewTab}
-                        variant="dashSecondary"
-                        size="dash"
-                        className="text-xs"
-                        title={et.openInNewTabTitle}
-                    >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        {et.openInNewTab}
-                    </Button>
-                </div>
+                {/* Header action buttons — full-width on mobile, own row; inline+shrink-0 from md */}
+                <TooltipProvider>
+                    <div className="flex items-center gap-2 md:shrink-0">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={onSendTest}
+                                    disabled={isSendingTest}
+                                    variant="dashSecondary"
+                                    size="dash"
+                                    className="flex-1 md:flex-none text-xs"
+                                >
+                                    <Send className="h-3.5 w-3.5" />
+                                    {isSendingTest ? et.sending : et.sendTest}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{et.sendTestTitle}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={onOpenInNewTab}
+                                    variant="dashSecondary"
+                                    size="dash"
+                                    className="flex-1 md:flex-none text-xs"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    {et.openInNewTab}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{et.openInNewTabTitle}</TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
             </div>
 
             {/* Save error banner */}
@@ -153,11 +177,10 @@ export function EmailTemplateEditView({
                 </div>
             )}
 
-            {/* Split layout */}
-            <div
-                className="grid gap-6"
-                style={{ gridTemplateColumns: 'minmax(360px, 4fr) minmax(420px, 6fr)' }}
-            >
+            {/* Split layout — only true desktop (xl, ≥1280px) gets the 2-column split; phone
+                AND tablet/iPad (mini/Air/Pro, all <1280px) stack to 1 column so neither the
+                form nor the preview gets squeezed into a too-narrow side-by-side column. */}
+            <div className="grid gap-6 grid-cols-1 xl:grid-cols-[minmax(360px,4fr)_minmax(420px,6fr)]">
                 <EmailTemplateFormCard
                     templateType={templateType}
                     locale={locale}

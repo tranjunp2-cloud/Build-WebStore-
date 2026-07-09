@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
 
 // ── Mock next/navigation & actions ──────────────────────────────────────────
@@ -119,17 +119,23 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
         it('[TC-F19.24] Displays Staff Directory completely with all info', () => {
             render(<StaffDirectoryClient tenantId="tenant-1" initialStaff={mockStaff} />);
 
-            expect(screen.getByText('Store Owner')).toBeInTheDocument();
-            expect(screen.getByText('owner@test.com')).toBeInTheDocument();
-            
+            // Component renders two responsive layouts (mobile card list `md:hidden`
+            // + desktop table `hidden md:block`); both exist in jsdom since CSS
+            // visibility isn't applied. Scope assertions to the desktop table so
+            // text matches stay unambiguous.
+            const table = within(screen.getByRole('table'));
+
+            expect(table.getByText('Store Owner')).toBeInTheDocument();
+            expect(table.getByText('owner@test.com')).toBeInTheDocument();
+
             // Badges
-            expect(screen.getByText('Owner')).toBeInTheDocument();
-            expect(screen.getByText('Manager')).toBeInTheDocument();
-            expect(screen.getByText('Custom Features')).toBeInTheDocument();
+            expect(table.getByText('Owner')).toBeInTheDocument();
+            expect(table.getByText('Manager')).toBeInTheDocument();
+            expect(table.getByText('Custom Features')).toBeInTheDocument();
 
             // Statuses
-            expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
-            expect(screen.getByText('Pending')).toBeInTheDocument();
+            expect(table.getAllByText('Active').length).toBeGreaterThan(0);
+            expect(table.getByText('Pending')).toBeInTheDocument();
         });
 
     });

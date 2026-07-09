@@ -1,5 +1,5 @@
 /**
- * Seed script for PrimeWeb Storefront testing.
+ * Seed script for Web Store Storefront testing.
  * Creates: 1 admin user, 1 tenant, 1 site, 5 products.
  *
  * Usage: npx tsx src/scripts/seed-storefront.ts
@@ -33,7 +33,7 @@ async function seed() {
                 email: ADMIN_EMAIL,
                 password: ADMIN_PASSWORD,
                 firstName: 'Admin',
-                lastName: 'PrimeWeb',
+                lastName: 'Web Store',
                 roles: ['super-admin'],
             },
         })
@@ -246,6 +246,10 @@ async function seed() {
                 status: 'active',
                 inventory: p.inventory,
                 sku: p.sku,
+                // Publishing gate (GH-1458) requires weight > 0 for status:'active' — the
+                // collection's own defaultValue:0 is treated as missing. Seed data has no
+                // per-product weight, so a flat placeholder is used (dev/demo data only).
+                weight: 500,
             } as any,
         })
         console.log(`✅ Created product: ${p.name} — RM ${p.price.toFixed(2)}`)

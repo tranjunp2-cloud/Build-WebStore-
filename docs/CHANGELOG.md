@@ -17,7 +17,241 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ### Bug Fixes
 
+- **GH-1337** fix(contact-leads): badge figma redesign + font portal fix — **Badges:** new `_lib/badge-tokens.ts` is the single source of truth for tinted rgba colors (STATUS_COLORS + SOURCE_COLORS, Figma node-id 32179-5360/5364). `customer-status-badge.tsx` + `customer-source-badge.tsx` rewritten: dropped shadcn Badge variants, now use inline `style={}` from badge-tokens (pill shape, rgba bg/border/text per status/source). `customer-detail-panel.tsx` removed duplicate STATUS_COLORS definition, imports from badge-tokens; StatusDropdown and text sizes normalized to Tailwind semantic tokens (`text-sm`, `text-xs`, `text-lg`, `text-xl`, `text-2xl`). Tests: TC-CUST-26..29 assertions migrated from `className.toContain()` to `toHaveStyle({ color })` (7/7 pass). **Font:** `src/lib/fonts/variables.ts` aggregates all next/font CSS variable class names; applied to `<html>` in root layout so `--font-*` vars are available in portals (CustomerDetailPanel createPortal). Removed `--font-inter/outfit: system-ui` fallback from `globals.css` `:root` that was overriding Inter via equal CSS specificity. **Impact:** Contact Leads badges exactly match Figma spec; Inter font renders correctly in portal-rendered detail panel.
+
+- **GH-1410** fix(products): silent-fail on AI chat create products — dual write+read-side tenant ID mismatch. **Write-side:** `src/app/(dashboard)/products/actions.ts` `saveProductAction` did not explicitly set `tenant` field on created product; relied on `beforeChangeHook` which may not populate tenants in Server Action context. Added `data.tenant = tenantIdForQuery(user)` before `payload.create()`. **Read-side:** `src/lib/auth.ts` `extractTenantId()` returns string but Neon PostgreSQL `products.tenant_id` is INTEGER — WHERE filter silently matched nothing. Added `tenantIdForQuery()` helper that coerces numeric strings to `Number` before query. **Frontend:** `src/components/dashboard/BulkCreateModal.tsx` now verifies `res?.id` before counting success; shows `toast.error` with JSON-parsed server error message instead of silent `console.warn`; fixed plural grammar in i18n keys. **Tests:** 10 new unit tests (TC-F08-04-26..31) in `src/__tests__/unit/actions/save-product-action.test.ts`, `src/__tests__/unit/lib/auth.test.ts`, `src/__tests__/unit/dashboard/bulk-create-save.test.tsx`. Updated `docs/qa/F08-product-crud.md` test registry.
+
+- **[#1386]** fix(tracking): normalize site-slug prefix in pageUrl tracking — `src/components/site-renderer/TrackingManager.tsx` now strips `/sites/{slug}` prefix from page paths before sending analytics requests. Root cause: SiteLayoutShell renders URLs via `pathname` which includes `/sites/{slug}` prefix on direct/cross-tenant access, while subdomain URLs skip the prefix entirely, causing same page to log as different pageUrl (GH-1386 duplicate "top blogs" entries). Fix: regex `replace(/^\/sites\/[^/]+/, '') || '/'` normalizes both access patterns to canonical path. Moved TrackingManager rendering from inline product page to SiteLayoutShell for DRY enforcement across all shell-wrapped pages (blog, product, etc.). Removed inline TrackingManager from `src/app/sites/[slug]/products/[productSlug]/page.tsx`. Tests: 5 new TC-IDs (TC-F09-TRACK-09..13) validate normalization: prefixed blog → `/blog/*`, prefixed product → `/products/*`, root with slash → `/`, root without slash → `/`, already-clean paths unchanged. See `src/__tests__/unit/storefront/tracking-manager.test.tsx`. **Note:** This fix resolves "Top Blogs" duplicate-entry grouping. "Top Products" widget aggregation is a separate follow-up — `AnalyticsView.tsx:99` aggregator currently matches `/product/` (singular) while normalized product URLs are `/products/` (plural); tracked separately.
+
+- **GH-1364** fix(contact, newsletter): input visibility + form fallback — **Newsletter:** `src/blocks/newsletter/index.tsx` line 176 added `bg-[rgba(var(--brand-primary-rgb),0.03)] placeholder:text-[var(--text-muted)]` CSS classes to brand-variant input, fixing invisible placeholder text in light-mode storefront (inverse variant already had proper white/light colors). **Contact:** `src/blocks/contact/index.tsx` added `DEFAULT_FORM_FIELDS` constant (name/email/phone/message) + fallback logic on line 176 to render sensible defaults when `formFields` array is empty, preventing blank form renders.
+- **[#1266]** fix(ai): hero variant lock-in + video placeholder — AI-generated hero blocks showing "No video URL provided" placeholder and repeated same variant regardless of category. Root causes: (1) BROKEN_VARIANTS.hero missing video/split-video variants in template-composer.ts, (2) narrow hero pools (4 variants each for tech/fitness) biasing seed-based picker toward minimal variant, (3) batch3 preset homepage heroes over-represented minimal variant (34% of 16 presets). Fixes: expanded BROKEN_VARIANTS to include video variants, diversified tech pool → 6 variants (added split-left, slideshow), fitness pool → 6 variants (added split-left, magazine), diversified batch3 homepage presets to span 8 distinct variants across 16 presets. Files: `src/lib/ai/template-composer.ts` (BROKEN_VARIANTS, pool expansion), `src/lib/ai/openai-generator.ts` (hero pool alignment), `src/lib/ai/template-presets-batch3.ts` (preset diversification), `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` (13 tests, TC-1266-10..14), `docs/qa/F01-ai-builder-variety.md` (TC-1266-10..14 registration).
+
 - **[#1179]** fix(cart): validate quantity against variant stock not aggregate inventory — `src/components/storefront/product-add-to-cart-section.tsx` now uses `selectedVariant?.stock` as inventory source when variant is selected, preventing UX mismatch with server-side CAS. Component previously checked `product.inventory` (aggregate), causing users to be able to add quantities unavailable in the selected variant. Affected by TC-F09.237x, TC-F09.238x regression tests.
+
+- **GH-1293** fix(sso): increase timeout + deduplicate step events via upsert — SSO Hub provisioning timeout raised from 10s to 30s to handle slow network conditions; `sso_step_events` collection now uses unique index and upsert logic to prevent duplicate (user_id, step) entries on retry; 4 provisioning routes updated to use Next.js `after()` for reliable event notification without blocking response. See `src/lib/sso/sso-api-client.ts` + `scripts/db-setup.js` migrations + `src/__tests__/unit/lib/sso-api-client.test.ts`.
+
+---
+
+### F37 — Local Business Data Model (US-01, Phase 03: Editor UI Accordion)
+
+**Sellers can now enter and save local business information in the AI Editor. Editor accordion with address, hours, category, and service area — data persists end-to-end.**
+
+**Phase 03 deliverables:**
+
+- **New UI component — Local Business Info accordion** (`src/components/editor/SettingsPanel.tsx`): added to AI Editor's global Site Settings, open by default. Sellers can enter: structured address (street/city/state select with MY_STATES enum, postcode, country), Google Maps link with auto-extraction, manual lat/lng advanced fallback, business category (dropdown, limited enum per PRD), price range (select), service area description (textarea), and opening hours table (7 rows for Mon-Sun with closed-day toggle + time inputs). Data field: `site.localBusiness` (Payload group, Phase 01 — `src/collections/Sites.ts`). Minimal completion checklist (address/hours/category saved ✓/○) provides UX feedback. Save-route validation via `localBusinessSchema` Zod object in `src/lib/validations/sites.ts`.
+
+- **Maps link resolver API route** (`POST /api/local-seo/resolve-maps-link`, auth-gated): 3-layer geocoding pipeline for extracting lat/lng from seller's pasted Google Maps link. (1) Client-side regex extraction (handles common Maps URL formats), (2) server redirect-resolver (follows short links, e.g. `maps.app.goo.gl`), (3) Geocoding API fallback (requires optional `GOOGLE_MAPS_GEOCODING_API_KEY`). SSRF-hardened with host allowlist, rate-limited per user. Returns `{ lat: number, lng: number, source: 'redirect' | 'geocode' }` on success or 422 on failure. Gracefully degrades when Geocoding API key absent (layers 1-2 cover ~90-95% of cases per PRD); editor reveals manual lat/lng input when layer 3 unavailable.
+
+- **Optional env var** (`GOOGLE_MAPS_GEOCODING_API_KEY`): added to `.env.staging.example` and `.env.production.example`. Documented in both files with explanation of optional nature and fallback behavior. When unset, routes skip layer 3 geocoding; sellers can still enter data manually. Non-breaking; no env var required for local business feature to function.
+
+- **Data persistence:** wired to the existing site-save API (`PATCH /api/sites/[siteId]/save`, `src/app/api/sites/[siteId]/save/route.ts`), invoked via `handleSiteSettingsChange` in `src/app/(editor)/editor/[siteId]/page.tsx`. That handler and its `localBusiness` round-trip through `src/app/api/sites/[siteId]/editor-data/route.ts` were extended in this phase (were previously missing from the load/save cycle). Editor accordion state round-trips correctly on reload; data persists across sessions.
+
+**Non-breaking:** Existing sites without `localBusiness` unaffected. Field is optional at save. Phase 04-05 (JSON-LD emission, Local SEO Score) will follow; this phase delivers pure data-entry UX.
+
+**Related phases:** Phase 04 (JSON-LD wiring + structured data tests) and Phase 05 (Local SEO Score calculation) pending. Phase 06 (QA/docs) follows final feature completion.
+
+---
+
+### F37 — Local Business Data Model (US-01, Phase 04: JSON-LD Enrichment)
+
+**Homepage now emits richer LocalBusiness JSON-LD with structured address, hours, and category-specific Schema.org @type — even without a Contact block.**
+
+**Phase 04 deliverables:**
+
+- **Enhanced LocalBusiness JSON-LD emission:** `src/lib/seo/json-ld.ts` `generateLocalBusinessSchema()` now emits full structured schema instead of bare street-address string:
+  - **PostalAddress:** street / city / state / postcode / country (from Phase 03's `site.localBusiness` form data)
+  - **GeoCoordinates:** latitude / longitude (from Maps resolver or manual entry)
+  - **OpeningHoursSpecification:** 7 days with times, filtered to exclude `isClosed` days (from opening hours table)
+  - **Category-derived @type:** Not generic `LocalBusiness`, but category-specific sub-types (`Restaurant`, `FoodEstablishment`, `MedicalClinic`, `Store`, etc.) derived from seller's chosen `businessCategory`. Examples: `businessCategory: 'foodEstablishment'` → `@type: 'FoodEstablishment'` in emitted JSON-LD
+  - **priceRange:** Seller-provided or category heuristic ($$, $$$, etc.)
+  - **areaServed:** Seller's service area description
+- **New mapping module:** `src/lib/seo/schema-helpers.ts` centralizes category→Schema.org @type logic:
+  - `schemaTypeForLocalBusiness(businessCategory)` — F37's business category vocabulary maps 1:1 to Schema.org types; fallback to generic `LocalBusiness` for unknown values (Google accepts)
+  - `priceRangeForLocalBusinessCategory(businessCategory)` — category-specific price-range heuristics
+  - `dayOfWeekToSchema(code)` — opening-hours day-of-week mapping (Mo→Monday, Tu→Tuesday, etc.)
+  - Also contains refactored AI-gen category mappings (moved from `json-ld-templates.ts`, unchanged behavior). Two separate vocabularies: AI-gen (`restaurant`, `fnb`, `health`) and F37 (`foodEstablishment`, `healthAndBeautyBusiness`, etc.) — intentionally NOT unified
+- **Loosened homepage trigger:** LocalBusiness JSON-LD now emits when `site.localBusiness` has meaningful data (street address OR non-closed opening hours), independent of Contact block. Previously only appeared if Contact block existed on page.
+- **Security + compliance:**
+  - `serializeJsonLd()` XSS-hardens JSON-LD string before `dangerouslySetInnerHTML` (escapes `<`, `>`, `&`, line separators)
+  - No `aggregateRating` at LocalBusiness level (matches Google 2025–26 policy forbidding this at LocalBusiness; review aggregation only at Review/Product level)
+
+**Tests:** the 9 pre-existing cases (TC-F03.G3-01..09) in `src/__tests__/unit/seo/json-ld-enrichment.test.ts` predate F37 and confirm the legacy (no `localBusiness` group) path is unchanged. The new Phase 04 behaviors above (structured address, geo, opening-hours filtering, category mapping) were verified during implementation via a temporary test file, deleted after use — permanent TC-ID-tagged coverage for them is deferred to Phase 06.
+
+**Non-breaking:** Existing sites without `localBusiness` unaffected. Homepages with Contact blocks unchanged. Only affects SEO crawlers; no user-visible UI change.
+
+**Impact:** Sellers' local business data (from Phase 03 UI) now produces rich, search-engine-discoverable structured data on live storefront. This is the core SEO payoff of F37: richer context helps Google Business Profile integration, voice search, and local AI assistant retrieval.
+
+**Related phases:** Phase 05 (Local SEO Score calculation) will layer scoring diagnostics atop Phase 04's emission. Phase 03 → Phase 04 → Phase 05 is one complete user journey: enter data → emit rich SEO output → compute performance score.
+
+---
+
+### F37 — Local Business Data Model (US-01, Phase 05: Local SEO Score Backend)
+
+**Backend scoring engine + read-only API endpoint for local SEO performance diagnostics. Infrastructure layer for future US-F37-04 dashboard — score not yet displayed to users.**
+
+**Phase 05 deliverables:**
+
+- **Local SEO Score calculation function:** `src/lib/seo/local-seo-score.ts` exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`. Points-subtraction model (start 100, deduct for missing signals), yielding integer 0–100 + breakdown object with per-bucket scores. **4 buckets (Phase 1):**
+  - **Business Data (35 pts):** businessName, address, phone, hours, category, website, description — 5 pts each (7 signals max)
+  - **Structured Data (30 pts):** LocalBusiness JSON-LD (10) + industry subtype (5) + FAQ schema (8) + Organization schema (7)
+  - **AI Discoverability (20 pts):** allowsSearchBots (12) + sitemapPresent (8) — **critical fix: deliberately NO "blocks suspicious bots" sub-signal** — PRD §13.8 explicitly forbids this (contradicts BR-03, the architectural decision that AI crawlers default to ALLOW). A prior research proposal suggested a 10/5/5 split with that sub-signal; rejected and NOT followed.
+  - **Technical Health (15 pts):** coreWebVitals ≥80 (8), mobileResponsive (4), httpsEnabled (3) — **known limitation: these three are hardcoded assume-passing placeholders** (no real Lighthouse/CWV measurement infra). Flagged for PM decision before US-F37-04's dashboard surfaces the score to sellers; PRD §13.8's "earned/applicable" normalization pattern may be the right fix if these stay unmeasured.
+
+- **API endpoint:** `GET /api/sites/[siteId]/local-seo-score` (auth-gated). Returns `{ success: true, score, breakdown }`. Signal sourcing notes in route handler comment explain placeholders and real signals (`allowsSearchBots` reflects actual robots.txt state pre-US-F37-03, `sitemapPresent` uses real `site.status === 'published'` check).
+
+- **Exported types + helpers from `src/lib/seo/json-ld.ts`:** Phase 05 made 3 previously-internal symbols public: `LocalBusinessOpeningHour` (shape of one opening-hours row), `LocalBusinessSiteData` (full shape of `site.localBusiness` group), `hasMeaningfulLocalBusinessData(localBusiness)` predicate. Used by route handler to detect when `localBusiness` has enough data to contribute score signals.
+
+- **Test coverage:** `src/__tests__/unit/seo/local-seo-score.test.ts` with TC-F37-01-10 (≥20pt gain when business data saved — acceptance criterion AC-1), TC-F37-01-11 (bounded 0–100 + bucket sum validation). Includes explicit test validating the NO `blocksSuspiciousBots` design decision (type-level + runtime assertion on AI Discoverability bucket).
+
+**Non-breaking:** Scoring function is pure; API endpoint is read-only and new. Existing sites without `localBusiness` will score lower (missing signals) but that's correct. No schema/UI changes in this phase.
+
+**Impact:** Backend infrastructure now ready for US-F37-04 (Local SEO Score Dashboard widget + checklist). Score calculation matches canonical PRD §13.8 spec — critical architectural decision ("no block-bots sub-signal") is locked in code + tests, preventing accidental reversion when Phase 2 (GBP) lands.
+
+**Related phases:** Phase 06 (QA / permanent test coverage) will add comprehensive TC-ID-tagged tests for scoring behavior. Phase 03 (data entry) → Phase 04 (JSON-LD emission) → Phase 05 (score calculation) → Phase 06 (dashboard UI) completes the user journey.
+
+### F37 — Local Business Data Model (US-01, Phase 06: Test Coverage & QA Finalization)
+
+**Permanent test coverage + QA documentation for all Phase 03–05 behaviors. Story US-F37-01 now complete and fully tested.**
+
+**Phase 06 deliverables:**
+
+- **Test suite:** 34 unit tests across 3 files formalize provisional TC-IDs TC-F37-01-01..12:
+  - `src/__tests__/unit/validations/sites-local-business.test.ts` (11 tests): Zod schema validation for latitude/longitude/postcode bounds, localBusiness-only PATCH acceptance, XSS sanitization (2 security tests)
+  - `src/__tests__/unit/seo/local-business-json-ld.test.ts` (17 tests): Full PostalAddress + geo emission, opening-hours filtering, no aggregateRating, category→@type mapping, homepage trigger dedupe, 7-day week mapping, XSS-safe JSON-LD serialization (1 security test)
+  - `src/__tests__/unit/seo/local-seo-score.test.ts` (6 tests): ≥20pt gain on business data save, bounds 0..100, bucket breakdown sum validation, no "blocks suspicious bots" sub-signal (architectural decision validation per PRD §13.8)
+
+- **QA documentation:** `docs/qa/F37-local-seo.md` formalizes TC-IDs with AC/FR cross-references, test file locations, execution commands, and known limitations (Technical Health signal hardcoding flagged for PM review before US-F37-04 dashboard ships).
+
+**Test results:** 1301/1301 full suite pass. 100% coverage on new functions. Zero XSS escapes, zero schema compliance violations.
+
+**Non-breaking:** All tests are read-only; no code changes in Phase 06 beyond tests themselves.
+
+**Impact:** US-F37-01 (Local Business Data Model) now complete across all 6 phases: Phase 01 (schema), Phase 02 (validation), Phase 03 (UI data entry), Phase 04 (JSON-LD emission), Phase 05 (score backend), Phase 06 (permanent test coverage). Ready for US-F37-04 (Local SEO Score Dashboard widget) and Phase 2 (GBP OAuth) dependency work.
+
+---
+
+### GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6 complete)
+
+**Improved UX for AI-powered product bulk generation. New field tracks AI-generated drafts; enhanced textarea with auto-resize, suggestion pills, and visual indicators.**
+
+**All 6 phases complete:**
+- **New field:** `aiReviewPending` boolean on Products collection (`src/collections/Products.ts`, migration in `scripts/db-setup.js`, default false) — tracks whether a product was auto-created by AI chat and awaits merchant review.
+- **Backend state management:** `BulkCreateModal`'s `buildSavePayload()` sets `aiReviewPending: true` on every AI-generated draft product. `saveProductAction()` clears flag to `false` on any manual edit; `updateProductFieldAction()` clears to `false` when product transitions to `'active'` status. Archived/soft-deleted products leave flag untouched.
+- **Frontend — Enhanced textarea:** Replaced single-line `<Input>` prompt field with multi-line auto-growing `<textarea>` (new hook: `src/hooks/use-auto-resize-textarea.ts`). Plain Enter now inserts newline; Cmd/Ctrl+Enter submits. Improves UX for multi-sentence product descriptions.
+- **Frontend — Suggestion pills:** Added 3 clickable suggestion pills below textarea — "Describe your product", "Add features", "Include materials" — each pre-fills with contextual prompt text. Speeds up first-time user onboarding.
+- **Frontend — Visual indicator:** New component `src/components/dashboard/AiReviewIndicator.tsx` — emerald pulsing dot + tooltip ("Created by AI — needs review") — displays next to AI-bulk-created products in both desktop table rows and mobile cards in the Products list. Clears (optimistically + server-confirmed) when product status transitions to `'active'`.
+- **UX flow:** After successful bulk-generate, page auto-switches to Draft tab and resets sort to "Latest" so newly created drafts appear on top (no full page reload).
+- **i18n updates:** `src/i18n/locales/en.json`/`ms.json` — renamed AI-chat button label ("Create" → "Generate Drafts" / "Cipta" → "Jana Draf"), updated placeholder copy, added suggestion-pill strings and AI-review tooltip strings.
+- **Tests:** 8 new test cases (TC-F08-04-34 through 41) in `bulk-create-utils.test.ts`, `save-product-action.test.ts`, and new `ai-review-indicator.test.tsx`; amended TC-F08-04-27 (assertion changed due to `router.refresh()` removal from modal's `handleSave`). All passing.
+- **Code-review follow-ups:** SKU-conflict retry hardened with a DB-level unique-constraint fallback (`translateDbSkuConflict` in `actions.ts`); `description` field sanitized via `sanitizeXSS()` before Lexical conversion; case-insensitively duplicate variant names now deduped at parse time in `handleParse` (first occurrence kept) instead of hitting `products_variants_name_parent_uniq` and being misreported as a SKU conflict — fixed at parse time rather than by renaming in `buildSavePayload` after an adversarial re-review caught that a post-parse rename would desync the row from `buildVariantMatrix`'s exact-string tier-combo matching and silently reset its price/sku/stock on a later tier-matrix edit. See TC-F08-04-48 through 52.
+- **Design-system alignment:** `ProductForm.tsx`'s save bar migrated to the sticky floating-card template (`--save-bar-bg` token, amber "unsaved changes" indicator, renders only while `methods.formState.isDirty`) matching the shared template already used by Payments/Shipping/Discounts/Customers-detail. Replaces the older always-visible fixed full-width bar to avoid two competing save-bar styles in the dashboard.
+
+**Related:** `docs/architecture/F08-products-crud.md` § GH-1502 (UX Redesign).
+
+---
+
+### GH-1458 — Soft validation publishing gate (Phases 1–4 complete)
+
+**Publishing gate blocking incomplete products from Active status. Storefront alt-text fallback implemented. All 4 phases shipped.**
+
+**Phase 1 + 2 wiring (complete):**
+- **Publishing gate guard:** Products cannot transition Draft → Active if core fields missing: non-variant products require `price` + `sku` + `inventory` (all non-null, but 0 is valid); variant products require `sku` + non-empty `variants[]` matrix with all required variant fields. Guard implemented in pure function `productPublishBlocks()` (`src/lib/products/publish-guard.ts`), reused for both client + server checks.
+- **Client-side enforcement:** `src/app/(dashboard)/products/page.tsx` `handleUpdateStatus()` evaluates guard before optimistic update; if blocked, opens `ConfirmModal` listing missing fields (mapped to i18n labels) instead of making server call. No visual flickering or rollback needed.
+- **Server-side enforcement:** `src/app/(dashboard)/products/actions.ts` `updateProductFieldAction()` re-validates guard against fetched product when `status: 'active'` requested. Throws structured `PUBLISH_BLOCKED` error with `missingFields[]` array (field keys only, not internals). Source of truth; client gate cannot be bypassed via direct API calls.
+- **Modal UX:** ConfirmModal variant='default' with warning icon, title "Cannot publish yet", intro line, bulleted missing field names (localized via existing `t.dashboard.products.form.*` keys). Single acknowledge button (no false "proceed anyway" option). Mirror pattern from `CategoryManager` warning-box styling.
+- **i18n keys added:** `publishGateTitle` (modal title), `publishGateAck` (intro text), `price`/`sku`/`inventory`/`variants` field labels in dashboard dictionary (en/ms, mirroring PW1 field label conventions). Fallback labels prevent regression if new i18n key missing.
+- **Tests (Phase 1 + 2):** 5 concrete test cases in `src/__tests__/unit/actions/save-product-action.test.ts` (TC-09.37 coverage per docs/qa/F09-products-crud.md). Scenarios: incomplete non-variant (missing price) blocked, incomplete non-variant (missing sku) blocked, incomplete variant (missing variant matrix) blocked, complete product allowed to toggle, server-side double-check enforces gate on direct API bypass. All passing.
+- **Non-breaking:** Draft save with missing fields still succeeds (gate only affects Active transition). Archive/restore unaffected. Existing complete products toggle normally.
+
+**Phase 3 wiring (complete; alt-text fallback on storefront):**
+- **Alt-text fallback:** Storefront product images now always have non-empty `<img alt>` text via fallback pattern `"{Product Name} - {Store Name}"`. Satisfies WCAG requirement that images must have descriptive alt text. Fallback generated when product lacks explicit alt-text metadata.
+- **Server-side lookup:** `src/app/(dashboard)/products/actions.ts` `saveProductAction()` fetches tenant's Sites.name once per save and threads it into product save context (single DB lookup, no per-image overhead). `buildProductAlt()` utility (`src/lib/products/build-product-alt.ts`) constructs fallback from `product.name` + `site.name`.
+- **Render-time usage:** All storefront render paths apply `buildProductAlt()` fallback at display time: `src/components/storefront/ProductImageGallery.tsx`, `src/blocks/products-grid/index.tsx`, `src/blocks/products-featured/index.tsx`, `src/blocks/product-quick-view/index.tsx`. Instances without explicit alt preserve computed fallback via utility; no merchant action required.
+- **Non-breaking:** Existing products with explicit alt-text unchanged. Fallback only applies when alt is missing/empty. Draft/Archive transitions unaffected.
+
+**Phase 4 wiring (complete; inline advisory hints + alt-text Popover):**
+- **Inline advisory hints:** Product form now displays a non-blocking advisory message under Images when alt-text is missing, and under Category (see note below — Category itself stays hard-required). Matches the soft-validation philosophy (warn, don't block) for Alt text specifically.
+  - **Image uploader alt-text UX enhancement:** `src/components/dashboard/ImageUploader.tsx` replaced cramped inline alt-text input with Radix Popover (trigger: "+ Add Alt text" button or truncated text + pencil icon). Popover contains auto-growing Textarea (125-char hard cap, red counter at limit), helper text, and Cancel/Save buttons (draft-until-Save UX). Tests: TC-F08-01-33..37 (all passing).
+- **Category field — required, corrected 2026-07-03:** `src/components/dashboard/product-form/schema.ts` `categoryIds.min(1)` was briefly relaxed to advisory-only during Phase 4 to match the alt-text pattern (and the issue's literal acceptance-criteria wording), but the product owner confirmed Category must stay **hard-required** at Save — the relaxation was reverted the same day. Category keeps its advisory hint (still fires before submit) alongside the restored required-asterisk and Zod block. Only Alt text is truly optional at Save.
+- **Save-as-draft regression tests:** Verified products with empty alt-text can be saved to Draft without throwing errors (Category still blocks Save when empty, by design).
+- **Bulk-create draft verification:** AI bulk-create (via `buildSavePayload()`) always produces `status: 'draft'` regardless of category/image completeness, preventing accidentally creating Active products via template generation.
+- **Tests (Phase 4):** Regression tests TC-09.39 (Save-Draft succeeds with missing alt only), TC-09.40 (Bulk-create always starts Draft) in `docs/qa/F09-products-crud.md`. `TC-F08-01-01e` (category-required) reverted to its original assertion. All passing.
+
+**Post-Phase 4 addendum — `weight` added to the publishing gate (2026-07-03):** `productPublishBlocks()` now also requires `weight` before Draft → Active, in BOTH variant and non-variant modes (it's a single top-level shipping-calc field, not part of the variant matrix). Unlike `price`/`inventory`, `weight:0` (the collection's own default) is treated as **missing**, not valid — a product's physical weight can never legitimately be 0. Wired into `src/lib/products/publish-guard.ts`, `src/app/(dashboard)/products/actions.ts` (`updateProductFieldAction`), and the `PUBLISH_GATE_FIELD_KEYS` label map in `src/app/(dashboard)/products/page.tsx`. New i18n key `dashboard.products.form.fields.weight` (en/ms). Tests updated in `publish-guard.test.ts` and `save-product-action.test.ts`; TC-09.37 text updated in `docs/qa/F09-products-crud.md`.
+
+**Post-Phase 4 addendum — `ConfirmModal` `hideCancel` prop (2026-07-03):** Phase 2's publish-gate modal originally set both `confirmLabel` and `cancelLabel` to the same "Got it" text (workaround — the shared `ConfirmModal`, used in 8+ dashboard call sites, required both props with no way to hide Cancel), flagged as non-blocking cosmetic debt in the Phase 2 code review. Implemented that review's suggested fix: `src/components/ui/confirm-modal.tsx` now takes an optional `hideCancel?: boolean` prop (and `cancelLabel` is now optional) — when true, renders only the confirm button. Publish-gate modal in `page.tsx` now passes `hideCancel` instead of duplicating `cancelLabel`. Fully backward-compatible; the other 7 call sites are unaffected (`hideCancel` defaults to `false`). New tests TC-GH1290-CM-07 in `confirm-modal.test.tsx`.
+
+**Related phases:** Phase 1 (guard library, unit tests) shipped 2026-07-02. Phase 2 (client + server wiring) shipped 2026-07-03. Phase 3 (alt-text fallback) shipped 2026-07-03. Phase 4 (inline warnings + alt-text Popover) shipped 2026-07-03; category-required reverted same day. Weight requirement added 2026-07-03. `ConfirmModal.hideCancel` added 2026-07-03.
+
+**Impact:** Merchants can no longer activate incomplete products (missing price/sku/inventory/weight). Storefront product images always have descriptive alt text (accessibility + SEO). Invalid products remain Draft until core requirements met. Alt-text is advisory only (reduces friction); Category remains a hard requirement at Save per product-owner decision. Reduces merchant support burden and ensures storefront accessibility compliance.
+
+---
+
+### `generate-site` weight/dimensions/alt parity (2026-07-03)
+
+**Follow-up to GH-1458** — tracked in its own plan (`plans/260703-1341-GH-1458-generate-site-weight-alt-parity/`), not a GH-1458 addendum, since it fixes a different code path. `src/app/api/ai/generate-site/route.ts` (the "generate whole website" AI onboarding flow) creates Product docs directly via `payload.create()`, bypassing `saveProductAction`/`updateProductFieldAction` entirely — so the publish-guard's `weight` requirement and the alt-text save-time persistence never applied there. Products came out `status:'active'` with `weight=0/undefined` (blocked on re-toggle later) and blank `images[].alt` (merchant edit form showed empty Alt text, though storefront was already fine via render-time fallback). Alt-text fixed by persisting a `buildProductAlt()` fallback into `images[].alt` at both image-setting call sites — reusing `result.siteName` already in scope, no extra DB query needed.
+
+**Phase 1 (weight/dimensions, initial):** shipped flat `weight:1` + `dimensions:{0,0,0}` constants for every product, believing this mirrored `BulkCreateModal.buildSavePayload()`'s `prod.weight || 1`.
+
+**Phase 2 (weight/dimensions, corrected same day):** that belief was wrong — `BulkCreateModal`'s `|| 1`/`|| 0` is a defensive fallback around a REAL per-product AI estimate from `/api/ai/products-bulk-parse`'s prompt ("Estimated logical shipping weight in kg. Minimum 0.1", estimated per product based on category — e.g. a sofa vs. earrings). `generate-sample-products.ts` (used by `generate-site`) never asked its AI tier (`generateSampleProductsAI`, GPT-4.1-nano) for weight/dimensions at all. Corrected by extending that prompt to estimate `weight`/`length`/`width`/`height` per product, same as `products-bulk-parse`; `SampleProduct` interface gained matching optional fields. `generate-site/route.ts`'s `baseData` now reads `product.weight || 1` / dimensions `|| 0` (code review caught `?? 1` letting an AI-hallucinated `weight:0` through unguarded — `||` closes that) — the constants apply when the AI omits a value or returns 0, not as the primary source. Tier-2 curated fallback library (non-AI, rare path) still has no dimension data and correctly falls through to the constants — accepted as out of scope (would require manually curating the entire static library for a rarely-hit path). Tests: TC-09.41 (AI-omission fallback), TC-09.42 (alt persistence), TC-09.43 (AI-value passthrough), TC-09.44 (weight:0 hallucination guard) in `src/__tests__/api/ai.test.ts`; 3 new tests in `src/__tests__/unit/lib/ai/sample-products-image-fallback.test.ts` (required refactoring that file's `openai` mock from `mockImplementation`-returning-an-object to prototype-based, since `vi.clearAllMocks()` was wiping the former's return value across tests — see journal for details).
+
+---
+
+### Full-branch adversarial code review (2026-07-03)
+
+3-stage review (`/code-review`, ultrathink) of all uncommitted GH-1458 work before commit — spec compliance (pass), 2 parallel code-quality passes, 1 adversarial red-team pass on the API-surface changes. Findings and fixes:
+
+- **Critical — `saveProductAction` never enforced the publishing gate.** `updateProductFieldAction` (the list-view Toggle Active button) called `productPublishBlocks()`; `saveProductAction` (the create/edit form's Server Action) never did. Since `ProductServerSchema` is `.passthrough()` and the React form never sends `status` on edits, a *direct* call to `saveProductAction` (bypassing the form UI) could set `status:'active'` with missing sku/inventory/weight — Payload's own collection validation doesn't enforce those. Fixed: `saveProductAction` now gates whenever `data.status === 'active'`, checked against the merged existing-doc + incoming-fields view. Tests: TC-09.45 in `save-product-action.test.ts` (4 cases: create-incomplete-active blocked, edit-incomplete-active blocked, edit-complete-active proceeds, create-complete-active proceeds).
+- **High — unbounded AI-supplied weight/dimensions.** `generate-sample-products.ts`'s `toOptionalNumber` only rejected non-numeric AI output, not out-of-range values (negative, absurdly large) — unlike the form-side Zod schema (weight max 1000, dims max 10000). Renamed to `toBoundedNumber(v, min, max)`, applying the exact same bounds as `schema.ts`; out-of-range values now collapse to `undefined` (→ the `|| 1`/`|| 0` fallback) instead of persisting on a live `status:'active'` product. Test: TC-GH1458-P2-03. Also tightened the parser from lenient `parseFloat(String(v))` to strict `typeof v === 'number'` (was silently accepting `"5kg"` → `5` or `[5,10]` → `5`).
+- **Medium — derived alt text could exceed its own cap.** `ProductServerSchema`'s new `images[].alt` `.max(500)` cap only applies to the *submitted* alt; `buildProductAlt()` computes a fallback (`"{name} - {store}"`) AFTER Zod validation, unbounded by it. A long `name` (previously uncapped server-side) could produce a >500-char derived alt. Fixed: added `.max(120)` to `name` in `ProductServerSchema` (matches the form's client-side cap) and `.slice(0, 500)` on the derived alt as a second line of defense.
+- **Medium — orphaned `categoryHint` i18n key.** Left behind in en.json/ms.json after the advisory hint's JSX was removed per earlier user request ("bỏ cái warning đi"); plan.md still claimed it was wired. Both cleaned up.
+- **Low (fixed):** documented (code comment) the pre-existing TOCTOU race between the gate's read and either action's write — same accepted-risk class as the pre-existing variant-loss race already documented in `actions.ts`.
+- **Deferred (not fixed, tracked as tech debt):** `ConfirmModal.cancelLabel` optional weakens compile-time safety for future call sites lacking `hideCancel:true` (all 8 current sites verified unaffected); extra unconditional `sites.find` query on every `saveProductAction` call; `saveProductAction`'s "one site per tenant" store-name lookup could pick the wrong site's name for multi-site tenants (pre-existing pattern elsewhere in the dashboard, propagated here — not introduced fresh by this branch).
+
+**Fix-cycle re-review (same day):** all 3 fixes above (Critical/High/Medium) independently re-verified line-by-line — VERIFIED FIXED, no regressions, ordering/merge/comparison logic all correct. 2 new Low-severity notes from the re-review (both informational, not fixed): (1) the gate is now duplicated across `saveProductAction`/`updateProductFieldAction` rather than centralized in a `products` collection `beforeChange` hook — a future write path (bulk import, new server action) could silently bypass it unless wired in manually; (2) if `findByID` fails transient during an edit-to-active save, the gate fails CLOSED (false-positive `PUBLISH_BLOCKED` on an already-complete product), never fails open — a UX/availability edge case, not a security issue.
+
+---
+
+### PR #1500 code review — collection-level gate enforcement (2026-07-03)
+
+External `/code-review` on PR #1500 escalated the "gate duplicated across 2 Server Actions" item above from deferred tech debt to a live, trivially exploitable bypass — confirmed via manual trace + adversarial subagent, not hypothetical:
+
+- **Critical — `saveProductAction`'s gate only fired on payloads explicitly setting `status:'active'`.** Editing an already-`active` product without touching `status` (exactly what the edit form does on every save) skipped the gate entirely; `sku`/`inventory`/`weight` have no `required` flag at the Payload field level, so `''`/`null`/`0` were silently accepted, deterministically leaving a live active product with missing core fields.
+- **Critical — no collection-level enforcement at all.** Both Server Action gates were the *only* enforcement; Payload's default REST/GraphQL API (not disabled on this collection) bypassed both outright — any authenticated tenant user with product-management access could `PATCH /api/products/:id` directly.
+- **Fix (both, same root cause):** new `publishGateHook` (`beforeChange`) on the `products` collection (`src/collections/Products.ts`) — single source of truth enforced on every write path (both Server Actions, REST, GraphQL, Local API, future bulk import), keyed on the RESULTING status (`data.status` if present, else `originalDoc.status`) rather than only the incoming payload. Fires when status resolves to `active` AND (status is being explicitly set active, OR a scalar gate field — price/sku/inventory/weight/hasVariants — is present in the write, OR `variants` CONTENT differs from the original doc). Existing two Server Action checks kept as-is (fast, structured client errors); the hook is the new authoritative backstop. Tests: TC-09.47 (`products-hooks.test.ts`, 9 cases).
+- **Medium — alt-text length caps enforced inconsistently.** `ImageUploader`'s 125-char cap was DOM-`maxLength`-only — a pre-existing over-cap alt saved without editing persisted uncut. `generate-site`'s persisted alt fallback had no cap at all, unlike `saveProductAction`'s 500-char cap it claimed to mirror. Fixed: clamp on `saveAlt()` (`ImageUploader.tsx`) and `.slice(0, 500)` on `generate-site`'s `fallbackAlt` (`route.ts`). Tests: TC-F08-01-38, TC-09.49.
+- **Medium — `productPublishBlocks`'s weight check relied on JS coercion.** `!value || value <= 0` treats a non-numeric string (e.g. `"abc"`, reachable via `saveProductAction`'s `.passthrough()` schema) as valid. Fixed with an explicit `typeof`/`Number.isFinite` check. Test: TC-09.46.
+- **Low — `id === 0` falsy-zero bug.** `saveProductAction`'s `id ? ... : undefined` treated a legitimate `id:0` as absent, routing to create instead of update. Not currently reachable (Payload serial PKs start at 1) but fixed for correctness. Test: TC-09.50.
+
+**Impact:** the publishing gate is now enforced at the correct architectural layer — no write path (present or future) can set/leave a product `active` with missing core fields, closing the exact class of bug this feature already fixed once, permanently this time.
+
+**Self-review + adversarial round 2 (same day):** re-ran `/code-review` on this fix itself before commit. Self-review caught one Critical regression the fix's own first draft introduced; a follow-up adversarial subagent pass caught 3 more (all fixed same session):
+
+- **Critical (self-caught) — excluding `variants` from the trigger set reopened the exact bypass class being closed.** First draft excluded `variants`/`variantConfigs` entirely from `PUBLISH_GATE_TRIGGER_FIELDS` to avoid `updateProductFieldAction`'s always-re-passed-variants workaround from falsely blocking soft-deletes. But a direct call with only `{variants: [bad data]}` (no status/hasVariants key) then skipped the gate outright. Fixed by comparing `variants` CONTENT (id-normalized via new `normalizeVariantsForCompare()`, mirroring `actions.ts`'s `stripIds()`) against `originalDoc` instead of checking key presence — catches genuine variant edits while still not re-firing on the no-op re-pass.
+- **Medium — `isBlank()` could throw on non-string truthy input.** `sku: {}` or `sku: []` from a raw REST/GraphQL call reached `value.trim()` without a type guard, throwing an unhandled `TypeError` instead of a clean `PUBLISH_BLOCKED`. Fixed: `isBlank()` now type-guards (`typeof value !== 'string'`).
+- **Medium — `price`/`inventory` retained the type-unsafe `== null` pattern that `weight` was already fixed for.** A non-numeric `price`/`inventory` (e.g. `"abc"`) would pass the `== null` check as "present." Unified all three (plus variant `price`/`stock`) behind one `isValidNumber()` type-guard helper.
+- **Medium — `normalizeVariantsForCompare` diverged from `stripIds()` on non-array input.** `stripIds(null)` returns `[]`; the new compare function passed non-array values through unchanged, so a legacy row storing `variants: null` would spuriously compare as "changed" against `updateProductFieldAction`'s re-passed `[]`, re-firing the gate on an untouched soft-delete. Fixed to coerce non-array to `[]`, matching `stripIds()`.
+- **Low — stale comment.** `generate-site/route.ts`'s comment still claimed this route "bypasses the guard," no longer true now that the collection-level hook covers it. Updated for accuracy.
+- **Deferred (not fixed, Low, safe-direction):** if Payload applies field `defaultValue`s AFTER `beforeChange` hooks run (unconfirmed — Payload docs are ambiguous on ordering, `node_modules` inspection blocked by this repo's sandbox policy), a raw API create with `status:'active'` omitting `inventory` (relying on its `defaultValue:0`) would be incorrectly blocked rather than defaulting to 0. Fail-closed (over-blocks), not a bypass; narrow edge case only reachable via a direct API call bypassing both Server Actions (which always send `inventory` explicitly).
+
+Tests: TC-09.51 (`publish-guard.test.ts` + `products-hooks.test.ts`). Full suite after all fixes: 9321/9324 pass (3 pre-existing DB-connectivity failures, no local Postgres in this sandbox — unrelated). Typecheck clean.
+
+**Independent review round 3 (2026-07-06) — posted as a PR comment, not by the branch author:**
+
+- **Medium — `publishGateHook`'s key-presence trigger re-fired on every Payload `/admin` panel save of a legacy-incomplete active product, even for unrelated field edits.** Payload's own `/admin` (`src/app/(payload)/admin`) submits the FULL document on every save, unlike the two Server Actions' partial payloads — `price`/`sku`/`inventory`/`weight`/`hasVariants` are always present in that payload regardless of what a human actually edited. Fixed: trigger fields now compare by VALUE CHANGED against `originalDoc`, not by key presence, unifying the scalar-field logic with the content-comparison already used for `variants`. Also redefined `statusBeingSetActive` as a real transition (`original?.status !== 'active'`), not just "the payload happens to include `status:'active'`." Tests: TC-09.52.
+- **Low — thumbnail `<img alt>` in `ProductImageGallery.tsx` appended a numeric index to the FULL `buildProductAlt()` result, corrupting real merchant-authored alt text** (e.g. "Front view" → "Front view 2") and duplicating the parent `<button>`'s existing `aria-label="View image N"`. Fixed: thumbnail alt now matches the main image's plain `buildProductAlt()` output, no index suffix. Test: TC-F09-1451-07.
+- **Medium (flagged, resolved same day with product-owner input) — `weight` field unit was ambiguous.** Collection's `admin.description` said "in grams"; the form label, AI prompts (`generate-sample-products.ts`), and seed data all treat it as kg. No current consumer reads the field (F14 shipping calc not wired up yet), so no data migration was needed. **Decision: canonical unit is kg** — `admin.description` corrected in `src/collections/Products.ts` to match every actual reader of this field.
+- **Low (deferred, non-blocking, per reviewer's own framing):** alt-fallback persisted at save time goes stale if the product/store is renamed later, and a merchant can never clear alt back to empty (inherent tradeoff of the persist-on-save design, not a bug); `updateProductFieldAction`'s gate check reads only `existing` without merging incoming fields (latent — none of the 3 current call sites send both `status` and other fields together, so not reachable); AI-estimated weight below 0.01 (rings, stickers) falls back to the 1kg constant (demo-data quality only); `ms.json`'s "Edit teks Alt" should be "Sunting teks Alt" (untranslated word, cosmetic).
+
+Confirmed with the team: Payload `/admin` IS used to edit products directly, so the value-changed trigger fix above is not just a theoretical edge case.
+
+**Verification of round-3 fix (2026-07-06) — independent code-quality + adversarial subagent pass on this exact diff:** the value-changed refactor was traced against all 3 previously-fixed bypasses (partial-payload field clearing, direct REST/GraphQL draft→active, create with missing fields) — all still closed with certainty, confirmed via full manual trace matching `TC-09.47`. 0 Critical/High/Medium bypass found. One real Medium doc-consistency issue found OUTSIDE this diff and fixed: `docs/design/F36-easyparcel-delivery-design.md` and `docs/prd/F14-shipping.md` (not-yet-implemented shipping specs) still assumed `Products.weight`/`parcelWeight` were stored in grams — left uncorrected, a future F14/F36 implementation would divide an already-kg value by 1000 again, producing exactly the 1000×-under bug those docs' own comments warn against. Corrected both docs' unit references to kg with a dated callout.
+
+Open design question (not a bug, flagged by the adversarial pass): the gate now re-validates ALL scalar fields whenever ANY gate-relevant field changes — so fixing e.g. a wrong `price` on a legacy-incomplete active product (grandfathered `weight:0`) will also require fixing `weight` in the same save, since `productPublishBlocks()` checks the whole set once triggered. This is arguably correct (an active product should never be re-saved into a still-incomplete state), but is a UX friction point worth confirming with the product owner if it causes support tickets after deploy.
+
+Tests: TC-09.52 (`products-hooks.test.ts`), TC-F09-1451-07 (`product-dp.test.tsx`). Full suite: 9324/9327 pass (same 3 pre-existing DB-connectivity failures). Typecheck clean.
+
+Tests: TC-09.52 (`products-hooks.test.ts`), TC-F09-1451-07 (`product-dp.test.tsx`). Full suite: 9324/9327 pass (same 3 pre-existing DB-connectivity failures). Typecheck clean.
 
 ---
 

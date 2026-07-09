@@ -89,7 +89,7 @@ export async function PATCH(
         }
 
         // Verify site exists
-        const existing = await payload.findByID({ collection: 'sites', id: siteId })
+        const existing = await payload.findByID({ collection: 'sites', id: siteId, disableErrors: true })
         if (!existing) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
@@ -186,6 +186,17 @@ export async function PATCH(
             })
 
             for (const pg of sitePages.docs) {
+                // Orphaned draft version rows (parent_id NULL in _pages_v — left behind by a
+                // hard-deleted/failed page create) surface through `draft: true` as docs with
+                // id=null. They map to no live `pages` row, so `update({ id: null })` makes
+                // Payload treat it as a bulk update and throw "Missing 'where' query of
+                // documents to update." — which 500s the ENTIRE publish (all real pages too).
+                // A promotable page always has a serial PK, so a null id is never a real page:
+                // skip it. (Cleaning the orphan _pages_v rows is separate DB hygiene.)
+                if (pg.id == null) {
+                    console.warn(`[Publish] Skipping orphan version row with null id (site ${siteId})`)
+                    continue
+                }
                 const pageId = String(pg.id)
                 // Never promote a soft-deleted page (see deletedPageIds above).
                 if (deletedPageIds.has(Number(pg.id))) continue
@@ -472,7 +483,7 @@ export async function DELETE(
         const payload = await getPayload({ config })
         const { siteId } = await params
 
-        const existing = await payload.findByID({ collection: 'sites', id: siteId })
+        const existing = await payload.findByID({ collection: 'sites', id: siteId, disableErrors: true })
         if (!existing) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },

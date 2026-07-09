@@ -3,7 +3,8 @@ import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
-import { searchPhotos, buildImgixUrl, trackDownload, UnsplashError } from './unsplash-client'
+import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import { normalizeComposerCategory } from './composer-category-resolver'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import type { BlogPost } from './content/types'
 
@@ -35,22 +36,24 @@ async function fetchBlogThumbnail(
         category
     let wasRateLimited = false
 
-    // Tier A: Unsplash search
+    // Tier A: Pixabay search
     if (!searchRateLimited) {
         try {
-            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape' })
+            // GH-1185: site-domain filter — blog topics follow the site's
+            // industry, so a loose keyword match still lands on-domain.
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200, category: pixCategory })
             if (photos.length > 0) {
                 const photo = photos[0]!
-                const url = buildImgixUrl(photo.urls.raw, { w: 1200, h: 630, fit: 'crop' })
-                trackDownload(photo.links.download_location)
-                const id = await uploadImageUrl(url, filename, seed.title, tenantId, payload)
+                // photo.url is already sized by the client (Pixabay fixed sizes).
+                const id = await uploadImageUrl(photo.url, filename, seed.title, tenantId, payload)
                 if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
                 console.warn(`[seed-blog-posts] Tier A orphan for "${seed.slug}", falling to Tier B`)
             }
         } catch (err) {
-            if (err instanceof UnsplashError && err.code === 'RATE_LIMITED') {
+            if (err instanceof PixabayError && err.code === 'RATE_LIMITED') {
                 wasRateLimited = true
-                console.warn(`[seed-blog-posts] Unsplash rate-limited for "${seed.slug}", using curated URL`)
+                console.warn(`[seed-blog-posts] Pixabay rate-limited for "${seed.slug}", using curated URL`)
             } else {
                 console.warn(`[seed-blog-posts] Tier A failed for "${seed.slug}":`, (err as Error).message)
             }
@@ -88,23 +91,43 @@ function disambiguateSlugs(seeds: AnyBlogSeed[]): AnyBlogSeed[] {
     })
 }
 
-export async function seedBlogPosts(
-    payload: BasePayload,
-    tenantId: number | string,
-    siteId: number | string,
-    category: string,
-    businessName: string,
-    userId: number | string,
-    products?: string[],
-    industry?: string,
-    seed?: number,
-): Promise<number> {
+export type PreparedBlogPost = {
+    title: string
+    slug: string
+    content: string
+    thumbnailId?: number
+}
+
+/**
+ * Phase 1 — no site dependency: AI seed topics + full article bodies (3
+ * parallel GPT calls, 30s-bounded each) + thumbnails. gen-perf blog-inline:
+ * the route kicks this DURING the site GPT window so `persistBlogPosts` can
+ * insert all 3 posts BEFORE the `done` event; also reused by the legacy
+ * post-response `seedBlogPosts` path.
+ * Returns [] when the tenant already has posts (regenerate — nothing to
+ * seed), null when preparation failed entirely (caller falls back to legacy
+ * post-response seeding). Never throws.
+ */
+export async function prepareBlogPosts(opts: {
+    payload: BasePayload
+    tenantId: number | string
+    category: string
+    businessName: string
+    products?: string[]
+    industry?: string
+    seed?: number
+    /** Settles when the request's other Pixabay consumers (image pool,
+     *  sample products) finished searching — the thumbnail phase waits for
+     *  it so blog searches never compete for the rate limit (GH-1190). */
+    pixabayGate?: Promise<unknown>
+}): Promise<PreparedBlogPost[] | null> {
+    const { payload, tenantId, category, businessName, products, industry, seed } = opts
     try {
         const existing = await payload.count({
             collection: 'blogs',
             where: { tenant: { equals: tenantId } },
         })
-        if (existing.totalDocs > 0) return 0
+        if (existing.totalDocs > 0) return []
 
         let seeds: AnyBlogSeed[] = []
         try {
@@ -140,66 +163,106 @@ export async function seedBlogPosts(
 
         seeds = disambiguateSlugs(seeds)
 
+        // Article bodies are independent of Pixabay — start all 3 GPT calls
+        // now so they overlap the thumbnail phase below.
+        const contentPromises = seeds.map((s) =>
+            generateBlogPostContent(s.title, businessName, industry ?? category).catch(() => undefined),
+        )
+
+        // Thumbnails keep the legacy sequencing (one at a time, 500ms apart,
+        // rate-limit short-circuit) — gentle on Pixabay, and gated behind the
+        // request's other Pixabay consumers (GH-1190).
+        if (opts.pixabayGate) await opts.pixabayGate.catch(() => undefined)
+
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)
-
-        let count = 0
+        const thumbnailIds: (number | undefined)[] = []
         let searchRateLimited = false
-
         for (let i = 0; i < seeds.length; i++) {
-            const seed = seeds[i]!
             if (i > 0) await new Promise(r => setTimeout(r, 500))
-
             const { thumbnailId, wasRateLimited } = await fetchBlogThumbnail(
-                seed, i, blogThumbnails, tenantId, category, searchRateLimited, payload,
+                seeds[i]!, i, blogThumbnails, tenantId, category, searchRateLimited, payload,
             )
             if (wasRateLimited) searchRateLimited = true
-
-            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seed.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
-
-            let richContent: string | undefined
-            try {
-                richContent = await generateBlogPostContent(seed.title, businessName, industry ?? category)
-            } catch {
-                // non-fatal
-            }
-
-            // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
-            let finalSlug = `${tenantId}-${seed.slug}`
-            try {
-                const slugCheck = await payload.find({
-                    collection: 'blogs',
-                    where: { slug: { equals: finalSlug } },
-                    limit: 1,
-                })
-                if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
-            } catch { /* proceed with original slug */ }
-
-            try {
-                await payload.create({
-                    collection: 'blogs',
-                    data: {
-                        tenant: tenantId,
-                        site: siteId,
-                        title: seed.title,
-                        slug: finalSlug,
-                        content: richContent ?? `<p>${seed.excerpt}</p>`,
-                        status: 'published',
-                        publishedAt: new Date().toISOString(),
-                        author: userId,
-                        ...(thumbnailId !== undefined ? { thumbnail: thumbnailId } : {}),
-                    },
-                    context: { skipPublishNotify: true },
-                })
-                count++
-            } catch (err) {
-                console.warn(`[seed-blog-posts] post "${seed.slug}" failed (non-fatal):`, (err as Error).message)
-            }
+            thumbnailIds.push(thumbnailId)
+            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seeds[i]!.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
         }
 
-        return count
+        const contents = await Promise.all(contentPromises)
+        return seeds.map((s, i) => ({
+            title: s.title,
+            slug: s.slug,
+            content: contents[i] ?? `<p>${s.excerpt}</p>`,
+            ...(thumbnailIds[i] !== undefined ? { thumbnailId: thumbnailIds[i] } : {}),
+        }))
     } catch (err) {
-        console.warn('[seed-blog-posts] skipped (non-fatal):', (err as Error).message)
-        return 0
+        console.warn('[seed-blog-posts] prepare failed (non-fatal):', (err as Error).message)
+        return null
     }
+}
+
+/**
+ * Phase 2 — needs the created site: insert the prepared posts. Split from
+ * prepare so the route can run it inline before `done`. Never throws;
+ * per-post failures are logged and skipped.
+ */
+export async function persistBlogPosts(
+    payload: BasePayload,
+    prepared: PreparedBlogPost[],
+    tenantId: number | string,
+    siteId: number | string,
+    userId: number | string,
+): Promise<number> {
+    let count = 0
+    for (const post of prepared) {
+        // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
+        let finalSlug = `${tenantId}-${post.slug}`
+        try {
+            const slugCheck = await payload.find({
+                collection: 'blogs',
+                where: { slug: { equals: finalSlug } },
+                limit: 1,
+            })
+            if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
+        } catch { /* proceed with original slug */ }
+
+        try {
+            await payload.create({
+                collection: 'blogs',
+                data: {
+                    tenant: tenantId,
+                    site: siteId,
+                    title: post.title,
+                    slug: finalSlug,
+                    content: post.content,
+                    status: 'published',
+                    publishedAt: new Date().toISOString(),
+                    author: userId,
+                    ...(post.thumbnailId !== undefined ? { thumbnail: post.thumbnailId } : {}),
+                },
+                context: { skipPublishNotify: true },
+            })
+            count++
+        } catch (err) {
+            console.warn(`[seed-blog-posts] post "${post.slug}" failed (non-fatal):`, (err as Error).message)
+        }
+    }
+    return count
+}
+
+/** Legacy single-shot path (post-response fallback): prepare + persist. */
+export async function seedBlogPosts(
+    payload: BasePayload,
+    tenantId: number | string,
+    siteId: number | string,
+    category: string,
+    businessName: string,
+    userId: number | string,
+    products?: string[],
+    industry?: string,
+    seed?: number,
+): Promise<number> {
+    const prepared = await prepareBlogPosts({ payload, tenantId, category, businessName, products, industry, seed })
+    if (!prepared || prepared.length === 0) return 0
+    return persistBlogPosts(payload, prepared, tenantId, siteId, userId)
 }

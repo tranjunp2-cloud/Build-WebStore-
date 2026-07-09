@@ -44,6 +44,14 @@ interface PreviewFrameProps {
     onPageNavigate?: (pageId: string) => void
     onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
+    /**
+     * F05 compact canvas (mobile + iPad): hide the floating `BlockActionBar`
+     * overlay (duplicate/AI-edit/delete icons above the selected block) — the
+     * compact block-settings sheet already covers move/delete. Optional,
+     * additive; desktop (incl. its own "preview as mobile" viewport toggle)
+     * omits this and is unaffected.
+     */
+    hideBlockActionBar?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
@@ -222,6 +230,7 @@ function PreviewFrameInner({
     onPageNavigate,
     onBlockAIEdit,
     disableDragDrop = false,
+    hideBlockActionBar = false,
     onInlineEditSave,
     onHandleReady,
     onFooterUpdate,
@@ -267,6 +276,9 @@ function PreviewFrameInner({
     }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
+    // GH-1367 Bug 3: keeps the iframe frozen while the inline-edit save flushes in the
+    // background, even though the text toolbar (gated by textEditingData) is already hidden.
+    const [isFlushingEdit, setIsFlushingEdit] = useState(false)
     const [iframeScrollY, setIframeScrollY] = useState(0)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
@@ -344,6 +356,11 @@ function PreviewFrameInner({
     const textEditStopTimerRef = useRef<number | null>(null)
     const currentLiveTextRef = useRef<string | null>(null)
     const pendingInlineEditRef = useRef<InlineEditPayload | null>(null)
+    // GH-1367 Bug 3 (M1): monotonic token per inline-edit session. A background save's
+    // .finally() must only clear shared state if it still owns the current session —
+    // otherwise a save that resolves after the user re-targets another text would clobber
+    // the new session's pending payload / re-enable autosave mid-edit.
+    const editSessionSeqRef = useRef(0)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -570,6 +587,9 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
+                // New session — invalidate any in-flight save's .finally() so it won't clobber
+                // this session's pending payload / autosave suspension (GH-1367 Bug 3 M1).
+                editSessionSeqRef.current += 1
                 // Suspend all auto-saves while inline editing is active.
                 // Also clear any pending timer that carries stale blocks from before this session.
                 setIsInlineEditing(true)
@@ -591,14 +611,25 @@ function PreviewFrameInner({
                     }
                     currentLiveTextRef.current = null
                     applyInlineEditPayload(pendingInlineEditRef.current)
-                    // Save FIRST (blocks already updated by TEXT_EDITED), then resume
-                    // auto-saves and unfreeze iframe so it reloads with the just-saved data.
-                    // Prefer onInlineEditSave (component's handleSave) — it bypasses the
-                    // isSaving guard that can block performSave when a concurrent save is in flight.
+                    // GH-1367 Bug 3: hide the text toolbar IMMEDIATELY (decoupled from save).
+                    // Previously setTextEditingData(null) ran inside .finally(), so the toolbar
+                    // lingered for the full save+reload round-trip (~3s). Now it clears at once
+                    // and the block action toolbar can take over instantly.
+                    setTextEditingData(null)
+                    // Keep the iframe frozen via isFlushingEdit until the save resolves so it
+                    // reloads with the just-saved data (no stale reload / black gap).
+                    setIsFlushingEdit(true)
+                    // Save in the background. Prefer onInlineEditSave (component's handleSave) —
+                    // it bypasses the isSaving guard that can block performSave when a concurrent
+                    // save is in flight.
+                    const flushSession = editSessionSeqRef.current
                     void (onInlineEditSaveRef.current?.() ?? performSave(true)).finally(() => {
+                        // A newer edit session started while this save was in flight — skip cleanup
+                        // so we don't clobber the new session's pending payload / autosave state.
+                        if (editSessionSeqRef.current !== flushSession) return
                         pendingInlineEditRef.current = null
                         setIsInlineEditing(false)
-                        setTextEditingData(null)
+                        setIsFlushingEdit(false)
                     })
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
@@ -630,7 +661,8 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
-                if (['navigation', 'footer', 'breadcrumb'].includes(e.data.blockType)) return
+                // logo-cloud uses LogoImageOverlay for image replacement — suppress generic ImageToolbar
+                if (['navigation', 'footer', 'breadcrumb', 'logo-cloud'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -777,6 +809,10 @@ function PreviewFrameInner({
         setIsEditing(false)
         setIsSubmitting(false)
         setTextEditingData(null)
+        // GH-1367 Bug 3: also release the inline-edit save freeze. A token-guarded save .finally()
+        // may skip clearing it (stale session); reset it here so navigation/key changes can't leave
+        // the preview iframe permanently frozen. Self-heals on the next save's iframeKey bump.
+        setIsFlushingEdit(false)
         setImageClickData(null)
         setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
@@ -1248,12 +1284,14 @@ function PreviewFrameInner({
     // If the user is actively editing text, freeze the iframeKey so it doesn't navigate.
     // Once they blur/stop editing, it safely syncs up and reloads the preview.
     const previousIframeKey = useRef(iframeKey)
-    const effectiveIframeKey = (textEditingData || isEditing) ? previousIframeKey.current : iframeKey
+    // isFlushingEdit keeps the freeze alive while the inline-edit save flushes (GH-1367 Bug 3),
+    // even though textEditingData was already cleared to hide the toolbar.
+    const effectiveIframeKey = (textEditingData || isEditing || isFlushingEdit) ? previousIframeKey.current : iframeKey
     useEffect(() => {
-        if (!textEditingData && !isEditing) {
+        if (!textEditingData && !isEditing && !isFlushingEdit) {
             previousIframeKey.current = iframeKey
         }
-    }, [iframeKey, textEditingData, isEditing])
+    }, [iframeKey, textEditingData, isEditing, isFlushingEdit])
 
     const iframeSrc = useMemo(() => {
         const url = new URL(`/preview/${siteId}`, 'http://localhost')
@@ -1262,6 +1300,11 @@ function PreviewFrameInner({
             url.searchParams.set('pageId', pageId)
         }
         url.searchParams.set('editor', '1')
+        // Mobile/tablet compact chrome (same signal CompactEditorLayout already passes as
+        // disableDragDrop) — the injected click handler uses this to skip activating the
+        // inline WYSIWYG text-edit toolbar, which is desktop-only in the F05-v2 spec (text
+        // edits go through the block-settings sheet's fields on mobile/tablet instead).
+        if (disableDragDrop) url.searchParams.set('compact', '1')
 
         // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
         // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
@@ -1273,7 +1316,7 @@ function PreviewFrameInner({
 
         return url.pathname + url.search
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [siteId, effectiveIframeKey, pageId]) // DO NOT depend on savedScrollYRef to prevent constant reloads
+    }, [siteId, effectiveIframeKey, pageId, disableDragDrop]) // DO NOT depend on savedScrollYRef to prevent constant reloads
 
 
     if (isLoading) {
@@ -1401,7 +1444,7 @@ function PreviewFrameInner({
                             const selectedLayout = selectedBlock !== null
                                 ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                                 : null
-                            if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
+                            if (!selectedLayout || !overlayOffset || dragState || textEditingData || hideBlockActionBar) return null
 
                             return (
                                 <>

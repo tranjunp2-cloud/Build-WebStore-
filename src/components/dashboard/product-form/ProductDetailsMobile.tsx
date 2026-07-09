@@ -4,6 +4,7 @@ import { ArrowLeft, Package, Trash2, Edit2 } from 'lucide-react';
 import Image from 'next/image';
 import { ProductImageWithFallback } from '../ProductImageWithFallback';
 import { useI18n } from '@/i18n';
+import { Button } from '@/components/ui/button';
 
 interface ProductDetailsMobileProps {
     product: DetailedProduct;
@@ -31,8 +32,10 @@ function getImageUrl(image: any): string | null {
 export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: ProductDetailsMobileProps) {
     const { t } = useI18n();
     const [activeIdx, setActiveIdx] = useState(0)
-    // Process Images
-    const displayImages = product.images?.map(img => getImageUrl(img.image)).filter(Boolean) as string[] || [];
+    // Process Images — carry alt alongside url so render sites can use stored alt text
+    const displayImages = (product.images ?? [])
+        .map(img => ({ url: getImageUrl(img.image), alt: img.alt }))
+        .filter(img => img.url !== null) as { url: string; alt?: string }[]
 
     // Description extracting raw text from Payload RichText if available
     let descText = product.shortDescription || ''
@@ -61,7 +64,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
         : undefined;
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-80px)] w-full md:hidden bg-background text-white pt-6 pb-[200px] relative" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="flex flex-col min-h-[calc(100vh-80px)] w-full sm:max-w-[560px] sm:mx-auto xl:hidden bg-background text-white pt-6 pb-[120px] relative" style={{ fontFamily: "'Inter', sans-serif" }}>
             
             {/* Header */}
             <div className="flex items-center gap-4 px-4 mb-8">
@@ -77,8 +80,8 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 <div className="flex flex-col w-full relative mb-2">
                     <div className="relative w-full aspect-[4/5] max-h-[500px] bg-secondary">
                         <ProductImageWithFallback
-                            imgUrl={displayImages[activeIdx] ?? displayImages[0] ?? null}
-                            alt={product.name || 'Product Image'}
+                            imgUrl={displayImages[activeIdx]?.url ?? displayImages[0]?.url ?? null}
+                            alt={displayImages[activeIdx]?.alt || product.name || 'Product Image'}
                             size="lg"
                             sizes="100vw"
                         />
@@ -86,7 +89,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                     {/* Thumbnails Overlay */}
                     {displayImages.length > 1 && (
                         <div className="relative flex items-center gap-2 overflow-x-auto px-4 scrollbar-none z-10 -mt-10 pb-2">
-                            {displayImages.map((imgUrl, idx) => (
+                            {displayImages.map((img, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => setActiveIdx(idx)}
@@ -96,7 +99,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                                             : 'border-2 border-transparent'
                                     }`}
                                 >
-                                    <ProductImageWithFallback imgUrl={imgUrl} alt="Thumbnail" size="sm" sizes="64px" />
+                                    <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="64px" />
                                 </button>
                             ))}
                         </div>
@@ -115,16 +118,10 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                     </div>
 
                     {/* Price Module */}
-                    <div className="flex items-center gap-4 mt-2">
-                        <div className="flex flex-col">
-                            <span className="text-[30px] font-bold text-foreground leading-[1.2]">RM</span>
-                            <span className="text-[30px] font-bold text-foreground leading-[1.2]">{displayPrice.toFixed(2)}</span>
-                        </div>
+                    <div className="flex items-baseline gap-3 mt-1">
+                        <span className="text-[22px] font-bold text-foreground leading-tight">RM {displayPrice.toFixed(2)}</span>
                         {displayComparePrice ? (
-                            <div className="flex flex-col opacity-50 line-through">
-                                <span className="text-[18px] text-muted-foreground leading-[1.55]">RM</span>
-                                <span className="text-[18px] text-muted-foreground leading-[1.55]">{displayComparePrice.toFixed(2)}</span>
-                            </div>
+                            <span className="text-[15px] text-muted-foreground line-through opacity-60">RM {displayComparePrice.toFixed(2)}</span>
                         ) : null}
                     </div>
 
@@ -196,25 +193,29 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 </div>
             </div>
 
-            {/* Sticky Footer */}
-            <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-white/10 p-4 pb-8 z-50">
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <button 
-                        onClick={onEdit}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] !text-white py-4 rounded-lg font-bold text-[16px] leading-[24px] hover:opacity-90 transition-opacity shadow-[0px_4px_6px_-4px_hsl(var(--primary)/0.1),0px_10px_15px_-3px_hsl(var(--primary)/0.1)] border-none appearance-none outline-none"
+            {/* Sticky Footer — DS buttons (match the desktop QuickView modal: dashSecondary destructive + dashPrimary).
+                Confined to the 488px detail panel from md up (mobile stays full-width) so the bar sits under
+                the panel, not centered across the whole viewport. */}
+            <div className="fixed bottom-0 left-0 right-0 md:left-auto md:w-[488px] bg-background/90 backdrop-blur-md border-t border-white/10 p-4 pb-8 z-50">
+                <div className="flex gap-3 sm:max-w-[560px] sm:mx-auto">
+                    <Button
+                        variant="dashSecondary"
+                        size="dash"
+                        onClick={onDelete}
+                        className="flex-1 flex items-center justify-center gap-2 [border:1px_solid_hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
                     >
-                        <Edit2 className="w-5 h-5" />
-                        {t.dashboard?.products?.form?.editProduct || 'EDIT PRODUCT'}
-                    </button>
-                    <button 
-                        onClick={() => {
-                            onDelete();
-                        }}
-                        className="w-full flex items-center justify-center gap-2 bg-transparent text-destructive py-2 font-medium text-[12px] leading-[16px] tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-lg border-none appearance-none outline-none"
-                    >
-                        <Trash2 className="w-[14px] h-[14px]" />
+                        <Trash2 className="w-3.5 h-3.5" />
                         {t.dashboard?.products?.form?.delete || 'DELETE PRODUCT'}
-                    </button>
+                    </Button>
+                    <Button
+                        variant="dashPrimary"
+                        size="dash"
+                        onClick={onEdit}
+                        className="flex-1 flex items-center justify-center gap-2"
+                    >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        {t.dashboard?.products?.form?.editProduct || 'EDIT PRODUCT'}
+                    </Button>
                 </div>
             </div>
         </div>

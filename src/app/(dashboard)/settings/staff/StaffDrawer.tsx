@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { useI18n } from '@/i18n';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
@@ -10,6 +10,7 @@ import { ALLOWED_PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 const CUSTOM_FEATURE_IDS = [...ALLOWED_PERMISSIONS] as const;
 const CUSTOM_FEATURE_FALLBACKS: Record<string, string> = {
@@ -134,16 +135,22 @@ export function StaffDrawer({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--dash-overlay)] backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
             <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
                     <h2 className="text-[24px] font-bold text-dash-text leading-[1.333em] font-['Inter']">
                         {isEditMode ? (t?.Staff?.drawer?.editTitle || 'Edit Staff Permissions') : (t?.Staff?.drawer?.inviteTitle || 'Invite New Staff')}
                     </h2>
-                    <button onClick={onClose} className="p-0 m-0 border-none shadow-none outline-none appearance-none bg-transparent hover:bg-dash-surface-hover rounded-[8px] flex items-center justify-center w-[32px] h-[32px] text-dash-text-muted hover:text-dash-text transition-colors">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-[32px] w-[32px] rounded-[8px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-[var(--dash-surface-hover)]"
+                    >
                         <X className="w-5 h-5" strokeWidth={1.6} />
-                    </button>
+                    </Button>
                 </div>
 
 
@@ -152,9 +159,9 @@ export function StaffDrawer({
                     
                     {/* Email Input */}
                     <div className="flex flex-col gap-[8px] px-[24px] pt-[24px]">
-                        <label className="text-[14px] font-medium text-dash-text font-['Inter']">
+                        <Label className="text-[14px] font-medium text-dash-text font-['Inter']">
                             {isEditMode ? (t?.Staff?.drawer?.email || 'Login Email') : (t?.Staff?.drawer?.email || 'Email Address')}
-                        </label>
+                        </Label>
                         <Input
                             type="email"
                             value={email}
@@ -162,7 +169,7 @@ export function StaffDrawer({
                             disabled={isEditMode}
                             maxLength={254}
                             placeholder="staff@domain.com"
-                            className={cn("h-[48px] px-[16px] rounded-[12px] text-[16px] font-['Inter']", emailError && "border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))] focus-visible:ring-[hsl(var(--destructive)/0.5)]")}
+                            className={cn("text-[13px]", emailError && "border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))] focus-visible:ring-[hsl(var(--destructive)/0.5)]")}
                         />
                         {emailError && (
                             <p className="text-[12px] font-normal text-destructive font-['Inter'] mt-[4px]">
@@ -178,16 +185,16 @@ export function StaffDrawer({
 
                     {/* Role Selection */}
                     <div className="flex flex-col gap-[16px] px-[24px] pt-[24px] pb-[24px]">
-                        <label className="text-[14px] font-semibold text-dash-text font-['Inter']">
+                        <Label className="text-[14px] font-semibold text-dash-text font-['Inter']">
                             {t?.Staff?.drawer?.roles?.label || 'Select Role'}
-                        </label>
+                        </Label>
                         <div className="flex flex-col gap-[12px]">
 
                             {/* Manager Option */}
                             <div
                                 onClick={() => { if(!isRoleDisabled) setRole('admin'); }}
                                 style={role !== 'admin' ? { borderColor: 'var(--dash-border)' } : {}}
-                                className={`flex items-start px-[18px] py-[18px] min-h-[76px] rounded-[12px] border-2 border-solid transition-all ${
+                                className={`flex items-start px-[14px] py-[11px] rounded-lg border border-solid transition-all ${
                                     isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
                                 } ${
                                     role === 'admin'
@@ -197,11 +204,11 @@ export function StaffDrawer({
                             >
                                 <div
                                     style={role !== 'admin' ? { borderColor: 'var(--dash-border)' } : {}}
-                                    className={`flex shrink-0 items-center justify-center w-[20px] h-[20px] rounded-full border-2 border-solid transition-all mr-[16px] mt-[1px] ${role === 'admin' ? 'border-[hsl(var(--primary))]' : 'bg-transparent'}`}>
-                                    {role === 'admin' && <div className="w-[10px] h-[10px] rounded-full bg-[hsl(var(--primary))]" />}
+                                    className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-full border-2 border-solid transition-all mr-[12px] mt-[1px] ${role === 'admin' ? 'border-[hsl(var(--primary))]' : 'bg-transparent'}`}>
+                                    {role === 'admin' && <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--primary))]" />}
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className={`text-[15px] font-medium leading-tight mb-[6px] ${role === 'admin' ? 'text-dash-text' : 'text-dash-text-muted'}`}>{t?.Staff?.drawer?.roles?.admin || 'Manager'}</span>
+                                    <span className={`text-[14px] font-medium leading-tight mb-[2px] ${role === 'admin' ? 'text-dash-text' : 'text-dash-text-muted'}`}>{t?.Staff?.drawer?.roles?.admin || 'Manager'}</span>
                                     <span className="text-[13px] text-dash-text-muted">{t?.Staff?.drawer?.roles?.adminDesc || 'Can manage everything except delete the store.'}</span>
                                 </div>
                             </div>
@@ -214,7 +221,7 @@ export function StaffDrawer({
                                     }
                                 }}
                                 style={role !== 'custom' ? { borderColor: 'var(--dash-border)' } : {}}
-                                className={`flex flex-col w-full rounded-[12px] border-2 border-solid transition-all ${
+                                className={`flex flex-col w-full rounded-lg border border-solid transition-all ${
                                     isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
                                 } ${
                                     role === 'custom'
@@ -222,19 +229,19 @@ export function StaffDrawer({
                                         : 'bg-dash-surface'
                                 }`}
                             >
-                                <div className={`flex items-center px-[18px] ${role === 'custom' ? 'pt-[18px] pb-[16px]' : 'py-[18px]'}`}>
+                                <div className={`flex items-center px-[14px] ${role === 'custom' ? 'pt-[12px] pb-[10px]' : 'py-[11px]'}`}>
                                     <div
                                         style={role !== 'custom' ? { borderColor: 'var(--dash-border)' } : {}}
-                                        className={`flex shrink-0 items-center justify-center w-[20px] h-[20px] rounded-full border-2 border-solid transition-all mr-[16px] ${role === 'custom' ? 'border-[hsl(var(--primary))]' : 'bg-transparent'}`}>
-                                        {role === 'custom' && <div className="w-[10px] h-[10px] rounded-full bg-[hsl(var(--primary))]" />}
+                                        className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-full border-2 border-solid transition-all mr-[12px] ${role === 'custom' ? 'border-[hsl(var(--primary))]' : 'bg-transparent'}`}>
+                                        {role === 'custom' && <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--primary))]" />}
                                     </div>
-                                    <span className={`text-[15px] font-medium leading-tight ${role === 'custom' ? 'text-dash-text' : 'text-dash-text-muted'}`}>
+                                    <span className={`text-[14px] font-medium leading-tight ${role === 'custom' ? 'text-dash-text' : 'text-dash-text-muted'}`}>
                                         {t?.Staff?.drawer?.roles?.custom || 'Custom Features'}
                                     </span>
                                 </div>
 
                                 {role === 'custom' && (
-                                    <div className="flex flex-col gap-[12px] pb-[20px] pr-[18px] pl-[54px] animate-in fade-in duration-200">
+                                    <div className="flex flex-col gap-[10px] pb-[14px] pr-[14px] pl-[44px] animate-in fade-in duration-200">
                                         {CUSTOM_FEATURE_IDS.map(featureId => {
                                             const isChecked = selectedFeatures.includes(featureId);
                                             const isFeatureDisabled = editData?.role === 'owner';
@@ -251,7 +258,9 @@ export function StaffDrawer({
                                                     <div
                                                         style={!isChecked ? { borderColor: 'var(--dash-border)' } : {}}
                                                         className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-[4px] border border-solid transition-colors ${isChecked ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'bg-transparent'}`}
-                                                    />
+                                                    >
+                                                        {isChecked && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+                                                    </div>
                                                     <span className={`text-[14px] leading-tight select-none ${isChecked ? 'text-dash-text font-medium' : 'text-dash-text-muted font-normal'}`}>
                                                         {label}
                                                     </span>
@@ -273,7 +282,7 @@ export function StaffDrawer({
                         type="button"
                         onClick={onClose}
                         variant="dashSecondary"
-                        className="px-[28px] h-[46px] rounded-[12px] text-[16px] font-medium font-['Inter']"
+                        size="dash"
                     >
                         {t?.Staff?.drawer?.cancelBtn || 'Cancel'}
                     </Button>
@@ -282,7 +291,7 @@ export function StaffDrawer({
                         disabled={isPending || editData?.role === 'owner' || (role === 'custom' && selectedFeatures.length === 0)}
                         onClick={handleSave}
                         variant="dashPrimary"
-                        className="px-[32px] h-[46px] rounded-[12px] text-[16px] font-['Inter']"
+                        size="dash"
                     >
                         {isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                         {isEditMode ? (t?.Staff?.drawer?.saveBtn || 'Save Changes') : (t?.Staff?.drawer?.sendInviteBtn || 'Send Invite')}

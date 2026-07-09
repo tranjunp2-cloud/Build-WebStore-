@@ -22,6 +22,17 @@ build/
 .env.local
 .env.production
 .env.staging
+.env.qc-test
+
+## JMeter (QC test env — never commit real creds or results)
+.jmx-config/*.properties
+!.jmx-config/*.properties.example
+.jmx-results/
+*.jtl
+
+## k6 (QC perf test raw output — analyse locally, commit only summaries)
+reports/perf/
+!reports/perf/.gitkeep
 
 ## Bot config (personality controlled by PM/Lead only)
 .bot-config.json

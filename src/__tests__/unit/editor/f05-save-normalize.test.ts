@@ -20,6 +20,12 @@
  *   TC-F05-save-20  → normalizeBlocksForPersistence: cta block with invalid ctaStyle → coerced to 'primary' (GH-1283)
  *   TC-F05-save-20b → normalizeBlocksForPersistence: cta block with valid ctaStyle → unchanged
  *   TC-F05-save-21  → normalizeBlocksForPersistence: contact block with email='' → coerced to null (GH-generate-site)
+ *   TC-F05-save-21b → normalizeBlocksForPersistence: contact block with email missing TLD (e.g. 'info@brand') → coerced to null
+ *   TC-F05-save-21c → normalizeBlocksForPersistence: contact block with email domain Cyrillic → coerced to null
+ *   TC-F05-save-21d → normalizeBlocksForPersistence: contact block with valid email → unchanged
+ *   TC-F05-save-21e → normalizeBlocksForPersistence: contact block with email whitespace → trimmed
+ *   TC-F05-save-21f → normalizeBlocksForPersistence: non-contact block email → NOT sanitized (only contact applied)
+ *   TC-F05-save-21g → PAYLOAD_EMAIL_RE unit test: valid/invalid emails + Payload-subset guards (hyphen-edge, IP literal, double-dot)
  *   TC-GH1381-04a → normalizeBlocksForPersistence: gallery images[].image {id,url,alt} → id extracted (GH-1381)
  *   TC-GH1381-04b → normalizeBlocksForPersistence: gallery mixed image types (object + int + null)
  *   TC-GH1381-04c → normalizeBlocksForPersistence: gallery image {url} without id → null
@@ -36,6 +42,7 @@ import {
     stripNestedIds,
     normalizeBlocksForPersistence,
     sanitizeBlockVariant,
+    PAYLOAD_EMAIL_RE,
 } from '@/lib/block-normalization'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -703,6 +710,11 @@ describe('normalizeBlocksForPersistence — cta ctaStyle coercion (GH-1283)', ()
 
 // TC-F05-save-21: generate-site contact email='' fails Payload email-format validation
 describe('normalizeBlocksForPersistence — contact email coercion (generate-site)', () => {
+    beforeEach(() => {
+        // Mock console.warn to avoid test noise from email validation warnings
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
     it('TC-F05-save-21: contact block with email="" → coerced to null (prevents Payload email ValidationError on create)', () => {
         // Arrange — AI gen may produce email: '' on contact block
         const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: '' }]
@@ -714,26 +726,92 @@ describe('normalizeBlocksForPersistence — contact email coercion (generate-sit
         expect(result[0].email).toBeNull()
     })
 
-    it('TC-F05-save-21b: contact block with valid email → unchanged', () => {
-        // Arrange
-        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: 'hello@example.com' }]
+    it('TC-F05-save-21b: contact block with email missing TLD (e.g. "info@brand") → coerced to null', () => {
+        // Arrange — AI may generate incomplete email with no TLD (domain must have {2,} char TLD per Payload regex)
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: 'info@brand' }]
 
         // Act
         const result = normalizeBlocksForPersistence(blocks)
 
-        // Assert
-        expect(result[0].email).toBe('hello@example.com')
+        // Assert — invalid email format (no TLD) dropped to null
+        expect(result[0].email).toBeNull()
     })
 
-    it('TC-F05-save-21c: non-contact block with email="" → NOT coerced', () => {
-        // Arrange — guard is scoped to contact block only
-        const blocks = [{ blockType: 'hero', headline: 'Hello', email: '' }]
+    it('TC-F05-save-21c: contact block with email domain Cyrillic characters → coerced to null', () => {
+        // Arrange — PAYLOAD_EMAIL_RE only accepts ASCII domains, not Unicode/Cyrillic
+        // Construct domain with Cyrillic characters: "sitinaskandan.my" → insert Cyrillic U+043A/U+0430/U+043D (к/а/н)
+        const cyrillic = 'hello@situnasкандar.my' // sitуаскан (к=U+043A, а=U+0430, н=U+043D)
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: cyrillic }]
 
         // Act
         const result = normalizeBlocksForPersistence(blocks)
 
-        // Assert — hero block email untouched
-        expect(result[0].email).toBe('')
+        // Assert — non-ASCII domain fails PAYLOAD_EMAIL_RE, dropped to null
+        expect(result[0].email).toBeNull()
+    })
+
+    it('TC-F05-save-21d: contact block with valid email → unchanged', () => {
+        // Arrange — valid ASCII domain with proper TLD
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: 'hello@restaurant.com' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid email kept as-is
+        expect(result[0].email).toBe('hello@restaurant.com')
+    })
+
+    it('TC-F05-save-21e: contact block with email whitespace (leading/trailing) → trimmed', () => {
+        // Arrange — email with extra whitespace around valid address
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: '  hi@brand.com  ' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — whitespace trimmed while preserving valid email
+        expect(result[0].email).toBe('hi@brand.com')
+    })
+
+    it('TC-F05-save-21f: non-contact block with email field → NOT sanitized by contact guard', () => {
+        // Arrange — footer or other block with email field; should NOT apply contact email sanitization
+        const blocks = [
+            { blockType: 'footer', variant: 'simple', email: '' },
+            { blockType: 'hero', headline: 'Hello', email: 'invalid-email' }
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — non-contact blocks keep their email values untouched (not sanitized)
+        expect(result[0].email).toBe('')          // footer empty string unchanged
+        expect(result[1].email).toBe('invalid-email')  // hero invalid email unchanged
+    })
+
+    it('TC-F05-save-21g: PAYLOAD_EMAIL_RE regex validation unit test', () => {
+        // Test the regex directly to document expected matching behavior
+
+        // Valid emails — should match
+        expect(PAYLOAD_EMAIL_RE.test('a@b.co')).toBe(true)
+        expect(PAYLOAD_EMAIL_RE.test('hello@example.com')).toBe(true)
+        expect(PAYLOAD_EMAIL_RE.test('user+tag@domain.co.uk')).toBe(true)
+        expect(PAYLOAD_EMAIL_RE.test('info@restaurant.com')).toBe(true)
+        expect(PAYLOAD_EMAIL_RE.test('test@a-b-c.com')).toBe(true)
+
+        // Invalid emails — should NOT match
+        expect(PAYLOAD_EMAIL_RE.test('a@b')).toBe(false)           // no TLD (single-char)
+        expect(PAYLOAD_EMAIL_RE.test('info@brand')).toBe(false)    // no TLD
+        expect(PAYLOAD_EMAIL_RE.test('a@b.c')).toBe(false)         // 1-char TLD
+        expect(PAYLOAD_EMAIL_RE.test('')).toBe(false)              // empty
+        expect(PAYLOAD_EMAIL_RE.test('no-at-sign.com')).toBe(false) // missing @
+        // Non-ASCII domain with Cyrillic (U+043A к)
+        expect(PAYLOAD_EMAIL_RE.test('hello@domainк.com')).toBe(false)
+
+        // Subset-with-Payload guard: these are KEPT by the old classic regex but REJECTED by
+        // Payload v3.79 — the regex must match Payload so we never persist an email it rejects.
+        expect(PAYLOAD_EMAIL_RE.test('a@-bad.com')).toBe(false)    // label starts with hyphen
+        expect(PAYLOAD_EMAIL_RE.test('a@bad-.com')).toBe(false)    // label ends with hyphen
+        expect(PAYLOAD_EMAIL_RE.test('a@[127.0.0.1]')).toBe(false) // IP literal
+        expect(PAYLOAD_EMAIL_RE.test('a..b@example.com')).toBe(false) // consecutive dots in local
     })
 })
 

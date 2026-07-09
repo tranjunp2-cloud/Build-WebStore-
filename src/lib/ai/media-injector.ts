@@ -13,8 +13,8 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
-import { pickManyFromPool, type ImageRole } from './image-pool'
+import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
+import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
 export interface BlockImageSpec {
@@ -80,21 +80,68 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
 }
 
 /**
- * Which block types should fetch images from Unsplash during gen.
- * Env var `UNSPLASH_BLOCKS` overrides (comma-separated list).
- * Default: hero-only to stay within Demo rate limit (50 req/hr).
- * Set to `all` to enable all block types (for Production 5000/hr).
+ * Which block types should fetch stock images during gen.
+ * Env var `PIXABAY_BLOCKS` overrides (comma-separated list).
+ * Default: hero-only. Set to `all` to enable all block types — safe given
+ * Pixabay's generous limit (~100 req/min ≈ 6000/hr).
  *
  * BLOCK_IMAGE_SPEC above is still used by cleanupNonNumericImageFields
  * and stripOrphanMediaRefs regardless — those only clean refs, not fetch.
  */
-function getUnsplashEnabledBlocks(): ReadonlySet<string> {
-    const env = process.env.UNSPLASH_BLOCKS?.trim()
-    if (!env) return UNSPLASH_BLOCKS_DEFAULT
+function getImageEnabledBlocks(): ReadonlySet<string> {
+    const env = process.env.PIXABAY_BLOCKS?.trim()
+    if (!env) return IMAGE_BLOCKS_DEFAULT
     if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
     return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
 }
-const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+
+// GH-1185: blocks whose image slots show PEOPLE — routed to the dedicated
+// portrait search (getAvatarMedia) instead of the product-keyword pool.
+const PEOPLE_BLOCKS: ReadonlySet<string> = new Set(['testimonials', 'team', 'doctor-profile'])
+
+// Pool sizing: fetch/pre-upload only what the enabled blocks can consume,
+// not a fixed 12+6. Buffer keeps enough surplus that pickManyFromPool can
+// shuffle DISTINCT picks across same-role blocks (anti-duplication) — a pool
+// sized to the exact count would hand every same-role block the identical set.
+const POOL_BUFFER_FACTOR = 1.4
+const POOL_MIN_EXTRA = 2
+
+/**
+ * Per-bucket pool size derived from the enabled image blocks — known entirely
+ * pre-GPT (env + static specs), so this can size the pre-GPT pool build.
+ *
+ * A bucket's base = the LARGEST single-block need mapping to it (blocks share
+ * the pool as a selection reservoir, they don't each consume a disjoint slice),
+ * then padded by the diversity buffer and capped at the legacy default. People
+ * blocks are excluded (avatars use getAvatarMedia, not the pool). A bucket with
+ * no enabled block resolves to 0 → buildImagePool skips that Pixabay call.
+ *
+ * Default config (hero-only) → { landscape: 3, square: 0 } instead of 12+6.
+ */
+export function computePoolBucketSizes(
+    enabled: ReadonlySet<string> = getImageEnabledBlocks(),
+): { landscape: number; square: number } {
+    let landscapeBase = 0
+    let squareBase = 0
+    for (const blockType of enabled) {
+        if (PEOPLE_BLOCKS.has(blockType)) continue
+        const spec = BLOCK_IMAGE_SPEC[blockType]
+        if (!spec) continue
+        const need = spec.nestedArray
+            ? Math.max(...spec.nestedArray.map((a) => a.minCount ?? 1))
+            : 1 // top-level fields share one Media ID → 1 slot per block
+        const bucket = bucketForRole(roleForBlock(blockType))
+        if (bucket === 'square') squareBase = Math.max(squareBase, need)
+        else landscapeBase = Math.max(landscapeBase, need)
+    }
+    const sized = (base: number, cap: number) =>
+        base === 0 ? 0 : Math.min(cap, Math.max(base + POOL_MIN_EXTRA, Math.ceil(base * POOL_BUFFER_FACTOR)))
+    return {
+        landscape: sized(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        square: sized(squareBase, DEFAULT_SQUARE_SIZE),
+    }
+}
 
 
 export interface ImageNeed {
@@ -157,7 +204,7 @@ function hashBlockSeed(blockType: string, businessName: string): number {
  */
 export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
     const needs: ImageNeed[] = []
-    const enabledBlocks = getUnsplashEnabledBlocks()
+    const enabledBlocks = getImageEnabledBlocks()
 
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
@@ -446,6 +493,27 @@ export async function fulfillImageNeeds(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
             if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
+
+            // GH-1185: people slots (testimonial avatars, team members,
+            // doctor profiles) are PEOPLE — never pool photos (pool is built
+            // from product keywords → food close-ups in face slots).
+            // Dedicated portrait search; on miss leave empty (initials
+            // placeholder beats a food avatar), so no pool/legacy fallback.
+            if (PEOPLE_BLOCKS.has(blockType)) {
+                try {
+                    const result = await getAvatarMedia(totalCount, ctx.language, ctx, payload, blockType)
+                    if (result.failures.length > 0) {
+                        console.warn(
+                            `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
+                        )
+                    }
+                    return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: Math.max(0, totalCount - result.mediaIds.length) }
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err)
+                    console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
+                    return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                }
+            }
 
             // Phase-03 pool-aware fast path: pick from pre-built site pool to
             // preserve visual cohesion across blocks.

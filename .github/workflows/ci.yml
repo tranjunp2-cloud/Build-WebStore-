@@ -26,7 +26,7 @@ name: CI
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, staging, qc-test]
     paths-ignore:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
@@ -45,6 +45,11 @@ on:
       - '.github/pull_request_template.md'
       - '*.md'
       - 'LICENSE'
+  # Manual dispatch lets sync-staging-to-qc-test.yml re-trigger the
+  # deploy-qc-test job after it pushes to qc-test with GITHUB_TOKEN.
+  # GITHUB_TOKEN pushes do not fire push events, but workflow_dispatch
+  # from another workflow does create a new run.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -605,6 +610,154 @@ jobs:
           event: 'deploy_fail'
           environment: 'production'
           branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 8: Deploy to Vercel (qc-test branch → Preview scope with branch-filter)
+  # ──────────────────────────────────────
+  # Isolated QC environment for JMeter / load / E2E tests.
+  #
+  # Architecture:
+  #   - Neon project ech-prime-web-v2-qc-test (Free tier) — data + compute
+  #     + quota isolated from staging
+  #   - Vercel Preview scope with branch-filter (branch=qc-test) — env vars
+  #     (DATABASE_URI, APP_ENV, QC_SEED_PASSWORD) override staging values
+  #     only for this specific branch. Pro plan does not permit a second
+  #     custom environment (staging already occupies the slot), so we
+  #     leverage Vercel's built-in branch-filter feature instead.
+  #   - Branch `qc-test` protected — QC lead + dev owner push only
+  #
+  # Deploy target is `preview` (default) — Vercel picks branch-scoped env
+  # vars automatically based on `github.ref`. No `--target=qc-test` flag
+  # because there is no custom env named `qc-test` on Vercel.
+  # Plan: plans/260702-1719-qc-test-env-setup/
+  deploy-qc-test:
+    name: "Deploy: Vercel (qc-test)"
+    # Accepts both push (normal branch push) and workflow_dispatch (invoked
+    # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-qc-test
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (Preview scope + branch=qc-test overrides)
+        # `--environment=preview --git-branch=qc-test` pulls the branch-
+        # scoped Preview vars: base Preview vars first, then any var whose
+        # scope filter says "Preview + branch: qc-test" wins. Stamps
+        # .vercel/.env.preview.local with VERCEL_TARGET_ENV=preview.
+        run: |
+          vercel pull --yes \
+            --environment=preview \
+            --git-branch=qc-test \
+            --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.preview.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # Sanity check: must resolve to QC endpoint, not staging.
+          if echo "$DATABASE_URI" | grep -q "ep-blue-king-a1qufqjg"; then
+            echo "::error::DATABASE_URI points at staging endpoint — branch-filter override missing"
+            echo "::error::Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
+            exit 1
+          fi
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (preview)
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt (preview)
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'qc-test'
+          branch: qc-test
           author: ${{ github.actor }}
           commit-sha: ${{ github.sha }}
           commit-msg: ${{ steps.commit.outputs.subject }}

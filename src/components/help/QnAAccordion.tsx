@@ -35,8 +35,10 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
         }
     };
 
+    // Preflight is OFF: without `border-0`, `border-solid` alone exposes the UA default
+    // `medium` (~3px) width on the top/left/right sides — only the 1px bottom divider may paint.
     return (
-        <div className={`transition-all duration-200 ${!isLast ? 'border-b border-solid border-[hsl(var(--border))]' : ''}`}>
+        <div className={`transition-all duration-200 ${!isLast ? 'border-0 border-b border-solid border-[hsl(var(--border))]' : ''}`}>
             <div
                 role="button"
                 tabIndex={0}
@@ -46,7 +48,7 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                 className="flex items-center justify-between w-full px-5 py-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] hover:bg-[hsl(var(--secondary))] transition-colors"
                 style={{ userSelect: 'none' }}
             >
-                <div className="text-[14px] font-semibold text-white pr-4">
+                <div className="min-w-0 break-words text-[14px] font-semibold text-white pr-4">
                     {question}
                 </div>
                 <div

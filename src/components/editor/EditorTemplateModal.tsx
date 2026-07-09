@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Search, X, AlertTriangle } from 'lucide-react'
+import { Loader2, X, AlertTriangle } from 'lucide-react'
+import { TableSearch } from '@/components/ui/table-search'
 import { toast } from 'sonner'
 import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
 import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal'
@@ -44,7 +45,6 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
     const categories = CATEGORY_KEYS.map(key => ({ value: CATEGORY_VALUES[key], label: tt[key] }))
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const [searchInput, setSearchInput] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [activeCategory, setActiveCategory] = useState('all')
     const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
@@ -54,12 +54,6 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
     // Hover preview state (desktop only)
     const [hoverPreview, setHoverPreview] = useState<{ template: Template; rect: DOMRect } | null>(null)
     const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-    // Debounced search (300ms)
-    useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(searchInput), 300)
-        return () => clearTimeout(timer)
-    }, [searchInput])
 
     // Clean up hover timer on unmount
     useEffect(() => {
@@ -205,16 +199,14 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
 
                     {/* Filters */}
                     <div className="flex flex-col gap-3 border-b border-white/5 px-6 py-3 sm:flex-row sm:flex-wrap sm:items-center">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
-                            <input
-                                type="text"
-                                placeholder={tt.searchPlaceholder}
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:outline-none sm:w-auto"
-                            />
-                        </div>
+                        {/* Shared search box (design-system) — 300ms debounce handled internally */}
+                        <TableSearch
+                            value={debouncedSearch}
+                            onSearch={setDebouncedSearch}
+                            placeholder={tt.searchPlaceholder}
+                            debounceMs={300}
+                            className="min-w-0 max-w-none sm:max-w-[280px]"
+                        />
                         <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide sm:flex-wrap sm:pb-0">
                             {categories.map((cat) => (
                                 <button

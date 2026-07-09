@@ -1,5 +1,6 @@
 import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import { revalidatePageAfterChange, revalidatePageAfterDelete } from '../lib/cache/revalidate-storefront'
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -171,7 +172,6 @@ const ContactBlock = {
                 { label: 'Info Only', value: 'info-only' },
                 { label: 'Split (form left, info right)', value: 'split' },
                 { label: 'Card Float', value: 'card-float' },
-                { label: 'Map Split', value: 'map-split' },
                 { label: 'Minimal Inline', value: 'minimal-inline' },
             ],
         },
@@ -1515,7 +1515,8 @@ const GalleryMasonryBlock = {
 export const Pages: CollectionConfig = {
     slug: 'pages',
     hooks: {
-        afterChange: [afterChangeHook],
+        afterChange: [afterChangeHook, revalidatePageAfterChange],
+        afterDelete: [revalidatePageAfterDelete],
     },
     admin: {
         useAsTitle: 'title',

@@ -10,6 +10,8 @@ import { useI18n } from '@/i18n'
 import { SkuMatrixMobile } from './SkuMatrixMobile'
 import { computeDuplicateIndicesForOptions, isNonEmptyTier, buildVariantMatrix, cartesianProductOfTiers } from './variant-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
 
 export function VariantsInventorySection() {
     const { register, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
@@ -170,45 +172,31 @@ export function VariantsInventorySection() {
                         <h3 className="text-[16px] font-medium text-foreground leading-[1.42] m-0">{t.dashboard.products.form.sections?.hasVariants || 'Product has multiple Options/Variants'}</h3>
                         <p className="text-[12px] text-foreground/50 leading-[1.33] m-0">{t.dashboard.products.form.sections?.hasVariantsExample || 'Example: color, size, style'}</p>
                     </div>
-                    <button 
-                        type="button"
-                        onClick={() => {
-                            const newVal = !hasVariants
+                    <Switch
+                        checked={!!hasVariants}
+                        onCheckedChange={(newVal) => {
                             setValue('hasVariants', newVal, { shouldDirty: true })
                             if (newVal && tiers.length === 0) {
                                 appendTier({ id: crypto.randomUUID(), name: '', options: [] })
                             }
                         }}
-                        className={cn(
-                            "relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border border-white/[0.12] px-[3px] transition-colors focus-visible:outline-none focus:outline-none focus:ring-0",
-                            hasVariants ? "bg-primary" : "bg-secondary"
-                        )}
-                    >
-                        <span 
-                            className={cn(
-                                "pointer-events-none block h-6 w-6 rounded-full bg-white transition-transform shadow-sm",
-                                hasVariants ? "translate-x-[26px]" : "translate-x-0"
-                            )}
-                        />
-                    </button>
+                        className="shrink-0"
+                    />
                 </div>
 
                 {/* Base Information (Always Visible as Master Values) */}
                 <div className="flex flex-col gap-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-foreground">*</span>
                             </label>
-                            <input
+                            <Input
                                 type="number"
                                 step="0.01"
                                 {...register('basePrice')}
                                 placeholder="0"
-                                className={cn(
-                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.basePrice ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                                )}
+                                className={cn(errors.basePrice && "border-destructive focus-visible:border-destructive")}
                             />
                             {errors.basePrice && <p className="text-xs text-destructive">{errors.basePrice.message}</p>}
                         </div>
@@ -216,15 +204,12 @@ export function VariantsInventorySection() {
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
                             </label>
-                            <input
+                            <Input
                                 type="number"
                                 step="0.01"
                                 {...register('compareAtPrice')}
                                 placeholder="0"
-                                className={cn(
-                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.compareAtPrice ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                                )}
+                                className={cn(errors.compareAtPrice && "border-destructive focus-visible:border-destructive")}
                             />
                             {errors.compareAtPrice && <p className="text-xs text-destructive">{errors.compareAtPrice.message}</p>}
                         </div>
@@ -235,12 +220,12 @@ export function VariantsInventorySection() {
                         </p>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-foreground">*</span>
                             </label>
-                            <input
+                            <Input
                                 {...register('baseSku', {
                                     onBlur: () => {
                                         const current = getValues('baseSku') || 'SKU'
@@ -251,10 +236,7 @@ export function VariantsInventorySection() {
                                     }
                                 })}
                                 placeholder="SKU-001"
-                                className={cn(
-                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.baseSku ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                                )}
+                                className={cn(errors.baseSku && "border-destructive focus-visible:border-destructive")}
                             />
                             {errors.baseSku && <p className="text-xs text-destructive">{errors.baseSku.message}</p>}
                         </div>
@@ -262,14 +244,11 @@ export function VariantsInventorySection() {
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-foreground">*</span>
                             </label>
-                            <input
+                            <Input
                                 type="number"
                                 {...register('baseInventory')}
                                 placeholder="0"
-                                className={cn(
-                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.baseInventory ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                                )}
+                                className={cn(errors.baseInventory && "border-destructive focus-visible:border-destructive")}
                             />
                             {errors.baseInventory && <p className="text-xs text-destructive">{errors.baseInventory.message}</p>}
                         </div>
@@ -325,14 +304,13 @@ export function VariantsInventorySection() {
                                                 {t.dashboard.products.form.sections?.optionNameLabel || 'Option name'}
                                                 {index === 0 && <span className="text-foreground ml-0.5">*</span>}
                                             </span>
-                                            <input
+                                            <Input
                                                 {...register(`tiers.${index}.name`)}
                                                 placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || 'e.g. Color') : (t.dashboard.products.form.sections?.tierPlaceholderSize || 'e.g. Size')}
                                                 className={cn(
-                                                    'w-full rounded-2xl border bg-background px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/40 outline-none focus:ring-1 transition-colors',
                                                     (errors.tiers?.[index]?.name || hasDuplicateTierNames)
-                                                        ? 'border-destructive focus:border-destructive focus:ring-red-500'
-                                                        : 'border-white/[0.08] focus:border-white focus:ring-white'
+                                                        ? 'border-destructive focus-visible:border-destructive focus-visible:ring-red-500'
+                                                        : undefined
                                                 )}
                                             />
                                             {errors.tiers?.[index]?.name && (
@@ -359,12 +337,12 @@ export function VariantsInventorySection() {
                                                     return (
                                                         <div key={oIdx} className="flex flex-col gap-1 w-full">
                                                             <div className="flex items-center gap-2">
-                                                                <input
+                                                                <Input
                                                                     {...register(`tiers.${index}.options.${oIdx}` as const)}
                                                                     placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || 'e.g. Red') : (t.dashboard.products.form.sections?.optionPlaceholderSmall || 'e.g. Small')}
                                                                     className={cn(
-                                                                        'flex-1 rounded-xl border bg-background px-4 py-[10px] text-[14px] text-foreground outline-none focus:ring-1 transition-colors',
-                                                                        showRed ? 'border-destructive focus:border-destructive focus:ring-red-500' : 'border-white/[0.08] focus:border-white focus:ring-white'
+                                                                        'flex-1',
+                                                                        showRed && 'border-destructive focus-visible:border-destructive focus-visible:ring-red-500'
                                                                     )}
                                                                 />
                                                                 <button
@@ -480,7 +458,7 @@ export function VariantsInventorySection() {
                                 <div className="px-4 py-3 border-b border-white/[0.08] bg-secondary/50">
                                     <h3 className="text-[14px] font-medium text-foreground">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
                                 </div>
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-left text-sm border-spacing-y-2 border-separate -mt-2">
                                         <thead className="text-[12px] uppercase text-foreground/60 font-medium whitespace-nowrap">
                                             <tr>
@@ -497,47 +475,39 @@ export function VariantsInventorySection() {
                                                     <td className="px-4 py-3 text-foreground text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input
+                                                            <Input
                                                                 {...register(`variants.${i}.skuCode`)}
-                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[140px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.skuCode ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                                                )}
+                                                                className={cn("h-9 min-w-[140px]", errors.variants?.[i]?.skuCode && "border-destructive focus-visible:border-destructive")}
                                                             />
                                                             {errors.variants?.[i]?.skuCode && <span className="text-[10px] text-destructive">{errors.variants[i]?.skuCode?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input
+                                                            <Input
                                                                 type="number"
                                                                 {...register(`variants.${i}.price`)}
-                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.price ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                                                )}
+                                                                className={cn("h-9 min-w-[120px]", errors.variants?.[i]?.price && "border-destructive focus-visible:border-destructive")}
                                                             />
                                                             {errors.variants?.[i]?.price && <span className="text-[10px] text-destructive">{errors.variants[i]?.price?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input
+                                                            <Input
                                                                 type="number"
                                                                 {...register(`variants.${i}.compareAtPrice`)}
-                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.compareAtPrice ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                                                )}
+                                                                className={cn("h-9 min-w-[120px]", errors.variants?.[i]?.compareAtPrice && "border-destructive focus-visible:border-destructive")}
                                                             />
                                                             {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-destructive">{errors.variants[i]?.compareAtPrice?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input
+                                                            <Input
                                                                 type="number"
                                                                 {...register(`variants.${i}.stock`)}
-                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.stock ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                                                )}
+                                                                className={cn("h-9 min-w-[120px]", errors.variants?.[i]?.stock && "border-destructive focus-visible:border-destructive")}
                                                             />
                                                             {errors.variants?.[i]?.stock && <span className="text-[10px] text-destructive">{errors.variants[i]?.stock?.message}</span>}
                                                         </div>
@@ -547,7 +517,7 @@ export function VariantsInventorySection() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="md:hidden">
+                                <div className="lg:hidden">
                                     <SkuMatrixMobile variants={variants} variantsLive={variantsLive} />
                                 </div>
                             </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT, decodeJwt } from 'jose'
-import { getPayload } from 'payload'
+import { getPayload, type BasePayload } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit, RateLimitResult } from '@/lib/rateLimit'
 
@@ -14,6 +14,30 @@ function rateLimited(r: RateLimitResult) {
         },
         { status: 429, headers: { 'Retry-After': String(retryAfter) } },
     )
+}
+
+// Queries sso_step_events to find first incomplete Web Store step.
+// Step 1 = Pick Template, Step 2 = Setup Shipping, Step 3 = Add Product.
+// Returns /onboarding if 0 steps done, /dashboard if all done.
+// Fail-open: returns /dashboard on any DB error to avoid blocking SSO.
+async function getWebStoreRedirect(payload: BasePayload, userId: number | string): Promise<string> {
+    try {
+        const db = (payload.db as any)?.drizzle
+        if (!db) return '/dashboard'
+        const { sql } = await import('drizzle-orm')
+        // Any row for a step means the user took that action (notification may still be pending/retrying)
+        const result = await db.execute(
+            sql`SELECT DISTINCT step FROM sso_step_events WHERE user_id = ${Number(userId)}`,
+        )
+        const completed = new Set<number>((result.rows ?? [] as { step: number }[]).map((r: { step: number }) => r.step))
+        if (!completed.has(1)) return '/onboarding'
+        if (!completed.has(2)) return '/settings/shipping'
+        if (!completed.has(3)) return '/products/new'
+        return '/dashboard'
+    } catch (err) {
+        console.error('[SSO] getWebStoreRedirect failed for user', userId, err)
+        return '/dashboard'
+    }
 }
 
 export async function POST(req: NextRequest) {
@@ -135,15 +159,23 @@ export async function POST(req: NextRequest) {
         const tenants = user.tenants as { tenant: { onboardingCompleted?: boolean } | string }[] | undefined
         const hasSeenAiWizard = user.has_seen_ai_wizard as boolean | undefined
         let redirectTo = '/dashboard'
-        if (roles.includes('tenant-owner') && !hasSeenAiWizard) {
-            if (!tenants || tenants.length === 0) {
-                redirectTo = '/onboarding'
-            } else {
-                const firstTenant = tenants[0]?.tenant
-                // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
-                if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+        if (roles.includes('tenant-owner')) {
+            if (!hasSeenAiWizard) {
+                if (!tenants || tenants.length === 0) {
                     redirectTo = '/onboarding'
+                } else {
+                    const firstTenant = tenants[0]?.tenant
+                    // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
+                    if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+                        redirectTo = '/onboarding'
+                    } else {
+                        // Onboarding complete — route to first incomplete Web Store step
+                        redirectTo = await getWebStoreRedirect(payload, id)
+                    }
                 }
+            } else {
+                // hasSeenAiWizard=true: wizard bypassed — route to first incomplete Web Store step
+                redirectTo = await getWebStoreRedirect(payload, id)
             }
         }
 

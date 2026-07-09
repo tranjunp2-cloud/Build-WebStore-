@@ -26,10 +26,12 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { EmailTemplateCardList } from './email-template-card-list'
 
-const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
+export const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
-const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
+export const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'welcome':                    Users,
     'otp-verification':           ShieldCheck,
     'forgot-password':            Key,
@@ -59,11 +61,11 @@ const TEMPLATE_LABELS: Partial<Record<EmailTemplateType, string>> = {
     'newsletter-seller-digest':   'Newsletter (Seller Digest)',
 }
 
-function toLabel(type: EmailTemplateType): string {
+export function toLabel(type: EmailTemplateType): string {
     return TEMPLATE_LABELS[type] ?? type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
+export function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
     if (!iso) return defaultLabel
     const diff = Date.now() - new Date(iso).getTime()
     const mins = Math.floor(diff / 60000)
@@ -95,45 +97,55 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
 
     const customizedCount = activeTypes.filter((tp) => findRow(tp)).length
 
+
     return (
         <div className="w-full">
             <h1 className="text-2xl font-bold text-[var(--dash-text)] mb-1">{et.title}</h1>
             <p className="text-sm text-[var(--dash-text-muted)] mb-6">{et.subtitle}</p>
 
-            {/* Tabs row — full-width baseline border; blue underline only under the active tab.
-                Preflight is off (tailwind.config.js) so Tailwind border utils have no border-style
-                and render invisible — paint borders via inline shorthand instead. */}
-            <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
-                <div className="flex gap-0">
-                    {(['buyer', 'seller'] as const).map((tab) => {
-                        const count = tab === 'buyer' ? allBuyer.length : allSeller.length
-                        const isActive = audienceTab === tab
-                        return (
-                            <button
-                                key={tab}
-                                type="button"
-                                onClick={() => onTabChange(tab)}
-                                className={`flex items-center gap-2 px-4 pb-2.5 text-sm font-medium transition-colors -mb-px ${
-                                    isActive ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]'
-                                }`}
-                                style={{ borderBottom: isActive ? '2px solid var(--dash-accent)' : '2px solid transparent' }}
-                            >
-                                {tab === 'buyer' ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
-                                {tab === 'buyer' ? et.buyerEmails : et.sellerEmails}
-                                <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
-                                    {count}
-                                </span>
-                            </button>
-                        )
-                    })}
+            <Tabs value={audienceTab} onValueChange={(v) => onTabChange(v as 'buyer' | 'seller')}>
+                {/* Tabs row — TabsList carries the baseline divider so the active underline aligns
+                    exactly like every other tab bar; the summary count floats on the right. */}
+                <div className="relative mb-4">
+                    <TabsList variant="underline">
+                        <TabsTrigger value="buyer" variant="underline">
+                            <User className="h-4 w-4" />
+                            {et.buyerEmails}
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                {allBuyer.length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="seller" variant="underline">
+                            <Store className="h-4 w-4" />
+                            {et.sellerEmails}
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                {allSeller.length}
+                            </span>
+                        </TabsTrigger>
+                    </TabsList>
+                    {/* On phones the absolute count overlaps the tabs — show it
+                        statically below the tab bar instead (sm+ keeps the float). */}
+                    <span className="hidden sm:block absolute right-0 top-2 text-xs text-[var(--dash-text-muted)] pointer-events-none">
+                        {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
+                    </span>
                 </div>
-                <span className="text-xs text-[var(--dash-text-muted)]">
+                <p className="sm:hidden -mt-2 mb-4 text-xs text-[var(--dash-text-muted)]">
                     {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
-                </span>
-            </div>
+                </p>
 
             {/* Table */}
-            <div className="mb-4">
+            <TabsContent value={audienceTab} className="mt-0">
+            {/* Phones: card list (avoids fixed-column table overflow). iPad + desktop keep the table. */}
+            <div className="md:hidden mb-4">
+                <EmailTemplateCardList
+                    types={activeTypes}
+                    recipient={recipient}
+                    findRow={findRow}
+                    onSelectTemplate={onSelectTemplate}
+                    onToggleEnabled={onToggleEnabled}
+                />
+            </div>
+            <div className="hidden md:block mb-4">
                 <Table>
                     <colgroup>
                         <col />
@@ -262,6 +274,8 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                     {et.footerDesc}
                 </span>
             </div>
+            </TabsContent>
+            </Tabs>
         </div>
     )
 }

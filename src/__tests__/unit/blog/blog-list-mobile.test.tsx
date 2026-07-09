@@ -59,6 +59,9 @@ vi.mock('@/i18n', () => ({
                         allStatus: 'All Status',
                         draft: 'Draft',
                         published: 'Published',
+                        statusLabel: 'Status',
+                        categoryLabel: 'Category',
+                        sortLabel: 'Sort',
                         allCategories: 'All Categories',
                         sortNewest: 'Newest',
                         sortOldest: 'Oldest',
@@ -84,7 +87,9 @@ vi.mock('@/i18n', () => ({
                         bulkDeleteFailed: 'Some posts failed to delete',
                         bulkDeleteConfirm: 'Are you sure you want to delete {count} posts?',
                         bulkDeleteWarning: 'This action cannot be undone.',
-                        deletePublishedWarning: 'Warning: This post is currently published.',
+                        bulkDeleteTitle: 'Delete {count} posts?',
+                        bulkDeletePublishedWarning: 'Some selected posts are currently published. Deleting them will immediately remove them from your storefront.',
+                        deletePublishedWarning: 'Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.',
                         cancel: 'Cancel',
                         deleting: 'Deleting...',
                         bulkPublish: 'Publish',
@@ -106,7 +111,9 @@ vi.mock('@/i18n', () => ({
                     mobile: { published: 'Published', draft: 'Draft' },
                     noPostsTitle: 'No blog posts yet',
                     noPostsSubtitle: 'Create your first blog post to engage customers',
-                    unknownAuthor: 'Author',
+                    unknownAuthor: 'Unknown',
+                    loadFailed: 'Failed to load blog posts',
+                    tryAgain: 'Try Again',
                     noMatches: 'No posts match your filters',
                     resetFilters: 'Reset Filters',
                     categoryModal: {
@@ -132,7 +139,14 @@ vi.mock('@/i18n', () => ({
                         toastDeleteSuccess: 'Category "{name}" deleted',
                         toastDeleteFail: 'Failed to delete category',
                     },
-                    pagination: { previous: 'Previous', next: 'Next' },
+                    pagination: {
+                        previous: 'Previous',
+                        next: 'Next',
+                        showing: 'Showing',
+                        of: 'of',
+                        unit: 'posts',
+                        rowsPerPage: 'Rows per page:',
+                    },
                 },
             },
             common: {
@@ -150,6 +164,9 @@ vi.mock('@/i18n', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 import BlogListPage from '@/app/(dashboard)/blog/page'
 import * as actions from '@/app/(dashboard)/blog/actions'
+// BlogListPage uses Radix Tooltip; in the app the dashboard layout supplies the
+// TooltipProvider, so the unit test wraps the page to mirror production.
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const mockPost = (overrides: Partial<any> = {}) => ({
@@ -197,7 +214,7 @@ describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () 
     it('shows empty state heading when there are no posts and no active filters', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -209,7 +226,7 @@ describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () 
     it('shows "Create Post" CTA button in empty state', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -238,7 +255,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert — mobile card list is present in the DOM
@@ -256,7 +273,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -280,7 +297,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -296,7 +313,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -315,7 +332,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // The global empty state only shows when search = '' AND statusFilter = ''
@@ -347,7 +364,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
     it('renders the page title "Blogs"', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -359,7 +376,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
     it('renders the Create Post button', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Assert
@@ -375,7 +392,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
         vi.mocked(useRouter).mockReturnValue({ push: pushMock, refresh: vi.fn() } as any)
 
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Act
@@ -406,7 +423,7 @@ describe('[TC-F17-01-12] Bulk action bar appears when posts are selected', () =>
     it('shows bulk action bar (Publish + Delete buttons) when at least one post is checked', async () => {
         // Arrange
         await act(async () => {
-            render(<BlogListPage />)
+            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
         })
 
         // Wait for posts to render

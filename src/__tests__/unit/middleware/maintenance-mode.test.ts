@@ -64,12 +64,12 @@ describe('Maintenance mode middleware logic [BUG-F05-006]', () => {
 
         it('uses "Website" as fallback for empty siteName', () => {
             const html = buildMaintenanceHtml('')
-            expect(html).toContain('Website đang bảo trì')
+            expect(html).toContain('Website is under maintenance')
         })
 
         it('renders normal siteName correctly', () => {
             const html = buildMaintenanceHtml('Coffee Haven')
-            expect(html).toContain('Coffee Haven đang bảo trì')
+            expect(html).toContain('Coffee Haven is under maintenance')
         })
 
         it('contains noindex robots meta', () => {

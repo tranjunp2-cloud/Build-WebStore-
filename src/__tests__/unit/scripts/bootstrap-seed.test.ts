@@ -89,7 +89,7 @@ describe('bootstrapSeed()', () => {
         // Verify INSERT user
         expect(mockPool.query).toHaveBeenNthCalledWith(2,
             expect.stringContaining('INSERT INTO users'),
-            ['new-admin@test.com', 'Admin', 'PrimeWeb'],
+            ['new-admin@test.com', 'Admin', 'Web Store'],
         )
         // Verify INSERT role with correct parent_id
         expect(mockPool.query).toHaveBeenNthCalledWith(3,

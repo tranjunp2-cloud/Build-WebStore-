@@ -9,13 +9,14 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 
 void _CSS_VARS
 
 function ServiceCTA({ cta, resolveHref }: { cta: ServiceItem['cta']; resolveHref: (href: string | undefined) => string }) {
     if (!cta) return null
     return (
-        <a
+        <SmartLink
             href={resolveHref(cta?.url)}
             className={`inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80 ${TOUCH_TARGET.min}`}
             style={{ color: 'var(--brand-primary)' }}
@@ -24,7 +25,7 @@ function ServiceCTA({ cta, resolveHref }: { cta: ServiceItem['cta']; resolveHref
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
-        </a>
+        </SmartLink>
     )
 }
 
@@ -112,13 +113,13 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                         </p>
                     )}
                     {featured.cta && (
-                        <a
+                        <SmartLink
                             href={resolveHref(featured.cta?.url)}
                             className={`inline-flex items-center justify-center mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
                             {featured.cta.label}
-                        </a>
+                        </SmartLink>
                     )}
                 </div>
                 {/* Rest as grid */}

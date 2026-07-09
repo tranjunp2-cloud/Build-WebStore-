@@ -13,7 +13,7 @@ export default function OnboardingPage() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
                         <Zap className="h-4 w-4 text-white" />
                     </div>
-                    <span className="text-lg font-semibold text-white">PrimeWeb</span>
+                    <span className="text-lg font-semibold text-white">Web Store</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5">
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
                             <Sparkles className="h-8 w-8 text-white" />
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                            Welcome to PrimeWeb!
+                            Welcome to Web Store!
                         </h1>
                         <p className="mt-3 text-base text-slate-400">
                             Let&apos;s build your professional website. Choose how you want to start.
@@ -129,7 +129,7 @@ export default function OnboardingPage() {
 
             {/* Footer */}
             <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-600">
-                © 2026 PrimeWeb. AI-powered website builder for Malaysian SMEs.
+                © 2026 Web Store. AI-powered website builder for Malaysian SMEs.
             </footer>
         </div>
     )

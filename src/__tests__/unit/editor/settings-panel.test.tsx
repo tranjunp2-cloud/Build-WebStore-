@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,13 @@ const defaultProps = {
 describe('SettingsPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // Stub jsdom's missing Radix Select support (hasPointerCapture, scrollIntoView)
+        if (!window.HTMLElement.prototype.hasPointerCapture) {
+            window.HTMLElement.prototype.hasPointerCapture = () => false
+        }
+        if (!window.HTMLElement.prototype.scrollIntoView) {
+            window.HTMLElement.prototype.scrollIntoView = () => {}
+        }
     })
 
     // ── Empty state ──────────────────────────────────────────────────────
@@ -140,20 +147,36 @@ describe('SettingsPanel', () => {
         // Arrange & Act
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
-        // Assert
-        expect(screen.getByText('Heading Font')).toBeInTheDocument()
-        const selects = screen.getAllByRole('combobox')
-        // First select is heading font
-        expect(selects[0]).toHaveValue('Outfit')
+        // Assert — FontSelect renders a Radix Select trigger with role="combobox"
+        const headingLabel = screen.getByText('Heading Font')
+
+        // F37 US-01 added the Local Business accordion's own comboboxes (state/
+        // category/priceRange <Select>s) earlier in the Global tab, so font
+        // selectors can no longer be found by absolute index — scope to the
+        // combobox rendered right next to the "Heading Font" label instead.
+        const headingFontCombobox = headingLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
+        expect(headingFontCombobox.textContent).toContain('Outfit')
     })
 
-    it('changing heading font calls onThemeChange', () => {
+    it('changing heading font calls onThemeChange', async () => {
         // Arrange
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
-        const selects = screen.getAllByRole('combobox')
 
-        // Act
-        fireEvent.change(selects[0], { target: { value: 'Playfair Display' } })
+        // Find the heading font selector, scoped by its label (see note above)
+        const headingLabel = screen.getByText('Heading Font')
+        const headingFontCombobox = headingLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
+        expect(headingFontCombobox.textContent).toContain('Outfit')
+
+        // Act — click to open the Radix Select listbox
+        fireEvent.click(headingFontCombobox)
+
+        // Find the "Playfair Display" option in the portal and click it
+        await waitFor(() => {
+            const option = screen.getByRole('option', { name: /Playfair Display/i })
+            expect(option).toBeInTheDocument()
+        })
+        const option = screen.getByRole('option', { name: /Playfair Display/i })
+        fireEvent.click(option)
 
         // Assert
         expect(defaultProps.onThemeChange).toHaveBeenCalledWith('fontHeading', 'Playfair Display')
@@ -163,20 +186,34 @@ describe('SettingsPanel', () => {
         // Arrange & Act
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
-        // Assert
-        expect(screen.getByText('Body Font')).toBeInTheDocument()
-        const selects = screen.getAllByRole('combobox')
-        // Second select is body font
-        expect(selects[1]).toHaveValue('Inter')
+        // Assert — FontSelect renders a Radix Select trigger with role="combobox"
+        const bodyLabel = screen.getByText('Body Font')
+
+        // Scope by label (see "renders heading font selector" test note above) —
+        // the Local Business accordion's <Select>s shift absolute combobox indices.
+        const bodyFontCombobox = bodyLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
+        expect(bodyFontCombobox.textContent).toContain('Inter')
     })
 
-    it('changing body font calls onThemeChange', () => {
+    it('changing body font calls onThemeChange', async () => {
         // Arrange
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
-        const selects = screen.getAllByRole('combobox')
 
-        // Act
-        fireEvent.change(selects[1], { target: { value: 'DM Sans' } })
+        // Find the body font selector, scoped by its label (see note above)
+        const bodyLabel = screen.getByText('Body Font')
+        const bodyFontCombobox = bodyLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
+        expect(bodyFontCombobox.textContent).toContain('Inter')
+
+        // Act — click to open the Radix Select listbox
+        fireEvent.click(bodyFontCombobox)
+
+        // Find the "DM Sans" option in the portal and click it
+        await waitFor(() => {
+            const option = screen.getByRole('option', { name: /DM Sans/i })
+            expect(option).toBeInTheDocument()
+        })
+        const option = screen.getByRole('option', { name: /DM Sans/i })
+        fireEvent.click(option)
 
         // Assert
         expect(defaultProps.onThemeChange).toHaveBeenCalledWith('fontBody', 'DM Sans')

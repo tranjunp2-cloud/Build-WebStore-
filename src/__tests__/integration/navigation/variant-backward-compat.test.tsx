@@ -1,6 +1,6 @@
 /**
  * Integration Tests — NavigationBlock variant backward compatibility (dual-read aliases)
- * TC-NAV-03, TC-NAV-11
+ * TC-NAV-03, TC-NAV-11, TC-NAV-13
  * Convention: docs/TEST_CONVENTION.md | QA: docs/qa/F-navigation.md
  *
  * Verifies that old DB variant names ('simple', 'mega-menu', 'pill') render
@@ -13,6 +13,11 @@ import React from 'react'
 import { I18nProvider } from '@/i18n'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
+
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+    usePathname: () => '/',
+}))
 
 vi.mock('framer-motion', () => {
     const React = require('react')
@@ -28,6 +33,11 @@ vi.mock('framer-motion', () => {
 
     return {
         motion: {
+            create: (Component) => {
+                const M = React.forwardRef(({ children, ...rest }, ref) => React.createElement(Component, { ...rest, ref }, children))
+                M.displayName = 'MotionMock'
+                return M
+            },
             nav: createPrimitive('nav'),
             div: createPrimitive('div'),
             a: createPrimitive('a'),
@@ -123,5 +133,60 @@ describe('TC-NAV-11 — seed row with variant "simple" renders identical to vari
 
         // Assert
         expect(legacyContainer.innerHTML).toBe(canonicalContainer.innerHTML)
+    })
+})
+
+// ── TC-NAV-13: CTA button suppressed on all non-default nav variants ──────────
+
+describe('TC-NAV-13 — NavigationBlock suppresses CTA button on non-default variants', () => {
+    const ctaLabel = 'Reserve a Ritual'
+
+    function makeCtaBlock(variant: string) {
+        return {
+            blockType: 'navigation',
+            variant,
+            logoText: 'Acme Corp',
+            links: [{ label: 'Home', url: '/' }],
+            ctaButton: { show: true, label: ctaLabel, url: '/reserve' },
+        }
+    }
+
+    it.each(['transparent', 'sidebar', 'floating', 'centered', 'mega'])(
+        'does not render CTA label on %s variant',
+        (variant) => {
+            // Arrange + Act
+            const { container } = render(
+                <I18nProvider defaultLocale="en">
+                    <NavigationBlock block={makeCtaBlock(variant)} theme={{}} site={site} page={{}} />
+                </I18nProvider>,
+            )
+
+            // Assert
+            expect(container.innerHTML).not.toContain(ctaLabel)
+        },
+    )
+
+    it('renders CTA label on default variant', () => {
+        // Arrange + Act
+        const { container } = render(
+            <I18nProvider defaultLocale="en">
+                <NavigationBlock block={makeCtaBlock('default')} theme={{}} site={site} page={{}} />
+            </I18nProvider>,
+        )
+
+        // Assert
+        expect(container.innerHTML).toContain(ctaLabel)
+    })
+
+    it('suppresses CTA via legacy alias "mega-menu" (routes to mega, non-default)', () => {
+        // Arrange + Act
+        const { container } = render(
+            <I18nProvider defaultLocale="en">
+                <NavigationBlock block={makeCtaBlock('mega-menu')} theme={{}} site={site} page={{}} />
+            </I18nProvider>,
+        )
+
+        // Assert — mega-menu alias → mega (non-default) → CTA suppressed
+        expect(container.innerHTML).not.toContain(ctaLabel)
     })
 })

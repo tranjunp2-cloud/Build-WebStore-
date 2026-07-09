@@ -2,6 +2,10 @@
 
 import { Percent, Banknote, Info, CircleAlert } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fmtRM, MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -32,6 +36,10 @@ interface DiscountFormFieldsProps {
     set: (k: keyof DiscountDraft, v: string) => void
 }
 
+// Error border for the shared <Input> controls (preflight OFF → destructive border needs an explicit
+// utility). Matches the error styling already used in discount-form-header.
+const errorRing = 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive'
+
 export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: DiscountFormFieldsProps) {
     const { t, ti } = useI18n()
     const d = t.dashboard.discounts.form
@@ -46,15 +54,6 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
     const senPreview =
         fixedAmount != null && !fixedOverCap ? fmtRM(Math.round(fixedAmount * 100)) : null
 
-    const inputBase =
-        'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors'
-    const inputStyle = {
-        background: 'var(--dash-surface-hover)',
-        borderColor: 'hsl(var(--input-border))',
-        color: 'var(--dash-text)',
-    } as React.CSSProperties
-    const inputErrorStyle = { ...inputStyle, borderColor: 'hsl(var(--destructive))' }
-    const labelStyle = { color: 'var(--dash-text)', fontSize: 13, fontWeight: 500 } as React.CSSProperties
     const helpStyle = { color: 'var(--dash-text-muted)', fontSize: 12 } as React.CSSProperties
 
     // Native <input type="date"> only opens the picker when its calendar icon is clicked. Calling
@@ -65,13 +64,13 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
     }
 
     return (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        // Tablet (768–1023): single column; 2-col only from lg (1024) so iPad portrait isn't cramped.
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {/* Code */}
             <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>{d.codeLabel} <span className="text-destructive">*</span></label>
-                <input
-                    className={`${inputBase} font-mono tracking-wider`}
-                    style={errors.code ? inputErrorStyle : inputStyle}
+                <Label>{d.codeLabel} <span className="text-destructive">*</span></Label>
+                <Input
+                    className={cn('font-mono tracking-wider', errors.code && errorRing)}
                     value={draft.code}
                     onChange={(e) => set('code', e.target.value.replace(/\s/g, '').toUpperCase())}
                     placeholder={d.codePlaceholder}
@@ -87,30 +86,28 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                 }
             </div>
 
-            {/* Status */}
+            {/* Status — shared <Select> (Radix) */}
             <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>{d.statusLabel}</label>
-                <select
-                    className={inputBase}
-                    style={inputStyle}
-                    value={draft.status}
-                    onChange={(e) => set('status', e.target.value)}
-                >
-                    <option value="active">{d.statusActive}</option>
-                    <option value="inactive">{d.statusInactive}</option>
-                </select>
+                <Label>{d.statusLabel}</Label>
+                <Select value={draft.status} onValueChange={(v) => set('status', v)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="active">{d.statusActive}</SelectItem>
+                        <SelectItem value="inactive">{d.statusInactive}</SelectItem>
+                    </SelectContent>
+                </Select>
                 <span style={helpStyle}>{d.statusHelp}</span>
             </div>
 
             {/* Description */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label style={labelStyle}>
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
+                <Label>
                     {d.descriptionLabel}{' '}
                     <span style={{ color: 'var(--dash-text-muted)', fontWeight: 400, fontSize: 11 }}>{d.descriptionOptional}</span>
-                </label>
-                <textarea
-                    className={`${inputBase} resize-none`}
-                    style={inputStyle}
+                </Label>
+                <Textarea
                     rows={2}
                     value={draft.description}
                     onChange={(e) => set('description', e.target.value.slice(0, 500))}
@@ -118,23 +115,26 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                 />
             </div>
 
-            {/* Type */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label style={labelStyle}>{d.typeLabel} <span className="text-destructive">*</span></label>
-                <div className="flex rounded-md border overflow-hidden w-fit" style={{ borderColor: 'hsl(var(--input-border))' }}>
+            {/* Type — bespoke segmented toggle (kept per design): two labeled options with icons, not a
+                boolean switch. Only the container radius is token-synced to rounded-lg. */}
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
+                <Label>{d.typeLabel} <span className="text-destructive">*</span></Label>
+                <div className="flex rounded-lg border border-solid overflow-hidden w-fit" style={{ borderColor: 'hsl(var(--input-border))' }}>
                     {(['percentage', 'fixed'] as const).map((tp) => (
                         <button
                             key={tp}
                             type="button"
                             onClick={() => { set('type', tp); set('valueInput', '') }}
                             className={cn(
-                                'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
-                                draft.type === tp && 'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white'
+                                // No focus ring at all (per request): outline-none kills Chrome's
+                                // default blue ring, and we add no replacement ring.
+                                'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors outline-none',
+                                draft.type === tp && 'bg-[hsl(var(--primary))] !text-white'
                             )}
                             style={
                                 draft.type === tp
                                     ? undefined
-                                    : { background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }
+                                    : { background: 'hsl(var(--card))', color: 'var(--dash-text-muted)' }
                             }
                         >
                             {tp === 'percentage' ? <Percent className="h-3.5 w-3.5" /> : <Banknote className="h-3.5 w-3.5" />}
@@ -144,24 +144,21 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                 </div>
             </div>
 
-            {/* Value */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label style={labelStyle}>{d.valueLabel} <span className="text-destructive">*</span></label>
+            {/* Value — bespoke affix group (kept per F33): RM/% unit panel shares the border box, so the
+                inner number input stays bare. Container token-synced to card bg + rounded-lg. */}
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
+                <Label>{d.valueLabel} <span className="text-destructive">*</span></Label>
                 <div className="flex items-center gap-3">
-                    {/* Affix-input group (per F33 design): unit label is a sibling panel with a divider,
-                        not an overlay — keeps the native number spinner usable without overlapping the
-                        RM/% label. Fixed → RM prefix (left); percentage → % suffix (right). */}
                     <div
-                        className="flex max-w-[220px] items-center overflow-hidden rounded-md border transition-colors focus-within:border-[hsl(var(--primary))]"
+                        className="flex max-w-[220px] items-center overflow-hidden rounded-lg border border-solid bg-[hsl(var(--card))] transition-colors focus-within:border-[hsl(var(--primary))]"
                         style={{
-                            background: 'var(--dash-surface-hover)',
                             borderColor: errors.value ? 'hsl(var(--destructive))' : 'hsl(var(--input-border))',
                         }}
                     >
                         {draft.type === 'fixed' && (
                             <span
-                                className="flex h-9 shrink-0 items-center border-r px-3 text-xs font-semibold"
-                                style={{ color: 'var(--dash-text-muted)', borderColor: 'hsl(var(--input-border))' }}
+                                className="flex h-9 shrink-0 items-center pl-3 pr-1 text-xs font-semibold"
+                                style={{ color: 'var(--dash-text-muted)' }}
                             >
                                 RM
                             </span>
@@ -181,8 +178,8 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                         />
                         {draft.type === 'percentage' && (
                             <span
-                                className="flex h-9 shrink-0 items-center border-l px-3 text-xs font-semibold"
-                                style={{ color: 'var(--dash-text-muted)', borderColor: 'hsl(var(--input-border))' }}
+                                className="flex h-9 shrink-0 items-center pl-1 pr-3 text-xs font-semibold"
+                                style={{ color: 'var(--dash-text-muted)' }}
                             >
                                 %
                             </span>
@@ -210,10 +207,9 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
             {/* Usage limit */}
             <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>{d.usageLimitLabel}</label>
-                <input
-                    className={`${inputBase} max-w-[220px]`}
-                    style={errors.usageLimit ? inputErrorStyle : inputStyle}
+                <Label>{d.usageLimitLabel}</Label>
+                <Input
+                    className={cn('max-w-[220px]', errors.usageLimit && errorRing)}
                     type="number"
                     value={draft.usageLimit}
                     onChange={(e) => set('usageLimit', e.target.value)}
@@ -232,7 +228,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             {/* Used so far (read-only, edit/detail only — hidden on create) */}
             {!isNew && (
                 <div className="flex flex-col gap-1.5">
-                    <label className="flex items-center gap-1.5" style={labelStyle}>
+                    <Label className="flex items-center gap-1.5">
                         {d.usedSoFarLabel}
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -256,10 +252,9 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                                 {d.usedSoFarTitle}
                             </TooltipContent>
                         </Tooltip>
-                    </label>
-                    <input
-                        className={`${inputBase} max-w-[220px] font-mono`}
-                        style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }}
+                    </Label>
+                    <Input
+                        className="max-w-[220px] cursor-not-allowed font-mono opacity-60"
                         value={String(usageCount)}
                         readOnly
                     />
@@ -267,13 +262,12 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             )}
 
             {/* Date window — Starts at + Expires at always share one row */}
-            <div className="grid grid-cols-1 gap-5 sm:col-span-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 lg:col-span-2 lg:grid-cols-2">
                 {/* Starts At */}
                 <div className="flex flex-col gap-1.5">
-                    <label style={labelStyle}>{d.startsAtLabel}</label>
-                    <input
-                        className={inputBase}
-                        style={errors.dates ? inputErrorStyle : inputStyle}
+                    <Label>{d.startsAtLabel}</Label>
+                    <Input
+                        className={cn(errors.dates && errorRing)}
                         type="date"
                         value={draft.startsAt}
                         onChange={(e) => set('startsAt', e.target.value)}
@@ -286,10 +280,9 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
                 {/* Expires At */}
                 <div className="flex flex-col gap-1.5">
-                    <label style={labelStyle}>{d.expiresAtLabel}</label>
-                    <input
-                        className={inputBase}
-                        style={errors.dates ? inputErrorStyle : inputStyle}
+                    <Label>{d.expiresAtLabel}</Label>
+                    <Input
+                        className={cn(errors.dates && errorRing)}
                         type="date"
                         value={draft.expiresAt}
                         onChange={(e) => set('expiresAt', e.target.value)}

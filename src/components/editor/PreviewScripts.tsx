@@ -27,7 +27,9 @@ export function PreviewScripts() {
             // keep window.location.origin fallback
         }
 
-        const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
+        // NOTE: 'DIV' intentionally excluded — a background wrapper DIV must not qualify as
+        // editable text (GH-1367 Bug 1). Editable text is authored via semantic tags below.
+        const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
         // cartWidget has no user-editable text fields — block contenteditable entirely
         const noTextEditBlockTypes = new Set(['cartWidget'])
@@ -35,7 +37,11 @@ export function PreviewScripts() {
         const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
-        
+        // Mobile/tablet compact chrome (PreviewFrame sets ?compact=1 when disableDragDrop is
+        // on) — inline WYSIWYG text editing is desktop-only per F05-v2; text on mobile/tablet
+        // is edited via the block-settings sheet's fields instead. Image edit stays enabled.
+        const isCompactPreview = new URLSearchParams(window.location.search).get('compact') === '1'
+
         let hoveredEl: HTMLElement | null = null
         let hoverTimer: number | null = null
         let hoveredBlock: Element | null = null
@@ -310,7 +316,29 @@ export function PreviewScripts() {
             window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, parentOrigin)
         }
 
+        // GH-1367 Bug 1: returns true only when the cursor is over a real rendered text node,
+        // not over padding/background/empty area of a block. Lets background clicks fall through
+        // to block selection instead of wrongly activating the text edit toolbar.
+        const clickLandedOnTextNode = (x: number, y: number): boolean => {
+            const doc = document as Document & {
+                caretRangeFromPoint?: (x: number, y: number) => Range | null
+                caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node | null } | null
+            }
+            if (typeof doc.caretRangeFromPoint === 'function') {
+                const range = doc.caretRangeFromPoint(x, y)
+                return !!range && range.startContainer?.nodeType === Node.TEXT_NODE
+            }
+            // Firefox
+            if (typeof doc.caretPositionFromPoint === 'function') {
+                const pos = doc.caretPositionFromPoint(x, y)
+                return !!pos && pos.offsetNode?.nodeType === Node.TEXT_NODE
+            }
+            // No caret API support (ultra-rare) → preserve legacy behavior, don't block editing
+            return true
+        }
+
         const onTextClick = (e: MouseEvent) => {
+            if (isCompactPreview) return
             let target = e.target as HTMLElement
             if ((target as HTMLElement).closest('[data-editor-control]')) return
             const blockContainer = target.closest('[data-block-index]')
@@ -320,6 +348,10 @@ export function PreviewScripts() {
             if (blockType && excludedBlockTypes.includes(blockType)) return
             // whatsapp-button and cartWidget use InlineEdit — global contenteditable must not activate
             if (blockType && noTextEditBlockTypes.has(blockType)) return
+
+            // GH-1367 Bug 1: only activate text editing when the click landed on actual text glyphs.
+            // Background/padding clicks fall through so onClick() block-selection takes over.
+            if (!clickLandedOnTextNode(e.clientX, e.clientY)) return
 
             // Walk up from click target to find nearest valid editable element
             // (click may land on <b>, <i>, <u> inside a valid element)
@@ -1099,11 +1131,20 @@ export function PreviewScripts() {
             if (e.data?.type === 'SCROLL_TO_BLOCK') {
                 const idx = e.data.index
                 if (idx !== undefined && idx !== null) {
-                    const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement
-                    if (el) {
-                        const top = el.getBoundingClientRect().top + window.scrollY
-                        window.scrollTo({ top: top - 80, behavior: 'smooth' })
+                    // The preceding UPDATE_FULL_LAYOUT message re-renders React state
+                    // asynchronously, so the target block's DOM node may not exist on the
+                    // very next frame yet — retry across a few frames before giving up.
+                    let attempts = 0
+                    const tryScroll = () => {
+                        const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement | null
+                        if (el) {
+                            const top = el.getBoundingClientRect().top + window.scrollY
+                            window.scrollTo({ top: top - 80, behavior: 'smooth' })
+                        } else if (attempts++ < 20) {
+                            requestAnimationFrame(tryScroll)
+                        }
                     }
+                    tryScroll()
                 }
             }
         }

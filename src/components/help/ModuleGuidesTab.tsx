@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, ZoomIn, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface StepData {
   num: number
@@ -177,22 +179,18 @@ export function ModuleGuidesTab() {
 
   return (
     <div className="w-full flex flex-col pt-2">
-      {/* Module Tabs Header */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {MODULES_DATA.map((module) => (
-          <button
-            key={module.id}
-            onClick={() => handleTabClick(module.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold rounded-[20px] border transition-all duration-200 ${
-              activeModule === module.id
-                ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] !text-white'
-                : 'bg-[hsl(var(--card))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]'
-            }`}
-          >
-            <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
-          </button>
-        ))}
-      </div>
+      {/* Module Tabs Header — underline tabs (matches DashboardTabs / Discounts / Team & Account
+          via the global `.dash-tab-trigger` underline on data-state=active). Wraps on narrow
+          screens (no horizontal scrollbar). */}
+      <Tabs value={activeModule} onValueChange={handleTabClick} className="mb-6">
+        <TabsList variant="underline">
+          {MODULES_DATA.map((module) => (
+            <TabsTrigger key={module.id} variant="underline" value={module.id}>
+              <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {/* Module Contents Array */}
       {MODULES_DATA.map((module) => (
@@ -209,7 +207,7 @@ export function ModuleGuidesTab() {
           {module.steps.map((step) => (
             <div
               key={`${module.id}-step-${step.num}`}
-              className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-6 mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
+              className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-4 sm:p-6 mb-4 sm:mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
             >
               <h3 className="text-[16px] font-bold text-white flex items-center mb-3">
                 <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] !text-white text-[13px] font-bold mr-2.5 shrink-0">

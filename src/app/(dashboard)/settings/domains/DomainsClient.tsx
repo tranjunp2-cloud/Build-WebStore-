@@ -9,6 +9,9 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
@@ -64,10 +67,12 @@ function SelectPrimaryPanel({
             >
 
                 {/* Close chevron button — Figma circular outlined accent */}
-                <button
+                <Button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full transition-colors shrink-0 z-10"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-[20px] left-[-18px] h-[36px] w-[36px] rounded-full shrink-0 z-10"
                     style={{
                         background: 'var(--dash-surface)',
                         border: '1px solid var(--dash-border)',
@@ -75,7 +80,7 @@ function SelectPrimaryPanel({
                     }}
                 >
                     <ChevronRight className="h-5 w-5" />
-                </button>
+                </Button>
 
                 {/* Content */}
                 <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
@@ -91,11 +96,12 @@ function SelectPrimaryPanel({
                         {options.map(opt => {
                             const isSelected = selected === opt.value;
                             return (
-                                <button
+                                <Button
                                     key={opt.value ?? '__platform__'}
                                     type="button"
                                     onClick={() => setSelected(opt.value)}
-                                    className="flex items-center gap-[12px] w-full p-[16px] rounded-[8px] transition-all text-left font-['Inter']"
+                                    variant="ghost"
+                                    className="flex items-center gap-[12px] w-full p-[16px] h-auto rounded-lg transition-all justify-start font-['Inter']"
                                     style={isSelected
                                         ? { border: '1px solid hsl(var(--primary))', background: 'hsl(var(--primary)/0.06)' }
                                         : { border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }
@@ -125,7 +131,7 @@ function SelectPrimaryPanel({
                                     >
                                         {opt.label}
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -146,7 +152,8 @@ function SelectPrimaryPanel({
                         type="button"
                         onClick={onClose}
                         variant="dashSecondary"
-                        className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
+                        size="dash"
+                        className="flex-1 font-medium"
                     >
                         {t?.Domains?.cancel || 'Cancel'}
                     </Button>
@@ -155,7 +162,8 @@ function SelectPrimaryPanel({
                         disabled={isPending}
                         onClick={() => onSave(selected)}
                         variant="dashPrimary"
-                        className="flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter']"
+                        size="dash"
+                        className="flex-1"
                     >
                         {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                         {t?.Domains?.save || 'Save'}
@@ -233,36 +241,40 @@ function TxtChallengeCard({
                         TXT Record #{i + 1}
                     </p>
 
-                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Name</label>
+                    <Label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Name</Label>
                     <div className="flex items-center gap-2 mt-1 mb-3">
                         <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.domain}
                         </code>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => copy(`name-${i}`, v.domain)}
                             aria-label={`Copy TXT record name ${v.domain}`}
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
-                        </button>
+                        </Button>
                     </div>
 
-                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Value</label>
+                    <Label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Value</Label>
                     <div className="flex items-center gap-2 mt-1 mb-2">
                         <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.value}
                         </code>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => copy(`value-${i}`, v.value)}
                             aria-label="Copy TXT record value"
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
-                        </button>
+                        </Button>
                     </div>
 
                     {v.reason && (
@@ -283,7 +295,7 @@ function TxtChallengeCard({
                 disabled={isVerifying}
                 aria-busy={isVerifying}
                 variant="dashPrimary"
-                className="h-[44px] px-6 rounded-[12px] text-[14px] font-['Inter']"
+                size="dash"
             >
                 {isVerifying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 {isVerifying ? 'Verifying…' : 'Verify Now'}
@@ -541,7 +553,7 @@ export function DomainsClient({
             <div className="space-y-[16px]">
                 {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
                 <div
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px]"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] p-[16px] sm:py-[25px] sm:px-[25px] rounded-[16px]"
                     style={{ minHeight: '102px', border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                 >
                     {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
@@ -549,14 +561,15 @@ export function DomainsClient({
                         <h2 className="text-[18px] font-semibold leading-[1.556em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>{t?.Domains?.addDomainHeading || 'Add a Domain to your store'}</h2>
                         <p className="mt-[4px] text-[14px] font-normal leading-[1.429em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.addDomainDesc || 'Connect your custom domain to make your store accessible'}</p>
                     </div>
-                    {/* Buttons — stack on mobile, row on desktop */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px] sm:gap-[24px] shrink-0">
+                    {/* Buttons — one row on all sizes (mobile: both share the row via flex-1,
+                        text shrinks + wraps if needed at very narrow widths). Desktop unchanged. */}
+                    <div className="flex flex-row items-stretch sm:items-center gap-2 shrink-0">
                         <Button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
                             variant="dashSecondary"
                             size="dash"
-                            className="whitespace-nowrap font-['Inter']"
+                            className="flex-1 sm:flex-none min-w-0 h-auto min-h-9 px-3 sm:px-4 py-1.5 leading-tight whitespace-normal sm:whitespace-nowrap text-xs sm:text-[13px] font-['Inter']"
                         >
                             {t?.Domains?.selectPrimary || 'Select primary domain'}
                         </Button>
@@ -565,7 +578,7 @@ export function DomainsClient({
                             onClick={() => { setIsAddModalOpen(true); setDomainError(''); setNewDomainInput(''); }}
                             variant="dashPrimary"
                             size="dash"
-                            className="whitespace-nowrap font-['Inter']"
+                            className="flex-1 sm:flex-none min-w-0 h-auto min-h-9 px-3 sm:px-4 py-1.5 leading-tight whitespace-normal sm:whitespace-nowrap text-xs sm:text-[13px] font-['Inter']"
                         >
                             <Plus className="h-4 w-4" />
                             <span>{t?.Domains?.addCustomDomain || 'Add Custom Domain'}</span>
@@ -575,7 +588,7 @@ export function DomainsClient({
 
                 {/* Platform subdomain card — F23: with slug editor */}
                 <div
-                    className="flex flex-col pt-[25px] px-[25px] pb-[25px] rounded-[16px] gap-[16px]"
+                    className="flex flex-col p-[16px] sm:pt-[25px] sm:px-[25px] sm:pb-[25px] rounded-[16px] gap-[16px]"
                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                 >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
@@ -591,24 +604,24 @@ export function DomainsClient({
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-0">
-                                    <input
-                                        type="text"
-                                        value={slugInput}
-                                        onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
-                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] text-[14px] font-mono focus:outline-none transition-colors"
-                                        style={{
-                                            border: '1px solid var(--dash-border)',
-                                            borderRight: 'none',
-                                            background: 'var(--dash-surface)',
-                                            color: 'var(--dash-text)',
-                                        }}
-                                        autoFocus
-                                    />
+                                    {/* Input-group: viền + focus-ring nằm ở khung bao ngoài (focus-within)
+                                        nên cả cụm input + hậu tố .domain sáng viền liền mạch khi focus.
+                                        Input bên trong để trong suốt (cùng pattern ô tiền "RM" form discount). */}
                                     <div
-                                        className="h-[44px] flex items-center px-3 rounded-r-[12px] text-[13px] text-slate-500 whitespace-nowrap"
-                                        style={{ border: '1px solid var(--dash-border)', borderLeft: 'none', background: 'var(--dash-surface)' }}
+                                        className="flex h-9 w-full max-w-[280px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
+                                        style={{ background: 'var(--dash-surface)' }}
                                     >
-                                        .{PLATFORM_DOMAIN}
+                                        <input
+                                            type="text"
+                                            value={slugInput}
+                                            onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
+                                            className="h-full min-w-0 flex-1 border-0 bg-transparent pl-3 pr-1 text-[13px] font-mono outline-none"
+                                            style={{ color: 'var(--dash-text)' }}
+                                            autoFocus
+                                        />
+                                        <span className="flex h-full items-center pr-3 text-[13px] text-slate-500 whitespace-nowrap">
+                                            .{PLATFORM_DOMAIN}
+                                        </span>
                                     </div>
                                     <div className="ml-2">
                                         {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
@@ -624,24 +637,26 @@ export function DomainsClient({
                                 {t?.Domains?.connected || 'Connected'}
                             </Badge>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                             {!isEditingSlug ? (
                                 <Button
                                     type="button"
                                     onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                     variant="dashSecondary"
-                                    className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px] font-medium"
+                                    size="dash"
+                                    className="w-full sm:w-auto justify-center"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     {t?.Domains?.changeSubdomain || 'Change subdomain'}
                                 </Button>
                             ) : (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
                                     <Button
                                         type="button"
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                         variant="dashSecondary"
-                                        className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px] font-medium"
+                                        size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.cancel || 'Cancel'}
                                     </Button>
@@ -650,7 +665,8 @@ export function DomainsClient({
                                         disabled={slugStatus !== 'available' || slugInput === currentSlug}
                                         onClick={() => setShowSlugConfirm(true)}
                                         variant="dashPrimary"
-                                        className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px]"
+                                        size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.save || 'Save'}
                                     </Button>
@@ -685,7 +701,8 @@ export function DomainsClient({
                                     type="button"
                                     onClick={() => setShowSlugConfirm(false)}
                                     variant="dashSecondary"
-                                    className="py-[10px] px-[20px] h-auto rounded-[12px] text-[14px] font-medium"
+                                    size="dash"
+                                    className="font-medium"
                                 >
                                     {t?.Domains?.cancel || 'Cancel'}
                                 </Button>
@@ -694,7 +711,7 @@ export function DomainsClient({
                                     disabled={savingSlug}
                                     onClick={handleSaveSlug}
                                     variant="dashPrimary"
-                                    className="py-[10px] px-[20px] h-auto rounded-[12px] text-[14px]"
+                                    size="dash"
                                 >
                                     {savingSlug && <Loader2 className="h-4 w-4 animate-spin" />}
                                     {t?.Domains?.confirmChange || 'Confirm change'}
@@ -713,7 +730,7 @@ export function DomainsClient({
                         return (
                             <div
                                 key={domain}
-                                className="flex flex-col p-[25px] rounded-[16px] gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300"
+                                className="flex flex-col p-[16px] sm:p-[25px] rounded-[16px] gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300"
                                 style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                             >
                                 <div className="flex flex-col gap-2">
@@ -742,13 +759,16 @@ export function DomainsClient({
                                                         >
                                                             <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{ip.trim()}</span>
                                                         </div>
-                                                        <button
+                                                        <Button
                                                             type="button"
                                                             onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }}
-                                                            className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
+                                                            aria-label={`Copy A record IP ${idx + 1}`}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] shrink-0"
                                                         >
                                                             <Copy className="h-5 w-5" />
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 ))}
                                                 <p className="text-[12px] text-slate-400">{t?.Domains?.pointToIps || 'Point your domain to any of these IPs.'}</p>
@@ -764,13 +784,15 @@ export function DomainsClient({
                                                 >
                                                     <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{DNS_CNAME}</span>
                                                 </div>
-                                                <button
+                                                <Button
                                                     type="button"
                                                     onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success(t?.Domains?.copied || 'Copied!'); }}
-                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] shrink-0"
                                                 >
                                                     <Copy className="h-5 w-5" />
-                                                </button>
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -796,7 +818,8 @@ export function DomainsClient({
                                         onClick={() => handleVerify(domain)}
                                         disabled={isPending || !!verifyingDomain}
                                         variant="dashPrimary"
-                                        className="w-full sm:flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter'] gap-[8px]"
+                                        size="dash"
+                                        className="w-full sm:flex-1 gap-[8px]"
                                     >
                                         {verifyingDomain === domain ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
                                         {verifyingDomain === domain ? (t?.Domains?.verifying || 'Verifying...') : (t?.Domains?.verifyConnection || 'Verify Connection')}
@@ -805,9 +828,10 @@ export function DomainsClient({
                                     <Button
                                         type="button"
                                         variant="dashSecondary"
+                                        size="dash"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending}
-                                        className="w-full sm:w-[112px] h-[50px] rounded-[16px] text-[16px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)]"
+                                        className="w-full sm:w-[112px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)]"
                                     >
                                         {t?.Domains?.remove || 'Remove'}
                                     </Button>
@@ -832,37 +856,46 @@ export function DomainsClient({
                         return (
                             <div key={domain} className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
                                 <div
-                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] gap-[16px]"
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[16px] px-[16px] pb-[1px] sm:pt-[25px] sm:px-[25px] rounded-[16px] gap-[16px]"
                                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                                 >
-                                <div className="flex flex-col gap-2 pb-[25px]">
-                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
-                                    <div className="flex flex-wrap gap-2 items-center">
-                                        {/* Active status — theme-aware success badge */}
-                                        <Badge variant="success" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium">
-                                            {t?.Domains?.connectedSecured || 'Connected & Secured'}
-                                        </Badge>
-                                        {isPrimary && (
-                                            <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[hsl(var(--info)/0.3)] bg-[hsl(var(--info)/0.2)]">
-                                                <span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
-                                            </div>
-                                        )}
+                                    <div className="flex flex-col gap-2 pb-[16px] sm:pb-[25px]">
+                                        <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                            {/* Active status — theme-aware success badge */}
+                                            <Badge variant="success" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium">
+                                                {t?.Domains?.connectedSecured || 'Connected & Secured'}
+                                            </Badge>
+                                            {isPrimary && (
+                                                <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[hsl(var(--info)/0.3)] bg-[hsl(var(--info)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                {/* Remove button — visible on all screen sizes */}
-                                <div className="flex items-center gap-3 pb-[25px]">
-                                    {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
-                                    <Button
-                                        type="button"
-                                        variant="dashSecondary"
-                                        onClick={() => setRemovingDomain(domain)}
-                                        disabled={isPending || isPrimary === true}
-                                        className="h-[44px] px-[16px] rounded-[12px] text-[14px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
-                                        title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
-                                    >
-                                        {t?.Domains?.removeDomain || 'Remove Domain'}
-                                    </Button>
-                                </div>
+                                    {/* Remove button — visible on all screen sizes */}
+                                    <div className="flex items-center gap-3 pb-[16px] sm:pb-[25px]">
+                                        {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="dashSecondary"
+                                                        size="dash"
+                                                        onClick={() => setRemovingDomain(domain)}
+                                                        disabled={isPending || isPrimary === true}
+                                                        className="font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
+                                                    >
+                                                        {t?.Domains?.removeDomain || 'Remove Domain'}
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    {isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -900,7 +933,7 @@ export function DomainsClient({
                             onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
                             placeholder="example.com"
                             autoFocus
-                            className={cn("mt-[24px] h-[50px] py-[12px] px-[16px] rounded-[16px] text-[16px] font-normal font-['Inter']", domainError && "border-[hsl(var(--destructive))]")}
+                            className={cn("mt-[24px] text-[13px]", domainError && "border-[hsl(var(--destructive))]")}
                         />
                         {domainError && (
                             <p className="text-destructive text-[13px] mt-[8px]">{domainError}</p>
@@ -911,7 +944,8 @@ export function DomainsClient({
                                 type="button"
                                 onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
                                 variant="dashSecondary"
-                                className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
+                                size="dash"
+                                className="flex-1 font-medium"
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
                             </Button>
@@ -921,9 +955,10 @@ export function DomainsClient({
                                 onClick={handleAddDomain}
                                 disabled={isPending}
                                 variant="dashPrimary"
-                                className={cn("flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter']", !newDomainInput.trim() && 'opacity-50')}
+                                size="dash"
+                                className={cn("flex-1", !newDomainInput.trim() && 'opacity-50')}
                             >
-                                {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+                                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                                 {t?.Domains?.addDomain || 'Add Domain'}
                             </Button>
                         </div>
@@ -946,47 +981,17 @@ export function DomainsClient({
             )}
 
             {/* ── Remove Domain Confirmation Modal (TC-F19.14 QA) ─────────── */}
-            {removingDomain && typeof document !== 'undefined' && createPortal(
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-                >
-                    <div
-                        className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200"
-                        style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
-                    >
-                        <div className="flex flex-col">
-                            <div className="m-0 p-0 text-[20px] font-semibold leading-[1.4em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>
-                                {t?.Domains?.removeDomainTitle || 'Remove domain'}
-                            </div>
-                            <div className="m-0 p-0 mt-[8px] text-[14px] font-normal leading-[1.428em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
-                                {(t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain)}
-                            </div>
-                        </div>
-                        <div className="mt-[24px] flex items-center gap-[12px]">
-                            <Button
-                                type="button"
-                                onClick={() => setRemovingDomain(null)}
-                                variant="dashSecondary"
-                                className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
-                            >
-                                {t?.Domains?.cancel || 'Cancel'}
-                            </Button>
-                            {/* Shared <Button> dashSecondary, soft-destructive (GH-1290 Bug 1) — đồng bộ với nút Cancel kế bên */}
-                            <Button
-                                type="button"
-                                variant="dashSecondary"
-                                onClick={handleRemoveConfirm}
-                                disabled={isPending}
-                                className="flex-1 h-[50px] rounded-[16px] gap-2 text-[16px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
-                            >
-                                {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
-                                {t?.Domains?.removeDomain || 'Remove Domain'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+            <ConfirmModal
+                open={!!removingDomain}
+                onConfirm={handleRemoveConfirm}
+                onCancel={() => setRemovingDomain(null)}
+                title={t?.Domains?.removeDomainTitle || 'Remove domain'}
+                description={removingDomain ? (t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain) : undefined}
+                confirmLabel={t?.Domains?.removeDomain || 'Remove Domain'}
+                cancelLabel={t?.Domains?.cancel || 'Cancel'}
+                variant="danger"
+                loading={isPending}
+            />
         </div>
     );
 }

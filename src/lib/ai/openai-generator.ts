@@ -41,6 +41,7 @@ import { detectLanguage } from './lang-detect'
 import { getNavLabels, hasDedicatedStrings } from './block-i18n'
 import { prefetchNavLabels } from './nav-label-translator'
 import { prefetchBlockStrings } from './block-strings-translator'
+import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -245,92 +246,120 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
-        const callStart = Date.now()
         const modelName = selectModel('site-generation')
-        let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
-        try {
-            completion = await openai.chat.completions.create({
+        // Single source of truth for the split-path flag — used both to ACTIVATE
+        // the parallel split below AND to run syncFooterAcrossPages in the shared
+        // multi-page post-processing. These two MUST agree: a mismatch skips the
+        // footer re-sync while the split still clones footers pre-enforcer,
+        // reopening the footer-variant bug (gen-page-split.ts syncFooterAcrossPages).
+        // Default ON; GEN_PARALLEL_PAGES=false opts out.
+        const useParallelSplit = process.env.GEN_PARALLEL_PAGES !== 'false'
+        let parsed: Record<string, unknown>
+
+        // Phase 05 (plan 260703-1341) — split the single mega-call (home + 4
+        // subpages in one JSON response, ~60s) into 3 parallel calls: home ∥
+        // subpages batches. Wall-clock ≈ max instead of sum. Default ON — set
+        // GEN_PARALLEL_PAGES=false for the legacy single-call path (emergency
+        // rollback; that path stays byte-identical to pre-Phase-05 behavior).
+        if (useParallelSplit) {
+            parsed = await runParallelPageSplit({
+                openai,
                 model: modelName,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPromptText },
-                ],
-                temperature: 0.7,
-                // Plan 260416: 6000 was too tight — 5-page sites need
-                // ~6500-7500 tokens, so JSON was truncated on every gen
-                // causing 100% fallback to legacy composer. 10000 gives
-                // safe headroom. Cost unchanged (GPT charges actual output,
-                // not the cap — typical output stays ~5200-7000 tokens).
-                max_tokens: 10000,
-                response_format: { type: 'json_object' },
+                systemPrompt,
+                userPromptText,
+                promptText,
+                businessInfo,
+                seed: themeSeed,
+                language: detectedLang,
+                blockLang,
             })
-        } catch (err) {
-            logAiUsage({
-                endpoint: 'site-generation',
-                model: modelName,
-                tokensIn: 0,
-                tokensOut: 0,
-                durationMs: Date.now() - callStart,
-                success: false,
-                errorCode: err instanceof Error ? err.name : 'unknown',
-            })
-            // Plan 260415 F01-gen-audit — surface OpenAI API error body so the
-            // outer route log captures the failure reason instead of a generic
-            // "fallback" message. Staging has been masking "400 could not parse
-            // the JSON body" failures inside the outer catch for weeks without
-            // a clear attribution.
-            if (err && typeof err === 'object') {
-                const apiErr = err as { status?: number; message?: string; error?: unknown }
-                // Plan 260417-0837 item 1.7 — structured logging for OpenAI 400
-                // parse failures. Prior logs lacked biz name/desc/reqBytes which
-                // are the three things we need to repro. No root-cause chase
-                // here, just surface enough signal to diagnose next session.
-                const bizName = (businessInfo.businessName ?? '').slice(0, 100)
-                const bizDesc = (businessInfo.shortDescription ?? '').slice(0, 200)
-                const reqBytes = systemPrompt.length + userPromptText.length
-                console.error(
-                    `[AI-400] OpenAI FAIL status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} reqBytes=${reqBytes} bizName="${bizName}" msg=${String(apiErr.message).slice(0, 300)}`,
-                )
-                if (bizDesc) {
-                    console.error(`[AI-400] bizDesc="${bizDesc}"`)
-                }
-                if (apiErr.error) {
-                    try {
-                        console.error(`[AI-400] body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
-                    } catch {
-                        // ignore serialization failures
+            events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
+        } else {
+            const callStart = Date.now()
+            let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+            try {
+                completion = await openai.chat.completions.create({
+                    model: modelName,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPromptText },
+                    ],
+                    temperature: 0.7,
+                    // Plan 260416: 6000 was too tight — 5-page sites need
+                    // ~6500-7500 tokens, so JSON was truncated on every gen
+                    // causing 100% fallback to legacy composer. 10000 gives
+                    // safe headroom. Cost unchanged (GPT charges actual output,
+                    // not the cap — typical output stays ~5200-7000 tokens).
+                    max_tokens: 10000,
+                    response_format: { type: 'json_object' },
+                })
+            } catch (err) {
+                logAiUsage({
+                    endpoint: 'site-generation',
+                    model: modelName,
+                    tokensIn: 0,
+                    tokensOut: 0,
+                    durationMs: Date.now() - callStart,
+                    success: false,
+                    errorCode: err instanceof Error ? err.name : 'unknown',
+                })
+                // Plan 260415 F01-gen-audit — surface OpenAI API error body so the
+                // outer route log captures the failure reason instead of a generic
+                // "fallback" message. Staging has been masking "400 could not parse
+                // the JSON body" failures inside the outer catch for weeks without
+                // a clear attribution.
+                if (err && typeof err === 'object') {
+                    const apiErr = err as { status?: number; message?: string; error?: unknown }
+                    // Plan 260417-0837 item 1.7 — structured logging for OpenAI 400
+                    // parse failures. Prior logs lacked biz name/desc/reqBytes which
+                    // are the three things we need to repro. No root-cause chase
+                    // here, just surface enough signal to diagnose next session.
+                    const bizName = (businessInfo.businessName ?? '').slice(0, 100)
+                    const bizDesc = (businessInfo.shortDescription ?? '').slice(0, 200)
+                    const reqBytes = systemPrompt.length + userPromptText.length
+                    console.error(
+                        `[AI-400] OpenAI FAIL status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} reqBytes=${reqBytes} bizName="${bizName}" msg=${String(apiErr.message).slice(0, 300)}`,
+                    )
+                    if (bizDesc) {
+                        console.error(`[AI-400] bizDesc="${bizDesc}"`)
+                    }
+                    if (apiErr.error) {
+                        try {
+                            console.error(`[AI-400] body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
+                        } catch {
+                            // ignore serialization failures
+                        }
                     }
                 }
+                throw err
             }
-            throw err
-        }
 
-        logAiUsage({
-            endpoint: 'site-generation',
-            model: completion.model,
-            tokensIn: completion.usage?.prompt_tokens ?? 0,
-            tokensOut: completion.usage?.completion_tokens ?? 0,
-            durationMs: Date.now() - callStart,
-            success: true,
-        })
+            logAiUsage({
+                endpoint: 'site-generation',
+                model: completion.model,
+                tokensIn: completion.usage?.prompt_tokens ?? 0,
+                tokensOut: completion.usage?.completion_tokens ?? 0,
+                durationMs: Date.now() - callStart,
+                success: true,
+            })
 
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            throw new Error('Empty AI response')
-        }
+            const content = completion.choices[0]?.message?.content
+            if (!content) {
+                throw new Error('Empty AI response')
+            }
 
-        events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
+            events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
 
-        let parsed: Record<string, unknown>
-        try {
-            parsed = JSON.parse(content) as Record<string, unknown>
-        } catch {
-            // AI response may be truncated — try to repair by trimming incomplete trailing content
-            const lastBrace = content.lastIndexOf('}')
-            if (lastBrace > 0) {
-                parsed = JSON.parse(content.slice(0, lastBrace + 1)) as Record<string, unknown>
-            } else {
-                throw new Error('Invalid JSON response from AI')
+            try {
+                parsed = JSON.parse(content) as Record<string, unknown>
+            } catch {
+                // AI response may be truncated — try to repair by trimming incomplete trailing content
+                const lastBrace = content.lastIndexOf('}')
+                if (lastBrace > 0) {
+                    parsed = JSON.parse(content.slice(0, lastBrace + 1)) as Record<string, unknown>
+                } else {
+                    throw new Error('Invalid JSON response from AI')
+                }
             }
         }
 
@@ -509,6 +538,13 @@ export async function generateSiteWithAI(
             }
 
             validBlocks = allBlocks
+
+            // gen-perf phase-09: the structure enforcer above may restyle the
+            // HOMEPAGE footer per its recipe — re-sync subpage footers so all
+            // pages share one footer (split path clones it pre-enforcement).
+            if (useParallelSplit) {
+                syncFooterAcrossPages(generatedPages)
+            }
 
             // Phase 06 — override per-page SEO with deterministic unique values
             // mined from page content, and attach ogImage + JSON-LD. AI-returned
@@ -868,13 +904,13 @@ const VARIANT_ALIASES: Record<string, string> = {
 }
 
 /** Category-weighted variant preferences — preferred variants per category per block type */
-const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
+export const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
     restaurant: {
         hero: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
         features: ['grid-3', 'icon-top', 'zigzag', 'list'],
         testimonials: ['cards', 'spotlight', 'masonry', 'carousel'],
         footer: ['simple', 'dark-gradient', 'centered-stack'],
-        contact: ['split', 'map-split', 'form'],
+        contact: ['split', 'form'],
         stats: ['row', 'highlight', 'cards', 'inline-text'],
         gallery: ['masonry', 'carousel', 'grid'],
         faq: ['accordion', 'simple', 'numbered'],
@@ -918,7 +954,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
-        hero: ['gradient', 'cards-overlay', 'minimal', 'parallax'],
+        hero: ['gradient', 'minimal', 'cards-overlay', 'parallax', 'split-left', 'slideshow'],
         features: ['zigzag', 'grid-2', 'icon-left', 'carousel'],
         testimonials: ['spotlight', 'cards', 'video-text'],
         footer: ['minimal', 'dark-gradient', 'simple'],
@@ -938,7 +974,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['grid-3', 'icon-left', 'list', 'zigzag'],
         testimonials: ['cards', 'carousel', 'spotlight'],
         footer: ['simple', 'dark-gradient', 'centered-stack'],
-        contact: ['split', 'form', 'map-split'],
+        contact: ['split', 'form'],
         stats: ['row', 'grid', 'highlight', 'chart-bars'],
         gallery: ['grid', 'carousel'],
         faq: ['accordion', 'grid', 'simple', 'numbered'],
@@ -986,7 +1022,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['icon-top', 'grid-3', 'list', 'zigzag'],
         testimonials: ['cards', 'spotlight', 'minimal-quote'],
         footer: ['simple', 'dark-gradient', 'centered-stack'],
-        contact: ['split', 'map-split', 'form'],
+        contact: ['split', 'form'],
         stats: ['row', 'highlight', 'chart-bars', 'cards'],
         gallery: ['grid', 'carousel'],
         faq: ['accordion', 'grid', 'numbered'],
@@ -1018,7 +1054,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['grid-3', 'icon-left', 'list'],
         testimonials: ['spotlight', 'masonry', 'cards'],
         footer: ['simple', 'dark-gradient', 'centered-stack'],
-        contact: ['map-split', 'split', 'card-float'],
+        contact: ['split', 'card-float'],
         stats: ['grid', 'highlight', 'row', 'cards'],
         gallery: ['carousel', 'lightbox', 'grid'],
         faq: ['accordion', 'simple', 'chat-bubbles'],
@@ -1030,7 +1066,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['grid', 'bio-modal', 'compact-row'],
     },
     fitness: {
-        hero: ['fullscreen', 'parallax', 'gradient', 'cards-overlay'],
+        hero: ['fullscreen', 'parallax', 'cards-overlay', 'gradient', 'split-left', 'magazine'],
         features: ['grid-4', 'zigzag', 'icon-top', 'carousel'],
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['dark-gradient', 'simple', 'centered-stack'],
@@ -1066,7 +1102,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['icon-top', 'grid-3', 'zigzag', 'list'],
         testimonials: ['cards', 'masonry', 'carousel', 'minimal-quote'],
         footer: ['simple', 'centered-stack', 'dark-gradient'],
-        contact: ['split', 'map-split', 'form'],
+        contact: ['split', 'form'],
         stats: ['row', 'highlight', 'cards'],
         gallery: ['masonry', 'carousel', 'grid'],
         faq: ['accordion', 'simple', 'chat-bubbles'],
@@ -1082,7 +1118,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['grid-3', 'zigzag', 'icon-top'],
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['dark-gradient', 'simple', 'centered-stack'],
-        contact: ['map-split', 'split', 'form'],
+        contact: ['split', 'form'],
         stats: ['row', 'grid', 'highlight', 'cards'],
         gallery: ['lightbox', 'carousel', 'grid'],
         faq: ['accordion', 'simple', 'chat-bubbles'],
@@ -1098,7 +1134,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         features: ['zigzag', 'grid-3', 'carousel', 'icon-left'],
         testimonials: ['masonry', 'spotlight', 'carousel'],
         footer: ['dark-gradient', 'simple', 'minimal'],
-        contact: ['map-split', 'split', 'card-float'],
+        contact: ['split', 'card-float'],
         stats: ['row', 'highlight', 'grid', 'inline-text'],
         gallery: ['carousel', 'lightbox', 'masonry'],
         faq: ['accordion', 'grid', 'chat-bubbles', 'numbered'],
@@ -1668,6 +1704,20 @@ export function sanitizeBlockData(
             safeMember.name = String(mObj.name || mObj.fullName || 'Member')
             safeMember.role = String(mObj.role || mObj.position || 'Role')
 
+            // Normalize image: AI may emit a string URL or {url,alt}; Zod schema
+            // (team config) expects {url, alt?}. Mirror the gallery wrapping below.
+            // media-injector replaces this with a real Media ID afterward.
+            const img = mObj.image
+            if (typeof img === 'string') {
+                safeMember.image = img ? { url: img, alt: safeMember.name } : undefined
+            } else if (img && typeof img === 'object') {
+                const iObj = img as Record<string, unknown>
+                const url = String(iObj.url || iObj.src || '')
+                safeMember.image = url ? { url, alt: String(iObj.alt || safeMember.name) } : undefined
+            } else {
+                safeMember.image = undefined
+            }
+
             if (Array.isArray(safeMember.socials)) {
                 safeMember.socials = safeMember.socials.map((social: unknown) => {
                     if (typeof social === 'string') return { platform: social.toLowerCase(), url: '#' }
@@ -1821,7 +1871,7 @@ export function sanitizeBlockData(
         s.stats = s.stats.map((stat: unknown) => {
             if (typeof stat === 'string') return { value: stat, label: stat }
             const sObj = (typeof stat === 'object' && stat !== null ? stat : {}) as Record<string, unknown>
-            const rawValue = String(sObj.value || sObj.number || '0')
+            const rawValue = String(sObj.value || sObj.number || '0').replace(/<[^>]*>/g, '').trim()
             return {
                 value: clampStatValue(rawValue),
                 label: String(sObj.label || sObj.text || 'Stat'),

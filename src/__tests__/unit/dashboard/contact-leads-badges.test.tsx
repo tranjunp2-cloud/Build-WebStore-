@@ -1,11 +1,9 @@
 /**
  * Customer Badge Components — TC-CUST-26..26d, TC-CUST-27..29
  *
- * GH-1222: these badges were migrated to the shared <Badge> design-system component,
- * which maps each status/source to a theme-aware VARIANT (light -700 / dark -300 tints)
- * instead of bespoke -400 colors. Tests now assert the variant's signature class on the
- * Badge element (a <div>, queried via its label) — the status→variant mapping is the
- * component's real responsibility; the exact color shade lives in <Badge>.
+ * GH-1337: badges rewritten to match Figma spec (node-id=32179-5360/5364).
+ * Now use tinted inline styles via badge-tokens.ts (DRY, no shadcn variants).
+ * Assertions migrated from className.toContain() to toHaveStyle({ color }).
  */
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -24,40 +22,40 @@ function withI18n(ui: React.ReactElement) {
 }
 
 describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
-    it('[TC-CUST-26] renders "New" label with warning variant (amber)', () => {
+    it('[TC-CUST-26] renders "New" label with amber tinted color', () => {
         withI18n(<CustomerStatusBadge status="new" />)
-        expect(screen.getByText('New').className).toContain('text-amber-700')
+        expect(screen.getByText('New')).toHaveStyle({ color: '#fbbf24' })
     })
 
-    it('[TC-CUST-26b] renders "Contacted" label with success variant (emerald)', () => {
+    it('[TC-CUST-26b] renders "Contacted" label with teal tinted color', () => {
         withI18n(<CustomerStatusBadge status="contacted" />)
-        expect(screen.getByText('Contacted').className).toContain('text-emerald-700')
+        expect(screen.getByText('Contacted')).toHaveStyle({ color: '#2dd4bf' })
     })
 
-    it('[TC-CUST-26c] renders "Ignored" label with secondary variant (slate)', () => {
+    it('[TC-CUST-26c] renders "Ignored" label with gray tinted color', () => {
         withI18n(<CustomerStatusBadge status="ignored" />)
-        expect(screen.getByText('Ignored').className).toContain('text-slate-600')
+        expect(screen.getByText('Ignored')).toHaveStyle({ color: '#9ca3af' })
     })
 
-    it('[TC-CUST-26d] renders "Read" label with outline variant', () => {
+    it('[TC-CUST-26d] renders "Read" label with indigo tinted color', () => {
         withI18n(<CustomerStatusBadge status="read" />)
-        expect(screen.getByText('Read').className).toContain('border-slate-300')
+        expect(screen.getByText('Read')).toHaveStyle({ color: '#818cf8' })
     })
 
-    it('[TC-CUST-27] renders "Subscribed" label with default variant (blue)', () => {
+    it('[TC-CUST-27] renders "Subscribed" label with violet tinted color', () => {
         withI18n(<CustomerStatusBadge status="subscribed" />)
-        expect(screen.getByText('Subscribed').className).toContain('bg-blue-600')
+        expect(screen.getByText('Subscribed')).toHaveStyle({ color: '#8a81f5' })
     })
 })
 
 describe('[TC-CUST-28..29] CustomerSourceBadge', () => {
-    it('[TC-CUST-28] renders "Contact Forms" label with default variant (blue)', () => {
+    it('[TC-CUST-28] renders "Contact Forms" label with blue tinted color', () => {
         withI18n(<CustomerSourceBadge source="contact-form" />)
-        expect(screen.getByText('Contact Forms').className).toContain('bg-blue-600')
+        expect(screen.getByText('Contact Forms')).toHaveStyle({ color: '#3b82f6' })
     })
 
-    it('[TC-CUST-29] renders "Newsletter Subscriptions" label with secondary variant (slate)', () => {
+    it('[TC-CUST-29] renders "Newsletter Subscriptions" label with violet tinted color', () => {
         withI18n(<CustomerSourceBadge source="newsletter" />)
-        expect(screen.getByText('Newsletter Subscriptions').className).toContain('text-slate-600')
+        expect(screen.getByText('Newsletter Subscriptions')).toHaveStyle({ color: '#8a81f5' })
     })
 })

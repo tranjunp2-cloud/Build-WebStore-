@@ -22,13 +22,15 @@ export interface ConfirmModalProps {
     title: React.ReactNode
     description?: React.ReactNode
     confirmLabel: string
-    cancelLabel: string
+    cancelLabel?: string
     /** `danger` = destructive (red) confirm; `default` = primary confirm. */
     variant?: 'danger' | 'default'
     /** Spinner + disabled on the confirm button while an async action runs. */
     loading?: boolean
     /** Custom icon node; defaults to a trash icon for `danger`, none for `default`. */
     icon?: React.ReactNode
+    /** Alert-only dialogs (nothing to actually cancel) — renders just the confirm button. */
+    hideCancel?: boolean
 }
 
 export function ConfirmModal({
@@ -42,6 +44,7 @@ export function ConfirmModal({
     variant = 'danger',
     loading = false,
     icon,
+    hideCancel = false,
 }: ConfirmModalProps) {
     const isDanger = variant === 'danger'
     const resolvedIcon =
@@ -50,7 +53,7 @@ export function ConfirmModal({
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v && !loading) onCancel() }}>
             <DialogContent
-                className="max-w-sm rounded-[20px] text-center [&>button]:hidden"
+                className="max-w-sm rounded-lg text-center [&>button]:hidden"
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Icon — centered tinted square (danger = destructive, default = primary) */}
@@ -82,20 +85,22 @@ export function ConfirmModal({
 
                 {/* Buttons — compact, centered (no flex-1 → no skew on long text) */}
                 <div className="flex items-center justify-center gap-3 mt-5">
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        disabled={loading}
-                        className="rounded-[10px] h-[40px] px-5 text-[14px] font-medium bg-transparent hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50"
-                        style={{ color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--input-border))' }}
-                    >
-                        {cancelLabel}
-                    </button>
+                    {!hideCancel && (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            disabled={loading}
+                            className="rounded-lg h-[40px] px-5 text-[14px] font-medium bg-transparent hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50"
+                            style={{ color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--input-border))' }}
+                        >
+                            {cancelLabel}
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={onConfirm}
                         disabled={loading}
-                        className="flex items-center justify-center gap-1.5 rounded-[10px] h-[40px] px-5 text-[14px] font-medium transition-opacity hover:opacity-90 cursor-pointer border-none disabled:opacity-50"
+                        className="flex items-center justify-center gap-1.5 rounded-lg h-[40px] px-5 text-[14px] font-medium transition-opacity hover:opacity-90 cursor-pointer border-none disabled:opacity-50"
                         style={{ background: isDanger ? 'hsl(var(--destructive))' : 'hsl(var(--primary))', color: '#fff' }}
                     >
                         {loading ? (

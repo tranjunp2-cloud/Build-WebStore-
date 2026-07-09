@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Input } from './input'
 
 /**
  * GH-1222 — Shared dashboard search box (the F33 / Discounts search input).
@@ -51,18 +52,16 @@ export function TableSearch({
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
                 style={{ color: 'var(--dash-text-muted)' }}
             />
-            <input
+            {/* Uses the shared <Input> so the border (solid, box-border, full wrap)
+                matches every other field in the CMS. White fill (bg-card) in light
+                mode so the box reads as a real input, not the page background. */}
+            <Input
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder={placeholder}
                 autoComplete="off"
-                className="w-full h-9 rounded-md pl-9 pr-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
-                style={{
-                    // Transparent fill to match the FilterChip pills (same height).
-                    background: 'transparent',
-                    color: 'var(--dash-text)',
-                }}
+                className="h-9 pl-9 pr-3 text-[13px] bg-[hsl(var(--card))]"
             />
         </div>
     )

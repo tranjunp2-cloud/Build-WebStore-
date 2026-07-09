@@ -1310,6 +1310,427 @@ describe('[TC-NAV-EDITOR] SiteRenderer nav offset for overlay variants (editor v
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-01 — GH-1412 regression: nav-offset respects explicit blockSpacing.paddingTop
+// When overlay nav + editor + user sets blockSpacing.paddingTop, wrapper must use user's value
+// (not nav-height override). Default behavior (no user setting) → still use nav-height.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-01] SiteRenderer nav-offset respects explicit blockSpacing.paddingTop', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'navigation') return makeTestBlock('navigation')
+            if (type === 'cta') return makeTestBlock('cta')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-01a: overlay nav + isEditor=true + user-set blockSpacing.paddingTop=120 → wrapper paddingTop = "120px" (not nav-height)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithCTASpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 120 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTASpacing} isEditor={true} />
+        )
+
+        // Assert — wrapper should respect user's 120px, not nav-height offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('120px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+
+    it('TC-F04-SR-GH1412-01b: overlay nav + isEditor=true + NO user blockSpacing.paddingTop → wrapper uses nav-height default (floating)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithCTA = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    // NO blockSpacing set — should use default nav-offset
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTA} isEditor={true} />
+        )
+
+        // Assert — with no user blockSpacing, should fall back to nav-height offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+
+    it('TC-F04-SR-GH1412-01c: transparent nav + isEditor=true + user-set blockSpacing.paddingTop=80 → uses "80px" (not nav-height)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'transparent' } }
+        const pageWithCTASpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 80 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTASpacing} isEditor={true} />
+        )
+
+        // Assert
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('80px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('var(--nav-height, 64px)')
+    })
+
+    it('TC-F04-SR-GH1412-01d: non-overlay nav (sticky/default) does NOT apply nav-offset even in editor', () => {
+        // Arrange — sticky nav should never trigger applyNavOffset
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'default' } }
+        const pageWithCTA = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 60 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTA} isEditor={true} />
+        )
+
+        // Assert — should use the explicit blockSpacing value (sticky nav doesn't trigger offset)
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('60px')
+    })
+
+    it('TC-F04-SR-GH1412-01e: overlay nav + isEditor=true + user-set blockSpacing.paddingTop=0 → uses "0px" (explicit 0 wins over nav-offset)', () => {
+        // Arrange — paddingTop=0 is a deliberate user choice; `0 === undefined` is false
+        // so it must NOT fall back to the nav-height default.
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithZeroSpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 0 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithZeroSpacing} isEditor={true} />
+        )
+
+        // Assert — explicit 0 must be respected, not overridden by nav-offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('0px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
+// Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
+//
+// Note: TC-IDs are prefixed F04 (Block Renderer QA doc) because this tests
+// SiteRenderer's _logoHref injection behaviour which is a block-renderer
+// concern. Tests live here (f05-site-renderer.test.tsx) because the subject
+// under test is SiteRenderer — there is no separate F04 test file for it.
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-02 — GH-1412 regression: CTA floating-sticky joins floating widget stack
+// CTA floats (joins floating container) only in floating-sticky variant.
+// Other CTA variants (banner/card/etc) render in normal flow, not floating.
+// CTA + whatsapp-button (both floating-sticky / bottom-right) → grouped in same floating container,
+// NOT overlapping. Tests verify floatingBlockSet excludes other-variant CTA + renders correctly.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-02] SiteRenderer floating-sticky CTA joins widget stack', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-02a: CTA floating-sticky + whatsapp-button bottom-right → both in same floating container z-[51]', () => {
+        // Arrange — both blocks should join floatingBlockSet and render in grouped bottom-right container
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join us' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — both blocks should NOT appear in main flow (no [data-block-type="cta"] wrapper in main content)
+        const mainFlowCTA = container.querySelector('[data-block-type="cta"]')
+        expect(mainFlowCTA).toBeNull()
+
+        // Assert — both blocks should be inside the floating container (z-[51] div with bottom-6 right-6)
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+
+        // Assert — outer group lays out vertically on mobile (flex-col) and horizontally on
+        // desktop (md:flex-row); the launcher column keeps its own flex-col-reverse stack.
+        expect(floatingContainer?.classList.contains('flex')).toBe(true)
+        expect(floatingContainer?.classList.contains('flex-col')).toBe(true)
+        expect(floatingContainer?.classList.contains('md:flex-row')).toBe(true)
+        expect(floatingContainer?.classList.contains('gap-3')).toBe(true)
+
+        // Assert — both test blocks should render inside the floating container
+        expect(screen.getByTestId('block-cta')).toBeInTheDocument()
+        expect(screen.getByTestId('block-whatsapp-button')).toBeInTheDocument()
+    })
+
+    it('TC-F04-SR-GH1412-02b: CTA variant="card" (non-floating) renders in main flow, NOT in floating container', () => {
+        // Arrange — CTA variant != 'floating-sticky' should NOT join floating stack
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'card', headline: 'Special offer' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — card CTA test block should render somewhere in the document (not null)
+        const ctaTestBlock = screen.getByTestId('block-cta')
+        expect(ctaTestBlock).toBeInTheDocument()
+
+        // Assert — card CTA should NOT be inside the floating container
+        // Verify: look for block-type=cta inside floating container → should not find
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        if (floatingContainer) {
+            const ctaInFloating = floatingContainer.querySelector('[data-testid="block-cta"]')
+            expect(ctaInFloating).toBeNull() // CTA should not be in floating container
+
+            // Only whatsapp should be in floating container
+            const whatsappInFloating = floatingContainer.querySelector('[data-testid="block-whatsapp-button"]')
+            expect(whatsappInFloating).toBeInTheDocument()
+        }
+    })
+
+    it('TC-F04-SR-GH1412-02c: whatsapp-button alone in bottom-right renders in floating container (regression test)', () => {
+        // Arrange — verify whatsapp floating behavior unchanged when no CTA present
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — whatsapp should be in floating container
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+        expect(screen.getByTestId('block-whatsapp-button')).toBeInTheDocument()
+
+        // Assert — container has correct styling
+        expect(floatingContainer?.classList.contains('flex')).toBe(true)
+        expect(floatingContainer?.classList.contains('flex-col-reverse')).toBe(true)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-03 — CTA floating-sticky is a SEPARATE block beside the launcher column
+// GH-1412: the launcher widgets (WhatsApp/social/cart) keep their own untouched
+// flex-col-reverse column; a floating-sticky CTA renders as a sibling next to it,
+// NOT inside the launcher column.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky separated from launcher column', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-03a: launcher column (flex-col-reverse) holds whatsapp but NOT the CTA', () => {
+        // Arrange
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join now' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — both blocks present in the floating group
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer?.querySelectorAll('[data-testid]').length).toBe(2)
+
+        // Assert — the nested launcher column keeps its own flex-col-reverse stack and
+        // contains the whatsapp launcher but NOT the CTA (CTA is a separate sibling).
+        const launcherColumn = floatingContainer?.querySelector('.flex.flex-col-reverse')
+        expect(launcherColumn).toBeInTheDocument()
+        expect(launcherColumn?.querySelector('[data-testid="block-whatsapp-button"]')).toBeInTheDocument()
+        expect(launcherColumn?.querySelector('[data-testid="block-cta"]')).toBeNull()
+    })
+
+    it('TC-F04-SR-GH1412-03b: CTA renders before the launcher column in DOM (CTA left on desktop, top on mobile)', () => {
+        // Arrange — author order does not matter; CTA must still precede the launcher column
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Contact us' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — direct children of the group: [CTA block, launcher column]
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        const directChildren = Array.from(floatingContainer.children) as HTMLElement[]
+        expect(directChildren.length).toBe(2)
+        // First direct child holds the CTA; second is the launcher column.
+        expect(directChildren[0].querySelector('[data-testid="block-cta"]')).toBeInTheDocument()
+        expect(directChildren[1].classList.contains('flex-col-reverse')).toBe(true)
+        expect(directChildren[1].querySelector('[data-testid="block-whatsapp-button"]')).toBeInTheDocument()
+    })
+
+    it('TC-F04-SR-GH1412-03c: CTA non-floating variant stays in main flow, not in floating container', () => {
+        // Arrange — CTA variant='card' (not floating-sticky) should NOT join floating stack
+        // Only whatsapp should be in the bottom-right floating container
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'card', headline: 'Special offer' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — floating container should only have whatsapp (1 child)
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        const floatingChildren = floatingContainer?.querySelectorAll('[data-testid]')
+        expect(floatingChildren?.length).toBe(1)
+        expect(floatingChildren?.[0]?.getAttribute('data-testid')).toBe('block-whatsapp-button')
+
+        // Assert — card CTA renders in main flow (somewhere else in document)
+        const ctaInMain = screen.getByTestId('block-cta')
+        expect(ctaInMain).toBeInTheDocument()
+        // Verify it's NOT inside the floating container
+        expect(floatingContainer?.contains(ctaInMain)).toBe(false)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-04 — bottom-right group responsive layout
+// GH-1412: a bottom-right group that contains a floating-sticky CTA lays out
+// horizontally on desktop (md:flex-row) but stays a vertical stack on mobile
+// (flex-col-reverse) so the wide CTA card never overflows the viewport width.
+// Widget-only groups (no CTA) stay vertical at every breakpoint.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-04] SiteRenderer bottom-right responsive layout (CTA → md:flex-row)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-04a: CTA floating-sticky + whatsapp → container is horizontal on desktop (md:flex-row), vertical on mobile (flex-col-reverse)', () => {
+        // Arrange
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join now' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — bottom-right floating group opts into the desktop row layout
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer.className).toContain('md:flex-row')
+        // Mobile stays a vertical stack (outer column; launcher sub-column keeps flex-col-reverse)
+        expect(floatingContainer.className).toContain('flex-col')
+    })
+
+    it('TC-F04-SR-GH1412-04b: whatsapp only (no CTA) → container stays vertical, NO md:flex-row', () => {
+        // Arrange — widget-only bottom-right group must not switch to horizontal
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer.className).not.toContain('md:flex-row')
+        expect(floatingContainer.className).toContain('flex-col-reverse')
+    })
+
+    it('TC-F04-SR-GH1412-04c: multiple floating-sticky CTAs stack in a column (no horizontal overflow)', () => {
+        // Arrange — two floating-sticky CTAs must stack vertically in the CTA column, not spread
+        // across the desktop row (which would overflow the viewport width).
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'First CTA' },
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Second CTA' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — first direct child is the CTA column holding BOTH CTAs
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        const ctaColumn = floatingContainer.children[0] as HTMLElement
+        expect(ctaColumn.className).toContain('flex-col')
+        expect(ctaColumn.querySelectorAll('[data-testid="block-cta"]').length).toBe(2)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
 // Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
 //

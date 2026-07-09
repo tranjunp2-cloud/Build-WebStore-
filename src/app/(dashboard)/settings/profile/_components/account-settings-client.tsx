@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n'
 import { isOwner } from '@/lib/profile/role-utils'
 import { isStaging } from '@/lib/env'
 import type { PlatformUser } from '@/types/user'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ProfileBanner } from './profile-banner'
 import { GeneralInfoTab } from './general-info-tab'
 import { SecurityTab } from './security-tab'
@@ -16,10 +17,10 @@ type Props = {
     hideHeading?: boolean
 }
 
+
 export function AccountSettingsClient({ initialUser, hideHeading = false }: Props) {
     const { t } = useI18n()
     const [user, setUser] = useState<PlatformUser>(initialUser)
-    const [activeTab, setActiveTab] = useState('general')
 
     const ssoBase = (process.env.NEXT_PUBLIC_SSO_BASE_URL ?? '').replace(/\/$/, '')
     const ssoUrl = ssoBase ? `${ssoBase}/setting` : ''
@@ -28,10 +29,6 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
 
     function onUserUpdate(partial: Partial<PlatformUser>) {
         setUser(prev => ({ ...prev, ...partial }))
-    }
-
-    function handleTabChange(value: string) {
-        setActiveTab(value)
     }
 
     return (
@@ -44,50 +41,30 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
 
             <ProfileBanner user={user} role={role} onUserUpdate={onUserUpdate} />
 
-            <div className="flex flex-col gap-8">
-                {/* Tab navigation */}
-                <div className="flex gap-8 border-b border-[hsl(var(--border)/0.1)]">
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange('general')}
-                        className={[
-                            'text-[14px] tracking-[1.4px] uppercase px-2 transition-colors',
-                            activeTab === 'general'
-                                ? 'font-black text-[hsl(var(--primary))] border-b-2 border-[hsl(var(--primary))] pb-[18px]'
-                                : 'font-bold text-[hsl(var(--muted-foreground))] border-b-2 border-transparent pb-[16px]',
-                        ].join(' ')}
-                    >
+            <Tabs defaultValue="general" className="flex flex-col gap-8">
+                <TabsList variant="underline">
+                    <TabsTrigger value="general" variant="underline">
                         {t.profile.tabs.general}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange('security')}
-                        className={[
-                            'text-[14px] tracking-[1.4px] uppercase px-2 transition-colors',
-                            activeTab === 'security'
-                                ? 'font-black text-[hsl(var(--primary))] border-b-2 border-[hsl(var(--primary))] pb-[18px]'
-                                : 'font-bold text-[hsl(var(--muted-foreground))] border-b-2 border-transparent pb-[16px]',
-                        ].join(' ')}
-                    >
+                    </TabsTrigger>
+                    <TabsTrigger value="security" variant="underline">
                         {t.profile.tabs.security}
-                    </button>
-                </div>
-
-                {activeTab === 'general' && (
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="general" className="mt-0">
                     <GeneralInfoTab
                         user={user}
                         role={role}
                         ssoUrl={ssoUrl}
                         onUserUpdate={onUserUpdate}
                     />
-                )}
-                {activeTab === 'security' && (
+                </TabsContent>
+                <TabsContent value="security" className="mt-0">
                     <SecurityTab
                         role={role}
                         ssoUrl={ssoUrl}
                     />
-                )}
-            </div>
+                </TabsContent>
+            </Tabs>
 
             {isStaging() && <ResetAccountCard />}
         </div>

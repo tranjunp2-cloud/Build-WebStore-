@@ -87,17 +87,41 @@ export function OrdersActionBar({
     const [paymentVal, setPaymentVal] = useState('all')
     const [sortVal, setSortVal] = useState('-createdAt')
 
+    // GH-1516: desktop (xl+) puts search + all 4 filter chips on ONE row — search
+    // flexes between a 220px floor (still usable at 1280 with the sidebar open) and a
+    // 480px cap, chips keep their auto width; flex-wrap is the safety net if a locale's
+    // labels outgrow the row. Below xl stays 2 rows: search (row 1) + filters (row 2).
     return (
-        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full">
+        <div className="flex flex-col gap-3 w-full xl:flex-row xl:flex-wrap xl:items-center">
             <TableSearch
                 value={search}
                 onSearch={(q) => onSearch?.(q)}
                 placeholder={o.search}
                 debounceMs={0}
-                className="w-full md:flex-1 md:max-w-[400px]"
+                className="w-full xl:w-auto xl:flex-1 xl:min-w-[220px] xl:max-w-[480px]"
             />
 
-            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+            {/* All 4 selects on ONE row at every width below xl (grid-cols-4) → search +
+                filters = 2 rows total. Desktop (xl+): original auto-width flex-wrap row.
+                To fit 4 pills on a phone the below-xl chips are progressively trimmed:
+                  • label grows (flex-1), stays left-aligned, truncates (min-w-0);
+                  • the leading icon hides below sm (shows again from sm up);
+                  • the " : value" hides below 820px (mobile + iPad mini) so the pill is
+                    just Date / Status / Payment / Sort — the picked option is still shown
+                    once the dropdown opens; from iPad Air (>=820) the value returns;
+                  • padding/font shrink on the smallest widths.
+                All tweaks target `.chip-trigger` (not the dropdown options) and reset at
+                xl so desktop stays byte-identical. */}
+            <div className="grid grid-cols-4 gap-1.5 md:gap-2 w-full xl:w-auto
+                            xl:flex xl:items-center xl:flex-wrap
+                            [&_.chip-trigger]:w-full xl:[&_.chip-trigger]:w-auto
+                            [&_.chip-trigger]:px-2 min-[820px]:[&_.chip-trigger]:px-3
+                            [&_.chip-trigger]:text-[12px] sm:[&_.chip-trigger]:text-[13px]
+                            [&_.chip-trigger>span]:flex-1 [&_.chip-trigger>span]:text-left [&_.chip-trigger>span]:min-w-0
+                            xl:[&_.chip-trigger>span]:flex-none
+                            [&_.chip-icon]:hidden sm:[&_.chip-icon]:inline
+                            [&_[data-chip-sep]]:hidden [&_[data-chip-value]]:hidden
+                            min-[820px]:[&_[data-chip-sep]]:inline min-[820px]:[&_[data-chip-value]]:inline">
                 <FilterChip<string>
                     icon={Calendar}
                     label={o.filterLabels.date}
