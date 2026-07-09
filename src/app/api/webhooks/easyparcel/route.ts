@@ -99,7 +99,8 @@ export async function POST(req: Request) {
     const topic = typeof body.topic === 'string' ? body.topic : null
 
     // Mirror the raw (PII-redacted) payload to Sentry for observation — the only way
-    // to see EP's real shape without Vercel log access. Gated by EASYPARCEL_WEBHOOK_DEBUG.
+    // to see EP's real shape without Vercel log access. TEMPORARY: remove once the
+    // go-live canary confirms the shape (see echoWebhookPayload doc).
     echoWebhookPayload(body, { topic })
 
     if (topic && topic.startsWith('ondemand')) {

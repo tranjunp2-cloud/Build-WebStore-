@@ -9,10 +9,10 @@ import * as Sentry from '@sentry/nextjs'
  *
  * Two channels:
  *  - echoWebhookPayload() — mirrors EVERY parsed payload (level=info) so the real
- *    shape can be observed. Gated behind EASYPARCEL_WEBHOOK_DEBUG so it can be
- *    switched on for a canary and off afterward WITHOUT a redeploy.
+ *    shape can be observed. Always-on during the go-live canary; REMOVE once the
+ *    payload shape is confirmed (see the fn doc below).
  *  - reportWebhookAnomaly() — flags a payload we could not fully process
- *    (level=error), always on, so schema drift is caught even when echo is off.
+ *    (level=error), always on, so schema drift is caught long-term.
  *
  * PII SAFETY: EP's "Shipment Created" payload carries sender/receiver name, phone,
  * email, address, postcode, city. `sendDefaultPii` is false project-wide — every
@@ -48,10 +48,12 @@ interface EchoMeta {
 
 /**
  * Mirror the full (PII-redacted) webhook payload to Sentry for observation.
- * No-op unless EASYPARCEL_WEBHOOK_DEBUG is set — keep it on only during a canary.
+ *
+ * TEMPORARY: always-on during the EP go-live canary so the operator (no Vercel log
+ * access) can see EP's real payload shape. REMOVE this echo — and its call in
+ * route.ts — once the shape is confirmed, to avoid steady-state info-event noise.
  */
 export function echoWebhookPayload(body: Record<string, unknown>, meta: EchoMeta = {}): void {
-    if (!process.env.EASYPARCEL_WEBHOOK_DEBUG) return
     Sentry.withScope((scope) => {
         scope.setLevel('info')
         scope.setTag('ep_webhook.topic', meta.topic ?? 'none')
