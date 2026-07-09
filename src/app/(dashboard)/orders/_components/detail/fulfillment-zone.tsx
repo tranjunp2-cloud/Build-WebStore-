@@ -446,7 +446,11 @@ export function FulfillmentZone({
                   className="btn btn-primary"
                   style={{ backgroundColor: 'rgb(59, 130, 246)' }}
                   onClick={() => setPrintOpen(true)}
-                  disabled={!labelUrl}
+                  // PD-F13a: gate on awbNo, not labelUrl — PrintLabelModal never reads
+                  // labelUrl, it probes /api/orders/[id]/label?format= off awbNo. A valid
+                  // label state can have labelUrls populated but top-level labelUrl null,
+                  // which would leave Print permanently disabled if gated on labelUrl.
+                  disabled={!awbNo}
                 >
                   <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
                 </button>
@@ -538,7 +542,8 @@ export function FulfillmentZone({
                   className="btn btn-primary"
                   style={{ backgroundColor: 'rgb(59, 130, 246)' }}
                   onClick={() => setPrintOpen(true)}
-                  disabled={!labelUrl}
+                  // PD-F13a: see success-branch comment above — gate on awbNo, not labelUrl.
+                  disabled={!awbNo}
                 >
                   <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
                 </button>

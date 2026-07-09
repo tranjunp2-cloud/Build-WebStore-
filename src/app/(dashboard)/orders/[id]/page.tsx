@@ -15,5 +15,9 @@ export default async function OrderDetailPage({
     params: Promise<{ id: string }>
 }) {
     const { id } = await params
-    return <OrderDetailView orderId={id} />
+    // PD-F13b: key by id so Next.js remounts the whole subtree (incl. FulfillmentZone)
+    // on order-id change — App Router preserves component state across dynamic-segment
+    // navigations by default, which otherwise leaks FulfillmentZone's local state
+    // (localAwb, forceCodBlocked, forceMissing, …) from the previous order.
+    return <OrderDetailView key={id} orderId={id} />
 }
