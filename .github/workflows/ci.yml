@@ -735,6 +735,20 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed: $URL"
 
+      - name: Promote alias → ech-prime-web-v2-qc.vercel.app
+        # vercel deploy creates a per-deploy URL. The stable QC domain needs an
+        # explicit alias to each new deploy — Vercel's automatic branch-alias
+        # rollover does NOT apply to preview scope. Without this, QA keeps
+        # hitting whichever deploy first claimed the alias (as happened on
+        # 2026-07-09: OTP bypass deploy built successfully but alias stayed
+        # pinned to a 6-day-old deploy).
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          URL="${URL#https://}"
+          vercel alias set "$URL" ech-prime-web-v2-qc.vercel.app --token="$VERCEL_TOKEN"
+          echo "Alias rolled: ech-prime-web-v2-qc.vercel.app → $URL"
+
       - name: Notify deploy success
         if: success()
         uses: ./.github/actions/smart-notify
