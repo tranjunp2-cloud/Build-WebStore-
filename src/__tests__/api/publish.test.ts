@@ -493,6 +493,69 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(Object.prototype.hasOwnProperty.call(pageUpdate![0].data, 'deletedAt')).toBe(false)
     })
 
+    it('TC-F01-pub-15: skips orphan version rows (id=null) so publish does not 500 with "Missing where"', async () => {
+        // Regression (Sentry, staging): a hard-deleted / failed page-create leaves an
+        // orphan row in _pages_v (parent_id NULL). find({draft:true}) surfaces it as a
+        // doc with id=null; payload.update({id:null}) has neither id nor where → Payload
+        // throws APIError "Missing 'where' query of documents to update." → the ENTIRE
+        // publish 500s (real pages never promote). Fix: skip id==null docs in the loop.
+        const { getPayload } = await import('payload')
+        const siteId = '123'
+        mockSiteRecord = { id: siteId, name: 'My Coffee Site', status: 'draft', tenant: 'tenant-1', publishedAt: null }
+
+        // draft:true returns the orphan (id:null) alongside a real page (id:12).
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: null, _status: 'draft', site: siteId, slug: '/orphan', layout: [] },
+                { id: 12, _status: 'draft', site: siteId, slug: '/home', layout: [] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            // Faithfully mirror Payload: update() with neither a resolved id nor a
+            // `where` throws APIError — this is the exact 500 the fix must prevent.
+            if (id == null) {
+                throw Object.assign(new Error("Missing 'where' query of documents to update."), { name: 'APIError' })
+            }
+            return { id, ...data }
+        })
+        const executeSpy = vi.fn().mockResolvedValue({ rows: [] }) // no soft-deleted pages
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+            db: { drizzle: { execute: executeSpy } },
+        })
+
+        const req = makePatchReq(siteId)
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId }) })
+        const body = await res.json()
+
+        // No 500 — orphan is skipped, not promoted.
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+
+        const pageUpdates = updateSpy.mock.calls.filter(c => c[0].collection === 'pages')
+        const promotedIds = pageUpdates.map(c => c[0].id)
+        // Real page IS promoted...
+        expect(promotedIds).toContain(12)
+        // ...the orphan (id null) is NEVER passed to update — that call is exactly what
+        // would throw "Missing 'where'".
+        expect(promotedIds).not.toContain(null)
+        expect(promotedIds).not.toContain(undefined)
+    })
+
     it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
         // Regression: page with an industry block (doctor-profile, property-card,
         // class-schedule, etc.) whose nested required array row was seeded empty
