@@ -49,6 +49,7 @@ export async function SEOView() {
     let technicalSeoScore = 100
     let keywords: TrackedKeyword[] = []
     let autoMetaGenerationEnabled = true
+    let aiCrawlersEnabled = true
     let siteId: string | number | null = null
     const missingSeoItems: MissingSeoItem[] = []
 
@@ -62,6 +63,7 @@ export async function SEOView() {
             if (site) {
                 siteId = site.id
                 autoMetaGenerationEnabled = site.seo?.autoMetaEnabled !== false
+                aiCrawlersEnabled = site.aiCrawlersEnabled !== false
 
                 if (site.seo?.trackedKeywords && site.seo.trackedKeywords.length > 0) {
                     keywords = site.seo.trackedKeywords.map((k: { id?: string; keyword: string; currentRank?: number; previousRank?: number }, idx: number) => {
@@ -209,6 +211,7 @@ export async function SEOView() {
             technicalSeoScore={technicalSeoScore}
             keywords={keywords}
             autoMetaGenerationEnabled={autoMetaGenerationEnabled}
+            aiCrawlersEnabled={aiCrawlersEnabled}
             siteId={siteId}
             missingSeoItems={missingSeoItems}
         />

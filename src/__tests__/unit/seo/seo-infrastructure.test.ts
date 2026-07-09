@@ -69,6 +69,14 @@ function resolveCanonicalUrl(
 /**
  * Mirrors robots.txt body generation
  * (src/app/sites/[slug]/robots.txt/route.ts)
+ *
+ * NOTE: This is a STATIC mirror of the default User-agent: * section only.
+ * AI-bot toggle behavior (GPTBot/ClaudeBot/etc Allow/Disallow rules) is tested
+ * via the real route import in src/__tests__/unit/seo/ai-crawlers-robots.test.ts
+ * (TC-F37-03). Do NOT extend this mirror with AI-bot logic — per testing rule,
+ * import from source, never re-implement. This mirror's assertions verify only
+ * the base directives (User-agent: *, Allow, Disallow, Sitemap) which are
+ * unaffected by the toggle.
  */
 function generateRobotsTxt(baseUrl: string): string {
     return [

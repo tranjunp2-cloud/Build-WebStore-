@@ -204,3 +204,63 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
         </div>
     )
 }
+
+export function AiCrawlersToggle({ defaultChecked, siteId }: { defaultChecked: boolean; siteId?: string | number }) {
+    const { t } = useI18n()
+    const aiCrawlers = t.dashboard.seo.aiCrawlers
+    const [checked, setChecked] = useState(defaultChecked)
+    const [saving, setSaving] = useState(false)
+
+    const trackToggleChanged = (enabled: boolean) => {
+        if (!siteId) return
+        fetch('/api/analytics/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                siteId: String(siteId),
+                event: 'ai_crawler_toggle_changed',
+                pageUrl: window.location.pathname,
+                metadata: { enabled },
+            }),
+        }).catch(() => {})
+    }
+
+    const handleChange = async (newValue: boolean) => {
+        setChecked(newValue)
+        if (!siteId) return
+        setSaving(true)
+        try {
+            const res = await fetch('/api/seo/ai-crawlers-toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ siteId: String(siteId), enabled: newValue }),
+            })
+            if (!res.ok) throw new Error('failed')
+            trackToggleChanged(newValue)
+        } catch {
+            setChecked(!newValue)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-[2px] min-w-0">
+                <span className="text-[14px] font-semibold text-white leading-[1.4]">
+                    {aiCrawlers.label || 'Cho phép AI crawlers index website'}
+                </span>
+                <span className="text-[12px] leading-[1.5] text-[#9CA3AF]">
+                    {aiCrawlers.description || 'Allows GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront so ChatGPT/Perplexity/Gemini can recommend your business.'}
+                </span>
+            </div>
+            <Switch
+                checked={checked}
+                onCheckedChange={handleChange}
+                disabled={saving}
+                className="shrink-0"
+                aria-label={aiCrawlers.label || 'Cho phép AI crawlers index website'}
+            />
+        </div>
+    )
+}

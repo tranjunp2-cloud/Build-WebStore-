@@ -286,6 +286,13 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'aiCrawlersEnabled',
+            type: 'checkbox',
+            defaultValue: true,
+            label: 'Cho phép AI crawlers index website',
+            admin: { description: 'Allow GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront.' },
+        },
+        {
             name: 'socialLinks',
             type: 'group',
             fields: [

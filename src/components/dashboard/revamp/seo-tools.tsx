@@ -6,18 +6,24 @@
  * All text driven by t.dashboard.revamp.tools.*
  */
 import { useState } from 'react'
-import { Network, TextSearch, Zap, RefreshCw, Loader2 } from 'lucide-react'
+import { Network, TextSearch, Zap, RefreshCw, Loader2, Bot } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { SectionHead, HelpTip } from './atoms'
 
-export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number | null; autoMetaEnabled: boolean }) {
+export function SeoTools({
+    siteId, autoMetaEnabled, aiCrawlersEnabled,
+}: {
+    siteId: string | number | null; autoMetaEnabled: boolean; aiCrawlersEnabled: boolean
+}) {
     const { t, ti } = useI18n()
     const toolsT = t.dashboard.revamp.tools
 
     const [autoMeta, setAutoMeta] = useState(autoMetaEnabled)
     const [savingMeta, setSavingMeta] = useState(false)
     const [generating, setGenerating] = useState(false)
+    const [aiCrawlers, setAiCrawlers] = useState(aiCrawlersEnabled)
+    const [savingAiCrawlers, setSavingAiCrawlers] = useState(false)
 
     const toggleMeta = async () => {
         if (!siteId || savingMeta) return
@@ -37,6 +43,27 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
             toast.error(toolsT.metaError)
         } finally {
             setSavingMeta(false)
+        }
+    }
+
+    const toggleAiCrawlers = async () => {
+        if (!siteId || savingAiCrawlers) return
+        const next = !aiCrawlers
+        setAiCrawlers(next)
+        setSavingAiCrawlers(true)
+        try {
+            const res = await fetch('/api/seo/ai-crawlers-toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ siteId: String(siteId), enabled: next }),
+            })
+            if (!res.ok) throw new Error('failed')
+            toast.success(next ? toolsT.aiCrawlersOn : toolsT.aiCrawlersOff)
+        } catch {
+            setAiCrawlers(!next)
+            toast.error(toolsT.aiCrawlersError)
+        } finally {
+            setSavingAiCrawlers(false)
         }
     }
 
@@ -104,6 +131,29 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
                         onClick={toggleMeta}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMeta() } }}
                         style={savingMeta ? { cursor: 'wait' } : undefined}
+                    />
+                </div>
+
+                {/* AI crawlers */}
+                <div className="auto-row">
+                    <span className="sw-ic"><Bot aria-hidden /></span>
+                    <div className="sw-text">
+                        <div className="t">
+                            {toolsT.aiCrawlers}
+                            <HelpTip tip={toolsT.aiCrawlersTip} />
+                            {aiCrawlers && <span className="active-badge"><Zap aria-hidden />{toolsT.active}</span>}
+                        </div>
+                        <div className="d">{toolsT.aiCrawlersDesc}</div>
+                    </div>
+                    <div
+                        className={`switch ${aiCrawlers ? 'on' : ''}`}
+                        role="switch"
+                        aria-checked={aiCrawlers}
+                        aria-label={toolsT.aiCrawlers}
+                        tabIndex={0}
+                        onClick={toggleAiCrawlers}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAiCrawlers() } }}
+                        style={savingAiCrawlers ? { cursor: 'wait' } : undefined}
                     />
                 </div>
             </div>

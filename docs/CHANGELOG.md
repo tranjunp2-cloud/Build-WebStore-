@@ -154,6 +154,31 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### US-F37-03 — AI Crawler Permissions & llms.txt
+
+**AI crawler default-allow + dynamic content-contract route. First phase of Local SEO feature.**
+
+**Implementation complete (93 new/passing SEO unit tests, 2 adversarial review passes):**
+- **New field:** `aiCrawlersEnabled` boolean on Sites collection (`src/collections/Sites.ts`, default `true`, migration in `scripts/db-setup.js`) — seller opt-out toggle for AI crawler access.
+- **robots.txt dynamic defaults:** `src/app/sites/[slug]/robots.txt/route.ts` fetches site config and honors the toggle. Default behavior: GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot are allowed (Disallow rules removed); scraper bots (Amazonbot, Bytespider, etc.) always blocked. When toggle is `false`, only the 5 AI bots get `Disallow: /` rule. Googlebot and other standard crawlers unaffected by toggle. Cache TTL kept short (10 min / 1h stale) so toggle changes propagate quickly.
+- **New llms.txt route:** `src/app/sites/[slug]/llms.txt/route.ts` serves dynamic markdown content-contract per tenant, scoped by `site.id` (not just tenant) for pages/products/blogs to avoid cross-site leakage on multi-site tenants. Includes: business name, description, 5+ key URLs (floored via static routes for sparse new sites), contact info, opening hours (from US-F37-01's `site.localBusiness.openingHours`, once that merged into this branch), experimental-standard notice. Response cached 5 minutes. 404 on missing tenant/site.
+- **API toggle endpoint:** `src/app/api/seo/ai-crawlers-toggle/route.ts` (POST) — owner-auth + tenant-ownership check (403 prevention on cross-tenant IDOR). Validates `siteId` presence (400 on missing) and rejects string values for `enabled`. Fires analytics event `ai_crawler_toggle_changed` on state change.
+- **Dashboard UI:** Toggle control added to `src/components/dashboard/views/SEOView.tsx` / `SEOViewContent.tsx` / `SEOKeywordTracker.tsx`. i18n strings added to `src/i18n/locales/en.json` and `ms.json`.
+- **Tests:** All 93 new tests passing (TC-F37-03-01 through TC-F37-03-46 provisional IDs; QC backfill required post-merge, see Open Blockers).
+
+**Acceptance Criteria (from US-F37-03 story):**
+- AC-4: robots.txt allows GPTBot/ClaudeBot by default, blocks scrapers always, respects toggle ✓
+- AC-5: /llms.txt serves markdown per-tenant, 5-min cache, 404 on missing site ✓
+- AC-6: POST toggle endpoint enforces auth + tenant-ownership, logs analytics ✓
+
+**Related:** PRD `docs/prd/F37-local-seo-search-performance.md` (FR-07/08/09), stories `docs/stories/F37-local-seo-stories.md` (US-F37-03). Plan detail `plans/260708-1112-GH-03-ai-crawler-llms-txt/`.
+
+**QC NOTE:** Test case IDs use provisional TC-F37-03-01 through 46 format. QC/PM must backfill official TC-IDs in `docs/qa/F37-local-seo.md` post-merge (file does not yet exist; copy story acceptance criteria as scaffold).
+
+**Known follow-ups (from adversarial review, deferred — not blocking):** (1) robots.txt/llms.txt site lookup uses `limit:1` with no explicit sort — for tenants with 2+ simultaneously published sites, site selection is non-deterministic (pre-existing pattern shared with `sitemap.xml`). Confirmed with PM: current product reality is 1 site per tenant, so not actively exploitable today; revisit if multi-site-per-tenant becomes supported. (2) `ai-crawlers-toggle` ownership check accepts any tenant in the user's full tenant list while `withFeatureGuard` only checks `tenants[0]` — same mismatch pre-exists in the sibling `auto-meta-toggle` route. Confirmed with PM: current product reality is 1 tenant per user, so not actively exploitable today; revisit if multi-tenant-per-user becomes supported (needs a coordinated fix across both routes at that point).
+
+---
+
 ### GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6 complete)
 
 **Improved UX for AI-powered product bulk generation. New field tracks AI-generated drafts; enhanced textarea with auto-resize, suggestion pills, and visual indicators.**

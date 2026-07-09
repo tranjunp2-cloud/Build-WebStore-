@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Gauge, Map, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { AutoMetaToggle } from './SEOKeywordTracker'
+import { AutoMetaToggle, AiCrawlersToggle } from './SEOKeywordTracker'
 import { GenerateSitemapButton } from './GenerateSitemapButton'
 import { AIFixModal } from '@/components/dashboard/AIFixModal'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ interface SEOViewContentProps {
     technicalSeoScore: number
     keywords: TrackedKeyword[]
     autoMetaGenerationEnabled: boolean
+    aiCrawlersEnabled: boolean
     siteId: string | number | null
     missingSeoItems?: MissingSeoItem[]
 }
@@ -41,7 +42,7 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
 
 export function SEOViewContent({
     score, metaTagsScore, contentQualityScore, technicalSeoScore,
-    keywords, autoMetaGenerationEnabled, siteId, missingSeoItems = [],
+    keywords, autoMetaGenerationEnabled, aiCrawlersEnabled, siteId, missingSeoItems = [],
 }: SEOViewContentProps) {
     const { t, ti } = useI18n()
     const router = useRouter()
@@ -175,6 +176,17 @@ export function SEOViewContent({
                             {seo.metaTagsSection || 'Automatic Meta Tags'}
                         </div>
                         <AutoMetaToggle defaultChecked={autoMetaGenerationEnabled} siteId={siteId ?? undefined} />
+                    </div>
+
+                    {/* Divider between the two functional areas */}
+                    <div className="h-[1px] w-full bg-[#1F2937] my-[20px]" />
+
+                    {/* Sub-section: AI Crawler Permissions (US-F37-03) */}
+                    <div>
+                        <div className="text-[12px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-[12px]">
+                            {seo.aiCrawlersSection || 'AI Crawler Permissions'}
+                        </div>
+                        <AiCrawlersToggle defaultChecked={aiCrawlersEnabled} siteId={siteId ?? undefined} />
                     </div>
                 </div>
             </div>

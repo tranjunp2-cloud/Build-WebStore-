@@ -1087,6 +1087,7 @@
             "sitemapAndMeta": "Sitemap & Meta Tags",
             "sitemapConfig": "Sitemap Configuration",
             "metaTagsSection": "Automatic Meta Tags",
+            "aiCrawlersSection": "AI Crawler Permissions",
             "statusLabel": "Status:",
             "statusUpToDate": "Up-to-date",
             "lastUpdated": "Last updated: {date}",
@@ -1100,6 +1101,10 @@
                 "description": "Automatically creates SEO-optimized title and description tags for new pages and products.",
                 "on": "ON",
                 "off": "OFF"
+            },
+            "aiCrawlers": {
+                "label": "Allow AI crawlers to index your website",
+                "description": "Allows GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront so ChatGPT/Perplexity/Gemini can recommend your business."
             },
             "keywordColumns": {
                 "keyword": "Keyword",
@@ -3025,7 +3030,13 @@
                 "sitemapError": "Could not generate sitemap",
                 "metaOn": "Auto meta tags turned on",
                 "metaOff": "Auto meta tags turned off",
-                "metaError": "Could not update setting"
+                "metaError": "Could not update setting",
+                "aiCrawlers": "Allow AI crawlers to index your website",
+                "aiCrawlersTip": "Lets AI assistants like ChatGPT, Perplexity and Gemini read your store so they can recommend your business.",
+                "aiCrawlersDesc": "Allows GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront so ChatGPT/Perplexity/Gemini can recommend your business.",
+                "aiCrawlersOn": "AI crawlers turned on",
+                "aiCrawlersOff": "AI crawlers turned off",
+                "aiCrawlersError": "Could not update setting"
             },
             "orders": {
                 "title": "Pending orders",

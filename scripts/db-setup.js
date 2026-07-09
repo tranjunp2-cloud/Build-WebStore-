@@ -1793,8 +1793,10 @@ const MIGRATIONS = [
     sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
   },
   {
+    // `variant` is a Postgres enum (enum_pages_blocks_cta_variant); casting to text avoids
+    // "invalid input value for enum" when 'floating' isn't a current enum member.
     name: 'pages_blocks_cta.rename_floating_to_card',
-    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
+    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant::text = 'floating';`,
   },
   {
     name: 'pages_blocks_newsletter.create_table',
@@ -2132,8 +2134,9 @@ const MIGRATIONS = [
     sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
   },
   {
+    // Same enum-cast fix as pages_blocks_cta.rename_floating_to_card, for the version table.
     name: '_pages_v_blocks_cta.rename_floating_to_card',
-    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
+    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant::text = 'floating';`,
   },
   {
     name: '_pages_v_blocks_newsletter.create_table',
@@ -2525,6 +2528,11 @@ const MIGRATIONS = [
   {
     name: 'sites.seo_auto_meta_enabled',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS seo_auto_meta_enabled boolean DEFAULT true;`,
+  },
+  // ── F37-03: AI crawler permissions toggle ──
+  {
+    name: 'sites.ai_crawlers_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_crawlers_enabled boolean DEFAULT true;`,
   },
   // ── F23: Custom Subdomain Slug — previousSlugs array ──
   {
@@ -3883,9 +3891,21 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_pricing.add_billing_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS billing_cycle1 varchar DEFAULT 'Monthly', ADD COLUMN IF NOT EXISTS billing_cycle2 varchar DEFAULT 'Yearly', ADD COLUMN IF NOT EXISTS discount_percent integer;` },
   { name: '_pages_v_blocks_pricing_feature_matrix.create_table', sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_feature_matrix" (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, feature_name varchar);` },
   { name: '_pages_v_blocks_pricing_feature_matrix_values.create_table', sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_feature_matrix_values" (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, included boolean DEFAULT false);` },
-  // Rename billing_cycle_1/2 → billing_cycle1/2 to match Payload Drizzle naming (no underscore before digit)
-  { name: 'pages_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
-  { name: '_pages_v_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
+  // Rename billing_cycle_1/2 → billing_cycle1/2 to match Payload Drizzle naming (no underscore before digit).
+  // Guarded: on DBs where the table was created after `add_billing_cols` above (correct names from the
+  // start), the old underscored columns never existed — plain RENAME COLUMN would error.
+  { name: 'pages_blocks_pricing.rename_billing_cycle_cols', sql: `DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pages_blocks_pricing' AND column_name = 'billing_cycle_1') THEN
+      ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1;
+      ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;
+    END IF;
+  END $$;` },
+  { name: '_pages_v_blocks_pricing.rename_billing_cycle_cols', sql: `DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = '_pages_v_blocks_pricing' AND column_name = 'billing_cycle_1') THEN
+      ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1;
+      ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;
+    END IF;
+  END $$;` },
   // GH-891: yearlyDiscount field was missing from Payload PricingBlock.fields — add column so saves persist
   { name: 'pages_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
   { name: '_pages_v_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
@@ -4134,6 +4154,13 @@ const MIGRATIONS = [
       updated_at timestamptz DEFAULT now() NOT NULL,
       created_at timestamptz DEFAULT now() NOT NULL
     );` },
+  // Dedupe pre-existing rows before enforcing uniqueness — earlier code paths could insert
+  // duplicate (tenant_id, lower(trim(email))) rows before this constraint existed. Keeps lowest id.
+  { name: 'customers.dedupe_before_email_unique',
+    sql: `DELETE FROM customers a USING customers b
+          WHERE a.tenant_id = b.tenant_id
+            AND LOWER(TRIM(a.email)) = LOWER(TRIM(b.email))
+            AND a.id > b.id;` },
   { name: 'customers.tenant_email_lower_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS customers_tenant_email_lower_uniq
           ON customers (tenant_id, LOWER(TRIM(email)));` },
@@ -4522,6 +4549,14 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_plan_features_plan_code ON plan_features(plan_code);
     `,
   },
+  // DBs where plan_features pre-dates this file's CREATE TABLE (created via an earlier partial
+  // run) never got the inline UNIQUE(plan_code, feature_code) — add it retroactively so the
+  // seed's ON CONFLICT target below resolves.
+  { name: 'plan_features.add_unique_plan_code_feature_code', sql: `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plan_features_plan_code_feature_code_key') THEN
+      ALTER TABLE plan_features ADD CONSTRAINT plan_features_plan_code_feature_code_key UNIQUE (plan_code, feature_code);
+    END IF;
+  END $$;` },
   {
     name: 'f-subscription-plan-features-seed',
     sql: `
@@ -4703,6 +4738,13 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.plan_features_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_features_id_idx" ON "payload_locked_documents_rels" ("plan_features_id");`,
   },
+  // DBs where plan_subscriptions pre-dates this file's CREATE TABLE never got the inline
+  // UNIQUE(tenant_id, name) — add it retroactively so the backfill's ON CONFLICT target below resolves.
+  { name: 'plan_subscriptions.add_unique_tenant_id_name', sql: `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plan_subscriptions_tenant_id_name_key') THEN
+      ALTER TABLE plan_subscriptions ADD CONSTRAINT plan_subscriptions_tenant_id_name_key UNIQUE (tenant_id, name);
+    END IF;
+  END $$;` },
   // ── F34: Backfill plan_subscriptions from existing tenants.plan ──
   // Idempotent: skips tenants that already have any plan_subscription row.
   // Mapping matches mapPlanCodeToTier() reverse:
