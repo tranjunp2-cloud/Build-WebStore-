@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const cookieStore = await cookies()
     const isMs = (cookieStore.get('prefer_lang')?.value ?? 'en') === 'ms'
     return {
-        title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
+        title: isMs ? 'Papan Pemuka | Web Store' : 'Dashboard | Web Store',
         description: isMs
             ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
             : 'Monitor your store performance and manage your online business.',

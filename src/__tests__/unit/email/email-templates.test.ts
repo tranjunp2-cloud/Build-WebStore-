@@ -11,7 +11,7 @@ describe('welcomeEmail', () => {
 
     it('defaults to EN locale when no locale specified', () => {
         const result = welcomeEmail(baseData)
-        expect(result.subject).toBe('Welcome to PrimeWeb! 🎉')
+        expect(result.subject).toBe('Welcome to Web Store! 🎉')
         expect(result.html).toContain('Hi')
         expect(result.html).toContain('Get Started →')
         expect(result.html).toContain('lang="en"')
@@ -19,7 +19,7 @@ describe('welcomeEmail', () => {
 
     it('renders EN locale correctly', () => {
         const result = welcomeEmail({ ...baseData, locale: 'en' })
-        expect(result.subject).toBe('Welcome to PrimeWeb! 🎉')
+        expect(result.subject).toBe('Welcome to Web Store! 🎉')
         expect(result.html).toContain('Welcome! 🎉')
         expect(result.html).toContain('Get started in 3 steps')
         expect(result.html).toContain('Ahmad')
@@ -27,7 +27,7 @@ describe('welcomeEmail', () => {
 
     it('renders MS locale correctly', () => {
         const result = welcomeEmail({ ...baseData, locale: 'ms' })
-        expect(result.subject).toBe('Selamat Datang ke PrimeWeb! 🎉')
+        expect(result.subject).toBe('Selamat Datang ke Web Store! 🎉')
         expect(result.html).toContain('Selamat Datang! 🎉')
         expect(result.html).toContain('Mula dalam 3 langkah')
         expect(result.html).toContain('Mula Sekarang →')
@@ -205,14 +205,14 @@ describe('forgotPasswordEmail', () => {
 
     it('defaults to EN locale when no locale specified', () => {
         const result = forgotPasswordEmail(baseData)
-        expect(result.subject).toBe('Reset your PrimeWeb password 🔐')
+        expect(result.subject).toBe('Reset your Web Store password 🔐')
         expect(result.html).toContain('lang="en"')
         expect(result.html).toContain('Ahmad')
     })
 
     it('renders EN locale with correct content', () => {
         const result = forgotPasswordEmail({ ...baseData, locale: 'en' })
-        expect(result.subject).toBe('Reset your PrimeWeb password 🔐')
+        expect(result.subject).toBe('Reset your Web Store password 🔐')
         expect(result.html).toContain('Password Reset')
         expect(result.html).toContain('Reset Password →')
         expect(result.html).toContain('This link expires in 1 hour')
@@ -220,7 +220,7 @@ describe('forgotPasswordEmail', () => {
 
     it('renders MS locale correctly (TC-F02.28: bilingual)', () => {
         const result = forgotPasswordEmail({ ...baseData, locale: 'ms' })
-        expect(result.subject).toBe('Tetapkan semula kata laluan PrimeWeb anda 🔐')
+        expect(result.subject).toBe('Tetapkan semula kata laluan Web Store anda 🔐')
         expect(result.html).toContain('Tetapan Semula Kata Laluan')
         expect(result.html).toContain('Tetapkan Semula Kata Laluan →')
         expect(result.html).toContain('lang="ms"')
@@ -258,7 +258,7 @@ describe('otpVerificationEmail', () => {
 
     it('renders EN locale with correct content (TC-F02.21)', () => {
         const result = otpVerificationEmail({ ...baseData, locale: 'en' })
-        expect(result.subject).toBe('Your PrimeWeb verification code 🔐')
+        expect(result.subject).toBe('Your Web Store verification code 🔐')
         expect(result.html).toContain('Email Verification')
         expect(result.html).toContain('Verify your identity to continue')
         expect(result.html).toContain('This code expires in 5 minutes')
@@ -266,7 +266,7 @@ describe('otpVerificationEmail', () => {
 
     it('renders MS locale correctly (bilingual)', () => {
         const result = otpVerificationEmail({ ...baseData, locale: 'ms' })
-        expect(result.subject).toBe('Kod pengesahan PrimeWeb anda 🔐')
+        expect(result.subject).toBe('Kod pengesahan Web Store anda 🔐')
         expect(result.html).toContain('Pengesahan E-mel')
         expect(result.html).toContain('Sahkan identiti anda untuk meneruskan')
         expect(result.html).toContain('lang="ms"')
