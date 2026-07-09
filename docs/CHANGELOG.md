@@ -158,13 +158,13 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 **AI crawler default-allow + dynamic content-contract route. First phase of Local SEO feature.**
 
-**Implementation complete (93 new/passing SEO unit tests, 2 adversarial review passes):**
+**Implementation complete (46 new/passing SEO unit tests, 2 adversarial review passes):**
 - **New field:** `aiCrawlersEnabled` boolean on Sites collection (`src/collections/Sites.ts`, default `true`, migration in `scripts/db-setup.js`) — seller opt-out toggle for AI crawler access.
 - **robots.txt dynamic defaults:** `src/app/sites/[slug]/robots.txt/route.ts` fetches site config and honors the toggle. Default behavior: GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot are allowed (Disallow rules removed); scraper bots (Amazonbot, Bytespider, etc.) always blocked. When toggle is `false`, only the 5 AI bots get `Disallow: /` rule. Googlebot and other standard crawlers unaffected by toggle. Cache TTL kept short (10 min / 1h stale) so toggle changes propagate quickly.
 - **New llms.txt route:** `src/app/sites/[slug]/llms.txt/route.ts` serves dynamic markdown content-contract per tenant, scoped by `site.id` (not just tenant) for pages/products/blogs to avoid cross-site leakage on multi-site tenants. Includes: business name, description, 5+ key URLs (floored via static routes for sparse new sites), contact info, opening hours (from US-F37-01's `site.localBusiness.openingHours`, once that merged into this branch), experimental-standard notice. Response cached 5 minutes. 404 on missing tenant/site.
-- **API toggle endpoint:** `src/app/api/seo/ai-crawlers-toggle/route.ts` (POST) — owner-auth + tenant-ownership check (403 prevention on cross-tenant IDOR). Validates `siteId` presence (400 on missing) and rejects string values for `enabled`. Fires analytics event `ai_crawler_toggle_changed` on state change.
-- **Dashboard UI:** Toggle control added to `src/components/dashboard/views/SEOView.tsx` / `SEOViewContent.tsx` / `SEOKeywordTracker.tsx`. i18n strings added to `src/i18n/locales/en.json` and `ms.json`.
-- **Tests:** All 93 new tests passing (TC-F37-03-01 through TC-F37-03-46 provisional IDs; QC backfill required post-merge, see Open Blockers).
+- **API toggle endpoint:** `src/app/api/seo/ai-crawlers-toggle/route.ts` (POST) — owner-auth + tenant-ownership check (403 prevention on cross-tenant IDOR). Validates `siteId` presence (400 on missing) and rejects string values for `enabled`.
+- **Dashboard UI:** AI-crawler toggle in `src/components/dashboard/revamp/seo-tools.tsx`, wired via `src/lib/dashboard/seo-data.ts` → `src/lib/dashboard/dashboard-types.ts` → `src/app/(dashboard)/dashboard/page.tsx`. Fires analytics event `ai_crawler_toggle_changed` client-side on successful persist. i18n strings under `dashboard.revamp.tools.aiCrawlers*` in `src/i18n/locales/en.json` and `ms.json`.
+- **Tests:** All 46 new tests passing (TC-F37-03-01 through TC-F37-03-46 provisional IDs; QC backfill required post-merge, see Open Blockers).
 
 **Acceptance Criteria (from US-F37-03 story):**
 - AC-4: robots.txt allows GPTBot/ClaudeBot by default, blocks scrapers always, respects toggle ✓

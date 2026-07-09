@@ -1087,7 +1087,6 @@
             "sitemapAndMeta": "Peta Laman & Tag Meta",
             "sitemapConfig": "Konfigurasi Peta Laman",
             "metaTagsSection": "Tag Meta Automatik",
-            "aiCrawlersSection": "Kebenaran Crawler AI",
             "statusLabel": "Status:",
             "statusUpToDate": "Terkini",
             "lastUpdated": "Kemaskini terakhir: {date}",
@@ -1101,10 +1100,6 @@
                 "description": "Mencipta tag tajuk dan penerangan yang dioptimumkan SEO secara automatik untuk halaman dan produk baharu.",
                 "on": "ON",
                 "off": "OFF"
-            },
-            "aiCrawlers": {
-                "label": "Benarkan crawler AI mengindeks laman web anda",
-                "description": "Membenarkan GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot mengindeks laman ini supaya ChatGPT/Perplexity/Gemini boleh mengesyorkan perniagaan anda."
             },
             "keywordColumns": {
                 "keyword": "Kata Kunci",

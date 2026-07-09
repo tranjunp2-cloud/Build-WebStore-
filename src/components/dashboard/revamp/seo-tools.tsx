@@ -59,6 +59,16 @@ export function SeoTools({
             })
             if (!res.ok) throw new Error('failed')
             toast.success(next ? toolsT.aiCrawlersOn : toolsT.aiCrawlersOff)
+            fetch("/api/analytics/track", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    siteId: String(siteId),
+                    event: "ai_crawler_toggle_changed",
+                    pageUrl: window.location.pathname,
+                    metadata: { enabled: next },
+                }),
+            }).catch(() => {});
         } catch {
             setAiCrawlers(!next)
             toast.error(toolsT.aiCrawlersError)
