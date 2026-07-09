@@ -136,16 +136,13 @@ describe('[TC-F37-03] POST /api/seo/ai-crawlers-toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-30: Truthy enabled values become true
+    // TC-F37-03-30: Non-boolean truthy value (number) rejected with 400
+    // (was "coerces to true" pre-fix — Boolean(enabled) silently accepted
+    // any type, including 0/null/[]/{} in ways that could silently write
+    // the wrong value on a compliance-sensitive toggle; now strict)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-30: coerces enabled to boolean (truthy → true)', async () => {
+    it('TC-F37-03-30: returns 400 when enabled is a non-boolean truthy value (number)', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({
-            id: 'site-1',
-            tenant: 'tenant-1',
-        })
-        mockUpdate.mockResolvedValue({})
-
         const req = {
             json: () => Promise.resolve({
                 siteId: 'site-1',
@@ -154,27 +151,20 @@ describe('[TC-F37-03] POST /api/seo/ai-crawlers-toggle', () => {
         } as unknown as Request
 
         // Act
-        await toggleAiCrawlers(req, {} as any)
+        const response = await toggleAiCrawlers(req, {} as any)
+        const body = await response.json()
 
         // Assert
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: { aiCrawlersEnabled: true },
-            })
-        )
+        expect(response.status).toBe(400)
+        expect(body.success).toBe(false)
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-31: Falsy enabled values become false
+    // TC-F37-03-31: Non-boolean falsy value (number) rejected with 400
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-31: coerces enabled to boolean (falsy → false)', async () => {
+    it('TC-F37-03-31: returns 400 when enabled is a non-boolean falsy value (number)', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({
-            id: 'site-1',
-            tenant: 'tenant-1',
-        })
-        mockUpdate.mockResolvedValue({})
-
         const req = {
             json: () => Promise.resolve({
                 siteId: 'site-1',
@@ -183,14 +173,33 @@ describe('[TC-F37-03] POST /api/seo/ai-crawlers-toggle', () => {
         } as unknown as Request
 
         // Act
-        await toggleAiCrawlers(req, {} as any)
+        const response = await toggleAiCrawlers(req, {} as any)
+        const body = await response.json()
 
         // Assert
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: { aiCrawlersEnabled: false },
-            })
-        )
+        expect(response.status).toBe(400)
+        expect(body.success).toBe(false)
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // ────────────────────────────────────────────────────────────────
+    // TC-F37-03-48: null/undefined/array/object also rejected with 400
+    // ────────────────────────────────────────────────────────────────
+    it('TC-F37-03-48: returns 400 when enabled is null, missing, or a non-primitive', async () => {
+        for (const badValue of [null, undefined, [], {}]) {
+            const req = {
+                json: () => Promise.resolve({ siteId: 'site-1', enabled: badValue }),
+            } as unknown as Request
+
+            // Act
+            const response = await toggleAiCrawlers(req, {} as any)
+            const body = await response.json()
+
+            // Assert
+            expect(response.status).toBe(400)
+            expect(body.success).toBe(false)
+        }
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // ────────────────────────────────────────────────────────────────

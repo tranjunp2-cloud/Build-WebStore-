@@ -45,6 +45,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                     { status: { equals: 'published' } },
                 ],
             },
+            // Deterministic tie-break for tenants with 2+ published sites (schema
+            // allows it, no unique constraint) — oldest site wins consistently
+            // rather than an arbitrary DB-order pick. Real fix (domain-based
+            // per-site resolution) tracked in OPEN_BLOCKERS.
+            sort: 'createdAt',
             limit: 1,
         })
         const [site] = siteResults.docs
@@ -54,9 +59,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
         const baseUrl = slug === 'custom' ? `https://${hostname}` : `https://${slug}.${rootDomain}`
 
-        const aiBotLines = AI_ASSISTANT_BOTS.flatMap(bot => [
+        // RFC 9309 §2.2.1: a crawler applies only the most specific matching
+        // group and ignores `User-agent: *` entirely — so each named bot group
+        // must repeat the /api//admin/ exclusions itself, or that bot would be
+        // over-permissioned relative to the `*` group when allowed.
+        const aiBotLines = AI_ASSISTANT_BOTS.flatMap(bot => allowAiCrawlers ? [
             `User-agent: ${bot}`,
-            allowAiCrawlers ? 'Allow: /' : 'Disallow: /',
+            'Allow: /',
+            'Disallow: /api/',
+            'Disallow: /admin/',
+            '',
+        ] : [
+            `User-agent: ${bot}`,
+            'Disallow: /',
             '',
         ])
         const scraperBotLines = BLOCKED_SCRAPER_BOTS.flatMap(bot => [

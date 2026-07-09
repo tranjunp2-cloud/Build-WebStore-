@@ -15,7 +15,7 @@ export const POST = withFeatureGuard('sitemap_robot_configuration')(withAuth(asy
         if (!siteId) {
             return NextResponse.json({ success: false, error: 'siteId required' }, { status: 400 })
         }
-        if (typeof enabled === 'string') {
+        if (typeof enabled !== 'boolean') {
             return NextResponse.json({ success: false, error: 'enabled must be a boolean' }, { status: 400 })
         }
 
@@ -35,7 +35,7 @@ export const POST = withFeatureGuard('sitemap_robot_configuration')(withAuth(asy
         await payload.update({
             collection: 'sites',
             id: siteId,
-            data: { aiCrawlersEnabled: Boolean(enabled) },
+            data: { aiCrawlersEnabled: enabled },
         })
 
         return NextResponse.json({ success: true })

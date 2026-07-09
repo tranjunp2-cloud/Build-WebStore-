@@ -383,4 +383,40 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
         expect(body).toContain('Disallow: /api/')
         expect(body).toContain('Disallow: /admin/')
     })
+
+    // ────────────────────────────────────────────────────────────────
+    // TC-F37-03-47: AI-bot groups repeat /api//admin/ exclusions when allowed
+    // (RFC 9309 §2.2.1 — a crawler applies only its own most-specific group,
+    // ignoring User-agent: * entirely, so the exclusions must be per-group)
+    // ────────────────────────────────────────────────────────────────
+    it('TC-F37-03-47: AI bot groups include Disallow: /api/ and /admin/ when allowed', async () => {
+        // Arrange
+        const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
+        const mockSite = {
+            id: 'site-1',
+            tenant: 'tenant-1',
+            aiCrawlersEnabled: true,
+            status: 'published',
+        }
+
+        mockFind
+            .mockResolvedValueOnce({ docs: [mockTenant] })
+            .mockResolvedValueOnce({ docs: [mockSite] })
+
+        // Act
+        const response = await getRobotsTxt(
+            {
+                headers: new Map([['x-tenant-hostname', '']]) as any,
+            } as any,
+            { params: Promise.resolve({ slug: 'mycafe' }) }
+        )
+        const body = await response.text()
+
+        // Assert — each AI bot's own group must carry the same exclusions as User-agent: *
+        expect(body).toMatch(/User-agent: GPTBot\nAllow: \/\nDisallow: \/api\/\nDisallow: \/admin\//)
+        expect(body).toMatch(/User-agent: ClaudeBot\nAllow: \/\nDisallow: \/api\/\nDisallow: \/admin\//)
+        expect(body).toMatch(/User-agent: Google-Extended\nAllow: \/\nDisallow: \/api\/\nDisallow: \/admin\//)
+        expect(body).toMatch(/User-agent: PerplexityBot\nAllow: \/\nDisallow: \/api\/\nDisallow: \/admin\//)
+        expect(body).toMatch(/User-agent: CCBot\nAllow: \/\nDisallow: \/api\/\nDisallow: \/admin\//)
+    })
 })

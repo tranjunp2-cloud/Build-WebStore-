@@ -42,6 +42,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                     { status: { equals: 'published' } },
                 ],
             },
+            // Deterministic tie-break for tenants with 2+ published sites (schema
+            // allows it, no unique constraint) — oldest site wins consistently
+            // rather than an arbitrary DB-order pick. Real fix (domain-based
+            // per-site resolution) tracked in OPEN_BLOCKERS.
+            sort: 'createdAt',
             limit: 1,
         })
         const [site] = siteResults.docs
