@@ -80,6 +80,19 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
+        // F4: never let self-deliver clobber a purchased EasyParcel shipment — if the order
+        // already has an EP shipment/AWB number, the EP wallet has already been charged and a
+        // label bought. Overwriting with self-delivery would orphan that paid shipment.
+        if ((order as any).easyParcelOrderNo || (order as any).awbNo) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: { code: 'EP_LABEL_EXISTS', message: 'This order already has an EasyParcel label — self-delivery is not allowed' },
+                },
+                { status: 422 },
+            )
+        }
+
         // NOTE: Self-deliver is intentionally exempt from the shared ORDER_STATUS_TRANSITIONS
         // cross-check. The transition table defines the normal ship flow (confirmed →
         // ready_to_ship → shipped), but a merchant fulfilling manually skips the

@@ -17,6 +17,11 @@ import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+// F1: Xendit /refunds `reason` is a fixed enum — passing free-text (or any other value)
+// causes Xendit to 400 AFTER the DB CAS already flipped status='refunded', leaving the
+// order marked refunded with no money actually moved. Whitelist against the enum.
+const XENDIT_REFUND_REASONS = new Set(['REQUESTED_BY_CUSTOMER', 'FRAUDULENT', 'DUPLICATE', 'CANCELLATION', 'OTHERS'])
+
 /**
  * POST /api/orders/[id]/refund
  *
@@ -37,7 +42,10 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (ct.includes('application/json')) {
             const body = await request.json()
             if (body?.reason && typeof body.reason === 'string' && body.reason.trim()) {
-                refundReason = body.reason.trim()
+                // F1: map any free-text/unknown value to 'OTHERS' — never forward raw user input
+                // to Xendit's fixed reason enum.
+                const candidate = body.reason.trim().toUpperCase()
+                refundReason = XENDIT_REFUND_REASONS.has(candidate) ? candidate : 'OTHERS'
             }
         }
     } catch {

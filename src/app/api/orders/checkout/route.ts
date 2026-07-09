@@ -6,6 +6,7 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
+import { evaluateCodEligibility } from '@/lib/shipping/cod-eligibility'
 import { productWeightToGrams } from '@/lib/shipping/product-weight'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
@@ -341,6 +342,39 @@ export async function POST(request: Request) {
 
         // Shared gateway-agnostic total (F33): total = max(0, subtotal − discount) + shipping, sen-exact.
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
+
+        // F3: re-verify COD eligibility against the FINAL amount that will actually be collected
+        // and persisted as `codAmount` below (Math.round(total * 100)) — the earlier getRates gate
+        // above only had `effSubtotalSen` (pre-shipping, pre-discount-adjusted) to work with, since
+        // shipping isn't known until the rate is picked. That smaller/different estimate could pass
+        // while the real total fails (or vice versa) at a courier's COD min/max boundary, letting a
+        // checkout succeed that create-label's live re-check then hard-rejects post-order. Re-check
+        // locally (no extra EP call) against the already-quoted bestRate's live cod limits.
+        // Only when a REAL EP courier was picked — flat-rate fallback (bestRate.courier === 'flat')
+        // carries no courier COD limits and COD is always allowed there (same sentinel as the EP
+        // field writes below, and consistent with the first gate which keys off rateResult.codIneligible).
+        if (paymentMethod === 'cod' && bestRate.courier !== 'flat') {
+            const finalCodAmountSen = Math.round(total * 100)
+            const finalCodCheck = evaluateCodEligibility([bestRate], finalCodAmountSen)
+            if (finalCodCheck.eligible.length === 0) {
+                const codIneligibleMessages: Record<string, string> = {
+                    no_cod_courier: 'No courier in this store\'s list supports COD for this address',
+                    over_max: 'Order total exceeds the courier COD limit',
+                    under_min: 'Order total is below the courier COD minimum',
+                }
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'COD_NOT_ELIGIBLE',
+                            message: codIneligibleMessages[finalCodCheck.reason!],
+                            reason: finalCodCheck.reason,
+                        },
+                    },
+                    { status: 422 }
+                )
+            }
+        }
 
         // Compute bank_transfer-specific fields (before create)
         let paymentReference: string | undefined

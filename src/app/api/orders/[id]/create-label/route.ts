@@ -1,5 +1,6 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
@@ -185,13 +186,47 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             codAmountRm,
         })
 
-        const submitRes = await submitOrder(token, submitParams)
+        // F2: atomic claim guard against the double-charge race. Two concurrent requests could
+        // both pass the `existingShipmentNo` idempotency check above (both read null), then both
+        // call submitOrder → EP wallet charged twice. Claim the row here with a conditional
+        // UPDATE (only succeeds while easy_parcel_order_no IS NULL) so only ONE request proceeds
+        // to submitOrder; the loser gets 409. This reuses the existing idempotency column rather
+        // than adding a new lock table/field (KISS) — release back to NULL on any failure path so
+        // retries aren't permanently blocked. Residual risk: a crash between claim and
+        // release-on-failure leaves the order stuck claimed until the next successful retry
+        // (which fails fast, safe) or manual ops intervention — acceptable narrow window, not a
+        // full distributed lock.
+        const claimToken = `CLAIM:${Date.now()}:${Math.random().toString(36).slice(2)}`
+        const claimResult = await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET easy_parcel_order_no = ${claimToken}
+            WHERE id = ${orderId} AND easy_parcel_order_no IS NULL
+            RETURNING id
+        `)
+        if (!claimResult.rows?.length) {
+            return NextResponse.json(
+                { success: false, error: { code: 'LABEL_IN_PROGRESS', message: 'Label creation is already in progress for this order' } },
+                { status: 409 },
+            )
+        }
+        const releaseClaim = () => (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET easy_parcel_order_no = NULL
+            WHERE id = ${orderId} AND easy_parcel_order_no = ${claimToken}
+        `).catch(() => {})
+
+        let submitRes: Awaited<ReturnType<typeof submitOrder>>
+        try {
+            submitRes = await submitOrder(token, submitParams)
+        } catch (err) {
+            await releaseClaim()
+            throw err
+        }
         // Envelope: data[] (orders) → shipments[] (per order). We submit one parcel → one shipment.
         const firstShipment = submitRes.data?.[0]?.shipments?.[0]
 
         // status:'success' = shipment created + wallet charged. awb_number/label may still be null
         // (courier generates the AWB asynchronously) — that is NOT a failure.
         if (!firstShipment || firstShipment.status !== 'success' || !firstShipment.shipment_number) {
+            await releaseClaim()
             const errMsg = firstShipment?.errors?.[0] ?? 'EasyParcel failed to create shipment'
             return NextResponse.json(
                 { success: false, error: { code: 'EASYPARCEL_ERROR', message: errMsg } },

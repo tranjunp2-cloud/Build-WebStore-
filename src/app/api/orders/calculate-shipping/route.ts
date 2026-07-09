@@ -11,6 +11,7 @@ import { getRates } from '@/lib/shipping/get-rates'
 import { productWeightToGrams, DEFAULT_ITEM_WEIGHT_GRAMS } from '@/lib/shipping/product-weight'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 export const maxDuration = 60
 
@@ -51,6 +52,14 @@ export async function POST(request: Request) {
         }
         if (typeof subtotalSen !== 'number' || !Number.isFinite(subtotalSen) || subtotalSen < 0 || !Number.isInteger(subtotalSen)) {
             return badRequest('VALIDATION_ERROR', 'subtotalSen must be a non-negative integer (sen)')
+        }
+
+        // F5: public unauth route — without a rate limit, spamming this endpoint burns EP
+        // quotation quota and triggers repeated tenant EP token-refresh writes. ~20/min/siteId
+        // is generous enough for legitimate cart/shipping-widget re-fetches.
+        const rl = await checkRateLimit(`calc-shipping:${siteId}`, 20, 60_000)
+        if (!rl.allowed) {
+            return badRequest('RATE_LIMITED', 'Too many requests, please try again shortly', 429)
         }
 
         const payload = await getPayload({ config })
@@ -94,9 +103,12 @@ export async function POST(request: Request) {
                 .map((i: any) => i.productId)
             if (lookupIds.length > 0) {
                 try {
+                    // F5: scope to this site — unscoped `id: { in: lookupIds } }` let a caller pass
+                    // arbitrary product IDs from ANY tenant/site and read back their weight enum
+                    // (cross-tenant data leak via the derived total weight / shipping fee).
                     const productDocs = await payload.find({
                         collection: 'products',
-                        where: { id: { in: lookupIds } },
+                        where: { and: [{ id: { in: lookupIds } }, { site: { equals: (site as any).id } }] },
                         limit: lookupIds.length,
                         depth: 0,
                         overrideAccess: true,
