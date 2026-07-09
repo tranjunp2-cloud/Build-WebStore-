@@ -203,8 +203,12 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
         router.push('/discounts')
     }
 
+    // GH-1538 review (levietducprime): pb-14 (56px) < save-bar footprint
+    // (~50px bar + bottom-4) — could clip the last field when the fixed
+    // bar is showing and the page is scrolled to bottom. Matches pb-24
+    // already used by ProductForm/customers-detail/shipping.
     return (
-        <div className="flex flex-col min-h-0 pb-14">
+        <div className="flex flex-col min-h-0 pb-24">
             <DiscountFormHeader
                 isNew={isNew}
                 code={discount?.code}

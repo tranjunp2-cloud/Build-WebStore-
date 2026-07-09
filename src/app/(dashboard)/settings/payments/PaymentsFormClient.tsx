@@ -565,8 +565,11 @@ export function PaymentsFormClient({
 
     if (isLoading) return <div className="p-8 text-white">{pt.loading}</div>;
 
+    // GH-1538 review (levietducprime): no pb wrapper at all — the fixed
+    // save-bar (position: fixed, bottom-4) can clip the last field on scroll.
+    // Matches pb-24 already used by ProductForm/customers-detail/shipping/discount.
     return (
-        <div className="w-full space-y-[32px]">
+        <div className="w-full space-y-[32px] pb-24">
             {/* Page header */}
             <div className="flex items-center gap-4">
                 <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-sky-500/[0.12] border border-sky-500/[0.20] shrink-0">
