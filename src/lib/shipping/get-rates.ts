@@ -83,21 +83,27 @@ export async function getRates(
             return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
         }
 
-        const rates: RateOption[] = (firstResult.quotations ?? []).map((q) => {
-            const codFeature = q.features?.find((f: any) => f.cod != null)?.cod
-            return {
-                courier: q.courier.courier_id,
-                serviceId: q.courier.service_id,
-                courierName: q.courier.courier_name,
-                serviceName: q.courier.service_name,
-                priceSen: Math.round(parseFloat(q.pricing.total_amount) * 100),
-                codAvailable: codFeature?.available ?? false,
-                // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
-                codMinSen: rmStringToSen(codFeature?.min_cod_amount),
-                codMaxSen: rmStringToSen(codFeature?.max_cod_amount),
-                estDelivery: q.courier.delivery_duration ?? '3–5 business days',
-            }
-        })
+        const rates: RateOption[] = (firstResult.quotations ?? [])
+            .map((q) => {
+                const codFeature = q.features?.find((f: any) => f.cod != null)?.cod
+                return {
+                    courier: q.courier.courier_id,
+                    serviceId: q.courier.service_id,
+                    courierName: q.courier.courier_name,
+                    serviceName: q.courier.service_name,
+                    priceSen: Math.round(parseFloat(q.pricing.total_amount) * 100),
+                    codAvailable: codFeature?.available ?? false,
+                    // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
+                    codMinSen: rmStringToSen(codFeature?.min_cod_amount),
+                    codMaxSen: rmStringToSen(codFeature?.max_cod_amount),
+                    estDelivery: q.courier.delivery_duration ?? '3–5 business days',
+                }
+            })
+            // F10 (review #1434): EP sometimes sends "" / non-numeric total_amount →
+            // parseFloat → NaN. NaN comparisons in pickCheapest() are always false, so a
+            // NaN-priced rate could still be selected. Drop unparseable rates before they
+            // reach usableRates/pickCheapest — same NaN-safe intent as rmStringToSen above.
+            .filter((r) => Number.isFinite(r.priceSen))
 
         // Exclude BYOC ("Bring Your Own Contract") couriers from auto-selection. They only ship on
         // the merchant's own carrier contract, which isn't linked here — auto-picking one would fail

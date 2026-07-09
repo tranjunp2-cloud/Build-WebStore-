@@ -645,7 +645,10 @@ describe('applyTrackingUpdate (unit)', () => {
 
   it('[TC-F36.OD.046] unknown EP status → maps to "unknown", update called', async () => {
     // Arrange
+    // F8 re-read: mock find() to return no docs so applyTrackingUpdate falls back to the
+    // caller-supplied `order` object below (unit test isolates from the DB entirely).
     const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn().mockResolvedValue({}),
       logger: { debug: vi.fn() },
     }
@@ -672,7 +675,9 @@ describe('applyTrackingUpdate (unit)', () => {
 
   it('[TC-F36.OD.047] history appended with ISO eventTime', async () => {
     // Arrange
+    // F8 re-read: no docs found → falls back to the caller-supplied `order.shippingTrackingHistory`.
     const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn().mockResolvedValue({}),
       logger: { debug: vi.fn() },
     }

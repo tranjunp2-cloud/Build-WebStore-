@@ -187,8 +187,12 @@ export async function POST(req: Request) {
             ? mapShipmentStatusCode(epStatus)
             : mapTrackingStatus(epStatus)
         if (mapped.internal === 'unknown') {
+            // F6 (review #1434): an unmapped code must never overwrite a valid tracking
+            // status with 'unknown' ("Processing") — report the anomaly and stop here
+            // instead of calling applyTrackingUpdate.
             payload.logger.warn({ awb, epStatus }, '[ep-webhook] unmapped status code')
             reportWebhookAnomaly('unknown_status', { topic, awb, statusRaw: epStatus })
+            return NextResponse.json({ received: true, matched: true, reason: 'unknown_status' })
         }
 
         // Courier free-text (topic tracking.update → latest_tracking_status) shown as the

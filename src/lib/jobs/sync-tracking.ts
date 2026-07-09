@@ -1,13 +1,19 @@
 import 'server-only'
 import type { BasePayload } from 'payload'
-import { tracking } from '@/lib/shipping/easyparcel/client'
+import { trackingStatus } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { applyTrackingUpdate } from '@/lib/shipping/easyparcel/apply-tracking-update'
+import { applyTrackingUpdate, TERMINAL } from '@/lib/shipping/easyparcel/apply-tracking-update'
+import type { EpTrackingStatusResult } from '@/lib/shipping/easyparcel/types'
 
-const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
+// F9 (review #1434): EP's tracking_status endpoint accepts up to 100 AWBs per call
+// (2026-06 docs) — batch instead of one call per order so a large backlog doesn't exceed
+// the cron function's maxDuration=60 budget.
+const EP_TRACKING_BATCH_SIZE = 100
 
 export async function syncTrackingJob(payload: BasePayload) {
-    // Find orders with AWB set and non-terminal tracking status
+    // Find orders with AWB set and non-terminal tracking status. Oldest-synced-first (F9,
+    // review #1434) so a truncated/timed-out run still makes progress across the backlog
+    // instead of always re-scanning the same head of the list.
     const result = await payload.find({
         collection: 'orders',
         where: {
@@ -16,6 +22,7 @@ export async function syncTrackingJob(payload: BasePayload) {
                 { shippingTrackingStatus: { not_in: [...TERMINAL] } },
             ],
         },
+        sort: 'shippingTrackingLastUpdated',
         limit: 200,
         overrideAccess: true,
         depth: 0,
@@ -71,48 +78,68 @@ export async function syncTrackingJob(payload: BasePayload) {
             continue
         }
 
-        for (const order of orders) {
-            scanned++
-            try {
-                const awbNo: string = order.awbNo
-                if (!awbNo) continue
+        // F9 (review #1434): batch AWBs into groups of <=100 and issue one trackingStatus()
+        // call per group instead of one single-AWB call per order.
+        for (let i = 0; i < orders.length; i += EP_TRACKING_BATCH_SIZE) {
+            const batch = orders.slice(i, i + EP_TRACKING_BATCH_SIZE)
 
-                // Prefer trackingNumber (new API field); fall back to awbNo for legacy orders
-                const trackingRef: string = order.trackingNumber || awbNo
+            // Prefer trackingNumber (new API field); fall back to awbNo for legacy orders.
+            const awbToOrder = new Map<string, any>()
+            for (const order of batch) {
+                const trackingRef: string = order.trackingNumber || order.awbNo
                 if (!trackingRef) continue
+                awbToOrder.set(trackingRef, order)
+            }
+            scanned += batch.length
 
-                // Documented tracking_status endpoint returns { data: { results: [...] } } —
-                // one result per requested AWB (single-AWB call here, so index 0).
-                const statusResp = await tracking(token, trackingRef)
-                const apiResult = statusResp.data?.results?.[0]
-                if (!apiResult || apiResult.status !== 'success' || apiResult.latest_shipment_status_code == null) {
+            const awbNumbers = [...awbToOrder.keys()]
+            if (awbNumbers.length === 0) continue
+
+            let results: EpTrackingStatusResult[]
+            try {
+                const statusResp = await trackingStatus(token, awbNumbers)
+                results = statusResp.data?.results ?? []
+            } catch (err: unknown) {
+                payload.logger.error(
+                    { err, tenantId, awbCount: awbNumbers.length },
+                    '[sync-tracking] batch tracking_status call failed',
+                )
+                errors += awbNumbers.length
+                continue
+            }
+
+            for (const apiResult of results) {
+                const order = awbToOrder.get(apiResult.awb_number)
+                if (!order) continue
+
+                if (apiResult.status !== 'success' || apiResult.latest_shipment_status_code == null) {
                     payload.logger.warn(
-                        { orderId: order.id, trackingRef, epStatus: apiResult?.status },
+                        { orderId: order.id, awb: apiResult.awb_number, epStatus: apiResult.status },
                         '[sync-tracking] tracking_status returned no usable result, skipping',
                     )
                     errors++
                     continue
                 }
 
-                // Shared writer: maps the numeric shipment_status_code, skips unchanged,
-                // appends history (using courier free-text as description), and
-                // auto-completes on delivered (same code path as the EP webhook receiver).
-                const result = await applyTrackingUpdate(
-                    payload,
-                    order,
-                    apiResult.latest_shipment_status_code,
-                    apiResult.latest_tracking_status,
-                )
-                if (result === 'unchanged') continue
-
-                updated++
-            } catch (err: unknown) {
-                // Log without including any secret values in message
-                payload.logger.error(
-                    { err, orderId: order.id, awbNo: order.awbNo },
-                    '[sync-tracking] failed to sync order',
-                )
-                errors++
+                try {
+                    // Shared writer: maps the numeric shipment_status_code, skips unchanged,
+                    // appends history (using courier free-text as description), and
+                    // auto-completes on delivered (same code path as the EP webhook receiver).
+                    const result = await applyTrackingUpdate(
+                        payload,
+                        order,
+                        apiResult.latest_shipment_status_code,
+                        apiResult.latest_tracking_status,
+                    )
+                    if (result === 'updated') updated++
+                } catch (err: unknown) {
+                    // Log without including any secret values in message
+                    payload.logger.error(
+                        { err, orderId: order.id, awbNo: order.awbNo },
+                        '[sync-tracking] failed to sync order',
+                    )
+                    errors++
+                }
             }
         }
     }

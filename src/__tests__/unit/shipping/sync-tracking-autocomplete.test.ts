@@ -13,8 +13,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { syncTrackingJob } from '@/lib/jobs/sync-tracking'
 
 // Mock external deps at top level (vi.mock())
+// F9 (review #1434): sync-tracking now batches AWBs via trackingStatus() instead of one
+// tracking() call per order — mock the batch endpoint the code actually calls.
 vi.mock('@/lib/shipping/easyparcel/client', () => ({
-  tracking: vi.fn(),
+  trackingStatus: vi.fn(),
 }))
 
 vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
@@ -23,15 +25,15 @@ vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
 
 // Do NOT mock status-map — it's pure and critical to test with real mapping
 import { mapTrackingStatus } from '@/lib/shipping/easyparcel/status-map'
-import { tracking } from '@/lib/shipping/easyparcel/client'
+import { trackingStatus } from '@/lib/shipping/easyparcel/client'
 
 describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => {
   let mockPayload: any
-  let mockTracking: any
+  let mockTrackingStatus: any
 
   beforeEach(() => {
-    mockTracking = tracking as any
-    mockTracking.mockClear()
+    mockTrackingStatus = trackingStatus as any
+    mockTrackingStatus.mockClear()
 
     // Build a realistic payload mock with find() and update() signatures
     // matching Payload CMS structure
@@ -95,7 +97,7 @@ describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => 
 
     // Mock tracking response (documented shape): numeric latest_shipment_status_code
     // 5 → maps to 'delivered' via mapShipmentStatusCode
-    mockTracking.mockResolvedValue({
+    mockTrackingStatus.mockResolvedValue({
       data: {
         results: [
           {
@@ -164,7 +166,7 @@ describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => 
       return Promise.resolve({ docs: [] })
     })
 
-    mockTracking.mockResolvedValue({
+    mockTrackingStatus.mockResolvedValue({
       data: {
         results: [
           {
@@ -223,7 +225,7 @@ describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => 
       return Promise.resolve({ docs: [] })
     })
 
-    mockTracking.mockResolvedValue({
+    mockTrackingStatus.mockResolvedValue({
       data: {
         results: [
           {
@@ -290,7 +292,7 @@ describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => 
     })
 
     // Return code 4 (In Transit), not 5 (Delivered)
-    mockTracking.mockResolvedValue({
+    mockTrackingStatus.mockResolvedValue({
       data: {
         results: [
           {
