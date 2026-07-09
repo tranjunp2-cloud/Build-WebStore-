@@ -30,6 +30,7 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
+import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
@@ -453,7 +454,25 @@ export async function POST(req: NextRequest) {
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
-                    const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
+                    // LLM for 2-4 business-specific visual terms (SAME language as
+                    // input) so the pool query isn't generic industry scaffolding.
+                    // mergeKeywords keeps products FIRST + caps at 3 — Pixabay `q`
+                    // is AND-matched (image-pool.ts buildPoolQuery), so more terms
+                    // than that risks zero results. Any extraction failure → [],
+                    // rawKeywords collapses to products-only (pre-fix behavior).
+                    // Skip the call entirely when products already fill the cap-3
+                    // budget — merge would discard every extracted term anyway.
+                    const extractedKeywords = _parsedProductsForPool.length >= 3
+                        ? []
+                        : await extractImageKeywords({
+                            businessName: businessInfo.businessName,
+                            industry: businessInfo.industry,
+                            shortDescription: businessInfo.shortDescription,
+                            products: businessInfo.products,
+                            language,
+                        }).catch((): string[] => [])
+                    const rawKeywords = mergeKeywords(_parsedProductsForPool, extractedKeywords)
                     // Isolate buildImagePool failure so rawKeywords is always
                     // preserved for the fulfillImageNeeds legacy search path even
                     // when pool build fails (e.g. Pixabay 429 / missing key).

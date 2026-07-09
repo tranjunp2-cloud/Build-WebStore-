@@ -67,6 +67,11 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-RAW-15** | `[Positive]` | `opts.lang` override cho curated query không detect được | `VN_CATEGORY_QUERIES.fnb` "quán cà phê" chỉ chứa dấu ambiguous (á/à/ê) → detect miss; override `lang:'vi'` → URL vẫn có `lang=vi` (review fix PR #1481 — A1) | [x] |
 | **TC-F38-RAW-16** | `[Positive]` | NFC normalize: input NFD (decomposed) vẫn detect + gate đúng | "phở bò" dạng NFD → `detectQueryLang`='vi'; `photoMatchesQuery` match tag NFC của Pixabay (review fix PR #1481 — M5) | [x] |
 | **TC-F38-RAW-17** | `[Negative]` | Tier-3 VN fallback throw (429) không escape catch | `getMediaForBlock`: hero → vẫn resolve với curated hero fallback; non-hero → resolve rỗng + failures, KHÔNG unhandled rejection (review fix PR #1481 — H1 `return await`) | [x] |
+| **TC-F38-RAW-18** | `[Positive]` | `extractImageKeywords` returns 2-4 keywords in input language from business info | Mock OpenAI, pass businessName + shortDescription → extract returns 2-4 concrete visual terms (same language, trimmed, < 4 items) | [ ] |
+| **TC-F38-RAW-19** | `[Negative]` | no `OPENAI_API_KEY` / timeout / malformed JSON → `[]` (graceful) | Mock OpenAI client missing / throw timeout / return malformed JSON → fn returns `[]`, no throw | [ ] |
+| **TC-F38-RAW-20** | `[Positive]` | `mergeKeywords` products-first, case-insensitive dedup, cap 3; empty products → extracted fills | Products ["phở bò", "gỏi"] + extracted ["PHỞ", "cơm"] → ["phở bò", "gỏi", "cơm"] (base first, dedup case-insensitive, capped 3) | [ ] |
+| **TC-F38-RAW-21** | `[Positive]` | `planImageNeeds` skips `logo-cloud` even when `PIXABAY_BLOCKS=all` (no image need emitted) | Pass blocks=[{blockType: 'logo-cloud', logos:[...]}], PIXABAY_BLOCKS=all → planImageNeeds returns 0 needs (logo-cloud excluded) | [ ] |
+| **TC-F38-RAW-22** | `[Positive]` | `hydrateUrlUploadsToMedia`/`cleanupNonNumericImageFields` still process logo-cloud spec | logo-cloud logos[].logo.url (Media object) → hydrate ingest as real Media; empty {url:''} → cleanup strips | [ ] |
 
 ## 5. Kiểm thử thủ công (staging)
 
