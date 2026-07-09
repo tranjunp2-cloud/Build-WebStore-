@@ -27,7 +27,20 @@ export default async function ShippingSettingsPage() {
             id: tenantId,
             depth: 0,
             overrideAccess: true,
-            select: { easyParcelIntegration: true } as any,
+            // SECURITY: overrideAccess bypasses the field-level read:()=>false on the
+            // token subfields, and every prop passed to a client component is serialized
+            // into the page payload — so whitelist ONLY non-secret subfields here. NEVER
+            // add accessToken/refreshToken/tokenExpiresAt/tokenRefreshExpiresAt.
+            select: {
+                easyParcelIntegration: {
+                    enabled: true,
+                    warehouse: true,
+                    warehouses: true,
+                    testedAt: true,
+                    accountName: true,
+                    accountEmail: true,
+                },
+            } as any,
         }).catch(() => null),
     ])
 

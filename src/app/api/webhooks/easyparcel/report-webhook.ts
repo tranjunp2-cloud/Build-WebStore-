@@ -22,9 +22,18 @@ import * as Sentry from '@sentry/nextjs'
  * practice nothing is masked — the guard exists for the other topics.
  */
 
-const PII_KEY_PATTERN = /name|phone|email|address|postcode|city|contact/i
+// PII VALUE keys — any key whose name matches has its value masked. Broad on purpose:
+// EP's real field names are unverified, so cover documented (sender_phone_number,
+// sender_address1, sender_postcode) AND legacy/alternate shapes (send_mobile, addr1,
+// zip, tel, street, line1, company).
+const PII_KEY_PATTERN =
+    /name|phone|mobile|tel\b|email|address|addr|street|line[_-]?\d|postcode|postal|zip|city|contact|company|consignee|recipient/i
 
-/** Deep-copy a webhook body with PII-keyed values masked. Recurses one level. */
+// PII CONTAINER keys — the ENTIRE subtree is masked (covers any child field name we
+// haven't anticipated, e.g. { sender: { hp: "...", street: "..." } }).
+const PII_CONTAINER_PATTERN = /^(sender|receiver|recipient|consignee|buyer|customer|from|to)$/i
+
+/** Deep-copy a webhook body with PII-keyed values (and PII container subtrees) masked. */
 function redact(value: unknown, depth = 0): unknown {
     if (Array.isArray(value)) {
         return depth > 2 ? '[array]' : value.map((v) => redact(v, depth + 1))
@@ -33,7 +42,9 @@ function redact(value: unknown, depth = 0): unknown {
         if (depth > 2) return '[object]'
         const out: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-            out[k] = PII_KEY_PATTERN.test(k) ? '[redacted]' : redact(v, depth + 1)
+            if (PII_CONTAINER_PATTERN.test(k)) out[k] = '[redacted]'
+            else if (PII_KEY_PATTERN.test(k)) out[k] = '[redacted]'
+            else out[k] = redact(v, depth + 1)
         }
         return out
     }
