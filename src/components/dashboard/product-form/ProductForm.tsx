@@ -222,7 +222,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 {/* Form sections */}
                 <div className="flex flex-col gap-6 pb-24">
                     <GeneralInfoSection categories={categories} isEdit={isEdit} />
-                    <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-6">
+                    <div className="rounded-2xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[hsl(var(--card))] p-[25px] flex flex-col gap-6">
                         <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.variants || 'Variants & Inventory'}</h2>
                         <MasterFieldsSection />
                         <VariantOptionsSection />
@@ -232,15 +232,19 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     <AttributesSection />
                 </div>
 
-                {/* Save bar — GH-1509 design-system pass (PR #1512): sticky floating card,
+                {/* Save bar — GH-1509 design-system pass (PR #1512): floating card,
                     `--save-bar-bg` token, amber "unsaved changes" indicator, size="sm" buttons —
                     same template now shared by Payments/Shipping/Discounts/Customers-detail.
                     Only renders while dirty (was previously always visible, cycling
-                    "New product"/"Unsaved changes"/"Up to date" status text). */}
+                    "New product"/"Unsaved changes"/"Up to date" status text).
+                    `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
+                    regardless of content length, instead of drifting until scrolled past its
+                    natural flow position. `--dash-content-pl` (CMSLayoutClient) clears the sidebar
+                    at lg+. */}
                 {methods.formState.isDirty && (
                     <div
-                        className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
-                        style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+                        className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
+                        style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)' }}
                     >
                         <div className="flex items-center gap-2 text-[13px]">
                             <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />

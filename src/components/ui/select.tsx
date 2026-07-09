@@ -128,7 +128,10 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-[hsl(var(--primary))] data-[state=checked]:font-medium",
+      // select-item: plain CSS hook in globals.css for the hover/highlight background —
+      // Tailwind's data-[highlighted]: variant doesn't reliably paint on Radix's portaled
+      // content here (same class of issue as the SelectContent bg-popover fix above).
+      "select-item relative flex w-full cursor-default select-none items-center rounded py-1.5 pl-2 pr-8 text-sm outline-none transition-colors focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:bg-[hsl(var(--primary)/0.1)] data-[state=checked]:text-[hsl(var(--primary))] data-[state=checked]:font-medium",
       className
     )}
     {...props}

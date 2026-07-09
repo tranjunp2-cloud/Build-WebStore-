@@ -11,7 +11,7 @@ export function ShippingDimensionsSection() {
     const { t } = useI18n()
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-5">
+        <div className="rounded-2xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[hsl(var(--card))] p-[25px] flex flex-col gap-5">
             <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.shipping || 'Shipping Configuration'}</h2>
             
             {/* Tablet (md, ~518px content): keep 2 cols — 4 cols squeezes inputs to ~110px.
