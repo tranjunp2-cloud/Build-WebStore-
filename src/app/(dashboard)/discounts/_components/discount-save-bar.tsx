@@ -28,7 +28,7 @@ export function DiscountSaveBar({ isNew, saving, onCancel, onSave }: DiscountSav
     return (
         <div
             className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
-            style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+            style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)' }}
         >
             <div className="flex items-center gap-2 text-[13px]">
                 <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />

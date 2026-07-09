@@ -546,7 +546,10 @@ export default function CategoryManager() {
                                         <SelectTrigger>
                                             <SelectValue placeholder={t.dashboard.products.categories.form.parentNone || '--None--'} />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        {/* z-[110]: SelectContent portals to <body> with a default z-50, which renders
+                                            BEHIND this modal's z-[100] overlay — dropdown opens but is covered, so
+                                            items are unclickable. Same convention as ShipOrderModal/CancelOrderModal. */}
+                                        <SelectContent className="z-[110]">
                                             <SelectItem value="__none__">{t.dashboard.products.categories.form.parentNone || '--None--'}</SelectItem>
                                             {categories
                                                 .filter(c => c.id !== formData.id)

@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
@@ -482,30 +482,22 @@ export default function ProductsPage() {
                         <TabsList variant="underline">
                             <TabsTrigger variant="underline" value="all">
                                 {t.dashboard.products.list.filterAll}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.all}
-                                </span>
+                                <TabsCount>{statusCounts.all}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="active">
 
                                 {t.dashboard.products.list.filterActive}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.active}
-                                </span>
+                                <TabsCount>{statusCounts.active}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="draft">
                                 <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
                                 {t.dashboard.products.list.filterDraft}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.draft}
-                                </span>
+                                <TabsCount>{statusCounts.draft}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="archived">
                                 <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
                                 {t.dashboard.products.list.filterArchived}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.archived}
-                                </span>
+                                <TabsCount>{statusCounts.archived}</TabsCount>
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
