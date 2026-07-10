@@ -412,13 +412,119 @@ Reference: [`docs/qa/F14-shipping.md`](../qa/F14-shipping.md) — 20 TC mapped t
 
 ---
 
+## 16. F36 Order Detail Redesign (GH-1333)
+
+### Full-Page Order Detail with EasyParcel Fulfillment
+
+F36 moves Order Detail from a right-slide drawer to a **full-page route** (`src/app/(dashboard)/orders/[id]/page.tsx`) with 2-column layout: left column = order items/customer/payment, right column = fulfillment zone.
+
+#### Schema Changes (Phase 01)
+
+New fields on `Orders` collection:
+- **`selfDeliveryCourier`** (`text`): manual courier name for self-delivery orders (when EP unavailable or disabled)
+- **`pickupScheduledAt`** (`date`): seller-selected pickup date (informational, EP collection date already set)
+- **`pickupSlot`** (`text`): e.g. "08:00–12:00" (informational only)
+
+New helper module: `src/lib/shipping/cod-block.ts` exports `isCodBlocked()` to detect orders with COD amount + East Malaysia state → blocked fulfillment recovery options.
+
+> **⚠️ Superseded decision (pending code rework):** the East-Malaysia hardcode below is
+> the *as-built* behavior. Verified decision (2026-07-03) is to **follow EasyParcel** —
+> COD eligibility read LIVE per-route (`cod.available` + per-courier min/max, rules R1–R5),
+> **no region hardcode**. `cod-block.ts` is to be reworked accordingly. This doc describes
+> current code; it updates when the code changes. See
+> [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md) §8 + COD proof brief.
+
+#### Fulfillment State Machine (Phase 03)
+
+Fulfillment zone displays 1 of 7 states based on: EasyParcel enabled, order status, label creation, tracking data.
+
+| State | Condition | Components |
+|-------|-----------|------------|
+| **pending→confirm** | status=pending, EP ready, no label | Wizard: enter weight → confirm → create label |
+| **ready→create-label** | status=pending, missing weight | Form: input parcelWeight (sen) → re-confirm |
+| **success** | status=pending, label created (labelUrl + awbNo) | Print label modal + schedule pickup popover + COD recovery (if applicable) |
+| **shipping/completed** | status=shipped or completed, shippingTrackingHistory | Tracking timeline (immutable) |
+| **cancelled** | status=cancelled | Reason display (immutable) |
+| **cod-blocked** | codAmount>0 + East MY state | Recovery only: "Ship manually" self-delivery form |
+| **missing-weight** | all states above but parcelWeight null | Inline form: weight input + confirm button |
+
+#### New Components
+
+Under `src/app/(dashboard)/orders/_components/detail/`:
+- **`fulfillment-zone.tsx`** — main state dispatcher + subcomponent routing
+- **`create-label-flow.tsx`** — single-step create-label with auto-confirm post-label
+- **`schedule-pickup-popover.tsx`** — date/slot picker → persist pickupScheduledAt
+- **`print-label-modal.tsx`** — modal wraps `labelUrl` PDF (open/download/print, A4/A6 toggle)
+- **`missing-weight-form.tsx`** — parcelWeight input (sen) with validation
+- **`self-delivery-zone.tsx`** — selfDeliveryCourier text input + trackingNumber
+- **`cod-recovery.tsx`** — "Ship manually" button → self-delivery form
+- **`tracking-timeline.tsx`** — milestone timeline from `shippingTrackingHistory` array
+- **`order-items-card.tsx`** — SKU/weight/thumbnail, expandable details
+- **`customer-card.tsx`** — buyer name/email/phone/address
+- **`payment-card.tsx`** — payment method + status badge
+- **`order-actions-card.tsx`** — status dropdown, cancel/refund buttons
+- **`courier-logo.tsx`** — EP logo renderer (cached, fallback monogram)
+
+Styling: `src/app/(dashboard)/orders/_components/detail/{order-detail,fulfillment,items-table,side}.css` integrated with `--dash-*` design tokens.
+
+#### New API Routes (Phase 01)
+
+- **`POST /api/orders/[id]/self-deliver`** — Body: `{ courier: string, trackingNumber: string }`. Sets `selfDeliveryCourier` + `trackingNumber` + status→shipped (if status=pending).
+- **`POST /api/orders/[id]/pickup`** — Body: `{ scheduledAt: ISO date, slot: string }`. Persists `pickupScheduledAt` + `pickupSlot` (informational, no EP reschedule).
+
+#### i18n Keys (Phase 06)
+
+New sections under `dashboard.orders`:
+- **`fulfillment`** — heading
+- **`createLabel`** — button text, loading state, success/error messages
+- **`pickup`** — schedule button, slot picker label, success message
+- **`printLabel`** — modal title, open/download/print buttons
+- **`missingWeight`** — form label, placeholder, error messages
+- **`selfDelivery`** — courier input label, tracking input label, submit button
+- **`codRecovery`** — heading, message, button
+- **`tracking`** — timeline heading, milestone statuses (pending, confirmed, picked-up, in-transit, out-for-delivery, delivered)
+
+Keys replicated in `en.json` and `ms.json` (Malay).
+
+#### Data Flow
+
+```
+OrderDetailPage (RSC)
+  │ fetches: order (via Payload), easyParcelIntegration
+  ├── useQuery getOrder() on client
+  ├── detailLayout (2-col)
+  │   ├── Left: items-card, customer-card, payment-card, actions-card
+  │   └── Right: fulfillment-zone [state dispatcher]
+  │       ├── if (pending + EP + no-label) → create-label-flow
+  │       ├── if (pending + missing-weight) → missing-weight-form
+  │       ├── if (pending + label-ok) → print-label-modal + schedule-pickup
+  │       ├── if (cod-blocked) → cod-recovery
+  │       ├── if (shipped/completed) → tracking-timeline
+  │       └── if (cancelled) → reason display
+```
+
+#### COD Block Detection
+
+```typescript
+// src/lib/shipping/cod-block.ts
+export function isCodBlocked(order: OrderType): boolean {
+  if (!order.codAmount || order.codAmount <= 0) return false
+  const state = order.shippingAddress?.state
+  return EAST_MY_STATES.includes(state) // Sabah, Sarawak, Labuan
+}
+```
+
+East Malaysia (Sabah/Sarawak/Labuan) blocks COD + EasyParcel prepaid. Recovery in v1: self-deliver only. Repick EP prepaid deferred to v2 (requires payment-switch).
+
+---
+
 ## 16. Wave 7+ Integration Point (F36 EasyParcel)
 
 **F36 adds real-time courier rates via EasyParcel OAuth + v2026-03 API.** Flat-rate fallback remains as hybrid fallback when EasyParcel not configured or unavailable (timeout/error). Tracking status arrives via webhook (topics 1/2/3) + numeric codes (0-11), mapped to dual-field: `order.status` (lifecycle, manual) vs `shippingTrackingStatus` (display, cron-synced). No changes required to F14 logic; F36 branches `getRates()` → EasyParcel vs flat-rate before reaching F14 calculation.
 
 ---
 
-## 16. Assumptions
+## 18. Assumptions
 
 - **Self-delivery model** — merchant handles fulfillment outside the system. No carrier API calls in Wave 6.
 - Single-seller cart only — all items in cart from same `siteId`
@@ -426,10 +532,11 @@ Reference: [`docs/qa/F14-shipping.md`](../qa/F14-shipping.md) — 20 TC mapped t
 - SST 6% computed on subtotal ONLY (BR-05) — existing checkout.ts behavior unchanged
 - Free shipping is shop-wide, not per-product
 - `trackingNumber` (Orders collection) is free-text manually entered by seller — no format validation, no live carrier lookup
+- F36 order detail uses local state for pickup scheduling (no EasyParcel reschedule API call)
 
 ---
 
-## 17. Open Risks
+## 19. Open Risks
 
 - **Risk:** `lib/auth/check-tenant-member` may not exist as named — verify when implementing PATCH. Mitigate: borrow pattern from `src/app/api/sites/[siteId]/save/route.ts`.
 - **Risk:** Existing sites in DB have `freeAbove = null` — migration must set default to avoid checkout breaks. Mitigate: backfill in `scripts/db-setup.js`.

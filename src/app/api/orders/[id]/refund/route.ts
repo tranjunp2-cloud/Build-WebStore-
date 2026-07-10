@@ -17,6 +17,11 @@ import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+// F1: Xendit /refunds `reason` is a fixed enum — passing free-text (or any other value)
+// causes Xendit to 400 AFTER the DB CAS already flipped status='refunded', leaving the
+// order marked refunded with no money actually moved. Whitelist against the enum.
+const XENDIT_REFUND_REASONS = new Set(['REQUESTED_BY_CUSTOMER', 'FRAUDULENT', 'DUPLICATE', 'CANCELLATION', 'OTHERS'])
+
 /**
  * POST /api/orders/[id]/refund
  *
@@ -29,6 +34,23 @@ type RouteContext = { params: Promise<{ id: string }> }
 export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
     const payload = await getPayload({ config })
+
+    // Parse optional reason from body (guard non-JSON or missing body gracefully)
+    let refundReason = 'REQUESTED_BY_CUSTOMER'
+    try {
+        const ct = request.headers.get('content-type') ?? ''
+        if (ct.includes('application/json')) {
+            const body = await request.json()
+            if (body?.reason && typeof body.reason === 'string' && body.reason.trim()) {
+                // F1: map any free-text/unknown value to 'OTHERS' — never forward raw user input
+                // to Xendit's fixed reason enum.
+                const candidate = body.reason.trim().toUpperCase()
+                refundReason = XENDIT_REFUND_REASONS.has(candidate) ? candidate : 'OTHERS'
+            }
+        }
+    } catch {
+        // Non-JSON or empty body — keep default reason
+    }
 
     // Fetch order with tenant expanded (depth: 1)
     let order: any
@@ -237,7 +259,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 invoiceId: order.xenditPaymentRequestId,
                 // Xendit MYR = major unit (RM). order.total already RM. NO *100.
                 amount: order.total,
-                reason: 'REQUESTED_BY_CUSTOMER',
+                reason: refundReason,
             })
         } catch (err) {
             // CAS already committed — log clearly. Ops must handle via Xendit dashboard.

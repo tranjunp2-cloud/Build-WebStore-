@@ -587,6 +587,93 @@ export const Tenants: CollectionConfig = {
                 },
             ],
         },
+        {
+            name: 'easyParcelIntegration',
+            type: 'group',
+            label: 'EasyParcel Integration',
+            admin: {
+                description: 'Connect tenant own EasyParcel account for shipping rates and label purchase',
+            },
+            fields: [
+                {
+                    name: 'enabled',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    admin: { description: 'Master toggle — enable EasyParcel for this tenant' },
+                },
+                {
+                    name: 'accessToken',
+                    type: 'text',
+                    access: { read: () => false },
+                    admin: { description: 'EP OAuth access token — never exposed to client' },
+                },
+                {
+                    name: 'refreshToken',
+                    type: 'text',
+                    access: { read: () => false },
+                    admin: { description: 'EP OAuth refresh token — never exposed to client' },
+                },
+                {
+                    name: 'tokenExpiresAt',
+                    type: 'date',
+                    access: { read: () => false },
+                    admin: { readOnly: true, description: 'When the EP access token expires' },
+                },
+                {
+                    name: 'tokenRefreshExpiresAt',
+                    type: 'date',
+                    access: { read: () => false },
+                    admin: { readOnly: true, description: 'When the EP refresh token expires' },
+                },
+                {
+                    name: 'warehouse',
+                    type: 'json',
+                    admin: {
+                        description: 'Legacy single pickup warehouse (kept for back-compat). New configs use `warehouses`.',
+                    },
+                },
+                {
+                    name: 'warehouses',
+                    type: 'json',
+                    admin: {
+                        description: 'Pickup addresses: [{id, label, phone, address1, address2, city, state, postcode, country, isDefault}]',
+                    },
+                },
+                {
+                    // DEPRECATED — unused since courier selection became fully automatic (2026-07-01).
+                    // Column kept to avoid a migration; do NOT read or write from application code.
+                    name: 'selectedCourier',
+                    type: 'text',
+                    defaultValue: 'flash',
+                    admin: { description: '[DEPRECATED] Single courier ID — superseded by automatic cheapest-courier selection. Do not use.' },
+                },
+                {
+                    // DEPRECATED — unused since courier selection became fully automatic (2026-07-01).
+                    // Column kept to avoid a migration; do NOT read or write from application code.
+                    name: 'selectedCouriers',
+                    type: 'json',
+                    admin: {
+                        description:
+                            '[DEPRECATED] Courier allowlist — superseded by automatic cheapest-courier selection. Do not use.',
+                    },
+                },
+                {
+                    name: 'testedAt',
+                    type: 'date',
+                    admin: { readOnly: true, description: 'Timestamp of last successful EP connection test' },
+                },
+                {
+                    name: 'accountName',
+                    type: 'text',
+                    admin: { readOnly: true, description: 'Connected EP account name (from account info)' },
+                },
+                {
+                    name: 'accountEmail',
+                    type: 'text',
+                    admin: { readOnly: true, description: 'Connected EP sender/pickup email (from account info)' },
+                },
+            ],
+        },
     ],
     timestamps: true,
 }

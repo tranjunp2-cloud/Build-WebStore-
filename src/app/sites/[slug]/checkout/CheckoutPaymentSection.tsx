@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Lock, ShieldCheck, MapPin, QrCode, Landmark, AlertCircle } from 'lucide-react'
+import { Lock, ShieldCheck, QrCode, Landmark, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 type Props = {
@@ -131,7 +131,6 @@ export function CheckoutPaymentSection({
                                 <h3 className="pm-title">{ck.cod}</h3>
                                 <p className="pm-desc">{ck.codDetail}</p>
                                 <div className="pm-pills">
-                                    <span className="pm-pill"><MapPin size={11} /> {ck.westMalaysiaOnly}</span>
                                     <span className="pm-pill">{ck.noExtraFee}</span>
                                 </div>
                             </div>

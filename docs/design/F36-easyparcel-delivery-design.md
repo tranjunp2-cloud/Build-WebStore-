@@ -3,8 +3,8 @@
 > **Epic:** Storefront Commerce & Fulfillment (Malaysia)
 > **Feature Code:** F36
 > **Links:**
-> - PRD: [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md)
-> - Stories: `docs/stories/F36-easyparcel-delivery-stories.md` _(planned — chưa tạo)_
+> - **PRD (main):** [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md) ← Read first for context
+> - Stories: [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md)
 > - Architecture: `docs/architecture/F36-easyparcel-delivery.md` _(planned — chưa tạo)_
 > - Research: [`easyparcel-api-deep-dive`](../../plans/reports/researcher-260611-1614-easyparcel-api-deep-dive.md), [`my-shipping-aggregators`](../../plans/reports/researcher-260611-1614-my-shipping-aggregators.md)
 > - **🎨 Hi-fi design:** _TBD — chưa generate; ASCII low-fi bên dưới là source-of-truth tạm thời._
@@ -24,7 +24,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - **Screen B — Checkout Rate (Phase B):** Buyer nhập địa chỉ (reuse F14 cascade) → phí ship thật vào thẳng Order Summary (1 dòng "Shipping", KHÔNG section vận chuyển, KHÔNG SST). Hybrid: chưa cấu hình → giữ UI fee đơn F14.
 - **Screen C — Create Label (Phase C):** KHÔNG màn riêng. Mua label gắn vào nút **"Ready to Ship"** có sẵn trong `OrderDetailPanel` → AWB + label PDF; in label; pickup/dropoff. Non-EP: `ShipOrderModal` manual giữ nguyên (nhánh do config tenant, KHÔNG tab toggle).
 - **Screen D — Order Tracking (Phase C):** KHÔNG màn riêng — làm giàu component có sẵn của trang đơn buyer (`OrderTrackingClient`: `OtShippingCard` + `OtTimeline`) + badge tracking trong `OrderDetailPanel` merchant. Dual-field: `order.status` (lifecycle, manual) tách khỏi `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron poll 30–60′).
-- **Screen E — Returns (Phase D):** KHÔNG dựng RMA/buyer-request UI. 2 luồng phân biệt bằng banner: **Case 1 Courier RTS** (auto khi `shippingTrackingStatus=RETURNED`) + **Case 2 Buyer RMA** (merchant tự mở, buyer tự gửi + nhập tracking tay). Cả 2 reuse `/refund` + `/cancel`; cancel refund = message theo trạng thái label gốc. Reverse label = cắt khỏi MVP (§8).
+- **Screen E — Returns (Phase D):** KHÔNG dựng RMA/buyer-request UI. 2 luồng phân biệt bằng banner: **Case 1 Courier RTS** (auto khi `shippingTrackingStatus=RETURNED`) + **Case 2 Buyer RMA** (merchant tự mở, buyer tự gửi + nhập tracking tay). Cả 2 reuse `/refund` + `/cancel`; cancel pre-pickup phải hủy EP shipment trước, picked-up trở đi dùng Refund/Return. Reverse label = cắt khỏi MVP (§8).
 
 ### Design Principles
 - **KISS:** Mirror pattern `echIntegration` cho connect; reuse Card form của F14/F19.
@@ -80,11 +80,13 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │ ┌──────────────────────────────────────┐ │
 │ │ ✅ Connected — Live (account + ví)   │ │ ◄── green Alert
 │ │                                      │ │
-│ │ 🚚 Courier (chọn 1 cho shop)         │ │
-│ │  (•) J&T Express    [Phổ biến SME]   │ │
-│ │  ( ) DHL eCommerce  [Phổ biến SME]   │ │
-│ │  ( ) Flash Express  [Phổ biến SME]   │ │
-│ │  ＋ Xem thêm courier (3)             │ │
+│ │ 🚚 Courier (chọn ≥1 cho allowlist)   │ │
+│ │  ☑ J&T Express                       │ │
+│ │  ☐ DHL eCommerce                     │ │
+│ │  ☑ Flash Express                     │ │
+│ │  ☐ Pos Laju                          │ │
+│ │  ☐ [+3 more...]                      │ │
+│ │  ⚠️ Ví dưới RM10 → cảnh báo          │ │
 │ │  (không show giá — giá thật ở        │ │
 │ │   checkout · vận đơn tạo manual)     │ │
 │ └──────────────────────────────────────┘ │
@@ -96,8 +98,8 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - Connect button: `<Button variant="default">` "Connect with EasyParcel ↗" (blue) → redirects OAuth popup to `https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...`
 - OAuth callback (backend): POST `/oauth/token` exchanges `code` + Basic auth → `access_token` (10h) + `refresh_token` (1yr), stores securely per tenant.oauthTokens
 - Connected state: Green `<Alert>` showing account name + wallet balance + Disconnect button
-- Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → dùng cho COD West-MY. Force-validate postcode via rate-check call.
-- Courier: `<RadioGroup>` **single-select** từ response tại OAuth connect (`courier_id`, `courier_name`, logo). Chỉ **4 couriers** (COD-supporting: J&T, DHL eCommerce, Flash, Aramex) — no "See more" collapse.
+- Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → informational only; COD eligibility determined by live quotation response per-route. Force-validate postcode via rate-check call.
+- Courier: `<Checkbox>` list **multi-select allowlist** `selectedCouriers[]` từ live `/courier/list?country_code=MY` response (tất cả couriers available, không giới hạn 4 loại). **UX recommendation: chọn ≥1 courier; checkout sẽ tự pick cheapest trong allowlist.** Hiện wallet threshold warning nếu balance < RM10.
 - Parcel weight/dims: KHÔNG có form — lấy từ `Products.weight` + `Products.dimensions`; product=0 → const `DEFAULT_PARCEL`
 
 **States:**
@@ -128,11 +130,13 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │ │ (reuse F14 cascade)          │ • Áo Khoác Bò    RM 50 x1 ││
 │ │ State:    [ Selangor     ▼ ] │ ───────────────────────── ││
 │ │ City:     [ Shah Alam    ▼ ] │ Subtotal:         RM 50   ││
-│ │ Postcode: [ 40000        ▼ ] │ Shipping:         RM 5.42 ││
-│ │                              │ ───────────────────────── ││
-│ │ (KHÔNG có section vận        │ Total:         RM 55.42   ││
-│ │  chuyển — shop chốt 1        │                           ││
-│ │  courier; buyer không chọn)  │ [ Place Order ]           ││
+│ │ Postcode: [ 40000        ▼ ] │ Shipping:                 ││
+│ │                              │ 🚚 J&T Express  RM 5.42   ││
+│ │ (KHÔNG có section vận        │    2–3 ngày               ││
+│ │  chuyển — shop chốt 1        │ ───────────────────────── ││
+│ │  courier; buyer không chọn)  │ Total:         RM 55.42   ││
+│ │                              │                           ││
+│ │                              │ [ Place Order ]           ││
 │ │                              │ (KHÔNG có dòng SST)       ││
 │ └──────────────────────────────┴───────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
@@ -165,10 +169,9 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 | Điều kiện chặn | Helper Text (hiện dưới COD option) |
 |----------------|-------------------------------------|
-| Địa chỉ East MY (Sabah/Sarawak) | "COD chỉ khả dụng cho địa chỉ West Malaysia" |
-| total > RM7,000 | "Đơn vượt hạn mức COD (RM7,000)" |
-| selectedCourier không hỗ trợ COD | "Courier đang chọn không hỗ trợ COD" |
-| total < RM5.01 | "Giá trị đơn tối thiểu để dùng COD là RM5.01" |
+| Không có courier COD-capable (R3: `cod.available=false` cho tất cả couriers trong allowlist) | "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
+| Đơn vượt hạn mức COD của courier (R1: `codAmount > max_cod_amount`) | "Đơn vượt hạn mức COD của courier" |
+| Đơn dưới mức tối thiểu COD của courier (R2: `codAmount < min_cod_amount`) | "Đơn dưới mức tối thiểu để dùng COD" |
 
 **COD selected — fee disclosure (informational):**
 
@@ -180,9 +183,12 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 **Components:**
 - Shipping address: **reuse F14 geo cascade** State → City → Postcode (`<Select>` × 3, `/api/geo/*` + `CheckoutForm`) — KHÔNG dựng form mới
-- Phí ship: 1 dòng trong Order Summary — `formatPrice(fee,'MYR')` (KHÔNG có section vận chuyển riêng, KHÔNG picker, KHÔNG courier branding; shop đã chốt 1 courier)
+- Phí ship: 1 dòng trong Order Summary — `formatPrice(fee,'MYR')` + **courier name + logo + ETA** (từ calculate-shipping response `rates[]` array — selected/cheapest rate). KHÔNG section vận chuyển riêng, KHÔNG picker (shop đã chốt 1 courier).
 - **KHÔNG có dòng SST** ở Order Summary (SST gỡ ở checkout từ F33 phase-06 — `total = subtotal − discount + shipping`)
-- COD option: `<RadioGroup>` trong payment methods; eligibility check từ zone (geo lookup `/api/geo/lookup/[postcode]` → `zone='west'`) + `cod_service_available` từ rate response + total vs min/max. Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
+- COD option: `<RadioGroup>` trong payment methods; eligibility check từ **R1–R5 live rules** (see PRD §8): (1) **R3:** `cod.available=true` từ rate response của selected courier, (2) **R2:** total ≥ `min_cod_amount` của courier đó, (3) **R1:** total ≤ `max_cod_amount` của courier đó. Tất cả read live từ quotation, per-route, per-courier. **NO region hardcode** (R4) — follow quotation response. Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
+  
+  > **COD Validation (R1–R5 decision):** Code enforces ALL COD rules; EasyParcel does NOT validate ineligible orders. UI gating chặn checkout, server route cũng hard-rejects COD param nếu không đủ điều kiện. Courier picker chỉ show COD-capable couriers (from live rate response). Ref: [`decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) · [`ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) · GH-1333 · [F36 PRD §8](../prd/F36-easyparcel-delivery.md#8-key-api-contract-decisions-v2026-03-spec)
+
 - COD fee disclosure: `<Alert variant="default" className="text-xs">` hiện khi buyer chọn COD — informational only, không block.
 - Loading: `<Skeleton>` 1 row khi gọi `/api/orders/calculate-shipping` (debounce 300ms sau khi đủ địa chỉ)
 - Fallback: render block fee đơn F14 (zero thay đổi)
@@ -196,14 +202,16 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Rate API lỗi/timeout | Fallback flat-rate F14 + log warning (im lặng với buyer, không chặn) |
 | Free triggered | Badge "FREE" trên dòng phí ship |
 | COD available | COD option enabled trong payment methods |
-| COD East MY | COD `<RadioGroupItem disabled>` + helper "COD chỉ khả dụng cho địa chỉ West Malaysia" |
-| COD over limit | COD disabled + helper "Đơn vượt hạn mức COD (RM7,000)" |
-| COD courier không hỗ trợ | COD disabled + helper "Courier đang chọn không hỗ trợ COD" |
+| COD over limit | COD disabled + helper "Đơn vượt hạn mức COD của courier (tối đa theo courier)" |
+| COD allowlist no COD-capable | COD disabled + helper "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
+| COD under limit | COD disabled + helper "Đơn dưới mức tối thiểu để dùng COD" |
 | COD selected | `<Alert>` fee disclosure hiện (informational) |
 
 ---
 
 ### 2.3. "Ready to Ship" modal — Create Label (KHÔNG phải màn riêng) <a id="screen-c-create-label"></a>
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase A+B only. Forward-looking design; no code yet.**
 
 > **Đây là 1 `<Dialog>` confirm bật từ nút "Ready to Ship" có sẵn — KHÔNG phải scene/route riêng.** Lý do giữ modal: bấm = **trừ tiền thật từ ví EasyParcel** → cần confirm cân nặng/dims (cước phụ thuộc cân) + chọn pickup trước khi trừ ví. Bỏ modal = trừ ví mù.
 
@@ -278,10 +286,10 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 **Components:**
 - Modal: `<Dialog>` tạo label gắn vào action "Ready to Ship" của `OrderDetailPanel`. **Điểm intercept (code-level):** nút status-dependent ở `OrderDetailPanel.tsx` (onClick ~L861–863). EP tenant chặn đúng nhánh `status==='confirmed'` (hiện gọi `handleAction('ready_to_ship')`) → mở `<Dialog>` Create Label thay vì flip status thẳng. **KHÔNG** đụng nhánh `status==='ready_to_ship'` (`setIsShipModalOpen(true)`) — đó là bước "Ship Order" (xác nhận pickup → shipped), giữ nguyên. `ShipOrderModal.tsx` giữ nguyên cho nhánh manual non-EP.
-- Courier: **KHÔNG hiển thị trong modal** — shop đã khoá 1 courier (`selectedCourier`), không cần nhắc lại ở đây (courier vẫn dùng `selectedCourier` ngầm khi gọi label).
+- Courier: **KHÔNG hiển thị trong modal** — checkout đã tự pick cheapest courier từ allowlist cho đơn này (`selectedCourier` = auto-picked for order). Courier này sẽ dùng ngầm khi gọi label submit; không cần buyer/merchant chọn lại.
 - Weight: `<Input type="number">` prefill từ `order.parcelWeight` (snapshot `Σ(qty×Products.weight)` lúc checkout; =0 → `DEFAULT_PARCEL`). Sửa được.
 - Dims (thùng): `<Input type="number">` × 3 (L/W/H) = thùng thật merchant gói — prefill `DEFAULT_PARCEL` box (đơn 1 món → `Products.dimensions`). **KHÔNG gộp dims đa-SP.** Sửa được.
-- Pickup: `<RadioGroup>` pickup/dropoff + `<DatePicker>` (`collection_date`) — **CUT-OFF-AWARE**: `min = HÔM NAY` nếu T2–T6 & giờ MYT (server-side) < cut-off của `selectedCourier` (J&T 13:50 / Flash 14:00 / Pos 12:50 — const `COURIER_CUTOFF`), ngược lại `min = ngày làm việc kế`; default = min; disable quá khứ + Sat/Sun; holiday để API bump; KHÔNG time picker. Hint: "Lấy hôm nay nếu tạo trước HH:MM". Dropoff vẫn truyền `collection_date`.
+- Pickup: `<RadioGroup>` pickup/dropoff + `<DatePicker>` (`collection_date`) — **CUT-OFF-AWARE**: `min = HÔM NAY` nếu T2–T6 & giờ MYT (server-side) < cut-off của courier auto-picked (J&T 13:50 / Flash 14:00 / Pos 12:50 — const `COURIER_CUTOFF`), ngược lại `min = ngày làm việc kế`; default = min; disable quá khứ + Sat/Sun; holiday để API bump; KHÔNG time picker. Hint: "Lấy hôm nay nếu tạo trước HH:MM". Dropoff vẫn truyền `collection_date`.
 - Primary: `<Button>` "Tạo & trừ ví" → spinner 1 bước (submit, ví trừ ngay); idempotent theo `awbNo` (đã có `awbNo` → disable)
 - Print: `<Button variant="outline">` mở `labelUrl` (PDF) tab mới
 - Copy AWB: `<Button size="icon">` + clipboard
@@ -289,7 +297,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 **Components (COD-specific additions):**
 - COD badge: `<Badge variant="secondary">COD</Badge>` hiện dưới tiêu đề modal khi `order.paymentMethod='cod'`; kèm `codAmount` = `formatPrice(order.codAmount, 'MYR')`.
 - COD fee note: `<Alert variant="default" className="text-xs">` thông tin phí COD max(flat, 4%) của courier — informational; không block.
-- COD East MY block: `<Alert variant="destructive">` "EasyParcel COD chỉ West Malaysia — không thể tạo label COD cho địa chỉ này" + disable nút tạo; merchant phải xử lý thủ công.
+- COD ineligibility block: `<Alert variant="destructive">` "Courier không hỗ trợ COD cho địa chỉ này (per R1–R5)" + disable nút tạo; merchant phải xử lý thủ công (recheck route/courier availability).
 
 **States:**
 | State | UI |
@@ -300,11 +308,13 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Creating | Spinner "Đang tạo & trừ ví..." (1 bước — submit_orders trừ ví ngay) |
 | Wallet low | Red `<Alert>` `EASYPARCEL_WALLET_LOW` + link nạp + Thử lại; order unchanged |
 | API error | Red `<Alert>` generic + Thử lại; order unchanged |
-| COD East MY | Red `<Alert>` "EasyParcel COD chỉ West Malaysia" + disable nút tạo |
+| COD ineligible (R1–R5 check) | Red `<Alert>` "Courier không hỗ trợ COD cho địa chỉ này" + disable nút tạo (per-route per-courier check) |
 
 ---
 
 ### 2.4. Screen D — Order Tracking (nhúng order detail) <a id="screen-d-tracking"></a>
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Forward-looking design; no code yet.**
 
 **Path:** `/sites/[slug]/orders/[orderNumber]` (buyer) + `OrderDetailPanel` (merchant) — **KHÔNG màn riêng**, làm giàu component có sẵn.
 **Trạng thái:** Đơn shipped, có AWB, cron đã sync 1 mốc.
@@ -390,6 +400,8 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 ### 2.5. Screen E — Returns (merchant) <a id="screen-e-returns"></a>
 
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase D only. Forward-looking design; no code yet.**
+
 **Path:** `Dashboard > Orders > [order]` — dùng nút **Refund / Cancel có sẵn** trong `OrderDetailPanel`. **KHÔNG có màn RMA, KHÔNG buyer return-request.** 1 màn, **2 context phân biệt bằng banner đầu đơn**, cùng hội tụ về nút Refund.
 
 > **2 luồng trả hàng khác bản chất — phải phân biệt:**
@@ -434,16 +446,19 @@ CASE 2 — Buyer Return (THỦ CÔNG, ngoài EP)
 
 ```text
 Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nhận hủy]
-Đã mua, chưa pickup: → "Refund tiền hàng. Cước: hủy đơn trên dashboard EasyParcel
-                        để hoàn ví." [Đi tới EasyParcel ↗] [Xác nhận]
-Đã pickup:       → "Refund tiền hàng. ⚠️ Cước đã mất." [Xác nhận]
+Đã mua, chưa pickup: → "Đang hủy vận đơn EasyParcel trước khi hủy đơn..."
+                       [Xác nhận hủy] → EP success mới refund/restock/email
+EP cancel failed: → "Không hủy được vận đơn EasyParcel. Đơn chưa bị hủy,
+                    chưa hoàn tiền, chưa nhập kho." [Thử lại]
+Đã pickup:       → "Không thể hủy đơn vì courier đã pickup. Dùng Refund/Return.
+                    ⚠️ Cước đã mất."
 ```
 
 **Components:**
 - Case 1 banner: `<Alert variant="destructive">` tự render khi `shippingTrackingStatus = RETURNED` (0 field mới — dùng lại tracking enum của Screen D).
 - Case 2 trigger + fields: nút "Khách xin trả hàng" mở `<Alert>` + input tracking tay + `<RadioGroup>` ai chịu phí. **Field lưu DB chưa chốt — xem §10.**
 - Refund + restock (chung cả 2 case): **REUSE nút Refund/Cancel có sẵn** trong `OrderDetailPanel` (`/api/orders/[id]/{refund,cancel}`). KHÔNG component refund mới.
-- Cancel tiers: `<Alert>` text theo trạng thái label chọn endpoint — chưa label → `/cancel` (full refund+restock); đã label → `/refund` + message hủy cước trên dashboard EP.
+- Cancel tiers: `<Alert>` text theo trạng thái label — chưa label → `/cancel` (full refund+restock); đã label + pre-pickup → `/cancel` refresh tracking + EP `POST /shipment/cancel`, EP success mới local cancel; picked-up trở đi → block Cancel, chuyển sang Refund/Return.
 - Refund tiền hàng qua provider có sẵn (Stripe live; manual COD/bank; Xendit = F34) — KHÔNG qua EasyParcel.
 
 **States:**
@@ -452,15 +467,16 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 | Case 1 — EP báo `RETURNED` | Banner đỏ tự hiện; gợi ý kiểm hàng → Refund; cảnh báo cước/COD đã mất |
 | Case 2 — merchant mở RMA | Banner vàng; input tracking tay + radio ai chịu phí |
 | Nhận hàng về (cả 2) | Bấm nút Refund có sẵn → refund + restock (reuse) |
-| Cancel chưa label | `/cancel` có sẵn: refund full + restock ngay |
-| Cancel chưa pickup | `/refund` có sẵn: refund hàng; link EasyParcel hủy cước thủ công |
-| Cancel đã pickup | `/refund` có sẵn: refund hàng; cảnh báo cước mất |
+| Cancel chưa label | `/cancel` có sẵn: refund full + restock + discount release/email ngay |
+| Cancel chưa pickup | `/cancel`: refresh EP tracking → EP cancel shipment → local cancel/refund/restock/email |
+| EP cancel failed | Không local cancel/refund/restock; Alert lỗi + Thử lại |
+| Cancel đã pickup | Cancel disabled/blocked; dùng Refund/Return; cảnh báo cước mất |
 
 ---
 
 ## 3. Mobile 375px <a id="mobile"></a>
 
-**Settings (Mobile):** tabs full-width; keys/warehouse stack vertical; courier list 1-col radio (single-select); Save full-width sticky bottom.
+**Settings (Mobile):** tabs full-width; keys/warehouse stack vertical; courier list 1-col checkbox (multi-select allowlist); Save full-width sticky bottom.
 
 **Checkout shipping fee (Mobile):** buyer KHÔNG chọn courier (shop đã khoá 1 courier) — chỉ 1 dòng "Shipping" trong Order Summary, đồng nhất desktop §2.2.
 
@@ -494,9 +510,9 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 |--------|---------|-------|-------|---------|-----------|
 | A Settings | Connect redirect / Save spinner | Chỉ block Connect | Red Alert `EP_NOT_CONNECTED` / OAuth err, không lộ token | Toast "Đã lưu" + green Connected (account + ví) | Chưa connect → warehouse/courier khoá; warehouse thiếu field → helper |
 | B Checkout | Skeleton 1 row (debounce 300ms) | "Nhập địa chỉ để xem cước" | **Fallback flat-rate F14** (im lặng) + log | 1 dòng "Shipping" trong Order Summary / FREE badge | Postcode `^\d{5}$` (reuse F14) |
-| B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | East MY → disabled + helper; over limit → disabled; courier không hỗ trợ → disabled |
-| C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | COD East MY → block + disable nút; idempotent khi có AWB |
-| C COD label | COD badge + codAmount prefill | — | East MY block (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
+| B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | R1–R3: courier không hỗ trợ / over limit / under minimum → disabled |
+| C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | R1–R5 ineligibility → block + disable; idempotent khi có AWB |
+| C COD label | COD badge + codAmount prefill | — | R1–R5 ineligibility (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
 | D Tracking | Timeline skeleton | "Đang chuẩn bị hàng" | "Chưa lấy được trạng thái" | Timeline mốc mới | — |
 | D COD status | — | codStatus badge ẩn (non-COD) | — | Badge pending/collected/settled | Merchant update thủ công; no API auto-transition |
 | E Returns | Refund spinner (reuse) | — | API err + Thử lại | Toast refund + restock | Case 1 auto (`RETURNED`); Case 2 cancel tiers theo label gốc |
@@ -513,7 +529,8 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 | Connect button | `Button variant="default"` → OAuth redirect | Connect with EasyParcel (no secret inputs) |
 | Text/number input | `Input` | Warehouse, weight, dims |
 | Dropdown | `Select` | MY states (geo cascade) |
-| Radio | `RadioGroup`, `RadioGroupItem` | Courier picker (settings, single-select), return fee responsibility (Case 2), pickup |
+| Radio | `RadioGroup`, `RadioGroupItem` | Return fee responsibility (Case 2), pickup |
+| Checkbox | `Checkbox` | Courier allowlist (settings, multi-select) |
 | Switch | `Switch` | Connect enable |
 | Date picker | `Popover` + `Calendar` | `collection_date` pickup |
 | Dialog | `Dialog` | Create label (→ Sheet on mobile) |
@@ -558,7 +575,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 - ❌ Insurance / parcel-protection toggle
 - ❌ Multi-warehouse picker (1 origin/merchant cho MVP)
 - ❌ COD reconciliation dashboard (chỉ lưu `codAmount`; đối soát xem trên EasyParcel)
-- ❌ Auto-cancel shipment trong app (xử lý trên dashboard EasyParcel)
+- ❌ Force-cancel shipment sau pickup hoặc sau khi courier đã xử lý
 - ❌ Màn/route "Tạo vận đơn" riêng + tab toggle manual/EP (label gắn vào nút "Ready to Ship" có sẵn)
 - ❌ RMA collection + buyer return-request UI (return = reuse nút Refund/Cancel có sẵn)
 - ❌ **Reverse label / EP-paid return pickup** (đảo origin↔dest qua `POST /shipment/submit_orders`) — buyer tự gửi + nhập tracking tay đã đủ cho MVP; pickup tại địa chỉ buyer lẻ chưa chắc mọi courier MY hỗ trợ. Backlog post-MVP.
@@ -581,12 +598,12 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 | Prime Field | v2026-03 Param | Transform | Notes |
 |---|---|---|---|
 | Warehouse postcode | `sender.postcode` | copy as-is (5 digits) | sender = warehouse (origin) |
-| Warehouse state | `sender.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | e.g., "MY-07" = Penang |
+| Warehouse state | `sender.subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | e.g., "MY-07" = Penang |
 | Warehouse country | `sender.country` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
 | Buyer postcode | `receiver.postcode` | copy as-is (5 digits) | — |
-| Buyer state | `receiver.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | same mapping |
+| Buyer state | `receiver.subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | same mapping |
 | Buyer country | `receiver.country` | hardcode `"MY"` | — |
-| Package weight | `weight` | `aggregateWeightKg()` → double, 2 decimals | kg, NOT grams |
+| Package weight | `weight` | `aggregateWeightKg()` → double, 1 decimal, min floor 0.1kg | kg, NOT grams |
 | Package width | `width` | parse to integer | cm |
 | Package length | `length` | parse to integer | cm |
 | Package height | `height` | parse to integer | cm |
@@ -612,14 +629,14 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 |---|---|---|---|
 | Name | `name` | copy as-is | required |
 | Company | `company` | copy as-is | optional |
-| Phone country code | `phone_number_country_code` | hardcode `"MY"` | ISO country code |
-| Phone number | `phone_number` | `normalizePhone()` → digits only | e.g., "0122134567" (no +60) |
+| Phone country code | `phone_number_country_code` | hardcode `"60"` | Malaysia country code (digits, not ISO alpha) |
+| Phone number | `phone_number` | `splitPhone()` → number only | e.g., "122134567" (from "60122134567") |
 | Email | `email` | copy as-is | optional |
 | Address line 1 | `address_1` | `addressLine(order)[0]` | primary address |
 | Address line 2 | `address_2` | `addressLine(order)[1]` | optional, secondary |
 | City | `city` | copy as-is | **required** (separate from postcode) |
 | Postcode | `postcode` | copy as-is (5 digits) | — |
-| Subdivision code | `subdivision_code` | `mapToISO3166_2()` → "MY-XX" | ISO 3166-2 |
+| Subdivision code | `subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | ISO 3166-2 |
 | Country code | `country_code` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
 
 ### 9.3 State → ISO 3166-2 MY Mapping (All 16 states)
@@ -647,7 +664,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 ### 9.4 Transform Functions (Pseudo-code, v2026-03)
 
-#### mapToISO3166_2(primeStateName) — MY states only
+#### mapSubdivisionCode(primeStateName) — MY states only
 
 ```
 INPUT:  "Selangor" OR "Pulau Pinang"
@@ -662,22 +679,32 @@ const subdivisionMap = {
 return subdivisionMap[primeStateName] || null;  // FAIL if unmapped
 ```
 
-#### normalizePhone(phone) — v2026-03 uses digits-only format
+#### normalizePhone(phone) — v2026-03 uses 60-prefix format
 
 ```
-INPUT:  "+60-12-2134567"  OR  "0122134567"  OR  "122134567"
-OUTPUT: "0122134567" (leading 0, no +60 prefix, no dashes)
+INPUT:  "+60-12-2134567"  OR  "0122134567"  OR  "122134567"  OR  "60122134567"
+OUTPUT: "60122134567" (60-prefix, digits only, no leading 0)
 
 1. Strip all non-digits: phone.replace(/\D/g, "")
-2. If starts with "60": remove "60", prepend "0"
-3. If doesn't start with "0": prepend "0"
-4. Validate 10 ≤ length ≤ 11; else FAIL
-5. Return result
+2. If starts with "0": remove leading "0", prepend "60"
+3. If starts with "60": keep as-is
+4. If doesn't start with "60": prepend "60"
+5. Validate length = 11 (60 + 9 digits); else FAIL
+6. Return result
 
-"+60122134567" → "0122134567" ✓
-"0122134567"   → "0122134567" ✓
-"122134567"    → "0122134567" ✓
-"6012"         → FAIL (length < 10)
+"+60122134567" → "60122134567" ✓
+"0122134567"   → "60122134567" ✓
+"122134567"    → "60122134567" ✓
+"60122134567"  → "60122134567" ✓
+"6012"         → FAIL (invalid length)
+```
+
+**splitPhone(phone) helper:**
+```
+INPUT:  "60122134567"  OR  "0122134567"
+OUTPUT: { countryCode: "60", number: "122134567" }
+
+Split normalizePhone result at position 2 (first 2 chars = "60").
 ```
 
 #### addressLine(order) — split address into line1 + line2
@@ -719,7 +746,7 @@ return weight_kg
 
 ### 9.5 Key Gotchas
 
-- **Phone is split into 2 fields:** `phone_number_country_code` (e.g. `"MY"`) + `phone_number` (digits-only, no +60 prefix). Don't send a single combined phone string.
+- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"60"` — country code digits, not ISO alpha) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
 - **Postcode param is `postcode`** (same field name on `POST /shipment/quotations` and `POST /shipment/submit_orders`).
 - **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
 - **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.

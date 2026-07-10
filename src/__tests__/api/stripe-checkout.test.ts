@@ -73,6 +73,31 @@ vi.mock('@/lib/discounts/record-discount-redemption', () => ({
     recordDiscountRedemption: (...args: any[]) => mockRecordRedemption(...args),
 }))
 
+// EasyParcel rate lookup — thin passthrough to the REAL flat-rate calculator (no EP call),
+// mirroring getRates' epToken-null branch. Keeps TC-SHIP-01..03 measuring the site's
+// shippingConfig (westRate/eastRate/freeAbove) instead of a hardcoded price.
+vi.mock('@/lib/shipping/get-rates', async () => {
+    const { getShippingRate } = await vi.importActual<typeof import('@/lib/shipping/calculate-fee')>('@/lib/shipping/calculate-fee')
+    return {
+        getRates: vi.fn(async (params: any, _token: unknown, flatConfig: any, destState?: string) => ({
+            rates: [{
+                courier: 'flat',
+                serviceId: 'flat',
+                courierName: 'Flat Rate',
+                serviceName: 'Standard',
+                priceSen: getShippingRate(destState ?? params.destState, flatConfig, params.subtotalSen),
+                codAvailable: false,
+                estDelivery: '3-5 business days',
+            }],
+            degraded: false,
+        })),
+    }
+})
+
+vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
+    getValidToken: vi.fn().mockResolvedValue(null),
+}))
+
 import { POST } from '@/app/api/orders/stripe-checkout/route'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
