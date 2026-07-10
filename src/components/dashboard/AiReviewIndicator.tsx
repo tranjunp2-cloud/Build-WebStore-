@@ -19,17 +19,19 @@ type AiReviewIndicatorProps = {
  * outside the trigger close it — desktop hover/focus behavior is unchanged.
  */
 export function AiReviewIndicator({ pending, t }: AiReviewIndicatorProps) {
-    const { open, setOpen, triggerRef, toggle } = useTapToggleTooltip<HTMLButtonElement>()
+    const { open, onOpenChange, onPointerDown, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
     if (!pending) return null
 
     return (
-        <Tooltip open={open} onOpenChange={setOpen}>
+        <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
                 <button
-                    ref={triggerRef}
+                    ref={ref}
                     type="button"
                     aria-label={t.dashboard.products.list.aiReviewAriaLabel}
-                    onClick={toggle}
+                    onPointerDown={onPointerDown}
+                    onFocus={onFocus}
+                    onClick={onClick}
                     className="inline-flex shrink-0 cursor-help items-center justify-center"
                 >
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />

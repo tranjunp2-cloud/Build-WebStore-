@@ -21,20 +21,22 @@ type MissingInfoIndicatorProps = {
  * outside the trigger close it — desktop hover/focus behavior is unchanged.
  */
 export function MissingInfoIndicator({ missing, t }: MissingInfoIndicatorProps) {
-    const { open, setOpen, triggerRef, toggle } = useTapToggleTooltip<HTMLButtonElement>()
+    const { open, onOpenChange, onPointerDown, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
     if (!missing.length) return null
 
     const label = (field: MissingField) =>
         field === 'alt' ? t.dashboard.products.list.missingAlt : t.dashboard.products.list.missingCategory
 
     return (
-        <Tooltip open={open} onOpenChange={setOpen}>
+        <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
                 <button
-                    ref={triggerRef}
+                    ref={ref}
                     type="button"
                     aria-label={t.dashboard.products.list.missingInfoTitle}
-                    onClick={toggle}
+                    onPointerDown={onPointerDown}
+                    onFocus={onFocus}
+                    onClick={onClick}
                     className="inline-flex shrink-0 cursor-help items-center justify-center"
                 >
                     <AlertTriangle className="w-4 h-4 text-warning" aria-hidden="true" />
