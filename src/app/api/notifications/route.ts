@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { isNotFoundError } from '@/lib/api/is-not-found-error'
 import type { NotificationsResponse } from '@/types/notification'
 
 export const dynamic = 'force-dynamic'
@@ -27,8 +28,12 @@ export const GET = withAuth(async (user, request) => {
 
         const payload = await getPayload({ config })
         const url = new URL(request.url)
-        const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50)
-        const offset = parseInt(url.searchParams.get('offset') || '0')
+        // Coerce to safe defaults so non-numeric input (e.g. ?limit=abc → NaN)
+        // can't flow into payload.find and surface as a 500 (GH #1519 bug class).
+        const parsedLimit = parseInt(url.searchParams.get('limit') || '20', 10)
+        const limit = Number.isNaN(parsedLimit) ? 20 : Math.min(Math.max(parsedLimit, 1), 50)
+        const parsedOffset = parseInt(url.searchParams.get('offset') || '0', 10)
+        const offset = Number.isNaN(parsedOffset) || parsedOffset < 0 ? 0 : parsedOffset
         const since = url.searchParams.get('since')
 
         // Resolve tenant ID for this user
@@ -42,13 +47,23 @@ export const GET = withAuth(async (user, request) => {
             return NextResponse.json<NotificationsResponse>({ unreadCount: 0, items: [] })
         }
 
-        // Build where filter
-        const sinceFilter = since ? (() => {
-            const sinceDate = new Date(since)
+        // Parse + validate `since`. Accept either epoch milliseconds (all digits)
+        // or a date string. Reject unparseable values with 400 instead of letting
+        // `new Date(...).toISOString()` throw and surface as a 500 (GH #1519 Bug 1).
+        let sinceFilter: { createdAt: { greater_than: string } } | null = null
+        if (since) {
+            const raw: string | number = /^\d+$/.test(since) ? Number(since) : since
+            const sinceDate = new Date(raw)
+            if (isNaN(sinceDate.getTime())) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'INVALID_SINCE', message: 'Invalid "since" timestamp' } },
+                    { status: 400 },
+                )
+            }
             const now = new Date()
             const effectiveSince = sinceDate > now ? new Date(now.getTime() - 60_000) : sinceDate
-            return { createdAt: { greater_than: effectiveSince.toISOString() } }
-        })() : null
+            sinceFilter = { createdAt: { greater_than: effectiveSince.toISOString() } }
+        }
 
         // Fetch notifications (Payload access control enforces user scoping)
         const result = await payload.find({
@@ -101,6 +116,14 @@ export const GET = withAuth(async (user, request) => {
         })
     } catch (error) {
         console.error('[Notifications GET Error]', error)
+        // A NotFound thrown from Payload is a client-side (bad reference) error,
+        // not a server crash — reclassify as 404 (GH #1519).
+        if (isNotFoundError(error)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Resource not found' } },
+                { status: 404 },
+            )
+        }
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load notifications' } },
             { status: 500 }
