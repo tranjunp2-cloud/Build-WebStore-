@@ -80,7 +80,13 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     WHERE id = ${orderId}
                       AND status IN ('confirmed', 'paid', 'processing')
                       AND easy_parcel_order_no = ${existingShipmentNo}
-                `).catch(() => {})
+                `).catch((err: unknown) => {
+                    // Non-fatal: the next retry heals it — but leave a trace for ops.
+                    payload.logger.warn(
+                        { orderId, err: err instanceof Error ? err.message : String(err) },
+                        '[create-label] crash-remnant status heal failed',
+                    )
+                })
             }
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }

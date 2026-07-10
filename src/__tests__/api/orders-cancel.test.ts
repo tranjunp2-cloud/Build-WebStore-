@@ -612,6 +612,9 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'buyer@test.com' }))
         expect(vi.mocked(orderCancelledEmail)).toHaveBeenCalled()
         expect(vi.mocked(orderRefundedEmail)).not.toHaveBeenCalled()
+        // TC-F36.166: the Stripe forward CAS carries the label-race guard too (the plain-branch
+        // SQL assertion alone would not catch the clause being dropped from this copy)
+        expect(JSON.stringify(mockDrizzleExecute.mock.calls[0][0])).toMatch(/easy_parcel_order_no IS NULL/)
     })
 
     it('[TC-F10-03-27] Stripe cancel blocked when stripeAccountId missing → 422 STRIPE_NOT_REFUNDABLE', async () => {
@@ -842,5 +845,22 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.error.code).toBe('LABEL_EXISTS')
         expect(mockUpdate).not.toHaveBeenCalled()
         expect(mockSendEmail).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F36.166] CAS miss on a transient CLAIM: sentinel → 409 LABEL_IN_PROGRESS (retryable)', async () => {
+        // In-flight create-label claim (TTL 120s): the right client action is retry —
+        // distinct from a real shipment, which needs the EP-dashboard cancel first.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [] })
+            .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', easyParcelOrderNo: 'CLAIM:1760000000000:ab12cd' })
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
+
+        const req = { json: () => Promise.resolve({ reason: 'race with in-flight claim' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        expect(body.error.code).toBe('LABEL_IN_PROGRESS')
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 })

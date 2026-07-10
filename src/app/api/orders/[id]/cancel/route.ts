@@ -119,10 +119,17 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     return NextResponse.json({ success: true, data: recheck, restock: [] })
                 }
                 if ((recheck as any)?.easyParcelOrderNo) {
-                    // CAS missed on the label guard, not a status change — a create-label
-                    // claim or a real EP shipment exists (wallet money committed).
+                    // CAS missed on the label guard, not a status change. CLAIM: = a
+                    // create-label request in flight (transient — retry); a real shipment
+                    // number = wallet money committed (cancel the EP shipment first).
+                    const inFlight = String((recheck as any).easyParcelOrderNo).startsWith('CLAIM:')
                     return NextResponse.json(
-                        { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                        {
+                            success: false,
+                            error: inFlight
+                                ? { code: 'LABEL_IN_PROGRESS', message: 'Label creation is in progress for this order — retry in a moment' }
+                                : { code: 'LABEL_EXISTS', message: 'A shipping label exists for this order — cancel the EasyParcel shipment first' },
+                        },
                         { status: 409 }
                     )
                 }
@@ -251,10 +258,17 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     return NextResponse.json({ success: true, data: recheck, restock: [] })
                 }
                 if ((recheck as any)?.easyParcelOrderNo) {
-                    // CAS missed on the label guard, not a status change — a create-label
-                    // claim or a real EP shipment exists (wallet money committed).
+                    // CAS missed on the label guard, not a status change. CLAIM: = a
+                    // create-label request in flight (transient — retry); a real shipment
+                    // number = wallet money committed (cancel the EP shipment first).
+                    const inFlight = String((recheck as any).easyParcelOrderNo).startsWith('CLAIM:')
                     return NextResponse.json(
-                        { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                        {
+                            success: false,
+                            error: inFlight
+                                ? { code: 'LABEL_IN_PROGRESS', message: 'Label creation is in progress for this order — retry in a moment' }
+                                : { code: 'LABEL_EXISTS', message: 'A shipping label exists for this order — cancel the EasyParcel shipment first' },
+                        },
                         { status: 409 }
                     )
                 }
@@ -331,10 +345,17 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 return NextResponse.json({ success: true, data: recheck, restock: [] })
             }
             if ((recheck as any)?.easyParcelOrderNo) {
-                // CAS missed on the label guard, not a status change — a create-label
-                // claim or a real EP shipment exists (wallet money committed).
+                // CAS missed on the label guard, not a status change. CLAIM: = a
+                // create-label request in flight (transient — retry); a real shipment
+                // number = wallet money committed (cancel the EP shipment first).
+                const inFlight = String((recheck as any).easyParcelOrderNo).startsWith('CLAIM:')
                 return NextResponse.json(
-                    { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                    {
+                        success: false,
+                        error: inFlight
+                            ? { code: 'LABEL_IN_PROGRESS', message: 'Label creation is in progress for this order — retry in a moment' }
+                            : { code: 'LABEL_EXISTS', message: 'A shipping label exists for this order — cancel the EasyParcel shipment first' },
+                    },
                     { status: 409 }
                 )
             }
