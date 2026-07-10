@@ -362,6 +362,57 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 | **TC-F36.149** | Edge | High | **[TBD]** Weight boundary sandbox (0.09/0.1/0/30/50 kg) | Sandbox quotations: weight 0.09, 0.1, 0, 30, 50. | 0.1 accept, 0 reject, 0.09 TBD, 30 (J&T max), 50 (Flash). Ghi kết quả. | §9 checklist |
 | **TC-F36.150** | Edge | Medium | **[TBD]** Dim boundary sandbox (>150cm, fractional) | Sandbox: width=160, dims fractional 30.5. | >150 reject/accept? fractional round? Ghi kết quả. | §9 checklist |
 
+### 3.18b Collection method resolution (US-F36-07 correction 2026-07-10)
+
+> Bug live 2026-07-10: chọn Pickup nhưng EP tạo đơn drop-off. Root cause: EP model pickup/drop-off
+> là SERVICE VARIANT riêng (submit không có flag method — service_id quyết định); checkout
+> `pickCheapest` chốt variant rẻ nhất (thường drop-off) và UI method không được gửi/resolve.
+> Fix: giữ `is_pickup`/`is_dropoff` trong RateOption + resolver live tại create-label
+> (`resolve-collection-method.ts`) đổi sang variant cùng courier khớp method trước submit.
+
+| TC | Type | Priority | Title | Steps | Expected | Refs |
+|----|------|----------|-------|-------|----------|------|
+| **TC-F36.151** | Func | Critical | Stored service khớp method → giữ nguyên | Resolver: quote trả stored service `is_pickup=true`, method=pickup. | `{ok:true, changed:false, serviceId=stored}` — không đổi service, không đổi giá. | US-F36-07 |
+| **TC-F36.152** | Func | Critical | Stored drop-off-only + method=pickup → đổi variant pickup rẻ nhất cùng courier | Resolver: stored `is_pickup=false,is_dropoff=true`; quote có 2 variant pickup cùng courier_id (giá khác nhau) + 1 variant NaN price. | `{ok:true, changed:true}` với serviceId của variant pickup RẺ NHẤT có giá hợp lệ (NaN bị loại); trả serviceName + priceRm. | US-F36-07 |
+| **TC-F36.153** | Func | Critical | Courier không có variant nào cho method → METHOD_NOT_SUPPORTED | Resolver: mọi service cùng courier đều `is_pickup=false`, method=pickup. | `{ok:false, supported:['dropoff']}` → route trả 422 `METHOD_NOT_SUPPORTED`, KHÔNG gọi submit (ví không bị charge). | US-F36-07 |
+| **TC-F36.154** | Edge | High | Quotation lỗi → fail-open dùng stored service | Resolver: `quotations` throw. | `{ok:true, changed:false}` — submit vẫn là authority, không chặn label vì quote hỏng. | US-F36-07 |
+| **TC-F36.155** | Edge | High | Stored service vắng mặt trong quote → fail-open | Resolver: quote không chứa stored service_id. | `{ok:true, changed:false}`. | US-F36-07 |
+| **TC-F36.156** | Func | High | getRates giữ `isPickup`/`isDropoff` từ quotation | getRates với EP quote `is_pickup/is_dropoff`. | RateOption có `isPickup`/`isDropoff` đúng giá trị (flat fallback: absent). | US-F36-07 |
+
+### 3.18c Async AWB — awb_number null lúc submit (verified live 2026-07-10, Pos)
+
+> Submit success có thể trả `awb_number: null` (courier sinh AWB sau) — shipment ĐÃ tạo, ví ĐÃ trừ.
+> Bug live: UI gate success trên `awbNo` → vẫn hiện "Ready to Ship" cho label đã mua. Cron sync
+> KHÔNG backfill được (trackingStatus query THEO awb) → đường duy nhất nhận AWB là webhook
+> match theo `shipment_number`. Yêu cầu ops: đăng ký thêm topic **Shipment AWB Update** trên EP portal.
+
+| TC | Type | Priority | Title | Steps | Expected | Refs |
+|----|------|----------|-------|-------|----------|------|
+| **TC-F36.157** | Func | Critical | Fulfill state success theo shipment number, không theo AWB | `deriveFulfillState`: `ready_to_ship` + `easyParcelOrderNo` set + `awbNo` null. | `'success'` (banner label created, Print disabled, hint "AWB pending"). `CLAIM:` sentinel → KHÔNG success. | US-F36-05 |
+| **TC-F36.158** | Func | Critical | Webhook backfill AWB qua shipment_number khi awb lookup miss | Webhook payload awb + shipment_number + status code; DB không có order nào mang awb đó nhưng có order `easyParcelOrderNo` khớp, `awbNo` null. | Order được update `awbNo`+`trackingNumber` = awb payload, rồi applyTrackingUpdate chạy bình thường (matched:true). Order đã có AWB khác → KHÔNG clobber (order_not_found). | US-F36-06 |
+
+### 3.18d Mark shipment cancelled — merchant attest (mới 2026-07-10)
+
+> Verified live 2026-07-10: EP **không** dispatch webhook cho cancel thao tác trên dashboard
+> (EP delivery log trống, pipeline nhận đã chứng minh thông) + cron không poll được đơn chưa có
+> AWB → đơn `ready_to_ship` có shipment đã hủy bị kẹt vĩnh viễn (không cancel/refund/re-label/
+> self-deliver). Flow mới (THUẦN BỔ SUNG): seller tự xác nhận đã hủy trên EP →
+> `POST /api/orders/[id]/mark-shipment-cancelled` clear EP fields (giữ audit trong tracking
+> history) → zone quay về màn create-label sẵn có để tạo label mới. Trust model: tiền cước là
+> ví EP của chính seller; khai sai chỉ rủi ro ví họ (double booking) — confirm dialog cảnh báo.
+
+| TC | Type | Priority | Title | Steps | Expected | Refs |
+|----|------|----------|-------|-------|----------|------|
+| **TC-F36.159** | Func | Critical | Mark cancelled happy path — CAS clear + về `confirmed` + audit history | Order `ready_to_ship` + `easyParcelOrderNo` thật. POST mark-shipment-cancelled. | 200 `{status:'confirmed'}`; CAS 1 lần: `status='confirmed'` (mở lại CẢ create-label lẫn /cancel theo BR-Cancel-02) + clear `easyParcelOrderNo/awbNo/trackingNumber/labelUrl(s)/pickupScheduledAt/codStatus`, tracking=`cancelled`; history append entry chứa shipment + AWB cũ. | §3.18d |
+| **TC-F36.160** | Func | Critical | Guards: không shipment / CLAIM: / sai status / not found | (a) `easyParcelOrderNo` null → 422 `NO_EP_SHIPMENT`; (b) `CLAIM:` sentinel → 422 `NO_EP_SHIPMENT`; (c) status `shipped` → 422 `INVALID_TRANSITION`; (d) order không tồn tại → 404. | Không có write nào xảy ra ở mọi nhánh guard. | §3.18d |
+| **TC-F36.161** | Edge | High | Concurrent: CAS miss → idempotent hoặc 409 | 2 request song song; hoặc order đổi trạng thái giữa chừng. | Loser: nếu shipment đã cleared → 200 `alreadyMarked` (không append history trùng); nếu order còn shipment/đổi status → 409 `CONFLICT`. | §3.18d |
+| **TC-F36.162** | Func | High | Sau clear, zone quay về màn create-label + cancel mở lại | `deriveFulfillState`: `confirmed` + không shipment/awb + `shippingCourier` + `parcelWeight` còn. | `'ready'` — hiện lại màn Create label (method + date) sẵn có; create-label chạy lại qua idempotency NULL. Order-actions: nút Cancel hiện lại (`isCancelAllowed('confirmed')`). | §3.18d |
+| **TC-F36.163** | Money | Critical | create-label status guard trong claim CAS (review #1582) | Đơn confirmed; /cancel (refund) và create-label chạy song song, /cancel thắng trước. | Claim CAS có `AND status IN ('confirmed','paid','processing')` → create-label thua trả 422 `INVALID_TRANSITION` (không phải 409); KHÔNG charge ví EP, KHÔNG resurrect đơn cancelled lên ready_to_ship. Manual/race test — verify bằng đọc SQL + recheck branch. | §3.18d |
+| **TC-F36.164** | Money | Critical | Resolver ưu tiên variant COD khi đơn COD (review #1582) | Đơn COD, method=pickup; courier có variant pickup rẻ KHÔNG COD + variant pickup đắt hơn CÓ COD. | Chọn variant CÓ COD (tránh false `COD_NOT_ELIGIBLE`). Không có variant COD nào → fallback cheapest, COD gate downstream báo chính xác kèm recovery panel. | §3.18b |
+| **TC-F36.165** | Func | High | Client dùng `supported[]` từ 422 METHOD_NOT_SUPPORTED (review #1582) | Server trả `supported: []` (courier không hỗ trợ cả 2 method — EP flag anomaly). | Cả 2 option disable, KHÔNG auto-flip vào method cũng unsupported, CTA Ready-to-Ship disable, toast `methodNoneSupported`. Không loop 422. Manual/UI. | §3.18b |
+| **TC-F36.166** | Money | Critical | /cancel guard label-free (review #1582 round 2-3) | /cancel chen vào cửa sổ claim→submit của create-label (order đang giữ `CLAIM:` hoặc shipment thật). | Cả 3 CAS tiến của /cancel có `AND easy_parcel_order_no IS NULL` → cancel thua khi label đang/đã book. CAS miss vì label → **409**: shipment thật → `LABEL_EXISTS` ("cancel the EP shipment first"); `CLAIM:` transient → `LABEL_IN_PROGRESS` (retry). 2 CAS rollback KHÔNG có guard (phải luôn restore được). Enum defensive `'paid'` trong db-setup. 3 unit tests + 1 SQL assertion trong test Stripe (TC-F10-03-26) khóa guard ở CAS xendit/stripe. | §3.18d |
+| **TC-F36.167** | Func | High | Crash-remnant self-heal trong nhánh alreadyCreated (review #1582 round 3) | create-label ghi shipment + flip status bằng 2 update riêng; crash giữa chừng → order pre-ship (`confirmed/paid/processing`) giữ shipment THẬT. Merchant bấm lại Ready to Ship. | Nhánh idempotency `alreadyCreated` CAS flip status → `ready_to_ship` (WHERE khớp đúng shipment đã đọc, không đụng cancelled/shipped) → UI ra state success, mở lại lối mark-shipment-cancelled → /cancel. Manual/api. | §3.18d |
+
 ---
 
 ### 3.19 Additional Edge & Integration

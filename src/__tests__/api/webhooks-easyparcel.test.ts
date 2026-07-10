@@ -702,3 +702,88 @@ describe('applyTrackingUpdate (unit)', () => {
     expect(historyArray[1].eventTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/)
   })
 })
+
+// ─── TC-F36.158: async-AWB backfill via shipment_number (docs/qa §3.18c) ──────
+// Submit can return awb_number null (courier generates it later) — the order holds
+// only easyParcelOrderNo, so the AWB lookup misses. The webhook must adopt the AWB
+// onto that order (the sync cron can't: trackingStatus queries BY awb).
+
+describe('POST /api/webhooks/easyparcel — async-AWB backfill', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+  })
+
+  afterEach(() => {
+    delete process.env.EASYPARCEL_WEBHOOK_SECRET
+  })
+
+  it('[TC-F36.158] awb miss + shipment_number match + awbNo null → backfills awb, then applies tracking update', async () => {
+    // Arrange
+    const order = {
+      id: 'order-77',
+      status: 'ready_to_ship',
+      awbNo: null,
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [],
+    }
+    mockFind
+      .mockResolvedValueOnce({ docs: [] })        // 1: awbNo/trackingNumber lookup misses
+      .mockResolvedValueOnce({ docs: [order] })   // 2: easyParcelOrderNo match
+      .mockResolvedValue({ docs: [order] })       // 3+: F8 re-read inside applyTrackingUpdate
+    mockUpdate.mockResolvedValue({ id: 'order-77' })
+
+    // Act
+    const res = await callPost('my-secret', {
+      awb_number: 'POS111222333',
+      shipment_number: 'EI-77XYZ',
+      shipment_status_code: 3,
+    })
+    const body = await res.json()
+
+    // Assert
+    expect(res.status).toBe(200)
+    expect(body.matched).toBe(true)
+    expect(body.result).toBe('updated')
+    expect(mockFind).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      collection: 'orders',
+      where: { easyParcelOrderNo: { equals: 'EI-77XYZ' } },
+    }))
+    // 1st update = AWB backfill; 2nd = tracking write (applyTrackingUpdate)
+    expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+      collection: 'orders',
+      id: 'order-77',
+      data: { awbNo: 'POS111222333', trackingNumber: 'POS111222333' },
+    })
+    expect(mockUpdate.mock.calls[1][0].data).toMatchObject({ shippingTrackingStatus: 'picked_up' })
+  })
+
+  it('[TC-F36.158] shipment_number matches an order holding a DIFFERENT awb → no clobber, order_not_found', async () => {
+    // Arrange — the stored AWB belongs to another shipment; adopting would corrupt it
+    mockFind
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValueOnce({
+        docs: [{
+          id: 'order-88',
+          status: 'ready_to_ship',
+          awbNo: 'OTHER999',
+          shippingTrackingStatus: 'pending_pickup',
+          shippingTrackingHistory: [],
+        }],
+      })
+
+    // Act
+    const res = await callPost('my-secret', {
+      awb_number: 'POS111',
+      shipment_number: 'EI-88',
+      shipment_status_code: 3,
+    })
+    const body = await res.json()
+
+    // Assert
+    expect(res.status).toBe(200)
+    expect(body.matched).toBe(false)
+    expect(body.reason).toBe('order_not_found')
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+})

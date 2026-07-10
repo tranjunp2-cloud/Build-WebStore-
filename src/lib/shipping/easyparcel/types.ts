@@ -25,6 +25,11 @@ export interface RateOption {
     codMaxSen?: number    // max COD amount in sen (from API, R1 gate)
     estDelivery: string
     degraded?: boolean    // true = fallback flat rate used
+    // Collection capability of the SERVICE (EP models pickup vs drop-off as separate
+    // service variants — there is no method flag on submit; the service_id decides it).
+    // Optional: absent on flat-rate fallback (not an EP service).
+    isPickup?: boolean
+    isDropoff?: boolean
 }
 
 // --- OAuth ---

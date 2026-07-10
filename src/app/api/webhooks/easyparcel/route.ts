@@ -170,9 +170,49 @@ export async function POST(req: Request) {
             depth: 0,
             overrideAccess: true,
         })
-        const order = found.docs[0] as
-            | { id: string | number; status?: string; shippingTrackingStatus?: string | null; shippingTrackingHistory?: { status: string; description: string; eventTime: string }[] | null }
-            | undefined
+        type WebhookOrder = {
+            id: string | number
+            status?: string
+            awbNo?: string | null
+            shippingTrackingStatus?: string | null
+            shippingTrackingHistory?: { status: string; description: string; eventTime: string }[] | null
+        }
+        let order = found.docs[0] as WebhookOrder | undefined
+
+        // Async-AWB backfill: submit can return awb_number null (courier generates it later
+        // — verified live 2026-07-10, Pos), so the order holds only easyParcelOrderNo and
+        // the AWB lookup above misses. If the payload carries the shipment_number, match on
+        // it and adopt this AWB — the only automatic path that ever delivers the AWB (the
+        // sync cron can't poll: trackingStatus queries BY awb). Requires the "Shipment AWB
+        // Update" webhook topic to be registered alongside the two status topics.
+        if (!order) {
+            const shipmentNo = extractField(body, ['shipment_number'])
+            if (shipmentNo) {
+                const byShipment = await payload.find({
+                    collection: 'orders',
+                    where: { easyParcelOrderNo: { equals: shipmentNo } },
+                    limit: 1,
+                    depth: 0,
+                    overrideAccess: true,
+                })
+                const candidate = byShipment.docs[0] as WebhookOrder | undefined
+                // Only adopt onto an AWB-less order — a different stored AWB means this
+                // webhook belongs to another shipment and must not clobber it.
+                if (candidate && !candidate.awbNo) {
+                    await payload.update({
+                        collection: 'orders',
+                        id: candidate.id,
+                        data: { awbNo: awb, trackingNumber: awb } as Record<string, unknown>,
+                        overrideAccess: true,
+                    })
+                    payload.logger.info(
+                        { orderId: candidate.id, awb, shipmentNo },
+                        '[ep-webhook] awb backfilled via shipment_number match',
+                    )
+                    order = candidate
+                }
+            }
+        }
 
         if (!order) {
             // 200 (not 404) — permanent mismatch must not trigger EP retry storms
