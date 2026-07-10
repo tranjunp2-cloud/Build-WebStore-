@@ -2066,7 +2066,22 @@ export default function EditorPage() {
         }
     }, [])
 
-    const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
+    const handleMobileBlockSelect = useCallback((blockIndex: number | null, blockType?: string) => {
+        // GH-1557 Bug 7: nav/footer/breadcrumb aren't in `blocks`/`globalBlocks` (no
+        // currentBlock resolves for them) — route to SettingsPanel's Menu tab like desktop's
+        // handleBlockSelectWithContext, but still open the compact sheet (unlike desktop,
+        // whose SettingsPanel is always mounted, this sheet only mounts on demand).
+        if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
+            setSelectedBlock(null)
+            setSelectedGlobalBlockType(null)
+            const sectionMap: Record<string, string> = { breadcrumb: 'breadcrumb', footer: 'footer' }
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: sectionMap[blockType] })
+            if (isCompactLayout) {
+                setIsMobileSettingsOpen(true)
+                setToolsSheetOpen(false) // Phase 03: XOR — block sheet takes over from the Tools sheet
+            }
+            return
+        }
         setSelectedBlock(blockIndex)
         // Floating blocks route via onEditGlobalBlock → handleBlockSelectWithContext, not here.
         // Guard clears global type state when switching to a page block (index >= 0 or null).
