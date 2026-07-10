@@ -64,14 +64,14 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
         : undefined;
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-80px)] w-full sm:max-w-[560px] sm:mx-auto xl:hidden bg-background text-white pt-6 pb-[120px] relative" style={{ fontFamily: "'Inter', sans-serif" }}>
-            
+        <div className="flex flex-col min-h-[calc(100vh-80px)] w-full sm:max-w-[560px] sm:mx-auto xl:hidden bg-background text-foreground pt-6 pb-[120px] relative" style={{ fontFamily: "'Inter', sans-serif" }}>
+
             {/* Header */}
             <div className="flex items-center gap-4 px-4 mb-8">
                 <button onClick={onClose} className="p-2 -ml-2 rounded-xl shrink-0 transition-opacity hover:opacity-70 bg-transparent border-none appearance-none outline-none">
-                    <ArrowLeft className="w-6 h-6 text-white" />
+                    <ArrowLeft className="w-6 h-6 text-foreground" />
                 </button>
-                <h1 className="text-[24px] font-bold text-white uppercase tracking-wider">{t.dashboard?.products?.mobile?.productDetails || 'PRODUCT DETAILS'}</h1>
+                <h1 className="text-[24px] font-bold text-foreground uppercase tracking-wider">{t.dashboard?.products?.mobile?.productDetails || 'PRODUCT DETAILS'}</h1>
             </div>
 
             <div className="flex flex-col gap-6">
