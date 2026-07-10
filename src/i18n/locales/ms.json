@@ -3028,7 +3028,13 @@
                 "sitemapError": "Tidak dapat menjana peta laman",
                 "metaOn": "Tag meta automatik dihidupkan",
                 "metaOff": "Tag meta automatik dimatikan",
-                "metaError": "Tidak dapat mengemas kini tetapan"
+                "metaError": "Tidak dapat mengemas kini tetapan",
+                "aiCrawlers": "Benarkan crawler AI mengindeks laman web anda",
+                "aiCrawlersTip": "Membolehkan pembantu AI seperti ChatGPT, Perplexity dan Gemini membaca kedai anda supaya mereka boleh mengesyorkan perniagaan anda.",
+                "aiCrawlersDesc": "Membenarkan GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot mengindeks laman ini supaya ChatGPT/Perplexity/Gemini boleh mengesyorkan perniagaan anda.",
+                "aiCrawlersOn": "Crawler AI dihidupkan",
+                "aiCrawlersOff": "Crawler AI dimatikan",
+                "aiCrawlersError": "Tidak dapat mengemas kini tetapan"
             },
             "orders": {
                 "title": "Pesanan belum selesai",

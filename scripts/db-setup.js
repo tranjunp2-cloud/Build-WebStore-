@@ -2526,6 +2526,11 @@ const MIGRATIONS = [
     name: 'sites.seo_auto_meta_enabled',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS seo_auto_meta_enabled boolean DEFAULT true;`,
   },
+  // ── F37-03: AI crawler permissions toggle ──
+  {
+    name: 'sites.ai_crawlers_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_crawlers_enabled boolean DEFAULT true;`,
+  },
   // ── F23: Custom Subdomain Slug — previousSlugs array ──
   {
     name: 'tenants_previous_slugs.create_table',

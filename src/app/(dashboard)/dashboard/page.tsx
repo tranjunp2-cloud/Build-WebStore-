@@ -144,7 +144,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'seo':
                 return seo ? <SeoHealth key="seo" data={seo} /> : null
             case 'tools':
-                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} /> : null
+                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} aiCrawlersEnabled={seo.aiCrawlersEnabled} /> : null
             case 'orders':
                 return <PendingOrders key="orders" />
             default:
