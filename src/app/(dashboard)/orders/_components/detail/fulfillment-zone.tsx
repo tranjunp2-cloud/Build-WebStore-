@@ -93,8 +93,16 @@ export function deriveFulfillState(order: FulfillmentOrder): FulfillState {
   // EP shipped/transit
   if (status === 'shipped') return 'shipping'
 
-  // EP label already created → success/ready-to-ship holding state
-  if (awbNo && status === 'ready_to_ship') return 'success'
+  // EP label already created → success/ready-to-ship holding state.
+  // Gate on the shipment number, not the AWB: submit can return awb_number null (the
+  // courier generates it asynchronously, e.g. Pos) while the shipment IS created and the
+  // wallet charged — keying on awbNo alone re-offers "Ready to Ship" for a bought label.
+  // A CLAIM: sentinel is an in-flight create-label request, not a created shipment.
+  const epShipmentNo =
+    order.easyParcelOrderNo && !order.easyParcelOrderNo.startsWith('CLAIM:')
+      ? order.easyParcelOrderNo
+      : null
+  if ((awbNo || epShipmentNo) && status === 'ready_to_ship') return 'success'
 
   // Pending states (COD / awaiting confirmation) — must run BEFORE EP-config branch so that
   // an unconfirmed order in an EP-off/no-courier tenant shows "Confirm order", not self-delivery.
@@ -159,6 +167,15 @@ export function FulfillmentZone({
   // After label created: optimistically show awbNo + labelUrl before refetch
   const [localAwb, setLocalAwb] = useState<string | null>(null)
   const [localLabelUrl, setLocalLabelUrl] = useState<string | null>(null)
+  // Async-AWB case: create-label succeeded with awbNo null — flip to success immediately
+  // (the refetched order carries easyParcelOrderNo, but don't wait a round-trip to show it)
+  const [localCreated, setLocalCreated] = useState(false)
+
+  // Mark-shipment-cancelled (merchant attest — EP sends no webhook for dashboard cancels):
+  // two-step inline confirm, then clear EP fields server-side → zone falls back to 'ready'
+  // so the merchant re-creates a label through the normal existing flow.
+  const [markCancelOpen, setMarkCancelOpen] = useState(false)
+  const [markCancelBusy, setMarkCancelBusy] = useState(false)
 
   // Missing-data override: user clicked "Ready to Ship" but EP returned MISSING_*
   const [forceMissing, setForceMissing] = useState(false)
@@ -210,7 +227,10 @@ export function FulfillmentZone({
     }
   }, [order.id, onUpdate, f])
 
-  const state = forceCodBlocked ? 'cod-blocked' : forceMissing ? 'missing-data' : deriveFulfillState(order)
+  const derived = forceCodBlocked ? 'cod-blocked' : forceMissing ? 'missing-data' : deriveFulfillState(order)
+  // Optimistic success after create-label with a null AWB (async-AWB couriers): the stale
+  // `order` prop has no easyParcelOrderNo yet, so derive still says 'ready' until refetch.
+  const state = localCreated && derived === 'ready' ? 'success' : derived
 
   // ── Pending ───────────────────────────────────────────────────────────────
   if (state === 'pending') {
@@ -330,6 +350,7 @@ export function FulfillmentZone({
           onSuccess={(newAwb, newLabel) => {
             setLocalAwb(newAwb)
             setLocalLabelUrl(newLabel)
+            setLocalCreated(true)
             setForceMissing(false)
             onUpdate()
           }}
@@ -380,6 +401,7 @@ export function FulfillmentZone({
           onSuccess={(newAwb, newLabel) => {
             setLocalAwb(newAwb)
             setLocalLabelUrl(newLabel)
+            setLocalCreated(true)
             // Wallet was charged for the label — refetch balance on next read
             invalidateEpShippingInfo(tenantId)
             onUpdate()
@@ -426,7 +448,7 @@ export function FulfillmentZone({
                 </div>
               </div>
 
-              {awbNo && (
+              {awbNo ? (
                 <div className="st-field grow">
                   <div className="od-info-l">{f.trackingAwb}</div>
                   <div className="copyfield">
@@ -437,6 +459,15 @@ export function FulfillmentZone({
                     >
                       <Copy style={{ width: 13, height: 13 }} /> {f.copy}
                     </button>
+                  </div>
+                </div>
+              ) : (
+                // Async-AWB couriers (e.g. Pos): shipment created + wallet charged, AWB
+                // generated later and lands via webhook backfill. Print unlocks with it.
+                <div className="st-field grow">
+                  <div className="od-info-l">{f.trackingAwb}</div>
+                  <div style={{ fontSize: 13, opacity: 0.75, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Clock style={{ width: 13, height: 13, flexShrink: 0 }} /> {f.awbPending}
                   </div>
                 </div>
               )}
@@ -472,6 +503,70 @@ export function FulfillmentZone({
               </div>
             </div>
           </div>
+
+          {/* Merchant attest: shipment cancelled on the EP dashboard. EP dispatches NO
+              webhook for dashboard cancels (verified live 2026-07-10) and AWB-less
+              shipments can't be cron-polled — without this the order shows "Label
+              created" forever. Clearing re-arms the normal create-label flow. */}
+          {!markCancelOpen ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ alignSelf: 'flex-start', marginTop: 8, opacity: 0.85 }}
+              onClick={() => setMarkCancelOpen(true)}
+            >
+              <XCircle style={{ width: 14, height: 14 }} /> {f.markCancelled}
+            </button>
+          ) : (
+            <div className="alert error" role="alertdialog" style={{ marginTop: 8 }}>
+              <XCircle className="lead" style={{ width: 17, height: 17, flexShrink: 0, marginTop: 1 }} />
+              <div className="a-body">
+                <div className="a-t">{f.markCancelledConfirmTitle}</div>
+                {f.markCancelledConfirmDesc}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={markCancelBusy}
+                    onClick={async () => {
+                      setMarkCancelBusy(true)
+                      try {
+                        const res = await fetch(`/api/orders/${order.id}/mark-shipment-cancelled`, { method: 'POST' })
+                        const data = await res.json().catch(() => null)
+                        if (!res.ok && !data?.success) {
+                          const rawMsg = data?.error?.message
+                          toast.error(typeof rawMsg === 'string' ? rawMsg : f.markCancelledFailed)
+                          return
+                        }
+                        toast.success(f.markCancelledDone)
+                        // Reset the optimistic label state or the zone would stay 'success'
+                        setLocalAwb(null)
+                        setLocalLabelUrl(null)
+                        setLocalCreated(false)
+                        setMarkCancelOpen(false)
+                        onUpdate()
+                      } catch {
+                        toast.error(f.markCancelledFailed)
+                      } finally {
+                        setMarkCancelBusy(false)
+                      }
+                    }}
+                  >
+                    {markCancelBusy ? <span className="spin" /> : <XCircle style={{ width: 14, height: 14 }} />}
+                    {f.markCancelledYes}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={markCancelBusy}
+                    onClick={() => setMarkCancelOpen(false)}
+                  >
+                    {f.markCancelledNo}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {printOpen && (

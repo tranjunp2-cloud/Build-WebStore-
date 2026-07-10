@@ -1419,6 +1419,14 @@
                 "handToCourierFallback": "Label penghantaran dicipta. Serahkan kepada kurier.",
                 "courier": "Kurier",
                 "trackingAwb": "Nombor penjejakan (AWB)",
+                "awbPending": "Sedang dijana oleh kurier — akan dipaparkan di sini secara automatik",
+                "markCancelled": "Saya telah membatalkan penghantaran ini di EasyParcel",
+                "markCancelledConfirmTitle": "Tandakan penghantaran sebagai dibatalkan?",
+                "markCancelledConfirmDesc": "Sahkan hanya jika anda telah membatalkan penghantaran ini di dashboard EasyParcel (kos penghantaran dikembalikan ke dompet EP anda). Pesanan kembali ke status Confirmed — anda boleh cipta label baharu atau batalkan pesanan. Menempah semula semasa penghantaran lama masih aktif akan mengecaj dompet anda dua kali.",
+                "markCancelledYes": "Ya, penghantaran telah dibatalkan",
+                "markCancelledNo": "Kekalkan label",
+                "markCancelledDone": "Penghantaran ditanda sebagai dibatalkan — cipta label baharu atau batalkan pesanan",
+                "markCancelledFailed": "Tidak dapat menanda penghantaran sebagai dibatalkan",
                 "copy": "Salin",
                 "copied": "Disalin!",
                 "printLabel": "Cetak label (PDF)",
@@ -1468,7 +1476,10 @@
                 "cutoffHint": "Cipta sebelum {time} (MYT) untuk pengambilan hari yang sama",
                 "dropoffHint": "Hantar bungkusan ke pusat kurier pada tarikh ini",
                 "weekendWarning": "Pengambilan hanya pada hari bekerja — pilih hari bekerja",
-                "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)"
+                "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)",
+                "methodNoPickup": "Kurier ini hanya menyokong drop-off untuk laluan ini",
+                "methodNoDropoff": "Kurier ini hanya menyokong pengambilan untuk laluan ini",
+                "serviceSwitched": "Ditempah {service} ({amount}) mengikut kaedah pengambilan anda"
             },
             "pickup": {
                 "title": "Jadualkan pengambilan",

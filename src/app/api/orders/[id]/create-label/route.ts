@@ -12,6 +12,7 @@ import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easypar
 import { clampCollectionDate } from '@/lib/shipping/easyparcel/pickup-schedule'
 import { buildSubmitParams } from './build-submit-params'
 import { verifyCodEligibilityLive } from './verify-cod-eligibility'
+import { resolveServiceForMethod, type CollectionMethod } from './resolve-collection-method'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -27,15 +28,18 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const orderId = Number.isFinite(Number(id)) ? Number(id) : id
         const payload = await getPayload({ config })
 
-        // Parse optional body (parcel weight override, collection date)
+        // Parse optional body (parcel weight override, collection date, collection method)
         let parcelWeightGrams: number | undefined
         let collectionDate: string | undefined
+        let method: CollectionMethod | undefined
         try {
             const body = await request.json()
             if (typeof body?.parcelWeightGrams === 'number') parcelWeightGrams = body.parcelWeightGrams
             if (typeof body?.collectionDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.collectionDate)) {
                 collectionDate = body.collectionDate
             }
+            // Absent method = legacy client → skip resolution, submit the stored service as-is
+            if (body?.method === 'pickup' || body?.method === 'dropoff') method = body.method
         } catch { /* empty body is fine */ }
 
         // Load order with depth=2 to resolve tenant
@@ -137,6 +141,47 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const courier = (order as any).shippingCourier as string | undefined
         const weightGrams = parcelWeightGrams ?? ((order as any).parcelWeight as number | undefined) ?? 500
 
+        // US-F36-07 correction: honor the merchant's pickup/drop-off choice. EP has no method
+        // flag on submit — the service_id variant decides collection, and checkout stored the
+        // cheapest variant (often drop-off). Resolve BEFORE the CAS claim (read-only quote, no
+        // claim to release) and use the effective service for the COD gate + submit below.
+        let effectiveServiceId = shippingServiceId
+        let serviceSwitched: { serviceName: string; priceRm: number | null } | null = null
+        if (method) {
+            const resolved = await resolveServiceForMethod({
+                token,
+                senderPostcode: warehouse.postcode ?? '',
+                senderState: warehouse.state ?? '',
+                receiverPostcode: shippingAddress.postcode,
+                receiverState: shippingAddress.state ?? '',
+                weightGrams,
+                parcelValueRm: (order as any).total ?? 0,
+                serviceId: shippingServiceId,
+                method,
+            })
+            if (!resolved.ok) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'METHOD_NOT_SUPPORTED',
+                            message: `This courier does not support ${method} on this route`,
+                            supported: resolved.supported,
+                        },
+                    },
+                    { status: 422 },
+                )
+            }
+            if (resolved.changed) {
+                effectiveServiceId = resolved.serviceId
+                serviceSwitched = { serviceName: resolved.serviceName, priceRm: resolved.priceRm }
+                payload.logger.info(
+                    { orderId, from: shippingServiceId, to: resolved.serviceId, method },
+                    '[create-label] service switched to match collection method',
+                )
+            }
+        }
+
         // US-F36-07 AC-3b: never trust the client's collection date — re-compute the
         // earliest (cut-off aware, MYT) at request time and clamp past/weekend dates.
         // The shifted flag is returned so the UI can tell the merchant the date moved.
@@ -158,7 +203,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 weightGrams,
                 parcelValueRm: (order as any).total ?? 0,
                 codAmountSen,
-                serviceId: shippingServiceId,
+                serviceId: effectiveServiceId,
             })
             if (!codCheck.ok) {
                 return NextResponse.json(
@@ -182,7 +227,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             customerName: (order as any).customerName ?? '',
             customerPhone: (order as any).customerPhone ?? '',
             total: (order as any).total ?? 0,
-            shippingServiceId,
+            shippingServiceId: effectiveServiceId,
             shippingCourier: courier,
             weightGrams,
             collectionDate: collection.date,
@@ -306,6 +351,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 // shown as the locked "Pickup · DD/MM" line on the order detail.
                 pickupScheduledAt: collection.date,
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
+                // Method resolution booked a different service variant — keep the order's
+                // service in sync with what EP actually charged/booked.
+                ...(effectiveServiceId !== shippingServiceId ? { shippingServiceId: effectiveServiceId } : {}),
             } as any,
         })
 
@@ -324,6 +372,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 labelUrl,
                 collectionDate: collection.date,
                 collectionDateShifted: collection.shifted,
+                // Non-null when the stored service couldn't do the requested method and a
+                // same-courier variant was booked instead (wallet charged that variant's price)
+                serviceSwitched,
             },
         })
     } catch (error: unknown) {
