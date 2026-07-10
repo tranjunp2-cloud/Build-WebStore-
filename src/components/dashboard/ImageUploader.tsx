@@ -224,15 +224,15 @@ export function ImageUploader({
                                             type="button"
                                             title={img.alt}
                                             aria-label={t.dashboard.imageUploader?.editAltText || 'Edit Alt text'}
-                                            className="mt-1 flex w-full items-center gap-1 rounded-[6px] px-0.5 py-[3px] text-left text-[11px] text-white/50 transition-colors hover:bg-white/5 hover:text-white/80"
+                                            className="mt-1 flex w-full items-center gap-1 rounded-[6px] px-0.5 py-[3px] text-left text-[11px] text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                                         >
                                             <span className="min-w-0 flex-1 truncate">{img.alt}</span>
-                                            <Pencil className="h-3 w-3 shrink-0 text-white/30" />
+                                            <Pencil className="h-3 w-3 shrink-0 text-[hsl(var(--muted-foreground))]" />
                                         </button>
                                     ) : (
                                         <button
                                             type="button"
-                                            className="mt-1 w-full rounded-[6px] px-0.5 py-[3px] text-left text-[11px] font-medium text-[hsl(var(--primary))] transition-colors hover:bg-white/5"
+                                            className="mt-1 w-full rounded-[6px] px-0.5 py-[3px] text-left text-[11px] font-medium text-[hsl(var(--primary))] transition-colors hover:bg-[hsl(var(--muted))]"
                                         >
                                             {t.dashboard.imageUploader?.addAltText || '+ Add Alt text'}
                                         </button>
@@ -269,7 +269,7 @@ export function ImageUploader({
                                         <button
                                             type="button"
                                             onClick={() => setOpenAltId(null)}
-                                            className="rounded-[7px] border border-[hsl(var(--input-border))] px-3 py-1.5 text-[12px] font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:bg-white/5"
+                                            className="rounded-[7px] border border-[hsl(var(--input-border))] px-3 py-1.5 text-[12px] font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))]"
                                         >
                                             {t.dashboard.imageUploader?.cancel || 'Cancel'}
                                         </button>

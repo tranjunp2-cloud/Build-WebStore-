@@ -51,9 +51,9 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
         expect(badge.className).toContain('rounded-md')
     })
 
-    // ── TC-F08-1525-21: Range with breakdown → Tooltip wrapper ────────────────
+    // ── TC-F08-1525-21: Multi-variant total with breakdown → Tooltip wrapper ──
 
-    it('TC-F08-1525-21: range stock with breakdown → renders Tooltip trigger + Badge + breakdown content', () => {
+    it('TC-F08-1525-21: multi-variant stock with breakdown → renders Tooltip trigger + total Badge + breakdown content', () => {
         // Arrange
         const product = {
             hasVariants: true,
@@ -86,8 +86,8 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
             </TooltipProvider>,
         )
 
-        // Assert
-        const badge = screen.getByText('5 - 15')
+        // Assert — label is the master-inventory total (5+15=20), not a "5 - 15" range
+        const badge = screen.getByText('20')
         expect(badge).toBeInTheDocument()
         expect(badge.className).toContain('rounded-md')
 
@@ -97,9 +97,9 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
         expect(screen.getAllByText('Blue-L: 15').length).toBeGreaterThan(0)
     })
 
-    // ── TC-F08-1525-22: Single variant → single number with breakdown populated ──
+    // ── TC-F08-1525-22: Single variant → total (=that variant's stock), showVariantCount=true ──
 
-    it('TC-F08-1525-22: single variant (1 option) → single number badge, breakdown still populated', () => {
+    it('TC-F08-1525-22: single variant (1 option) → total badge, showVariantCount=true so caller shows "1 variant", breakdown still populated', () => {
         // Arrange
         const product = {
             hasVariants: true,
@@ -108,7 +108,7 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
         const stockDisplay = computeStockDisplay(product)
 
         // Act
-        const { container } = render(
+        render(
             <Badge variant={stockDisplay.severity} dot>
                 {stockDisplay.label}
             </Badge>,
@@ -116,7 +116,8 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
 
         // Assert
         expect(screen.getByText('8')).toBeInTheDocument()
-        expect(stockDisplay.isRange).toBe(false)
+        expect(stockDisplay.showVariantCount).toBe(true)
+        expect(stockDisplay.variantCount).toBe(1)
         // breakdown should be present (for consistency even if single)
         expect(stockDisplay.breakdown).toEqual([{ name: 'Red-M', stock: 8 }])
     })
@@ -144,7 +145,7 @@ describe('[TC-F08-1525-20..24] Products list stock cell rendering', () => {
         // Assert
         expect(singleDisplay.breakdown?.length).toBe(1)
         expect(multipleDisplay.breakdown?.length).toBe(2)
-        expect(multipleDisplay.isRange).toBe(true)
+        expect(multipleDisplay.showVariantCount).toBe(true)
 
         // Single: no tooltip needed (only 1 variant to show)
         // Multiple: tooltip helpful to show all variants

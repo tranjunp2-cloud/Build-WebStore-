@@ -134,6 +134,9 @@ export async function getProductsAction() {
     return JSON.parse(JSON.stringify(res.docs))
 }
 
+// NOTE: not a pure read — fetching a product with `aiReviewPending: true` clears that flag
+// as a side effect (opening the edit page counts as the merchant reviewing an AI draft; see
+// below). Any future caller of this action, not just the edit page, will trigger that write.
 export async function getProductAction(id: string | number) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
@@ -145,6 +148,28 @@ export async function getProductAction(id: string | number) {
         user,
         depth: 1
     })
+
+    // Opening the edit page counts as the merchant having reviewed an AI-generated draft —
+    // clear the pending flag immediately rather than waiting for an explicit save.
+    // Best-effort: this is a secondary side effect of what is otherwise a read. If the write
+    // fails, the read must still succeed — callers (any future one, not just the edit page)
+    // expect getProductAction to behave like a read and must not see a load failure just
+    // because this flag-clear hiccuped.
+    if (res?.aiReviewPending) {
+        try {
+            await payload.update({
+                collection: 'products',
+                id,
+                data: { aiReviewPending: false },
+                user,
+                overrideAccess: false,
+            })
+            res.aiReviewPending = false
+        } catch (err) {
+            console.error('[getProductAction] failed to clear aiReviewPending', { id, err })
+        }
+    }
+
     return JSON.parse(JSON.stringify(res))
 }
 
