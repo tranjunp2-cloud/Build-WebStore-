@@ -217,12 +217,16 @@
                                   wide table fits without horizontal scroll)
    Column ratios stay per-page via each table's <colgroup>; element sizes that aren't
    text (thumbnails, action buttons) are tuned per-page. Higher specificity (class +
-   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px]. */
+   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px].
+   `:not([aria-hidden])` excludes decorative status dots (Badge's `dot` prop,
+   AiReviewIndicator's pulse dot) — those are tiny fixed-size spans with no text; the
+   8px cell padding this rule adds below xl was stretching them into ellipse/pill
+   shapes since padding eats into their `w-1.5` (6px) box under border-box sizing. */
 .dash-table-compact th { font-size: 10px; }
-.dash-table-compact td, .dash-table-compact td span { font-size: 12px; }
+.dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 12px; }
 @media (max-width: 1279.98px) {
   .dash-table-compact th { font-size: 8px; padding-left: 8px; padding-right: 8px; }
-  .dash-table-compact td, .dash-table-compact td span { font-size: 10px; padding-left: 8px; padding-right: 8px; }
+  .dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 10px; padding-left: 8px; padding-right: 8px; }
 }
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */

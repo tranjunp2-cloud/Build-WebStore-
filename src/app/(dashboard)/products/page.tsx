@@ -39,7 +39,7 @@ import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
-import { computeStockDisplay, singleSeverity, type StockSeverity } from '@/lib/products/stock-display'
+import { computeStockDisplay, singleSeverity, type StockDisplay, type StockSeverity } from '@/lib/products/stock-display'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
@@ -88,6 +88,17 @@ function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
     if (currency === 'SGD') return `S$${price.toFixed(2)}`
     return `$${price.toFixed(2)}`
+}
+
+// Composes the Stock column's final display string. `computeStockDisplay` stays i18n-free
+// (mirrors getDisplayPrice's "From " prefix pattern — the pure helper returns raw numbers,
+// the caller adds words) — for a variant product this appends "1 variant" / "{N} variants".
+function formatStockLabel(stockDisplay: StockDisplay, t: ReturnType<typeof useI18n>['t']) {
+    if (!stockDisplay.showVariantCount) return stockDisplay.label
+    const suffix = stockDisplay.variantCount === 1
+        ? (t.dashboard.products.list.stockVariantCountOne || '1 variant')
+        : (t.dashboard.products.list.stockVariantCountMany || '{count} variants').replace('{count}', String(stockDisplay.variantCount))
+    return `${stockDisplay.label} / ${suffix}`
 }
 
 // Mobile Stock chip styling keyed by `computeStockDisplay` severity (GH-1525 #4).
@@ -405,8 +416,15 @@ export default function ProductsPage() {
 
     return (
         <div className="space-y-6 pb-20">
-            {/* AI Chat Banner (Figma Node 30882:5804) */}
-            <div className="rounded-[16px] border border-[hsl(var(--primary))]/20 bg-gradient-to-r from-blue-500/10 to-teal-400/10 p-[24px] overflow-hidden relative">
+            {/* AI Chat Banner (Figma Node 30882:5804) — flat card + corner-confined radial
+                teal glow (design ref: ai-bulk-create.html .ai-box), not a full-width color sweep */}
+            <div
+                className="rounded-[18px] [border:2px_solid_hsl(var(--border))] bg-[hsl(var(--card))] p-[24px] overflow-hidden relative"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(120% 140% at 85% -10%, hsl(var(--primary) / 0.10), transparent 55%)',
+                }}
+            >
                 <div className="relative flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
@@ -415,30 +433,34 @@ export default function ProductsPage() {
                     <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
                     {/* Command shell — textarea + footer (hint + Generate button) share one bordered
                         box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
-                    <div className="w-full rounded-xl border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))] transition-colors">
+                    <div className="w-full rounded-xl [border:2px_solid_hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:[border-color:hsl(var(--ring))] focus-within:ring-[3px] focus-within:ring-[hsl(var(--primary))]/10 transition-colors">
                         <textarea
                             ref={aiTextareaRef}
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
                             onKeyDown={e => {
-                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && aiPrompt.trim()) {
+                                // Plain Enter generates; ⌘/Ctrl+Enter and Shift+Enter fall
+                                // through to the textarea's default behavior and insert a new
+                                // line (Shift+Enter must stay excluded — it's the conventional
+                                // newline shortcut in chat-style inputs and was never asked to change).
+                                if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && aiPrompt.trim()) {
                                     e.preventDefault()
                                     handleCreateAi()
                                 }
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
                             rows={1}
-                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[14px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
                         />
-                        <div className="flex items-center justify-between gap-3 border-t border-[hsl(var(--input-border))]/60 px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
-                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
-                                <span>·</span>
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
-                                <span>+</span>
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                        <div className="flex items-center justify-end md:justify-between gap-3 [border-top:1px_solid_hsl(var(--input-border))] px-3 py-1">
+                            <div className="hidden md:flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
                                 <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
+                                <span>·</span>
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <span>+</span>
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
                             </div>
                             {/* Generate Drafts — shared dashboard primary button (size="dash") */}
                             <Button
@@ -446,9 +468,9 @@ export default function ProductsPage() {
                                 size="dash"
                                 onClick={handleCreateAi}
                                 disabled={!aiPrompt.trim()}
-                                className="shrink-0 justify-center"
+                                className="shrink-0 justify-center !h-6 !px-2.5 !text-[11.5px]"
                             >
-                                <Sparkles className="h-4 w-4" />
+                                <Sparkles className="!h-3 !w-3" />
                                 {t.dashboard.products.list.aiChatBtn}
                             </Button>
                         </div>
@@ -467,7 +489,7 @@ export default function ProductsPage() {
                                     setAiPrompt(suggestion.fill)
                                     aiTextareaRef.current?.focus()
                                 }}
-                                className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
+                                className="rounded-full [border:1px_solid_hsl(var(--border))] bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:[border-color:hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10"
                             >
                                 {suggestion.label}
                             </button>
@@ -814,6 +836,7 @@ export default function ProductsPage() {
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                             const stockDisplay = computeStockDisplay(product)
+                                            const stockLabel = formatStockLabel(stockDisplay, t)
                                             const missing = getMissingFields(product)
 
                                             return (
@@ -863,13 +886,13 @@ export default function ProductsPage() {
                                                                         onClick={(e) => e.stopPropagation()}
                                                                         tabIndex={0}
                                                                         role="button"
-                                                                        aria-label={`${t.dashboard.products.list.colStock}: ${stockDisplay.label}`}
+                                                                        aria-label={`${t.dashboard.products.list.colStock}: ${stockLabel}`}
                                                                         className="inline-flex cursor-help"
                                                                     >
-                                                                        <Badge variant={stockDisplay.severity} dot>{stockDisplay.label}</Badge>
+                                                                        <Badge variant={stockDisplay.severity} dot>{stockLabel}</Badge>
                                                                     </span>
                                                                 </TooltipTrigger>
-                                                                <TooltipContent onClick={(e) => e.stopPropagation()} className="w-52 p-0 overflow-hidden">
+                                                                <TooltipContent align="start" onClick={(e) => e.stopPropagation()} className="w-52 p-0 overflow-hidden">
                                                                     <p className="border-b border-[hsl(var(--border))] px-3 py-2 text-[12px] font-semibold text-foreground">
                                                                         {t.dashboard.products.list.colStock}
                                                                     </p>
@@ -890,7 +913,7 @@ export default function ProductsPage() {
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                         ) : (
-                                                            <Badge variant={stockDisplay.severity} dot>{stockDisplay.label}</Badge>
+                                                            <Badge variant={stockDisplay.severity} dot>{stockLabel}</Badge>
                                                         )}
                                                     </TableCell>
 
@@ -939,6 +962,7 @@ export default function ProductsPage() {
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const stockDisplay = computeStockDisplay(product)
+                                const stockLabel = formatStockLabel(stockDisplay, t)
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                 const missing = getMissingFields(product)
@@ -1006,7 +1030,7 @@ export default function ProductsPage() {
                                                                 {stockDisplay.severity === 'warning' && (
                                                                     <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                                                 )}
-                                                                <span className="text-[13px] font-semibold">{stockDisplay.label}</span>
+                                                                <span className="text-[13px] font-semibold">{stockLabel}</span>
                                                             </button>
                                                         </PopoverTrigger>
                                                         <PopoverContent
@@ -1038,7 +1062,7 @@ export default function ProductsPage() {
                                                         {stockDisplay.severity === 'warning' && (
                                                             <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                                         )}
-                                                        <span className="text-[13px] font-semibold">{stockDisplay.label}</span>
+                                                        <span className="text-[13px] font-semibold">{stockLabel}</span>
                                                     </div>
                                                 )}
                                             </div>
