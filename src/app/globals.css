@@ -381,6 +381,11 @@ html:not(.dark) {
 .dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
 /* AI Fix All Issues gradient btn — light=white, dark=black */
 .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #fff !important; }
+/* GH-1578: checkbox ticks on bg-[hsl(var(--primary))] / bg-[#10B981] bypass this remap via
+   inline style={{ color: '#fff' }} instead of an exception here — those bg values are dynamic
+   CSS-var/arbitrary classes that don't lend themselves to a static selector exception. See
+   StaffDrawer.tsx and AIFixModal.tsx. If you add a new text-white element on a colored/checked
+   background, it WILL get remapped unless you either add an exception above or use inline style. */
 .dark .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #0F172A !important; }
 /* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
 html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
