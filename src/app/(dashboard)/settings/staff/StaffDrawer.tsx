@@ -259,7 +259,7 @@ export function StaffDrawer({
                                                         style={!isChecked ? { borderColor: 'var(--dash-border)' } : {}}
                                                         className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-[4px] border border-solid transition-colors ${isChecked ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'bg-transparent'}`}
                                                     >
-                                                        {isChecked && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+                                                        {isChecked && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                                                     </div>
                                                     <span className={`text-[14px] leading-tight select-none ${isChecked ? 'text-dash-text font-medium' : 'text-dash-text-muted font-normal'}`}>
                                                         {label}
