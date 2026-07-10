@@ -292,7 +292,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
 
     // ── Header ─────────────────────────────────────────────────────────────
     const headerIcon = state === 'done'
-        ? <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0 bg-[#10B981]"><Check className="w-5 h-5 text-white" strokeWidth={3} /></div>
+        ? <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0 bg-[#10B981]"><Check className="w-5 h-5" style={{ color: '#fff' }} strokeWidth={3} /></div>
         : <div className={`flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0 ${state === 'error' ? 'bg-red-500' : 'bg-gradient-to-tr from-[#22D3EE] to-[#3B82F6]'}`}><Sparkles className="w-5 h-5 text-white" fill="currentColor" strokeWidth={1} /></div>
 
     const headerTitle = {
@@ -347,7 +347,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                     {taskMessages.slice(-3).map((msg, idx) => (
                                         <div key={idx} className="flex items-center gap-3 p-4 rounded-xl border bg-[#064E3B]/40 border-emerald-500/30">
                                             <div className="flex bg-[#10B981] w-5 h-5 rounded-[4px] items-center justify-center shrink-0">
-                                                <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                                                <Check className="w-3.5 h-3.5" style={{ color: '#fff' }} strokeWidth={3} />
                                             </div>
                                             <span className="text-sm font-medium text-white">{msg}</span>
                                         </div>
@@ -367,7 +367,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                             </div>
                                         ) : (
                                             <div className="flex bg-[#10B981] w-5 h-5 rounded-[4px] items-center justify-center shrink-0">
-                                                <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                                                <Check className="w-3.5 h-3.5" style={{ color: '#fff' }} strokeWidth={3} />
                                             </div>
                                         )}
                                         <span className={`text-sm font-medium ${idx === taskMessages.slice(-3).length - 1 ? 'text-red-400' : 'text-white'}`}>{msg}</span>
