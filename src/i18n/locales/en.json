@@ -1237,6 +1237,7 @@
                 "status": "Status",
                 "loading": "Loading orders...",
                 "noOrders": "No orders found",
+                "noOrdersSubtitle": "When a customer completes a purchase on your storefront, their order details will appear here — tracking fulfillment and payment status in real time.",
                 "selectAll": "Select all rows"
             },
             "pagination": {
@@ -1658,6 +1659,7 @@
                 "colPrice": "Price (RM)",
                 "colStock": "Stock",
                 "colWeight": "Weight",
+                "colCreated": "Created",
                 "colStatus": "Status",
                 "colActions": "Actions",
                 "edit": "Edit",
@@ -2061,6 +2063,7 @@
             "refresh": "Refresh",
             "total": "total",
             "empty": "No customers found",
+            "emptySubtitle": "When a visitor submits a contact or registration form on your website, their details will appear here — allowing you to track and manage potential leads.",
             "deleteSuccess": "Deleted",
             "deleteFailed": "Failed to delete",
             "statusUpdated": "Status updated",

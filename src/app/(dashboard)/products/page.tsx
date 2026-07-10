@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { format } from 'date-fns'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -787,11 +788,12 @@ export default function ProductsPage() {
                                 >
                                     <colgroup>
                                         <col style={{ width: '60px' }} />
-                                        <col style={{ width: '30%' }} />
-                                        <col style={{ width: '16%' }} />
-                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '24%' }} />
+                                        <col style={{ width: '15%' }} />
                                         <col style={{ width: '12%' }} />
-                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '11%' }} />
+                                        <col style={{ width: '116px' }} />
+                                        <col style={{ width: '12%' }} />
                                         <col style={{ width: '86px' }} />
                                     </colgroup>
 
@@ -802,6 +804,22 @@ export default function ProductsPage() {
                                             <TableHead>{t.dashboard.products.list.colPrice}</TableHead>
                                             <TableHead>{t.dashboard.products.list.colStock}</TableHead>
                                             <TableHead>{t.dashboard.products.list.colWeight}</TableHead>
+                                            <TableHead
+                                                className="cursor-pointer select-none"
+                                                onClick={() => setSortBy(prev => (prev === 'Latest' ? 'Oldest' : 'Latest'))}
+                                                title={t.dashboard.products.list.colCreated}
+                                            >
+                                                <span className="inline-flex items-center gap-1">
+                                                    {t.dashboard.products.list.colCreated}
+                                                    {sortBy === 'Latest' ? (
+                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                    ) : sortBy === 'Oldest' ? (
+                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                    ) : (
+                                                        <ArrowUpDown className="w-3.5 h-3.5 opacity-50" />
+                                                    )}
+                                                </span>
+                                            </TableHead>
                                             <TableHead>{t.dashboard.products.list.colStatus}</TableHead>
                                             <TableHead className="text-right">{t.dashboard.products.list.colActions}</TableHead>
                                         </TableRow>
@@ -813,6 +831,8 @@ export default function ProductsPage() {
                                             const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
+                                            const createdDate = product.createdAt ? new Date(product.createdAt) : null
+                                            const createdDisplay = createdDate && !isNaN(createdDate.getTime()) ? format(createdDate, 'dd MMM yyyy') : '—'
                                             const stockDisplay = computeStockDisplay(product)
                                             const missing = getMissingFields(product)
 
@@ -897,6 +917,17 @@ export default function ProductsPage() {
                                                     {/* Weight */}
                                                     <TableCell>
                                                         <span className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{weightDisplay}</span>
+                                                    </TableCell>
+
+                                                    {/* Created */}
+                                                    <TableCell>
+                                                        <span
+                                                            className="text-[14px] whitespace-nowrap"
+                                                            style={{ color: 'var(--dash-text-muted)' }}
+                                                            title={createdDate ? createdDate.toLocaleString() : undefined}
+                                                        >
+                                                            {createdDisplay}
+                                                        </span>
                                                     </TableCell>
 
                                                     {/* Status toggle */}

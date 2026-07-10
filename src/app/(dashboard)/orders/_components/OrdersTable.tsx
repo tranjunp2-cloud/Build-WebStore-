@@ -119,7 +119,7 @@ function OrdersTableInner({ orders, loading, selectedRows, onSelectionChange, ne
 
     // Empty state — shown in place of the table (both mobile and desktop) when not loading and no orders.
     if (!loading && orders.length === 0) {
-        return <TableEmptyState icon={<Package />} title={o.tableHeaders.noOrders} />
+        return <TableEmptyState icon={<Package />} title={o.tableHeaders.noOrders} subtitle={o.tableHeaders.noOrdersSubtitle} />
     }
 
     return (
