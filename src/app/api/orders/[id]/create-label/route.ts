@@ -68,6 +68,20 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // shipment — treat it as not-yet-created so it falls through to the CAS (which returns
         // 409 for an active claim, or reclaims a stale one). Only a real shipment_number counts.
         if (existingShipmentNo && !existingShipmentNo.startsWith('CLAIM:')) {
+            // Crash-remnant self-heal (review #1582 round 3): the shipment write and the
+            // ready_to_ship flip below are two separate updates — a crash/DB hiccup between
+            // them leaves a pre-ship order holding a REAL shipment, which the label guards
+            // (claim CAS status filter + /cancel label guard) would otherwise strand. Flip
+            // it on the retry the merchant inevitably makes; the CAS keeps it race-safe
+            // (matches the exact shipment read above, never touches cancelled/shipped).
+            if (['confirmed', 'paid', 'processing'].includes((order as any).status)) {
+                await (payload.db.drizzle as any).execute(sql`
+                    UPDATE orders SET status = 'ready_to_ship', updated_at = NOW()
+                    WHERE id = ${orderId}
+                      AND status IN ('confirmed', 'paid', 'processing')
+                      AND easy_parcel_order_no = ${existingShipmentNo}
+                `).catch(() => {})
+            }
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }
 

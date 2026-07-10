@@ -811,4 +811,36 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         // No customerEmail on order → no email sent
         expect(mockSendEmail).not.toHaveBeenCalled()
     })
+
+    // ── TC-F36.166: /cancel label guard (review #1582 round 2-3) ─────────────────
+
+    it('[TC-F36.166] forward CAS requires easy_parcel_order_no IS NULL (label-race guard)', async () => {
+        // A create-label claim/shipment means EP wallet money is (about to be) committed —
+        // the forward CAS must refuse to cancel such rows (rollback CAS stays unguarded).
+        mockFindByID.mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [] })
+        const req = { json: () => Promise.resolve({ reason: 'label guard sql check' }) } as unknown as Request
+        await POST(req, ctx as any)
+
+        const casCall = mockDrizzleExecute.mock.calls[0][0]
+        const sqlText = JSON.stringify(casCall)
+        expect(sqlText).toMatch(/easy_parcel_order_no IS NULL/)
+    })
+
+    it('[TC-F36.166] CAS miss because order holds a shipment → 409 LABEL_EXISTS (not "status changed")', async () => {
+        // Remnant/race: status still cancellable but easy_parcel_order_no is set — the
+        // recheck must report the REAL reason instead of the misleading status message.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [] })
+            .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', easyParcelOrderNo: 'EI-REMNANT-1' })
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [] }) // CAS blocked by the label guard
+
+        const req = { json: () => Promise.resolve({ reason: 'race with create-label' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        expect(body.error.code).toBe('LABEL_EXISTS')
+        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(mockSendEmail).not.toHaveBeenCalled()
+    })
 })

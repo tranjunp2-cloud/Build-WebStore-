@@ -118,6 +118,14 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 if ((recheck as any)?.status === 'cancelled') {
                     return NextResponse.json({ success: true, data: recheck, restock: [] })
                 }
+                if ((recheck as any)?.easyParcelOrderNo) {
+                    // CAS missed on the label guard, not a status change — a create-label
+                    // claim or a real EP shipment exists (wallet money committed).
+                    return NextResponse.json(
+                        { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                        { status: 409 }
+                    )
+                }
                 return NextResponse.json(
                     { success: false, error: { code: 'INVALID_TRANSITION', message: 'Order status changed — cancellation no longer valid' } },
                     { status: 422 }
@@ -242,6 +250,14 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 if ((recheck as any)?.status === 'cancelled') {
                     return NextResponse.json({ success: true, data: recheck, restock: [] })
                 }
+                if ((recheck as any)?.easyParcelOrderNo) {
+                    // CAS missed on the label guard, not a status change — a create-label
+                    // claim or a real EP shipment exists (wallet money committed).
+                    return NextResponse.json(
+                        { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                        { status: 409 }
+                    )
+                }
                 return NextResponse.json(
                     { success: false, error: { code: 'INVALID_TRANSITION', message: 'Order status changed — cancellation no longer valid' } },
                     { status: 422 }
@@ -313,6 +329,14 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             })
             if ((recheck as any)?.status === 'cancelled') {
                 return NextResponse.json({ success: true, data: recheck, restock: [] })
+            }
+            if ((recheck as any)?.easyParcelOrderNo) {
+                // CAS missed on the label guard, not a status change — a create-label
+                // claim or a real EP shipment exists (wallet money committed).
+                return NextResponse.json(
+                    { success: false, error: { code: 'LABEL_EXISTS', message: 'A shipping label claim or shipment exists for this order — cancel the EasyParcel shipment first' } },
+                    { status: 409 }
+                )
             }
             // Status advanced to a non-cancellable state between validation and CAS
             return NextResponse.json(
