@@ -60,7 +60,8 @@
   --dash-error: #FB2C36;
   --dash-warning: #B45309;
   --dash-overlay: rgba(0, 0, 0, 0.35);
-  --save-bar-bg: rgba(248, 250, 252, 0.92);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(25, 32, 56, 0.10);
 
   /* Editor semantic tokens — light mode */
   --editor-bg: #F1F5F9;
@@ -88,7 +89,8 @@
   --dash-divider: #232E3D;
   --dash-warning: #F5B945;
   --dash-overlay: rgba(0, 0, 0, 0.5);
-  --save-bar-bg: rgba(15, 23, 42, 0.88);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(0, 0, 0, 0.60);
 
   /* Editor semantic tokens — dark mode */
   --editor-bg: #0B1120;
@@ -383,6 +385,11 @@ html:not(.dark) {
 .dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
 /* AI Fix All Issues gradient btn — light=white, dark=black */
 .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #fff !important; }
+/* GH-1578: checkbox ticks on bg-[hsl(var(--primary))] / bg-[#10B981] bypass this remap via
+   inline style={{ color: '#fff' }} instead of an exception here — those bg values are dynamic
+   CSS-var/arbitrary classes that don't lend themselves to a static selector exception. See
+   StaffDrawer.tsx and AIFixModal.tsx. If you add a new text-white element on a colored/checked
+   background, it WILL get remapped unless you either add an exception above or use inline style. */
 .dark .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #0F172A !important; }
 /* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
 html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
