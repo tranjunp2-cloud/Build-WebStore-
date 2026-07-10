@@ -3811,6 +3811,7 @@
         },
         "imageToolbar": {
             "changeImage": "Change Image",
+            "uploading": "Uploading...",
             "generateAI": "Generate AI Image"
         },
         "saveStatus": {

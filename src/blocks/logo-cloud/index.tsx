@@ -7,7 +7,7 @@ import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Caption } from '../shared/Typography'
 import { SectionWrapper } from '../shared/SectionWrapper'
-import { LogoImageOverlay } from './LogoImageOverlay'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 void _CSS_VARS
 
@@ -90,7 +90,7 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <LogoHeadline text={headline} />
                 <div className={`flex flex-wrap items-center justify-center ${gap} max-w-5xl mx-auto`}>
                     {logos.map((item, i) => (
-                        <LogoImageOverlay key={i} logoIndex={i} altText={item.logo?.alt || item.name}>
+                        <MediaUploadOverlay key={i} field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
                             <LogoFrame size={size}>
                                 {item.logo?.url ? (
                                     <LogoImage item={item} index={i} />
@@ -98,7 +98,7 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                                     <LogoPlaceholder name={item.name} imageIndex={i} />
                                 )}
                             </LogoFrame>
-                        </LogoImageOverlay>
+                        </MediaUploadOverlay>
                     ))}
                 </div>
             </SectionWrapper>

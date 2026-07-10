@@ -9,6 +9,7 @@ import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 void _CSS_VARS
 
@@ -62,7 +63,9 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <Image src={beforeImage?.url || '/placeholder.png'} alt={beforeImage?.alt || 'Before'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
+                            <MediaUploadOverlay field="beforeImage" altText={beforeImage?.alt || 'Before'} valueShape="url-group">
+                                <Image src={beforeImage?.url || '/placeholder.png'} alt={beforeImage?.alt || 'Before'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
+                            </MediaUploadOverlay>
                             {beforeImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
@@ -73,7 +76,9 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                             )}
                         </div>
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <Image src={afterImage?.url || '/placeholder.png'} alt={afterImage?.alt || 'After'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
+                            <MediaUploadOverlay field="afterImage" altText={afterImage?.alt || 'After'} valueShape="url-group">
+                                <Image src={afterImage?.url || '/placeholder.png'} alt={afterImage?.alt || 'After'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
+                            </MediaUploadOverlay>
                             {afterImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"

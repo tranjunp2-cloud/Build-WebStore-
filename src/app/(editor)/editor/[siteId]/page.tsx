@@ -877,7 +877,11 @@ export default function EditorPage() {
             // Exclude locale-control fields too — they are site-wide, not per-locale content.
             // Snapshotting them into _localeContent[gen] would freeze a stale secondaryLocale/
             // switcher state and re-apply it on save+reload, silently reverting Remove/Make Default.
-            const SKIP = new Set(['id', 'blockType', 'logo', '_localeContent', '__localeInit', ...STRUCTURAL_BLOCK_FIELDS])
+            // GH-1381: media fields must be skipped as well (mirrors NON_TRANSLATABLE_FIELDS'
+            // media group) — snapshotting `images` freezes the array into localeOverrides, and
+            // since getDisplayBlock merges override-over-flat, a later image upload (which only
+            // updates the flat block) would be masked by the stale snapshot even across reloads.
+            const SKIP = new Set(['id', 'blockType', 'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', '_localeContent', '__localeInit', ...STRUCTURAL_BLOCK_FIELDS])
             const extractContent = (block: BlockData) =>
                 Object.fromEntries(
                     Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),

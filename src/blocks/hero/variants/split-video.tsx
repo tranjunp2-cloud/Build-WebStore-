@@ -15,7 +15,7 @@ import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 
 export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], badge, videoUrl, image } = block
+    const { headline, subheadline, ctaButtons = [], badge, videoUrl: initialVideoUrl, image } = block
     const primaryColor = CSS_VARS.primary
     const isOwner = useIsOwner()
     const isBuilderPreview = useIsBuilderPreview()
@@ -24,6 +24,11 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
+    // GH-1381: local state so a freshly uploaded video shows immediately (mirrors VideoHero).
+    // Without this, first-upload preview stayed stale until reload.
+    const [videoUrl, setVideoUrl] = useState(initialVideoUrl)
+    // Keep local state in sync when the block prop changes (undo, reload, AI regen, clear).
+    useEffect(() => { setVideoUrl(initialVideoUrl) }, [initialVideoUrl])
 
     // Respect prefers-reduced-motion
     useEffect(() => {
@@ -81,6 +86,7 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                         showImageButton={false}
                         showVideoButton={true}
                         videoField="videoUrl"
+                        onVideoUploaded={(url) => { setVideoUrl(url); setIsPlaying(true) }}
                     >
                         <motion.div
                             initial={{ opacity: 0, x: 40 }}

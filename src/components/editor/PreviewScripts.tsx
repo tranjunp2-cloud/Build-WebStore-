@@ -118,6 +118,9 @@ export function PreviewScripts() {
             const imgEl = target.tagName === 'IMG' ? target
                 : (target.getAttribute('data-image-index') !== null ? target : null)
             if (imgEl) {
+                // GH-1381: overlay-managed images handle their own hover affordance — skip the
+                // parent-frame IMAGE_HOVERED hint so it doesn't compete with the overlay button.
+                if (imgEl.closest('[data-media-overlay]')) return
                 const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
                 if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
                     if (hoverTimer) clearTimeout(hoverTimer)
@@ -610,6 +613,11 @@ export function PreviewScripts() {
             const imgEl = target.tagName === 'IMG' ? target
                 : (target.getAttribute('data-image-index') !== null ? target : null)
             if (imgEl) {
+                // GH-1381: images wrapped by MediaUploadOverlay are edited via the in-iframe overlay
+                // button (Path A). Skip the parent-frame ImageToolbar (Path B) so both don't fire —
+                // that double-trigger is the inconsistent left/right "Change Image" bug. Path B stays
+                // active as a fallback for surfaces not yet wrapped by an overlay.
+                if (imgEl.closest('[data-media-overlay]')) return
                 e.preventDefault()
                 e.stopPropagation()
                 const blockContainer = imgEl.closest('[data-block-index]')

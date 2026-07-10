@@ -176,10 +176,17 @@ describe('TC-F30-HMO-007: valid image upload triggers onFieldChange', () => {
         await waitFor(() => {
             expect(mockOnFieldChange).toHaveBeenCalledWith('image', { id: 101, url: 'https://cdn/img.jpg', alt: 'Hero image' })
         })
-        expect(postMessageSpy).toHaveBeenCalledWith(
-            { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
-            expect.any(String),
-        )
+        // GH-1381: success toast now waits for the parent's BLOCK_FIELD_CHANGE_RESULT ACK
+        window.dispatchEvent(new MessageEvent('message', {
+            origin: window.location.origin,
+            data: { type: 'BLOCK_FIELD_CHANGE_RESULT', blockIndex: 0, field: 'image', ok: true },
+        }))
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+                expect.any(String),
+            )
+        })
     })
 })
 

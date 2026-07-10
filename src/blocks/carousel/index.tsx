@@ -11,6 +11,7 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 export function CarouselBlock({ block, theme: _theme, site }: BlockProps<CarouselConfig>) {
     void _theme
@@ -105,12 +106,29 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                         {items.map((item, i) => (
                             <div key={i} className="w-full shrink-0">
                                 <div className="aspect-[16/9] relative">
-                                    <img
-                                        src={item.imageUrl}
-                                        alt={item.title || `Slide ${i + 1}`}
-                                        className="w-full h-full object-cover"
-                                        data-image-index={i}
-                                    />
+                                    {i < rawItems.length ? (
+                                        <MediaUploadOverlay
+                                            field={`items.${i}.image`}
+                                            altText={item.title || `Slide ${i + 1}`}
+                                            valueShape="media"
+                                            positionClass="relative"
+                                            className="w-full h-full"
+                                        >
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.title || `Slide ${i + 1}`}
+                                                className="w-full h-full object-cover"
+                                                data-image-index={i}
+                                            />
+                                        </MediaUploadOverlay>
+                                    ) : (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.title || `Slide ${i + 1}`}
+                                            className="w-full h-full object-cover"
+                                            data-image-index={i}
+                                        />
+                                    )}
                                     {(item.title || item.description) && (
                                         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 bg-gradient-to-t from-black/70 to-transparent">
                                             {item.title && <Heading level={3} className="text-white mb-2">{item.title}</Heading>}
@@ -160,7 +178,19 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                         style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                                     >
                                         <div className="relative aspect-[16/10] overflow-hidden">
-                                            <Image src={item.imageUrl} alt={item.title || ''} fill className="object-cover" data-image-index={i} />
+                                            {i < rawItems.length ? (
+                                                <MediaUploadOverlay
+                                                    field={`items.${i}.image`}
+                                                    altText={item.title || `Slide ${i + 1}`}
+                                                    valueShape="media"
+                                                    positionClass="relative"
+                                                    className="w-full h-full"
+                                                >
+                                                    <Image src={item.imageUrl} alt={item.title || ''} fill className="object-cover" data-image-index={i} />
+                                                </MediaUploadOverlay>
+                                            ) : (
+                                                <Image src={item.imageUrl} alt={item.title || ''} fill className="object-cover" data-image-index={i} />
+                                            )}
                                         </div>
                                         <div className={CARD_PADDING.md}>
                                             {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}
@@ -205,13 +235,31 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                 style={{ background: `rgba(var(--brand-primary-rgb), 0.024)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
                             >
                                 {item.imageUrl && (
-                                    <img
-                                        src={item.imageUrl}
-                                        alt={item.title || ''}
-                                        className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
-                                        style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
-                                        data-image-index={i}
-                                    />
+                                    i < rawItems.length ? (
+                                        <MediaUploadOverlay
+                                            field={`items.${i}.image`}
+                                            altText={item.title || `Slide ${i + 1}`}
+                                            valueShape="media"
+                                            positionClass="relative"
+                                            className="w-16 h-16 rounded-full mx-auto mb-6 overflow-hidden"
+                                        >
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.title || ''}
+                                                className="w-full h-full object-cover"
+                                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
+                                                data-image-index={i}
+                                            />
+                                        </MediaUploadOverlay>
+                                    ) : (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.title || ''}
+                                            className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
+                                            style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
+                                            data-image-index={i}
+                                        />
+                                    )
                                 )}
                                 {item.description && (
                                     <blockquote className="text-lg md:text-xl leading-relaxed opacity-80 mb-6 italic">
