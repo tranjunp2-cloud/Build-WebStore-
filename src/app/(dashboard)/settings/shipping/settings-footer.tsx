@@ -31,7 +31,7 @@ export function SettingsFooter({ isDirty, isSaving, onReset, onSave }: Props) {
 
     return (
         <div
-            className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-[hsl(var(--border))]"
+            className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
             style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
         >
             <div className="flex items-center gap-2 text-[13px]">
