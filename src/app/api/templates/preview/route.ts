@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { buildFullHTML } from '@/lib/htmlBuilder'
+import { isNotFoundError } from '@/lib/api/is-not-found-error'
 import { THEMES } from '../../preview/renderers'
 export async function GET(req: Request) {
     try {
@@ -84,6 +85,11 @@ export async function GET(req: Request) {
         const html = buildFullHTML(blocks, finalTheme, cat, undefined, heroImageIndex)
         return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     } catch (e: unknown) {
+        // Payload `findByID` throws NotFound for a non-existent template id —
+        // that's a client error (bad id), so return 404 not 500 (GH #1519).
+        if (isNotFoundError(e)) {
+            return new NextResponse('Template not found', { status: 404 })
+        }
         const message = e instanceof Error ? e.message : 'Preview error'
         return new NextResponse(`Error: ${message}`, { status: 500 })
     }
