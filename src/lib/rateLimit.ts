@@ -59,6 +59,25 @@ function checkRateLimitMemory(
     return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt }
 }
 
+// ── QC load-test bypass ─────────────────────────────────────────────────
+/**
+ * On the isolated QC lane (Vercel scope `qc-test`), when explicitly opted in,
+ * skip rate limiting so single-IP k6 load tests measure REAL app throughput
+ * instead of just the limiter. Mirrors the OTP bypass pattern
+ * (src/lib/otp/qc-bypass.ts): gated on BOTH the scope stamp AND an explicit
+ * env flag — so it can NEVER activate on staging/production even by accident.
+ *
+ * Guard (both must hold):
+ *   1. APP_ENV === 'qc-test'                 — Vercel scope stamp
+ *   2. QC_RATELIMIT_BYPASS_ENABLED === 'true' — explicit opt-in per env
+ */
+function isQcRateLimitBypassEnabled(): boolean {
+    return (
+        (process.env.APP_ENV === 'qc-test' || process.env.NEXT_PUBLIC_APP_ENV === 'qc-test')
+        && process.env.QC_RATELIMIT_BYPASS_ENABLED === 'true'
+    )
+}
+
 // ── Public API (same interface as before) ───────────────────────────────
 
 /**
@@ -69,6 +88,11 @@ export async function checkRateLimit(
     limit: number = 20,
     windowMs: number = 3600000
 ): Promise<RateLimitResult> {
+    // QC load-test lane: allow everything (see isQcRateLimitBypassEnabled).
+    if (isQcRateLimitBypassEnabled()) {
+        return { allowed: true, remaining: limit, resetAt: Date.now() + windowMs }
+    }
+
     const limiter = getUpstashLimiter(limit, windowMs)
     if (limiter) {
         try {
