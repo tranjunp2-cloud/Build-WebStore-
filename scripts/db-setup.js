@@ -4847,6 +4847,9 @@ const MIGRATIONS = [
   { name: 'orders.awb_no', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS awb_no varchar;` },
   { name: 'orders.awb_no_idx', sql: `CREATE INDEX IF NOT EXISTS orders_awb_no_idx ON orders (awb_no);` },
   { name: 'orders.easy_parcel_order_no', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS easy_parcel_order_no varchar;` },
+  // Webhook async-AWB backfill matches orders BY shipment number (the only automatic path
+  // delivering the AWB when submit returned awb_number null) — index or it seq-scans orders.
+  { name: 'orders.easy_parcel_order_no_idx', sql: `CREATE INDEX IF NOT EXISTS orders_easy_parcel_order_no_idx ON orders (easy_parcel_order_no);` },
   { name: 'orders.label_url', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_url text;` },
   { name: 'orders.shipping_tracking_status', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_tracking_status varchar;` },
   { name: 'orders.shipping_tracking_status_idx', sql: `CREATE INDEX IF NOT EXISTS orders_shipping_tracking_status_idx ON orders (shipping_tracking_status);` },

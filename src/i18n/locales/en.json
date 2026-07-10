@@ -1479,6 +1479,8 @@
                 "dateShifted": "Collection date moved to {date} (earliest available)",
                 "methodNoPickup": "This courier only supports drop-off on this route",
                 "methodNoDropoff": "This courier only supports pickup on this route",
+                "methodNoneSupported": "This courier supports neither pickup nor drop-off on this route — contact EasyParcel support",
+                "methodUnverified": "Collection method could not be confirmed with EasyParcel — check the shipment on the EP dashboard",
                 "serviceSwitched": "Booked {service} ({amount}) to match your collection method"
             },
             "pickup": {

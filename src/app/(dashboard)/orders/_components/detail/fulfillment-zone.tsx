@@ -6,7 +6,7 @@
  * State machine mirrors phase-03 spec table.
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   Truck, Copy, Printer, CalendarClock,
@@ -176,6 +176,18 @@ export function FulfillmentZone({
   // so the merchant re-creates a label through the normal existing flow.
   const [markCancelOpen, setMarkCancelOpen] = useState(false)
   const [markCancelBusy, setMarkCancelBusy] = useState(false)
+
+  // Drop stale optimistic label state when the refetched order's EP fields are gone —
+  // e.g. mark-shipment-cancelled ran in another tab (review #1582: otherwise localCreated
+  // forces 'success' forever on this mount). Deps don't change in the post-create window
+  // (order prop still stale), so the fresh optimistic state survives until refetch lands.
+  useEffect(() => {
+    if (!order.easyParcelOrderNo && !order.awbNo) {
+      setLocalCreated(false)
+      setLocalAwb(null)
+      setLocalLabelUrl(null)
+    }
+  }, [order.easyParcelOrderNo, order.awbNo])
 
   // Missing-data override: user clicked "Ready to Ship" but EP returned MISSING_*
   const [forceMissing, setForceMissing] = useState(false)
@@ -518,10 +530,10 @@ export function FulfillmentZone({
               <XCircle style={{ width: 14, height: 14 }} /> {f.markCancelled}
             </button>
           ) : (
-            <div className="alert error" role="alertdialog" style={{ marginTop: 8 }}>
+            <div className="alert error" role="alertdialog" aria-labelledby="mark-cancel-title" style={{ marginTop: 8 }}>
               <XCircle className="lead" style={{ width: 17, height: 17, flexShrink: 0, marginTop: 1 }} />
               <div className="a-body">
-                <div className="a-t">{f.markCancelledConfirmTitle}</div>
+                <div className="a-t" id="mark-cancel-title">{f.markCancelledConfirmTitle}</div>
                 {f.markCancelledConfirmDesc}
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                   <button
@@ -533,7 +545,7 @@ export function FulfillmentZone({
                       try {
                         const res = await fetch(`/api/orders/${order.id}/mark-shipment-cancelled`, { method: 'POST' })
                         const data = await res.json().catch(() => null)
-                        if (!res.ok && !data?.success) {
+                        if (!res.ok || data?.success !== true) {
                           const rawMsg = data?.error?.message
                           toast.error(typeof rawMsg === 'string' ? rawMsg : f.markCancelledFailed)
                           return

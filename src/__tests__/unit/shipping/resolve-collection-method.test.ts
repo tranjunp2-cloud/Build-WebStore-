@@ -29,6 +29,7 @@ interface QuoteFixture {
     price: string          // EP sends total_amount as string
     isPickup: boolean
     isDropoff: boolean
+    codAvailable?: boolean
 }
 
 function mockQuote(items: QuoteFixture[]) {
@@ -46,7 +47,7 @@ function mockQuote(items: QuoteFixture[]) {
                     is_dropoff: i.isDropoff,
                 },
                 pricing: { currency: 'MYR', total_amount: i.price, shipment_price: i.price },
-                features: [],
+                features: i.codAvailable ? [{ cod: { available: true } }] : [],
             })),
         }],
     } as any)
@@ -81,7 +82,7 @@ describe('resolveServiceForMethod', () => {
         const res = await resolveServiceForMethod(baseArgs)
 
         // Assert
-        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false })
+        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false, verified: true })
     })
 
     it('[TC-F36.152] switches to the CHEAPEST same-courier variant supporting the method (NaN price excluded)', async () => {
@@ -105,6 +106,7 @@ describe('resolveServiceForMethod', () => {
             serviceName: 'Pos Laju',
             priceRm: 7.2,
             changed: true,
+            verified: true,
         })
     })
 
@@ -130,8 +132,9 @@ describe('resolveServiceForMethod', () => {
         // Act
         const res = await resolveServiceForMethod(baseArgs)
 
-        // Assert — submit stays the authority; never block the label on a broken quote
-        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false })
+        // Assert — submit stays the authority; never block the label on a broken quote.
+        // verified:false marks the fail-open so the route can disclose it (methodResolved).
+        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false, verified: false })
     })
 
     it('[TC-F36.155] fails open when the stored service is absent from the quote', async () => {
@@ -144,7 +147,7 @@ describe('resolveServiceForMethod', () => {
         const res = await resolveServiceForMethod(baseArgs)
 
         // Assert
-        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false })
+        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false, verified: false })
     })
 
     it('[TC-F36.151] dropoff method keeps a dropoff-capable stored service', async () => {
@@ -157,6 +160,50 @@ describe('resolveServiceForMethod', () => {
         const res = await resolveServiceForMethod({ ...baseArgs, method: 'dropoff' })
 
         // Assert
-        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false })
+        expect(res).toEqual({ ok: true, serviceId: 'pos-melplus', changed: false, verified: true })
+    })
+
+    it('[TC-F36.164] codRequired prefers the cheapest COD-capable variant over cheaper non-COD ones', async () => {
+        // Arrange — pickup-std is cheaper but has no COD; pickup-cod supports it
+        mockQuote([
+            { courierId: 'pos', serviceId: 'pos-melplus', price: '6.22', isPickup: false, isDropoff: true, codAvailable: true },
+            { courierId: 'pos', serviceId: 'pos-pickup-std', price: '7.20', isPickup: true, isDropoff: false },
+            { courierId: 'pos', serviceId: 'pos-pickup-cod', serviceName: 'Pos Laju COD', price: '8.10', isPickup: true, isDropoff: false, codAvailable: true },
+        ])
+
+        // Act
+        const res = await resolveServiceForMethod({ ...baseArgs, codRequired: true })
+
+        // Assert — false COD_NOT_ELIGIBLE would follow if the non-COD variant were picked
+        expect(res).toEqual({
+            ok: true,
+            serviceId: 'pos-pickup-cod',
+            serviceName: 'Pos Laju COD',
+            priceRm: 8.1,
+            changed: true,
+            verified: true,
+        })
+    })
+
+    it('[TC-F36.164] codRequired with NO COD-capable variant falls back to cheapest (COD gate reports accurately)', async () => {
+        // Arrange — booking is still possible; the downstream COD gate produces the
+        // accurate COD_NOT_ELIGIBLE + recovery panel instead of a misleading 422 here
+        mockQuote([
+            { courierId: 'pos', serviceId: 'pos-melplus', price: '6.22', isPickup: false, isDropoff: true, codAvailable: true },
+            { courierId: 'pos', serviceId: 'pos-pickup-std', serviceName: 'Pos Laju', price: '7.20', isPickup: true, isDropoff: false },
+        ])
+
+        // Act
+        const res = await resolveServiceForMethod({ ...baseArgs, codRequired: true })
+
+        // Assert
+        expect(res).toEqual({
+            ok: true,
+            serviceId: 'pos-pickup-std',
+            serviceName: 'Pos Laju',
+            priceRm: 7.2,
+            changed: true,
+            verified: true,
+        })
     })
 })

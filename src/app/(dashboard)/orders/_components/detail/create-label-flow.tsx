@@ -108,12 +108,21 @@ export function CreateLabelFlow({
           setStep('idle')
           onCodBlocked()
         } else if (code === 'METHOD_NOT_SUPPORTED') {
-          // Courier has no service variant for this method on this route — disable the
-          // option, flip to the other one, and let the merchant retry with one click.
+          // Courier has no service variant for this method on this route. Trust the
+          // server's supported[] (review #1582): it can be EMPTY (EP flag anomaly) —
+          // never auto-flip onto a method that is itself unsupported, or the merchant
+          // loops 422s with contradictory toasts.
           setStep('idle')
-          setUnsupported((prev) => (prev.includes(method) ? prev : [...prev, method]))
-          setMethod(method === 'pickup' ? 'dropoff' : 'pickup')
-          toast.error(method === 'pickup' ? cl.methodNoPickup : cl.methodNoDropoff)
+          const supported: string[] = Array.isArray(data?.error?.supported) ? data.error.supported : []
+          const nowUnsupported = (['pickup', 'dropoff'] as const).filter((m) => !supported.includes(m))
+          setUnsupported(nowUnsupported)
+          const other = method === 'pickup' ? 'dropoff' : 'pickup'
+          if (!nowUnsupported.includes(other)) setMethod(other)
+          toast.error(
+            nowUnsupported.length === 2
+              ? cl.methodNoneSupported
+              : method === 'pickup' ? cl.methodNoPickup : cl.methodNoDropoff,
+          )
         } else if (code === 'EASYPARCEL_WALLET_LOW') {
           setStep('wallet-low')
           setErrorMsg(msg)
@@ -124,11 +133,16 @@ export function CreateLabelFlow({
         return
       }
 
-      const { awbNo, labelUrl, collectionDate: usedDate, collectionDateShifted, serviceSwitched } = data.data ?? data
+      const { awbNo, labelUrl, collectionDate: usedDate, collectionDateShifted, serviceSwitched, methodResolved } = data.data ?? data
       toast.success(cl.labelCreated)
       // AC-3b: the server clamped the date (cut-off passed / weekend) — tell the merchant
       if (collectionDateShifted && typeof usedDate === 'string') {
         toast.info(ti(cl.dateShifted, { date: `${usedDate.slice(8, 10)}/${usedDate.slice(5, 7)}` }))
+      }
+      // Fail-open transparency (review #1582): the method-verification quote failed, so the
+      // label booked with the stored service and the collection method was NOT confirmed.
+      if (methodResolved === false) {
+        toast.info(cl.methodUnverified)
       }
       // Money honesty: the stored service couldn't do the chosen method, so a same-courier
       // variant was booked — tell the merchant what the wallet was actually charged for.
@@ -361,7 +375,9 @@ export function CreateLabelFlow({
           className="btn btn-grad ship-cta ship-cta-fixed"
           style={{ height: 40 }}
           onClick={handleShip}
-          disabled={!dateValid}
+          // Also blocked when the SELECTED method is unsupported (both-methods-out case:
+          // the auto-flip has nowhere to go, so without this the CTA would loop 422s)
+          disabled={!dateValid || unsupported.includes(method)}
         >
           {cl.readyToShip}
         </button>

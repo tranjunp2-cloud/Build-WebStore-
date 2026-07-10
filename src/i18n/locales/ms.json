@@ -1479,6 +1479,8 @@
                 "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)",
                 "methodNoPickup": "Kurier ini hanya menyokong drop-off untuk laluan ini",
                 "methodNoDropoff": "Kurier ini hanya menyokong pengambilan untuk laluan ini",
+                "methodNoneSupported": "Kurier ini tidak menyokong pengambilan mahupun drop-off untuk laluan ini — hubungi sokongan EasyParcel",
+                "methodUnverified": "Kaedah pengambilan tidak dapat disahkan dengan EasyParcel — semak penghantaran di dashboard EP",
                 "serviceSwitched": "Ditempah {service} ({amount}) mengikut kaedah pengambilan anda"
             },
             "pickup": {

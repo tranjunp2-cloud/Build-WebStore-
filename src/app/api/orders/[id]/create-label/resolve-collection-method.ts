@@ -6,10 +6,11 @@ import type { EpQuotationItem } from '@/lib/shipping/easyparcel/types'
 export type CollectionMethod = 'pickup' | 'dropoff'
 
 export type ResolveMethodResult =
-    /** Stored service already supports the method (or quote unavailable — fail-open). */
-    | { ok: true; serviceId: string; changed: false }
+    /** Stored service already supports the method; verified=false means the quote was
+     *  unavailable (fail-open) — the method could NOT actually be confirmed. */
+    | { ok: true; serviceId: string; changed: false; verified: boolean }
     /** Stored service can't do the method; cheapest same-courier variant that can was picked. */
-    | { ok: true; serviceId: string; serviceName: string; priceRm: number | null; changed: true }
+    | { ok: true; serviceId: string; serviceName: string; priceRm: number | null; changed: true; verified: true }
     /** No service of this courier supports the requested method on this route. */
     | { ok: false; supported: CollectionMethod[] }
 
@@ -44,6 +45,9 @@ export async function resolveServiceForMethod(args: {
     parcelValueRm: number
     serviceId: string
     method: CollectionMethod
+    /** COD order: prefer variants whose live quote offers COD — picking a cheaper
+     *  non-COD variant would trip the COD gate even though a valid variant exists. */
+    codRequired?: boolean
 }): Promise<ResolveMethodResult> {
     let resp
     try {
@@ -63,20 +67,20 @@ export async function resolveServiceForMethod(args: {
         })
     } catch (err) {
         console.warn('[create-label] method re-quote failed — proceeding with stored service (fail-open):', (err as Error).message)
-        return { ok: true, serviceId: args.serviceId, changed: false }
+        return { ok: true, serviceId: args.serviceId, changed: false, verified: false }
     }
 
     const firstResult = resp.data?.[0]
     if (!firstResult || firstResult.status === 'error') {
-        return { ok: true, serviceId: args.serviceId, changed: false }
+        return { ok: true, serviceId: args.serviceId, changed: false, verified: false }
     }
 
     const quotes = firstResult.quotations ?? []
     const stored = quotes.find((q) => q.courier.service_id === args.serviceId)
-    if (!stored) return { ok: true, serviceId: args.serviceId, changed: false }
+    if (!stored) return { ok: true, serviceId: args.serviceId, changed: false, verified: false }
 
     if (supportsMethod(stored, args.method)) {
-        return { ok: true, serviceId: args.serviceId, changed: false }
+        return { ok: true, serviceId: args.serviceId, changed: false, verified: true }
     }
 
     // Same-courier variants that support the requested method, cheapest first.
@@ -91,7 +95,19 @@ export async function resolveServiceForMethod(args: {
         .filter((c) => Number.isFinite(c.priceRm))
         .sort((a, b) => a.priceRm - b.priceRm)
 
-    const best = candidates[0]
+    // COD orders: prefer the cheapest COD-capable variant. Fall back to the plain
+    // cheapest when none offers COD — the COD gate downstream then produces the
+    // accurate COD_NOT_ELIGIBLE (with its recovery panel), instead of this resolver
+    // returning a misleading METHOD_NOT_SUPPORTED.
+    const quoteHasCod = (q: EpQuotationItem) =>
+        q.features?.find((f) => f.cod != null)?.cod?.available === true
+    const pool = args.codRequired
+        ? (candidates.filter((c) => quoteHasCod(c.q)).length > 0
+            ? candidates.filter((c) => quoteHasCod(c.q))
+            : candidates)
+        : candidates
+
+    const best = pool[0]
     if (best) {
         return {
             ok: true,
@@ -99,6 +115,7 @@ export async function resolveServiceForMethod(args: {
             serviceName: best.q.courier.service_name,
             priceRm: best.priceRm,
             changed: true,
+            verified: true,
         }
     }
 
