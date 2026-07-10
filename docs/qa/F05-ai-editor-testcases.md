@@ -361,6 +361,34 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+### GH-1557: Mobile Editor UX/Interaction Bugs (11 Cases)
+
+QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[siteId]`, not the AI-Builder read-only preview). Bugs 1 and 5 were deliberately left un-fixed by product decision — see Notes below. Bug 2's fix pre-existed via unrelated commit `076b24e8d`/#1538 (no new TC-IDs).
+
+| TC-ID | Bug | Layer | Description | Assertion |
+|-------|-----|-------|-------------|-----------|
+| **TC-GH1557-04-01** | Bug 4 (scroll lock) | Unit | Block-settings sheet locks/unlocks background scroll | Opening sets `document.body.style.overflow = 'hidden'`; closing restores `''` |
+| **TC-GH1557-04-02** | Bug 4 (scroll lock) | Unit | Tools sheet locks scroll; stays locked across an open-A→open-B sheet transition | Single effect keyed on `(isMobileSettingsOpen \|\| toolsSheetOpen)` — no race window |
+| **TC-GH1557-07-01** | Bug 7 (nav/footer routing) | Unit | Tapping nav/footer/breadcrumb opens the Menu tab despite no `currentBlock` | Sheet renders `SettingsPanel` + correct label (Footer/Navigation/Breadcrumb) from `settingsRequestedTab.section` alone |
+| **TC-GH1557-07-02** | Bug 7 (nav/footer routing) | Unit | Regular block tap still opens the generic block-settings sheet (no regression) | `SettingsPanel` renders with block label + Move/Delete controls |
+| **TC-GH1557-07-03** | Bug 7 (nav/footer routing) | Unit | No block + no menu request → sheet stays closed (baseline unaffected) | `currentBlock=null`, `settingsRequestedTab=null` → sheet does not render |
+| **TC-GH1557-05-01** | Bug 3/6 (image click race) | Unit | Tapping non-image block content still posts `BLOCK_CONTAINER_CLICKED` (no regression) | 1 `BLOCK_CONTAINER_CLICKED` message |
+| **TC-GH1557-05-02** | Bug 3/6 (image click race) | Unit | Tapping an `<img>` in compact mode skips `BLOCK_CONTAINER_CLICKED`, still posts `IMAGE_EDITING_STARTED` | 0 `BLOCK_CONTAINER_CLICKED`, 1 `IMAGE_EDITING_STARTED` |
+| **TC-GH1557-05-03** | Bug 3/6 (image click race) | Unit | Non-`<img>` placeholder (`data-image-index`, e.g. logo initials) also skips block-select | Same as above for non-IMG target |
+| **TC-GH1557-05-04** | Bug 3/6 (image click race) | Unit | **Desktop** (no `?compact=1`) tapping an image posts BOTH messages — existing desktop behavior unchanged | 1 `BLOCK_CONTAINER_CLICKED` + 1 `IMAGE_EDITING_STARTED` (fix is compact-only) |
+| **TC-GH1557-06-01** | Bug 3/6 edge case | Unit | Image tap inside a read-only block type (`products-featured`) still block-selects | Mutual exclusion correctly scoped — does not suppress select for non-editable images |
+| **TC-GH1557-06-02** | Cross-phase (Bug 4 + Bug 7) | Unit | Scroll-lock still activates when the sheet opens via the nav/footer Menu-tab path, not just the block path | `document.body.style.overflow` locks/unlocks correctly for `navFooterMenuMode` |
+
+**Files:** `compact-editor-layout-scroll-lock.test.tsx`, `compact-editor-layout-nav-footer-menu.test.tsx`, `preview-scripts-image-click-race.test.tsx` (all under `src/__tests__/unit/editor/`).
+
+**Notes:**
+- Bug 1 (iOS auto-zoom on focusing the Page Library "Page name" field) was **implemented then reverted** after discussion — this is considered standard iOS Safari behavior (auto-zoom when focusing a sub-16px input), not a bug to fix. `input.tsx` is unchanged; no new TC-ID.
+- Bug 5 (mobile inline text-edit parity with desktop) was **not implemented — confirmed with PM as intentional product behavior, not a bug.** It would have reversed a deliberate decision from PR #1485/#1472 (commit `7d035d55`, "text on mobile/tablet is edited via the block-settings sheet's fields, not inline canvas edit"). Flagged before implementing; PM confirmed mobile has no inline text edit by design — only block/component editing via the settings sheet. GH-1557's Bug 5 stays open on the issue tracker but is won't-fix, not a pending gap.
+- All 11 cases above are jsdom/unit-level only — they verify the underlying event/state logic, not real touch-device timing. The touch-tap-timing aspect of Bug 3/6 has **not** been verified on a real device or browser (no test credentials available for the local environment in this session). Recommend a manual pass on a real device before merge.
+- **Code review caveat worth internalizing:** an initial fix attempt for Bug 6 (a `hero-media-overlay.tsx` CSS change) passed `tsc` and all jsdom tests including TC-GH1557-05-02, yet was a real regression in an actual browser — jsdom doesn't do layout/hit-testing, so a synthetic-fixture test (`<img data-image-index>` with no overlay sibling) couldn't have caught an actual DOM element physically covering another. Caught by adversarial code review reasoning about real component markup, not by any test. Reverted; see `phase-05-image-click-race.md`'s "Code Review" section for the full story.
+
+---
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |
