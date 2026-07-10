@@ -1355,7 +1355,20 @@ export function BuilderLinkScripts() {
             } catch { /* invalid URL — let browser handle */ }
         }
         document.addEventListener('click', onClick)
-        return () => document.removeEventListener('click', onClick)
+
+        // GH-1461 rework: this document is the review-only builder preview — the default
+        // `cursor: auto` shows the text I-beam over copy, which reads as "editable here".
+        // Force the arrow instead. Links keep the pointer cursor (UA stylesheet sets it
+        // on <a> explicitly, so it isn't overridden by this inherited value), as do
+        // elements with their own cursor-* utility classes.
+        const style = document.createElement('style')
+        style.textContent = 'html { cursor: default; }'
+        document.head.appendChild(style)
+
+        return () => {
+            document.removeEventListener('click', onClick)
+            style.remove()
+        }
     }, [])
     return null
 }
