@@ -199,66 +199,76 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 
 ### 6.1 Desktop — Trang Quản lý Danh Mục
 
+*Header: nút back-arrow (←) về `/products`, H1 "Category Management", subtitle "Manage product categories (up to 3 levels deep)", nút [+ Add Category] (primary) góc phải. Bảng cây có header cột: **Category Name | LEVEL | PRODUCTS | ACTIONS**. Mỗi node: chevron expand (chỉ khi có con), icon folder/file, tên, badge **L{level}**, **{n} products** (productCount), actions **[+ Add sub]** (ẩn khi node ở L3) · **[✏️ Edit]** · **[🗑️ Delete]**. Thụt lề L2 ~52px, L3 ~84px. Pagination (10/25/50/100) ở cuối bảng.*
+
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ [≡ Logo]  Search...                             [👤 Admin]  │
-├──────────────┬──────────────────────────────────────────────┤
-│ 🏠 Dashboard │ 📁 Quản Lý Danh Mục                          │
-│ 📦 Products  │                                              │
-│ 🛒 Orders    │ [🔍 Tìm danh mục...]        [+ Thêm Danh Mục]│
-│ ⚙️ Settings  │ ──────────────────────────────────────────── │
-│              │                                              │
-│              │ 📂 Thời Trang (L1)              [✏️] [🗑️]   │
-│              │ ├── 📂 Nữ (L2)                  [✏️] [🗑️]   │
-│              │ │   ├── 📄 Áo Khoác (L3)        [✏️] [🗑️]   │
-│              │ │   ├── 📄 Váy Đầm (L3)         [✏️] [🗑️]   │
-│              │ │   └── [+ Thêm danh mục con]               │
-│              │ ├── 📂 Nam (L2)                  [✏️] [🗑️]   │
-│              │ │   ├── 📄 Áo Thun (L3)          [✏️] [🗑️]   │
-│              │ │   └── [+ Thêm danh mục con]               │
-│              │ └── [+ Thêm danh mục con]                   │
-│              │                                              │
-│              │ 📂 Đồ Ăn & Thức Uống (L1)       [✏️] [🗑️]   │
-│              │ ├── 📄 Trà Sữa (L2)              [✏️] [🗑️]   │
-│              │ ├── 📄 Cà Phê (L2)               [✏️] [🗑️]   │
-│              │ └── [+ Thêm danh mục con]                   │
-│              │                                              │
-│              │ 📂 Mỹ Phẩm (L1)                  [✏️] [🗑️]   │
-│              │ └── [+ Thêm danh mục con]                   │
-│              │                                              │
-└──────────────┴──────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ [≡ Logo]  Search...                                 [👤 Admin]  │
+├──────────────┬──────────────────────────────────────────────────┤
+│ 🏠 Dashboard │ ←  Category Management                            │
+│ 📦 Products  │    Manage product categories (up to 3 levels)     │
+│ 🛒 Orders    │                                    [+ Add Category]│
+│ ⚙️ Settings  │ [🔍 Search categories...]                         │
+│              │ ────────────────────────────────────────────────  │
+│              │ CATEGORY NAME              │ LEVEL │ PRODUCTS │ ACTIONS       │
+│              │ ───────────────────────────┼───────┼──────────┼────────────── │
+│              │ ▼ 📂 Thời Trang            │  L1   │ 24 prod  │ [+][✏️][🗑️]  │
+│              │   ▼ 📂 Nữ                  │  L2   │ 15 prod  │ [+][✏️][🗑️]  │
+│              │       📄 Áo Khoác          │  L3   │  8 prod  │    [✏️][🗑️]  │
+│              │       📄 Váy Đầm           │  L3   │  5 prod  │    [✏️][🗑️]  │
+│              │     [+ Add subcategory]                                       │
+│              │   ▶ 📂 Nam                 │  L2   │  9 prod  │ [+][✏️][🗑️]  │
+│              │   [+ Add subcategory]                                         │
+│              │ ▶ 📂 Đồ Ăn & Thức Uống     │  L1   │ 18 prod  │ [+][✏️][🗑️]  │
+│              │ ▶ 📂 Mỹ Phẩm              │  L1   │ 12 prod  │ [+][✏️][🗑️]  │
+│              │ ────────────────────────────────────────────────  │
+│              │ Rows: [10 ▼]              ‹ 1 2 3 ›   1–10 of 24   │
+└──────────────┴──────────────────────────────────────────────────┘
 ```
+> Node ở L3 **ẩn** nút [+ Add sub] (đã đạt cấp sâu nhất). Dòng inline `[+ Add subcategory]` hiện dưới node đang mở, cũng ẩn ở L3.
 
 ### 6.2 Modal — Thêm / Sửa Danh Mục
 
-*Khi bấm [+ Thêm Danh Mục] hoặc [✏️ Sửa], hệ thống mở Modal nhập liệu.*
+*Modal (max ~448px). **Tiêu đề contextual** theo ngữ cảnh mở:*
+- *Toolbar [+ Add Category] → **"Add New Category"***
+- *Nút [+] trên 1 node (add con) → **"Add Subcategory"***
+- *Nút [✏️ Edit] → **"Edit Category"***
+
+*Field theo THỨ TỰ code thật: **Name*** → **Parent Category** → **Description (Optional)** → **Category Image (Optional)** → **URL Slug**. Footer: [Cancel] [Save Category].*
 
 ```text
-       ┌── 📁 Thêm Danh Mục Mới ─────────────────[X]┐
+       ┌── Add New Category ──────────────────────[X]┐
        │                                             │
-       │ Tên Danh Mục (*)                            │
-       │ [ Nhập tên danh mục...                   ]  │
+       │ Category Name (*)                           │
+       │ [ Enter category name...                 ]  │
+       │   ↳ tạo mới: tự sinh URL Slug khi gõ tên    │
        │                                             │
-       │ Danh Mục Cha (Tuỳ chọn)                    │
-       │ [ -- Không (Root Level 1) -- ▼ ]            │
-       │   ├ Thời Trang                              │
-       │   │  ├ Thời Trang > Nữ                      │
-       │   │  └ Thời Trang > Nam                     │
-       │   ├ Đồ Ăn & Thức Uống                      │
-       │   └ Mỹ Phẩm                                │
+       │ Parent Category                             │
+       │ [ --None-- ▼ ]                              │
+       │   ├ Thời Trang                    (L1)      │
+       │   │  ├ Thời Trang > Nữ            (L2)      │
+       │   │  │  └ … > Áo Khoác            (L3) 🚫   │ ← L3 disabled (không làm cha)
+       │   │  └ Thời Trang > Nam           (L2)      │
+       │   ├ Đồ Ăn & Thức Uống            (L1)      │
+       │   └ Mỹ Phẩm                      (L1)      │
        │                                             │
-       │ Mô Tả (Tuỳ chọn)                           │
-       │ [ Mô tả ngắn cho danh mục...            ]  │
+       │ Description (Optional)                      │
+       │ [ Short description for SEO...          ]  │
        │                                             │
-       │ 🖼️ Ảnh Đại Diện (Tuỳ chọn)                  │
-       │ [ 📤 Tải ảnh lên ]                           │
+       │ Category Image (Optional)                   │
+       │ [ ⬆ Click to upload or drag and drop ]      │
        │                                             │
-       │ ⚠️ Lưu ý: Tối đa 3 cấp lồng nhau.          │
-       │ Nếu danh mục cha đã ở L2 thì con sẽ là L3. │
+       │ URL Slug                                    │
+       │ [ category-url                          ]  │
        │                                             │
-       │                    [ Hủy bỏ ] [ 💾 Lưu ]    │
+       │                 [ Cancel ] [ Save Category ]│
        └─────────────────────────────────────────────┘
 ```
+
+**Ghi chú hành vi modal:**
+- **Auto-slug:** ở chế độ **tạo mới**, gõ Name sẽ tự sinh URL Slug (bỏ dấu, lowercase, gạch nối). Ở chế độ **sửa**, slug giữ nguyên trừ khi user sửa tay.
+- **Parent khi mở từ [+] (add con):** tự điền danh mục đó vào Parent và **khóa (disabled)** — không cho đổi cha.
+- **Parent dropdown:** option **thụt lề theo cấp** (L1→L2→L3) hiển thị breadcrumb; **node L3 bị disable** (đã sâu nhất, không thể làm cha); **loại trừ chính nó + toàn bộ con/cháu** (chống vòng lặp). Depth kết quả luôn ≤ 3.
 
 ### 6.3 Mobile — Danh Mục dạng Accordion
 
@@ -285,7 +295,12 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 ```
 
 ### 6.4 Quy tắc Nghiệp vụ Danh Mục
-1. **Tối đa 3 cấp** (L1 → L2 → L3). Nếu danh mục cha đã ở L2, nút [+ Thêm con] sẽ tạo L3. Nếu đã là L3 thì **ẩn** nút thêm con.
-2. **Xóa mềm (Soft Delete):** Khi xóa 1 danh mục cha, tất cả danh mục con sẽ được gỡ liên kết (Unlink) khỏi cây, không bị xóa cứng.
-3. **Gán nhiều danh mục:** Một sản phẩm có thể thuộc nhiều danh mục cùng lúc (Multi-select tại Form sản phẩm).
-4. **Không cho phép trùng tên** cùng cấp dưới cùng 1 danh mục cha.
+1. **Tối đa 3 cấp** (L1 → L2 → L3). Nếu danh mục cha đã ở L2, nút [+ Add sub] sẽ tạo L3. Nếu đã là L3 thì **ẩn** nút thêm con.
+2. **Xóa danh mục:**
+   - **(a) Hard-block khi còn sản phẩm gán trực tiếp** (productCount > 0): chặn xóa, hiện thông báo *"Cannot delete this category. There are X products still assigned to it. Please reassign your products first."* → user phải chuyển sản phẩm sang danh mục khác trước.
+   - **(b) Nếu xóa được** (không còn SP gán trực tiếp): các danh mục **con trực tiếp được đẩy lên top-level** (`parent = null`), sau đó danh mục bị **soft-delete**. *(KHÔNG "gỡ liên kết khỏi cây" — con vẫn tồn tại, chỉ chuyển thành node gốc.)*
+3. **Sản phẩm ↔ Danh mục = 1–n (single-select):** mỗi sản phẩm chỉ thuộc **đúng 1 danh mục**. Form sản phẩm dùng **1 dropdown chọn danh mục** (không multi-select, không giới hạn "tối đa N").
+4. **Chống trùng lặp (dedup) — theo tenant:**
+   - **Slug** unique **per tenant** (không đụng tenant khác).
+   - **Tên** unique trong phạm vi **(cùng parent, cùng tenant)**, so sánh **case-insensitive + trim** — nên `"Áo"`, `"áo"`, `" Áo "` bị coi là trùng.
+5. **Chống vòng lặp (cycle prevention):** không cho đặt parent = **chính nó** hoặc **bất kỳ con/cháu** của nó; dropdown Parent đã loại các option này. Depth kết quả vẫn phải ≤ 3.
