@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 
@@ -356,5 +356,63 @@ describe('F19 Domain Management (DomainsClient)', () => {
                 expect.stringContaining('Domain connected!'),
             );
         });
+    });
+});
+
+// F23 #1459 — subdomain slug input: width + Vietnamese IME composition.
+// See docs/qa/F23-custom-subdomain-slug.md TC-F23-053..055.
+describe('F23 subdomain slug input (#1459)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        // Guard the debounced availability check (fires when slug !== current).
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ available: true }),
+        })) as unknown as typeof fetch);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    // Enter "Change subdomain" edit mode and return the slug input element.
+    function enterEditMode(): HTMLInputElement {
+        render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
+        fireEvent.click(screen.getByRole('button', { name: /Change subdomain/i }));
+        return screen.getByRole('textbox') as HTMLInputElement;
+    }
+
+    it('[TC-F23-053] keeps IME buffer while composing, sanitizes on compositionEnd', () => {
+        const input = enterEditMode();
+
+        // While composing (Vietnamese Telex), the raw buffer — incl. diacritics —
+        // must NOT be mutated mid-composition, otherwise chars get dropped.
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopđ' } });
+        expect(input.value).toBe('shopđ');
+
+        // On compositionEnd, filter to [a-z0-9-]: 'đ' is stripped, 'shop' preserved.
+        fireEvent.compositionEnd(input, { target: { value: 'shopđ' } });
+        expect(input.value).toBe('shop');
+    });
+
+    it('[TC-F23-054] EN keyboard onChange still lowercases and strips invalid chars', () => {
+        const input = enterEditMode();
+
+        // No composition in progress → sanitize synchronously as before.
+        fireEvent.change(input, { target: { value: 'My-Shop!@#' } });
+        expect(input.value).toBe('my-shop');
+    });
+
+    it('[TC-F23-055] input container is no longer hard-capped at 280px', () => {
+        const input = enterEditMode();
+        const container = input.parentElement as HTMLElement;
+
+        expect(container.className).not.toContain('max-w-[280px]');
+        expect(container.className).toContain('sm:max-w-[520px]');
+        // Input itself stays fluid so long slugs remain visible.
+        expect(input.className).toContain('flex-1');
+        expect(input.className).toContain('min-w-0');
     });
 });

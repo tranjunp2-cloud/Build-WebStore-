@@ -344,6 +344,9 @@ export function DomainsClient({
     const [showSlugConfirm, setShowSlugConfirm] = useState(false);
     const [savingSlug, setSavingSlug] = useState(false);
     const slugDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // F23 #1459: track IME composition so we don't sanitize mid-composition (drops Vietnamese chars)
+    const isComposingRef = useRef(false);
+    const sanitizeSlug = (v: string) => v.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63);
 
     const checkSlugAvailability = useCallback(async (slug: string) => {
         if (slug === currentSlug) { setSlugStatus('idle'); return; }
@@ -608,18 +611,28 @@ export function DomainsClient({
                                         nên cả cụm input + hậu tố .domain sáng viền liền mạch khi focus.
                                         Input bên trong để trong suốt (cùng pattern ô tiền "RM" form discount). */}
                                     <div
-                                        className="flex h-9 w-full max-w-[280px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
+                                        className="flex h-9 w-full sm:max-w-[520px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
                                         style={{ background: 'var(--dash-surface)' }}
                                     >
                                         <input
                                             type="text"
                                             value={slugInput}
-                                            onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                // While IME is composing, keep the raw buffer so Vietnamese
+                                                // (Telex/VNI) chars aren't dropped; sanitize on compositionEnd.
+                                                setSlugInput(isComposingRef.current ? raw : sanitizeSlug(raw));
+                                            }}
+                                            onCompositionStart={() => { isComposingRef.current = true; }}
+                                            onCompositionEnd={(e) => {
+                                                isComposingRef.current = false;
+                                                setSlugInput(sanitizeSlug(e.currentTarget.value));
+                                            }}
                                             className="h-full min-w-0 flex-1 border-0 bg-transparent pl-3 pr-1 text-[13px] font-mono outline-none"
                                             style={{ color: 'var(--dash-text)' }}
                                             autoFocus
                                         />
-                                        <span className="flex h-full items-center pr-3 text-[13px] text-slate-500 whitespace-nowrap">
+                                        <span className="flex h-full items-center pr-3 text-[13px] text-slate-500 whitespace-nowrap shrink-0">
                                             .{PLATFORM_DOMAIN}
                                         </span>
                                     </div>
