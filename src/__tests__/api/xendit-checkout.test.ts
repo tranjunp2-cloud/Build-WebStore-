@@ -72,12 +72,39 @@ vi.mock('@/lib/utils/storefront-url', () => ({
     buildStorefrontUrl: vi.fn((_slug: string, path: string) => `https://store.test${path}`),
 }))
 
+// EasyParcel rate lookup — thin passthrough to the REAL flat-rate calculator (no EP call),
+// mirroring getRates' epToken-null branch (same pattern as stripe-checkout.test.ts). Keeps
+// TC-SHIP-10..12 measuring the site's shippingConfig (westRate/eastRate/freeAbove).
+vi.mock('@/lib/shipping/get-rates', async () => {
+    const { getShippingRate } = await vi.importActual<typeof import('@/lib/shipping/calculate-fee')>('@/lib/shipping/calculate-fee')
+    return {
+        getRates: vi.fn(async (params: any, _token: unknown, flatConfig: any, destState?: string) => ({
+            rates: [{
+                courier: 'flat',
+                serviceId: 'flat',
+                courierName: 'Flat Rate',
+                serviceName: 'Standard',
+                priceSen: getShippingRate(destState ?? params.destState, flatConfig, params.subtotalSen),
+                codAvailable: false,
+                estDelivery: '3-5 business days',
+            }],
+            degraded: false,
+        })),
+    }
+})
+
+vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
+    getValidToken: vi.fn().mockResolvedValue(null),
+}))
+
 import { POST } from '@/app/api/orders/xendit-checkout/route'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { createInvoice } from '@/lib/payment/xendit'
+import { getRates } from '@/lib/shipping/get-rates'
 
 const mockBuildOrderItems = vi.mocked(buildOrderItems)
 const mockCreateInvoice = vi.mocked(createInvoice)
+const mockGetRates = vi.mocked(getRates)
 
 // ─── Test Helpers ─────────────────────────────────────────────────────
 
@@ -231,5 +258,74 @@ describe('POST /api/orders/xendit-checkout [shipping]', () => {
         expect(resBody.success).toBe(true)
         expect(mockCreate.mock.calls[0][0].data.shippingFee).toBe(0)
         expect(mockCreateInvoice.mock.calls[0][0].amount).toBeCloseTo(150, 2)
+    })
+
+    it('[TC-F36.29] persists EP courier fields when getRates returns a real EP rate', async () => {
+        // Arrange — EP quote wins: courier fields + parcelWeight must land on the order row
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 2, unitPrice: 5000, weightGrams: 750 }],
+            subtotal: 100, // RM — EP rate 880 sen = RM 8.80; total = RM 108.80
+            currency: 'MYR',
+            errorResponse: null,
+        } as any)
+        mockGetRates.mockResolvedValueOnce({
+            rates: [{
+                courier: 'EP-CR0A',
+                serviceId: 'EP-CS0W',
+                courierName: 'Poslaju',
+                serviceName: 'Poslaju Next Day',
+                priceSen: 880,
+                codAvailable: false,
+                estDelivery: '1-2 business days',
+            }],
+            degraded: false,
+        } as any)
+        mockCreate.mockResolvedValue({ ...VALID_ORDER, total: 108.8 })
+        mockCreateInvoice.mockResolvedValue(VALID_INVOICE)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockRequest(VALID_REQUEST_BODY) as any)
+        const resBody = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(resBody.success).toBe(true)
+        const created = mockCreate.mock.calls[0][0].data
+        expect(created.shippingCourier).toBe('EP-CR0A')
+        expect(created.shippingCourierName).toBe('Poslaju')
+        expect(created.shippingServiceId).toBe('EP-CS0W')
+        expect(created.parcelWeight).toBe(1500) // 750g × 2
+        expect(created.shippingFee).toBeCloseTo(8.8, 2)
+        expect(mockCreateInvoice.mock.calls[0][0].amount).toBeCloseTo(108.8, 2)
+    })
+
+    it('[TC-F36.29] omits EP courier fields on flat-rate fallback (self-delivery orders stay clean)', async () => {
+        // Arrange — flat passthrough (default mock): courier==='flat' must NOT write EP fields
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            subtotal: 50,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateInvoice.mockResolvedValue(VALID_INVOICE)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockRequest(VALID_REQUEST_BODY) as any)
+
+        // Assert
+        expect(res.status).toBe(200)
+        const created = mockCreate.mock.calls[0][0].data
+        expect(created.shippingCourier).toBeUndefined()
+        expect(created.shippingServiceId).toBeUndefined()
+        expect(created.parcelWeight).toBe(500) // weight default 500g still recorded
     })
 })
