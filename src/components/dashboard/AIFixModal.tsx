@@ -401,7 +401,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                                     onChange={() => toggleFix(fixKey(fix))}
                                                     className="peer appearance-none w-[18px] h-[18px] rounded-[4px] border-2 border-[#6B7280] bg-[#1F2937] checked:bg-[#10B981] checked:border-[#10B981] cursor-pointer transition-colors"
                                                 />
-                                                <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                <svg className="absolute w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100" style={{ color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1.5">
