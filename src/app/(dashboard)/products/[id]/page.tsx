@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { AlertTriangle } from 'lucide-react'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
 import { useI18n } from '@/i18n'
@@ -216,19 +215,11 @@ export default function ProductEditPage() {
 
     return (
         <div className="w-full">
-            {showLegacyWarning && (
-                <div
-                    role="alert"
-                    className="mx-auto max-w-3xl mb-4 flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-[13px] text-warning"
-                >
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
-                    <span>{t.dashboard.products.form.legacyPriceWarning}</span>
-                </div>
-            )}
             <ProductForm
                 isEdit={!isNew}
                 initialData={initialData || undefined}
                 onSubmitForm={handleSave}
+                showLegacyPriceWarning={showLegacyWarning}
             />
         </div>
     )
