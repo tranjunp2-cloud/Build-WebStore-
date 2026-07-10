@@ -36,8 +36,8 @@ export default function GuidelinePage() {
   ];
 
   return (
-    // PANEL: OVERVIEW — bg:card, border:1px border, border-radius:12px, padding:24px
-    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-4 sm:p-6">
+    // PANEL: OVERVIEW — bg:card, border:1px solid border (matches discounts/new form panel), border-radius:12px, padding:24px
+    <div className="w-full bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-xl p-4 sm:p-6">
       <div className="flex flex-col gap-[17px]">
 
         {/* Section 1: Welcome */}
@@ -80,7 +80,7 @@ export default function GuidelinePage() {
                 />
                 {/* Icon box: 40x40, bg:card, centered — matches demo .feature-icon */}
                 <div
-                  className="flex items-center justify-center rounded-[8px] bg-[hsl(var(--card))] shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] shrink-0 text-[hsl(var(--primary))]"
+                  className="flex items-center justify-center rounded-[8px] bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] shrink-0 text-[hsl(var(--primary))]"
                   style={{ width: 40, height: 40 }}
                   aria-hidden="true"
                 >
