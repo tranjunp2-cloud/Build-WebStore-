@@ -101,10 +101,15 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
             // CAS: commit cancel + payment_status='refunded' atomically.
             // AND payment_status='paid' guard prevents double-refund under concurrent requests.
+            // AND easy_parcel_order_no IS NULL (review #1582 round 2): a create-label claim or a
+            // created EP shipment means wallet money is (about to be) committed — cancelling mid
+            // claim→submit window would refund the buyer, then the label flow flips the order
+            // back to ready_to_ship, resurrecting a refunded order. Cancel only label-free rows.
             const xenditCas = await db.execute(sql`
                 UPDATE orders
                 SET status = 'cancelled', cancel_reason = ${reason}, payment_status = 'refunded', updated_at = NOW()
                 WHERE id = ${orderId} AND status = ${currentStatus} AND payment_status = 'paid'
+                  AND easy_parcel_order_no IS NULL
                 RETURNING id
             `)
 
@@ -223,10 +228,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
             // CAS: commit cancel + payment_status='refunded' atomically before calling Stripe API.
             // AND payment_status='paid' guard prevents double-refund under concurrent requests.
+            // AND easy_parcel_order_no IS NULL: see the Xendit CAS comment above (label race).
             const stripeCas = await db.execute(sql`
                 UPDATE orders
                 SET status = 'cancelled', cancel_reason = ${reason}, payment_status = 'refunded', updated_at = NOW()
                 WHERE id = ${orderId} AND status = ${currentStatus} AND payment_status = 'paid'
+                  AND easy_parcel_order_no IS NULL
                 RETURNING id
             `)
 
@@ -284,10 +291,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // Skip if Xendit or Stripe branch already ran its own CAS above.
         let casResult: { rows?: Array<Record<string, unknown>> } = { rows: [{}] }
         if (!xenditCasDone && !stripeCasDone) {
+            // AND easy_parcel_order_no IS NULL: see the Xendit CAS comment above (label race).
             casResult = await db.execute(sql`
                 UPDATE orders
                 SET status = 'cancelled', cancel_reason = ${reason}, updated_at = NOW()
                 WHERE id = ${orderId} AND status = ${currentStatus}
+                  AND easy_parcel_order_no IS NULL
                 RETURNING id
             `)
         }

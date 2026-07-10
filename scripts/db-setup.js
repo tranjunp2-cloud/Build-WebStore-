@@ -4094,6 +4094,9 @@ const MIGRATIONS = [
   { name: 'orders.enum_status_ready_to_ship', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'ready_to_ship'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.enum_status_payment_failed', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'payment_failed'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.enum_status_processing', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'processing'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  // create-label claim CAS filters status IN ('confirmed','paid','processing') — 'paid' relied
+  // on the original enum; any environment missing the label would 500 every create-label call.
+  { name: 'orders.enum_status_paid', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'paid'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   // ── F34: Xendit payment fields on Orders ──
