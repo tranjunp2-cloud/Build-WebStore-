@@ -36,7 +36,7 @@ vi.mock('@/app/(dashboard)/actions/media', () => ({
     uploadMediaAction: vi.fn(),
 }))
 
-import { saveProductAction, updateProductFieldAction } from '@/app/(dashboard)/products/actions'
+import { saveProductAction, updateProductFieldAction, getProductAction } from '@/app/(dashboard)/products/actions'
 import { getCurrentUser, extractTenantId, tenantIdForQuery } from '@/lib/auth'
 
 const VALID_PRODUCT = { name: 'Test Product', price: 100 }
@@ -920,5 +920,47 @@ describe('updateProductFieldAction', () => {
             const call = mockUpdate.mock.calls[0][0]
             expect(call.data).not.toHaveProperty('aiReviewPending')
         })
+    })
+})
+
+describe('getProductAction', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
+        mockUpdate.mockResolvedValue({ id: 42, aiReviewPending: false })
+    })
+
+    // ── AI-review flag: clear on view, not just on save (GH-1502 view-clears-flag) ──────
+
+    it('[TC-F08-04-60] aiReviewPending:true → clears the flag immediately on fetch', async () => {
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', aiReviewPending: true })
+
+        const result = await getProductAction(42)
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            id: 42,
+            data: expect.objectContaining({ aiReviewPending: false }),
+        }))
+        expect(result.aiReviewPending).toBe(false)
+    })
+
+    it('[TC-F08-04-61] aiReviewPending:false → no extra write issued', async () => {
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', aiReviewPending: false })
+
+        await getProductAction(42)
+
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-62] flag-clear write fails → getProductAction still resolves with the fetched data (read is not broken by a secondary-write failure)', async () => {
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', aiReviewPending: true })
+        mockUpdate.mockRejectedValue(new Error('transient DB error'))
+
+        const result = await getProductAction(42)
+
+        expect(result.name).toBe('Test Product')
+        // Write failed, so we don't claim it succeeded — flag stays as fetched (true).
+        expect(result.aiReviewPending).toBe(true)
     })
 })

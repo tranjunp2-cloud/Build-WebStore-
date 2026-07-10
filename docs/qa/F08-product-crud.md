@@ -172,6 +172,9 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-57** | `GH-1502-review-drawer` | `Integration` | Review drawer's Stock field for a variant product — no per-variant matrix exists at this stage (that's `ProductForm`'s job), so editing Stock here (`updateAllVariantsStock`) fills the same value into every variant uniformly; saved `inventory` is their sum. | Render `BulkCreateModal` with 1 variant product (2 variants, stock=0 each); change the Stock input to `7`; click Approve All. | - `saveProductAction` called with both variants' `stock` equal to `7`; `payload.inventory` equals `14`. | Medium | [x] |
 | **TC-F08-04-58** | `GH-1502-PR-1526-review-followup` | `Integration` | `coerceFiniteNumber` helper: a non-numeric string stock value (e.g. AI returns `"N/A"`) is caught by an explicit `Number.isFinite` check — `Number(v ?? 0)` alone does NOT catch this, since `NaN` is neither `null` nor `undefined` so the `?? 0` fallback never fires. Applied at parse time to both top-level and per-variant stock (and reused for price), matching the finiteness-check pattern already used for price. | Mock parse API returns 1 variant product with `variants[0].stock: "N/A"`; render `BulkCreateModal`. | - Stock input renders `"0"` (not `"N/A"`/blank/`NaN`); `saveProductAction` called with `variants[0].stock === 0` and `inventory === 0`. | Low | [x] |
 | **TC-F08-04-59** | `GH-1502-PR-1526-adversarial-followup` | `Unit` | `buildSavePayload`'s own `coerceFiniteNumber` call sites (variant `stock` + `inventory` sum/non-variant branch) are exercised directly — TC-F08-04-58 only covers the parse-time `uniqueMap` coercion, so by the time `buildSavePayload` ran in that test the data was already clean; this closes that coverage gap (found by adversarial review: reverting `buildSavePayload`'s 2 `coerceFiniteNumber` calls back to the naive pre-fix form still passed all other tests). | Unit: `buildSavePayload` called directly with a variant product (`variants[0].stock: 'N/A'`) and a non-variant product (`stock: 'N/A'`). | - Variant payload: `variants[0].stock === 0` and `inventory === 0`.<br>- Non-variant payload: `inventory === 0`. | Medium | [x] |
+| **TC-F08-04-60** | `GH-1502-view-clears-flag` | `Unit` | `getProductAction` clears `aiReviewPending` as soon as the product is fetched (opening the edit page counts as reviewed) instead of waiting for an explicit save. | Unit: `mockFindByID` resolves `{ id: 42, aiReviewPending: true }`; call `getProductAction(42)`. | - `mockUpdate` called once with `data` containing `{ aiReviewPending: false }`.<br>- Returned product has `aiReviewPending === false`. | High | [x] |
+| **TC-F08-04-61** | `GH-1502-view-clears-flag` | `Unit` | `getProductAction` does not issue an extra write when the product isn't pending review. | Unit: `mockFindByID` resolves `{ id: 42, aiReviewPending: false }`; call `getProductAction(42)`. | - `mockUpdate` NOT called. | Medium | [x] |
+| **TC-F08-04-62** | `GH-1502-view-clears-flag-adversarial-followup` | `Unit` | `getProductAction`'s flag-clear write is best-effort — if it fails, the read still resolves successfully instead of rejecting (found by adversarial review: an unguarded `payload.update` throw would previously make a successful read look like a load failure to the caller). | Unit: `mockFindByID` resolves `{ id: 42, aiReviewPending: true }`; `mockUpdate` rejects. | - `getProductAction` resolves (does not throw); returned `name` is correct; `aiReviewPending` stays `true` (write didn't succeed, so it isn't claimed as cleared). | High | [x] |
 
 ---
 ### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (12 Cases)
@@ -525,10 +528,10 @@ Added in phase-05 to lock in the P0 fixes from GH-1032.
 
 | TC-ID | Scenario | Expected | File |
 |---|---|---|---|
-| **TC-F08-1525-01** | No variants → returns single inventory as label, isRange=false | label='15', breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
-| **TC-F08-1525-02** | Exactly 1 variant → single number with breakdown populated | label='8', breakdown=[{name, stock}] | src/__tests__/unit/products/stock-display.test.ts |
-| **TC-F08-1525-03** | All variants equal stock → single number, isRange=false, breakdown populated | label='5', isRange=false | src/__tests__/unit/products/stock-display.test.ts |
-| **TC-F08-1525-04** | Variants differ → range label "{min} - {max}", isRange=true | label='2 - 10', isRange=true | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-01** | No variants → returns single inventory as label, showVariantCount=false | label='15', breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-02** | Exactly 1 variant → total label (=that variant's stock), showVariantCount=true, breakdown populated | label='8', showVariantCount=true, variantCount=1 | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-03** | All variants equal stock → label is the SUMMED TOTAL, not one variant's stock, showVariantCount=true | label='15' (5+5+5), showVariantCount=true | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-04** | Variants differ → total label (master inventory sum), no longer a "{min} - {max}" range | label='17' (2+10+5), showVariantCount=true | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-05** | String stock values coerced to number | min=3, max=7 numeric | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-06** | Range severity: max=0 → destructive | severity='destructive' | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-07** | Range severity: min=0 && max>0 → warning | severity='warning' | src/__tests__/unit/products/stock-display.test.ts |
@@ -536,8 +539,12 @@ Added in phase-05 to lock in the P0 fixes from GH-1032.
 | **TC-F08-1525-09** | Empty variants array → returns single inventory as label | label='12', breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-15** | Missing inventory → defaults to 0, severity=destructive (renumbered — 10-14 claimed by master-fields-disable.test.tsx) | label='0', severity='destructive' | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-16** | Range severity: 0<min<=5 → warning | severity='warning' | src/__tests__/unit/products/stock-display.test.ts |
-| **TC-F08-1525-17** | hasVariants=false (even with a populated variants array) → ignores variants, uses inventory | label='5', isRange=false, breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-17** | hasVariants=false (even with a populated variants array) → ignores variants, uses inventory | label='5', showVariantCount=false, breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
 | **TC-F08-1525-18** | Negative stock (corrupted/legacy data) clamped to 0, never rendered as false-healthy | severity≠'success', label uses 0 not negative | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-71** | Master-inventory-total label (2026-07-10 product decision): 3 variants totalling 30 → label reflects the sum, not a range | label='30', showVariantCount=true, variantCount=3, total=30 | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-72** | Total type consistency: `label` always equals `String(total)` whenever showVariantCount is true | label === String(total) | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-73** | `variantCount` always equals `breakdown.length` | variantCount === breakdown.length (4) | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-74** | No-variants case never sets showVariantCount, regardless of inventory value | showVariantCount=false, variantCount=0, label='999' | src/__tests__/unit/products/stock-display.test.ts |
 
 ### MasterFieldsSection — Master fields disable/enable logic (React component)
 
@@ -555,9 +562,9 @@ Added in phase-05 to lock in the P0 fixes from GH-1032.
 | TC-ID | Scenario | Expected | File |
 |---|---|---|---|
 | **TC-F08-1525-20** | Single stock number → renders plain Badge with label | Badge visible, label='15' | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
-| **TC-F08-1525-21** | Range with breakdown → Tooltip wrapper + Badge + breakdown content visible | Tooltip trigger, breakdown list rendered | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
-| **TC-F08-1525-22** | Single variant (1 option) → single number badge, breakdown still populated | label='8', isRange=false, breakdown populated | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
-| **TC-F08-1525-23** | breakdown.length > 1 with range → Tooltip; breakdown.length === 1 → plain Badge | Conditional rendering logic verified | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-21** | Multi-variant total with breakdown → Tooltip wrapper + total Badge (master inventory sum, not "{min} - {max}") + breakdown content visible | Tooltip trigger, badge label='20' (5+15), breakdown list rendered | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-22** | Single variant (1 option) → total badge (=that variant's stock), showVariantCount=true so caller renders "1 variant", breakdown still populated | label='8', showVariantCount=true, variantCount=1, breakdown populated | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-23** | breakdown.length > 1 → Tooltip; breakdown.length === 1 → plain Badge (both cases showVariantCount=true) | Conditional rendering logic verified | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
 | **TC-F08-1525-24** | ProductForm section order: MasterFieldsSection before VariantOptionsSection | Master section appears before Variant section in DOM | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
 | **TC-F08-1525-42** | Breakdown popup visual polish (issue 4 follow-up): each row colored by its OWN stock severity, not the outer range severity | mixed rows (0/3/20 stock) → destructive/warning/success independently | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
 

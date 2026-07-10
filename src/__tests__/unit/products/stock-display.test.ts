@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { computeStockDisplay, type StockDisplay } from '@/lib/products/stock-display'
 
-// ── TC-F08-1525-01..08: Stock Display Helper ───────────────────────────────────
+// ── TC-F08-1525-01..18: Stock Display Helper ───────────────────────────────────
+// Addendum (product decision, 2026-07-10): the "{min} - {max}" range label was
+// replaced with the master inventory total + variant count (e.g. "30 / 3 variants")
+// — see TC-F08-1525-19..22 below. Severity logic is unchanged (still derived from
+// the per-variant min/max spread via `rangeSeverity`, not the total).
 
 describe('[TC-F08-1525] computeStockDisplay', () => {
 	// TC-F08-1525-01: No variants → single number from inventory
@@ -10,15 +14,18 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		const result = computeStockDisplay(p)
 
 		expect(result.label).toBe('15')
-		expect(result.isRange).toBe(false)
+		expect(result.showVariantCount).toBe(false)
 		expect(result.min).toBe(15)
 		expect(result.max).toBe(15)
+		expect(result.total).toBe(15)
+		expect(result.variantCount).toBe(0)
 		expect(result.severity).toBe('success')
 		expect(result.breakdown).toBeNull()
 	})
 
-	// TC-F08-1525-02: Exactly 1 variant → single number (breakdown still populated)
-	it('TC-F08-1525-02: exactly 1 variant → single number with breakdown', () => {
+	// TC-F08-1525-02: Exactly 1 variant → total label (same number as that variant's
+	// stock), showVariantCount=true so the caller appends "1 variant"
+	it('TC-F08-1525-02: exactly 1 variant → total label, showVariantCount=true, breakdown populated', () => {
 		const p = {
 			hasVariants: true,
 			variants: [{ name: 'Red-M', stock: 8 }],
@@ -26,15 +33,17 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		const result = computeStockDisplay(p)
 
 		expect(result.label).toBe('8')
-		expect(result.isRange).toBe(false)
+		expect(result.showVariantCount).toBe(true)
 		expect(result.min).toBe(8)
 		expect(result.max).toBe(8)
+		expect(result.total).toBe(8)
+		expect(result.variantCount).toBe(1)
 		expect(result.severity).toBe('success')
 		expect(result.breakdown).toEqual([{ name: 'Red-M', stock: 8 }])
 	})
 
-	// TC-F08-1525-03: All variants equal stock → single number
-	it('TC-F08-1525-03: all variants equal stock → single number, isRange=false', () => {
+	// TC-F08-1525-03: All variants equal stock → total (sum), not the per-variant value
+	it('TC-F08-1525-03: all variants equal stock → label is the summed total, not one variant\'s stock', () => {
 		const p = {
 			hasVariants: true,
 			variants: [
@@ -45,16 +54,18 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		}
 		const result = computeStockDisplay(p)
 
-		expect(result.label).toBe('5')
-		expect(result.isRange).toBe(false)
+		expect(result.label).toBe('15') // 5+5+5, not '5'
+		expect(result.showVariantCount).toBe(true)
+		expect(result.variantCount).toBe(3)
 		expect(result.min).toBe(5)
 		expect(result.max).toBe(5)
-		expect(result.severity).toBe('warning') // stock=5 → singleSeverity=warning
+		expect(result.total).toBe(15)
+		expect(result.severity).toBe('warning') // per-variant min=5 → warning, unchanged by the label change
 		expect(result.breakdown).toHaveLength(3)
 	})
 
-	// TC-F08-1525-04: Variants differ → range label "{min} - {max}"
-	it('TC-F08-1525-04: variants differ → range label and isRange=true', () => {
+	// TC-F08-1525-04: Variants differ → total label (no longer a "{min} - {max}" range)
+	it('TC-F08-1525-04: variants differ → total label (not a min-max range)', () => {
 		const p = {
 			hasVariants: true,
 			variants: [
@@ -65,16 +76,18 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		}
 		const result = computeStockDisplay(p)
 
-		expect(result.label).toBe('2 - 10')
-		expect(result.isRange).toBe(true)
+		expect(result.label).toBe('17') // 2+10+5, not '2 - 10'
+		expect(result.showVariantCount).toBe(true)
+		expect(result.variantCount).toBe(3)
 		expect(result.min).toBe(2)
 		expect(result.max).toBe(10)
-		expect(result.severity).toBe('warning') // min > 0 && min <= 5 → warning
+		expect(result.total).toBe(17)
+		expect(result.severity).toBe('warning') // min > 0 && min <= 5 → warning, unchanged
 		expect(result.breakdown).toHaveLength(3)
 	})
 
-	// TC-F08-1525-05: String stock coercion → converted to number
-	it('TC-F08-1525-05: string stock values → coerced to numbers', () => {
+	// TC-F08-1525-05: String stock coercion → converted to number, summed into total
+	it('TC-F08-1525-05: string stock values → coerced to numbers before summing', () => {
 		const p = {
 			hasVariants: true,
 			variants: [
@@ -84,14 +97,15 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		}
 		const result = computeStockDisplay(p)
 
-		expect(result.label).toBe('3 - 7')
+		expect(result.label).toBe('10') // 7+3
 		expect(result.min).toBe(3)
 		expect(result.max).toBe(7)
+		expect(result.total).toBe(10)
 		expect(result.breakdown?.[0]?.stock).toBe(7)
 		expect(result.breakdown?.[1]?.stock).toBe(3)
 	})
 
-	// TC-F08-1525-06: Severity destructive → max === 0
+	// TC-F08-1525-06: Severity destructive → max === 0 (unaffected by the label change)
 	it('TC-F08-1525-06: severity destructive when max === 0', () => {
 		const p = {
 			hasVariants: true,
@@ -103,12 +117,12 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		const result = computeStockDisplay(p)
 
 		expect(result.label).toBe('0')
-		expect(result.isRange).toBe(false)
+		expect(result.showVariantCount).toBe(true)
 		expect(result.severity).toBe('destructive')
 	})
 
-	// TC-F08-1525-07: Severity warning → min === 0 && max > 0
-	it('TC-F08-1525-07: severity warning when min === 0 && max > 0 (mixed stock)', () => {
+	// TC-F08-1525-07: Severity warning → min === 0 && max > 0 (mixed stock); label is the total
+	it('TC-F08-1525-07: severity warning when min === 0 && max > 0 (mixed stock), label is total', () => {
 		const p = {
 			hasVariants: true,
 			variants: [
@@ -118,7 +132,7 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		}
 		const result = computeStockDisplay(p)
 
-		expect(result.label).toBe('0 - 5')
+		expect(result.label).toBe('5') // 0+5, not '0 - 5'
 		expect(result.severity).toBe('warning')
 	})
 
@@ -146,7 +160,8 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		const result = computeStockDisplay(p)
 
 		expect(result.label).toBe('12')
-		expect(result.isRange).toBe(false)
+		expect(result.showVariantCount).toBe(false)
+		expect(result.variantCount).toBe(0)
 		expect(result.breakdown).toBeNull()
 	})
 
@@ -188,7 +203,7 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		const result = computeStockDisplay(p)
 
 		expect(result.label).toBe('5')
-		expect(result.isRange).toBe(false)
+		expect(result.showVariantCount).toBe(false)
 		expect(result.breakdown).toBeNull()
 	})
 
@@ -210,5 +225,67 @@ describe('[TC-F08-1525] computeStockDisplay', () => {
 		expect(range.min).toBe(0)
 		expect(range.breakdown?.[0]?.stock).toBe(0)
 		expect(range.severity).not.toBe('success')
+	})
+
+	// ── TC-F08-1525-71..74: master-inventory-total label (2026-07-10 product decision) ──
+	// (71-74, not 19-22 — those numbers were already claimed by
+	// products-stock-cell.test.tsx's "Products List Stock Cell Rendering" section;
+	// found + renumbered by adversarial code review.)
+
+	// TC-F08-1525-71: canonical example from the request — 3 variants, total 30
+	it('TC-F08-1525-71: 3 variants totalling 30 → label "30", showVariantCount=true, variantCount=3', () => {
+		const p = {
+			hasVariants: true,
+			variants: [
+				{ name: 'S', stock: 10 },
+				{ name: 'M', stock: 10 },
+				{ name: 'L', stock: 10 },
+			],
+		}
+		const result = computeStockDisplay(p)
+
+		expect(result.label).toBe('30')
+		expect(result.showVariantCount).toBe(true)
+		expect(result.variantCount).toBe(3)
+		expect(result.total).toBe(30)
+	})
+
+	// TC-F08-1525-72: total type consistency — `label` is always `String(total)` for variant products
+	it('TC-F08-1525-72: label always equals String(total) whenever showVariantCount is true', () => {
+		const result = computeStockDisplay({
+			hasVariants: true,
+			variants: [
+				{ name: 'A', stock: 4 },
+				{ name: 'B', stock: 0 },
+				{ name: 'C', stock: 11 },
+			],
+		})
+
+		expect(result.label).toBe(String(result.total))
+	})
+
+	// TC-F08-1525-73: variantCount matches breakdown length exactly
+	it('TC-F08-1525-73: variantCount equals breakdown.length', () => {
+		const result = computeStockDisplay({
+			hasVariants: true,
+			variants: [
+				{ name: 'A', stock: 1 },
+				{ name: 'B', stock: 2 },
+				{ name: 'C', stock: 3 },
+				{ name: 'D', stock: 4 },
+			],
+		})
+
+		expect(result.variantCount).toBe(result.breakdown?.length)
+		expect(result.variantCount).toBe(4)
+	})
+
+	// TC-F08-1525-74: no-variants case never sets showVariantCount, regardless of inventory value
+	it('TC-F08-1525-74: showVariantCount stays false for non-variant products even with high inventory', () => {
+		const result: StockDisplay = computeStockDisplay({ hasVariants: false, inventory: 999 })
+
+		expect(result.showVariantCount).toBe(false)
+		expect(result.variantCount).toBe(0)
+		expect(result.label).toBe('999')
 	})
 })
