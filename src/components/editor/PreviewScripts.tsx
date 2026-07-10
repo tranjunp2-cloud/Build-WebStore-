@@ -1336,8 +1336,15 @@ export function PreviewScripts() {
 }
 
 /**
- * Lightweight click handler for builder preview mode (builder=1).
- * Opens external links in a new tab; lets internal nav links navigate normally.
+ * Lightweight scripts for every review-only preview surface: builder preview
+ * (builder=1), the standalone preview opened from the editor toolbar (no params),
+ * and blog preview pages (mounted unconditionally there).
+ *
+ * Does two things:
+ * 1. Opens external links in a new tab; internal nav links navigate normally.
+ * 2. Forces `cursor: default` on the whole document (GH-1461) — the UA I-beam
+ *    over text reads as "editable here" on a surface that cannot edit. Links
+ *    keep the pointer cursor (UA sets it on `a[href]` explicitly).
  */
 export function BuilderLinkScripts() {
     useEffect(() => {

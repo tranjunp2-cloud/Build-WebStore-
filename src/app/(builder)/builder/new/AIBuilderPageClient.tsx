@@ -68,11 +68,15 @@ function clearBuilderSessionStorage() {
     window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
 }
 
+// GH-1461: default readonly — the interactive (drag-reorder) path has no remaining caller
+// since the preview screens went review-only. Kept behind the flag rather than deleted so
+// the drag machinery is still reachable if a future editing surface needs it; a caller who
+// wants drags must opt in AND pass onReorder, or drags visually snap back without saving.
 function LivePreview({
     blocks,
     theme,
     onReorder,
-    interactive = true,
+    interactive = false,
     siteType,
 }: {
     blocks: any[]
@@ -830,10 +834,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         messages.find((message) => message.role === 'assistant')?.content.replace(/^🚀\s*/, '') ||
         t.onboarding.generating.startingMessage
 
-    // GH-1461 rework: preview screens (this panel + Full Preview modal) are review-only —
-    // dragListener/onReorder here would let users "edit" (reorder blocks) outside the real
-    // Editor, contradicting the ticket's "no edit here, only in Editor" requirement. Both
-    // consumers now share this single readonly instance.
+    // GH-1461 rework: the preview CANVAS (this panel + Full Preview modal) is review-only —
+    // no drag-reorder/edit affordances inside the rendered site itself. Block reorder is
+    // still available via the completion screen's own arrow buttons (handleMoveBlock),
+    // which are builder chrome, not part of the preview render. Both consumers share this
+    // single readonly instance.
     const readonlyPreviewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
             <LivePreview blocks={blocks} interactive={false} theme={theme} siteType={businessInfo?.industry} />
