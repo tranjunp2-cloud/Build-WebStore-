@@ -110,6 +110,9 @@ function LivePreview({
                 fontFamily: `'${theme.fontBody}', sans-serif`,
                 background: resolved.backgroundColor,
                 color: resolved.textColor,
+                // GH-1461 rework: default I-beam cursor over text reads as "editable" —
+                // this is review-only, so force the arrow cursor instead.
+                cursor: interactive ? undefined : 'default',
             }}
             values={blocks}
         >
@@ -827,19 +830,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         messages.find((message) => message.role === 'assistant')?.content.replace(/^🚀\s*/, '') ||
         t.onboarding.generating.startingMessage
 
-    const previewContent = blocks.length > 0 && theme ? (
-        <div className="h-full overflow-y-auto bg-[#06090F]">
-            <LivePreview blocks={blocks} onReorder={(newOrder) => { hasUserEditsRef.current = true; setBlocks(newOrder) }} theme={theme} siteType={businessInfo?.industry} />
-        </div>
-    ) : (
-        <div className="flex h-full items-center justify-center bg-[#06090F]">
-            <div className="text-center">
-                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || t.onboarding.completion.yourWebsite}</p>
-                <p className="mt-2 text-sm text-white/40">{t.onboarding.completion.previewPreparing}</p>
-            </div>
-        </div>
-    )
-
+    // GH-1461 rework: preview screens (this panel + Full Preview modal) are review-only —
+    // dragListener/onReorder here would let users "edit" (reorder blocks) outside the real
+    // Editor, contradicting the ticket's "no edit here, only in Editor" requirement. Both
+    // consumers now share this single readonly instance.
     const readonlyPreviewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
             <LivePreview blocks={blocks} interactive={false} theme={theme} siteType={businessInfo?.industry} />
@@ -972,7 +966,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onOpenPreview={() => setIsFullPreviewOpen(true)}
                     onPublish={handlePublish}
                     onPreviewModeChange={setPreviewMode}
-                    previewContent={previewContent}
+                    previewContent={readonlyPreviewContent}
                     previewMode={previewMode}
                     siteId={siteId}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
