@@ -73,6 +73,57 @@ function toSnakeCase(str) {
   return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
 }
 
+/**
+ * Scan the CURRENT full file (not just diff `+` lines) for field names nested
+ * inside an `array`-typed ancestor anywhere in the file. Used as a safety-net
+ * alongside the diff-only scope-stack in getNewFieldsFromDiff(): that stack
+ * only sees ADDED lines, so if a PR touches only a field NESTED inside an
+ * array (e.g. adds `validate:` to `opens`/`closes`) without touching the
+ * array's own `name`/`type: 'array'` lines, the diff-only stack never learns
+ * the field is array-nested and wrongly flags it as a new top-level column.
+ * Reading the full file gives complete nesting context regardless of which
+ * lines changed. Same algorithm as the diff-only stack, applied to all lines.
+ */
+function getArrayNestedFieldNames(source) {
+  const skip = new Set()
+  const lines = source.split('\n')
+  const scopeStack = [] // { indent, type }
+  for (let i = 0; i < lines.length; i++) {
+    const nameMatch = lines[i].match(/^(\s*)name:\s*['"](\w+)['"]/)
+    if (!nameMatch) continue
+    const indent = nameMatch[1].length
+    const fieldName = nameMatch[2]
+
+    while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
+      scopeStack.pop()
+    }
+
+    if (scopeStack.some((s) => s.type === 'array')) {
+      skip.add(fieldName)
+    }
+
+    let ownType = null
+    const inlineTypeMatch = lines[i].match(/type:\s*['"](\w+)['"]/)
+    if (inlineTypeMatch) {
+      ownType = inlineTypeMatch[1]
+    } else {
+      for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 8); j++) {
+        if (j === i) continue
+        const typeMatch = lines[j].match(/^(\s*)type:\s*['"](\w+)['"]/)
+        if (typeMatch && typeMatch[1].length === indent) {
+          ownType = typeMatch[2]
+          break
+        }
+      }
+    }
+
+    if (ownType === 'group' || ownType === 'array') {
+      scopeStack.push({ indent, type: ownType })
+    }
+  }
+  return skip
+}
+
 function getNewFieldsFromDiff() {
   const newFields = []
 
@@ -142,6 +193,20 @@ function getNewFieldsFromDiff() {
         if (ownType === 'group' || ownType === 'array') {
           skipFieldNames.add(fieldName) // groups/arrays have no direct column themselves
           scopeStack.push({ indent, type: ownType })
+        }
+      }
+
+      // Safety-net: the diff-only scope-stack above misses array-nesting when
+      // a PR only touches a field INSIDE an array without touching the array's
+      // own `name`/`type: 'array'` lines (those then never appear as `+` lines,
+      // so the stack never learns the field is array-nested). Cross-check
+      // against the full current file, which has complete nesting context
+      // regardless of which lines changed.
+      const currentFilePath = path.join(__dirname, '..', filePath)
+      if (fs.existsSync(currentFilePath)) {
+        const fullFileContent = fs.readFileSync(currentFilePath, 'utf8')
+        for (const name of getArrayNestedFieldNames(fullFileContent)) {
+          skipFieldNames.add(name)
         }
       }
 
