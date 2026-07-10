@@ -178,6 +178,85 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 **QC NOTE:** Test case IDs use provisional TC-F37-03-01 through 46 format. QC/PM must backfill official TC-IDs in `docs/qa/F37-local-seo.md` post-merge (file does not yet exist; copy story acceptance criteria as scaffold).
 
 **Known follow-ups (from adversarial + independent PR review, deferred — not blocking):** (1) Schema allows 2+ published sites per tenant (no unique constraint); `robots.txt`/`llms.txt` site lookup now sorts by `createdAt` for determinism, but `aiCrawlersEnabled` is per-site while the route resolves per-tenant — a sibling site's compliance opt-out could silently not apply if a tenant genuinely has multiple published sites (pre-existing pattern shared with `sitemap.xml`). No current product flow creates this configuration, so it's a best-effort mitigation, not a guarantee. Revisit with real domain-based per-site resolution if multi-site-per-tenant becomes supported. (2) `ai-crawlers-toggle` ownership check accepts any tenant in the user's full tenant list while `withFeatureGuard` only checks `tenants[0]` — same mismatch pre-exists in the sibling `auto-meta-toggle` route. Confirmed with PM: current product reality is 1 tenant per user, so not actively exploitable today; revisit if multi-tenant-per-user becomes supported (needs a coordinated fix across both routes at that point).
+---
+
+### F37 — Opening Hours Editor Redesign (Google Maps-style List View + Edit Modal, Multi-day Batch & Split-shift)
+
+**Local Business opening-hours editor redesigned from fixed 7-row inline table to Google Maps-style list view + modal, enabling multi-day batch edits and split-shift support (3 time ranges/day).**
+
+**Deliverables:**
+
+- **New pure-logic utilities module:** `src/components/editor/local-business/opening-hours-utils.ts` (1:1 row-data model, no canonicalization). Exports:
+  - `groupRowsByDay(rows)` — flatten array into day→ranges[] map for UI rendering
+  - `rangesFromDay(day, rows)` — extract time ranges for a single day
+  - `applyBatchSave(rows, selectedDays, ranges)` — atomic overwrite: drop all rows of selected days, re-insert from new ranges (Google parity)
+  - `defaultWeek()` — suggested default (Mon–Fri open, weekend closed)
+  - `describeDay(day)` — human label for day code
+
+- **New edit modal component:** `src/components/editor/local-business/opening-hours-edit-modal.tsx` (Radix Dialog, multi-day select toggle buttons, 3 time-range add/edit slots, closed/open-24h/custom modes). Features:
+  - Multi-day selector (7 day-toggle buttons, wraps at ~320px width)
+  - Mode picker: Closed / Open 24h (00:00–23:59) / Custom (N time ranges, N ≤ 3)
+  - Add Range button (up to 3 per day in modal)
+  - Save overwrites selected days atomically; Cancel discards changes
+
+- **Redesigned list-view editor:** Renamed `src/components/editor/local-business/opening-hours-table.tsx` → `opening-hours-editor.tsx`; component export `OpeningHoursTable` → `OpeningHoursEditor`. Now renders:
+  - One row per day (Mo–Su), height scales with number of time ranges (split-shift support)
+  - "Closed" badge for closed days, multi-line time ranges for open days
+  - Edit pencil icon → opens modal
+  - Quick-actions: "Edit all" (pre-fill from Monday), "Edit Mon–Fri" (batch weekday edit)
+  - Old fixed-7-row table deleted
+
+- **Validation cap increase:** `src/collections/Sites.ts` + `src/lib/validations/sites.ts` raised `openingHours.maxRows` from 7 to 21 (7 days × 3 shifts max). Zod cap synced with collection schema; enforced invariant prevents overflow.
+
+- **SettingsPanel wiring:** `src/components/editor/SettingsPanel.tsx` updated: 1-line import swap (`OpeningHoursEditor` imports + tag name change). Contract unchanged (same `onChange(rows)` callback).
+
+- **i18n updates:** `src/i18n/locales/en.json`, `ms.json` — 9 new keys (editAllHours, editWeekdaysHours, addTimeRange, multipleTimeRanges, openingTime, closingTime, etc.).
+
+- **No DB migration:** `day_of_week` has no unique constraint; 1:1 row mapping to new flat array model — existing data loads without loss.
+
+- **Architecture notes:**
+  - Save semantics: **overwrite, not merge**. Selecting Mon/Wed and saving new ranges drops all Mon/Wed rows, inserts new ones (Google Calendar parity).
+  - Encoding: closed = 1 row `{isClosed:true}`; open-24h = `{opens:'00:00', closes:'23:59'}`; split = N rows, same day, different times.
+  - Cap: 3 ranges/day in modal → 7×3 = 21 total rows (invariant).
+  - JSON-LD emission unchanged (already split-shift compatible; Phase 04's `OpeningHoursSpecification` generator handles 1:1 row mapping).
+
+**Tests:** 75/75 F37 test suite passing (49 before, +26 new tests). Unit + component coverage for list-view, modal, batch-save logic, validation. See `docs/qa/F37-local-seo.md` (v2.5) for TC-IDs.
+
+**Files created:** `src/components/editor/local-business/opening-hours-utils.ts`, `src/components/editor/local-business/opening-hours-edit-modal.tsx`. **Files deleted:** `src/components/editor/local-business/opening-hours-table.tsx`. **Files modified:** `src/components/editor/SettingsPanel.tsx`, `src/collections/Sites.ts`, `src/lib/validations/sites.ts`, `src/i18n/locales/{en,ms}.json`, `src/__tests__/unit/seo/local-business-json-ld.test.ts` (no changes to JSON-LD logic; test count reflects full suite).
+
+**Non-breaking:** Existing 1-row/day sites load with zero data loss. Field is optional. Max-row validation only blocks saves exceeding 21, doesn't regress earlier <7-row data.
+
+**Related:** Phase 04 (JSON-LD, Phase 05 scoring) already released and compatible with split-shift; no changes needed there. QA doc `docs/qa/F37-local-seo.md` already updated to v2.5 by QC; no duplicate work.
+
+---
+
+### F37 — Local Business Info: State→District→Postcode Cascade + hasMap JSON-LD (US-F37-01 Data Quality Follow-up & US-F37-02 Enhancement)
+
+**Data quality improvement: Sellers now enter standardized location data via DB-backed state/district/postcode cascade instead of freetext inputs. Enhanced JSON-LD now includes `hasMap` field for richer local search signals.**
+
+**F37-01 Data Quality Deliverables:**
+
+- **New cascade component:** `src/components/editor/local-business/geo-cascade-fields.tsx` — reusable State→District→Postcode cascade (forward cascade + reverse pre-fill resolution) using checkout's live `/api/geo/*` endpoints. Handles DB lookups (state/district names → ids), forward cascading (state change → reset district), and legacy pre-fill resolution (for edit mode on already-saved state/city/postcode strings).
+- **Removed dead code:** Deleted `src/components/editor/local-business/state-select.tsx` (single-select State field, superseded by cascade).
+- **SettingsPanel wiring:** `src/components/editor/SettingsPanel.tsx` updated to use new geo-cascade component; removed old city/postcode `<Input>` fields and postcode regex validation state.
+- **i18n updates:** `src/i18n/locales/en.json`, `ms.json` — added `selectCity`, `selectPostcode`, `loadingOption`, `legacyValueHint` cascade labels; removed the now-orphaned `invalidPostcode` validation key (postcode is selected from a DB-backed list, no longer freetext-validated).
+- **Tests:** `src/__tests__/unit/editor/geo-cascade-fields.test.tsx` — 8 unit tests covering forward cascade, reverse pre-fill, legacy degradation, and API error handling. All passing.
+
+**F37-02 Enhancement Deliverables:**
+
+- **Enhanced JSON-LD:** `src/lib/seo/json-ld.ts` added `hasMap` field (a Google Maps URL string, e.g. `https://www.google.com/maps?q={lat},{lng}`) to the LocalBusiness schema. Derived from the site's saved `latitude`/`longitude` as a fallback until GBP/Waze connect (US-F37-05/09); omitted entirely when coordinates are absent — improves local search signal richness for Google crawlers.
+
+**Files modified:** `src/components/editor/SettingsPanel.tsx`, `src/lib/seo/json-ld.ts`, `src/i18n/locales/{en,ms}.json`. **Files created:** `src/components/editor/local-business/geo-cascade-fields.tsx`, `src/__tests__/unit/editor/geo-cascade-fields.test.tsx`. **Files deleted:** `src/components/editor/local-business/state-select.tsx`. **Tests:** 8 new unit tests (all passing); 0 regressions on existing test suite.
+
+**Impact:** Local business location data now guaranteed to be valid and consistent with live geo database (no typos, postcodes tied to real districts). Reduces future data-quality issues and improves JSON-LD signal reliability for search engines. Sellers benefit from simplified, guided form UX instead of manual text entry.
+
+**Post-Implementation Follow-up Fixes (2026-07-10):**
+
+- **State-name mismatch:** `scripts/data/malaysia-geo.json` corrected 4 state names (KUL/LBN/PNG/PJY) to match `MY_STATES` enum, fixing seller address save failures in Kuala Lumpur/Penang/Labuan/Putrajaya on fresh-seed. Test: `src/__tests__/unit/scripts/malaysia-geo-seed-data.test.ts` (2 cases, both TC-F37-01-23).
+
+- **Geo-cascade race condition:** `src/components/editor/local-business/geo-cascade-fields.tsx` added ref-based stale-response guard in state/district select handlers, preventing concurrent rapid selections from overwriting district list with outdated API response. Test: added to `src/__tests__/unit/editor/geo-cascade-fields.test.tsx` (now 9 total, TC-F37-01-24).
+
+**Tests:** Full suite 9882 pass, 0 regressions. Fixes verified via `/code-review` adversarial pass + test fail-without-fix/pass-with-fix validation.
 
 ---
 

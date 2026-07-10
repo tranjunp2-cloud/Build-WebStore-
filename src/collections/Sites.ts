@@ -2,7 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
 import { THEME_ENUMS } from '../lib/theme/enums'
 import { MY_STATES } from '../lib/shipping/constants'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS } from '../lib/seo/local-business-constants'
+import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '../lib/seo/local-business-constants'
 
 const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
 const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
@@ -366,12 +366,24 @@ export const Sites: CollectionConfig = {
                 {
                     name: 'openingHours',
                     type: 'array',
-                    maxRows: 7,
-                    admin: { description: 'Up to 7 rows (Mon-Sun)' },
+                    maxRows: 21, // 7 days × up to 3 shifts (split-shift)
+                    admin: { description: 'Up to 21 rows (7 days × up to 3 shifts/day for split-shift hours)' },
                     fields: [
                         { name: 'dayOfWeek', type: 'select', options: DAY_OF_WEEK_OPTIONS },
-                        { name: 'opens', type: 'text', admin: { description: 'HH:MM' } },
-                        { name: 'closes', type: 'text', admin: { description: 'HH:MM' } },
+                        {
+                            name: 'opens',
+                            type: 'text',
+                            admin: { description: 'HH:MM' },
+                            validate: (val: string | null | undefined) =>
+                                !val || OPENING_HOURS_TIME_REGEX.test(val) || 'Must be in 24-hour HH:MM format (e.g. 09:00)',
+                        },
+                        {
+                            name: 'closes',
+                            type: 'text',
+                            admin: { description: 'HH:MM' },
+                            validate: (val: string | null | undefined) =>
+                                !val || OPENING_HOURS_TIME_REGEX.test(val) || 'Must be in 24-hour HH:MM format (e.g. 09:00)',
+                        },
                         { name: 'isClosed', type: 'checkbox', defaultValue: false },
                     ],
                 },

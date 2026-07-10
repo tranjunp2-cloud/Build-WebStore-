@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { MY_STATES } from '@/lib/shipping/constants'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS } from '@/lib/seo/local-business-constants'
+import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '@/lib/seo/local-business-constants'
 
 const nullableString = z.string().nullable().optional()
 
@@ -58,10 +58,13 @@ const localBusinessSchema = z.object({
     serviceAreaDescription: sanitizedString,
     openingHours: z.array(z.object({
         dayOfWeek: z.enum(DAY_OF_WEEK_VALUES).nullable().optional(),
-        opens: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).or(z.literal(''))),
-        closes: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).or(z.literal(''))),
+        opens: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
+        closes: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
         isClosed: z.boolean().optional(),
-    })).max(7).optional(),
+    }).refine(row => row.isClosed || !row.opens || !row.closes || row.closes > row.opens, {
+        message: 'Closing time must be after opening time (overnight hours are not supported)',
+        path: ['closes'],
+    })).max(21).optional(), // 7 days × up to 3 shifts (split-shift)
 }).optional()
 
 export const saveSiteSchema = z.object({

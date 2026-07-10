@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tests for saveSiteSchema's localBusinessSchema (F37 US-01 Phase 02/06)
- * TC-IDs: TC-F37-01-01 to TC-F37-01-04 (provisional — docs/qa/F37*.md not yet formalized)
+ * TC-IDs: TC-F37-01-01 to TC-F37-01-04, TC-F37-02-13, TC-F37-02-24 (provisional — docs/qa/F37*.md backfills official IDs)
  */
 import { describe, it, expect } from 'vitest'
 import { saveSiteSchema } from '@/lib/validations/sites'
@@ -90,5 +90,53 @@ describe('[Security] saveSiteSchema.localBusiness — XSS sanitization', () => {
         if (result.success) {
             expect(result.data.localBusiness?.serviceAreaDescription).not.toContain('<img')
         }
+    })
+})
+
+// ── TC-F37-02-13: openingHours cap raised 7→21 (split-shift support) ───────
+
+describe('[TC-F37-02-13] saveSiteSchema.localBusiness — openingHours cap raised 7→21 (split-shift)', () => {
+    it('accepts exactly 21 openingHours rows', () => {
+        const rows = Array.from({ length: 21 }, () => ({ dayOfWeek: 'Mo', opens: '09:00', closes: '18:00' }))
+        const result = saveSiteSchema.safeParse({ localBusiness: { openingHours: rows } })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects 22 openingHours rows (exceeds the new cap)', () => {
+        const rows = Array.from({ length: 22 }, () => ({ dayOfWeek: 'Mo', opens: '09:00', closes: '18:00' }))
+        const result = saveSiteSchema.safeParse({ localBusiness: { openingHours: rows } })
+        expect(result.success).toBe(false)
+    })
+})
+
+// ── TC-F37-02-24: closes must be after opens (overnight ranges rejected) ───
+
+describe('[TC-F37-02-24] saveSiteSchema.localBusiness — openingHours closes must be after opens', () => {
+    it('rejects a row where closes equals opens', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo', opens: '09:00', closes: '09:00' }] },
+        })
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects a row where closes is before opens (overnight not supported)', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo', opens: '21:00', closes: '02:00' }] },
+        })
+        expect(result.success).toBe(false)
+    })
+
+    it('accepts a row where closes is after opens', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo', opens: '09:00', closes: '18:00' }] },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts an isClosed row regardless of opens/closes values', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Sa', isClosed: true }] },
+        })
+        expect(result.success).toBe(true)
     })
 })
