@@ -11,6 +11,10 @@
   - Parent `<Select>` (`:548-568`) lists options flat as `breadcrumbs || name`, no indentation, no L3 disabling, and (pre-Phase-03) does not exclude self/descendants.
 - The row `+` button is already hidden at L3 (`renderNode` gates on `!isLevel3`, `:328`, `:365`) → "add subcategory" only ever originates from an L1/L2 node, so an auto-filled parent is always valid (child becomes L2/L3).
 
+## Decision (2026-07-12): single add-subcategory affordance
+
+Drop the inline **"+ Add subcategory"** row that currently renders under an expanded node in `CategoryManager.tsx` (`renderNode`, ~`:365-382`). Keep ONLY the row-level `+` icon button (title "Add Subcategory", hidden at L3) as the single, consistent affordance. Rationale: the two are redundant (same action); a category with zero children is a normal category (leaf), not a special "empty parent" state needing its own affordance. **Design leads code** — prototype already reflects this; PR-1 removes the inline row from the component.
+
 ## Overview
 
 Three UX refinements on the Add/Edit modal, all in `CategoryManager.tsx` (+ i18n):

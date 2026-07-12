@@ -132,12 +132,9 @@ function rowHtml(node){
     `</div>`;
   if(isOpen){
     (node.children||[]).forEach(c=>{ html += rowHtml(c); });
-    if(canSub){
-      const pl = lvl===1 ? ' pl-[52px]' : ' pl-[84px]';
-      html += `<div onclick="openAdd(${node.id})" class="flex items-center py-[10px] px-[20px]${pl} cursor-pointer hover:bg-[var(--dash-surface-hover)] transition-colors" style="border-bottom:1px solid var(--dash-border)">`+
-        `<div class="flex items-center justify-center w-[14px] h-[14px] text-[hsl(var(--primary))]">${I.plusSm}</div>`+
-        `<span class="text-[13px] font-medium text-[hsl(var(--primary))] ml-2">Add subcategory</span></div>`;
-    }
+    /* No inline "+ Add subcategory" row: the row-level "+" icon (title "Add Subcategory")
+       is the single, consistent affordance for adding a child to any node at level < 3.
+       A category with zero children is just a normal category (leaf), not a special state. */
   }
   html += `</div>`;
   return html;
