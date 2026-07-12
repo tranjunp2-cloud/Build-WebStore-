@@ -17,6 +17,7 @@
     --card: 220 35.29% 13.33%;
     --primary: var(--p-teal-400);
     --info: 204 100% 63%;
+    --level3: 265 85% 68%;
     --muted: 215 27.91% 16.86%;
     --secondary: 215 27.91% 16.86%;
     --muted-foreground: var(--p-gray-400);
@@ -100,8 +101,9 @@ function crumb(node){ const parts=[]; let c=node; while(c){ parts.unshift(c.name
 const actBtn = (cls,title,svg,on)=>`<button type="button" onclick="event.stopPropagation();${on}" class="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[hsl(var(--${cls}))] hover:bg-[hsl(var(--${cls})/0.1)] hover:border-[hsl(var(--${cls}))] transition-colors bg-transparent cursor-pointer" title="${title}">${svg}</button>`;
 
 function badge(lvl){
-  const color = lvl===1 ? 'primary' : 'info';
-  return `<div class="inline-flex items-center gap-1.5 rounded-md border border-solid px-2.5 py-0.5 border-slate-300 dark:border-white/20 text-[11px] font-semibold tracking-tight text-[hsl(var(--${color}))]">L${lvl}</div>`;
+  /* distinct colour per depth: L1 teal, L2 blue, L3 violet */
+  const c = lvl===1 ? 'primary' : lvl===2 ? 'info' : 'level3';
+  return `<div class="inline-flex items-center gap-1.5 rounded-md border border-solid px-2.5 py-0.5 text-[11px] font-semibold tracking-tight" style="color:hsl(var(--${c}));border-color:hsl(var(--${c})/0.4);background:hsl(var(--${c})/0.12)">L${lvl}</div>`;
 }
 
 function rowHtml(node){
