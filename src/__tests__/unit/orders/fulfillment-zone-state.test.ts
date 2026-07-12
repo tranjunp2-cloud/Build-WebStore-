@@ -56,6 +56,42 @@ describe('FulfillmentZone state derivation', () => {
     expect(deriveFulfillState(order)).toBe('success')
   })
 
+  // TC-F36.157: async-AWB — shipment created (wallet charged) but the courier hasn't
+  // generated the AWB yet. Success must key on the shipment number, or the zone
+  // re-offers "Ready to Ship" for a label that was already bought.
+  it('[TC-F36.157] status=ready_to_ship + easyParcelOrderNo set + awbNo null → "success" (async AWB)', () => {
+    const order: FulfillmentOrder = {
+      status: 'ready_to_ship',
+      awbNo: null,
+      easyParcelOrderNo: 'EI-77XYZ',
+    }
+    expect(deriveFulfillState(order)).toBe('success')
+  })
+
+  it('[TC-F36.157] CLAIM: sentinel (in-flight create-label) is NOT a created shipment → not "success"', () => {
+    const order: FulfillmentOrder = {
+      status: 'ready_to_ship',
+      awbNo: null,
+      easyParcelOrderNo: 'CLAIM:1760000000000:ab12cd',
+    }
+    expect(deriveFulfillState(order)).not.toBe('success')
+  })
+
+  // TC-F36.162: after mark-shipment-cancelled clears the EP fields, the order returns to
+  // 'confirmed' (re-opens /cancel per BR-Cancel-02) and the zone must derive 'ready' so
+  // the merchant re-creates a label via the normal existing flow.
+  it('[TC-F36.162] confirmed + EP fields cleared (post mark-cancelled) + courier still set → "ready"', () => {
+    const order: FulfillmentOrder = {
+      status: 'confirmed',
+      awbNo: null,
+      easyParcelOrderNo: null,
+      shippingCourier: 'EP-CR0A',
+      parcelWeight: 500,
+      tenant: { easyParcelIntegration: { enabled: true } },
+    }
+    expect(deriveFulfillState(order)).toBe('ready')
+  })
+
   // TC-F36.F07: EP disabled → 'self-delivery' (no courier available)
   it('[TC-F36.F07] EP disabled (enabled=false) + confirmed → "self-delivery"', () => {
     const order: FulfillmentOrder = {

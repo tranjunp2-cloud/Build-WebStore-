@@ -41,6 +41,8 @@ const mockQuotationsSuccess = (rates: Omit<RateOption, 'degraded'>[]) => {
             courier_name: r.courierName,
             service_name: r.serviceName,
             delivery_duration: r.estDelivery,
+            is_pickup: r.isPickup,
+            is_dropoff: r.isDropoff,
         },
         pricing: { total_amount: (r.priceSen / 100).toString() },
         features: r.codAvailable
@@ -87,6 +89,27 @@ describe('getRates', () => {
             expect(result.rates).toHaveLength(1)
             expect(result.rates[0].courier).toBe('flat')
             expect(result.degraded).toBe(false)
+        })
+    })
+
+    // US-F36-07 correction: pickup/drop-off is a SERVICE VARIANT property — the flags must
+    // survive normalization so create-label can honor the merchant's collection method.
+    describe('[TC-F36.156] preserves collection capability flags', () => {
+        it('maps is_pickup/is_dropoff from quotation onto RateOption', async () => {
+            mockQuotationsSuccess([
+                { courier: 'pos', serviceId: 'pos-melplus', courierName: 'Pos Malaysia', serviceName: 'Melplus', priceSen: 622, codAvailable: false, estDelivery: '2–3 days', isPickup: false, isDropoff: true },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].isPickup).toBe(false)
+            expect(result.rates[0].isDropoff).toBe(true)
+        })
+
+        it('leaves flags absent on flat-rate fallback (not an EP service)', async () => {
+            const result = await getRates(baseParams, null, flatConfig)
+            expect(result.rates[0].isPickup).toBeUndefined()
+            expect(result.rates[0].isDropoff).toBeUndefined()
         })
     })
 

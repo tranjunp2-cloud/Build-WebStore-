@@ -455,14 +455,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         // itself), silently falling back to Tailwind's flat bg-black/60 (0.6) in both themes.
         <div className="dash-shell">
         <div
-            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 backdrop-blur-sm antialiased"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
         >
             {/* Design-system tokens (not the design mockup's raw hex) — bg/border/text/focus all
                 resolve to the same --card/--border/--muted-foreground/--ring vars used by the
                 shared <Input> and every other dashboard form (ProductForm, discount-form). */}
-            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-t-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] border-b-0 overflow-hidden">
-                {/* Header — drawer style: title + subtitle (left), close button (right) */}
+            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] overflow-hidden">
+                {/* Header — title + subtitle (left), close button (right) */}
                 <div className="flex items-start justify-between gap-3 p-[18px_22px_14px] border-b border-solid border-[hsl(var(--border))]/30">
                     <div className="flex flex-col gap-[3px]">
                         <div className="flex items-center gap-[9px]">
@@ -489,7 +489,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     </button>
                 </div>
 
-                {/* Body — drawer-style scrollable draft list */}
+                {/* Body — scrollable draft list */}
                 <div className="flex-1 overflow-y-auto px-[24px] pt-[18px] pb-6 flex flex-col">
                     {isParsing ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -583,7 +583,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     )}
                 </div>
 
-                {/* Footer — drawer style: draft count (left), Discard/Approve All (right) */}
+                {/* Footer — draft count (left), Discard/Approve All (right) */}
                 <div className="flex w-full items-center justify-between gap-3 p-[18px_24px_18px] border-t border-solid border-[hsl(var(--border))]/30">
                     <span className="text-[13px] text-[hsl(var(--muted-foreground))]">
                         {draftCount === 1

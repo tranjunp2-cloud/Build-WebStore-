@@ -31,6 +31,11 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ id: 100, tenants: [{ tenant: 200 }] })
 }))
 
+// Mock rate limiter
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() + 60000 }),
+}))
+
 function createRequest(url: string, method = 'GET', body?: unknown) {
     return new NextRequest(new URL(url, 'http://localhost:3000'), {
         method,
@@ -61,6 +66,121 @@ describe('/api/notifications', () => {
 
             const res = await GET(createRequest('/api/notifications'))
             expect(res.status).toBe(500)
+        })
+
+        // ── GH#1519 regression tests: since parameter + NotFound handling ────────
+
+        it('TC-GH1519-02a: returns 200 when since parameter is missing', async () => {
+            // Arrange
+            const res = await GET(createRequest('/api/notifications'))
+
+            // Assert
+            expect(res.status).toBe(200)
+            const body = await res.json()
+            expect(body).toHaveProperty('unreadCount')
+            expect(body).toHaveProperty('items')
+        })
+
+        it('TC-GH1519-02b: returns 200 when since is valid ISO string', async () => {
+            // Arrange
+            const since = encodeURIComponent('2026-07-10T10:00:00Z')
+            const res = await GET(createRequest(`/api/notifications?since=${since}`))
+
+            // Assert
+            expect(res.status).toBe(200)
+            const body = await res.json()
+            expect(body).toHaveProperty('items')
+        })
+
+        it('TC-GH1519-02c: returns 200 when since is epoch milliseconds', async () => {
+            // Arrange
+            const res = await GET(createRequest('/api/notifications?since=1720704000000'))
+
+            // Assert
+            expect(res.status).toBe(200)
+        })
+
+        it('TC-GH1519-02d: returns 400 when since is unparseable date string', async () => {
+            // Arrange
+            const res = await GET(createRequest('/api/notifications?since=not-a-date'))
+
+            // Assert
+            expect(res.status).toBe(400)
+            const body = await res.json()
+            expect(body.success).toBe(false)
+            expect(body.error.code).toBe('INVALID_SINCE')
+        })
+
+        it('TC-GH1519-02e: returns 400 when since is malformed (99-99-99)', async () => {
+            // Arrange
+            const res = await GET(createRequest('/api/notifications?since=99-99-99'))
+
+            // Assert
+            expect(res.status).toBe(400)
+            const body = await res.json()
+            expect(body.error.code).toBe('INVALID_SINCE')
+        })
+
+        it('TC-GH1519-02f: returns 200 (not 500) when limit/offset are non-numeric', async () => {
+            // Arrange — fuzzed bad pagination input must coerce to safe defaults,
+            // not flow into payload.find as NaN and 500 (GH #1519 bug class).
+            const res = await GET(createRequest('/api/notifications?limit=abc&offset=xyz'))
+
+            // Assert
+            expect(res.status).toBe(200)
+        })
+
+        it('TC-GH1519-02g: returns 404 when Payload throws NotFound error', async () => {
+            // Arrange
+            const { getPayload } = await import('payload')
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                find: vi.fn().mockRejectedValue({
+                    name: 'NotFound',
+                    message: 'Notifications collection not found',
+                }),
+            } as unknown as Payload)
+
+            // Act
+            const res = await GET(createRequest('/api/notifications'))
+
+            // Assert
+            expect(res.status).toBe(404)
+            const body = await res.json()
+            expect(body.error.code).toBe('NOT_FOUND')
+        })
+
+        it('TC-GH1519-02h: returns 404 when NotFoundError variant is thrown', async () => {
+            // Arrange
+            const { getPayload } = await import('payload')
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                find: vi.fn().mockRejectedValue({
+                    name: 'NotFoundError',
+                    message: 'Document not found',
+                }),
+            } as unknown as Payload)
+
+            // Act
+            const res = await GET(createRequest('/api/notifications'))
+
+            // Assert
+            expect(res.status).toBe(404)
+        })
+
+        it('TC-GH1519-02i: returns 404 when error.status is 404', async () => {
+            // Arrange
+            const { getPayload } = await import('payload')
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                find: vi.fn().mockRejectedValue({
+                    status: 404,
+                    message: 'Not found',
+                }),
+            } as unknown as Payload)
+
+            // Act
+            const res = await GET(createRequest('/api/notifications'))
+
+            // Assert
+            expect(res.status).toBe(404)
         })
     })
 

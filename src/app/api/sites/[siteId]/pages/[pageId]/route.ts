@@ -8,6 +8,7 @@ import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { parseRequest } from '@/lib/validations/helpers'
+import { isNotFoundError } from '@/lib/api/is-not-found-error'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
@@ -301,6 +302,11 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
 
         const resolvedPageId = await ctx.params.then((p) => p.pageId).catch(() => undefined)
 
+        // A NotFound from Payload (page/site id doesn't exist) is a client error —
+        // return 404, not 500, while keeping the same failures[] envelope so the
+        // shared client parser still works (GH #1519).
+        const status = isNotFoundError(err) ? 404 : 500
+
         return NextResponse.json(
             {
                 error: {
@@ -314,7 +320,7 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
                     }],
                 },
             },
-            { status: 500 },
+            { status },
         )
     }
 }))

@@ -10,7 +10,13 @@ import configPromise from '@payload-config'
 export async function GET(req: NextRequest) {
     const host = req.nextUrl.searchParams.get('host')
     if (!host) {
-        return NextResponse.json({ isPrimary: false, primaryDomain: null }, { status: 400 })
+        // 400 must carry an explicit `error` key so callers can distinguish a
+        // client error from valid "no primary domain" data (which is 200 below).
+        // Previously returned a success-shaped body with a 400 status (GH #1519 Bug 2).
+        return NextResponse.json(
+            { error: { code: 'MISSING_HOST', message: 'Query param "host" is required' } },
+            { status: 400 },
+        )
     }
 
     try {

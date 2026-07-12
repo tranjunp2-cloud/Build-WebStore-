@@ -27,7 +27,8 @@ interface CreateLabelFlowProps {
   /** EP wallet balance (per-tenant cache) — shown under the cost line; note fallback when null. */
   wallet?: EpWalletInfo | null
   shippingFee?: number | null    // quoted at checkout (RM)
-  onSuccess: (awbNo: string, labelUrl: string | null) => void
+  // awbNo can be null: async-AWB couriers return awb_number null on a SUCCESSFUL submit
+  onSuccess: (awbNo: string | null, labelUrl: string | null) => void
   /** Server rejected with COD_NOT_ELIGIBLE (live R1/R2/R3 gate) — parent shows the COD recovery panel. */
   onCodBlocked?: () => void
 }
@@ -53,8 +54,12 @@ export function CreateLabelFlow({
   const [step, setStep] = useState<Step>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // US-F36-07: pickup (courier collects, default) vs dropoff (merchant brings parcel).
-  // Both send the same collection_date to EP (AC-1) — no separate pickup endpoint.
+  // The method is resolved server-side into a matching EP service VARIANT (EP has no
+  // method flag on submit — the service_id decides collection). If the courier can't do
+  // the chosen method on this route, the server rejects METHOD_NOT_SUPPORTED and the
+  // option is disabled here.
   const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup')
+  const [unsupported, setUnsupported] = useState<Array<'pickup' | 'dropoff'>>([])
   // Earliest date is cut-off aware per courier (shared helper — same math as the server clamp)
   const earliest = useMemo(() => earliestPickupDate(courierId ?? ''), [courierId])
   const [collectionDate, setCollectionDate] = useState(earliest)
@@ -87,7 +92,7 @@ export function CreateLabelFlow({
       const res = await fetch(`/api/orders/${orderId}/create-label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collectionDate }),
+        body: JSON.stringify({ collectionDate, method }),
       })
       if (cosmeticTimerRef.current) { clearTimeout(cosmeticTimerRef.current); cosmeticTimerRef.current = null }
       const data = await res.json()
@@ -102,6 +107,22 @@ export function CreateLabelFlow({
           // Live COD gate tripped (PD-021) — parent switches to the cod-blocked recovery panel
           setStep('idle')
           onCodBlocked()
+        } else if (code === 'METHOD_NOT_SUPPORTED') {
+          // Courier has no service variant for this method on this route. Trust the
+          // server's supported[] (review #1582): it can be EMPTY (EP flag anomaly) —
+          // never auto-flip onto a method that is itself unsupported, or the merchant
+          // loops 422s with contradictory toasts.
+          setStep('idle')
+          const supported: string[] = Array.isArray(data?.error?.supported) ? data.error.supported : []
+          const nowUnsupported = (['pickup', 'dropoff'] as const).filter((m) => !supported.includes(m))
+          setUnsupported(nowUnsupported)
+          const other = method === 'pickup' ? 'dropoff' : 'pickup'
+          if (!nowUnsupported.includes(other)) setMethod(other)
+          toast.error(
+            nowUnsupported.length === 2
+              ? cl.methodNoneSupported
+              : method === 'pickup' ? cl.methodNoPickup : cl.methodNoDropoff,
+          )
         } else if (code === 'EASYPARCEL_WALLET_LOW') {
           setStep('wallet-low')
           setErrorMsg(msg)
@@ -112,11 +133,24 @@ export function CreateLabelFlow({
         return
       }
 
-      const { awbNo, labelUrl, collectionDate: usedDate, collectionDateShifted } = data.data ?? data
+      const { awbNo, labelUrl, collectionDate: usedDate, collectionDateShifted, serviceSwitched, methodResolved } = data.data ?? data
       toast.success(cl.labelCreated)
       // AC-3b: the server clamped the date (cut-off passed / weekend) — tell the merchant
       if (collectionDateShifted && typeof usedDate === 'string') {
         toast.info(ti(cl.dateShifted, { date: `${usedDate.slice(8, 10)}/${usedDate.slice(5, 7)}` }))
+      }
+      // Fail-open transparency (review #1582): the method-verification quote failed, so the
+      // label booked with the stored service and the collection method was NOT confirmed.
+      if (methodResolved === false) {
+        toast.info(cl.methodUnverified)
+      }
+      // Money honesty: the stored service couldn't do the chosen method, so a same-courier
+      // variant was booked — tell the merchant what the wallet was actually charged for.
+      if (serviceSwitched?.serviceName) {
+        toast.info(ti(cl.serviceSwitched, {
+          service: serviceSwitched.serviceName,
+          amount: typeof serviceSwitched.priceRm === 'number' ? `MYR ${serviceSwitched.priceRm.toFixed(2)}` : '—',
+        }))
       }
       onSuccess(awbNo, labelUrl ?? null)
     } catch {
@@ -267,9 +301,11 @@ export function CreateLabelFlow({
               aria-checked={method === 'pickup'}
               className={`collect-method${method === 'pickup' ? ' on' : ''}`}
               onClick={() => setMethod('pickup')}
+              disabled={unsupported.includes('pickup')}
+              title={unsupported.includes('pickup') ? cl.methodNoPickup : undefined}
             >
               <span className="cm-title">{cl.methodPickup}</span>
-              <span className="cm-desc">{cl.methodPickupDesc}</span>
+              <span className="cm-desc">{unsupported.includes('pickup') ? cl.methodNoPickup : cl.methodPickupDesc}</span>
             </button>
             <button
               type="button"
@@ -277,9 +313,11 @@ export function CreateLabelFlow({
               aria-checked={method === 'dropoff'}
               className={`collect-method${method === 'dropoff' ? ' on' : ''}`}
               onClick={() => setMethod('dropoff')}
+              disabled={unsupported.includes('dropoff')}
+              title={unsupported.includes('dropoff') ? cl.methodNoDropoff : undefined}
             >
               <span className="cm-title">{cl.methodDropoff}</span>
-              <span className="cm-desc">{cl.methodDropoffDesc}</span>
+              <span className="cm-desc">{unsupported.includes('dropoff') ? cl.methodNoDropoff : cl.methodDropoffDesc}</span>
             </button>
           </div>
         </div>
@@ -337,7 +375,9 @@ export function CreateLabelFlow({
           className="btn btn-grad ship-cta ship-cta-fixed"
           style={{ height: 40 }}
           onClick={handleShip}
-          disabled={!dateValid}
+          // Also blocked when the SELECTED method is unsupported (both-methods-out case:
+          // the auto-flip has nowhere to go, so without this the CTA would loop 422s)
+          disabled={!dateValid || unsupported.includes(method)}
         >
           {cl.readyToShip}
         </button>

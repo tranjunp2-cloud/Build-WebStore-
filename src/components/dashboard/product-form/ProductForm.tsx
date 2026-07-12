@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
 import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
-import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft, AlertCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -25,9 +25,14 @@ interface ProductFormProps {
     initialData?: Partial<ProductFormValues>;
     isEdit?: boolean;
     onSubmitForm?: (data: ProductFormValues) => Promise<void>;
+    /** GH-1032 legacy variant-price bug — product was saved with a variant matrix
+     * but a base price of RM 0. Same warning as before, just relocated: rendered
+     * in the header's right slot (next to the title) instead of a full-width block
+     * above the form, so it no longer pushes the form sections down. */
+    showLegacyPriceWarning?: boolean;
 }
 
-export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormProps) {
+export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPriceWarning }: ProductFormProps) {
     const router = useRouter()
     const { t } = useI18n()
     const [isSaving, setIsSaving] = useState(false)
@@ -204,8 +209,10 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
         <FormProvider {...methods}>
             <form onSubmit={methods.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="relative flex flex-col w-full">
                 
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+                {/* Header — `flex-wrap` so the legacy-price warning (below) drops to its own
+                    full-width row on narrow viewports instead of squeezing the title into a
+                    cramped column; unaffected on desktop where both sit on one row. */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <div className="flex items-center gap-4">
                         <Link href="/products" className="flex shrink-0 items-center justify-center text-foreground hover:text-foreground/80 transition-colors">
                             <ArrowLeft className="h-6 w-6" />
@@ -217,6 +224,15 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                             <p className="text-[14px] text-foreground/60 leading-[1.43] m-0">{t.dashboard.products.form.fillInfo}</p>
                         </div>
                     </div>
+                    {showLegacyPriceWarning && (
+                        <div
+                            role="alert"
+                            className="flex items-start gap-3 w-full md:w-auto md:max-w-md rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-[13px] text-warning"
+                        >
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
+                            <span>{t.dashboard.products.form.legacyPriceWarning}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Form sections */}
@@ -243,8 +259,8 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     at lg+. */}
                 {methods.formState.isDirty && (
                     <div
-                        className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
-                        style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)' }}
+                        className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
+                        style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
                     >
                         <div className="flex items-center gap-2 text-[13px]">
                             <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
