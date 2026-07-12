@@ -234,7 +234,9 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 - *Nút [+] trên 1 node (add con) → **"Add Subcategory"***
 - *Nút [✏️ Edit] → **"Edit Category"***
 
-*Field theo THỨ TỰ code thật: **Name*** → **Parent Category** → **Description (Optional)** → **Category Image (Optional)** → **URL Slug**. Footer: [Cancel] [Save Category].*
+*Field theo THỨ TỰ code thật: **Name*** → **Parent Category** → **Description (Optional)** → **URL Slug**. Footer: [Cancel] [Save Category].*
+
+> **Bỏ field `Category Image` (2026-07-12, YAGNI):** ảnh danh mục hiện được lưu nhưng KHÔNG được hiển thị ở đâu (không storefront, không tree). PR-1 gỡ field `image` khỏi `Categories.ts` + migration drop cột `image_id`. Nếu sau này storefront cần thumbnail danh mục thì thêm lại kèm nơi tiêu thụ rõ ràng.
 
 ```text
        ┌── Add New Category ──────────────────────[X]┐
@@ -254,9 +256,6 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
        │                                             │
        │ Description (Optional)                      │
        │ [ Short description for SEO...          ]  │
-       │                                             │
-       │ Category Image (Optional)                   │
-       │ [ ⬆ Click to upload or drag and drop ]      │
        │                                             │
        │ URL Slug                                    │
        │ [ category-url                          ]  │

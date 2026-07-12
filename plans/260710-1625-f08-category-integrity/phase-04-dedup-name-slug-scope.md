@@ -48,7 +48,7 @@ Client async name-check: on name blur / debounced change, call a lightweight ser
 ## Related Code Files
 
 **Modify:**
-- `src/collections/Categories.ts` — remove `unique: true` from slug field (`:163`), keep `index: true`. (Coordinates with Phase 01.)
+- `src/collections/Categories.ts` — remove `unique: true` from slug field (`:163`), keep `index: true`. (Coordinates with Phase 01.) **Also remove the unused `image` upload field (`:189-194`)** — YAGNI decision 2026-07-12 (stored but never displayed). Migration to drop `image_id` column is in Phase 01.
 - `src/app/(dashboard)/products/categories/actions.ts` — in `saveCategoryAction`: add name-dedup pre-check query (scoped parent+tenant, exclude self); wrap create/update in try/catch to map Postgres unique-violation (code `23505`, constraint `categories_tenant_slug_uniq`) → structured `CATEGORY_SLUG_DUPLICATE`. Add exported `checkCategoryNameAvailable(...)` server action for the async client check.
 - `src/app/(dashboard)/products/categories/components/CategoryManager.tsx` — `handleSave` (`:216-253`): map thrown `CATEGORY_NAME_DUPLICATE`/`CATEGORY_SLUG_DUPLICATE` to inline errors; add debounced async name check state on the Name `<Input>` (`:528-541`) rendering red helper text `nameDuplicateError`.
 - `src/i18n/locales/en.json` / `ms.json` — `dashboard.products.categories.form.errors`: `nameDuplicate` = "Category name already exists in this level.", `slugDuplicate` = "This URL slug is already used in your store."

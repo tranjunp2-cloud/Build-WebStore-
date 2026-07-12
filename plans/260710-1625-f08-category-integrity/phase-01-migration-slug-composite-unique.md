@@ -96,6 +96,7 @@ pushDevSchema (skeleton) → MIGRATIONS run in order:
    ```
 
 6. Coordinate with Phase 04: remove `unique: true` from `Categories.ts` slug field in the SAME PR (leave `index: true`).
+7. **Drop unused `Category Image` column (2026-07-12 decision, YAGNI).** The `image` field is stored but never rendered (no storefront/tree consumer). Add a migration to drop the FK column: `ALTER TABLE categories DROP COLUMN IF EXISTS image_id;` (idempotent, `IF EXISTS`; not a `DROP TABLE`). Pairs with Phase 04 removing the field from `Categories.ts`. Verify the real column name via `psql \d categories` first (Payload upload field → `{field}_id`, expected `image_id`).
 
 ## Todo
 
