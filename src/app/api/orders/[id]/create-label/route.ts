@@ -162,7 +162,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     success: false,
                     error: {
                         code: 'CUSTOMER_PHONE_MISSING',
-                        message: 'Order has no valid customer phone number — couriers require one to deliver. Add the buyer\'s phone to the order before creating the label.',
+                        message: 'Order has no valid customer phone number — couriers require one to deliver. Fulfill this order manually, or contact support to update the buyer\'s phone.',
                     },
                 },
                 { status: 422 },

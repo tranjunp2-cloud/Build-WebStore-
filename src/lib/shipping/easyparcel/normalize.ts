@@ -88,9 +88,14 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
  * stranding the shipment at "Pending AWB" with the wallet already charged
  * (verified live 2026-07-13) — so callers must reject unusable phones BEFORE
  * submit instead of substituting a placeholder.
+ *
+ * Validates the POST-splitPhone number — the value actually sent to EP — not the
+ * raw digits: raw '600000000' has 9 digits but emits '0000000' (the exact legacy
+ * placeholder) once splitPhone strips the '60' prefix. Legit MY numbers are ≥8
+ * digits after the prefix strip (mobile 9-10, shortest landline 8).
  */
 export function hasUsablePhone(raw: string | null | undefined): boolean {
-    const digits = (raw ?? '').replace(/\D/g, '')
-    return digits.length >= 8 && !/^0+$/.test(digits)
+    const { number } = splitPhone(raw ?? '')
+    return number.length >= 8 && !/^0+$/.test(number)
 }
 

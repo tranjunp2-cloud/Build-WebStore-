@@ -39,6 +39,15 @@ describe('hasUsablePhone [TC-F36.186a]', () => {
         expect(hasUsablePhone('000000000')).toBe(false)       // all-zero, length ok
         expect(hasUsablePhone('---')).toBe(false)             // no digits at all
     })
+
+    it('validates the POST-splitPhone number, not raw digits (review #1595)', () => {
+        // 9 raw digits pass a raw-length check, but splitPhone strips '60' and
+        // emits '0000000' — the exact placeholder that stranded the live shipment.
+        expect(hasUsablePhone('600000000')).toBe(false)       // legacy receiver fallback literal
+        expect(hasUsablePhone('60000000')).toBe(false)        // 60 + zeros → '000000'
+        expect(hasUsablePhone('60123456')).toBe(false)        // emits 6 digits — courier-invalid
+        expect(hasUsablePhone('60412345678')).toBe(true)      // emits 9 digits — valid
+    })
 })
 
 describe('buildSubmitParams — no placeholder phone [TC-F36.186c]', () => {
@@ -54,6 +63,15 @@ describe('buildSubmitParams — no placeholder phone [TC-F36.186c]', () => {
     it('never emits the legacy 0000000 placeholder anywhere in the params', () => {
         const p = buildSubmitParams(baseInput)
 
+        expect(JSON.stringify(p)).not.toContain('0000000')
+    })
+
+    it('emits an EMPTY receiver phone for an empty input — no silent fallback (review #1595)', () => {
+        // Locks the placeholder removal itself: with the old `|| '0000000'` /
+        // `|| '600000000'` fallbacks, an empty phone emitted '0000000' here.
+        const p = buildSubmitParams({ ...baseInput, customerPhone: '' })
+
+        expect(p.receiver.phone_number).toBe('')
         expect(JSON.stringify(p)).not.toContain('0000000')
     })
 })

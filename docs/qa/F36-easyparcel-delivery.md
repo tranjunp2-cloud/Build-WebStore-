@@ -419,7 +419,7 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 | ID | Type | Pri | Title | Steps | Expected | Refs |
 |---|---|---|---|---|---|---|
-| **TC-F36.186** | Money | Critical | create-label guard `CUSTOMER_PHONE_MISSING` + bỏ placeholder phone | (a) `hasUsablePhone`: hợp lệ ≥8 digit không toàn 0 (chấp nhận `+60`/`0` prefix, ký tự cách/gạch); reject rỗng/`<8` digit/toàn 0. (b) Order thiếu/rác `customerPhone` → POST create-label. (c) Order phone hợp lệ → buildSubmitParams. | (a) đúng từng case; (b) 422 `CUSTOMER_PHONE_MISSING` TRƯỚC claim CAS — không charge ví, không CLAIM ghi xuống; (c) submit params KHÔNG bao giờ chứa `'0000000'` — phone thật pass-through qua `splitPhone`, sender/receiver đều vậy. `isWarehouseComplete` dùng chung `hasUsablePhone` (reject cả phone kho toàn 0). | §3.18e |
+| **TC-F36.186** | Money | Critical | create-label guard `CUSTOMER_PHONE_MISSING` + bỏ placeholder phone | (a) `hasUsablePhone`: validate số **SAU** `splitPhone` (giá trị thực gửi EP — review #1595) — hợp lệ ≥8 digit post-strip, không toàn 0; reject rỗng/ngắn/toàn 0/`'600000000'` (raw 9 digit nhưng emit `'0000000'`)/`'60123456'` (emit 6 digit). (b) Order thiếu/rác `customerPhone` → POST create-label. (c) buildSubmitParams: phone hợp lệ + phone RỖNG. | (a) đúng từng case — unit; (b) 422 `CUSTOMER_PHONE_MISSING` TRƯỚC claim CAS — không charge ví, không CLAIM ghi xuống — **manual/api** (create-label chưa có route-test harness); (c) phone thật pass-through qua `splitPhone`; phone rỗng → `phone_number: ''`, KHÔNG fallback — unit khoá việc bỏ placeholder. `isWarehouseComplete` dùng chung `hasUsablePhone` (reject cả phone kho `'600000000'`/toàn 0). | §3.18e |
 
 ---
 
