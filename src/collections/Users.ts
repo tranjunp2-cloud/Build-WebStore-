@@ -31,18 +31,24 @@ const USER_ROLE_OPTIONS = [
     { label: 'Viewer', value: 'viewer' },
 ]
 const VALID_ROLE_VALUES = new Set(USER_ROLE_OPTIONS.map((o) => o.value))
+// Operators that compare `roles` against an enum value — only these may carry a role
+// string. `exists` (boolean) is allowed but carries no enum value. Any OTHER operator
+// (like/contains/greater_than/…) on an enum column makes Postgres throw 42883 → 500,
+// so we reject them up front. (GH #1535 — Bug 1)
+const ROLE_VALUE_OPS = new Set(['equals', 'not_equals', 'in', 'not_in', 'all'])
 
 /**
  * beforeOperation guard: reject any query that filters `roles` by a value outside the
- * select enum (e.g. ?where[roles][in][]=buyer). Such a value reaches Postgres as
- * `users_roles.value IN ('buyer')` against the enum-typed column → "invalid input value
- * for enum" → Payload swallows it into a generic 500. Short-circuit with a clean 400 so a
- * bad filter value never crashes /api/users. Valid role filters pass through untouched.
+ * select enum (e.g. ?where[roles][in][]=buyer) or by an operator the enum column can't
+ * handle. Such queries otherwise reach Postgres and crash with "invalid input value for
+ * enum" / 42883 → Payload swallows it into a generic 500. Short-circuit with a clean 400
+ * so a bad filter never crashes /api/users. Valid role filters pass through untouched.
  * (GH #1535 — Bug 1)
  */
 const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
     const where = (args as { where?: unknown }).where
-    const invalid = new Set<string>()
+    const invalidValues = new Set<string>()
+    const badOperators = new Set<string>()
 
     const scan = (node: unknown): void => {
         if (!node || typeof node !== 'object') return
@@ -50,10 +56,17 @@ const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
             if ((key === 'and' || key === 'or') && Array.isArray(value)) {
                 value.forEach(scan)
             } else if (key === 'roles' && value && typeof value === 'object') {
-                for (const opVal of Object.values(value as Record<string, unknown>)) {
+                for (const [op, opVal] of Object.entries(value as Record<string, unknown>)) {
+                    if (op === 'exists') continue // boolean semantics — carries no enum value
+                    if (!ROLE_VALUE_OPS.has(op)) {
+                        badOperators.add(op)
+                        continue
+                    }
                     const vals = Array.isArray(opVal) ? opVal : [opVal]
                     for (const v of vals) {
-                        if (typeof v === 'string' && !VALID_ROLE_VALUES.has(v)) invalid.add(v)
+                        // For a value-comparison op, anything not an exact enum string is invalid
+                        // (catches 'buyer'/'staff' and non-string values like numbers).
+                        if (typeof v !== 'string' || !VALID_ROLE_VALUES.has(v)) invalidValues.add(String(v))
                     }
                 }
             }
@@ -61,9 +74,12 @@ const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
     }
     scan(where)
 
-    if (invalid.size > 0) {
+    if (invalidValues.size > 0 || badOperators.size > 0) {
+        const parts: string[] = []
+        if (invalidValues.size > 0) parts.push(`invalid value(s): ${[...invalidValues].join(', ')}`)
+        if (badOperators.size > 0) parts.push(`unsupported operator(s): ${[...badOperators].join(', ')}`)
         throw new APIError(
-            `Invalid roles filter value(s): ${[...invalid].join(', ')}. Valid roles: ${[...VALID_ROLE_VALUES].join(', ')}.`,
+            `Invalid roles filter — ${parts.join('; ')}. Valid roles: ${[...VALID_ROLE_VALUES].join(', ')}; operators: ${[...ROLE_VALUE_OPS].join(', ')}, exists.`,
             400,
         )
     }

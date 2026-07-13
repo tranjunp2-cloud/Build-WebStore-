@@ -8,12 +8,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin, UpdateTemplateSchema } from '@/lib/admin/api-utils'
+import { isNotFoundError } from '@/lib/api/is-not-found-error'
 
 type RouteContext = { params: Promise<{ id: string }> }
+
+// Template ids are integer serial PKs. A non-numeric id makes Payload/Drizzle throw a
+// Postgres cast error (22P02) that `disableErrors` does NOT suppress → 500. Reject it as
+// a plain 404 before touching the DB. (GH #1535 review)
+const isNumericId = (id: string) => /^\d+$/.test(id)
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
     return withSuperAdmin(async () => {
         const { id } = await ctx.params
+        if (!isNumericId(id)) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        }
         const payload = await getPayload({ config })
 
         // disableErrors: findByID throws NotFound on a missing id by default, which
@@ -37,6 +46,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
     return withSuperAdmin(async () => {
         const { id } = await ctx.params
+        if (!isNumericId(id)) {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        }
         const body = await req.json().catch(() => null)
 
         if (!body) {
@@ -53,12 +65,20 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
         const payload = await getPayload({ config })
 
-        const updated = await payload.update({
-            collection: 'templates',
-            id,
-            data: parsed.data,
-        })
-
-        return NextResponse.json({ data: updated })
+        // update() throws NotFound on a missing id (withSuperAdmin has no catch → 500).
+        // Map it to 404 so a non-existent template isn't reported as a server crash. (GH #1535)
+        try {
+            const updated = await payload.update({
+                collection: 'templates',
+                id,
+                data: parsed.data,
+            })
+            return NextResponse.json({ data: updated })
+        } catch (err) {
+            if (isNotFoundError(err)) {
+                return NextResponse.json({ error: 'Not found' }, { status: 404 })
+            }
+            throw err
+        }
     })(req)
 }

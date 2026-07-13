@@ -35,6 +35,8 @@ type AuthUserShape = {
 }
 
 const EXPORT_ROW_CAP = 10_000
+// Postgres int4 upper bound — a larger tenant id overflows the `::integer[]` cast → 500.
+const INT4_MAX = 2147483647
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -85,21 +87,22 @@ function resolveTenantIds(
 ): TenantResolutionResult {
     const isSuperAdmin = user.roles?.includes('super-admin') ?? false
 
-    // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer)
+    // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer).
+    // Cap at INT4_MAX so an out-of-range id can't overflow the `::integer[]` cast → 500.
     const userTenantIds: number[] = (user.tenants ?? []).map((t) => {
         const tenant = t.tenant
         if (typeof tenant === 'object' && tenant != null) return Number(tenant.id)
         return Number(tenant)
-    }).filter((id) => Number.isFinite(id) && id > 0)
+    }).filter((id) => Number.isInteger(id) && id > 0 && id <= INT4_MAX)
 
     if (isSuperAdmin) {
         if (requestedTenantId) {
-            // Validate: must be a positive integer string
-            if (!/^\d+$/.test(requestedTenantId)) {
-                // Return sentinel — caller will 400
+            // Validate: must be a positive integer string within int4 range (else the
+            // `::integer[]` bind overflows → 500). Return sentinel → caller 400s.
+            const id = parseInt(requestedTenantId, 10)
+            if (!/^\d+$/.test(requestedTenantId) || id > INT4_MAX) {
                 return { tenantIds: [-1], tenantLabel: '', isSuperAdmin: true }
             }
-            const id = parseInt(requestedTenantId, 10)
             return { tenantIds: [id], tenantLabel: String(id), isSuperAdmin: true }
         }
         // Super-admin without filter — export all (empty array signals no WHERE clause)

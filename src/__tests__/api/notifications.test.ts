@@ -235,7 +235,7 @@ describe('/api/notifications', () => {
             expect(params).toContain(200) // tenant_id
         })
 
-        it('TC-GH1535-02b: notificationIds UPDATE also enforces user_id + tenant_id ownership', async () => {
+        it('TC-GH1535-02b: notificationIds UPDATE enforces user_id + tenant ownership (all user tenants)', async () => {
             const { getPayload } = await import('payload')
             const captured: unknown[] = []
             vi.mocked(getPayload).mockResolvedValueOnce({
@@ -248,7 +248,21 @@ describe('/api/notifications', () => {
             const { params } = new PgDialect().sqlToQuery(captured[0] as never)
             expect(params).toContain('{1,2}') // id list as integer[] literal
             expect(params).toContain(100)     // user_id
-            expect(params).toContain(200)     // tenant_id
+            expect(params).toContain('{200}') // tenant scope = ALL user tenants as integer[] literal
+        })
+
+        it('TC-GH1535-02c: notificationIds beyond int4 range are dropped (no overflow 500)', async () => {
+            const { getPayload } = await import('payload')
+            const execSpy = vi.fn(async () => ({ rowCount: 1 }))
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                db: { drizzle: { execute: execSpy } },
+            } as unknown as Payload)
+
+            // '2147483648' = INT4_MAX+1 → filtered out; '5' remains valid
+            const res = await POST(createRequest('/api/notifications/mark-read', 'POST', { notificationIds: ['2147483648', '5'] }))
+            expect(res.status).toBe(200)
+            const { params } = new PgDialect().sqlToQuery(execSpy.mock.calls[0][0] as never)
+            expect(params).toContain('{5}') // only the in-range id survives
         })
 
         it('returns 500 on internal failure', async () => {

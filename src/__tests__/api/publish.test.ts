@@ -651,8 +651,10 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
         const body = await res.json()
 
-        // GH #1535: partial publish failure now returns 409 (not 500).
-        expect(res.status).toBe(409)
+        // GH #1535 (review): a non-validation server fault (TypeError, no validationErrors)
+        // keeps 500 so it stays visible in 5xx monitoring — only pure ValidationError
+        // failures downgrade to 409 (see TC-F01-pub-10).
+        expect(res.status).toBe(500)
         const failure = body.error.failures[0]
         expect(failure.errName).toBe('TypeError')
         expect(failure.errMsg).toContain("Cannot read properties of undefined")

@@ -77,5 +77,24 @@ describe('TC-GH1535-01: Users roles filter guard (rejectInvalidRoleFilter)', () 
                 run({ and: [{ email: { contains: 'a' } }, { 'tenants.role': { equals: 'owner' } }] }),
             ).not.toThrow()
         })
+
+        it('allows roles.exists (boolean operator, carries no enum value)', () => {
+            // ?where[roles][exists]=true arrives as the string 'true' — must NOT be
+            // treated as an invalid enum value. (GH #1535 review)
+            expect(() => run({ roles: { exists: true } })).not.toThrow()
+            expect(() => run({ roles: { exists: 'true' } })).not.toThrow()
+        })
+    })
+
+    describe('TC-GH1535-01c: unsupported operators on enum column → 400 (not Postgres 42883/500)', () => {
+        it('rejects roles.like even with a valid role value', () => {
+            // like/ilike on an enum column → Postgres 42883 → 500. The valid value would
+            // otherwise slip the value-check, so the operator itself must be rejected.
+            expect(() => run({ roles: { like: 'editor' } })).toThrow(APIError)
+        })
+
+        it('rejects roles.contains', () => {
+            expect(() => run({ roles: { contains: 'editor' } })).toThrow(APIError)
+        })
     })
 })

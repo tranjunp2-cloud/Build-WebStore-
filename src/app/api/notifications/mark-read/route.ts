@@ -17,6 +17,9 @@ const MarkReadSchema = z.object({
 
 export const dynamic = 'force-dynamic'
 
+// Postgres int4 upper bound — a larger id/value overflows `::integer[]` casts → 500.
+const INT4_MAX = 2147483647
+
 /**
  * POST /api/notifications/mark-read
  *
@@ -44,14 +47,19 @@ export const POST = withAuth(async (user, request) => {
         }
         const body = parsed.data as MarkReadPayload
 
-        // Resolve tenant ID
-        const userWithTenants = user as unknown as {
-            tenants?: Array<{ tenant: string | { id: string } }>
-        }
-        const firstTenant = userWithTenants.tenants?.[0]?.tenant
-        const tenantId = typeof firstTenant === 'object' ? firstTenant?.id : firstTenant
+        // Resolve tenant ids. mark_all uses the first tenant (unchanged behavior);
+        // specific-ids scope to ALL the user's tenants to match the collection update
+        // access policy — a multi-tenant user must be able to mark a notification read
+        // in any of their tenants, not just the first. (GH #1535 review)
+        const userTenants = (user as unknown as {
+            tenants?: Array<{ tenant: string | number | { id: string | number } }>
+        }).tenants ?? []
+        const tenantIds = userTenants
+            .map((t) => (typeof t.tenant === 'object' && t.tenant ? t.tenant.id : t.tenant))
+            .map(Number)
+            .filter((n) => Number.isInteger(n) && n > 0)
 
-        if (!tenantId) {
+        if (tenantIds.length === 0) {
             return NextResponse.json({ success: false, error: 'No tenant found' }, { status: 400 })
         }
 
@@ -66,7 +74,7 @@ export const POST = withAuth(async (user, request) => {
         }
 
         const uid = Number(user.id)
-        const tid = Number(tenantId)
+        const tid = tenantIds[0]
 
         if (body.mark_all) {
             // Single batched UPDATE instead of one round-trip per row. The old code
@@ -89,17 +97,21 @@ export const POST = withAuth(async (user, request) => {
 
         // Specific ids: bind as a Postgres integer[] literal ('{1,2}'), not a JS array
         // (the pg driver serializes a JS array to a bare scalar → malformed array literal).
+        // Cap at INT4_MAX so an out-of-range id can't overflow `::integer[]` → 500.
         // The user_id + tenant_id clause enforces ownership — a user cannot mark another
         // user's notifications even by guessing ids.
-        const ids = body.notificationIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+        const ids = body.notificationIds
+            .map(Number)
+            .filter((n) => Number.isInteger(n) && n > 0 && n <= INT4_MAX)
         if (ids.length === 0) {
             return NextResponse.json({ success: false, error: 'notificationIds required' }, { status: 400 })
         }
         const idArray = `{${ids.join(',')}}`
+        const tenantArray = `{${tenantIds.join(',')}}`
         const result = await db.execute(sql`
             UPDATE notifications
             SET is_read = true, updated_at = now()
-            WHERE id = ANY(${idArray}::integer[]) AND user_id = ${uid} AND tenant_id = ${tid} AND is_read = false
+            WHERE id = ANY(${idArray}::integer[]) AND user_id = ${uid} AND tenant_id = ANY(${tenantArray}::integer[]) AND is_read = false
         `)
         return NextResponse.json({ success: true, updated: Number(result?.rowCount ?? 0) })
     } catch (error) {
