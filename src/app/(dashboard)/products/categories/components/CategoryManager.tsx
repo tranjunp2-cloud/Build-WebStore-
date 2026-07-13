@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/select'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { getCategoriesAction, saveCategoryAction, deleteCategoryAction, checkCategoryNameAvailable } from '../actions'
 
 // Types
@@ -233,6 +233,9 @@ export default function CategoryManager() {
                 return { id: c.id, label: c.breadcrumbs || c.name, level }
             })
     }, [categories, formData.id])
+
+    // GH-1579: snap back when deletions strand currentPage past the last page
+    useTablePageClamp(currentPage, tree.length, pageSize, setCurrentPage)
 
     // Handlers
     const toggleExpand = (id: string | number) => {
@@ -543,7 +546,7 @@ export default function CategoryManager() {
                             )}
                         </div>
                     )}
-                    {!isLoading && tree.length > 0 && (
+                    {!isLoading && shouldShowTablePagination(tree.length) && (
                         <div
                             className="p-[16px]"
                             style={{ borderTop: '1px solid var(--dash-border)' }}

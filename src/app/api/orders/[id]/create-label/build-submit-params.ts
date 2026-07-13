@@ -63,8 +63,12 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         dimensionsCm,
     } = input
 
+    // No placeholder fallbacks here: a fake number ('0000000') passes EP submit but the
+    // courier's AWB issuance later rejects it, stranding the shipment at "Pending AWB"
+    // with the wallet already charged (live 2026-07-13). The route guards both phones
+    // (isWarehouseComplete + hasUsablePhone) before calling this builder.
     const senderPhone = splitPhone(warehouse.phone ?? '')
-    const receiverPhone = splitPhone(customerPhone || '600000000')
+    const receiverPhone = splitPhone(customerPhone)
     const weightKg = aggregateWeightKg(weightGrams)
 
     // Merge any caller override onto the default parcel size; EP requires height/width/length.
@@ -94,7 +98,7 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         sender: {
             name: warehouse.name ?? warehouse.label ?? 'Sender',
             phone_number_country_code: senderPhone.countryCode,
-            phone_number: senderPhone.number || '0000000',
+            phone_number: senderPhone.number,
             address_1: warehouse.address1 ?? '',
             address_2: warehouse.address2,
             postcode: warehouse.postcode ?? '',
@@ -105,7 +109,7 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         receiver: {
             name: customerName || 'Receiver',
             phone_number_country_code: receiverPhone.countryCode,
-            phone_number: receiverPhone.number || '0000000',
+            phone_number: receiverPhone.number,
             address_1: shippingAddress.line1 ?? '',
             address_2: shippingAddress.line2,
             postcode: shippingAddress.postcode ?? '',

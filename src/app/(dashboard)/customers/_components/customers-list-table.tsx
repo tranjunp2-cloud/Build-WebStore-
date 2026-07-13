@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n'
 import { RankBadge, CustomerAvatar } from './customers-shared-ui'
 import { CustomersListCards } from './customers-list-card'
 import { Badge } from '@/components/ui/badge'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import {
     Table,
@@ -133,7 +133,7 @@ export function CustomersListTable({
         )
     }
 
-    const footer = !loading && total > 0
+    const footer = !loading && shouldShowTablePagination(total)
         ? (
             <TablePagination
                 page={page}

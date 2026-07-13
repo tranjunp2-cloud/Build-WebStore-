@@ -30,6 +30,7 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
+import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
 import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
@@ -456,7 +457,25 @@ export async function POST(req: NextRequest) {
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
-                    const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
+                    // LLM for 2-4 business-specific visual terms (SAME language as
+                    // input) so the pool query isn't generic industry scaffolding.
+                    // mergeKeywords keeps products FIRST + caps at 3 — Pixabay `q`
+                    // is AND-matched (image-pool.ts buildPoolQuery), so more terms
+                    // than that risks zero results. Any extraction failure → [],
+                    // rawKeywords collapses to products-only (pre-fix behavior).
+                    // Skip the call entirely when products already fill the cap-3
+                    // budget — merge would discard every extracted term anyway.
+                    const extractedKeywords = _parsedProductsForPool.length >= 3
+                        ? []
+                        : await extractImageKeywords({
+                            businessName: businessInfo.businessName,
+                            industry: businessInfo.industry,
+                            shortDescription: businessInfo.shortDescription,
+                            products: businessInfo.products,
+                            language,
+                        }).catch((): string[] => [])
+                    const rawKeywords = mergeKeywords(_parsedProductsForPool, extractedKeywords)
                     // Translate raw user-language keywords → English before the
                     // Pixabay POOL search (better stock-photo coverage than raw
                     // VN/MS terms). Default ON — set GEN_TRANSLATE_POOL_KEYWORDS=false
@@ -464,6 +483,8 @@ export async function POST(req: NextRequest) {
                     // English keywords auto-skip the VN gate (detectQueryLang → undefined),
                     // no image-pool change needed. Only the pool query is translated;
                     // `englishKeywords` (legacy per-block search) stays RAW below.
+                    // Applied AFTER the business-context merge above so extracted
+                    // terms benefit from the same translation.
                     let poolKeywords = rawKeywords
                     if (process.env.GEN_TRANSLATE_POOL_KEYWORDS !== 'false' && rawKeywords.length > 0) {
                         const translated = await translateToEnglishKeywords({
