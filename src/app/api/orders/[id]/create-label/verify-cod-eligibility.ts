@@ -62,7 +62,9 @@ export async function verifyCodEligibilityLive(args: {
         serviceId: quote.courier.service_id,
         courierName: quote.courier.courier_name,
         serviceName: quote.courier.service_name,
-        priceSen: Math.round(parseFloat(quote.pricing.total_amount) * 100),
+        // Same basis as checkout/create-label (shipment_price + shipment_tax, prefix-tolerant),
+        // not total_amount. evaluateCodEligibility reads only the cod fields, but keep it aligned.
+        priceSen: (rmStringToSen(quote.pricing.shipment_price) ?? NaN) + (rmStringToSen(quote.pricing.shipment_tax) ?? 0),
         codAvailable: codFeature?.available ?? false,
         // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
         codMinSen: rmStringToSen(codFeature?.min_cod_amount),

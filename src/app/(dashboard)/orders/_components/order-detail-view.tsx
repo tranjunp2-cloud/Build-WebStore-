@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, Calendar, Truck, PackageCheck } from 'lucide-react'
@@ -54,15 +54,21 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     const [order, setOrder] = useState<OrderDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
+    // The order.updatedAt a cancel-reopen toast has already fired for — dedup guard so a
+    // slow silent refetch can't re-toast the same transition on the next 20s tick.
+    const cancelToastedForRef = useRef<string | null>(null)
 
     // `silent` = poll-triggered refresh: update the card in place without flipping the
     // full-page loading spinner (avoids a flash every time the background poll re-pulls).
     const fetchOrder = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setLoading(true)
-        setNotFound(false)
+        if (!opts?.silent) setNotFound(false)
         try {
             const res = await fetch(`/api/orders/${orderId}?depth=2`)
-            if (res.status === 404) { setNotFound(true); return }
+            // Only a user/mount fetch may tear the page down to "not found". A transient 404
+            // on a silent background poll (replica lag / session blip) must NOT destroy an open,
+            // valid order view — next tick self-heals.
+            if (res.status === 404) { if (!opts?.silent) setNotFound(true); return }
             if (!res.ok) throw new Error('fetch_failed')
             const result = await res.json()
             setOrder(result.data || result)
@@ -100,8 +106,14 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                 if (stopped || !data?.updatedAt || data.updatedAt === orderUpdatedAt) return
                 // This effect only runs while the order is in-flight, so a poll that now
                 // reports confirmed + tracking 'cancelled' IS the webhook cancel auto-reopen
-                // happening live — tell the merchant why the label just disappeared.
-                if (data.status === 'confirmed' && data.shippingTrackingStatus === 'cancelled') {
+                // happening live — tell the merchant why the label just disappeared. Guard on
+                // the updatedAt so a silent refetch slower than the 20s tick can't double-toast.
+                if (
+                    data.status === 'confirmed' &&
+                    data.shippingTrackingStatus === 'cancelled' &&
+                    cancelToastedForRef.current !== data.updatedAt
+                ) {
+                    cancelToastedForRef.current = data.updatedAt
                     toast.info(t.dashboard.orders.toast.shipmentCancelledOnEp)
                 }
                 fetchOrder({ silent: true })

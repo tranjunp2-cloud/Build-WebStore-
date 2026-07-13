@@ -141,7 +141,7 @@ export function OrderItemsCard({ order }: { order: OrderDetail }) {
                 const weightKg = product?.weight ?? 0
                 const weightDisplay =
                     anyHasWeight && weightKg > 0
-                        ? `${weightKg} kg`
+                        ? `${Number(weightKg.toFixed(2))} kg`
                         : anyHasWeight
                         ? '—'
                         : null

@@ -367,6 +367,9 @@ export function FulfillmentZone({
             setLocalLabelUrl(newLabel)
             setLocalCreated(true)
             setForceMissing(false)
+            // Wallet was charged for the label — invalidate the cached balance (parity with
+            // the main CreateLabelFlow success path).
+            invalidateEpShippingInfo(tenantId)
             ;(onLabelCreated ?? onUpdate)()
           }}
           onError={(code) => {

@@ -359,6 +359,26 @@ describe('getRates', () => {
             expect(result.degraded).toBe(false)
         })
 
+        it('is currency-prefix tolerant — parses "MYR5.30"/"MYR0.32" (review #1598)', async () => {
+            // COD sibling fields in the same response are "MYR…"-prefixed; shipment_price/tax
+            // may be too. rmStringToSen strips the prefix so the rate is NOT dropped.
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'pos', service_id: 'melplus', courier_name: 'Pos Malaysia', service_name: 'Melplus', delivery_duration: '2–3 days' },
+                        pricing: { total_amount: 'MYR6.22', shipment_price: 'MYR5.30', shipment_tax: 'MYR0.32' },
+                        features: [],
+                    }],
+                }],
+            })
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.degraded).toBe(false)           // NOT dropped to flat rate
+            expect(result.rates[0].priceSen).toBe(562)
+        })
+
         it('treats a missing shipment_tax as 0', async () => {
             ;(quotations as any).mockResolvedValue({
                 data: [{
