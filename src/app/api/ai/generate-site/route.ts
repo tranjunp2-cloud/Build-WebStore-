@@ -35,6 +35,7 @@ import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
@@ -1238,12 +1239,25 @@ export async function POST(req: NextRequest) {
         // sanitizedBlocks which still has raw AI slugs (/book-trial, /the-lab, etc.)
         const homepageLayout = (pageDefinitions[0]?.layout ?? []) as Array<{ blockType?: unknown }>
         const generatedHeaderBlock = homepageLayout.find(b => b.blockType === 'navigation') ?? null
+        // Auto-add floating cart when generated pages contain commerce blocks
+        // (products-grid / products-featured / product-quick-view). Uses the
+        // actually-persisted pages so a failed sub-page can't trigger a cart.
+        // Pending-aware: on regeneration a stale pendingGlobalBlocks draft
+        // (e.g. unpublished cart deletion) would shadow the live cart in the
+        // editor, so the cart is grafted into the pending draft as well.
+        const cartPatch = ensureCartGlobalBlockWithPending(
+            (site as { globalBlocks?: Record<string, unknown> | null }).globalBlocks,
+            (site as { pendingGlobalBlocks?: Record<string, unknown> | null }).pendingGlobalBlocks,
+            createdPages as Array<{ layout?: unknown[] }>,
+            generatedHeaderBlock,
+        )
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
             data: {
                 generationStatus: 'completed',
                 ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+                ...cartPatch,
             },
         })
 
