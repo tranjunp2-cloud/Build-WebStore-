@@ -74,32 +74,45 @@ function toSnakeCase(str) {
 }
 
 /**
- * Scan the CURRENT full file (not just diff `+` lines) for field names nested
- * inside an `array`-typed ancestor anywhere in the file. Used as a safety-net
- * alongside the diff-only scope-stack in getNewFieldsFromDiff(): that stack
- * only sees ADDED lines, so if a PR touches only a field NESTED inside an
- * array (e.g. adds `validate:` to `opens`/`closes`) without touching the
- * array's own `name`/`type: 'array'` lines, the diff-only stack never learns
- * the field is array-nested and wrongly flags it as a new top-level column.
- * Reading the full file gives complete nesting context regardless of which
- * lines changed. Same algorithm as the diff-only stack, applied to all lines.
+ * Scan the CURRENT full file (not just diff `+` lines) for the exact line
+ * content (trimmed) of field declarations nested inside an `array`-typed
+ * ancestor anywhere in the file. Used as a safety-net alongside the diff-only
+ * scope-stack in getNewFieldsFromDiff(): that stack only sees ADDED lines, so
+ * if a PR touches only a field NESTED inside an array (e.g. adds `validate:`
+ * to `opens`/`closes`) without touching the array's own `name`/`type: 'array'`
+ * lines, the diff-only stack never learns the field is array-nested and
+ * wrongly flags it as a new top-level column. Reading the full file gives
+ * complete nesting context regardless of which lines changed.
+ *
+ * Returns LINE SIGNATURES, not bare field names — a bare name is not enough
+ * to prove a SPECIFIC diff-added occurrence is nested, since the same name
+ * can be array-nested in one place and a genuine new top-level field
+ * elsewhere in the same file (e.g. Products.ts `value`/`key` nested under
+ * both `variantConfigs.options` and `attributes` — a brand-new top-level
+ * field also named `value` would share the bare name but never the exact
+ * line content, since it will have different admin/validate/maxLength
+ * details). The caller matches by exact trimmed line text, not by name.
  */
 function getArrayNestedFieldNames(source) {
-  const skip = new Set()
+  const nested = new Set()
   const lines = source.split('\n')
   const scopeStack = [] // { indent, type }
   for (let i = 0; i < lines.length; i++) {
-    const nameMatch = lines[i].match(/^(\s*)name:\s*['"](\w+)['"]/)
+    // Support both multi-line (`name:` starts the line) and compact
+    // single-line (`{ name: 'x', type: 'y' },`) field definitions — the
+    // dominant style in collections like Products.ts. Indent = leading
+    // whitespace of the whole line, NOT the position of `name:` itself.
+    const wsMatch = lines[i].match(/^(\s*)/)
+    const nameMatch = lines[i].match(/name:\s*['"](\w+)['"]/)
     if (!nameMatch) continue
-    const indent = nameMatch[1].length
-    const fieldName = nameMatch[2]
+    const indent = wsMatch[1].length
 
     while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
       scopeStack.pop()
     }
 
     if (scopeStack.some((s) => s.type === 'array')) {
-      skip.add(fieldName)
+      nested.add(lines[i].trim())
     }
 
     let ownType = null
@@ -119,6 +132,32 @@ function getArrayNestedFieldNames(source) {
 
     if (ownType === 'group' || ownType === 'array') {
       scopeStack.push({ indent, type: ownType })
+    }
+  }
+  return nested
+}
+
+/**
+ * Given the diff's added (`+`-prefixed) lines and the full current file
+ * content, return the set of field NAMES to skip because their diff-added
+ * declaration line's EXACT content matches a line that is array-nested
+ * somewhere in the full file. Matching by exact line content (not bare name)
+ * is what makes this safe against the name-collision case above: a brand-new
+ * top-level field's own diff line will only match if it is byte-identical to
+ * an existing array-nested line, which does not happen for a genuinely
+ * different field (different admin text/maxLength/validate/etc.).
+ */
+function resolveArrayNestedSkipNames(diffPlusLines, fullFileContent) {
+  const nestedLineSignatures = getArrayNestedFieldNames(fullFileContent)
+  const skip = new Set()
+  for (const diffLine of diffPlusLines) {
+    const wsMatch = diffLine.match(/^\+(\s*)/)
+    if (!wsMatch) continue
+    const rest = diffLine.slice(1)
+    const nameMatch = rest.match(/name:\s*['"](\w+)['"]/)
+    if (!nameMatch) continue
+    if (nestedLineSignatures.has(rest.trim())) {
+      skip.add(nameMatch[1])
     }
   }
   return skip
@@ -201,11 +240,20 @@ function getNewFieldsFromDiff() {
       // own `name`/`type: 'array'` lines (those then never appear as `+` lines,
       // so the stack never learns the field is array-nested). Cross-check
       // against the full current file, which has complete nesting context
-      // regardless of which lines changed.
+      // regardless of which lines changed — matched by EXACT line content
+      // (resolveArrayNestedSkipNames), not bare field name. Matching by bare
+      // name alone is unsafe: the same name can be array-nested in one place
+      // and a genuine new top-level field elsewhere in the same file (e.g.
+      // Products.ts has `value`/`key` nested under both
+      // `variantConfigs.options` AND `attributes` — a brand-new top-level
+      // field also named `value` would trivially satisfy a "name appears in
+      // diff" check, since its OWN declaration line is itself part of the
+      // diff, so bare-name matching does not actually distinguish it from a
+      // real nested occurrence).
       const currentFilePath = path.join(__dirname, '..', filePath)
       if (fs.existsSync(currentFilePath)) {
         const fullFileContent = fs.readFileSync(currentFilePath, 'utf8')
-        for (const name of getArrayNestedFieldNames(fullFileContent)) {
+        for (const name of resolveArrayNestedSkipNames(diffLines, fullFileContent)) {
           skipFieldNames.add(name)
         }
       }
@@ -821,4 +869,8 @@ function main() {
   process.exit(hasErrors ? 1 : 0)
 }
 
-main()
+if (require.main === module) {
+  main()
+}
+
+module.exports = { getArrayNestedFieldNames, resolveArrayNestedSkipNames }

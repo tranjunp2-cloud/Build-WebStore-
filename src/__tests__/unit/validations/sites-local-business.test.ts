@@ -140,3 +140,38 @@ describe('[TC-F37-02-24] saveSiteSchema.localBusiness — openingHours closes mu
         expect(result.success).toBe(true)
     })
 })
+
+// ── TC-F37-02-25: open row (isClosed=false) requires both opens AND closes ─
+
+describe('[TC-F37-02-25] saveSiteSchema.localBusiness — open row requires opens+closes', () => {
+    it('rejects a row missing closes when isClosed is false, and attaches the error to the closes path (not opens)', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo', opens: '09:00', isClosed: false }] },
+        })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            const paths = result.error.issues.map(issue => issue.path.join('.'))
+            expect(paths.some(p => p.endsWith('closes'))).toBe(true)
+            expect(paths.some(p => p.endsWith('opens'))).toBe(false)
+        }
+    })
+
+    it('rejects a row missing opens when isClosed is false, and attaches the error to the opens path (not closes)', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo', closes: '18:00', isClosed: false }] },
+        })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            const paths = result.error.issues.map(issue => issue.path.join('.'))
+            expect(paths.some(p => p.endsWith('opens'))).toBe(true)
+            expect(paths.some(p => p.endsWith('closes'))).toBe(false)
+        }
+    })
+
+    it('rejects a row missing both opens and closes when isClosed is omitted (defaults to open)', () => {
+        const result = saveSiteSchema.safeParse({
+            localBusiness: { openingHours: [{ dayOfWeek: 'Mo' }] },
+        })
+        expect(result.success).toBe(false)
+    })
+})

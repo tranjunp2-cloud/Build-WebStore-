@@ -61,9 +61,30 @@ const localBusinessSchema = z.object({
         opens: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
         closes: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
         isClosed: z.boolean().optional(),
-    }).refine(row => row.isClosed || !row.opens || !row.closes || row.closes > row.opens, {
-        message: 'Closing time must be after opening time (overnight hours are not supported)',
-        path: ['closes'],
+    }).superRefine((row, ctx) => {
+        if (row.isClosed) return
+        if (!row.opens) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Opening time is required unless the day is marked closed',
+                path: ['opens'],
+            })
+        }
+        if (!row.closes) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Closing time is required unless the day is marked closed',
+                path: ['closes'],
+            })
+        }
+        if (!row.opens || !row.closes) return
+        if (row.closes <= row.opens) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Closing time must be after opening time (overnight hours are not supported)',
+                path: ['closes'],
+            })
+        }
     })).max(21).optional(), // 7 days × up to 3 shifts (split-shift)
 }).optional()
 

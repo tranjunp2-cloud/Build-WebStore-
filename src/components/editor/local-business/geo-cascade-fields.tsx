@@ -61,6 +61,12 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
     const selectedStateIdRef = useRef('')
     const selectedDistrictIdRef = useRef('')
 
+    // Set the instant the user makes ANY manual cascade selection. `bootstrap()`
+    // (the mount-time reverse-resolve below) checks this before every setState
+    // so a late-resolving lookup/name-match can never clobber a selection the
+    // user already made while bootstrap was still in flight.
+    const userInteractedRef = useRef(false)
+
     useEffect(() => {
         if (resolvedOnce.current) return
         resolvedOnce.current = true
@@ -70,6 +76,8 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
         // to cascade ids (postcode-lookup primary path, name-match secondary).
         // Read-only pre-fill — never calls `onChange`, never clears a saved
         // string it can't map to a DB row (see legacyState/legacyCity below).
+        // Bails out at every checkpoint if the user has since interacted
+        // manually, so a slow reverse-resolve never overwrites a fresh pick.
         async function bootstrap() {
             let statesList: GeoState[] = []
             try {
@@ -77,8 +85,9 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
                 const data = await res.json()
                 statesList = Array.isArray(data) ? data : []
             } catch { /* empty options; select stays usable */ }
-            setStates(statesList)
             setStatesLoading(false)
+            if (userInteractedRef.current) return
+            setStates(statesList)
 
             const savedState = value.state?.trim() || ''
             const savedCity = value.city?.trim() || ''
@@ -90,14 +99,20 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
                     const res = await fetch(`/api/geo/lookup/${savedPostcode}`)
                     if (res.ok) {
                         const data: { state_id: number; district_id: number } = await res.json()
+                        if (userInteractedRef.current) return
                         setSelectedStateId(String(data.state_id))
-                        await fetchDistricts(data.state_id)
+                        const districtsList = await fetchDistricts(data.state_id)
+                        if (userInteractedRef.current) return
+                        setDistricts(districtsList)
                         setSelectedDistrictId(String(data.district_id))
-                        await fetchPostcodes(data.district_id)
+                        const postcodes = await fetchPostcodes(data.district_id)
+                        if (userInteractedRef.current) return
+                        setPostcodeOpts(postcodes)
                         return
                     }
                 } catch { /* fall through to name-match */ }
             }
+            if (userInteractedRef.current) return
 
             const stateRow = savedState ? statesList.find(row => row.name === savedState) : undefined
             if (!stateRow) {
@@ -107,6 +122,8 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
             }
             setSelectedStateId(String(stateRow.id))
             const districtsList = await fetchDistricts(stateRow.id)
+            if (userInteractedRef.current) return
+            setDistricts(districtsList)
 
             const districtRow = savedCity ? districtsList.find(row => row.name === savedCity) : undefined
             if (!districtRow) {
@@ -114,25 +131,33 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
                 return
             }
             setSelectedDistrictId(String(districtRow.id))
-            await fetchPostcodes(districtRow.id)
+            const postcodes = await fetchPostcodes(districtRow.id)
+            if (userInteractedRef.current) return
+            setPostcodeOpts(postcodes)
             // If savedPostcode isn't among the loaded options, the postcode
             // Select (controlled by `value.postcode`) simply shows no match —
             // the string is never cleared, no dedicated hint needed here.
         }
 
+        // Fetch-only helpers — state list is applied by the caller (bootstrap)
+        // AFTER re-checking `userInteractedRef`, so results never race a
+        // manual selection. Only used by bootstrap (handleStateSelect /
+        // handleDistrictSelect below fetch inline with their own stale-guard).
+        // The `finally` loading-flag clear is ALSO guarded: if the user
+        // interacted while this fetch was in flight, their own handler already
+        // owns `districtsLoading`/`postcodesLoading` (via its own inline fetch)
+        // — clearing it here would prematurely flip the flag while the user's
+        // real fetch is still pending.
         async function fetchDistricts(stateId: number): Promise<GeoDistrict[]> {
             setDistrictsLoading(true)
             try {
                 const res = await fetch(`/api/geo/districts?stateId=${stateId}`)
                 const data = await res.json()
-                const list: GeoDistrict[] = Array.isArray(data) ? data : []
-                setDistricts(list)
-                return list
+                return Array.isArray(data) ? data : []
             } catch {
-                setDistricts([])
                 return []
             } finally {
-                setDistrictsLoading(false)
+                if (!userInteractedRef.current) setDistrictsLoading(false)
             }
         }
 
@@ -141,20 +166,18 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
             try {
                 const res = await fetch(`/api/geo/postcodes?districtId=${districtId}`)
                 const data = await res.json()
-                const list: string[] = Array.isArray(data) ? data : []
-                setPostcodeOpts(list)
-                return list
+                return Array.isArray(data) ? data : []
             } catch {
-                setPostcodeOpts([])
                 return []
             } finally {
-                setPostcodesLoading(false)
+                if (!userInteractedRef.current) setPostcodesLoading(false)
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     function handleStateSelect(stateId: string) {
+        userInteractedRef.current = true
         setSelectedStateId(stateId)
         selectedStateIdRef.current = stateId
         setSelectedDistrictId('')
@@ -180,6 +203,7 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
     }
 
     function handleDistrictSelect(districtId: string) {
+        userInteractedRef.current = true
         setSelectedDistrictId(districtId)
         selectedDistrictIdRef.current = districtId
         setPostcodeOpts([])
@@ -201,6 +225,7 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
     }
 
     function handlePostcodeSelect(postcode: string) {
+        userInteractedRef.current = true
         onChange({ postcode })
     }
 

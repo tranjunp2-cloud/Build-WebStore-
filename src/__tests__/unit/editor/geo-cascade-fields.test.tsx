@@ -265,3 +265,46 @@ describe('[TC-F37-01-24] GeoCascadeFields — stale district-fetch response is d
         expect(screen.queryByRole('option', { name: 'Petaling Jaya' })).not.toBeInTheDocument()
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F37-01-25 — Manual selection during bootstrap wins over a late reverse-resolve
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F37-01-25] GeoCascadeFields — manual selection beats a slow mount-time reverse-resolve', () => {
+    it('picking a state while the saved-postcode lookup is still pending keeps the user\'s pick, not the lookup result', async () => {
+        // Arrange — states resolve fast (select becomes usable), but the reverse-resolve
+        // lookup for the SAVED postcode ('47300' -> Selangor/PJ) is deferred so we can
+        // interact manually while bootstrap is still mid-flight.
+        let resolveLookup!: (res: Response) => void
+        global.fetch = vi.fn((url: string) => {
+            if (url === '/api/geo/states') return Promise.resolve(makeJsonResponse(STATES))
+            if (url === '/api/geo/lookup/47300') return new Promise<Response>(resolve => { resolveLookup = resolve })
+            if (url === '/api/geo/districts?stateId=2') return Promise.resolve(makeJsonResponse(DISTRICTS_SABAH))
+            return Promise.resolve(makeJsonResponse([]))
+        }) as unknown as typeof fetch
+
+        const onChange = vi.fn()
+        render(<GeoCascadeFields value={{ state: 'Selangor', city: 'Petaling Jaya', postcode: '47300' }} onChange={onChange} labels={LABELS} />)
+        await waitFor(() => expect(triggers()[0]).not.toBeDisabled())
+
+        // Act — user picks Sabah manually WHILE the postcode-lookup reverse-resolve
+        // (for the saved Selangor/PJ postcode) is still pending.
+        fireEvent.click(triggers()[0])
+        fireEvent.click(await screen.findByRole('option', { name: 'Sabah' }))
+        expect(onChange).toHaveBeenCalledWith({ state: 'Sabah', city: '', postcode: '' })
+
+        // Now let the stale reverse-resolve for the SAVED postcode finally resolve.
+        resolveLookup(makeJsonResponse({ state_id: 1, district_id: 10 }))
+        await waitFor(() => expect(triggers()[1]).not.toBeDisabled())
+
+        // Assert — the late lookup result (Selangor/Petaling Jaya) must NOT clobber
+        // the user's manual pick (Sabah): state trigger still shows Sabah, the city
+        // select offers Sabah's district (not the stale Petaling Jaya), and onChange
+        // was never called again with Selangor after the user's own selection.
+        expect(triggers()[0]).toHaveTextContent('Sabah')
+        expect(triggers()[1]).not.toHaveTextContent('Petaling Jaya')
+        fireEvent.click(triggers()[1])
+        expect(await screen.findByRole('option', { name: 'Kota Kinabalu' })).toBeInTheDocument()
+        expect(screen.queryByRole('option', { name: 'Petaling Jaya' })).not.toBeInTheDocument()
+        expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ state: 'Selangor' }))
+    })
+})

@@ -374,15 +374,25 @@ export const Sites: CollectionConfig = {
                             name: 'opens',
                             type: 'text',
                             admin: { description: 'HH:MM' },
-                            validate: (val: string | null | undefined) =>
-                                !val || OPENING_HOURS_TIME_REGEX.test(val) || 'Must be in 24-hour HH:MM format (e.g. 09:00)',
+                            validate: (val: string | null | undefined, { siblingData }: { siblingData: Record<string, unknown> }) => {
+                                if (val && !OPENING_HOURS_TIME_REGEX.test(val)) return 'Must be in 24-hour HH:MM format (e.g. 09:00)'
+                                if (!siblingData?.isClosed && !val) return 'Opening time is required unless the day is marked closed'
+                                return true
+                            },
                         },
                         {
                             name: 'closes',
                             type: 'text',
                             admin: { description: 'HH:MM' },
-                            validate: (val: string | null | undefined) =>
-                                !val || OPENING_HOURS_TIME_REGEX.test(val) || 'Must be in 24-hour HH:MM format (e.g. 09:00)',
+                            validate: (val: string | null | undefined, { siblingData }: { siblingData: Record<string, unknown> }) => {
+                                if (val && !OPENING_HOURS_TIME_REGEX.test(val)) return 'Must be in 24-hour HH:MM format (e.g. 09:00)'
+                                if (!siblingData?.isClosed) {
+                                    if (!val) return 'Closing time is required unless the day is marked closed'
+                                    const opens = siblingData?.opens as string | undefined
+                                    if (opens && val <= opens) return 'Closing time must be after opening time (overnight hours are not supported)'
+                                }
+                                return true
+                            },
                         },
                         { name: 'isClosed', type: 'checkbox', defaultValue: false },
                     ],
