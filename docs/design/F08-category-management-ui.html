@@ -61,6 +61,7 @@ const I = {
   pen:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[16px] h-[16px] stroke-[1.5px]"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path></svg>',
   trash:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[16px] h-[16px] stroke-[1.5px]"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>',
   layers:'<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide shrink-0"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"></path><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"></path><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"></path></svg>',
+  warn:'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide shrink-0 mt-[1px]"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
 };
 
 /* ---------- data: real page-1 L1 cats + example children under "Fesyen Wanita"
@@ -75,7 +76,7 @@ const CATS = [
   {id:6,name:'F&amp;B',products:1,children:[]},
   {id:7,name:'Fashion',products:0,children:[]},
   {id:8,name:'Fesyen Wanita',products:5,children:[
-    {id:9,name:'Baju Muslimah',products:3,children:[
+    {id:9,name:'Baju Muslimah',products:0,children:[         /* 0 direct products -> deletable; demo children->top */
       {id:10,name:'Abaya',products:1,children:[]},           /* L3 (no + button) */
     ]},
     {id:11,name:'Blaus &amp; Kemeja',products:2,children:[]}, /* L2 (+ makes L3) */
@@ -273,22 +274,31 @@ function saveCat(){
 /* ---------- delete modal (hard-block if products>0, else children -> top-level) ---------- */
 function openDelete(id){
   const node = findNode(id);
-  const blocked = node.products > 0;
-  const hasKids = (node.children||[]).length>0;
-  const body = blocked
-    ? `<div class="rounded-lg px-3 py-2.5 text-[13px] flex items-start gap-2" style="background:hsl(var(--destructive)/0.1);color:hsl(var(--destructive));border:1px solid hsl(var(--destructive)/0.3)"><span>Cannot delete <b>${node.name}</b>. There are <b>${node.products} products</b> still assigned to it. Please reassign your products first.</span></div>`
-    : `<p class="text-[13px]" style="color:var(--dash-text-muted)">Are you sure you want to delete <b style="color:var(--dash-text)">${node.name}</b>?</p>`+
-      (hasKids?`<div class="rounded-lg px-3 py-2 text-[13px] flex items-start gap-2 mt-3" style="background:hsl(var(--warning)/0.1);color:hsl(var(--warning));border:1px solid hsl(var(--warning)/0.25)"><span>Its direct subcategories will be <b>moved to the top level</b> (not deleted).</span></div>`:'');
-  const confirmBtn = blocked
-    ? `<button disabled class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive));opacity:.4;cursor:not-allowed">Delete</button>`
-    : `<button onclick="confirmDelete(${id})" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive))">Delete</button>`;
-  const html = `<div class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(0,0,0,.6);backdrop-filter:blur(2px)" onclick="if(event.target===this)closeModal()">`+
-    `<div class="w-full max-w-[420px] rounded-[16px]" style="background:var(--dash-secondary-bg);border:1px solid var(--dash-border)">`+
+  const blocked = node.products > 0;         /* hard-block: DIRECT products assigned */
+  const kids = (node.children||[]).length;
+  const cancelBtn = `<button onclick="closeModal()" class="h-9 px-4 rounded-lg text-[13px] font-medium" style="border:1px solid var(--dash-border);color:var(--dash-text)">Cancel</button>`;
+  let body, footer;
+  if(blocked){
+    /* CASE 1 — category is assigned to products: block + explain + offer reassign */
+    body = `<div class="rounded-lg px-3 py-3 text-[13px] flex items-start gap-2.5" style="background:hsl(var(--destructive)/0.1);color:hsl(var(--destructive));border:1px solid hsl(var(--destructive)/0.3)">`+
+      `${I.warn}<span><b>Can&rsquo;t delete &ldquo;${node.name}&rdquo;.</b><br>It&rsquo;s still assigned to <b>${node.products} product${node.products>1?'s':''}</b>. Reassign or remove those products first, then delete.</span></div>`;
+    footer = cancelBtn +
+      `<button onclick="closeModal()" title="Go to Products filtered by this category" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:linear-gradient(90deg,#3b82f6,#2dd4bf)">Reassign products &rarr;</button>`+
+      `<button disabled class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive));opacity:.4;cursor:not-allowed">Delete</button>`;
+  } else {
+    /* CASE 2 — no products assigned: allow; if it has children, they move to top level */
+    body = `<p class="text-[13px]" style="color:var(--dash-text-muted)">Are you sure you want to delete <b style="color:var(--dash-text)">${node.name}</b>? This can&rsquo;t be undone.</p>`+
+      (kids?`<div class="rounded-lg px-3 py-2.5 text-[13px] flex items-start gap-2.5 mt-3" style="background:hsl(var(--warning)/0.1);color:hsl(var(--warning));border:1px solid hsl(var(--warning)/0.25)">`+
+        `${I.warn}<span>Its <b>${kids}</b> direct subcategor${kids>1?'ies':'y'} will be <b>moved to the top level</b> (not deleted).</span></div>`:'');
+    footer = cancelBtn + `<button onclick="confirmDelete(${id})" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive))">Delete</button>`;
+  }
+  document.getElementById('modalRoot').innerHTML =
+    `<div class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(0,0,0,.6);backdrop-filter:blur(2px)" onclick="if(event.target===this)closeModal()">`+
+    `<div class="w-full max-w-[440px] rounded-[16px]" style="background:var(--dash-secondary-bg);border:1px solid var(--dash-border)">`+
       `<div class="px-6 py-5" style="border-bottom:1px solid var(--dash-border)"><h2 class="text-[20px] font-bold m-0">Delete Category</h2></div>`+
       `<div class="p-6">${body}</div>`+
-      `<div class="px-6 py-4 flex justify-end gap-3" style="border-top:1px solid var(--dash-border)"><button onclick="closeModal()" class="h-9 px-4 rounded-lg text-[13px] font-medium" style="border:1px solid var(--dash-border);color:var(--dash-text)">Cancel</button>${confirmBtn}</div>`+
+      `<div class="px-6 py-4 flex justify-end gap-3 flex-wrap" style="border-top:1px solid var(--dash-border)">${footer}</div>`+
     `</div></div>`;
-  document.getElementById('modalRoot').innerHTML = html;
 }
 function confirmDelete(id){
   const node = findNode(id);
