@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-13 10:51  
 **Severity**: Medium  
-**Component**: Table pagination (dashboard + storefront)  
+**Component**: Table pagination (dashboard)  
 **Status**: Resolved (awaiting visual sign-off)
 
 ## What Happened
@@ -15,17 +15,17 @@ Regression felt obvious in hindsight: deleting rows on page 2+ down to total ≤
 
 ## Technical Details
 
-**File changes**: `src/components/ui/table-pagination.tsx` + 11 callers (products, staff, categories, blog, contact-leads, discounts, customers-detail-orders-tab, customers-export, etc.)
+**File changes**: `src/components/ui/table-pagination.tsx` + 11 gated callers (products, orders, customers list + detail-orders-tab, contact-leads table + card, discounts list + usage-history, blog, staff, categories) + contact-leads client layout (clamp only)
 
 **Key addition — useTablePageClamp hook**:
 ```ts
-useTablePageClamp(page, total, rowsPerPage, onPageChange, enabled)
+useTablePageClamp(page, total, limit, onPageChange, enabled)
 ```
-Wired into 6 delete-capable callers. Triggers `onPageChange(clamped)` if `page >= Math.ceil(total / rowsPerPage)`. Protects against stranded state.
+Wired into 6 delete-capable callers. Triggers `onPageChange(lastValidPage)` when `page > Math.max(1, Math.ceil(total / limit))`. Protects against stranded state.
 
 **Guard logic**: `total > 10` (rejected `|| totalPages <= 1`; conflicts with AC at limit=25 & total=20).
 
-**ChevronDown icon**: Radix `<ChevronDown />` in rows select wrapper, `pointer-events-none`, `--dash-text-muted` token. Relative positioned, no layout impact.
+**ChevronDown icon**: lucide-react `<ChevronDown />` in rows select wrapper, `pointer-events-none`, `--dash-text-muted` token. Relative positioned, no layout impact.
 
 **Rows options unchanged**: [10,25,50,100] per GH-1290 PM decision.
 
@@ -58,8 +58,3 @@ Pagination component logic (hide at ≤10) was correct in isolation. But we didn
 4. Note for future: consider exposing threshold as configurable if more tables adopt different limits
 
 **Decisions deferred**: Orders skipped clamp (no row deletion UI). Studio bespoke pagers out of scope. Threshold stays at 10 (revisit if support requests spike).
-
----
-
-**Status:** DONE  
-**Summary:** Implemented pagination hide for ≤10 rows with 11 gated callers; code review found and helped fix page-state regression via useTablePageClamp hook; tests + typecheck clean; awaiting user visual check.
