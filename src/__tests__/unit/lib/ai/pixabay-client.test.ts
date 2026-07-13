@@ -344,6 +344,20 @@ describe('searchPhotos', () => {
         await expect(searchPhotos('nature', 5)).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
+
+    it('[TC-F38-PIXABAY-12] TimeoutError from AbortSignal.timeout → TIMEOUT immediately, no retry', async () => {
+        // Arrange — AbortSignal.timeout() rejects fetch with a DOMException
+        // named 'TimeoutError' (NOT 'AbortError' — that is manual abort()).
+        // Pre-fix this fell into the generic retry branch and surfaced as
+        // SERVER_ERROR only after a second 15s hang.
+        const timeoutErr = new Error('The operation was aborted due to timeout')
+        timeoutErr.name = 'TimeoutError'
+        vi.mocked(fetch).mockRejectedValue(timeoutErr)
+
+        // Act + Assert — fail-fast: single attempt, classified TIMEOUT
+        await expect(searchPhotos('nature', 5)).rejects.toMatchObject({ code: 'TIMEOUT' })
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    })
 })
 
 // ── downloadPhotoBuffer ───────────────────────────────────────────────────────

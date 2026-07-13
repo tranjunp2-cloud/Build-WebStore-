@@ -219,7 +219,12 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
             throw new PixabayError('SERVER_ERROR', res.status, false)
         } catch (err) {
             if (err instanceof PixabayError) throw err
-            if (err instanceof Error && err.name === 'AbortError') {
+            // AbortSignal.timeout() throws DOMException named 'TimeoutError',
+            // NOT 'AbortError' (that's manual controller.abort()). Matching
+            // both keeps the fail-fast intent: a 15s hang throws TIMEOUT
+            // immediately instead of retrying into a 30s+ stall classified
+            // as SERVER_ERROR.
+            if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
                 throw new PixabayError('TIMEOUT', 0, true, err.message)
             }
             if (attempt === 0) {

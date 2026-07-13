@@ -13,7 +13,7 @@
  * Depends on: Phase 02 theme-moods (mood.photographyFilter + mood.imageryKeywords)
  */
 
-import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, type PixabayPhoto } from './pixabay-client'
+import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, PixabayError, type PixabayPhoto } from './pixabay-client'
 import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 
@@ -225,10 +225,18 @@ async function searchBucket(
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
+  // 429 short-circuit: once Pixabay rate-limits, every further tier is a
+  // guaranteed-fail request that deepens the storm (each searchPhotos already
+  // retries 429 once internally with ~2s sleep). Return thin/empty — the
+  // caller marks underfill and downstream paths have their own guards.
+  const isRateLimited = (err: unknown): boolean =>
+    err instanceof PixabayError && err.code === 'RATE_LIMITED'
+
   try {
     photos = (await searchPhotos(query, size, { orientation, width, category })) ?? []
   } catch (err) {
     console.warn(`[image-pool] ${orientation} search failed:`, err)
+    if (isRateLimited(err)) return { photos, usedFallback: true }
   }
   if (isVietnamese) {
     const gated = photos.filter((p) => photoMatchesQuery(p.alt, query))
@@ -253,6 +261,7 @@ async function searchBucket(
       photos = photos.concat(extra)
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
+      if (isRateLimited(err)) return { photos, usedFallback: true }
     }
   }
   if (photos.length >= minCount) return { photos, usedFallback }

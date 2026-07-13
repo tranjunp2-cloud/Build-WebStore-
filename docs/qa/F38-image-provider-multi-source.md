@@ -33,6 +33,7 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-PIXABAY-09** | `[Quality]` | squarish prefer near-square | over-fetch (per_page=count×3), ảnh gần vuông (0.8≤ar≤1.25) lên đầu, fill phần thiếu từ ảnh còn lại | [x] |
 | **TC-F38-PIXABAY-10** | `[Error]` | 401 → `UNAUTHORIZED` | non-retryable, fail ngay, 1 fetch | [x] |
 | **TC-F38-PIXABAY-11** | `[Error]` | buffer > maxBytes → `TOO_LARGE` | download vượt cap → `PixabayError` code `TOO_LARGE` | [x] |
+| **TC-F38-PIXABAY-12** | `[Error]` | `TimeoutError` (AbortSignal.timeout) → `TIMEOUT` fail-fast | `AbortSignal.timeout()` throw DOMException tên `TimeoutError` (không phải `AbortError`) → phân loại `TIMEOUT` ngay, 1 fetch, không retry thành 30s+ SERVER_ERROR | [ ] |
 
 ## 4. Regression — call site (đã có test, cập nhật mock sang Pixabay)
 
@@ -74,6 +75,7 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-RAW-22** | `[Positive]` | `hydrateUrlUploadsToMedia`/`cleanupNonNumericImageFields` still process logo-cloud spec | logo-cloud logos[].logo.url (Media object) → hydrate ingest as real Media; empty {url:''} → cleanup strips | [ ] |
 | **TC-F38-RAW-23** | `[Positive]` | Pool tier-3 fallback cho query non-VN underfill → EN category base keyword | `buildImagePool`: query Malay ("pen dan pensel...") primary + relaxed vẫn dưới `minCount` (0 hit HOẶC partial — tier-3 top-up cả 2 case, giống hành vi VN tier sẵn có) → tier-3 query = `CATEGORY_BASE_KEYWORDS[category][0]` (vd ecommerce → "product photography"); pool không rỗng, `underfill=true` | [ ] |
 | **TC-F38-RAW-24** | `[Positive]` | Legacy per-block tier-3 fallback cho query non-VN zero-hit → EN category base keyword | `getMediaForBlock`: keywords Malay zero-hit cả primary + broaden → tier-3 search EN category base keyword, trả media IDs thay vì rỗng (rỗng = URL GPT bịa sống sót qua ingest) | [ ] |
+| **TC-F38-RAW-25** | `[Negative]` | `RATE_LIMITED` short-circuit fallback ladder của pool | `searchBucket`: tier-1 hoặc tier-2 throw `RATE_LIMITED` → dừng ladder ngay (không gọi tier kế), `underfill=true`; lỗi non-429 (SERVER_ERROR) vẫn đi tiếp ladder | [ ] |
 
 ## 5. Kiểm thử thủ công (staging)
 
