@@ -139,11 +139,14 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
             email_tracking: false,
             whatsapp_tracking: false,
             awb_branding: false,
+            // COD is a feature.cod OBJECT per EP 2026-06 spec (cod_amount + cod_currency,
+            // both required) — NOT a top-level cod_amount, which EP silently ignores,
+            // creating a non-COD shipment where the courier collects nothing. Omit the
+            // whole object for prepaid orders.
+            ...(codAmountRm != null && codAmountRm > 0
+                ? { cod: { cod_amount: codAmountRm, cod_currency: 'MYR' } }
+                : {}),
         },
-    }
-
-    if (codAmountRm != null && codAmountRm > 0) {
-        params.cod_amount = codAmountRm
     }
 
     return params

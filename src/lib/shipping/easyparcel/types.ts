@@ -137,8 +137,11 @@ export interface EpSubmitOrderParams {
         email_tracking?: boolean
         whatsapp_tracking?: boolean
         awb_branding?: boolean
+        // COD lives INSIDE feature as an object (EP 2026-06 submit_orders spec), NOT as a
+        // top-level cod_amount — EP ignores the top-level field, so the shipment would be
+        // created without COD and the courier would collect nothing. Both sub-fields required.
+        cod?: { cod_amount: number; cod_currency: string }
     }
-    cod_amount?: number   // RM float, omit for non-COD
 }
 
 // Live shape (verified against 2026-03 doc): data is an array of orders, each with a shipments[].
