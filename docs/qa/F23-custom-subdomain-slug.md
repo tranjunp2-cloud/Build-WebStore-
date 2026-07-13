@@ -968,6 +968,21 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-061: Subdomain edit — Cancel giữa IME composition không làm kẹt checker ở session sau
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596 — comment levietducprime)
+- **Scenario Reference:** — (flag `isComposingSlug` kẹt true khi input unmount trước compositionend)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", đang composition
+- **Steps:**
+  1. `compositionStart` → `change` buffer → bấm **Cancel** (input unmount, compositionend không bao giờ bắn)
+  2. Bấm "Change subdomain" vào lại edit mode → gõ slug hợp lệ
+- **Expected:** Flag composition được reset khi vào edit mode → check chạy bình thường → Save enable; không fix thì effect debounce early-return vĩnh viễn, Save không bao giờ sáng
+- **Test Data:** `"shopcomposing"` (đang compose) → Cancel → `"shop-fresh"` → available
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1138,7 +1153,8 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 60 Test Cases — 18 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 61 Test Cases — 19 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
 *TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
 *TC-F23-056..057 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile + message lỗi treo khi gõ về slug hiện tại).*
 *TC-F23-058..060 bổ sung từ adversarial review PR #1596 (seq guard chống response về muộn, Save disable ngay khi gõ tiếp, IME composition không bắn check).*
+*TC-F23-061 bổ sung từ review comment PR #1596 (reset flag composition khi vào edit mode — chống kẹt checker sau Cancel giữa composition).*

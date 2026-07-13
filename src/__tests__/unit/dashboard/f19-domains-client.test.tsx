@@ -508,4 +508,23 @@ describe('F23 subdomain slug input (#1459)', () => {
             { timeout: 2000 }
         );
     });
+
+    it('[TC-F23-061] Cancel mid-composition does not wedge the checker on the next edit session', async () => {
+        const input = enterEditMode(); // beforeEach stub resolves { available: true }
+
+        // Cancel while composing: the input unmounts before compositionend can fire,
+        // so nothing on the (dead) element ever clears the composing flag.
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopcomposing' } });
+        fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+        // Re-enter edit mode — the flag must have been reset, or the debounce
+        // effect skips every check and Save can never enable again.
+        fireEvent.click(screen.getByRole('button', { name: /Change subdomain/i }));
+        const input2 = screen.getByRole('textbox') as HTMLInputElement;
+        fireEvent.change(input2, { target: { value: 'shop-fresh' } });
+
+        const save = screen.getByRole('button', { name: /^save$/i });
+        await waitFor(() => expect(save).not.toBeDisabled(), { timeout: 2000 });
+    });
 });

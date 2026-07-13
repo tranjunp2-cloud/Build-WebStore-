@@ -690,7 +690,12 @@ export function DomainsClient({
                             {!isEditingSlug ? (
                                 <Button
                                     type="button"
-                                    onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                                    onClick={() => {
+                                        setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle');
+                                        // Cancel giữa IME composition unmount input trước khi compositionend kịp bắn
+                                        // → flag kẹt true và effect debounce bỏ qua mọi check ở session sau. Reset ở đây.
+                                        setIsComposingSlug(false); isComposingRef.current = false;
+                                    }}
                                     variant="dashSecondary"
                                     size="dash"
                                     className="w-full sm:w-auto justify-center"
