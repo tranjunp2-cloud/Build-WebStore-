@@ -24,7 +24,6 @@ export function DiscountsClientLayout() {
 
     const [discounts, setDiscounts] = useState<Discount[]>([])
     const [total, setTotal] = useState(0)
-    const [totalPages, setTotalPages] = useState(1)
     // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
     const { page, setPage, limit, setLimit } = useUrlPagination(10)
     const [search, setSearch] = useState('')
@@ -69,7 +68,6 @@ export function DiscountsClientLayout() {
             // API returns Payload pagination shape: { docs, totalDocs, totalPages, page }
             setDiscounts(json.docs ?? [])
             setTotal(json.totalDocs ?? 0)
-            setTotalPages(json.totalPages ?? 1)
             setIsFirstLoad(false)
         } catch (err) {
             if (gen !== genRef.current) return
@@ -143,17 +141,19 @@ export function DiscountsClientLayout() {
                 credentials: 'include',
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            // Decrement AFTER the server commit so the GH-1579 page clamp (and the
-            // refetch it triggers) can never race the in-flight DELETE.
-            setTotal(n => Math.max(0, n - 1))
             toast.success(ti(d.deleteSuccess, { code: discount.code }))
+            // Refetch AFTER the server commit to reconcile records + total in one shot:
+            // deleting across the 11→10 boundary must pull in the row that lives on the
+            // next server page (a bare total decrement would strand it invisibly), and
+            // the page clamp handles any page overflow after the refetch (GH-1579).
+            load()
         } catch (err) {
             console.error('[Discounts delete]', err)
             // Restore on error
             setDiscounts(prev => [discount, ...prev])
             toast.error(ti(d.deleteFailed, { code: discount.code }))
         }
-    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti])
+    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti, load])
 
     const hasFilters = !!(search || statusFilter !== 'all' || typeFilter !== 'all')
     const isEmpty = !loading && discounts.length === 0

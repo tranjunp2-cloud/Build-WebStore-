@@ -85,7 +85,6 @@ export function StaffDirectoryClient({
         return filtered;
     }, [staff, debouncedSearch]);
 
-    const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
     const currentStaffPage = filteredStaff.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
     // GH-1579: snap back when removals/search strand currentPage past the last page
     useTablePageClamp(currentPage, filteredStaff.length, itemsPerPage, setCurrentPage);

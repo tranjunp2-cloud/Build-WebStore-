@@ -57,15 +57,16 @@ export function CustomersClientLayout() {
         setPendingDelete(null)
         try {
             await deleteCustomerAction(record.rawId, record.source)
-            // Mutate state only AFTER the server commit — the GH-1579 page clamp can
-            // trigger a refetch, which must never race the in-flight DELETE (ghost row).
-            setRecords(prev => prev.filter(r => r.id !== record.id))
-            setTotal(n => Math.max(0, n - 1))
             if (selected?.id === record.id) setSelected(null)
             toast.success(c.deleteSuccess)
         } catch {
-            load()
             toast.error(c.deleteFailed)
+        } finally {
+            // Refetch AFTER the server settles to reconcile records + total in one shot:
+            // a manual decrement strands the row on the next server page when a delete
+            // crosses the 11→10 hide boundary, and refetching post-commit means the
+            // GH-1579 clamp can never race an in-flight DELETE (ghost row).
+            load()
         }
     }
 

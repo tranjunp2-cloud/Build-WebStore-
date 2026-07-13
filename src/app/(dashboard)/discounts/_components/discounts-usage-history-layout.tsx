@@ -15,7 +15,7 @@ import {
     TableHead,
     TableCell,
 } from '@/components/ui/table'
-import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { TableSearch } from '@/components/ui/table-search'
 
 interface UsageRow {
@@ -48,10 +48,14 @@ export function DiscountsUsageHistoryLayout() {
     const [loading, setLoading] = useState(true)
     // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
     const { page, setPage, limit, setLimit } = useUrlPagination(10)
-    const [totalPages, setTotalPages] = useState(1)
     const [totalDocs, setTotalDocs] = useState(0)
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
+
+    // GH-1579: a stale ?page=N deep link with total ≤10 hides the pager entirely —
+    // snap back to a valid page once data lands (disabled while loading so the
+    // URL-restored page isn't clobbered before the first fetch resolves).
+    useTablePageClamp(page, totalDocs, limit, setPage, !loading)
 
     // Debounce the input so each keystroke doesn't hit the API; reset to page 1 on a new query.
     // Value-compare guard: setPage(1) fires only when the applied query actually CHANGES, so the
@@ -85,7 +89,6 @@ export function DiscountsUsageHistoryLayout() {
                 if (gen !== genRef.current) return
                 if (json.success) {
                     setRows(json.docs ?? [])
-                    setTotalPages(json.totalPages ?? 1)
                     setTotalDocs(json.totalDocs ?? 0)
                 }
             })
