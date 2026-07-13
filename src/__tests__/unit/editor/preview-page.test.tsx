@@ -232,8 +232,8 @@ describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
     })
 
     it('TC-F01-GH770-04: skips PreviewScripts when builder=1', async () => {
-        // Arrange
-        const mockSearchParams = Promise.resolve({ builder: '1' })
+        // Arrange — pageId present so the page fully renders its scripts branch
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1', builder: '1' })
         mockedGetCurrentUser.mockResolvedValue({
             id: 'user-1',
             tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
@@ -250,8 +250,10 @@ describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
         const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
         render(Component as React.ReactElement)
 
-        // Assert — PreviewScripts should NOT be rendered when builder=1
+        // Assert — PreviewScripts should NOT be rendered when builder=1;
+        // the lightweight readonly handler takes its place (GH-1461)
         expect(screen.queryByTestId('preview-scripts')).not.toBeInTheDocument()
+        expect(screen.getByTestId('builder-link-scripts')).toBeInTheDocument()
     })
 
     it('TC-F01-GH770-05: renders BuilderLinkScripts (not PreviewScripts) when neither builder nor editor param present (GH-1461)', async () => {
