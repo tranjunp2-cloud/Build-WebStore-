@@ -69,12 +69,14 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            {/* .dash-sidebar-mini: gates --dash-content-pl (globals.css) — left edge of the CONTENT
+            {/* .dash-shell-root scopes --dash-content-pl (globals.css) — left edge of the CONTENT
                 column (sidebar width + p-8 gutter) so fixed bottom save-bars align with the cards
                 at lg+ (GH-1592). Value lives in CSS (responsive 246/250/64px + 2rem), not inline,
-                because an inline style can't vary per breakpoint. */}
+                because an inline style can't vary per breakpoint. Scoped to this root marker (not
+                bare .dash-shell): modals/popovers self-apply dash-shell for theming and would
+                re-declare the var without the .dash-sidebar-mini gate. */}
             <div
-                className={cn('dash-shell min-h-screen bg-dash-bg flex flex-col', collapsed && 'dash-sidebar-mini')}
+                className={cn('dash-shell dash-shell-root min-h-screen bg-dash-bg flex flex-col', collapsed && 'dash-sidebar-mini')}
             >
                 <TenantAccessWatcher />
                 <TopHeader
