@@ -1949,6 +1949,7 @@
                 "parseError": "Processing error",
                 "aiQuotaExceeded": "AI system is overloaded or out of quota. Please try again later.",
                 "aiTimeout": "AI system responses are too slow (Timeout). Please try again with shorter text.",
+                "rateLimitExceeded": "You've used all your AI generation attempts this hour. Try again in {minutes} min.",
                 "previewTitle": "Preview Grid (AI Processed)",
                 "previewSubtitle": "Empty images will use a default carton icon when saved",
                 "colImage": "Image",

@@ -1,0 +1,146 @@
+// @vitest-environment jsdom
+// GH-1599: BulkCreateModal handleParse error-toast behavior on non-ok fetch responses.
+// Covers: rate-limit countdown toast (new), aiQuotaExceeded regression after the
+// JSON.stringify(data) throw refactor (previously matched on raw err.message).
+
+import React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, waitFor } from '@testing-library/react'
+import enLocale from '@/i18n/locales/en.json'
+
+// ── Mocks (must be top-level, before imports) ─────────────────────────────────
+
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ refresh: vi.fn() }),
+}))
+
+const mockToastError = vi.fn()
+vi.mock('sonner', () => ({
+    toast: {
+        success: vi.fn(),
+        error: (...args: unknown[]) => mockToastError(...args),
+    },
+}))
+
+vi.mock('@/app/(dashboard)/products/actions', () => ({
+    saveProductAction: vi.fn(),
+    getProductsAction: vi.fn(),
+    getProductAction: vi.fn(),
+    updateProductFieldAction: vi.fn(),
+    deleteProductAction: vi.fn(),
+}))
+
+// Real locale strings (not a hand-copied duplicate) so the test proves the actual
+// i18n key resolves and its {minutes} placeholder is interpolated correctly.
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({ t: enLocale, locale: 'en' }),
+}))
+
+vi.mock('@/app/(dashboard)/actions/media', () => ({
+    getOrCreateCrateCartonIdAction: () => Promise.resolve(null),
+}))
+
+vi.mock('@/app/(dashboard)/products/categories/actions', () => ({
+    getCategoriesAction: () => Promise.resolve([]),
+    saveCategoryAction: vi.fn(),
+}))
+
+vi.mock('@radix-ui/react-dialog', () => ({
+    Root: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Overlay: () => null,
+    Content: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Title: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Description: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Close: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+import { BulkCreateModal } from '../../../components/dashboard/BulkCreateModal'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function mockParseApiError(status: number, body: Record<string, unknown>) {
+    global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status,
+        json: async () => body,
+    }) as unknown as typeof fetch
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('429 rateLimitExceeded → toast shows the real i18n string with computed minutes-until-reset', async () => {
+        // Arrange: resetAt 5 minutes from now
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() + 5 * 60000 })
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        // Assert: toast text matches the real en.json template with {minutes} replaced by 5
+        const expected = enLocale.dashboard.products.bulkCreate.rateLimitExceeded.replace('{minutes}', '5')
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(expected)
+        })
+    })
+
+    it('429 rateLimitExceeded with an already-past resetAt clamps to a minimum of 1 minute (no "0 min"/negative)', async () => {
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() - 60000 })
+
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        const expected = enLocale.dashboard.products.bulkCreate.rateLimitExceeded.replace('{minutes}', '1')
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(expected)
+        })
+    })
+
+    it('429 rateLimitExceeded with a malformed/non-numeric resetAt clamps to 1 minute instead of showing "NaN min"', async () => {
+        // Code-review adversarial finding: Math.max(1, NaN) is NaN (not 1) — a non-numeric
+        // resetAt must be coerced BEFORE the minutes arithmetic, matching the coerceFiniteNumber
+        // guard already used elsewhere in this file for untrusted numeric input.
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: 'not-a-number' })
+
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        const expected = enLocale.dashboard.products.bulkCreate.rateLimitExceeded.replace('{minutes}', '1')
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(expected)
+        })
+        expect(mockToastError).not.toHaveBeenCalledWith(expect.stringContaining('NaN'))
+    })
+
+    it('500 aiQuotaExceeded → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
+        mockParseApiError(500, { error: 'aiQuotaExceeded' })
+
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(enLocale.dashboard.products.bulkCreate.aiQuotaExceeded)
+        })
+    })
+
+    it('500 aiTimeout → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
+        mockParseApiError(500, { error: 'aiTimeout' })
+
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(enLocale.dashboard.products.bulkCreate.aiTimeout)
+        })
+    })
+
+    it('unrecognized error code → falls back to the generic parseError toast', async () => {
+        mockParseApiError(500, { error: 'somethingUnexpected' })
+
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
+
+        await waitFor(() => {
+            expect(mockToastError).toHaveBeenCalledWith(enLocale.dashboard.products.bulkCreate.parseError)
+        })
+    })
+})
