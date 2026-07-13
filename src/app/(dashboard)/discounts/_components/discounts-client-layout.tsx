@@ -80,6 +80,13 @@ export function DiscountsClientLayout() {
 
     useEffect(() => { load() }, [load])
 
+    // Latest-load ref: post-delete reconciliation must fetch with the CURRENT
+    // page/filters, not the ones captured when the user clicked confirm — the
+    // stale closure could resolve after a pager click and recommit an empty
+    // page as the newest gen (GH-1579 re-review M1).
+    const loadRef = useRef(load)
+    loadRef.current = load
+
     // Stable handlers — reset page on filter/sort change
     const handleSearch       = useCallback((q: string)              => { setSearch(q);        setPage(1) }, [])
     const handleStatusFilter = useCallback((s: StatusFilter)        => { setStatusFilter(s);  setPage(1) }, [])
@@ -133,8 +140,8 @@ export function DiscountsClientLayout() {
         const discount = deleteTarget
         if (!discount) return
         setDeleteTarget(null)
-        // Optimistic remove
-        setDiscounts(prev => prev.filter(dc => dc.id !== discount.id))
+        // No optimistic removal — a refetch follows anyway (contact-leads style), and
+        // emptying the visible page mid-flight flashed the onboarding empty state.
         try {
             const res = await fetch(`/api/v1/discounts/${discount.id}`, {
                 method: 'DELETE',
@@ -146,14 +153,12 @@ export function DiscountsClientLayout() {
             // deleting across the 11→10 boundary must pull in the row that lives on the
             // next server page (a bare total decrement would strand it invisibly), and
             // the page clamp handles any page overflow after the refetch (GH-1579).
-            load()
+            loadRef.current()
         } catch (err) {
             console.error('[Discounts delete]', err)
-            // Restore on error
-            setDiscounts(prev => [discount, ...prev])
             toast.error(ti(d.deleteFailed, { code: discount.code }))
         }
-    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti, load])
+    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti])
 
     const hasFilters = !!(search || statusFilter !== 'all' || typeFilter !== 'all')
     const isEmpty = !loading && discounts.length === 0
