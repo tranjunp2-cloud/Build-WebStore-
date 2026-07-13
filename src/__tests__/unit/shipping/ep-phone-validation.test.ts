@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { hasUsablePhone, splitPhone } from '@/lib/shipping/easyparcel/normalize'
+import { hasUsablePhone, splitPhone } from '@/lib/shipping/easyparcel/phone'
 import { isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
 import { buildSubmitParams } from '@/app/api/orders/[id]/create-label/build-submit-params'
 
