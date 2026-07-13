@@ -906,6 +906,21 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-057: Subdomain edit — gõ về đúng slug hiện tại thì message lỗi cũ tự reset
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. `change` với giá trị `"ab"` → chờ debounce → message `"At least 3 characters"` xuất hiện
+  2. `change` về đúng slug hiện tại (`"mywebstore"`)
+- **Expected:** Status reset về `idle` — message lỗi cũ biến mất (trước đây effect early-return khi `slugInput === currentSlug` mà không reset status → message treo)
+- **Test Data:** `"ab"` → invalid → `"mywebstore"` → idle
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1076,6 +1091,6 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 56 Test Cases — 14 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 57 Test Cases — 15 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
 *TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
-*TC-F23-056 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile).*
+*TC-F23-056..057 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile + message lỗi treo khi gõ về slug hiện tại).*

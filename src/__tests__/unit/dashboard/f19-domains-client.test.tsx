@@ -438,4 +438,18 @@ describe('F23 subdomain slug input (#1459)', () => {
         expect(statusDiv.className).toContain('min-w-0');
         expect(statusDiv.className).not.toContain('ml-2');
     });
+
+    it('[TC-F23-057] reverting to the current slug clears the stale validation message (#1583)', async () => {
+        const input = enterEditMode();
+
+        fireEvent.change(input, { target: { value: 'ab' } });
+        await waitFor(() => screen.getByText('At least 3 characters'));
+
+        // Back to the untouched slug: the debounce effect's early-return branch
+        // must reset status to idle instead of leaving the old error hanging.
+        fireEvent.change(input, { target: { value: 'mywebstore' } });
+        await waitFor(() =>
+            expect(screen.queryByText('At least 3 characters')).not.toBeInTheDocument()
+        );
+    });
 });

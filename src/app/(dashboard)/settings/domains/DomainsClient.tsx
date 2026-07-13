@@ -363,7 +363,14 @@ export function DomainsClient({
     }, [currentSlug]);
 
     useEffect(() => {
-        if (!isEditingSlug || slugInput === currentSlug) return;
+        if (!isEditingSlug) return;
+        if (slugInput === currentSlug) {
+            // GH-1583: gõ về đúng slug hiện tại thì reset về idle — nhánh này không
+            // schedule checkSlugAvailability nên message lỗi cũ sẽ treo nếu không reset.
+            setSlugStatus('idle');
+            setSlugMessage('');
+            return;
+        }
         if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current);
         slugDebounceRef.current = setTimeout(() => checkSlugAvailability(slugInput), 400);
         return () => { if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current); };
