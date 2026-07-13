@@ -131,8 +131,12 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
             country_code: 'MY',
         },
         feature: {
+            // All EP tracking add-ons OFF: ECH sends its own order/tracking emails and
+            // hosts its own tracking page, so EP's paid "Tracking Email" (RM0.05/order,
+            // seen on the payment breakdown) is redundant. Keep contact `email` on
+            // sender/receiver (free) — it does not trigger the paid add-on.
             sms_tracking: false,
-            email_tracking: true,
+            email_tracking: false,
             whatsapp_tracking: false,
             awb_branding: false,
         },

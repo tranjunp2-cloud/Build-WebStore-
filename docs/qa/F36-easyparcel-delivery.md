@@ -425,6 +425,12 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 | **TC-F36.187** | Money | Critical | `phone_number_country_code` = ISO "MY", không phải dialing "60"; + email/company sender/receiver | (a) buildSubmitParams: assert `sender.phone_number_country_code === 'MY'` và `receiver` cũng vậy; JSON không chứa `"phone_number_country_code":"60"`. (b) email/company: có input → `receiver.email=customerEmail`, `sender.email=accountEmail`, `sender.company=accountName`; thiếu input → field undefined (drop khỏi JSON body, không gửi chuỗi rỗng). | (a) khoá country code đúng ISO — unit; (b) email/company map đúng nguồn (order.customerEmail, tenantEp.accountEmail/accountName) và omit sạch khi vắng — unit. `phone_number` giữ nguyên digits-only qua `splitPhone` (khớp EP example "1126760658"). | §3.18e |
 
+### 3.18f Webhook cancel auto-reopen order (live 2026-07-13, EP nay bắn webhook cancel)
+
+> **Xác nhận live 2026-07-13:** EP nay CÓ bắn webhook cho cancel (`shipment.status.update` code 0 + `shipment.tracking.update` `latest_shipment_status_code:0`). Bảng code đối chiếu spec chính thức EP 2026-06 (github easyparcel/OpenAPI `_webhooks.md`): 0=Cancel, 2=To Be Collected, 3=Collected, 4=Delivery In Transit, 5=Delivered, 6=Returned, 7=Schedule In Arrangement, 8=On Hold, 11=Drop Off — `status-map.ts` khớp đủ 9 code. Guard `ondemand.*` đúng (tránh xung đột code 5 Delivered vs ondemand 5 Cancelled-by-Driver).
+
+| **TC-F36.188** | Money | Critical | Webhook cancel (code 0) auto-reopen order về `confirmed` + clear EP fields | (a) Order `ready_to_ship`/`shipped`/`processing`/`paid`/`confirmed` + webhook code 0. (b) Order `completed`/`cancelled` (terminal) + webhook code 0. | (a) `applyTrackingUpdate` set `shippingTrackingStatus='cancelled'` **và** `status='confirmed'` + clear `easyParcelOrderNo/awbNo/trackingNumber/labelUrl/labelUrls/pickupScheduledAt/codStatus` → mở lại CẢ create-label lẫn /cancel (mirror mark-shipment-cancelled thủ công); chạy cho cả webhook lẫn cron (writer chung). (b) KHÔNG reopen — chỉ ghi tracking, `status` giữ nguyên (không hồi sinh đơn đã đóng). create-label khi ship lại re-seed `shippingTrackingStatus='pending_pickup'` nên không bị terminal-guard đóng băng. | §3.18f |
+
 ---
 
 ### 3.19 Additional Edge & Integration
