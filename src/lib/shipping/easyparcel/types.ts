@@ -79,8 +79,10 @@ export interface EpQuotationItem {
     }
     pricing: {
         currency: string
-        total_amount: string   // RM as string, e.g. "12.50"
-        shipment_price: string
+        total_amount: string     // RM string incl. add-on features (e.g. "12.50") — NOT what we
+                                 // charge: submit sends all features OFF, so EP only bills base+tax
+        shipment_price: string   // base shipping price (pre-tax)
+        shipment_tax?: string    // tax on shipment_price; may be absent → treat as 0
     }
     features: Array<{ cod?: EpQuotationCod } & Record<string, unknown>>
 }

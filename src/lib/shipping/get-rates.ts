@@ -91,7 +91,19 @@ export async function getRates(
                     serviceId: q.courier.service_id,
                     courierName: q.courier.courier_name,
                     serviceName: q.courier.service_name,
-                    priceSen: Math.round(parseFloat(q.pricing.total_amount) * 100),
+                    // Charge exactly what EP bills the wallet at submit. Per the submit_orders
+                    // response (docs 2026-06), the wallet debit is:
+                    //   total_paid_amount = shipment_price + shipment_tax + total_features_price
+                    //                     + total_features_tax + byoc_charges + byoc_tax − coupon
+                    // For ECH this reduces to shipment_price + shipment_tax: all EP features are
+                    // submitted OFF (feature.* = false), BYOC couriers are excluded from selection
+                    // (usableRates filter below), and no EP coupon is applied. NOT pricing.total_amount
+                    // — that bundles the quoted add-on features we never submit, over-quoting by the
+                    // feature price (live: 6.22 quote vs 5.62 actually billed). shipment_tax may be
+                    // absent → 0; an unparseable shipment_price → NaN → dropped by the filter below.
+                    priceSen: Math.round(
+                        (parseFloat(q.pricing.shipment_price) + (parseFloat(q.pricing.shipment_tax ?? '') || 0)) * 100,
+                    ),
                     codAvailable: codFeature?.available ?? false,
                     // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
                     codMinSen: rmStringToSen(codFeature?.min_cod_amount),
