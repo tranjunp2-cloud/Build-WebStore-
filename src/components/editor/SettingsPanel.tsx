@@ -489,14 +489,19 @@ function SettingsPanelInner({
     // the merge-then-track sequence lives in exactly one place (DRY).
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
         const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
-        // Saving any OTHER local-business field re-sends the stored openingHours
-        // array unchanged (full-object merge above). A row saved before AC-3's
-        // strict validation could have isClosed=false with missing opens/closes —
-        // re-sending it as-is now fails saveSiteSchema and blocks this unrelated
-        // save. Only sanitize on pass-through; the editor's own patch already
-        // guarantees valid rows (opening-hours-utils' encodeDay filters incomplete
-        // ranges), so an active openingHours edit should still validate strictly.
-        if (merged.openingHours && !patch.openingHours) {
+        // Every save re-sends the full openingHours array (full-object merge
+        // above). A row saved before AC-3's strict validation could have
+        // isClosed=false with missing opens/closes, or no dayOfWeek at all —
+        // re-sending it as-is now fails saveSiteSchema. This also has to run
+        // when patch.openingHours IS set: applyBatchSave only re-encodes the
+        // day(s) the user just edited and passes every OTHER day through
+        // unchanged, so a legacy-invalid row on an untouched day would still
+        // 400 the save. sanitizeLegacyOpeningHours is a no-op for well-formed
+        // rows (encodeDay's output always has dayOfWeek, and open rows always
+        // have both opens+closes), so this never weakens validation for a
+        // genuinely new bad submission — there isn't one, since the UI can't
+        // produce one.
+        if (merged.openingHours) {
             merged.openingHours = sanitizeLegacyOpeningHours(merged.openingHours)
         }
         const result = await onSiteSettingsChange?.({ localBusiness: merged })

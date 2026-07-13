@@ -3,6 +3,28 @@ import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cac
 import { THEME_ENUMS } from '../lib/theme/enums'
 import { MY_STATES } from '../lib/shipping/constants'
 import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '../lib/seo/local-business-constants'
+import { sanitizeLegacyOpeningHours } from '../components/editor/local-business/opening-hours-utils'
+import type { CollectionBeforeValidateHook } from 'payload'
+import type { OpeningHourRow } from '../components/editor/local-business/types'
+
+/** PR #1591 code review (Q2): the custom Editor UI (SettingsPanel.tsx) sanitizes
+ *  legacy-invalid openingHours rows before every save, but a direct Payload
+ *  admin-panel edit bypasses that entirely — a site saved before AC-3's strict
+ *  validation could get permanently stuck (the same class of bug as C1/C2, just
+ *  via the admin panel instead of the custom editor). Centralize the same
+ *  self-heal here so EVERY write path (admin panel, custom editor, any future
+ *  API caller) gets it, not just the one client component. */
+export const sanitizeOpeningHoursOnValidate: CollectionBeforeValidateHook = ({ data }) => {
+    const openingHours = (data?.localBusiness as { openingHours?: OpeningHourRow[] } | undefined)?.openingHours
+    if (!data || !Array.isArray(openingHours)) return data
+    return {
+        ...data,
+        localBusiness: {
+            ...data.localBusiness,
+            openingHours: sanitizeLegacyOpeningHours(openingHours),
+        },
+    }
+}
 
 const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
 const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
@@ -14,6 +36,7 @@ export const Sites: CollectionConfig = {
         description: 'Each tenant can have one or more websites.',
     },
     hooks: {
+        beforeValidate: [sanitizeOpeningHoursOnValidate],
         // Bust the storefront data cache on any site write (admin edits included).
         afterChange: [revalidateSiteAfterChange],
         afterDelete: [revalidateSiteAfterDelete],

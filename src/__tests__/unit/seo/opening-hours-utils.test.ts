@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tests for F37 US-01 opening-hours Google-style redesign (Phase 05)
- * TC-IDs: TC-F37-02-14 to TC-F37-02-20, TC-F37-02-23 (provisional — docs/qa/F37-local-seo.md backfills official IDs)
+ * TC-IDs: TC-F37-02-14 to TC-F37-02-20, TC-F37-02-23, TC-F37-02-26, TC-F37-02-27 — registered in docs/qa/F37-local-seo.md §3.12
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -190,10 +190,9 @@ describe('[TC-F37-02-23] isRangeOrderValid — closes must be strictly after ope
     })
 })
 
-// ── sanitizeLegacyOpeningHours — normalizes pre-AC-3 invalid rows to closed ──
-// (no F37 QA TC-ID yet — added for GH-02 legacy-data fix, backfills into docs/qa/F37-local-seo.md)
+// ── TC-F37-02-26: sanitizeLegacyOpeningHours — normalizes pre-AC-3 invalid rows to closed ──
 
-describe('sanitizeLegacyOpeningHours — normalizes rows saved before strict opens/closes validation', () => {
+describe('[TC-F37-02-26] sanitizeLegacyOpeningHours — normalizes rows saved before strict opens/closes validation', () => {
     it('normalizes a not-closed row missing both opens and closes to isClosed:true', () => {
         const result = sanitizeLegacyOpeningHours([{ dayOfWeek: 'Mo' }])
         expect(result).toEqual([{ dayOfWeek: 'Mo', isClosed: true, opens: undefined, closes: undefined }])
@@ -222,5 +221,28 @@ describe('sanitizeLegacyOpeningHours — normalizes rows saved before strict ope
         const result = sanitizeLegacyOpeningHours(rows)
         expect(result[0]).toEqual(rows[0])
         expect(result[1]).toMatchObject({ isClosed: true, opens: undefined, closes: undefined })
+    })
+})
+
+// ── TC-F37-02-27: sanitizeLegacyOpeningHours — drops orphan rows with no dayOfWeek ──
+// PR #1591 code review C2: applyBatchSave intentionally KEEPS a row with no
+// dayOfWeek (TC-F37-02-20, unchanged/still correct for LOCAL list edits), but
+// such a row is never matched by groupRowsByDay, so it's invisible in the UI
+// and the user can never fix or remove it — it would silently accumulate
+// toward the 21-row cap forever if resent to the server unchanged.
+
+describe('[TC-F37-02-27] sanitizeLegacyOpeningHours — drops rows with no dayOfWeek (invisible/unfixable in UI)', () => {
+    it('drops a row with no dayOfWeek even if opens/closes/isClosed are otherwise valid', () => {
+        const rows: OpeningHourRow[] = [{ opens: '09:00', closes: '18:00', isClosed: false }]
+        expect(sanitizeLegacyOpeningHours(rows)).toEqual([])
+    })
+
+    it('keeps valid rows while dropping only the dayOfWeek-less orphan in a mixed array', () => {
+        const rows: OpeningHourRow[] = [
+            { dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false },
+            { opens: '10:00', closes: '12:00', isClosed: false },
+        ]
+        const result = sanitizeLegacyOpeningHours(rows)
+        expect(result).toEqual([rows[0]])
     })
 })

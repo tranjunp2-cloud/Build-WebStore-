@@ -83,19 +83,27 @@ export function defaultWeek(): OpeningHourRow[] {
     )
 }
 
-/** Normalizes rows saved before AC-3 strict validation (isClosed false/omitted
- *  but opens/closes missing — possible under the old buggy `.refine()` OR-chain).
- *  Re-sending such a row unchanged now fails saveSiteSchema's superRefine and
- *  blocks saving ANY other local-business field, since the whole openingHours
- *  array round-trips on every save. Normalizing to closed matches how the row
+/** Normalizes rows saved before AC-3 strict validation. Two garbage shapes:
+ *  (1) isClosed false/omitted but opens/closes missing (old buggy `.refine()`
+ *  OR-chain let these persist) — normalized to closed, matching how the row
  *  already renders (describeDay/rangesFromDay filter it out) and how
- *  local-seo-score already scores it (never counted as open). */
+ *  local-seo-score already scores it (never counted as open).
+ *  (2) rows with no dayOfWeek at all — groupRowsByDay never matches them to
+ *  any day, so they're invisible in the UI and the user can never fix or
+ *  remove them; dropped outright rather than normalized.
+ *  Call unconditionally on every save (no-op for encodeDay's output — always
+ *  has dayOfWeek, and an open row always has both opens+closes) so a legacy
+ *  row on an UNTOUCHED day doesn't 400 an edit to a different day (applyBatchSave
+ *  passes untouched days through as-is) or block an edit to an unrelated
+ *  local-business field. */
 export function sanitizeLegacyOpeningHours(rows: OpeningHourRow[]): OpeningHourRow[] {
-    return rows.map(r =>
-        (!r.isClosed && (!r.opens || !r.closes))
-            ? { ...r, isClosed: true, opens: undefined, closes: undefined }
-            : r
-    )
+    return rows
+        .filter(r => r.dayOfWeek)
+        .map(r =>
+            (!r.isClosed && (!r.opens || !r.closes))
+                ? { ...r, isClosed: true, opens: undefined, closes: undefined }
+                : r
+        )
 }
 
 /** Display strings for one day's rows: one line per time range (split-shift =
