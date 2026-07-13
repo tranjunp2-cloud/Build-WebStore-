@@ -1,6 +1,6 @@
 import 'server-only'
 import { quotations } from '@/lib/shipping/easyparcel/client'
-import { mapSubdivisionCode, aggregateWeightKg } from '@/lib/shipping/easyparcel/normalize'
+import { mapSubdivisionCode, aggregateWeightKg, rmStringToSen } from '@/lib/shipping/easyparcel/normalize'
 import type { EpQuotationItem } from '@/lib/shipping/easyparcel/types'
 
 export type CollectionMethod = 'pickup' | 'dropoff'
@@ -91,7 +91,14 @@ export async function resolveServiceForMethod(args: {
             q.courier.courier_id === stored.courier.courier_id &&
             q.courier.service_id !== args.serviceId &&
             supportsMethod(q, args.method))
-        .map((q) => ({ q, priceRm: parseFloat(q.pricing.total_amount) }))
+        // Rank on shipment_price + shipment_tax — the same basis checkout charges and EP
+        // actually bills (NOT total_amount, which bundles never-submitted features). Prefix-
+        // tolerant via rmStringToSen (→ sen); unparseable base → NaN → sorts last / dropped.
+        .map((q) => {
+            const baseSen = rmStringToSen(q.pricing.shipment_price)
+            const priceRm = baseSen != null ? (baseSen + (rmStringToSen(q.pricing.shipment_tax) ?? 0)) / 100 : NaN
+            return { q, priceRm }
+        })
         .filter((c) => Number.isFinite(c.priceRm))
         .sort((a, b) => a.priceRm - b.priceRm)
 

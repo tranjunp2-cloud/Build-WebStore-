@@ -512,7 +512,7 @@ EP cancel failed: → "Không hủy được vận đơn EasyParcel. Đơn chưa
 | B Checkout | Skeleton 1 row (debounce 300ms) | "Nhập địa chỉ để xem cước" | **Fallback flat-rate F14** (im lặng) + log | 1 dòng "Shipping" trong Order Summary / FREE badge | Postcode `^\d{5}$` (reuse F14) |
 | B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | R1–R3: courier không hỗ trợ / over limit / under minimum → disabled |
 | C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | R1–R5 ineligibility → block + disable; idempotent khi có AWB |
-| C COD label | COD badge + codAmount prefill | — | R1–R5 ineligibility (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
+| C COD label | COD badge + codAmount prefill | — | R1–R5 ineligibility (Alert destructive + disable) | COD badge + fee note trong modal | COD gửi qua `feature.cod = { cod_amount, cod_currency:"MYR" }` (EP 2026-06 — VERIFIED 2026-07-13; KHÔNG phải top-level cod_amount, EP bỏ qua field top-level → shipment không COD) |
 | D Tracking | Timeline skeleton | "Đang chuẩn bị hàng" | "Chưa lấy được trạng thái" | Timeline mốc mới | — |
 | D COD status | — | codStatus badge ẩn (non-COD) | — | Badge pending/collected/settled | Merchant update thủ công; no API auto-transition |
 | E Returns | Refund spinner (reuse) | — | API err + Thử lại | Toast refund + restock | Case 1 auto (`RETURNED`); Case 2 cancel tiers theo label gốc |
@@ -629,7 +629,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 |---|---|---|---|
 | Name | `name` | copy as-is | required |
 | Company | `company` | copy as-is | optional |
-| Phone country code | `phone_number_country_code` | hardcode `"60"` | Malaysia country code (digits, not ISO alpha) |
+| Phone country code | `phone_number_country_code` | hardcode `"MY"` | ISO 3166-1 alpha-2 (CORRECTED 2026-07-13: NOT dialing code "60" — EP rejects "60" with "missing a valid country calling code", verified live) |
 | Phone number | `phone_number` | `splitPhone()` → number only | e.g., "122134567" (from "60122134567") |
 | Email | `email` | copy as-is | optional |
 | Address line 1 | `address_1` | `addressLine(order)[0]` | primary address |
@@ -746,7 +746,7 @@ return weight_kg
 
 ### 9.5 Key Gotchas
 
-- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"60"` — country code digits, not ISO alpha) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
+- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"MY"` — ISO 3166-1 alpha-2, NOT dialing code "60"; corrected 2026-07-13 after EP rejected "60" live) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
 - **Postcode param is `postcode`** (same field name on `POST /shipment/quotations` and `POST /shipment/submit_orders`).
 - **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
 - **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.

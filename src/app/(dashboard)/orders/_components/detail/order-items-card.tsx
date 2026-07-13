@@ -13,7 +13,7 @@ import type { OrderDetail } from '../OrderDetailPanel'
 interface ResolvedProduct {
     id?: string | number
     sku?: string | null
-    weight?: number | null          // grams
+    weight?: number | null          // kg (Products.weight canonical unit, confirmed 2026-07-06)
     images?: Array<{
         image?: {
             url?: string | null
@@ -136,12 +136,12 @@ export function OrderItemsCard({ order }: { order: OrderDetail }) {
                         : null
 
                 const sku = product?.sku ?? null
-                const weightGrams = product?.weight ?? 0
+                // Products.weight is already in KG (canonical unit, confirmed 2026-07-06) — show
+                // it directly as kg. Reading it as grams previously showed "0.1 g" for a 0.1 kg item.
+                const weightKg = product?.weight ?? 0
                 const weightDisplay =
-                    anyHasWeight && weightGrams > 0
-                        ? weightGrams >= 1000
-                            ? `${(weightGrams / 1000).toFixed(1)} kg`
-                            : `${weightGrams} g`
+                    anyHasWeight && weightKg > 0
+                        ? `${Number(weightKg.toFixed(2))} kg`
                         : anyHasWeight
                         ? '—'
                         : null

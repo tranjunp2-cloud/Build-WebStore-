@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
+import { Info, Check, ExternalLink, RefreshCw, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -257,9 +257,6 @@ export function CreateLabelFlow({
                 dark bg reads slightly larger than the tinted icon square at equal pixel size */}
             <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={32} />
             {displayName}
-            <span className="preset-tag">
-              <Lock style={{ width: 10, height: 10 }} /> {cl.fromSettings}
-            </span>
           </span>
         </div>
 

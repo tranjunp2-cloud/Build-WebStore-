@@ -29,6 +29,14 @@ export type ApplyTrackingResult = 'updated' | 'unchanged'
 // sync-tracking cron's order query can exclude the same set (single source of truth, DRY).
 export const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
 
+// Order statuses from which an EP shipment cancel (tracking → 'cancelled') should reopen the
+// order back to 'confirmed'. Mirrors the manual "Mark shipment cancelled" flow: once EP cancels
+// the shipment (freight refunded to the merchant's EP wallet — no buyer-payment impact), the
+// order must drop its EP shipment fields so the merchant can create a new label OR cancel the
+// order (both exits are gated on easy_parcel_order_no being NULL). Excludes terminal order
+// states (cancelled/completed/refunded) so a late cancel never resurrects a closed order.
+const REOPEN_ON_CANCEL_FROM = new Set(['ready_to_ship', 'shipped', 'processing', 'paid', 'confirmed'])
+
 /**
  * Map an EP raw status (numeric shipment_status_code or legacy status string) and
  * persist it onto the order.
@@ -109,6 +117,14 @@ export async function applyTrackingUpdate(
         mapped.internal === 'delivered' &&
         (freshOrderStatus === 'shipped' || freshOrderStatus === 'ready_to_ship')
 
+    // EP cancelled the shipment (code 0) — reopen the order to 'confirmed' and drop every EP
+    // shipment field so the merchant can re-ship or cancel the order, mirroring the manual
+    // "Mark shipment cancelled" flow. Now that EP dispatches cancel webhooks (verified live
+    // 2026-07-13), this runs automatically for both the webhook and the sync cron (shared
+    // writer). create-label re-seeds shippingTrackingStatus to 'pending_pickup' on re-ship,
+    // so leaving it 'cancelled' here does not freeze the next shipment's tracking.
+    const reopenOnCancel = mapped.internal === 'cancelled' && REOPEN_ON_CANCEL_FROM.has(freshOrderStatus ?? '')
+
     await payload.update({
         collection: 'orders',
         id: order.id,
@@ -117,6 +133,16 @@ export async function applyTrackingUpdate(
             shippingTrackingLastUpdated: new Date().toISOString(),
             shippingTrackingHistory: [...currentHistory, newEntry],
             ...(autoComplete ? { status: 'completed' } : {}),
+            ...(reopenOnCancel ? {
+                status: 'confirmed',
+                easyParcelOrderNo: null,
+                awbNo: null,
+                trackingNumber: null,
+                labelUrl: null,
+                labelUrls: null,
+                pickupScheduledAt: null,
+                codStatus: null,
+            } : {}),
         } as Record<string, unknown>,
         overrideAccess: true,
     })
