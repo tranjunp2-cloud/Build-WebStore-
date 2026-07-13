@@ -425,11 +425,32 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 | **TC-F36.187** | Money | Critical | `phone_number_country_code` = ISO "MY", không phải dialing "60"; + email/company sender/receiver | (a) buildSubmitParams: assert `sender.phone_number_country_code === 'MY'` và `receiver` cũng vậy; JSON không chứa `"phone_number_country_code":"60"`. (b) email/company: có input → `receiver.email=customerEmail`, `sender.email=accountEmail`, `sender.company=accountName`; thiếu input → field undefined (drop khỏi JSON body, không gửi chuỗi rỗng). | (a) khoá country code đúng ISO — unit; (b) email/company map đúng nguồn (order.customerEmail, tenantEp.accountEmail/accountName) và omit sạch khi vắng — unit. `phone_number` giữ nguyên digits-only qua `splitPhone` (khớp EP example "1126760658"). | §3.18e |
 
+| **TC-F36.189** | Money | Critical | COD gửi qua `feature.cod` object, KHÔNG phải top-level `cod_amount` | buildSubmitParams với `codAmountRm>0`; và prepaid (`undefined`/`0`). | COD order → `feature.cod = { cod_amount, cod_currency:'MYR' }`, top-level `cod_amount` KHÔNG tồn tại. Prepaid → `feature.cod` undefined. EP 2026-06 bỏ qua top-level cod_amount → nếu gửi sai chỗ, shipment tạo ra không COD, courier không thu tiền → merchant mất tiền hàng. Unit khoá cấu trúc. | §3.18e |
+
 ### 3.18f Webhook cancel auto-reopen order (live 2026-07-13, EP nay bắn webhook cancel)
 
 > **Xác nhận live 2026-07-13:** EP nay CÓ bắn webhook cho cancel (`shipment.status.update` code 0 + `shipment.tracking.update` `latest_shipment_status_code:0`). Bảng code đối chiếu spec chính thức EP 2026-06 (github easyparcel/OpenAPI `_webhooks.md`): 0=Cancel, 2=To Be Collected, 3=Collected, 4=Delivery In Transit, 5=Delivered, 6=Returned, 7=Schedule In Arrangement, 8=On Hold, 11=Drop Off — `status-map.ts` khớp đủ 9 code. Guard `ondemand.*` đúng (tránh xung đột code 5 Delivered vs ondemand 5 Cancelled-by-Driver).
 
 | **TC-F36.188** | Money | Critical | Webhook cancel (code 0) auto-reopen order về `confirmed` + clear EP fields | (a) Order `ready_to_ship`/`shipped`/`processing`/`paid`/`confirmed` + webhook code 0. (b) Order `completed`/`cancelled` (terminal) + webhook code 0. | (a) `applyTrackingUpdate` set `shippingTrackingStatus='cancelled'` **và** `status='confirmed'` + clear `easyParcelOrderNo/awbNo/trackingNumber/labelUrl/labelUrls/pickupScheduledAt/codStatus` → mở lại CẢ create-label lẫn /cancel (mirror mark-shipment-cancelled thủ công); chạy cho cả webhook lẫn cron (writer chung). (b) KHÔNG reopen — chỉ ghi tracking, `status` giữ nguyên (không hồi sinh đơn đã đóng). create-label khi ship lại re-seed `shippingTrackingStatus='pending_pickup'` nên không bị terminal-guard đóng băng. | §3.18f |
+| **TC-F36.190** | Func | High | Order detail poll near-real-time (không cần refresh tay) | (manual) Mở màn order detail của đơn `ready_to_ship`/`shipped` (tracking chưa terminal). Trigger webhook (hoặc gọi cron) đổi status/backfill AWB. Chờ ≤20s. | Card fulfillment tự cập nhật (AWB async hiện ra, status đổi) trong ≤20s KHÔNG bấm refresh — client poll `GET /api/orders/[id]/poll` (slim select: updatedAt/status/awbNo/trackingStatus), so `updatedAt` đổi → silent full-fetch (không nháy spinner). Đơn terminal (delivered/cancelled/completed) → poll TỰ DỪNG (0 request). Tab ẩn → không poll. Endpoint access-controlled (merchant chỉ poll đơn của mình → 404/403 nếu khác tenant). | §3.18f |
+
+#### Manual fallback route: `POST /api/orders/[id]/mark-shipment-cancelled`
+
+> **Nút UI đã gỡ (2026-07-13)** — webhook auto-reopen (TC-188) lo case thường. Nhưng **route API vẫn còn** làm fallback khẩn cấp cho trường hợp hiếm: EP KHÔNG bắn webhook cho một cancel nào đó (từng xảy ra 2026-07-10 với cancel khởi tạo từ merchant dashboard) → đơn kẹt ở "Label created" và không có webhook để tự mở lại.
+>
+> **Khi nào cần:** đơn hiển thị đã tạo label nhưng merchant đã hủy shipment trên EP dashboard, và sau vài phút vẫn không thấy order tự về `confirmed` (webhook không đến).
+>
+> **Cách gọi thủ công:**
+> ```bash
+> # Đăng nhập lấy payload-token trước (tenant owner của order), rồi:
+> curl -X POST https://<host>/api/orders/<ORDER_ID>/mark-shipment-cancelled \
+>   -H "Cookie: payload-token=<TOKEN>"
+> ```
+> - **Auth:** `withAuth` + `withFeatureGuard('order_management')` — cần token của tenant sở hữu order.
+> - **Guard:** chỉ chạy khi order đang `ready_to_ship` VÀ có `easy_parcel_order_no` thật (không phải `CLAIM:`). Sai state → 422; không shipment → 422 `NO_EP_SHIPMENT`.
+> - **Hiệu ứng:** giống hệt webhook auto-reopen — CAS set `status='confirmed'` + clear toàn bộ EP fields + `shipping_tracking_status='cancelled'` + append history "cancelled by merchant". Idempotent: gọi lại khi đã clear → 200 `alreadyMarked`.
+> - **An toàn tiền:** chỉ dùng SAU khi đã hủy shipment trên EP dashboard (freight hoàn về ví EP). Gọi khi shipment còn sống → book lại sẽ trừ ví 2 lần.
+> - **Tests:** `src/__tests__/api/orders-mark-shipment-cancelled.test.ts` (TC-F36.159–161) vẫn giữ — route còn sống nên test còn giá trị.
 
 ---
 

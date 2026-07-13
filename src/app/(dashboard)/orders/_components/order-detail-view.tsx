@@ -55,8 +55,10 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     const [loading, setLoading] = useState(true)
     const [notFound, setNotFound] = useState(false)
 
-    const fetchOrder = useCallback(async () => {
-        setLoading(true)
+    // `silent` = poll-triggered refresh: update the card in place without flipping the
+    // full-page loading spinner (avoids a flash every time the background poll re-pulls).
+    const fetchOrder = useCallback(async (opts?: { silent?: boolean }) => {
+        if (!opts?.silent) setLoading(true)
         setNotFound(false)
         try {
             const res = await fetch(`/api/orders/${orderId}?depth=2`)
@@ -65,13 +67,45 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
             const result = await res.json()
             setOrder(result.data || result)
         } catch {
-            toast.error(t.dashboard.orders.toast.loadFailed)
+            if (!opts?.silent) toast.error(t.dashboard.orders.toast.loadFailed)
         } finally {
-            setLoading(false)
+            if (!opts?.silent) setLoading(false)
         }
     }, [orderId, t.dashboard.orders.toast.loadFailed])
 
     useEffect(() => { fetchOrder() }, [fetchOrder])
+
+    // Near-real-time updates from EP webhooks (async AWB, tracking status, cancel
+    // auto-reopen) WITHOUT a manual refresh. Poll the slim /poll cursor every 20s while
+    // the order is in-flight and the tab is visible; only re-pull the full order when
+    // updatedAt actually changes. Self-stops on terminal states (delivered/cancelled/…)
+    // and hidden tabs, so idle/closed orders cost zero requests.
+    const orderUpdatedAt = (order as { updatedAt?: string } | null)?.updatedAt
+    const orderStatus = (order as { status?: string } | null)?.status
+    const orderTracking = (order as { shippingTrackingStatus?: string | null } | null)?.shippingTrackingStatus
+    const isInFlight =
+        !!orderStatus &&
+        ['ready_to_ship', 'shipped'].includes(orderStatus) &&
+        !['delivered', 'cancelled', 'returned_to_sender', 'lost'].includes(orderTracking ?? '')
+
+    useEffect(() => {
+        if (!isInFlight) return
+        let stopped = false
+        const tick = async () => {
+            if (document.visibilityState !== 'visible') return
+            try {
+                const res = await fetch(`/api/orders/${orderId}/poll`)
+                if (!res.ok) return
+                const { data } = await res.json()
+                if (stopped || !data?.updatedAt) return
+                if (data.updatedAt !== orderUpdatedAt) fetchOrder({ silent: true })
+            } catch {
+                // transient network/DB blip — the next tick retries
+            }
+        }
+        const id = setInterval(tick, 20000)
+        return () => { stopped = true; clearInterval(id) }
+    }, [isInFlight, orderId, orderUpdatedAt, fetchOrder])
 
     const handleBack = () => router.push('/orders')
 
