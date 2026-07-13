@@ -124,8 +124,8 @@ export function CustomersDetail({ customer }: Props) {
             {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (
                 <div
-                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
-                    style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
+                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm rounded-[10px]"
+                    style={{ background: 'hsl(var(--warning)/0.08)', border: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
                 >
                     <span>{cd.unsavedBanner}</span>
                     <button
