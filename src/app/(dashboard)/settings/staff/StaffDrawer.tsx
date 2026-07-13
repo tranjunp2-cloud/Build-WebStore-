@@ -65,8 +65,8 @@ export function StaffDrawer({
     if (!isOpen) return null;
 
     const handleToggleFeature = (featureId: string) => {
-        setSelectedFeatures(prev => 
-            prev.includes(featureId) 
+        setSelectedFeatures(prev =>
+            prev.includes(featureId)
                 ? prev.filter(f => f !== featureId)
                 : [...prev, featureId]
         );
@@ -135,7 +135,7 @@ export function StaffDrawer({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
             <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
@@ -156,7 +156,7 @@ export function StaffDrawer({
 
                 {/* Body Content */}
                 <div className="flex flex-col overflow-y-auto max-h-[70vh]">
-                    
+
                     {/* Email Input */}
                     <div className="flex flex-col gap-[8px] px-[24px] pt-[24px]">
                         <Label className="text-[14px] font-medium text-dash-text font-['Inter']">
@@ -192,15 +192,13 @@ export function StaffDrawer({
 
                             {/* Manager Option */}
                             <div
-                                onClick={() => { if(!isRoleDisabled) setRole('admin'); }}
+                                onClick={() => { if (!isRoleDisabled) setRole('admin'); }}
                                 style={role !== 'admin' ? { borderColor: 'var(--dash-border)' } : {}}
-                                className={`flex items-start px-[14px] py-[11px] rounded-lg border border-solid transition-all ${
-                                    isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
-                                } ${
-                                    role === 'admin'
+                                className={`flex items-start px-[14px] py-[11px] rounded-lg border border-solid transition-all ${isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
+                                    } ${role === 'admin'
                                         ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]'
                                         : 'bg-dash-surface'
-                                }`}
+                                    }`}
                             >
                                 <div
                                     style={role !== 'admin' ? { borderColor: 'var(--dash-border)' } : {}}
@@ -216,18 +214,16 @@ export function StaffDrawer({
                             {/* Custom Features Option */}
                             <div
                                 onClick={() => {
-                                    if(!isRoleDisabled && role !== 'custom') {
+                                    if (!isRoleDisabled && role !== 'custom') {
                                         setRole('custom');
                                     }
                                 }}
                                 style={role !== 'custom' ? { borderColor: 'var(--dash-border)' } : {}}
-                                className={`flex flex-col w-full rounded-lg border border-solid transition-all ${
-                                    isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
-                                } ${
-                                    role === 'custom'
+                                className={`flex flex-col w-full rounded-lg border border-solid transition-all ${isRoleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-dash-surface-hover'
+                                    } ${role === 'custom'
                                         ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]'
                                         : 'bg-dash-surface'
-                                }`}
+                                    }`}
                             >
                                 <div className={`flex items-center px-[14px] ${role === 'custom' ? 'pt-[12px] pb-[10px]' : 'py-[11px]'}`}>
                                     <div
@@ -251,7 +247,7 @@ export function StaffDrawer({
                                                     key={featureId}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if(!isFeatureDisabled) handleToggleFeature(featureId);
+                                                        if (!isFeatureDisabled) handleToggleFeature(featureId);
                                                     }}
                                                     className={`flex items-center gap-[12px] cursor-pointer transition-all ${isFeatureDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 >
