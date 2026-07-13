@@ -62,9 +62,35 @@ describe('buildSubmitParams — no placeholder phone [TC-F36.186c]', () => {
         const p = buildSubmitParams(baseInput)
 
         expect(p.sender.phone_number).toBe(splitPhone('01116127971').number)
-        expect(p.sender.phone_number_country_code).toBe('60')
         expect(p.receiver.phone_number).toBe(splitPhone('+60 12 345 6789').number)
-        expect(p.receiver.phone_number_country_code).toBe('60')
+    })
+
+    it('sends phone_number_country_code as ISO "MY", not dialing code "60" (TC-F36.187)', () => {
+        // Official EP spec: phone_number_country_code is ISO 3166-1 alpha-2. Sending
+        // "60" leaves EP's country field empty → "missing a valid country calling code".
+        const p = buildSubmitParams(baseInput)
+
+        expect(p.sender.phone_number_country_code).toBe('MY')
+        expect(p.receiver.phone_number_country_code).toBe('MY')
+        expect(JSON.stringify(p)).not.toContain('"phone_number_country_code":"60"')
+    })
+
+    it('maps email + company onto sender/receiver, omits when absent (TC-F36.187)', () => {
+        const withContacts = buildSubmitParams({
+            ...baseInput,
+            customerEmail: 'buyer@example.com',
+            senderEmail: 'merchant@store.my',
+            senderCompany: 'My Store',
+        })
+        expect(withContacts.receiver.email).toBe('buyer@example.com')
+        expect(withContacts.sender.email).toBe('merchant@store.my')
+        expect(withContacts.sender.company).toBe('My Store')
+
+        // Absent → omitted (undefined drops out of the JSON body), never empty string
+        const bare = buildSubmitParams(baseInput)
+        expect(bare.sender.email).toBeUndefined()
+        expect(bare.sender.company).toBeUndefined()
+        expect(bare.receiver.email).toBeUndefined()
     })
 
     it('never emits the legacy 0000000 placeholder anywhere in the params', () => {

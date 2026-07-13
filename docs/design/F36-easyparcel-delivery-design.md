@@ -629,7 +629,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 |---|---|---|---|
 | Name | `name` | copy as-is | required |
 | Company | `company` | copy as-is | optional |
-| Phone country code | `phone_number_country_code` | hardcode `"60"` | Malaysia country code (digits, not ISO alpha) |
+| Phone country code | `phone_number_country_code` | hardcode `"MY"` | ISO 3166-1 alpha-2 (CORRECTED 2026-07-13: NOT dialing code "60" — EP rejects "60" with "missing a valid country calling code", verified live) |
 | Phone number | `phone_number` | `splitPhone()` → number only | e.g., "122134567" (from "60122134567") |
 | Email | `email` | copy as-is | optional |
 | Address line 1 | `address_1` | `addressLine(order)[0]` | primary address |
@@ -746,7 +746,7 @@ return weight_kg
 
 ### 9.5 Key Gotchas
 
-- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"60"` — country code digits, not ISO alpha) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
+- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"MY"` — ISO 3166-1 alpha-2, NOT dialing code "60"; corrected 2026-07-13 after EP rejected "60" live) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
 - **Postcode param is `postcode`** (same field name on `POST /shipment/quotations` and `POST /shipment/submit_orders`).
 - **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
 - **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.

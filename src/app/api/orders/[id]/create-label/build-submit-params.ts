@@ -39,6 +39,9 @@ interface BuildSubmitParamsInput {
     shippingAddress: ShippingAddress
     customerName: string
     customerPhone: string
+    customerEmail?: string   // buyer email → receiver.email (checkout-required, omitted if absent)
+    senderEmail?: string     // merchant EP account email → sender.email
+    senderCompany?: string   // merchant EP account / store name → sender.company
     total: number           // RM float (order total)
     shippingServiceId: string
     shippingCourier?: string
@@ -54,6 +57,9 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         shippingAddress,
         customerName,
         customerPhone,
+        customerEmail,
+        senderEmail,
+        senderCompany,
         total,
         shippingServiceId,
         shippingCourier,
@@ -97,8 +103,14 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         }],
         sender: {
             name: warehouse.name ?? warehouse.label ?? 'Sender',
-            phone_number_country_code: senderPhone.countryCode,
+            company: senderCompany || undefined,
+            // EP wants the phone's ISO 3166-1 alpha-2 country code ("MY"), NOT the
+            // dialing code — sending "60" leaves EP's country field empty and fails
+            // AWB issuance with "missing a valid country calling code" (official spec
+            // https://easyparcel.github.io/OpenAPI, verified live 2026-07-13).
+            phone_number_country_code: 'MY',
             phone_number: senderPhone.number,
+            email: senderEmail || undefined,
             address_1: warehouse.address1 ?? '',
             address_2: warehouse.address2,
             postcode: warehouse.postcode ?? '',
@@ -108,8 +120,9 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         },
         receiver: {
             name: customerName || 'Receiver',
-            phone_number_country_code: receiverPhone.countryCode,
+            phone_number_country_code: 'MY',
             phone_number: receiverPhone.number,
+            email: customerEmail || undefined,
             address_1: shippingAddress.line1 ?? '',
             address_2: shippingAddress.line2,
             postcode: shippingAddress.postcode ?? '',

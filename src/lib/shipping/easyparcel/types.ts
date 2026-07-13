@@ -98,8 +98,8 @@ export interface EpQuotationResponse {
 export interface EpSubmitContact {
     name: string
     company?: string
-    phone_number_country_code: string  // "60"
-    phone_number: string               // digits only, no leading 0
+    phone_number_country_code: string  // ISO 3166-1 alpha-2 e.g. "MY" (NOT dialing code "60")
+    phone_number: string               // digits only, no country/trunk prefix (e.g. "1126760658")
     email?: string
     address_1: string
     address_2?: string
