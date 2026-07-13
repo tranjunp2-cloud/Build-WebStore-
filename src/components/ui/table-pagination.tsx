@@ -14,6 +14,10 @@ import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
  * fits on one default page" rule. Callers must gate their footer slot /
  * card-view wrapper with this so no empty bordered bar is left behind when
  * `TablePagination` itself returns null.
+ *
+ * INVARIANT: pass the SAME `rowsOptions` here as to the `TablePagination`
+ * instance being gated — if they diverge, the gate renders the wrapper while
+ * the component returns null, resurrecting the empty bordered bar.
  */
 export function shouldShowTablePagination(total: number, rowsOptions: number[] = [10, 25, 50, 100]) {
     return total > (rowsOptions[0] ?? 10)

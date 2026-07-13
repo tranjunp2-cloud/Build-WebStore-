@@ -143,6 +143,9 @@ export function DiscountsClientLayout() {
                 credentials: 'include',
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            // Decrement AFTER the server commit so the GH-1579 page clamp (and the
+            // refetch it triggers) can never race the in-flight DELETE.
+            setTotal(n => Math.max(0, n - 1))
             toast.success(ti(d.deleteSuccess, { code: discount.code }))
         } catch (err) {
             console.error('[Discounts delete]', err)

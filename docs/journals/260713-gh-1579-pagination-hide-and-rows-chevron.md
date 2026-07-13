@@ -21,7 +21,7 @@ Regression felt obvious in hindsight: deleting rows on page 2+ down to total ≤
 ```ts
 useTablePageClamp(page, total, limit, onPageChange, enabled)
 ```
-Wired into 6 delete-capable callers. Triggers `onPageChange(lastValidPage)` when `page > Math.max(1, Math.ceil(total / limit))`. Protects against stranded state.
+Wired into 7 mutation-capable callers. Triggers `onPageChange(lastValidPage)` when `page > Math.max(1, Math.ceil(total / limit))`. Protects against stranded state.
 
 **Guard logic**: `total > 10` (rejected `|| totalPages <= 1`; conflicts with AC at limit=25 & total=20).
 
@@ -57,4 +57,8 @@ Pagination component logic (hide at ≤10) was correct in isolation. But we didn
 3. QA spot-check delete flows on products, blog, discounts
 4. Note for future: consider exposing threshold as configurable if more tables adopt different limits
 
-**Decisions deferred**: Orders skipped clamp (no row deletion UI). Studio bespoke pagers out of scope. Threshold stays at 10 (revisit if support requests spike).
+## Adversarial Review Round (post-PR)
+
+`/code-review #1594` red-team pass found 3 major gaps in the clamp wiring itself: (1) discounts delete never updated `total` → clamp dead on that path; (2) contact-leads mutated `total` before awaiting the DELETE → clamp-triggered refetch could race it and resurrect the deleted row; (3) orders was skipped but bulk status-change + status filter shrinks the dataset the same way. All three fixed: totals now mutate only after server commit, orders got the clamp. Lesson: "no row deletion UI" was the wrong test — any server-confirmed mutation that shrinks the filtered dataset counts.
+
+**Decisions deferred**: Studio bespoke pagers out of scope. Threshold stays at 10 (revisit if support requests spike). Customers-detail-orders-tab shows a single-page bar for totals 11–25 (fixed limit 25, no rows selector) — documented tradeoff, PM call if it should hide.

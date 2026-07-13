@@ -55,11 +55,13 @@ export function CustomersClientLayout() {
         if (!pendingDelete) return
         const record = pendingDelete
         setPendingDelete(null)
-        setRecords(prev => prev.filter(r => r.id !== record.id))
-        setTotal(n => n - 1)
-        if (selected?.id === record.id) setSelected(null)
         try {
             await deleteCustomerAction(record.rawId, record.source)
+            // Mutate state only AFTER the server commit — the GH-1579 page clamp can
+            // trigger a refetch, which must never race the in-flight DELETE (ghost row).
+            setRecords(prev => prev.filter(r => r.id !== record.id))
+            setTotal(n => Math.max(0, n - 1))
+            if (selected?.id === record.id) setSelected(null)
             toast.success(c.deleteSuccess)
         } catch {
             load()

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Checkbox } from '@/components/ui/checkbox'
-import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 import {
@@ -307,6 +307,10 @@ export function OrdersTable({
     const [limit, setLimit] = useState(10)
     const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
     const { t } = useI18n()
+
+    // GH-1579: bulk status changes with an active status filter shrink the dataset —
+    // snap back when the refetched total strands page past the last valid page.
+    useTablePageClamp(page, total, limit, setPage, !loading)
 
     // Refs keep latest filter values accessible inside the silentFetch effect without
     // adding them as deps (which would turn silent-refresh into a full reload on every filter change)
