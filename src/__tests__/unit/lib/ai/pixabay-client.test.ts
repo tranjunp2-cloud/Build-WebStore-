@@ -399,4 +399,18 @@ describe('downloadPhotoBuffer', () => {
             downloadPhotoBuffer('https://pixabay.com/get/photo-1_1280.jpg', 2),
         ).rejects.toMatchObject({ code: 'TOO_LARGE' })
     })
+
+    it('[TC-F38-PIXABAY-13] TimeoutError on download → TIMEOUT, not DOWNLOAD_FAIL', async () => {
+        // Arrange — same bug class as TC-12: downloadPhotoBuffer's own
+        // AbortSignal.timeout throws 'TimeoutError', previously misfiled
+        // as DOWNLOAD_FAIL because only 'AbortError' was matched.
+        const timeoutErr = new Error('The operation was aborted due to timeout')
+        timeoutErr.name = 'TimeoutError'
+        vi.mocked(fetch).mockRejectedValue(timeoutErr)
+
+        // Act + Assert
+        await expect(
+            downloadPhotoBuffer('https://pixabay.com/get/photo-1_1280.jpg'),
+        ).rejects.toMatchObject({ code: 'TIMEOUT' })
+    })
 })

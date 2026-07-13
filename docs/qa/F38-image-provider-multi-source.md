@@ -33,7 +33,8 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-PIXABAY-09** | `[Quality]` | squarish prefer near-square | over-fetch (per_page=count×3), ảnh gần vuông (0.8≤ar≤1.25) lên đầu, fill phần thiếu từ ảnh còn lại | [x] |
 | **TC-F38-PIXABAY-10** | `[Error]` | 401 → `UNAUTHORIZED` | non-retryable, fail ngay, 1 fetch | [x] |
 | **TC-F38-PIXABAY-11** | `[Error]` | buffer > maxBytes → `TOO_LARGE` | download vượt cap → `PixabayError` code `TOO_LARGE` | [x] |
-| **TC-F38-PIXABAY-12** | `[Error]` | `TimeoutError` (AbortSignal.timeout) → `TIMEOUT` fail-fast | `AbortSignal.timeout()` throw DOMException tên `TimeoutError` (không phải `AbortError`) → phân loại `TIMEOUT` ngay, 1 fetch, không retry thành 30s+ SERVER_ERROR | [ ] |
+| **TC-F38-PIXABAY-12** | `[Error]` | `TimeoutError` (AbortSignal.timeout) → `TIMEOUT` fail-fast trong search | `AbortSignal.timeout()` throw DOMException tên `TimeoutError` (không phải `AbortError`) → phân loại `TIMEOUT` ngay, 1 fetch (retry cũ là dead code — tái dùng signal đã abort) | [ ] |
+| **TC-F38-PIXABAY-13** | `[Error]` | `TimeoutError` khi download → `TIMEOUT`, không phải `DOWNLOAD_FAIL` | `downloadPhotoBuffer` cùng bug class TC-12: chỉ match `AbortError` → timeout thật bị misfile `DOWNLOAD_FAIL`; giờ match cả `TimeoutError` | [ ] |
 
 ## 4. Regression — call site (đã có test, cập nhật mock sang Pixabay)
 

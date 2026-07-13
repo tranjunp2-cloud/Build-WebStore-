@@ -604,17 +604,18 @@ describe('TC-F38-RAW-25 — RATE_LIMITED short-circuits the pool fallback ladder
     expect(pool.underfill).toBe(true)
   })
 
-  it('tier-2 RATE_LIMITED → tier-3 skipped', async () => {
-    // Arrange
+  it('tier-2 RATE_LIMITED → tier-3 skipped, tier-1 partial photos preserved', async () => {
+    // Arrange — tier-1 returns a thin (below-minCount) result, tier-2 429s.
     mockSearchPhotos
-      .mockResolvedValueOnce([]) // tier-1: 0 hits
+      .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // tier-1: partial
       .mockRejectedValueOnce(new PixabayError('RATE_LIMITED', 429, true)) // tier-2
 
     // Act
     const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
 
-    // Assert — no tier-3 call after the 429
+    // Assert — no tier-3 call after the 429; the partial result is kept
     expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+    expect(pool.landscape.map((p) => p.id)).toEqual(['L0'])
     expect(pool.underfill).toBe(true)
   })
 

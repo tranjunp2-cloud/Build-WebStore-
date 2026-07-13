@@ -222,8 +222,10 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
             // AbortSignal.timeout() throws DOMException named 'TimeoutError',
             // NOT 'AbortError' (that's manual controller.abort()). Matching
             // both keeps the fail-fast intent: a 15s hang throws TIMEOUT
-            // immediately instead of retrying into a 30s+ stall classified
-            // as SERVER_ERROR.
+            // immediately. (The generic-branch retry it previously fell into
+            // was dead anyway — the caller's already-aborted signal is reused,
+            // so the second fetch rejected instantly and surfaced as a
+            // misclassified SERVER_ERROR.)
             if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
                 throw new PixabayError('TIMEOUT', 0, true, err.message)
             }
@@ -409,7 +411,9 @@ export async function downloadPhotoBuffer(
             headers: { 'User-Agent': 'ech-prime-web-v2/1.0' },
         })
     } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        // 'TimeoutError' is what AbortSignal.timeout() actually throws;
+        // 'AbortError' covers manual aborts (same fix as fetchWithRetry).
+        if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
             throw new PixabayError('TIMEOUT', 0, true, err.message)
         }
         throw new PixabayError('DOWNLOAD_FAIL', 0, true, (err as Error).message)
