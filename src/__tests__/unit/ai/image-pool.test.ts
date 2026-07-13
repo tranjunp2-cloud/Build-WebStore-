@@ -534,3 +534,55 @@ describe('TC-F01-W.18 — buildImagePool honors explicit bucket sizes', () => {
     expect(pool.underfill).toBe(false)
   })
 })
+
+// ── TC-F38-RAW-23: non-VN tier-3 category fallback (GH-1185 Malay gap) ──────
+describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keyword', () => {
+  it('Malay keywords 0-hit on primary + relaxed → tier-3 queries CATEGORY_BASE_KEYWORDS[category][0]', async () => {
+    // Arrange — Malay office-supplies terms have no Pixabay tag coverage:
+    // primary (all terms joined, AND-matched) and relaxed (first term) both
+    // return 0. Pre-fix, non-VN queries had NO tier-3 → empty pool → GPT's
+    // hallucinated stock URLs survived injection untouched.
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary landscape
+      .mockResolvedValueOnce([]) // relaxed landscape
+      .mockResolvedValueOnce(landscapeFixture) // tier-3 landscape
+
+    // Act — squareSize 0 keeps the mock queue landscape-only.
+    const pool = await buildImagePool(baseCtx({
+      category: 'ecommerce',
+      topProduct: undefined,
+      products: ['pen dan pensel', 'buku nota'],
+      mood: undefined,
+      squareSize: 0,
+    }))
+
+    // Assert — tier-3 query = EN category base keyword, default lang (no vi)
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
+    expect(mockSearchPhotos.mock.calls[2]![0]).toBe('product photography')
+    const tier3Opts = mockSearchPhotos.mock.calls[2]![2] as { lang?: string }
+    expect(tier3Opts.lang).toBeUndefined()
+    expect(pool.landscape.length).toBeGreaterThan(0)
+    expect(pool.underfill).toBe(true)
+  })
+
+  it('VN zero-hit still uses curated VN phrase with lang=vi (unchanged)', async () => {
+    // Arrange
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary landscape
+      .mockResolvedValueOnce([]) // relaxed landscape (broadens to category)
+      .mockResolvedValueOnce(landscapeFixture) // tier-3 landscape
+
+    // Act
+    await buildImagePool(baseCtx({
+      category: 'restaurant',
+      topProduct: 'phở bò',
+      mood: undefined,
+      squareSize: 0,
+    }))
+
+    // Assert — VN path unchanged: curated phrase + explicit lang=vi
+    expect(mockSearchPhotos.mock.calls[2]![0]).toBe('ẩm thực việt nam')
+    const tier3Opts = mockSearchPhotos.mock.calls[2]![2] as { lang?: string }
+    expect(tier3Opts.lang).toBe('vi')
+  })
+})

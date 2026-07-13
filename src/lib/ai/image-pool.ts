@@ -14,6 +14,7 @@
  */
 
 import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, type PixabayPhoto } from './pixabay-client'
+import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -252,23 +253,32 @@ async function searchBucket(
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
     }
   }
-  if (photos.length >= minCount || !isVietnamese) return { photos, usedFallback }
+  if (photos.length >= minCount) return { photos, usedFallback }
 
-  // Tier 3 — Vietnamese category phrase (only for VN inputs; curated, ungated).
-  const vnQuery = VN_CATEGORY_QUERIES[ctx.category]
-  if (vnQuery && vnQuery !== query) {
+  // Tier 3 — trusted category phrase, ungated. VN inputs use the curated
+  // Vietnamese phrase (lang=vi). Non-VN inputs (Malay/English zero-hit — e.g.
+  // "pen dan pensel" has no Pixabay tag coverage) fall to the English
+  // category base keyword instead of returning an empty bucket: an empty
+  // pool means media-injector replaces nothing, so GPT-hallucinated stock
+  // URLs (typically off-topic fashion shots for `ecommerce`) survive as-is.
+  const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
+  const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
+  if (catQuery && catQuery !== query) {
     usedFallback = true
     try {
-      // lang:'vi' explicit — curated phrases like "quán cà phê" (fnb) carry
-      // only ambiguous diacritics, so auto-detection would miss them and the
-      // search would run diacritic-stripped under Pixabay's default lang=en.
-      const extra = (await searchPhotos(vnQuery, size, { orientation, width, category, lang: 'vi' })) ?? []
+      // lang:'vi' explicit for VN phrases — curated phrases like "quán cà phê"
+      // (fnb) carry only ambiguous diacritics, so auto-detection would miss
+      // them and the search would run diacritic-stripped under Pixabay's
+      // default lang=en. EN base keywords use the default lang.
+      const extra = (await searchPhotos(catQuery, size, {
+        orientation, width, category, ...(vnQuery ? { lang: 'vi' as const } : {}),
+      })) ?? []
       if (extra.length > 0) {
-        console.info(`[image-pool] ${orientation} VN category fallback "${vnQuery}": +${extra.length}`)
+        console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
       }
       photos = photos.concat(extra)
     } catch (err) {
-      console.warn(`[image-pool] ${orientation} VN category fallback failed:`, err)
+      console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
     }
   }
   return { photos, usedFallback }
