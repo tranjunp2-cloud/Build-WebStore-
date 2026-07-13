@@ -1456,7 +1456,6 @@
                 "stepReserving": "Menempah slot",
                 "stepCharging": "Menolak dompet",
                 "courierLabel": "Kurier",
-                "fromSettings": "dari Tetapan",
                 "epCost": "Kos EasyParcel: {amount}",
                 "epCostNote": "Ditetapkan semasa daftar keluar — caj sebenar mungkin berbeza sedikit.",
                 "walletBalanceLabel": "Baki dompet",
