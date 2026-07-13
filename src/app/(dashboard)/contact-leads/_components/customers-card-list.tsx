@@ -1,7 +1,7 @@
 'use client'
 
 import { Eye, Trash2, Users } from 'lucide-react'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
@@ -97,7 +97,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                 )
             })}
 
-            {total > 0 && (
+            {shouldShowTablePagination(total) && (
                 <div className="pt-4 md:col-span-2">
                     <TablePagination
                         page={page}
