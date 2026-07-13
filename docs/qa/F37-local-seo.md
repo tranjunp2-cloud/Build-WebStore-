@@ -305,6 +305,26 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-02-23** | AC-2 | Func | `isRangeOrderValid` — closes must be strictly after opens (no overnight support) | `opening-hours-utils.test.ts` | Valid when closes > opens; invalid when closes == opens or closes < opens; treated as not-yet-invalid while either field is empty (mid-entry). | User-requested guard against nonsensical/mistyped ranges; overnight explicitly out of scope |
 | **TC-F37-02-24** | AC-2 | Func + Regression | `openingHours` closes-after-opens Zod refine + closed-row-without-times fix | `sites-local-business.test.ts` | Rejects closes==opens and closes<opens rows; accepts closes>opens; **accepts an `isClosed:true` row with no `opens`/`closes` keys at all** — regression guard for a real bug found in this pass (save API was silently rejecting every "Closed" day before `opens`/`closes` were made `.optional()` in the Zod schema to match the pre-existing `OpeningHourRow` TS type). | Fixes a functional bug: marking a day Closed previously failed to save |
 | **TC-F37-02-25** | AC-2 | Regression | Zod `.superRefine()` refactor (required-when-open check via cross-field validate) | `sites-local-business.test.ts` | **Fix from PR #1591 code review:** Zod `.refine()` left some paths uncovered (only validates at schema level, not per-field). Switched to `.superRefine()` for granular error handling + added field-level cross-field validate in `Sites.ts` collection using `siblingData` to access `isClosed` state when validating `opens`/`closes` fields. Tests reject: (1) opens without closes, (2) closes without opens, (3) closes ≤ opens. Accepts: (4) valid closed row with both missing, (5) valid open row with both present and closes > opens. | Fixes edge case: opening-hours validation was incomplete, could pass invalid rows upstream |
+| **TC-F37-02-26** | AC-2 | Regression | `sanitizeLegacyOpeningHours` — normalizes rows saved before TC-F37-02-25's strict validation | `opening-hours-utils.test.ts` | **Fix from PR #1591 code review (C2):** TC-F37-02-25 made `opens`/`closes` required-when-open, but a row saved under the OLD lenient rule (isClosed false/omitted, opens/closes missing) still exists in stored data and now fails validation on re-send. `handleLocalBusinessChange` calls this **unconditionally** on every save (not just when `openingHours` is untouched) because `applyBatchSave` only re-encodes the edited day(s) and passes every other day through as-is — a legacy-invalid row on an UNTOUCHED day would otherwise 400 an edit to a different day. No-op for `encodeDay`'s output. | Fixes a live-data hazard: sites saved before this PR could get permanently blocked from saving ANY local-business field |
+| **TC-F37-02-27** | AC-2 | Edge | `sanitizeLegacyOpeningHours` — drops orphan rows with no `dayOfWeek` | `opening-hours-utils.test.ts` | **Fix from PR #1591 code review (C2, same class as TC-F37-02-26):** `applyBatchSave` intentionally keeps a no-`dayOfWeek` row on any local batch edit (TC-F37-02-20, unchanged), but `groupRowsByDay` never matches it to a day, so it's invisible in the UI and unfixable by the user — it would silently accumulate toward `.max(21)` if resent to the server forever. Dropped at the save boundary instead of normalized. | Prevents an invisible/unfixable row from exhausting the 21-row split-shift cap |
+| **TC-F37-02-28** | AC-2 | Regression | `sanitizeOpeningHoursOnValidate` — `Sites.ts` `beforeValidate` hook, direct coverage | `sites-opening-hours-sanitize-hook.test.ts` | **Fix from PR #1591 code review (Q2 + Stage 3 adversarial finding #7):** the hook added to answer the reviewer's Q2 (admin-panel write path parity) had zero direct test coverage — only the pure `sanitizeLegacyOpeningHours` it delegates to was tested, so the guard logic, the merge/spread, and the fact the hook is actually wired into `hooks.beforeValidate` were all unverified. Tests cover: undefined data, no `localBusiness`, no `openingHours`, non-array `openingHours`, legacy-invalid + orphan rows sanitized, already-valid no-op, and — the highest-value case — sibling `localBusiness` fields and other top-level `data` fields are never dropped by the hook's spread/merge. | Closes a real Medium gap found by adversarial review: an accidental future edit to the hook (guard, spread, or removal from the `hooks` array) would previously go undetected by CI |
+
+---
+
+## 3.13 CI Migration Guard — `check-migrations.js` new-field detection redesign
+
+> Not an F37 feature — a CI hard-gate script (blocks PRs missing a DB migration for a new Payload field) that this PR's own field additions (`Sites.ts localBusiness`, `openingHours` cap) exercised heavily during review, triggering a full redesign. Tracked here per the project's single-doc-map convention (no dedicated doc owns CI scripts). See `docs/journals/260713-pr1591-f37-02-three-bug-fixes.md` and `plans/reports/code-review-260713-1139-GH-02-check-migrations-4-rounds-final.md` for the full adversarial-review trail.
+
+| ID | Type | Title | Test File | Key Assertions | Impact |
+|---|---|---|---|---|---|
+| **TC-check-migrations-01** | Func | `getFieldRoles` — classifies nested vs top-level vs container fields | `check-migrations.test.ts` | Array-child field → `nested:true`; field with no array ancestor → `nested:false`; the array/group field itself → `isContainer:true`, not counted as its own child. | Foundation for all new-field detection below |
+| **TC-check-migrations-02** | Edge | `getFieldRoles` — same bare name nested under two different arrays | `check-migrations.test.ts` | Both occurrences of a colliding name (e.g. `value` in `Products.ts`) correctly report `nested:true`. | Confirms depth-independence of the nested scope-stack |
+| **TC-check-migrations-03** | Regression | bare-name collision no longer false-negatives | `check-migrations.test.ts` | A brand-new top-level field is flagged even when its name collides with an unrelated nested field; a purely-nested edit is never flagged. | Closes round-1/2 false-negative (diff-line bare-name matching) |
+| **TC-check-migrations-04** | Regression | multi-line vs multi-line collision | `check-migrations.test.ts` | Multi-line-style new top-level field flagged despite colliding bare name with a multi-line nested field. | Closes round-2/3 false-negative (single-line `name:` matching) |
+| **TC-check-migrations-05** | Regression | rename to a colliding name | `check-migrations.test.ts` | A renamed top-level field is flagged even when the rename target collides with an unrelated nested field. | Closes round-3 false-negative (cross-hunk diff-line stitching) |
+| **TC-check-migrations-06** | Regression | cosmetic edits never false-flag | `check-migrations.test.ts` | Admin-text/validation-only edits to an existing field are never flagged; a genuinely new field added alongside a cosmetic edit still is. | Confirms `(name, nested)` identity (not full content) avoids false-positives |
+| **TC-check-migrations-07** | Regression | `isPathMissingAtRef` — distinguishes "file is new" from "git show genuinely failed" | `check-migrations.test.ts` | Recognizes `does not exist in` as legitimate empty baseline; does NOT recognize a bad-ref error or empty/unrelated message as one (fail-closed). | Prevents a false-positive storm if `BASE_BRANCH` itself is misconfigured |
+| **TC-check-migrations-08** | Regression | `isPathMissingAtRef` — recognizes the real message for a file new on disk | `check-migrations.test.ts` | Recognizes `exists on disk, but not in '<ref>'` (the actual message for the realistic code path — file passed `existsSync()`, absent at base) as a legitimate empty baseline. | **Fix from PR #1591 code review (C3):** TC-07 alone only covered a message variant that never fires given the `existsSync` guard; a brand-new tracked collection file was silently skipped instead of getting the new-field check |
 
 ---
 
@@ -374,11 +394,11 @@ Two dashboard code paths read the shared `analytics` collection:
 
 **File:** `src/__tests__/unit/seo/opening-hours-utils.test.ts`
 
-**Test count:** 23 tests (grouping, mode inference/round-trip, overwrite semantics, encodings, display strings, default week, defensive handling, closes-after-opens validator)
+**Test count:** 30 tests (grouping, mode inference/round-trip, overwrite semantics, encodings, display strings, default week, defensive handling, closes-after-opens validator, legacy-row sanitize)
 
 **Command:** `npm test -- opening-hours-utils`
 
-**TC-IDs covered:** TC-F37-02-14 through TC-F37-02-20, TC-F37-02-23
+**TC-IDs covered:** TC-F37-02-14 through TC-F37-02-20, TC-F37-02-23, TC-F37-02-26, TC-F37-02-27
 
 ---
 
@@ -391,6 +411,30 @@ Two dashboard code paths read the shared `analytics` collection:
 **Command:** `npm test -- opening-hours-editor`
 
 **TC-IDs covered:** TC-F37-02-22
+
+---
+
+### 4.8 CI Migration Guard Tests
+
+**File:** `src/__tests__/unit/scripts/check-migrations.test.ts`
+
+**Test count:** 14 tests (field-role classification, 4 collision-regression scenarios, cosmetic-edit false-positive guard, 2 git-error-message classification variants)
+
+**Command:** `npm test -- check-migrations`
+
+**TC-IDs covered:** TC-check-migrations-01 through TC-check-migrations-08
+
+---
+
+### 4.9 Sites Collection Hook Tests (`beforeValidate` opening-hours sanitize)
+
+**File:** `src/__tests__/unit/collections/sites-opening-hours-sanitize-hook.test.ts`
+
+**Test count:** 8 tests (guard branches, sanitize + orphan-drop behavior, no-op on valid data, sibling-field/top-level-field non-mutation)
+
+**Command:** `npm test -- sites-opening-hours-sanitize-hook`
+
+**TC-IDs covered:** TC-F37-02-28
 
 ---
 
@@ -411,6 +455,12 @@ Two dashboard code paths read the shared `analytics` collection:
 3. Apply PRD §13.8's "earned/applicable" normalization pattern (reweight buckets based on what's measurable per-site)
 
 See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Phase 06 PM review" for full context.
+
+### `check-migrations.js` — `getFieldRoles` parser edge cases (Low, not blocking)
+
+**Status:** flagged during PR #1591's second code review (M2, non-blocking). The regex/window-based field parser has known theoretical edge cases: (1) `name:` isn't anchored to an actual field-declaration context, so a `name:` appearing inside a comment or template literal could false-flag (fails safe — over-detection, not under-detection); (2) the forward/backward window used to find a field's own `type:` (±2/+8 lines) is heuristic, not a real parser; (3) Payload's `blocks` field type isn't modeled as a container (currently sidestepped because `Pages.ts`, the only file using `blocks`, is excluded from this check entirely).
+
+**Impact:** none observed — no current `TRACKED_COLLECTIONS` file triggers any of these. Noted for future hardening if a collection's formatting ever hits one of these shapes.
 
 ---
 
@@ -454,9 +504,11 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 | `local-seo-score.test.ts` | 7 | ✅ PASS | 100% of calculateLocalSeoScore | Scoring logic + bounds |
 | `geo-cascade-fields.test.tsx` | 9 | ✅ PASS | 100% of GeoCascadeFields forward cascade + reverse-resolve + legacy degradation + stale-response guard | RTL + mocked `/api/geo/*` |
 | `malaysia-geo-seed-data.test.ts` | 2 | ✅ PASS | Seed data consistency (`malaysia_states.name` vs `MY_STATES`) | Regression guard, `/code-review` finding |
-| `opening-hours-utils.test.ts` | 23 | ✅ PASS | 100% of groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid | Pure logic — overwrite semantics, encodings, round-trip, range validation |
+| `opening-hours-utils.test.ts` | 30 | ✅ PASS | 100% of groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid, sanitizeLegacyOpeningHours | Pure logic — overwrite semantics, encodings, round-trip, range validation, legacy-row sanitize |
 | `opening-hours-editor.test.tsx` | 4 | ✅ PASS | List view render (7 days, split-shift, closed, quick-actions) | RTL — light integration guard |
-| **Total** | **83** | ✅ **PASS** | **100%** | Opening Hours Google-style redesign complete (split-shift + multi-day batch + closes-after-opens validation); F37 suite 83/83 pass |
+| `check-migrations.test.ts` | 14 | ✅ PASS | 100% of getFieldRoles, diffNewTopLevelFieldNames, isPathMissingAtRef | CI hard-gate script (not F37 feature code) — new-field detection redesign + git-error classification |
+| `sites-opening-hours-sanitize-hook.test.ts` | 8 | ✅ PASS | 100% of sanitizeOpeningHoursOnValidate | `Sites.ts` `beforeValidate` hook — direct coverage added by Stage 3 adversarial finding #7 |
+| **Total** | **112** | ✅ **PASS** | **100%** | Opening Hours Google-style redesign + PR #1591 round-2 code review fixes (legacy-row sanitize on all write paths, check-migrations.js hardening) — reviewer's malaysia_states rename concern investigated and found already fixed by a pre-existing migration (commit `d5c03917`, staging since 2026-05-25) |
 
 ---
 
