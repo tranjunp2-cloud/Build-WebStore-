@@ -10,6 +10,7 @@ import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
 import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
 import { clampCollectionDate } from '@/lib/shipping/easyparcel/pickup-schedule'
+import { hasUsablePhone } from '@/lib/shipping/easyparcel/normalize'
 import { buildSubmitParams } from './build-submit-params'
 import { verifyCodEligibilityLive } from './verify-cod-eligibility'
 import { resolveServiceForMethod, type CollectionMethod } from './resolve-collection-method'
@@ -150,6 +151,24 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
+        // Reject unusable buyer phones BEFORE submit — a placeholder passes EP submit but
+        // the courier's AWB issuance rejects it later, stranding the shipment at "Pending
+        // AWB" with the wallet already charged (live 2026-07-13). Old orders can predate
+        // the phone-required checkout, so this cannot be assumed present.
+        const customerPhone = String((order as any).customerPhone ?? '')
+        if (!hasUsablePhone(customerPhone)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'CUSTOMER_PHONE_MISSING',
+                        message: 'Order has no valid customer phone number — couriers require one to deliver. Fulfill this order manually, or contact support to update the buyer\'s phone.',
+                    },
+                },
+                { status: 422 },
+            )
+        }
+
         const shippingServiceId = (order as any).shippingServiceId as string | undefined
         if (!shippingServiceId) {
             return NextResponse.json(
@@ -252,7 +271,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             warehouse,
             shippingAddress,
             customerName: (order as any).customerName ?? '',
-            customerPhone: (order as any).customerPhone ?? '',
+            customerPhone,
             total: (order as any).total ?? 0,
             shippingServiceId: effectiveServiceId,
             shippingCourier: courier,
