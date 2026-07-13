@@ -42,7 +42,7 @@ vi.mock('@/components/AppShell', () => ({
 
 vi.mock('@/components/editor/PreviewScripts', () => ({
     PreviewScripts: () => <div data-testid="preview-scripts">Scripts</div>,
-    BuilderLinkScripts: () => null,
+    BuilderLinkScripts: () => <div data-testid="builder-link-scripts">Link Scripts</div>,
 }))
 
 vi.mock('@/app/(preview)/preview/[siteId]/PreviewErrors', () => ({
@@ -254,8 +254,8 @@ describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
         expect(screen.queryByTestId('preview-scripts')).not.toBeInTheDocument()
     })
 
-    it('TC-F01-GH770-05: includes PreviewScripts when builder param not present', async () => {
-        // Arrange
+    it('TC-F01-GH770-05: renders BuilderLinkScripts (not PreviewScripts) when neither builder nor editor param present (GH-1461)', async () => {
+        // Arrange — standalone preview opened from the editor toolbar: no builder/editor param
         const mockSearchParams = Promise.resolve({ pageId: 'page-1' })
         mockedGetCurrentUser.mockResolvedValue({
             id: 'user-1',
@@ -273,8 +273,34 @@ describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
         const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
         render(Component as React.ReactElement)
 
-        // Assert — PreviewScripts should be rendered in normal (non-builder) mode
+        // Assert — GH-1461: standalone toolbar preview is review-only, so it gets the
+        // lightweight link handler instead of the full editing listeners
+        expect(screen.queryByTestId('preview-scripts')).not.toBeInTheDocument()
+        expect(screen.getByTestId('builder-link-scripts')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-08: includes PreviewScripts when editor param present (editor iframe)', async () => {
+        // Arrange — editor iframe context: editor=1
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1', editor: '1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — only the editor iframe keeps the full editing listeners (GH-1461)
         expect(screen.getByTestId('preview-scripts')).toBeInTheDocument()
+        expect(screen.queryByTestId('builder-link-scripts')).not.toBeInTheDocument()
     })
 
     it('TC-F01-GH770-06: builder parameter does not affect auth checks', async () => {
