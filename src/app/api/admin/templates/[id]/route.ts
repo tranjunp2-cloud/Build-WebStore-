@@ -12,15 +12,17 @@ import { isNotFoundError } from '@/lib/api/is-not-found-error'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-// Template ids are integer serial PKs. A non-numeric id makes Payload/Drizzle throw a
-// Postgres cast error (22P02) that `disableErrors` does NOT suppress → 500. Reject it as
-// a plain 404 before touching the DB. (GH #1535 review)
-const isNumericId = (id: string) => /^\d+$/.test(id)
+// Template ids are int4 serial PKs. Both a non-numeric id (Postgres 22P02 cast error) and
+// an out-of-range numeric id (22003 value out of range) make Payload/Drizzle throw — and
+// `disableErrors` suppresses NEITHER → 500. Reject both as a plain 404 before touching the
+// DB. (GH #1535 review — same INT4 cap applied in mark-read + customers/export.)
+const INT4_MAX = 2147483647
+const isValidTemplateId = (id: string) => /^\d+$/.test(id) && Number(id) <= INT4_MAX
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
     return withSuperAdmin(async () => {
         const { id } = await ctx.params
-        if (!isNumericId(id)) {
+        if (!isValidTemplateId(id)) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
         const payload = await getPayload({ config })
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
     return withSuperAdmin(async () => {
         const { id } = await ctx.params
-        if (!isNumericId(id)) {
+        if (!isValidTemplateId(id)) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
         const body = await req.json().catch(() => null)

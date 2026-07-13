@@ -33,22 +33,23 @@ import { GET, PATCH } from '@/app/api/admin/templates/[id]/route'
 
 const TEMPLATE = { id: 123, name: 'Test Template', category: 'business', isPremium: false }
 
-// Realistic Payload/pg behavior: non-numeric id → 22P02 cast error (NOT suppressed by
-// disableErrors); missing numeric id → NotFound (→ null when disableErrors).
+// Realistic Payload/pg behavior for an int4 PK. NEITHER of these is a NotFound, so
+// `disableErrors` does NOT suppress them → uncaught → 500 unless the route guards first:
+//   • non-numeric id → 22P02 (invalid input syntax for integer)
+//   • numeric id > INT4_MAX → 22003 (value out of range)
+//   • missing numeric id → NotFound (→ null when disableErrors)
+const PG_INT4_MAX = 2147483647
+function pgErr(msg: string, code: string) { const e: any = new Error(msg); e.code = code; return e }
 function realisticFindByID({ id, disableErrors }: { id: string | number; disableErrors?: boolean }) {
-    if (!/^\d+$/.test(String(id))) {
-        const err: any = new Error('invalid input syntax for type integer'); err.code = '22P02'
-        throw err
-    }
+    if (!/^\d+$/.test(String(id))) throw pgErr('invalid input syntax for type integer', '22P02')
+    if (Number(id) > PG_INT4_MAX) throw pgErr('value out of range for type integer', '22003')
     if (String(id) === '123') return TEMPLATE
     if (disableErrors) return null
     const err: any = new Error('Not Found'); err.name = 'NotFound'; throw err
 }
 function realisticUpdate({ id, data }: { id: string | number; data: any }) {
-    if (!/^\d+$/.test(String(id))) {
-        const err: any = new Error('invalid input syntax for type integer'); err.code = '22P02'
-        throw err
-    }
+    if (!/^\d+$/.test(String(id))) throw pgErr('invalid input syntax for type integer', '22P02')
+    if (Number(id) > PG_INT4_MAX) throw pgErr('value out of range for type integer', '22003')
     if (String(id) === '123') return { id: 123, ...data }
     const err: any = new Error('Not Found'); err.name = 'NotFound'; throw err
 }
@@ -82,6 +83,13 @@ describe('GET /api/admin/templates/[id] — TC-GH1535-05', () => {
             expect(findByIDSpy).not.toHaveBeenCalled()
         })
 
+        it('numeric id > INT4_MAX → 404 WITHOUT hitting the DB (int4 cap guard)', async () => {
+            // /^\d+$/ alone would let this through → Postgres 22003 out-of-range → 500.
+            const res = await GET(req(), ctx('99999999999999') as any)
+            expect(res.status).toBe(404)
+            expect(findByIDSpy).not.toHaveBeenCalled()
+        })
+
         it('empty id → 404', async () => {
             const res = await GET(req(), ctx('') as any)
             expect(res.status).toBe(404)
@@ -110,6 +118,12 @@ describe('PATCH /api/admin/templates/[id] — TC-GH1535-05', () => {
 
     it('TC-GH1535-05d: non-numeric id → 404 WITHOUT hitting the DB', async () => {
         const res = await PATCH(req('PATCH', { name: 'x' }), ctx('abc') as any)
+        expect(res.status).toBe(404)
+        expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('TC-GH1535-05f: numeric id > INT4_MAX → 404 WITHOUT hitting the DB', async () => {
+        const res = await PATCH(req('PATCH', { name: 'x' }), ctx('99999999999999') as any)
         expect(res.status).toBe(404)
         expect(updateSpy).not.toHaveBeenCalled()
     })
