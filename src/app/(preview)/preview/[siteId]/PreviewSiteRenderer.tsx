@@ -163,12 +163,12 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             isEditorIframe={isEditorIframe}
             isOwner={true}
             // GH-1461: BLOCK_FIELD_CHANGED is only ever listened to by the real editor's
-            // PreviewFrame.tsx — in builder-preview (?builder=1) nothing reads this postMessage,
-            // so wiring it up was vestigial and left edit-callback-gated UI (WhatsApp button
-            // preventDefault, cart-widget onClick disabled, CTA isEditing) silently broken in
-            // read-only preview. SiteRenderer itself nullifies the callback whenever
-            // isBuilderPreview is true (single source of truth), so this can stay unconditional.
-            onBlockFieldChange={handleBlockFieldChange}
+            // PreviewFrame.tsx — everywhere else (builder preview AND the standalone
+            // preview opened from the editor toolbar, which has no parent frame at all)
+            // nothing reads this postMessage, but a non-null callback still made
+            // media-upload-overlay render its "Change Image" hover UI on those
+            // review-only surfaces. Wire it only for the real editor iframe.
+            onBlockFieldChange={isEditorIframe && !isBuilderPreview ? handleBlockFieldChange : undefined}
         />
     )
 }

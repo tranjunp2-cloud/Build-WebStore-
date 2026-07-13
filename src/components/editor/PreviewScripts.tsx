@@ -1336,8 +1336,15 @@ export function PreviewScripts() {
 }
 
 /**
- * Lightweight click handler for builder preview mode (builder=1).
- * Opens external links in a new tab; lets internal nav links navigate normally.
+ * Lightweight scripts for every review-only preview surface: builder preview
+ * (builder=1), the standalone preview opened from the editor toolbar (no params),
+ * and blog preview pages (mounted unconditionally there).
+ *
+ * Does two things:
+ * 1. Opens external links in a new tab; internal nav links navigate normally.
+ * 2. Forces `cursor: default` on the whole document (GH-1461) — the UA I-beam
+ *    over text reads as "editable here" on a surface that cannot edit. Links
+ *    keep the pointer cursor (UA sets it on `a[href]` explicitly).
  */
 export function BuilderLinkScripts() {
     useEffect(() => {
@@ -1355,7 +1362,20 @@ export function BuilderLinkScripts() {
             } catch { /* invalid URL — let browser handle */ }
         }
         document.addEventListener('click', onClick)
-        return () => document.removeEventListener('click', onClick)
+
+        // GH-1461 rework: this document is the review-only builder preview — the default
+        // `cursor: auto` shows the text I-beam over copy, which reads as "editable here".
+        // Force the arrow instead. Links keep the pointer cursor (UA stylesheet sets it
+        // on <a> explicitly, so it isn't overridden by this inherited value), as do
+        // elements with their own cursor-* utility classes.
+        const style = document.createElement('style')
+        style.textContent = 'html { cursor: default; }'
+        document.head.appendChild(style)
+
+        return () => {
+            document.removeEventListener('click', onClick)
+            style.remove()
+        }
     }, [])
     return null
 }

@@ -90,15 +90,19 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <LogoHeadline text={headline} />
                 <div className={`flex flex-wrap items-center justify-center ${gap} max-w-5xl mx-auto`}>
                     {logos.map((item, i) => (
-                        <MediaUploadOverlay key={i} field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
-                            <LogoFrame size={size}>
-                                {item.logo?.url ? (
-                                    <LogoImage item={item} index={i} />
-                                ) : (
-                                    <LogoPlaceholder name={item.name} imageIndex={i} />
-                                )}
-                            </LogoFrame>
-                        </MediaUploadOverlay>
+                        // MediaUploadOverlay tracks hover on its parentElement — each tile needs
+                        // its own wrapper, or hovering one logo shows the overlay on all of them.
+                        <div key={i}>
+                            <MediaUploadOverlay field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
+                                <LogoFrame size={size}>
+                                    {item.logo?.url ? (
+                                        <LogoImage item={item} index={i} />
+                                    ) : (
+                                        <LogoPlaceholder name={item.name} imageIndex={i} />
+                                    )}
+                                </LogoFrame>
+                            </MediaUploadOverlay>
+                        </div>
                     ))}
                 </div>
             </SectionWrapper>
