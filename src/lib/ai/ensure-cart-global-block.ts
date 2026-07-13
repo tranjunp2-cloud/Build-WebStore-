@@ -37,3 +37,28 @@ export function ensureCartGlobalBlock(
 
     return { globalBlocks: { ...existing, cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } } }
 }
+
+/**
+ * ensureCartGlobalBlock + pendingGlobalBlocks awareness. The editor and
+ * preview read pendingGlobalBlocks FIRST when non-null (editor-data route),
+ * so a stale pending draft — e.g. an unpublished cartWidget deletion — would
+ * shadow the freshly persisted live cart and resurrect the missing-cart bug
+ * on regeneration/re-skin. When a pending draft exists and lacks a configured
+ * cart, graft the default cart into it too; other pending keys (unpublished
+ * whatsapp/social edits) are preserved rather than discarded.
+ */
+export function ensureCartGlobalBlockWithPending(
+    existingGlobalBlocks: Record<string, unknown> | null | undefined,
+    pendingGlobalBlocks: Record<string, unknown> | null | undefined,
+    pages: Array<{ layout?: unknown[] }>,
+    headerBlock?: unknown,
+): { globalBlocks?: Record<string, unknown>; pendingGlobalBlocks?: Record<string, unknown> } {
+    const livePatch = ensureCartGlobalBlock(existingGlobalBlocks, pages, headerBlock)
+    if (pendingGlobalBlocks == null) return livePatch
+
+    const pendingPatch = ensureCartGlobalBlock(pendingGlobalBlocks, pages, headerBlock)
+    return {
+        ...livePatch,
+        ...('globalBlocks' in pendingPatch ? { pendingGlobalBlocks: pendingPatch.globalBlocks } : {}),
+    }
+}

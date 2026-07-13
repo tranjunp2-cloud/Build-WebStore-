@@ -22,7 +22,7 @@ import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
-import { ensureCartGlobalBlock } from '@/lib/ai/ensure-cart-global-block'
+import { ensureCartGlobalBlock, ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -498,14 +498,17 @@ export const POST = withAuth(async (user, req) => {
                 }
 
                 // 3. Mark completed (+ auto-add floating cart when the re-skinned
-                // layouts contain commerce blocks and no cart is configured yet)
+                // layouts contain commerce blocks and no cart is configured yet).
+                // Pending-aware: a stale pendingGlobalBlocks draft (e.g. unpublished
+                // cart deletion) would shadow the live cart in the editor.
                 await payload.update({
                     collection: 'sites',
                     id: Number(siteId),
                     data: {
                         generationStatus: 'completed',
-                        ...ensureCartGlobalBlock(
+                        ...ensureCartGlobalBlockWithPending(
                             (existingSite as { globalBlocks?: Record<string, unknown> | null }).globalBlocks,
+                            (existingSite as { pendingGlobalBlocks?: Record<string, unknown> | null }).pendingGlobalBlocks,
                             reskinnedLayouts,
                             (existingSite as { headerBlock?: unknown }).headerBlock,
                         ),

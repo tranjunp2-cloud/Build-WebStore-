@@ -1,7 +1,7 @@
 /**
  * Unit Tests: generation-time cart auto-add — sites generated with commerce
  * blocks must persist a floating cartWidget into site.globalBlocks.
- * TC-IDs: TC-F01.CART-01 → TC-F01.CART-05
+ * TC-IDs: TC-F01.CART-01 → TC-F01.CART-05, TC-F01.CART-07
  * Convention: docs/TEST_CONVENTION.md
  * QA doc: docs/qa/F01-ai-chat-builder.md §3.x
  *
@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import {
     ensureCartGlobalBlock,
+    ensureCartGlobalBlockWithPending,
     DEFAULT_CART_WIDGET_BLOCK,
 } from '@/lib/ai/ensure-cart-global-block'
 
@@ -87,5 +88,50 @@ describe('TC-F01.CART-05: header cart suppresses the floating cart', () => {
     it('still adds the cart when headerBlock has no cart config', () => {
         const patch = ensureCartGlobalBlock(undefined, commercePages, { blockType: 'navigation', links: [] })
         expect(patch).toHaveProperty('globalBlocks.cartWidget')
+    })
+})
+
+describe('TC-F01.CART-07: stale pending draft must not shadow the new cart (regenerate/re-skin)', () => {
+    it('grafts the cart into a pending draft that deleted it (editor reads pending first)', () => {
+        const patch = ensureCartGlobalBlockWithPending(undefined, { cartWidget: null }, commercePages)
+        expect(patch.globalBlocks).toEqual({ cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } })
+        expect(patch.pendingGlobalBlocks).toEqual({ cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } })
+    })
+
+    it('patches pending even when the live cart is already configured (shadow case)', () => {
+        const live = { cartWidget: { blockType: 'cartWidget', variant: 'floating', label: 'Giỏ hàng', showLabel: true } }
+        const patch = ensureCartGlobalBlockWithPending(live, { cartWidget: null }, commercePages)
+        expect(patch.globalBlocks).toBeUndefined()
+        expect(patch.pendingGlobalBlocks).toEqual({ cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } })
+    })
+
+    it('preserves other unpublished pending keys when grafting', () => {
+        const pending = {
+            cartWidget: null,
+            whatsappButton: { blockType: 'whatsapp-button', phone: '+60123456789' },
+        }
+        const patch = ensureCartGlobalBlockWithPending(undefined, pending, commercePages)
+        expect(patch.pendingGlobalBlocks).toEqual({
+            cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK },
+            whatsappButton: pending.whatsappButton,
+        })
+    })
+
+    it('leaves a pending draft with a configured cart untouched', () => {
+        const pending = { cartWidget: { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: true } }
+        const patch = ensureCartGlobalBlockWithPending(undefined, pending, commercePages)
+        expect(patch.globalBlocks).toEqual({ cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } })
+        expect(patch).not.toHaveProperty('pendingGlobalBlocks')
+    })
+
+    it('returns the live patch only when there is no pending draft (null/undefined)', () => {
+        expect(ensureCartGlobalBlockWithPending(undefined, null, commercePages)).toEqual({
+            globalBlocks: { cartWidget: { ...DEFAULT_CART_WIDGET_BLOCK } },
+        })
+        expect(ensureCartGlobalBlockWithPending(undefined, undefined, contentOnlyPages)).toEqual({})
+    })
+
+    it('does nothing for non-commerce pages regardless of pending state', () => {
+        expect(ensureCartGlobalBlockWithPending(undefined, { cartWidget: null }, contentOnlyPages)).toEqual({})
     })
 })

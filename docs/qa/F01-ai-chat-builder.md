@@ -334,6 +334,7 @@ _Unit: `src/__tests__/unit/lib/ai/ensure-cart-global-block.test.ts` (`ensureCart
 | TC-F01.CART-04 | US | Unit | **[Unit]** Giữ các global block khác (whatsapp/social) khi merge cart | `existingGlobalBlocks = { whatsappButton: {...} }` + commerce pages | Patch chứa cả `whatsappButton` cũ lẫn `cartWidget` mới | High | [ ] |
 | TC-F01.CART-05 | US | Unit | **[Unit]** Header đã có cart (showCart) → không thêm floating cart | `headerBlock = { showCart: true }` + commerce pages | Trả về `{}` | Medium | [ ] |
 | TC-F01.CART-06 | US | E2E | **[E2E]** Generate site ecommerce → cart hiện trong editor + storefront | Generate site ngành ecommerce (có products-grid) → mở editor → publish | `site.globalBlocks.cartWidget` tồn tại trong DB; floating cart hiện ở editor canvas và site published | Critical | [ ] |
+| TC-F01.CART-07 | Review | Unit | **[Unit]** Pending draft cũ không che cart mới khi regenerate/re-skin | `pendingGlobalBlocks = { cartWidget: null }` (user xóa cart trong draft chưa publish) + regenerate commerce pages → gọi `ensureCartGlobalBlockWithPending` | Patch chứa cả `globalBlocks.cartWidget` lẫn `pendingGlobalBlocks.cartWidget` (editor/preview đọc pending trước); các key pending khác giữ nguyên; pending đã config cart hoặc pending null → không thêm `pendingGlobalBlocks` vào patch | Critical | [ ] |
 
 ---
 
