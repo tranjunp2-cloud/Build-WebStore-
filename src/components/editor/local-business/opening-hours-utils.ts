@@ -83,6 +83,21 @@ export function defaultWeek(): OpeningHourRow[] {
     )
 }
 
+/** Normalizes rows saved before AC-3 strict validation (isClosed false/omitted
+ *  but opens/closes missing — possible under the old buggy `.refine()` OR-chain).
+ *  Re-sending such a row unchanged now fails saveSiteSchema's superRefine and
+ *  blocks saving ANY other local-business field, since the whole openingHours
+ *  array round-trips on every save. Normalizing to closed matches how the row
+ *  already renders (describeDay/rangesFromDay filter it out) and how
+ *  local-seo-score already scores it (never counted as open). */
+export function sanitizeLegacyOpeningHours(rows: OpeningHourRow[]): OpeningHourRow[] {
+    return rows.map(r =>
+        (!r.isClosed && (!r.opens || !r.closes))
+            ? { ...r, isClosed: true, opens: undefined, closes: undefined }
+            : r
+    )
+}
+
 /** Display strings for one day's rows: one line per time range (split-shift =
  *  multiple lines), the closed label if fully closed, or `[]` if no data yet. */
 export function describeDay(rows: OpeningHourRow[], closedLabel: string): string[] {

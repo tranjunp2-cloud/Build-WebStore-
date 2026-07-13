@@ -46,6 +46,7 @@ import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-
 import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
 import { OpeningHoursEditor } from './local-business/opening-hours-editor'
+import { sanitizeLegacyOpeningHours } from './local-business/opening-hours-utils'
 import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
@@ -488,6 +489,16 @@ function SettingsPanelInner({
     // the merge-then-track sequence lives in exactly one place (DRY).
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
         const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
+        // Saving any OTHER local-business field re-sends the stored openingHours
+        // array unchanged (full-object merge above). A row saved before AC-3's
+        // strict validation could have isClosed=false with missing opens/closes —
+        // re-sending it as-is now fails saveSiteSchema and blocks this unrelated
+        // save. Only sanitize on pass-through; the editor's own patch already
+        // guarantees valid rows (opening-hours-utils' encodeDay filters incomplete
+        // ranges), so an active openingHours edit should still validate strictly.
+        if (merged.openingHours && !patch.openingHours) {
+            merged.openingHours = sanitizeLegacyOpeningHours(merged.openingHours)
+        }
         const result = await onSiteSettingsChange?.({ localBusiness: merged })
         // Only track on a confirmed successful save — onSiteSettingsChange resolves
         // even on failure (errors are caught/toasted upstream), so `result === true`

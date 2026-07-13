@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import {
     groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid,
+    sanitizeLegacyOpeningHours,
 } from '@/components/editor/local-business/opening-hours-utils'
 import type { OpeningHourRow } from '@/components/editor/local-business/types'
 
@@ -186,5 +187,40 @@ describe('[TC-F37-02-23] isRangeOrderValid — closes must be strictly after ope
         expect(isRangeOrderValid({ opens: '', closes: '18:00' })).toBe(true)
         expect(isRangeOrderValid({ opens: '09:00', closes: '' })).toBe(true)
         expect(isRangeOrderValid({ opens: '', closes: '' })).toBe(true)
+    })
+})
+
+// ── sanitizeLegacyOpeningHours — normalizes pre-AC-3 invalid rows to closed ──
+// (no F37 QA TC-ID yet — added for GH-02 legacy-data fix, backfills into docs/qa/F37-local-seo.md)
+
+describe('sanitizeLegacyOpeningHours — normalizes rows saved before strict opens/closes validation', () => {
+    it('normalizes a not-closed row missing both opens and closes to isClosed:true', () => {
+        const result = sanitizeLegacyOpeningHours([{ dayOfWeek: 'Mo' }])
+        expect(result).toEqual([{ dayOfWeek: 'Mo', isClosed: true, opens: undefined, closes: undefined }])
+    })
+
+    it('normalizes a not-closed row missing only closes to isClosed:true', () => {
+        const result = sanitizeLegacyOpeningHours([{ dayOfWeek: 'Mo', opens: '09:00', isClosed: false }])
+        expect(result[0]).toMatchObject({ isClosed: true, opens: undefined, closes: undefined })
+    })
+
+    it('leaves a valid open row (both opens and closes present) untouched', () => {
+        const row = { dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false }
+        expect(sanitizeLegacyOpeningHours([row])).toEqual([row])
+    })
+
+    it('leaves an already-closed row untouched', () => {
+        const row = { dayOfWeek: 'Sa', isClosed: true }
+        expect(sanitizeLegacyOpeningHours([row])).toEqual([row])
+    })
+
+    it('handles a mixed array — only the invalid row is normalized', () => {
+        const rows: OpeningHourRow[] = [
+            { dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false },
+            { dayOfWeek: 'Tu', opens: '09:00', isClosed: false },
+        ]
+        const result = sanitizeLegacyOpeningHours(rows)
+        expect(result[0]).toEqual(rows[0])
+        expect(result[1]).toMatchObject({ isClosed: true, opens: undefined, closes: undefined })
     })
 })
