@@ -581,6 +581,7 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
     }))
 
     // Assert — VN path unchanged: curated phrase + explicit lang=vi
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
     expect(mockSearchPhotos.mock.calls[2]![0]).toBe('ẩm thực việt nam')
     const tier3Opts = mockSearchPhotos.mock.calls[2]![2] as { lang?: string }
     expect(tier3Opts.lang).toBe('vi')

@@ -485,7 +485,11 @@ export async function getMediaForBlock(
     const categoryFallback = async (): Promise<BatchFetchResult> => {
         const vnQuery = isVN ? VN_CATEGORY_QUERIES[composerCategory] : undefined
         const fallbackQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[composerCategory]?.[0]
-        if (fallbackQuery && fallbackQuery !== query) {
+        // `!== keywords[0]` guard: tier-2 broadens to keywords[0], and on the
+        // scaffolding path deriveKeywords puts a random CATEGORY_BASE_KEYWORDS
+        // entry there — re-issuing the byte-identical just-failed search
+        // wastes a rate-limited Pixabay call.
+        if (fallbackQuery && fallbackQuery !== query && fallbackQuery !== keywords[0]?.trim()) {
             // lang:'vi' explicit for VN phrases — mirrors image-pool
             // searchBucket; curated phrases like "quán cà phê" are not
             // script-detectable. EN base keywords use the default lang.

@@ -204,7 +204,9 @@ export const VN_CATEGORY_QUERIES: Readonly<Record<string, string>> = {
  *   1. primary query — Vietnamese queries are relevance-gated (every query
  *      word must appear in the photo tags; kills "cá cơm" false positives)
  *   2. relaxed query (broadened by buildPoolQuery) — same gate
- *   3. Vietnamese category phrase (VN_CATEGORY_QUERIES) — trusted, ungated
+ *   3. trusted category phrase, ungated — curated VN phrase
+ *      (VN_CATEGORY_QUERIES) for VN queries, English category base keyword
+ *      (CATEGORY_BASE_KEYWORDS[category][0]) otherwise
  * Returns the photos plus whether any fallback tier fired (underfill signal).
  */
 async function searchBucket(
@@ -256,14 +258,18 @@ async function searchBucket(
   if (photos.length >= minCount) return { photos, usedFallback }
 
   // Tier 3 — trusted category phrase, ungated. VN inputs use the curated
-  // Vietnamese phrase (lang=vi). Non-VN inputs (Malay/English zero-hit — e.g.
-  // "pen dan pensel" has no Pixabay tag coverage) fall to the English
-  // category base keyword instead of returning an empty bucket: an empty
-  // pool means media-injector replaces nothing, so GPT-hallucinated stock
-  // URLs (typically off-topic fashion shots for `ecommerce`) survive as-is.
+  // Vietnamese phrase (lang=vi). Non-VN inputs whose bucket is still under
+  // minCount (zero or thin hits — e.g. "pen dan pensel" has no Pixabay tag
+  // coverage) top up with the English category base keyword instead of
+  // returning an empty/thin bucket: an empty pool means media-injector
+  // replaces nothing, so GPT-hallucinated stock URLs (typically off-topic
+  // fashion shots for `ecommerce`) survive as-is.
   const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
   const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
-  if (catQuery && catQuery !== query) {
+  // `!== relaxedQuery` guard: on the scaffolding path the tier-2 query can
+  // already equal the category base keyword — re-issuing the byte-identical
+  // just-failed search wastes a rate-limited Pixabay call.
+  if (catQuery && catQuery !== query && catQuery !== relaxedQuery) {
     usedFallback = true
     try {
       // lang:'vi' explicit for VN phrases — curated phrases like "quán cà phê"
