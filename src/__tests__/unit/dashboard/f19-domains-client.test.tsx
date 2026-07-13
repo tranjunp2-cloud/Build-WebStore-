@@ -415,4 +415,27 @@ describe('F23 subdomain slug input (#1459)', () => {
         expect(input.className).toContain('flex-1');
         expect(input.className).toContain('min-w-0');
     });
+
+    it('[TC-F23-056] edit row wraps so validation message is not clipped on mobile (#1583)', async () => {
+        const input = enterEditMode();
+        const inputGroup = input.parentElement as HTMLElement;
+        const row = inputGroup.parentElement as HTMLElement;
+
+        // Row must wrap: input is w-full on mobile, so the status/message
+        // block drops below it instead of overflowing the viewport.
+        // Both halves of the pair are load-bearing — pin them together.
+        expect(row.className).toContain('flex-wrap');
+        expect(inputGroup.className).toContain('w-full');
+        // Idle renders no status div — an empty one would wrap into a phantom row.
+        expect(row.children).toHaveLength(1);
+
+        // <3 chars → invalid after the 400ms debounce (no fetch involved).
+        fireEvent.change(input, { target: { value: 'ab' } });
+        const msg = await waitFor(() => screen.getByText('At least 3 characters'));
+
+        expect(msg.className).toContain('break-words');
+        const statusDiv = msg.parentElement as HTMLElement;
+        expect(statusDiv.className).toContain('min-w-0');
+        expect(statusDiv.className).not.toContain('ml-2');
+    });
 });

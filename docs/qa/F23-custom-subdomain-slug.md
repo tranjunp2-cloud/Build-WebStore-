@@ -890,6 +890,22 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-056: Subdomain edit — message validation không bị cắt trên mobile
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. Đọc className của row bao ngoài (cha của input-group)
+  2. Idle: đếm số con của row
+  3. `change` với giá trị `"ab"` (< 3 ký tự), chờ debounce 400ms
+- **Expected:** Row có `flex-wrap` (mobile: input `w-full` → message rớt xuống dưới, không tràn viewport); idle KHÔNG render status div (tránh dòng wrap rỗng); message `"At least 3 characters"` có `break-words`, container có `min-w-0`, không còn `ml-2`
+- **Test Data:** `"ab"` → invalid
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1060,5 +1076,6 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 55 Test Cases — 13 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 56 Test Cases — 14 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
 *TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
+*TC-F23-056 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile).*

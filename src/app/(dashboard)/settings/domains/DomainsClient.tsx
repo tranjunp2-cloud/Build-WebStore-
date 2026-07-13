@@ -606,7 +606,10 @@ export function DomainsClient({
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-0">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    {/* GH-1583: flex-wrap để cụm status/message rớt xuống dưới input trên mobile
+                                        (input w-full chiếm trọn hàng) thay vì tràn khỏi viewport; desktop không đổi
+                                        vì input max-w-[520px], gap-x-2 giữ đúng 8px như ml-2 cũ. */}
                                     {/* Input-group: viền + focus-ring nằm ở khung bao ngoài (focus-within)
                                         nên cả cụm input + hậu tố .domain sáng viền liền mạch khi focus.
                                         Input bên trong để trong suốt (cùng pattern ô tiền "RM" form discount). */}
@@ -636,13 +639,16 @@ export function DomainsClient({
                                             .{PLATFORM_DOMAIN}
                                         </span>
                                     </div>
-                                    <div className="ml-2">
-                                        {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
-                                        {slugStatus === 'available' && <Check className="h-4 w-4 text-[hsl(var(--success))]" />}
-                                        {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
-                                            <span className="text-[12px] text-[hsl(var(--destructive))]">{slugMessage}</span>
-                                        )}
-                                    </div>
+                                    {/* Idle không render — div rỗng sẽ wrap thành dòng thừa (gap-y) trên mobile. */}
+                                    {slugStatus !== 'idle' && (
+                                        <div className="min-w-0">
+                                            {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
+                                            {slugStatus === 'available' && <Check className="h-4 w-4 text-[hsl(var(--success))]" />}
+                                            {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
+                                                <span className="text-[12px] text-[hsl(var(--destructive))] break-words">{slugMessage}</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {/* "Connected" status badge — theme-aware via Badge success variant */}
