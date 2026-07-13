@@ -929,8 +929,8 @@ export function PaymentsFormClient({
 
             {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh.
                 `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
-                regardless of content length. `--dash-content-pl` (CMSLayoutClient) clears the
-                sidebar at lg+. */}
+                regardless of content length. `--dash-content-pl` (globals.css, GH-1592) aligns the
+                left edge with the content column (sidebar + p-8 gutter) at lg+. */}
             {isDirty && (
             <div
                 className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
