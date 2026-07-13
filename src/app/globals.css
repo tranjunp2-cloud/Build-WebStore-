@@ -327,6 +327,23 @@ html:not(.dark) {
   color: var(--dash-text);
 }
 
+/* --dash-content-pl: mép TRÁI của CỘT NỘI DUNG (sidebar + gutter trang md:p-8 = 2rem),
+   dùng cho các save bar `fixed ... lg:left-[var(--dash-content-pl)]` (settings/discounts/
+   customers/products). Trước đây var này set inline = 250px (mép sidebar, không cộng gutter,
+   không theo sidebar responsive 246/250) → bar nhô ~28-32px so với card nội dung (GH-1592).
+   Width sidebar phải khớp Sidebar.tsx (`w-[246px] 2xl:w-[250px]`, mini `w-[64px]`).
+   Scope vào `.dash-shell-root` (marker chỉ có trên layout root — CMSLayoutClient, nơi toggle
+   `.dash-sidebar-mini`), KHÔNG dùng `.dash-shell` trần: nhiều modal/popover tự gắn `dash-shell`
+   để ăn theme, nếu match sẽ re-declare var này mà không có gate mini → consumer lồng bên trong
+   đọc sai offset khi sidebar thu gọn; var định nghĩa ở root tự inherit xuống toàn cây. */
+@media (min-width: 1024px) {
+  .dash-shell-root { --dash-content-pl: calc(246px + 2rem); }
+  .dash-shell-root.dash-sidebar-mini { --dash-content-pl: calc(64px + 2rem); }
+}
+@media (min-width: 1536px) {
+  .dash-shell-root:not(.dash-sidebar-mini) { --dash-content-pl: calc(250px + 2rem); }
+}
+
 .dash-shell .bg-zinc-950,
 .dash-shell .bg-\[\#0B1120\],
 .dash-shell .bg-\[\#0f1729\],

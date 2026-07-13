@@ -102,8 +102,8 @@ export function DiscountFormHeader({
                 so "unsaved changes" + Revert don't apply (use footer Cancel/Save). */}
             {dirty && !isNew && (
                 <div
-                    className="flex items-center justify-between gap-4 px-6 py-2 mt-4 text-sm"
-                    style={{ background: 'hsl(var(--warning)/0.08)', borderTop: '1px solid hsl(var(--warning)/0.2)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
+                    className="flex items-center justify-between gap-4 px-6 py-2 mt-4 text-sm rounded-[10px]"
+                    style={{ background: 'hsl(var(--warning)/0.08)', border: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
                 >
                     <span>{d.unsavedChanges}</span>
                     <div className="flex items-center gap-2">
