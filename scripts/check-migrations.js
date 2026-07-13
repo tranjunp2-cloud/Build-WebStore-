@@ -145,7 +145,16 @@ function getFieldRoles(source) {
  * every tracked collection if BASE_BRANCH itself is misconfigured).
  */
 function isPathMissingAtRef(gitErrorMessage) {
-  return /does not exist in/.test(gitErrorMessage)
+  // "does not exist in" fires when the path never existed anywhere reachable
+  // from the ref; "exists on disk, but not in" is what git actually returns
+  // for the realistic case here — the file passed the existsSync() guard
+  // above (it's on disk, new in this PR) but isn't present at BASE_BRANCH yet.
+  // Verified against a real `git show <ref>:<path-new-on-disk>` invocation —
+  // matching only the first pattern silently fell through to the generic
+  // "could not read, skipping" branch, which SKIPS the file entirely instead
+  // of treating it as a new-file/empty-baseline (i.e. a brand-new tracked
+  // collection's fields would never get flagged for a missing migration).
+  return /does not exist in|exists on disk, but not in/.test(gitErrorMessage)
 }
 
 /**

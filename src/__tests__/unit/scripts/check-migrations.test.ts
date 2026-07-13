@@ -1,7 +1,9 @@
 /**
  * @fileoverview Regression guard for scripts/check-migrations.js's new-field
  * detection (getFieldRoles).
- * TC-IDs: TC-check-migrations-01 to 06 (provisional — no F37 QA doc owns this CI script)
+ * TC-IDs: TC-check-migrations-01 to 08 — registered in docs/qa/F37-local-seo.md
+ * §3.13 (CI infra script touched by this PR's field additions, not an F37
+ * feature test, but tracked there per the project's single-doc-map convention)
  *
  * History (see docs/journals for the full adversarial-review trail): the
  * previous 3 approaches to this CI hard-gate's array-nesting safety net were
@@ -245,5 +247,22 @@ describe('[TC-check-migrations-07] isPathMissingAtRef — distinguishes "file is
     it('does NOT recognize an empty or unrelated error message as "file is new"', () => {
         expect(isPathMissingAtRef('')).toBe(false)
         expect(isPathMissingAtRef('fatal: bad revision \'origin/totally-bad-ref-xyz\'')).toBe(false)
+    })
+})
+
+describe('[TC-check-migrations-08] isPathMissingAtRef — recognizes the actual message for a file new on disk (PR review finding C3)', () => {
+    // The realistic path in production: getNewFieldsFromDiff() only calls
+    // `git show` after fs.existsSync() already confirmed the file is on disk.
+    // For that exact case (file present in the current worktree, absent at
+    // BASE_BRANCH) git's real message is "exists on disk, but not in
+    // '<ref>'" — NOT "does not exist in". Repro'd via `touch
+    // src/collections/__Ghost__.ts && git show HEAD~50:src/collections/__Ghost__.ts`.
+    // TC-07's coverage alone missed this: a brand-new tracked collection file
+    // would hit the (b) "unknown failure, skip this file" branch instead of
+    // the (a) "empty baseline" branch, silently skipping the new-field check
+    // for that entire file.
+    it('recognizes the real "exists on disk, but not in" message as a legitimate empty baseline', () => {
+        const realMessage = "fatal: path 'src/collections/__Ghost__.ts' exists on disk, but not in 'HEAD~50'\n"
+        expect(isPathMissingAtRef(realMessage)).toBe(true)
     })
 })
