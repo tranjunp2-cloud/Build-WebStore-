@@ -97,15 +97,21 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                 const res = await fetch(`/api/orders/${orderId}/poll`)
                 if (!res.ok) return
                 const { data } = await res.json()
-                if (stopped || !data?.updatedAt) return
-                if (data.updatedAt !== orderUpdatedAt) fetchOrder({ silent: true })
+                if (stopped || !data?.updatedAt || data.updatedAt === orderUpdatedAt) return
+                // This effect only runs while the order is in-flight, so a poll that now
+                // reports confirmed + tracking 'cancelled' IS the webhook cancel auto-reopen
+                // happening live — tell the merchant why the label just disappeared.
+                if (data.status === 'confirmed' && data.shippingTrackingStatus === 'cancelled') {
+                    toast.info(t.dashboard.orders.toast.shipmentCancelledOnEp)
+                }
+                fetchOrder({ silent: true })
             } catch {
                 // transient network/DB blip — the next tick retries
             }
         }
         const id = setInterval(tick, 20000)
         return () => { stopped = true; clearInterval(id) }
-    }, [isInFlight, orderId, orderUpdatedAt, fetchOrder])
+    }, [isInFlight, orderId, orderUpdatedAt, fetchOrder, t.dashboard.orders.toast.shipmentCancelledOnEp])
 
     const handleBack = () => router.push('/orders')
 
@@ -212,6 +218,9 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                         <FulfillmentZone
                             order={order as unknown as FulfillmentOrder}
                             onUpdate={() => { fetchOrder(); router.refresh() }}
+                            // Label creation reconciles silently (no page reload): the success
+                            // card shows optimistically and the async AWB fills in via polling.
+                            onLabelCreated={() => { fetchOrder({ silent: true }) }}
                         />
                     </section>
 

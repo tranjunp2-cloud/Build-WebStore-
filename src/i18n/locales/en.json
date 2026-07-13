@@ -1217,7 +1217,8 @@
                 "loadFailed": "Failed to load orders",
                 "bulkSuccess": "Successfully confirmed {count} orders",
                 "bulkFailed": "{count} orders failed (invalid workflow)",
-                "updateFailed": "Failed to update order"
+                "updateFailed": "Failed to update order",
+                "shipmentCancelledOnEp": "This shipment was cancelled on the EasyParcel dashboard — please create a new label to ship again."
             },
             "pageTitle": "Orders",
             "pageSubtitle": "Manage and track your orders",

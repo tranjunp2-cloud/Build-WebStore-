@@ -154,9 +154,15 @@ function fmtMYR(rm: number): string {
 export function FulfillmentZone({
   order,
   onUpdate,
+  onLabelCreated,
 }: {
   order: FulfillmentOrder
   onUpdate: () => void
+  // Silent reconcile after label creation — refresh order state in place WITHOUT the
+  // full-page reload (router.refresh) that onUpdate does. The success card renders
+  // optimistically and the AWB fills in via polling, so no reload is needed. Falls
+  // back to onUpdate when not provided.
+  onLabelCreated?: () => void
 }) {
   const { t, ti } = useI18n()
   const f = t.dashboard.orders.fulfillment
@@ -361,7 +367,7 @@ export function FulfillmentZone({
             setLocalLabelUrl(newLabel)
             setLocalCreated(true)
             setForceMissing(false)
-            onUpdate()
+            ;(onLabelCreated ?? onUpdate)()
           }}
           onError={(code) => {
             // If EP returns a different error from the weight form, just surface it
@@ -413,7 +419,9 @@ export function FulfillmentZone({
             setLocalCreated(true)
             // Wallet was charged for the label — refetch balance on next read
             invalidateEpShippingInfo(tenantId)
-            onUpdate()
+            // Silent reconcile (no page reload): the success card is already shown
+            // optimistically; an async AWB fills in via polling.
+            ;(onLabelCreated ?? onUpdate)()
           }}
           onCodBlocked={() => setForceCodBlocked(true)}
         />
@@ -472,11 +480,13 @@ export function FulfillmentZone({
                 </div>
               ) : (
                 // Async-AWB couriers (e.g. Pos): shipment created + wallet charged, AWB
-                // generated later and lands via webhook backfill. Print unlocks with it.
+                // generated later and lands via webhook backfill (surfaced by polling —
+                // no page reload). Spinner marks the AWB spot as actively loading; Print
+                // unlocks once it arrives.
                 <div className="st-field grow">
                   <div className="od-info-l">{f.trackingAwb}</div>
                   <div style={{ fontSize: 13, opacity: 0.75, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Clock style={{ width: 13, height: 13, flexShrink: 0 }} /> {f.awbPending}
+                    <span className="spin" style={{ width: 13, height: 13, flexShrink: 0 }} /> {f.awbPending}
                   </div>
                 </div>
               )}

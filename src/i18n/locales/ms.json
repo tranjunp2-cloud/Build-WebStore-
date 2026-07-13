@@ -1217,7 +1217,8 @@
                 "loadFailed": "Gagal memuatkan pesanan",
                 "bulkSuccess": "Berjaya mengesahkan {count} pesanan",
                 "bulkFailed": "{count} pesanan gagal (aliran kerja tidak sah)",
-                "updateFailed": "Gagal mengemaskini pesanan"
+                "updateFailed": "Gagal mengemaskini pesanan",
+                "shipmentCancelledOnEp": "Penghantaran ini telah dibatalkan di dashboard EasyParcel — sila cipta label baharu untuk menghantar semula."
             },
             "pageTitle": "Pesanan",
             "pageSubtitle": "Urus dan jejak pesanan anda",
