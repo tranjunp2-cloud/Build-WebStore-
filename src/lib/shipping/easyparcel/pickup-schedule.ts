@@ -76,18 +76,28 @@ export function earliestPickupDate(courier: string, nowUtc: Date = new Date()): 
     return toMytDateString(pickup)
 }
 
+// EP's own dashboard caps the pickup-date picker at ~2 weeks out. Match that window.
+export const MAX_PICKUP_WINDOW_DAYS = 14
+
+/** Latest selectable pickup date as "YYYY-MM-DD" (MYT) — today + MAX_PICKUP_WINDOW_DAYS. */
+export function maxCollectionDate(nowUtc: Date = new Date()): string {
+    return toMytDateString(new Date(nowUtc.getTime() + MAX_PICKUP_WINDOW_DAYS * 24 * 3600 * 1000))
+}
+
 export interface ClampedCollectionDate {
     /** The date actually usable for submit_orders ("YYYY-MM-DD"). */
     date: string
-    /** True when the requested date was moved (past/cut-off/weekend) — UI shows "moved to DD/MM". */
+    /** True when the requested date was clamped into [earliest, max] — UI shows "moved to DD/MM". */
     shifted: boolean
 }
 
 /**
- * Server-side clamp (AC-3b): re-compute the earliest date AT REQUEST TIME and never
- * trust the client's date — a picker opened before cut-off can be submitted after it.
- * Rules: requested < earliest → earliest; weekend → next business day; no requested
- * date → earliest (default). "YYYY-MM-DD" strings compare correctly lexicographically.
+ * Server-side clamp (AC-3b): re-compute the valid window AT REQUEST TIME and never trust
+ * the client's date — a picker opened before cut-off can be submitted after it. Clamps
+ * `requested` into [earliest, max]. Weekends are NOT force-shifted: EP's dashboard itself
+ * allows weekend pickup dates (shows a soft warning, may delay AWB), so we mirror that and
+ * let EP bump to the next working day if the courier doesn't run that day.
+ * "YYYY-MM-DD" strings compare correctly lexicographically.
  */
 export function clampCollectionDate(
     courier: string,
@@ -95,9 +105,8 @@ export function clampCollectionDate(
     nowUtc: Date = new Date(),
 ): ClampedCollectionDate {
     const earliest = earliestPickupDate(courier, nowUtc)
+    const max = maxCollectionDate(nowUtc)
     let date = requested && requested > earliest ? requested : earliest
-    if (!isBusinessDateString(date)) {
-        date = toMytDateString(nextBusinessDay(new Date(`${date}T00:00:00+08:00`)))
-    }
+    if (date > max) date = max
     return { date, shifted: requested != null && date !== requested }
 }

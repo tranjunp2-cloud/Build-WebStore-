@@ -13,6 +13,7 @@ import {
   clampCollectionDate,
   isBusinessDateString,
   courierCutoffLabel,
+  maxCollectionDate,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 
 // Mon 2026-07-06 10:00 MYT (02:00 UTC) — weekday, before every cut-off
@@ -82,8 +83,19 @@ describe('clampCollectionDate (AC-3b server clamp)', () => {
       .toEqual({ date: '2026-07-09', shifted: false })
   })
 
-  it('[TC-F14.157] weekend date → bumped to next business day, shifted', () => {
-    expect(clampCollectionDate('jnt', '2026-07-11', MON_MORNING)) // Sat
-      .toEqual({ date: '2026-07-13', shifted: true })              // Mon
+  it('[TC-F36.193] weekend date within window → KEPT as-is, not shifted (EP allows weekends)', () => {
+    // Was previously bumped to Monday; now mirrors EP dashboard which accepts weekend pickup.
+    expect(clampCollectionDate('jnt', '2026-07-11', MON_MORNING)) // Sat, within 2-week window
+      .toEqual({ date: '2026-07-11', shifted: false })
+
+    expect(clampCollectionDate('jnt', '2026-07-12', MON_MORNING)) // Sun
+      .toEqual({ date: '2026-07-12', shifted: false })
+  })
+
+  it('[TC-F36.193] date beyond the ~2-week window → clamped down to max, shifted', () => {
+    // earliest = 2026-07-06, max = 2026-07-20 (earliest window 14 days from now)
+    expect(maxCollectionDate(MON_MORNING)).toBe('2026-07-20')
+    expect(clampCollectionDate('jnt', '2026-08-15', MON_MORNING)) // far future
+      .toEqual({ date: '2026-07-20', shifted: true })
   })
 })

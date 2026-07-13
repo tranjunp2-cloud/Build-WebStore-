@@ -11,6 +11,7 @@ import {
   earliestPickupDate,
   isBusinessDateString,
   courierCutoffLabel,
+  maxCollectionDate,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 import type { EpWalletInfo } from './use-ep-shipping-info'
 import { CourierLogo } from './courier-logo'
@@ -62,13 +63,16 @@ export function CreateLabelFlow({
   const [unsupported, setUnsupported] = useState<Array<'pickup' | 'dropoff'>>([])
   // Earliest date is cut-off aware per courier (shared helper — same math as the server clamp)
   const earliest = useMemo(() => earliestPickupDate(courierId ?? ''), [courierId])
+  const maxDate = useMemo(() => maxCollectionDate(), [])
   const [collectionDate, setCollectionDate] = useState(earliest)
+  // Weekend is a soft warning, NOT invalid (EP allows it) — only the [earliest, max] window gates.
   const dateIsBusiness = isBusinessDateString(collectionDate)
-  const dateValid = collectionDate >= earliest && dateIsBusiness
+  const dateValid = collectionDate >= earliest && collectionDate <= maxDate
 
   // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
   const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
   const earliestDate = useMemo(() => new Date(`${earliest}T00:00:00`), [earliest])
+  const maxDateObj = useMemo(() => new Date(`${maxDate}T00:00:00`), [maxDate])
   const dateToStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
@@ -321,7 +325,8 @@ export function CreateLabelFlow({
         <div className="collect-col collect-date">
           <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionDateLabel}</div>
           {/* Date card mirrors the method tiles: value + its note live INSIDE the card.
-              shadcn Calendar disables past dates + weekends right on the grid. */}
+              Calendar disables past dates + dates beyond the ~2-week window; weekends stay
+              SELECTABLE (EP allows them) but surface a soft warning below (mirrors EP's UI). */}
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="collect-date-card">
@@ -352,7 +357,7 @@ export function CreateLabelFlow({
                 mode="single"
                 selected={selectedDate}
                 defaultMonth={selectedDate}
-                disabled={[{ before: earliestDate }, { dayOfWeek: [0, 6] }]}
+                disabled={[{ before: earliestDate }, { after: maxDateObj }]}
                 onSelect={(d) => {
                   if (d) setCollectionDate(dateToStr(d))
                   setDateOpen(false)
