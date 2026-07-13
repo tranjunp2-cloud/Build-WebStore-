@@ -400,8 +400,11 @@ export const Products: CollectionConfig = {
             name: 'category',
             type: 'relationship',
             relationTo: 'categories',
+            // hasMany kept true intentionally (GH-1587 #5/#12): flipping to false would require a
+            // products_rels → direct-column data migration for zero functional gain, since
+            // CategorySelect.tsx already enforces single-select (onChange([cat.id]), array-of-one).
             hasMany: true,
-            admin: { description: 'Danh mục sản phẩm (Hỗ trợ Multi-select)' },
+            admin: { description: 'Danh mục sản phẩm (chọn 1 danh mục)' },
         },
         {
             name: 'tags',

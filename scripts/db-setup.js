@@ -4949,6 +4949,39 @@ const MIGRATIONS = [
     name: 'enum_analytics_event.add_local_business_data_saved',
     sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
   },
+  // ── F08 issue #14: category slug uniqueness global → per-tenant ──
+  // Dedupe existing rows before creating unique index (keep newest, soft-delete older duplicates).
+  // Verified live index name via `psql \d categories`: the field's `unique:true` produced a single
+  // UNIQUE btree index named `categories_slug_idx` (not a separate plain lookup index as originally
+  // assumed) — dropping it removes the only index on slug until Phase 04 removes `unique:true` from
+  // the Payload field (keeps `index:true`), which lets pushDevSchema recreate a plain `categories_slug_idx`.
+  {
+    name: 'categories.dedupe_tenant_slug',
+    sql: `UPDATE categories SET deleted_at = NOW()
+      WHERE deleted_at IS NULL
+        AND slug IS NOT NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (tenant_id, slug) id
+          FROM categories WHERE deleted_at IS NULL AND slug IS NOT NULL
+          ORDER BY tenant_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
+        );`,
+  },
+  {
+    name: 'categories.drop_global_slug_unique',
+    sql: `DROP INDEX IF EXISTS categories_slug_idx;
+          DROP INDEX IF EXISTS categories_slug_unique;
+          DROP INDEX IF EXISTS categories_slug_key;`,
+  },
+  {
+    name: 'categories.tenant_slug_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS categories_tenant_slug_uniq
+          ON categories (tenant_id, slug) WHERE deleted_at IS NULL;`,
+  },
+  // ── F08 issue #1587: drop unused Category Image field (YAGNI, stored but never rendered) ──
+  {
+    name: 'categories.drop_image_id',
+    sql: `ALTER TABLE categories DROP COLUMN IF EXISTS image_id;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4984,6 +5017,23 @@ async function verifyCriticalIndexes(pool) {
     );
   }
   console.log('[db-setup] ✅ verified sso_step_events_user_step_uniq exists');
+
+  // GH-1587: same failure class as above — categories.tenant_slug_unique's CREATE UNIQUE INDEX
+  // silently fails (warn-and-continue) if categories.dedupe_tenant_slug didn't fully dedupe
+  // (tenant_id, slug) first. Since categories.drop_global_slug_unique already dropped the OLD
+  // global unique index in an earlier migration step, a silent failure here means categories.slug
+  // ends up with NO uniqueness enforcement at all — strictly worse than pre-migration, and
+  // translateDbCategorySlugConflict() in actions.ts becomes permanently dead code with no error
+  // ever surfacing. Fail the build loudly instead of at runtime.
+  const catRows = await pool.query(
+    `SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'categories_tenant_slug_uniq'`
+  );
+  if (catRows.rows.length === 0) {
+    throw new Error(
+      'categories_tenant_slug_uniq index missing after migrations — per-tenant slug uniqueness is NOT enforced. Check categories.dedupe_tenant_slug for duplicate (tenant_id, slug) rows that survived it.'
+    );
+  }
+  console.log('[db-setup] ✅ verified categories_tenant_slug_uniq exists');
 }
 
 /**

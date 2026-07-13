@@ -69,20 +69,34 @@ export const Categories: CollectionConfig = {
     },
     hooks: {
         beforeValidate: [
-            async ({ data, req, operation }) => {
-                // Depth check: prevent > 3 levels
+            async ({ data, req, operation, originalDoc }) => {
+                // Depth + cycle check: walk the ancestor chain from the candidate parent up to
+                // the root ONCE, checking two things per hop: (1) does this ancestor equal the
+                // node's own id — a cycle (self-as-parent or descendant-as-parent), and (2) how
+                // many levels deep is the candidate parent — reject if placing a child under it
+                // would exceed 3 levels. Only relevant on update (create has no existing id, so
+                // no cycle is possible). Capped at 5 hops as a safety net against a pre-existing
+                // corrupted cycle in the data causing an infinite loop.
                 if (data?.parent) {
-                    let currentParent = await req.payload.findByID({
-                        collection: 'categories',
-                        id: data.parent,
-                    });
-                    let depth = 1;
-                    while (currentParent?.parent) {
+                    const selfId = operation === 'update' ? originalDoc?.id : undefined
+
+                    let candidateId: string | number | null | undefined = data.parent
+                    let depth = 0
+                    let hops = 0
+                    while (candidateId != null) {
+                        hops++
+                        if (hops > 5) break
+                        if (selfId != null && String(candidateId) === String(selfId)) {
+                            throw new Error('Không thể đặt danh mục làm cha của chính nó hoặc của danh mục con/cháu của nó');
+                        }
                         depth++;
-                        currentParent = await req.payload.findByID({
+                        const candidateDoc = await req.payload.findByID({
                             collection: 'categories',
-                            id: typeof currentParent.parent === 'object' ? currentParent.parent.id : currentParent.parent as string,
+                            id: candidateId,
                         });
+                        candidateId = candidateDoc?.parent
+                            ? (typeof candidateDoc.parent === 'object' ? candidateDoc.parent.id : candidateDoc.parent as string)
+                            : null;
                     }
                     // If the parent is already level 3, the child would be level 4, which is not allowed.
                     if (depth >= 3) {
@@ -160,7 +174,10 @@ export const Categories: CollectionConfig = {
         {
             name: 'slug',
             type: 'text',
-            unique: true,
+            // NOT globally unique — GH-1587 Phase 01 replaced the global unique index with a
+            // per-tenant composite unique index (categories_tenant_slug_uniq, DB-enforced via
+            // scripts/db-setup.js). Keep `index: true` only so Payload's pushDevSchema still
+            // creates a plain lookup index; do NOT re-add `unique: true` here.
             index: true,
             admin: { description: 'URL-friendly slug (Tự động tạo nếu để trống)' },
         },
@@ -185,12 +202,6 @@ export const Categories: CollectionConfig = {
             name: 'breadcrumbs',
             type: 'text',
             admin: { readOnly: true, description: 'Đường dẫn danh mục (auto-generated)' },
-        },
-        {
-            name: 'image',
-            type: 'upload',
-            relationTo: 'media',
-            admin: { description: 'Ảnh danh mục (Tùy chọn)' }
         },
         {
             name: 'deletedAt',

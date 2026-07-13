@@ -2013,8 +2013,9 @@
                 "maxLevelReached": "Tahap maksimum (Tahap 3) dicapai. Tidak boleh menambah subkategori lebih dalam.",
                 "productsCount": "produk",
                 "form": {
-                    "newTitle": "Tambah Kategori",
+                    "newTitle": "Tambah Kategori Baharu",
                     "editTitle": "Sunting Kategori",
+                    "addSubcategoryTitle": "Tambah Subkategori",
                     "name": "Nama Kategori *",
                     "namePlaceholder": "cth. Elektronik, Fesyen",
                     "slug": "Slug URL",
@@ -2024,18 +2025,22 @@
                     "parentNone": "Tiada (Tahap Atas)",
                     "description": "Penerangan",
                     "descriptionPlaceholder": "Penerangan ringkas untuk SEO (pilihan)",
-                    "image": "Imej Kategori",
                     "cancel": "Batal",
                     "save": "Simpan Kategori",
                     "saving": "Menyimpan...",
-                    "optional": "(Pilihan)"
+                    "optional": "(Pilihan)",
+                    "errors": {
+                        "nameDuplicate": "Nama kategori sudah wujud pada tahap ini.",
+                        "slugDuplicate": "Slug URL ini sudah digunakan dalam kedai anda."
+                    }
                 },
                 "deleteModal": {
                     "title": "Padam Kategori",
                     "warning1": "Adakah anda pasti mahu memadamkan",
                     "warning2": "",
-                    "subCategoryWarning": "Kategori ini mempunyai kategori anak. Ia akan dipisahkan dari pepohon (tidak dipadamkan secara kekal).",
+                    "subCategoryWarning": "Kategori ini mempunyai kategori anak. Ia akan dipindahkan ke tahap teratas (tidak dipadamkan secara kekal).",
                     "productsWarning": "Produk dalam kategori ini tidak akan dipadamkan, tetapi akan kehilangan tag kategori ini.",
+                    "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."
@@ -2047,7 +2052,8 @@
                     "loadError": "Gagal memuatkan kategori",
                     "saveError": "Gagal menyimpan kategori",
                     "deleteError": "Gagal memadamkan kategori",
-                    "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap"
+                    "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap",
+                    "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri."
                 }
             },
             "subtitle": "Urus produk kedai"

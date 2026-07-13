@@ -1,6 +1,6 @@
 # Phase 05 — Single-Select Cleanup (#5, #12)
 
-**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** pending
+**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** done
 
 ## Context
 
@@ -38,9 +38,9 @@ Make single-select the OFFICIAL, documented behavior. **No behavior change in co
 
 ## Todo
 
-- [ ] Update Products category admin description to single-select wording
-- [ ] Inline comment: hasMany kept intentionally (no migration)
-- [ ] Grep for other "multi-select" category copy; align if found
+- [x] Update Products category admin description to single-select wording
+- [x] Inline comment: hasMany kept intentionally (no migration)
+- [x] Grep for other "multi-select" category copy; align if found
 
 ## Success Criteria
 

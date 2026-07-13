@@ -1,6 +1,6 @@
 # Phase 02 — Delete Integrity (#10)
 
-**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** pending
+**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** done
 
 ## Context
 
@@ -60,12 +60,12 @@ deleteCategoryAction(id):
 
 ## Todo
 
-- [ ] Direct-count SQL in `deleteCategoryAction`
-- [ ] Hard-block throw with structured message
-- [ ] Re-parent direct children via payload.update (breadcrumbs regen)
-- [ ] Soft-delete self after checks
-- [ ] UI parse error + count-aware toast, keep modal open
-- [ ] i18n `hasProductsError` EN + MS; update `subCategoryWarning` copy EN + MS
+- [x] Direct-count SQL in `deleteCategoryAction`
+- [x] Hard-block throw with structured message
+- [x] Re-parent direct children via payload.update (breadcrumbs regen)
+- [x] Soft-delete self after checks
+- [x] UI parse error + count-aware toast, keep modal open
+- [x] i18n `hasProductsError` EN + MS; update `subCategoryWarning` copy EN + MS
 
 ## Success Criteria
 

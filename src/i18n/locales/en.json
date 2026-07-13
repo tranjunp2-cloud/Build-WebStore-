@@ -2013,8 +2013,9 @@
                 "maxLevelReached": "Maximum depth (Level 3) reached. Cannot add lower subcategories.",
                 "productsCount": "products",
                 "form": {
-                    "newTitle": "Add Category",
+                    "newTitle": "Add New Category",
                     "editTitle": "Edit Category",
+                    "addSubcategoryTitle": "Add Subcategory",
                     "name": "Category Name",
                     "namePlaceholder": "e.g. Electronics, Fashion",
                     "slug": "URL Slug",
@@ -2024,18 +2025,22 @@
                     "parentNone": "None (Top Level)",
                     "description": "Description",
                     "descriptionPlaceholder": "Short description for SEO (optional)",
-                    "image": "Category Image",
                     "cancel": "Cancel",
                     "save": "Save Category",
                     "saving": "Saving...",
-                    "optional": "(Optional)"
+                    "optional": "(Optional)",
+                    "errors": {
+                        "nameDuplicate": "Category name already exists in this level.",
+                        "slugDuplicate": "This URL slug is already used in your store."
+                    }
                 },
                 "deleteModal": {
                     "title": "Delete Category",
                     "warning1": "Are you sure you want to delete",
                     "warning2": "",
-                    "subCategoryWarning": "This category has child categories. They will be unlinked from the tree (not permanently deleted).",
+                    "subCategoryWarning": "This category has child categories. They will be moved to the top level (not permanently deleted).",
                     "productsWarning": "Products in this category will not be deleted, but will lose this category tag.",
+                    "hasProductsError": "Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.",
                     "cancel": "Cancel",
                     "confirm": "Delete",
                     "deleting": "Deleting..."
@@ -2047,7 +2052,8 @@
                     "loadError": "Failed to load categories",
                     "saveError": "Failed to save category",
                     "deleteError": "Failed to delete category",
-                    "maxDepthError": "Cannot nest deeper than 3 levels"
+                    "maxDepthError": "Cannot nest deeper than 3 levels",
+                    "cycleError": "Cannot set a category as a child of its own subcategory."
                 }
             },
             "subtitle": "Manage store products"

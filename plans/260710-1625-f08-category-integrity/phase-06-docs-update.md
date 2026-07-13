@@ -1,6 +1,6 @@
 # Phase 06 — Docs Update (PRD / Stories / QA)
 
-**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** pending · **Depends:** 02, 03, 04, 05
+**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** done · **Depends:** 02, 03, 04, 05
 
 ## Context
 
@@ -39,11 +39,11 @@ Update F08 PRD, stories, and QA test plan to reflect: (1) 1–n relation (1 prod
 
 ## Todo
 
-- [ ] PRD: relation 1–n, drop max-10, delete/cycle/dedup rules
-- [ ] Stories: acceptance criteria updated
-- [ ] QA: TC-05-11, -06, -09, -05, -12 revised; add children→top TC
-- [ ] Record hasMany trade-off note
-- [ ] Verify TC-IDs referenced by Phase 07 tests exist
+- [x] PRD: relation 1–n, drop max-10, delete/cycle/dedup rules
+- [x] Stories: acceptance criteria updated
+- [x] QA: TC-05-11, -06, -09, -05, -12 revised; add children→top TC
+- [x] Record hasMany trade-off note
+- [x] Verify TC-IDs referenced by Phase 07 tests exist
 
 ## Success Criteria
 

@@ -2,7 +2,7 @@
 
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 
 export async function getCategoriesAction() {
     const user = await getCurrentUser()
@@ -73,6 +73,59 @@ const CategoryServerSchema = z.object({
     depth: z.number().optional()
 }).passthrough();
 
+// Name dedup pre-check: case-insensitive + trimmed, scoped to (parent, tenant). Backend source
+// of truth for CATEGORY_NAME_DUPLICATE — the client's debounced check is UX-only and races are
+// expected/acceptable since this same query runs again here on submit.
+async function findDuplicateCategoryName(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    params: { name: string; parentId: string | number | null; tenantId: string | number; excludeId?: string | number }
+): Promise<boolean> {
+    const { sql } = await import('drizzle-orm')
+    const { name, parentId, tenantId, excludeId } = params
+    const parts = [
+        sql`lower(trim(name)) = lower(trim(${name}))`,
+        sql`tenant_id = ${tenantId}`,
+        parentId ? sql`parent_id = ${parentId}` : sql`parent_id IS NULL`,
+        sql`deleted_at IS NULL`,
+        ...(excludeId ? [sql`id <> ${excludeId}`] : []),
+    ]
+    const result = await (payload.db as any).drizzle.execute(
+        sql`SELECT id FROM categories WHERE ${sql.join(parts, sql` AND `)} LIMIT 1`
+    )
+    return result.rows.length > 0
+}
+
+export async function checkCategoryNameAvailable(name: string, parentId: string | number | null, excludeId?: string | number): Promise<boolean> {
+    const user = await getCurrentUser()
+    if (!user) return false
+    const tenantId = tenantIdForQuery(user)
+    if (!tenantId || !name.trim()) return true
+
+    const payload = await getPayload({ config: configPromise })
+    const isDuplicate = await findDuplicateCategoryName(payload, { name, parentId, tenantId, excludeId })
+    return !isDuplicate
+}
+
+// The `categories_tenant_slug_uniq` composite index (GH-1587 Phase 01) is raw-SQL, not a
+// Payload-native `unique:true` field. UNLIKE `products_sku_tenant_uniq` (an expression index,
+// `(tenant_id, lower(sku))`, whose nested `)` desyncs Payload's `Key (col)=(val)` detail-parsing
+// regex — see products/actions.ts translateDbSkuConflict), this is a plain-column composite index
+// `(tenant_id, slug)`, so Payload's regex DOES parse it successfully and resolves a path (verified
+// empirically: `path: "tenant_id, slug"`, not `null`). Categories has no other Payload-native
+// `unique:true` field since Phase 04 removed it from `slug` — this composite index is the ONLY
+// possible source of a "Value must be unique" ValidationError on this collection, so match on the
+// message alone (collection-scoped) rather than assuming an unresolved path.
+function translateDbCategorySlugConflict(err: unknown): Error {
+    const anyErr = err as { name?: string; data?: { collection?: string; errors?: Array<{ message?: string; path?: string | null }> } } | null | undefined
+    const errors = anyErr?.data?.errors ?? []
+    const isUnresolvedUniqueViolation =
+        anyErr?.name === 'ValidationError' &&
+        anyErr?.data?.collection === 'categories' &&
+        errors.some(e => e?.message === 'Value must be unique')
+    if (!isUnresolvedUniqueViolation) return err instanceof Error ? err : new Error(String(err))
+    return new Error('CATEGORY_SLUG_DUPLICATE')
+}
+
 export async function saveCategoryAction(rawData: unknown, id?: string | number) {
     const user = await getCurrentUser()
     if (!user) {
@@ -80,26 +133,67 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
     }
 
     const data = CategoryServerSchema.parse(rawData);
+    data.name = data.name.trim();
 
+    const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
-    
-    if (id) {
-        const res = await payload.update({
-            collection: 'categories',
-            id,
-            data,
-            user,
-            overrideAccess: false,
-        })
-        return JSON.parse(JSON.stringify(res));
+
+    // Security: CategoryServerSchema is `.passthrough()`, so a client could otherwise smuggle
+    // `tenant`/`site` fields through this server action and plant/move a category into another
+    // tenant's namespace (access.create has no `data` visibility to block it; access.update's
+    // Where-filter only gates WHICH doc can be targeted, not what fields the request writes to
+    // it; beforeChange's tenant auto-inject only fires on create AND only when absent). Always
+    // force the server-derived tenant, ignoring anything the client supplied. `site` is stripped
+    // outright — it's never user-facing in this form; create's existing beforeChange hook
+    // auto-derives it from `data.tenant`, and update never needs to change it.
+    delete (data as Record<string, unknown>).site
+    if (tenantId) {
+        data.tenant = tenantId
     } else {
-        const res = await payload.create({
-            collection: 'categories',
-            data,
-            user,
-            overrideAccess: false,
+        delete (data as Record<string, unknown>).tenant
+    }
+
+    if (tenantId) {
+        const rawParent = data.parent
+        const parentId: string | number | null = rawParent && typeof rawParent === 'object'
+            ? (rawParent as { id: string | number }).id
+            : (rawParent as string | number | null | undefined) ?? null
+        const isDuplicate = await findDuplicateCategoryName(payload, {
+            name: data.name,
+            parentId,
+            tenantId,
+            excludeId: id,
         })
-        return JSON.parse(JSON.stringify(res));
+        if (isDuplicate) {
+            throw new Error('CATEGORY_NAME_DUPLICATE')
+        }
+    }
+
+    if (id) {
+        try {
+            const res = await payload.update({
+                collection: 'categories',
+                id,
+                data,
+                user,
+                overrideAccess: false,
+            })
+            return JSON.parse(JSON.stringify(res));
+        } catch (updateErr) {
+            throw translateDbCategorySlugConflict(updateErr)
+        }
+    } else {
+        try {
+            const res = await payload.create({
+                collection: 'categories',
+                data,
+                user,
+                overrideAccess: false,
+            })
+            return JSON.parse(JSON.stringify(res));
+        } catch (createErr) {
+            throw translateDbCategorySlugConflict(createErr)
+        }
     }
 }
 
@@ -110,6 +204,56 @@ export async function deleteCategoryAction(id: string | number) {
     }
 
     const payload = await getPayload({ config: configPromise })
+
+    // Access check FIRST: the count query below is raw SQL with no tenant scoping, so we must
+    // confirm the caller can actually access this category (Payload's tenant-scoped access
+    // rules) before running it — otherwise directCount would leak another tenant's product
+    // count via the thrown error message. Throws if not found / not authorized for this tenant.
+    await payload.findByID({
+        collection: 'categories',
+        id,
+        user,
+        overrideAccess: false,
+    })
+
+    // Hard-block: count products assigned DIRECTLY to this category only (not descendants —
+    // direct children are re-parented to top-level below, so descendant products no longer
+    // sit under this node once the delete completes). [Decision: direct-only, confirmed 2026-07-10]
+    const { sql } = await import('drizzle-orm')
+    const countResult = await (payload.db as any).drizzle.execute(
+        sql`SELECT COUNT(DISTINCT r.parent_id)::int as count
+            FROM products_rels r
+            JOIN products p ON p.id = r.parent_id
+            WHERE r.path = 'category' AND r.categories_id = ${id} AND p.deleted_at IS NULL`
+    )
+    const directCount = (countResult.rows[0] as { count?: number } | undefined)?.count || 0
+    if (directCount > 0) {
+        throw new Error(`CATEGORY_HAS_PRODUCTS:${directCount}`)
+    }
+
+    // Re-parent direct children to top-level before soft-deleting self. Uses payload.update
+    // (not raw SQL) so the beforeChange breadcrumb-regen hook fires for each child.
+    // Known limitation: this bypasses saveCategoryAction's name-dedup pre-check, so a re-parented
+    // child could end up sharing a name with an existing top-level category. Same risk class as
+    // the accepted "no DB backstop for name dedup" limitation already documented in Phase 04 —
+    // low blast radius (no crash, name isn't DB-unique), not fixed here to avoid scope creep
+    // beyond GH-1587's stated requirements.
+    const children = await payload.find({
+        collection: 'categories',
+        where: { parent: { equals: id }, deletedAt: { exists: false } },
+        limit: 1000,
+        user,
+        overrideAccess: false,
+    })
+    for (const child of children.docs) {
+        await payload.update({
+            collection: 'categories',
+            id: child.id,
+            data: { parent: null },
+            user,
+            overrideAccess: false,
+        })
+    }
 
     const res = await payload.update({
         collection: 'categories',

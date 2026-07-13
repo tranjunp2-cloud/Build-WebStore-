@@ -1,6 +1,6 @@
 # Phase 07 — Tests (PR-1)
 
-**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** pending · **Depends:** 01–05
+**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** done · **Depends:** 01–05
 
 ## Context
 
@@ -26,7 +26,7 @@ Unit + integration coverage for the four backend integrity behaviors + single-se
 | deleteCategoryAction blocks when direct products>0 | unit (mock payload+sql) | new `category-delete-integrity.test.ts` | TC-05-06 |
 | deleteCategoryAction re-parents children to null | unit | same | new TC |
 | name dedup rejects same (name,parent,tenant), allows diff parent/tenant | unit | new `category-dedup.test.ts` | TC-05-05 |
-| slug 23505 → friendly CATEGORY_SLUG_DUPLICATE mapping | unit | same | TC-05-12 |
+| slug 23505 → friendly CATEGORY_SLUG_DUPLICATE mapping | unit | same | TC-05-05 |
 | CategorySelect selectLeaf replaces (single-select) | unit | `category-select.test.tsx` | TC-05-11 |
 
 ## Related Code Files
@@ -52,12 +52,12 @@ Unit + integration coverage for the four backend integrity behaviors + single-se
 
 ## Todo
 
-- [ ] Cycle unit tests (self + descendant + valid)
-- [ ] Delete hard-block + children re-parent tests
-- [ ] Name dedup + slug 23505 mapping tests
-- [ ] Single-select replacement assertion
-- [ ] Depth≤3 regression intact
-- [ ] `npm test` green; TC-IDs referenced
+- [x] Cycle unit tests (self + descendant + valid)
+- [x] Delete hard-block + children re-parent tests
+- [x] Name dedup + slug 23505 mapping tests
+- [x] Single-select replacement assertion
+- [x] Depth≤3 regression intact
+- [x] `npm test` green; TC-IDs referenced
 
 ## Success Criteria
 

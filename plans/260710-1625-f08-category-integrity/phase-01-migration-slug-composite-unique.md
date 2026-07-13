@@ -1,6 +1,6 @@
 # Phase 01 — Migration: Slug Composite Unique Per Tenant
 
-**PR:** 1 · **Migration:** YES · **Priority:** P1 (blocks Phase 04) · **Status:** pending
+**PR:** 1 · **Migration:** YES · **Priority:** P1 (blocks Phase 04) · **Status:** done
 
 ## Context
 
@@ -100,11 +100,11 @@ pushDevSchema (skeleton) → MIGRATIONS run in order:
 
 ## Todo
 
-- [ ] Verify live UNIQUE index/constraint name via `psql \d categories`
-- [ ] Add `categories.dedupe_tenant_slug` migration
-- [ ] Add `categories.drop_global_slug_unique` with verified name(s)
-- [ ] Add `categories.tenant_slug_unique` composite partial index
-- [ ] `check-migrations.js` passes
+- [x] Verify live UNIQUE index/constraint name via `psql \d categories`
+- [x] Add `categories.dedupe_tenant_slug` migration
+- [x] Add `categories.drop_global_slug_unique` with verified name(s)
+- [x] Add `categories.tenant_slug_unique` composite partial index
+- [x] `check-migrations.js` passes
 - [ ] Confirm Phase 04 removes `unique: true` from field in same PR
 
 ## Success Criteria
