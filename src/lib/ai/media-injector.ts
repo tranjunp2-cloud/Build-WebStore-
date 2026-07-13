@@ -100,6 +100,13 @@ const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
 // portrait search (getAvatarMedia) instead of the product-keyword pool.
 const PEOPLE_BLOCKS: ReadonlySet<string> = new Set(['testimonials', 'team', 'doctor-profile'])
 
+// GH-1185: logo-cloud must NEVER receive stock/pool photos — client logos are
+// name-only badges (monogram placeholder), not photo subjects. Kept separate
+// from `BLOCK_IMAGE_SPEC['logo-cloud']`, which is still required by
+// hydrateUrlUploadsToMedia / cleanupNonNumericImageFields / stripOrphanMediaRefs
+// for real editor-uploaded logos. This set only excludes fulfillment planning.
+const NO_STOCK_BLOCKS: ReadonlySet<string> = new Set(['logo-cloud'])
+
 // Pool sizing: fetch/pre-upload only what the enabled blocks can consume,
 // not a fixed 12+6. Buffer keeps enough surplus that pickManyFromPool can
 // shuffle DISTINCT picks across same-role blocks (anti-duplication) — a pool
@@ -126,6 +133,8 @@ export function computePoolBucketSizes(
     let squareBase = 0
     for (const blockType of enabled) {
         if (PEOPLE_BLOCKS.has(blockType)) continue
+        // GH-1185: logo-cloud never consumes stock photos — exclude from sizing
+        if (NO_STOCK_BLOCKS.has(blockType)) continue
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
         const need = spec.nestedArray
@@ -208,6 +217,7 @@ export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
 
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        if (NO_STOCK_BLOCKS.has(blockType)) continue
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
         if (!enabledBlocks.has(blockType)) continue

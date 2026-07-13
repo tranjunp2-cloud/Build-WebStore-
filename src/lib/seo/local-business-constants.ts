@@ -32,3 +32,11 @@ export const DAY_OF_WEEK_OPTIONS = [
     { label: 'Saturday', value: 'Sa' },
     { label: 'Sunday', value: 'Su' },
 ]
+
+/** Zero-padded 24h "HH:MM" (e.g. "09:00", "23:59"). Every consumer of
+ *  `openingHours.opens`/`.closes` (string comparison in `isRangeOrderValid`/
+ *  `sortRows`, JSON-LD's schema.org time format) assumes this exact shape —
+ *  enforced here at BOTH the Payload collection field and the Zod save-route
+ *  boundary so malformed data (e.g. admin-panel-entered "9:00") can never be
+ *  written via any path. */
+export const OPENING_HOURS_TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/

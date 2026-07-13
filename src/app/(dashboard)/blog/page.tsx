@@ -27,7 +27,7 @@ import {
     TableCell,
     TableActionButton,
 } from '@/components/ui/table'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -95,6 +95,8 @@ export default function BlogListPage() {
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(10)
+    // GH-1579: snap back when deletions strand page past the last page (meta null until first load → no-op)
+    useTablePageClamp(page, meta?.totalDocs ?? 0, limit, setPage, !loading)
     const [sortBy, setSortBy] = useState('-updatedAt')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [categories, setCategories] = useState<BlogCategory[]>([])
@@ -553,7 +555,7 @@ export default function BlogListPage() {
                 ))}
 
                 {/* Pagination — spans both columns under the card grid */}
-                {meta && meta.totalDocs > meta.limit && (
+                {meta && shouldShowTablePagination(meta.totalDocs) && (
                     <div className="py-4 shrink-0 md:col-span-2">
                         <TablePagination
                             page={meta.page}
@@ -580,7 +582,7 @@ export default function BlogListPage() {
                         // restores the original 1100 min-width + full sizing.
                         className="table-fixed w-full dash-table-compact min-[1280px]:min-w-[1100px]"
                         footer={
-                            meta ? (
+                            meta && shouldShowTablePagination(meta.totalDocs) ? (
                                 <TablePagination
                                     page={meta.page}
                                     total={meta.totalDocs}

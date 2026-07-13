@@ -79,8 +79,10 @@ export interface EpQuotationItem {
     }
     pricing: {
         currency: string
-        total_amount: string   // RM as string, e.g. "12.50"
-        shipment_price: string
+        total_amount: string     // RM string incl. add-on features (e.g. "12.50") — NOT what we
+                                 // charge: submit sends all features OFF, so EP only bills base+tax
+        shipment_price: string   // base shipping price (pre-tax)
+        shipment_tax?: string    // tax on shipment_price; may be absent → treat as 0
     }
     features: Array<{ cod?: EpQuotationCod } & Record<string, unknown>>
 }
@@ -98,8 +100,8 @@ export interface EpQuotationResponse {
 export interface EpSubmitContact {
     name: string
     company?: string
-    phone_number_country_code: string  // "60"
-    phone_number: string               // digits only, no leading 0
+    phone_number_country_code: string  // ISO 3166-1 alpha-2 e.g. "MY" (NOT dialing code "60")
+    phone_number: string               // digits only, no country/trunk prefix (e.g. "1126760658")
     email?: string
     address_1: string
     address_2?: string
@@ -137,8 +139,11 @@ export interface EpSubmitOrderParams {
         email_tracking?: boolean
         whatsapp_tracking?: boolean
         awb_branding?: boolean
+        // COD lives INSIDE feature as an object (EP 2026-06 submit_orders spec), NOT as a
+        // top-level cod_amount — EP ignores the top-level field, so the shipment would be
+        // created without COD and the courier would collect nothing. Both sub-fields required.
+        cod?: { cod_amount: number; cod_currency: string }
     }
-    cod_amount?: number   // RM float, omit for non-COD
 }
 
 // Live shape (verified against 2026-03 doc): data is an array of orders, each with a shipments[].

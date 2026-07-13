@@ -13,7 +13,8 @@
  * Depends on: Phase 02 theme-moods (mood.photographyFilter + mood.imageryKeywords)
  */
 
-import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, type PixabayPhoto } from './pixabay-client'
+import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, PixabayError, type PixabayPhoto } from './pixabay-client'
+import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -203,7 +204,9 @@ export const VN_CATEGORY_QUERIES: Readonly<Record<string, string>> = {
  *   1. primary query — Vietnamese queries are relevance-gated (every query
  *      word must appear in the photo tags; kills "cá cơm" false positives)
  *   2. relaxed query (broadened by buildPoolQuery) — same gate
- *   3. Vietnamese category phrase (VN_CATEGORY_QUERIES) — trusted, ungated
+ *   3. trusted category phrase, ungated — curated VN phrase
+ *      (VN_CATEGORY_QUERIES) for VN queries, English category base keyword
+ *      (CATEGORY_BASE_KEYWORDS[category][0]) otherwise
  * Returns the photos plus whether any fallback tier fired (underfill signal).
  */
 async function searchBucket(
@@ -222,10 +225,18 @@ async function searchBucket(
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
+  // 429 short-circuit: once Pixabay rate-limits, every further tier is a
+  // guaranteed-fail request that deepens the storm (each searchPhotos already
+  // retries 429 once internally with ~2s sleep). Return thin/empty — the
+  // caller marks underfill and downstream paths have their own guards.
+  const isRateLimited = (err: unknown): boolean =>
+    err instanceof PixabayError && err.code === 'RATE_LIMITED'
+
   try {
     photos = (await searchPhotos(query, size, { orientation, width, category })) ?? []
   } catch (err) {
     console.warn(`[image-pool] ${orientation} search failed:`, err)
+    if (isRateLimited(err)) return { photos, usedFallback: true }
   }
   if (isVietnamese) {
     const gated = photos.filter((p) => photoMatchesQuery(p.alt, query))
@@ -250,25 +261,39 @@ async function searchBucket(
       photos = photos.concat(extra)
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
+      if (isRateLimited(err)) return { photos, usedFallback: true }
     }
   }
-  if (photos.length >= minCount || !isVietnamese) return { photos, usedFallback }
+  if (photos.length >= minCount) return { photos, usedFallback }
 
-  // Tier 3 — Vietnamese category phrase (only for VN inputs; curated, ungated).
-  const vnQuery = VN_CATEGORY_QUERIES[ctx.category]
-  if (vnQuery && vnQuery !== query) {
+  // Tier 3 — trusted category phrase, ungated. VN inputs use the curated
+  // Vietnamese phrase (lang=vi). Non-VN inputs whose bucket is still under
+  // minCount (zero or thin hits — e.g. "pen dan pensel" has no Pixabay tag
+  // coverage) top up with the English category base keyword instead of
+  // returning an empty/thin bucket: an empty pool means media-injector
+  // replaces nothing, so GPT-hallucinated stock URLs (typically off-topic
+  // fashion shots for `ecommerce`) survive as-is.
+  const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
+  const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
+  // `!== relaxedQuery` guard: on the scaffolding path the tier-2 query can
+  // already equal the category base keyword — re-issuing the byte-identical
+  // just-failed search wastes a rate-limited Pixabay call.
+  if (catQuery && catQuery !== query && catQuery !== relaxedQuery) {
     usedFallback = true
     try {
-      // lang:'vi' explicit — curated phrases like "quán cà phê" (fnb) carry
-      // only ambiguous diacritics, so auto-detection would miss them and the
-      // search would run diacritic-stripped under Pixabay's default lang=en.
-      const extra = (await searchPhotos(vnQuery, size, { orientation, width, category, lang: 'vi' })) ?? []
+      // lang:'vi' explicit for VN phrases — curated phrases like "quán cà phê"
+      // (fnb) carry only ambiguous diacritics, so auto-detection would miss
+      // them and the search would run diacritic-stripped under Pixabay's
+      // default lang=en. EN base keywords use the default lang.
+      const extra = (await searchPhotos(catQuery, size, {
+        orientation, width, category, ...(vnQuery ? { lang: 'vi' as const } : {}),
+      })) ?? []
       if (extra.length > 0) {
-        console.info(`[image-pool] ${orientation} VN category fallback "${vnQuery}": +${extra.length}`)
+        console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
       }
       photos = photos.concat(extra)
     } catch (err) {
-      console.warn(`[image-pool] ${orientation} VN category fallback failed:`, err)
+      console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
     }
   }
   return { photos, usedFallback }

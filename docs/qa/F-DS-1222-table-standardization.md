@@ -66,7 +66,11 @@
 | **TC-DS1222-05-03** | `[Negative]` | Prev disabled ở trang đầu / Next ở trang cuối | page=1 → prev disabled; page=cuối → next disabled. |
 | **TC-DS1222-05-04** | `[Positive]` | Click số trang gọi onPageChange | Click trang 2 → `onPageChange(2)`. |
 | **TC-DS1222-05-05** | `[Positive]` | Đổi rows-per-page gọi onLimitChange | Chọn select → `onLimitChange(n)`; ẩn select khi không truyền `onLimitChange`. |
-| **TC-DS1222-05-06** | `[Edge]` | total=0 hiển thị 0–0 | from=0, to=0. |
+| **TC-DS1222-05-06** | `[Edge]` | total=0 không render bar | Component return null (GH-1579). |
+| **TC-DS1222-05-07** | `[Edge]` | Ẩn bar khi total ≤ 10 | total=10 → render null; total=5 → render null. |
+| **TC-DS1222-05-08** | `[Positive]` | Boundary total=11 → bar hiển thị | total=11, page=1, limit=10 → "1–10" + có nút trang. |
+| **TC-DS1222-05-09** | `[Positive]` | Select rows-per-page có icon ChevronDown | Bar render kèm `onLimitChange` → có `<svg class="lucide-chevron-down">` cạnh select (component: `pointer-events-none`, màu `var(--dash-text-muted)`). |
+| **TC-DS1222-05-10** | `[Edge]` | useTablePageClamp: total co lại → snap về trang hợp lệ | page=2, limit=10, total 12→10 → `onPageChange(1)`; enabled=false → không gọi. |
 
 ### NHÓM 06 — TableSearch
 

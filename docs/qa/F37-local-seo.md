@@ -1,12 +1,18 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 2.1 | **Updated:** 2026-07-09 | **Owner:** QA Team
+> **Version:** 2.7 | **Updated:** 2026-07-13 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.0
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (US-F37-01..09)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v2.7 (2026-07-13)** — Pre-merge code review pass on PR #1591 (US-F37-02 + Opening Hours + Geo-cascade) found and fixed 3 bugs via `/code-review --auto` + `/fix` autonomous modes, all verified red→green: (1) **CONFIRMED, Important** — Zod `.refine()` insufficient for opening-hours required-when-open check — some paths left uncovered, allowing invalid rows through. Fixed by switching to `.superRefine()` (allows per-error granularity) + added cross-field validate at field level in `src/collections/Sites.ts` using `siblingData`. Test: **TC-F37-02-25** (3 new test cases in `sites-local-business.test.ts`, verify closed-but-no-time rejected, opens-no-closes rejected, closes-le-opens rejected). (2) **CONFIRMED, Important** — Geo-cascade `bootstrap()` (reverse-resolve pre-fill on mount) race condition: async lookup completes after user has manually selected a value, overwriting the user's choice. Fixed by adding `userInteractedRef` guard in `geo-cascade-fields.tsx` — bootstrap only writes if user hasn't interacted yet. Test: **TC-F37-01-25** (added to `geo-cascade-fields.test.tsx`, verifies manual selection beats slow mount-time resolve). (3) **CONFIRMED, Minor** — `check-migrations.js::getArrayNestedFieldNames()` false-negative risk + compact-form bug: (a) Caller was skipping names-in-diff that happened to be array-nested somewhere else in file (poor intersection logic), now fixed by explicit intersect with diff-only names — prevents false-negative when field is both array-nested AND newly top-level; (b) Missed compact single-line field form (`{ name, type }` on one line, style used in `Products.ts`) — added regex branch to detect both inline + multi-line forms, parity with diff-scanning logic. Also refactored for testability: added `module.exports` + `require.main === module` guard. Tests: **TC-F37-03-CHECK-01..03** (3 new cases in new `check-migrations.test.ts` file, verify compact form detected, array-nested + top-level handling, false-negative prevention). All 3 fixes verified via fail-without-fix / pass-with-fix cycle. Tổng **64 TC-ID** (61 + 3 new).
+- **v2.6 (2026-07-10)** — Post-implementation visual QA pass on the Opening Hours modal (screenshot comparison against real Google Maps reference) surfaced 1 real functional bug + several visual gaps, all fixed: (1) **CONFIRMED, Important** — `applyBatchSave`'s `closed` encoding (`opening-hours-utils.ts`) produces rows without `opens`/`closes` keys, but `saveSiteSchema.localBusiness.openingHours` required both fields non-optional — **saving any "Closed" day was silently rejected by the save API**. Fixed by making `opens`/`closes` `.optional()` in the Zod schema (matches the pre-existing `OpeningHourRow` TS type, which already declared them optional — a schema/type drift bug). (2) Added a `closes > opens` order validation (user-requested; overnight ranges explicitly out of scope) — new pure `isRangeOrderValid()` helper, inline modal error + disabled Save, and a matching Zod `.refine()` at the save-route boundary. (3) Visual-only fixes: checkbox/border contrast on dark theme, day-toggle row spacing, added missing 3rd quick-action ("Edit Sat–Sun"), scroll/wrap layout, clock-icon contrast — no new TC-IDs (styling only). Added **TC-F37-02-23** (`isRangeOrderValid` unit tests) and **TC-F37-02-24** (Zod refine + closed-row-without-times regression). Tổng **61 TC-ID**.
+- **v2.5 (2026-07-10)** — Opening Hours redesign to Google Maps-style list + edit-modal UX (`plans/260710-1455-opening-hours-google-style/`): multi-day batch select, split-shift support (N time ranges/day), quick-actions ("Edit all hours", "Edit Mon–Fri"), relaxed `maxRows`/Zod cap 7→21 (7 days × up to 3 shifts). New pure-logic module `opening-hours-utils.ts` (overwrite-not-merge batch save, grouping, mode encoding, round-trip). Added **§3.12** (10 TC: TC-F37-02-13..22) across `sites-local-business.test.ts` (+2), `local-business-json-ld.test.ts` (+1 split-shift spec), new `opening-hours-utils.test.ts` (7 TC, 19 tests), new `opening-hours-editor.test.tsx` (1 TC, 4 tests, RTL). No DB migration needed (no unique constraint on `day_of_week`); `json-ld.ts` + `llms.txt` route already split-shift-compatible (1:1 row mapping, no per-day dedup). Tổng **59 TC-ID**.
+- **v2.4 (2026-07-10)** — `/code-review` ultrathink adversarial pass (4 parallel lenses: holistic, security, race-condition, data-integrity) on the full v2.3 geo-cascade diff found 2 real issues via `/fix` autonomous mode: (1) **CONFIRMED, Important** — `scripts/data/malaysia-geo.json` seeded 4/16 state names ('W.P. Kuala Lumpur', 'Pulau Pinang', 'W.P. Labuan', 'W.P. Putrajaya') that don't match the `z.enum(MY_STATES)` used to validate `localBusiness.state`; fixed at the seed source (now byte-exact match, verified against live checkout order-validation schema using the same enum+table). (2) **CONFIRMED, Minor** — `handleStateSelect`/`handleDistrictSelect` had no stale-response guard, so an out-of-order `/api/geo/districts` response could silently persist a district belonging to the wrong state; added a ref-based guard (same class of bug already present, unfixed, in the reference `CheckoutClient.tsx` this was ported from — out of scope here). Both fixes have regression tests independently verified fail-without-fix/pass-with-fix (TC-F37-01-23, TC-F37-01-24). Security/injection and i18n/TC-ID-consistency lenses found zero issues. Tổng **49 TC-ID**.
+- **v2.3 (2026-07-10)** — US-F37-01 geo-cascade data-quality follow-up (`plans/260710-1032-f37-local-business-geo-cascade/`): replaced freetext city/postcode with DB-backed State→District→Postcode cascade (ported from checkout `/api/geo/*`). Added **§3.11** (8 TC: TC-F37-01-15..22) covering forward cascade, reverse-resolve pre-fill (postcode-lookup + name-match), non-destructive legacy degradation, API-failure resilience, and a JSON-LD string-compat regression guard. New test file `geo-cascade-fields.test.tsx` (8 tests). Also corrected `local-seo-score.test.ts` count 6→7 (1 test under-counted since v1.0). Tổng **46 TC-ID** across the 4 F37 unit test files (11 + 20 + 7 + 8).
+- **v2.2 (2026-07-10)** — US-F37-02 gap-close (issue #1310): implemented `hasMap` Additional Criteria (was missing, no GBP/Waze yet) as a Google Maps URL fallback derived from `localBusiness` lat/lng; omits gracefully when coordinates absent. Added **TC-F37-02-12** (§3.10), 2 tests in `local-business-json-ld.test.ts`. Upgrade to GBP/Waze URL deferred to US-F37-05/09 (unchanged scope). Tổng **90 TC-ID**.
 - **v2.1 (2026-07-09)** — `/qa-full:check` verify + gap-fill. Đọc code thật (`map-links.ts`, `resolve-maps-link/route.ts`, `local-seo-score/route.ts`, `json-ld.ts`) + ck:scenario 12-dimension. Thêm §3.10 (16 TC: TC-F37-02-10/11, 04-15/16, 08-12/13/14, 09-17..25) phủ branch bỏ sót ở surface built-nhưng-chưa-test: `parseMapLink` pin-out-of-range fallthrough + boundary, `resolve-maps-link` SSRF (relative Location re-check, 3xx-no-Location, url+address precedence, neither→400), score API 403-null-tenant + faq-empty-not-earned, `serializeJsonLd` U+2028/2029, incomplete-hours drop, `parseAddress` part-count, metadata length boundary. Baseline F37 tests: 6 files / 80 pass. Tổng **89 TC-ID**.
 - **v2.0 (2026-07-09)** — Mở rộng scope từ chỉ US-F37-01 → **toàn bộ Phase 1** (US-01,02,03,04,08,09). Thêm §3.5–§3.9 (TC-F37-02/03/04/08/09-NN). Dựa trên 2 vòng review song song (requirements + code-reality scan). Đánh dấu trạng thái implementation: **US-02/US-08 FULLY BUILT** (bổ sung TC generator/branch chưa test), **US-04/US-09 PARTIAL** (ưu tiên API route + parser **built-nhưng-chưa-test**: `local-seo-score` API, `resolve-maps-link` SSRF, `parseMapLink`), **US-03 NOT-BUILT** (llms.txt + per-site toggle chưa có; robots.txt đang chặn AI bot NGƯỢC spec — TC spec-based + flag §9 #2). Waze/Halal (US-09) + checklist one-click (US-04) đánh `[NOT-BUILT]`. hreflang (AC-20) DEFERRED, không viết TC.
 - **v1.1 (2026-07-07)** — Pre-commit `/code-review` adversarial pass (2 cycles) found `local_business_data_saved` polluting seller-facing traffic dashboards. Cycle 1 fixed the (later found to be orphaned) `analytics/summary/route.ts`. Cycle 2's re-review caught that the actual LIVE dashboard path (`src/lib/dashboard/traffic-data.ts`) was still exposed via its ungated Top Referrers aggregation — fixed there too, with defense-in-depth. Added **TC-F37-01-13/14** (§3.4). 14 TC-IDs, 38 tests total.
@@ -227,6 +233,7 @@ Two dashboard code paths read the shared `analytics` collection:
 |---|---|---|---|---|---|---|
 | **TC-F37-02-10** | AC-3 | Sec | `serializeJsonLd` escape **U+2028/U+2029 + `<>&`** (không chỉ `</script>`) | `json-ld.ts` `[UNTESTED branch]` | Line-separator (U+2028) và paragraph-separator (U+2029) bị escape; `<`,`>`,`&` escape. Chống breakout `dangerouslySetInnerHTML` ngoài case </script>. | XSS defense đầy đủ |
 | **TC-F37-02-11** | AC-2 | Edge | openingHours drop row `isClosed=false` nhưng **thiếu opens/closes** | `json-ld.ts` | Row mở-nhưng-không-giờ bị loại khỏi `openingHoursSpecification` (không emit spec nửa vời). | Hours schema hợp lệ |
+| **TC-F37-02-12** | Additional Criteria | Func | `hasMap` — Google Maps URL fallback từ lat/lng khi GBP/Waze chưa connect | `local-business-json-ld.test.ts` (`[TC-F37-02-12]` describe) | Có lat/lng hợp lệ → `hasMap = https://www.google.com/maps?q={lat},{lng}`. Thiếu toạ độ → `hasMap` omit (không emit link hỏng). | Local Pack map link tạm thời, nâng cấp lên GBP/Waze URL khi US-F37-05/09 xong |
 
 ### US-F37-04 Score API/engine — branch chưa cover
 
@@ -259,17 +266,79 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ---
 
+## 3.11 Geo Cascade Data-Quality Follow-up (US-F37-01) **[FULLY BUILT]**
+
+> Not a new US — a data-quality improvement to the already-merged US-F37-01 (PR #1527), replacing freetext `city`/`postcode` with a DB-backed **State → District → Postcode** cascade ported from checkout's `/api/geo/*` pattern. Plan: `plans/260710-1032-f37-local-business-geo-cascade/`.
+
+| ID | AC/FR | Type | Title | Test File | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-01-15** | Additional Criteria | Func | Forward cascade: state→district→postcode writes plain string names via `onChange` | `geo-cascade-fields.test.tsx` | Each level fires exactly one `onChange` patch with resolved DB names, not ids. | Cascade UX matches checkout |
+| **TC-F37-01-16** | Additional Criteria | Func | Selecting a new state clears downstream city+postcode in ONE combined patch | `geo-cascade-fields.test.tsx` | Single `onChange` call per level (not 3 separate calls); district select re-disables. | No stale downstream selection |
+| **TC-F37-01-17** | Additional Criteria | Func | Reverse-resolve via `/api/geo/lookup/{postcode}` pre-selects state+district+postcode on mount | `geo-cascade-fields.test.tsx` | Valid saved postcode → all 3 selects pre-filled; `onChange` never fired (read-only pre-fill). | Existing sites keep working data quality |
+| **TC-F37-01-18** | Additional Criteria | Func | Reverse-resolve by exact name match when postcode blank | `geo-cascade-fields.test.tsx` | Saved state+city name-matched against DB list; postcode select stays empty. | Handles pre-lookup-API legacy saves |
+| **TC-F37-01-19** | Additional Criteria | Edge | Legacy city (freetext, no DB match) degrades non-destructively | `geo-cascade-fields.test.tsx` | State pre-selected; district shows placeholder + amber hint with raw saved string; `onChange` never fired (string never cleared). | Seller's existing SEO data never silently lost |
+| **TC-F37-01-20** | Additional Criteria | Edge | Legacy state (no DB match) + postcode-not-in-DB (lookup 404) both degrade non-destructively | `geo-cascade-fields.test.tsx` | (1) Unmatched state name → legacy hints on both state+city rows. (2) 404 lookup falls through to name-match without throwing; resolves fine when names DO match. | Graceful degradation, no crash |
+| **TC-F37-01-21** | NFR | Edge | All `/api/geo/*` calls rejecting (network/500) never throws; saved strings surface via legacy hint | `geo-cascade-fields.test.tsx` | Render doesn't throw; selects stay usable; legacy hint shows original saved value. | Resilience — page never breaks on geo API outage |
+| **TC-F37-01-22** | AC-1 | Func | Cascade string output (city/state/postcode) still maps unchanged to `addressLocality`/`addressRegion`/`postalCode` | `local-business-json-ld.test.ts` | `generateLocalBusinessSchema()` contract untouched — reads plain strings regardless of cascade vs legacy freetext origin. | Regression guard: JSON-LD never needs to change for this follow-up |
+| **TC-F37-01-23** | Data integrity | Regression | `scripts/data/malaysia-geo.json` state names match `MY_STATES` enum exactly (all 16) | `malaysia-geo-seed-data.test.ts` | Seed `name` field for every state equals a `MY_STATES` member; no duplicates. Found via `/code-review` ultrathink adversarial pass: 4/16 states (KL, Labuan, Penang, Putrajaya) previously seeded with official long-form names ('W.P. Kuala Lumpur' etc.) that fail `z.enum(MY_STATES)` validation on save — fixed at the seed source. | Prevents silent save failures for sellers in 4 major MY regions on any freshly-seeded environment |
+| **TC-F37-01-24** | NFR | Edge | Out-of-order `/api/geo/districts` response is discarded via stale-response guard | `geo-cascade-fields.test.tsx` | Selecting state A then B before A's districts fetch resolves, then resolving A's response AFTER B's, must NOT overwrite B's district list with A's (verified: fails without the ref-based guard, passes with it). Same pattern found in reference checkout implementation, not previously guarded. | Prevents wrong city/state data being silently persisted on rapid re-selection |
+| **TC-F37-01-25** | Additional Criteria | Regression | Manual selection beats async mount-time pre-fill (race condition guard) | `geo-cascade-fields.test.tsx` | **Fix from PR #1591 code review:** `bootstrap()` function (reverse-resolve pre-fill on component mount) was running async lookup of saved postcode/state-name after user had already manually selected a new value, silently overwriting the user's choice. Fixed by adding `userInteractedRef` guard — if user has interacted with any cascade level, `bootstrap()` skips writing to preserve user's manual selection. Tests: (1) Mount with saved postcode → pre-fill works (user hasn't interacted), (2) User selects state manually, then bootstrap completes → user's selection preserved (not overwritten). | Fixes race condition: pre-fill could clobber user's manual selection during edit |
+
+---
+
+## 3.12 Opening Hours — Google Maps-style Editor (US-F37-01 follow-up) **[FULLY BUILT]**
+
+> Not a new US — redesigns the Local Business opening-hours editor from a fixed 7-row inline table into a Google Maps-style **list view + edit modal** flow: multi-day batch select, split-shift (N time ranges/day), quick-actions. Plan: `plans/260710-1455-opening-hours-google-style/`.
+
+| ID | AC/FR | Type | Title | Test File | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-02-13** | AC-2 | Func | `openingHours` cap raised 7→21 (split-shift support) | `sites-local-business.test.ts` | 21-row payload passes `saveSiteSchema.localBusiness`; 22-row payload fails (`.max(21)`). | Zod cap stays in sync with Payload `maxRows` and modal's 3-ranges/day cap |
+| **TC-F37-02-14** | AC-2 | Func | `groupRowsByDay` — Mo→Su order, handles gaps and out-of-order input | `opening-hours-utils.test.ts` | 7 groups always returned in fixed day order regardless of input order; missing days yield empty arrays, not undefined. | List view renders deterministically regardless of DB row order |
+| **TC-F37-02-15** | AC-2 | Func | `rangesFromDay` — mode inference + split-shift round-trip | `opening-hours-utils.test.ts` | Infers closed/open24h/custom correctly; split-shift ranges round-trip through `groupRowsByDay` in opens-time order. | Modal pre-fill shows the correct mode and ranges for any saved day |
+| **TC-F37-02-16** | AC-2 | Func | `applyBatchSave` — OVERWRITE semantics, not merge | `opening-hours-utils.test.ts` | Saving a day replaces ALL its existing rows (no duplicate accumulation across repeated split-shift saves); untouched days are never altered; one call can batch-apply to multiple selected days. | Highest-risk logic in the whole feature — prevents duplicate/ghost hour rows on repeated edits |
+| **TC-F37-02-17** | AC-2 | Func | `applyBatchSave` — closed / open24h / custom encodings | `opening-hours-utils.test.ts` | closed → 1 `isClosed:true` row; open24h → 1 `00:00`–`23:59` row; custom → 1 row per range (split-shift); incomplete ranges (missing opens/closes) are skipped. | Encodings match the schema.org `OpeningHoursSpecification` contract with no half-written rows |
+| **TC-F37-02-18** | AC-2 | Edge | `describeDay` — list-view display strings | `opening-hours-utils.test.ts` | Empty day → `[]`; fully-closed day → `[closedLabel]`; split-shift day → one line per range. | List view text matches underlying data exactly, incl. split-shift |
+| **TC-F37-02-19** | AC-2 | Func | `defaultWeek` — brand-new-site empty-state suggestion unchanged | `opening-hours-utils.test.ts` | Mon–Fri 09:00–18:00 open, Sat/Sun closed (matches pre-redesign default). | Empty-state UX parity preserved across the redesign |
+| **TC-F37-02-20** | AC-2 | Edge | `applyBatchSave` — rows with no `dayOfWeek` are kept untouched | `opening-hours-utils.test.ts` | A malformed row (no `dayOfWeek`) is never dropped or matched by `selectedDays`, regardless of selection. | Defensive: legacy/malformed rows never silently disappear on save |
+| **TC-F37-02-21** | AC-2 | Func | Split-shift `openingHours` produces N separate `OpeningHoursSpecification` entries | `local-business-json-ld.test.ts` | A day with 2 time ranges (e.g. 07:00–11:00, 13:00–18:00) yields 2 separate spec entries with the same `dayOfWeek`, in range order. | Confirms `json-ld.ts`'s existing 1:1 row mapping needs zero changes for split-shift (regression guard from cap-raise) |
+| **TC-F37-02-22** | AC-2 | Func | `OpeningHoursEditor` list view renders 7 days incl. split-shift + quick-actions | `opening-hours-editor.test.tsx` | All 7 day labels render; a split-shift day shows both time-range lines; a closed day shows the closed label; all 3 quick-action buttons ("Edit all hours", "Edit Mon–Fri", "Edit Sat–Sun") render. | Light integration guard — real component render, not just pure-util coverage |
+| **TC-F37-02-23** | AC-2 | Func | `isRangeOrderValid` — closes must be strictly after opens (no overnight support) | `opening-hours-utils.test.ts` | Valid when closes > opens; invalid when closes == opens or closes < opens; treated as not-yet-invalid while either field is empty (mid-entry). | User-requested guard against nonsensical/mistyped ranges; overnight explicitly out of scope |
+| **TC-F37-02-24** | AC-2 | Func + Regression | `openingHours` closes-after-opens Zod refine + closed-row-without-times fix | `sites-local-business.test.ts` | Rejects closes==opens and closes<opens rows; accepts closes>opens; **accepts an `isClosed:true` row with no `opens`/`closes` keys at all** — regression guard for a real bug found in this pass (save API was silently rejecting every "Closed" day before `opens`/`closes` were made `.optional()` in the Zod schema to match the pre-existing `OpeningHourRow` TS type). | Fixes a functional bug: marking a day Closed previously failed to save |
+| **TC-F37-02-25** | AC-2 | Regression | Zod `.superRefine()` refactor (required-when-open check via cross-field validate) | `sites-local-business.test.ts` | **Fix from PR #1591 code review:** Zod `.refine()` left some paths uncovered (only validates at schema level, not per-field). Switched to `.superRefine()` for granular error handling + added field-level cross-field validate in `Sites.ts` collection using `siblingData` to access `isClosed` state when validating `opens`/`closes` fields. Tests reject: (1) opens without closes, (2) closes without opens, (3) closes ≤ opens. Accepts: (4) valid closed row with both missing, (5) valid open row with both present and closes > opens. | Fixes edge case: opening-hours validation was incomplete, could pass invalid rows upstream |
+| **TC-F37-02-26** | AC-2 | Regression | `sanitizeLegacyOpeningHours` — normalizes rows saved before TC-F37-02-25's strict validation | `opening-hours-utils.test.ts` | **Fix from PR #1591 code review (C2):** TC-F37-02-25 made `opens`/`closes` required-when-open, but a row saved under the OLD lenient rule (isClosed false/omitted, opens/closes missing) still exists in stored data and now fails validation on re-send. `handleLocalBusinessChange` calls this **unconditionally** on every save (not just when `openingHours` is untouched) because `applyBatchSave` only re-encodes the edited day(s) and passes every other day through as-is — a legacy-invalid row on an UNTOUCHED day would otherwise 400 an edit to a different day. No-op for `encodeDay`'s output. | Fixes a live-data hazard: sites saved before this PR could get permanently blocked from saving ANY local-business field |
+| **TC-F37-02-27** | AC-2 | Edge | `sanitizeLegacyOpeningHours` — drops orphan rows with no `dayOfWeek` | `opening-hours-utils.test.ts` | **Fix from PR #1591 code review (C2, same class as TC-F37-02-26):** `applyBatchSave` intentionally keeps a no-`dayOfWeek` row on any local batch edit (TC-F37-02-20, unchanged), but `groupRowsByDay` never matches it to a day, so it's invisible in the UI and unfixable by the user — it would silently accumulate toward `.max(21)` if resent to the server forever. Dropped at the save boundary instead of normalized. | Prevents an invisible/unfixable row from exhausting the 21-row split-shift cap |
+| **TC-F37-02-28** | AC-2 | Regression | `sanitizeOpeningHoursOnValidate` — `Sites.ts` `beforeValidate` hook, direct coverage | `sites-opening-hours-sanitize-hook.test.ts` | **Fix from PR #1591 code review (Q2 + Stage 3 adversarial finding #7):** the hook added to answer the reviewer's Q2 (admin-panel write path parity) had zero direct test coverage — only the pure `sanitizeLegacyOpeningHours` it delegates to was tested, so the guard logic, the merge/spread, and the fact the hook is actually wired into `hooks.beforeValidate` were all unverified. Tests cover: undefined data, no `localBusiness`, no `openingHours`, non-array `openingHours`, legacy-invalid + orphan rows sanitized, already-valid no-op, and — the highest-value case — sibling `localBusiness` fields and other top-level `data` fields are never dropped by the hook's spread/merge. | Closes a real Medium gap found by adversarial review: an accidental future edit to the hook (guard, spread, or removal from the `hooks` array) would previously go undetected by CI |
+
+---
+
+## 3.13 CI Migration Guard — `check-migrations.js` new-field detection redesign
+
+> Not an F37 feature — a CI hard-gate script (blocks PRs missing a DB migration for a new Payload field) that this PR's own field additions (`Sites.ts localBusiness`, `openingHours` cap) exercised heavily during review, triggering a full redesign. Tracked here per the project's single-doc-map convention (no dedicated doc owns CI scripts). See `docs/journals/260713-pr1591-f37-02-three-bug-fixes.md` and `plans/reports/code-review-260713-1139-GH-02-check-migrations-4-rounds-final.md` for the full adversarial-review trail.
+
+| ID | Type | Title | Test File | Key Assertions | Impact |
+|---|---|---|---|---|---|
+| **TC-check-migrations-01** | Func | `getFieldRoles` — classifies nested vs top-level vs container fields | `check-migrations.test.ts` | Array-child field → `nested:true`; field with no array ancestor → `nested:false`; the array/group field itself → `isContainer:true`, not counted as its own child. | Foundation for all new-field detection below |
+| **TC-check-migrations-02** | Edge | `getFieldRoles` — same bare name nested under two different arrays | `check-migrations.test.ts` | Both occurrences of a colliding name (e.g. `value` in `Products.ts`) correctly report `nested:true`. | Confirms depth-independence of the nested scope-stack |
+| **TC-check-migrations-03** | Regression | bare-name collision no longer false-negatives | `check-migrations.test.ts` | A brand-new top-level field is flagged even when its name collides with an unrelated nested field; a purely-nested edit is never flagged. | Closes round-1/2 false-negative (diff-line bare-name matching) |
+| **TC-check-migrations-04** | Regression | multi-line vs multi-line collision | `check-migrations.test.ts` | Multi-line-style new top-level field flagged despite colliding bare name with a multi-line nested field. | Closes round-2/3 false-negative (single-line `name:` matching) |
+| **TC-check-migrations-05** | Regression | rename to a colliding name | `check-migrations.test.ts` | A renamed top-level field is flagged even when the rename target collides with an unrelated nested field. | Closes round-3 false-negative (cross-hunk diff-line stitching) |
+| **TC-check-migrations-06** | Regression | cosmetic edits never false-flag | `check-migrations.test.ts` | Admin-text/validation-only edits to an existing field are never flagged; a genuinely new field added alongside a cosmetic edit still is. | Confirms `(name, nested)` identity (not full content) avoids false-positives |
+| **TC-check-migrations-07** | Regression | `isPathMissingAtRef` — distinguishes "file is new" from "git show genuinely failed" | `check-migrations.test.ts` | Recognizes `does not exist in` as legitimate empty baseline; does NOT recognize a bad-ref error or empty/unrelated message as one (fail-closed). | Prevents a false-positive storm if `BASE_BRANCH` itself is misconfigured |
+| **TC-check-migrations-08** | Regression | `isPathMissingAtRef` — recognizes the real message for a file new on disk | `check-migrations.test.ts` | Recognizes `exists on disk, but not in '<ref>'` (the actual message for the realistic code path — file passed `existsSync()`, absent at base) as a legitimate empty baseline. | **Fix from PR #1591 code review (C3):** TC-07 alone only covered a message variant that never fires given the `existsSync` guard; a brand-new tracked collection file was silently skipped instead of getting the new-field check |
+
+---
+
 ## 4. Test File Locations & Execution
 
 ### 4.1 Validation Tests (Phase 02)
 
 **File:** `src/__tests__/unit/validations/sites-local-business.test.ts`
 
-**Test count:** 11 tests (4 functional + 2 security + 5 refine-check variants)
+**Test count:** 17 tests (4 functional + 2 security + 5 refine-check variants + 2 opening-hours cap + 4 closes-after-opens)
 
 **Command:** `npm test -- sites-local-business`
 
-**TC-IDs covered:** TC-F37-01-01 through TC-F37-01-04, plus 2 security
+**TC-IDs covered:** TC-F37-01-01 through TC-F37-01-04, TC-F37-02-13, TC-F37-02-24, plus 2 security
 
 ---
 
@@ -277,11 +346,11 @@ Two dashboard code paths read the shared `analytics` collection:
 
 **File:** `src/__tests__/unit/seo/local-business-json-ld.test.ts`
 
-**Test count:** 17 tests (6 functional + 1 security + 10 day-mapping variants via `it.each`)
+**Test count:** 21 tests (7 functional + 1 security + 8 day-mapping variants via `it.each` + 2 `hasMap` + 2 cascade-compat/other + 1 split-shift)
 
 **Command:** `npm test -- local-business-json-ld`
 
-**TC-IDs covered:** TC-F37-01-05, TC-F37-01-06, TC-F37-01-07, TC-F37-01-08, TC-F37-01-09, TC-F37-01-12, plus 1 security
+**TC-IDs covered:** TC-F37-01-05, TC-F37-01-06, TC-F37-01-07, TC-F37-01-08, TC-F37-01-09, TC-F37-01-12, TC-F37-01-22, TC-F37-02-12, TC-F37-02-21, plus 1 security
 
 ---
 
@@ -289,11 +358,83 @@ Two dashboard code paths read the shared `analytics` collection:
 
 **File:** `src/__tests__/unit/seo/local-seo-score.test.ts`
 
-**Test count:** 6 tests (1 functional + 5 edge/validation)
+**Test count:** 7 tests (1 functional + 6 edge/validation)
 
 **Command:** `npm test -- local-seo-score`
 
 **TC-IDs covered:** TC-F37-01-10, TC-F37-01-11
+
+---
+
+### 4.4 Geo Cascade Component Tests (US-F37-01 data-quality follow-up)
+
+**File:** `src/__tests__/unit/editor/geo-cascade-fields.test.tsx`
+
+**Test count:** 9 tests (RTL + mocked `/api/geo/*` fetch)
+
+**Command:** `npm test -- geo-cascade-fields`
+
+**TC-IDs covered:** TC-F37-01-15 through TC-F37-01-21, TC-F37-01-24
+
+---
+
+### 4.5 Seed Data Regression Guard (US-F37-01 data-quality follow-up)
+
+**File:** `src/__tests__/unit/scripts/malaysia-geo-seed-data.test.ts`
+
+**Test count:** 2 tests
+
+**Command:** `npm test -- malaysia-geo-seed-data`
+
+**TC-IDs covered:** TC-F37-01-23
+
+---
+
+### 4.6 Opening Hours Utils Tests (Opening Hours Google-style redesign)
+
+**File:** `src/__tests__/unit/seo/opening-hours-utils.test.ts`
+
+**Test count:** 30 tests (grouping, mode inference/round-trip, overwrite semantics, encodings, display strings, default week, defensive handling, closes-after-opens validator, legacy-row sanitize)
+
+**Command:** `npm test -- opening-hours-utils`
+
+**TC-IDs covered:** TC-F37-02-14 through TC-F37-02-20, TC-F37-02-23, TC-F37-02-26, TC-F37-02-27
+
+---
+
+### 4.7 Opening Hours Editor Component Tests (Opening Hours Google-style redesign)
+
+**File:** `src/__tests__/unit/editor/opening-hours-editor.test.tsx`
+
+**Test count:** 4 tests (RTL render — 7-day list, split-shift display, closed display, quick-actions)
+
+**Command:** `npm test -- opening-hours-editor`
+
+**TC-IDs covered:** TC-F37-02-22
+
+---
+
+### 4.8 CI Migration Guard Tests
+
+**File:** `src/__tests__/unit/scripts/check-migrations.test.ts`
+
+**Test count:** 14 tests (field-role classification, 4 collision-regression scenarios, cosmetic-edit false-positive guard, 2 git-error-message classification variants)
+
+**Command:** `npm test -- check-migrations`
+
+**TC-IDs covered:** TC-check-migrations-01 through TC-check-migrations-08
+
+---
+
+### 4.9 Sites Collection Hook Tests (`beforeValidate` opening-hours sanitize)
+
+**File:** `src/__tests__/unit/collections/sites-opening-hours-sanitize-hook.test.ts`
+
+**Test count:** 8 tests (guard branches, sanitize + orphan-drop behavior, no-op on valid data, sibling-field/top-level-field non-mutation)
+
+**Command:** `npm test -- sites-opening-hours-sanitize-hook`
+
+**TC-IDs covered:** TC-F37-02-28
 
 ---
 
@@ -314,6 +455,12 @@ Two dashboard code paths read the shared `analytics` collection:
 3. Apply PRD §13.8's "earned/applicable" normalization pattern (reweight buckets based on what's measurable per-site)
 
 See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Phase 06 PM review" for full context.
+
+### `check-migrations.js` — `getFieldRoles` parser edge cases (Low, not blocking)
+
+**Status:** flagged during PR #1591's second code review (M2, non-blocking). The regex/window-based field parser has known theoretical edge cases: (1) `name:` isn't anchored to an actual field-declaration context, so a `name:` appearing inside a comment or template literal could false-flag (fails safe — over-detection, not under-detection); (2) the forward/backward window used to find a field's own `type:` (±2/+8 lines) is heuristic, not a real parser; (3) Payload's `blocks` field type isn't modeled as a container (currently sidestepped because `Pages.ts`, the only file using `blocks`, is excluded from this check entirely).
+
+**Impact:** none observed — no current `TRACKED_COLLECTIONS` file triggers any of these. Noted for future hardening if a collection's formatting ever hits one of these shapes.
 
 ---
 
@@ -352,10 +499,16 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 
 | File | Tests | Status | Coverage | Notes |
 |---|---|---|---|---|
-| `sites-local-business.test.ts` | 11 | ✅ PASS | 100% of saveSiteSchema.localBusiness | Zod schema + security |
-| `local-business-json-ld.test.ts` | 17 | ✅ PASS | 100% of generateLocalBusinessSchema, generatePageSchemas, dayOfWeekToSchema, serializeJsonLd | JSON-LD + trigger logic + XSS |
-| `local-seo-score.test.ts` | 6 | ✅ PASS | 100% of calculateLocalSeoScore | Scoring logic + bounds |
-| **Total** | **34** | ✅ **PASS** | **100%** | Phase 06 complete; full suite 1301/1301 pass |
+| `sites-local-business.test.ts` | 17 | ✅ PASS | 100% of saveSiteSchema.localBusiness | Zod schema + security + opening-hours cap + closes-after-opens |
+| `local-business-json-ld.test.ts` | 21 | ✅ PASS | 100% of generateLocalBusinessSchema, generatePageSchemas, dayOfWeekToSchema, serializeJsonLd | JSON-LD + trigger logic + XSS + hasMap + cascade-string regression + split-shift |
+| `local-seo-score.test.ts` | 7 | ✅ PASS | 100% of calculateLocalSeoScore | Scoring logic + bounds |
+| `geo-cascade-fields.test.tsx` | 9 | ✅ PASS | 100% of GeoCascadeFields forward cascade + reverse-resolve + legacy degradation + stale-response guard | RTL + mocked `/api/geo/*` |
+| `malaysia-geo-seed-data.test.ts` | 2 | ✅ PASS | Seed data consistency (`malaysia_states.name` vs `MY_STATES`) | Regression guard, `/code-review` finding |
+| `opening-hours-utils.test.ts` | 30 | ✅ PASS | 100% of groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid, sanitizeLegacyOpeningHours | Pure logic — overwrite semantics, encodings, round-trip, range validation, legacy-row sanitize |
+| `opening-hours-editor.test.tsx` | 4 | ✅ PASS | List view render (7 days, split-shift, closed, quick-actions) | RTL — light integration guard |
+| `check-migrations.test.ts` | 14 | ✅ PASS | 100% of getFieldRoles, diffNewTopLevelFieldNames, isPathMissingAtRef | CI hard-gate script (not F37 feature code) — new-field detection redesign + git-error classification |
+| `sites-opening-hours-sanitize-hook.test.ts` | 8 | ✅ PASS | 100% of sanitizeOpeningHoursOnValidate | `Sites.ts` `beforeValidate` hook — direct coverage added by Stage 3 adversarial finding #7 |
+| **Total** | **112** | ✅ **PASS** | **100%** | Opening Hours Google-style redesign + PR #1591 round-2 code review fixes (legacy-row sanitize on all write paths, check-migrations.js hardening) — reviewer's malaysia_states rename concern investigated and found already fixed by a pre-existing migration (commit `d5c03917`, staging since 2026-05-25) |
 
 ---
 
@@ -372,4 +525,4 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 
 ---
 
-**Last Verified:** 2026-07-09 (Phase-1 scope; TC-F37-02/03/04/08/09 mapped vào code thật qua 2 vòng review requirements + code-reality scan; trạng thái BUILT/UNTESTED/NOT-BUILT verified against actual `src/`)
+**Last Verified:** 2026-07-10 (Phase-1 scope; TC-F37-02/03/04/08/09 mapped vào code thật qua 2 vòng review requirements + code-reality scan; trạng thái BUILT/UNTESTED/NOT-BUILT verified against actual `src/`. §3.11 geo-cascade follow-up + §v2.4 post-review fixes: all 10 TC-IDs (TC-F37-01-15..24) executed and passing, `npm test -- geo-cascade-fields local-business-json-ld malaysia-geo-seed-data` green, full suite 9885 tests / 3 pre-existing unrelated failures confirmed via `tester` agent.)
