@@ -164,15 +164,21 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         render(<Wrapper />)
         await advanceCoachMarkTimers()
 
+        // Word-boundary match: toContain() is substring-based and would stay green
+        // for `text-white/90` or `hover:bg-[hsl(var(--primary))]` — variants the CSS
+        // allow-list selector does NOT match, so the dark-text bug would silently return.
+        const TEXT_WHITE = /(?:^|\s)text-white(?:\s|$)/
+        const TEAL_BG = /(?:^|\s)bg-\[hsl\(var\(--primary\)\)\](?:\s|$)/
+
         const nextBtn = screen.getByText('Next')
-        expect(nextBtn.className).toContain('text-white')
-        expect(nextBtn.className).toContain('bg-[hsl(var(--primary))]')
+        expect(nextBtn.className).toMatch(TEXT_WHITE)
+        expect(nextBtn.className).toMatch(TEAL_BG)
 
         fireEvent.click(nextBtn)
         await advanceCoachMarkTimers()
 
         const doneBtn = screen.getByText('Done')
-        expect(doneBtn.className).toContain('text-white')
-        expect(doneBtn.className).toContain('bg-[hsl(var(--primary))]')
+        expect(doneBtn.className).toMatch(TEXT_WHITE)
+        expect(doneBtn.className).toMatch(TEAL_BG)
     })
 })
