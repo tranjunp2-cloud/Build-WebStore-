@@ -26,7 +26,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -287,9 +287,10 @@ export default function ProductsPage() {
 
     // Rows-per-page stateful so the DS TablePagination selector ([10,25,50,100]) works (GH-1290 Bug 4)
     const [itemsPerPage, setItemsPerPage] = useState(10)
-    const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage)
     const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     const handleLimitChange = (n: number) => { setItemsPerPage(n); setCurrentPage(1) }
+    // GH-1579: snap back when deletions strand currentPage past the last page
+    useTablePageClamp(currentPage, filteredAndSortedProducts.length, itemsPerPage, setCurrentPage)
 
     const statusCounts = {
         all: products.length,
@@ -797,7 +798,7 @@ export default function ProductsPage() {
                             <div className="hidden min-[820px]:block">
                                 <Table
                                     className="table-fixed w-full dash-table-compact"
-                                    footer={
+                                    footer={shouldShowTablePagination(filteredAndSortedProducts.length) ? (
                                         <TablePagination
                                             page={currentPage}
                                             total={filteredAndSortedProducts.length}
@@ -806,7 +807,7 @@ export default function ProductsPage() {
                                             onLimitChange={handleLimitChange}
                                             labels={{ unit: 'products' }}
                                         />
-                                    }
+                                    ) : undefined}
                                 >
                                     <colgroup>
                                         <col style={{ width: '60px' }} />
@@ -1152,7 +1153,7 @@ export default function ProductsPage() {
 
                         {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
                             pager lives in its footer slot from iPad Air up. */}
-                        {totalPages > 1 && (
+                        {shouldShowTablePagination(filteredAndSortedProducts.length) && (
                             <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}

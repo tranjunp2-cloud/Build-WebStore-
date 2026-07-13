@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Checkbox } from '@/components/ui/checkbox'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 import {
@@ -429,7 +429,7 @@ export function OrdersTable({
                 selectedRows={selectedRows}
                 onSelectionChange={onSelectionChange || (() => { })}
                 newOrderIds={newOrderIds}
-                footer={total > 0 ? (
+                footer={shouldShowTablePagination(total) ? (
                     <TablePagination
                         page={page}
                         total={total}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useTablePageClamp } from '@/components/ui/table-pagination'
 import { CustomersActionBar } from './customers-action-bar'
 import { CustomersTable } from './customers-table'
 import { CustomersCardList } from './customers-card-list'
@@ -46,6 +47,8 @@ export function CustomersClientLayout() {
 
     useEffect(() => { setPage(1) }, [status, source, search])
     const handleLimitChange = (n: number) => { setLimit(n); setPage(1) }
+    // GH-1579: snap back when deletions strand page past the last page
+    useTablePageClamp(page, total, limit, setPage, !loading)
     useEffect(() => { load() }, [load])
 
     async function confirmDelete() {

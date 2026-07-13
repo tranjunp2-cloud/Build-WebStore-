@@ -6,7 +6,7 @@ import { Users, UserPlus, Trash2, Loader2, Search, Edit2, SearchX } from 'lucide
 import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { TablePagination } from '@/components/ui/table-pagination';
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination';
 import { TableEmptyState } from '@/components/ui/table-empty-state';
 import { Button } from '@/components/ui/button';
 import { removeStaff } from './actions';
@@ -87,6 +87,8 @@ export function StaffDirectoryClient({
 
     const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
     const currentStaffPage = filteredStaff.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    // GH-1579: snap back when removals/search strand currentPage past the last page
+    useTablePageClamp(currentPage, filteredStaff.length, itemsPerPage, setCurrentPage);
 
     // Handlers
     const handleRemove = (userId: string) => {
@@ -201,7 +203,7 @@ export function StaffDirectoryClient({
                                 </div>
                             );
                         })}
-                        {filteredStaff.length > itemsPerPage && (
+                        {shouldShowTablePagination(filteredStaff.length) && (
                             <div className="pt-2">
                                 <TablePagination
                                     page={currentPage}
@@ -219,7 +221,7 @@ export function StaffDirectoryClient({
                     <div className="hidden md:block">
                     <Table
                         minWidth={640}
-                        footer={(
+                        footer={shouldShowTablePagination(filteredStaff.length) ? (
                             <TablePagination
                                 page={currentPage}
                                 total={filteredStaff.length}
@@ -228,7 +230,7 @@ export function StaffDirectoryClient({
                                 onLimitChange={handleLimitChange}
                                 labels={{ unit: t?.Staff?.title || 'staff' }}
                             />
-                        )}
+                        ) : undefined}
                     >
                         <TableHeader>
                             <TableRow>

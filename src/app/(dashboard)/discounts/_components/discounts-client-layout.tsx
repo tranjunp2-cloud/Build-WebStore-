@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Download, Plus, Percent, SearchX } from 'lucide-react'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { Button } from '@/components/ui/button'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { DiscountsToolbar, type StatusFilter } from './discounts-toolbar'
@@ -39,6 +39,10 @@ export function DiscountsClientLayout() {
 
     // Generation ref — stale fetch guard (same pattern as customers layout)
     const genRef = useRef(0)
+
+    // GH-1579: snap back when deletions strand page past the last page.
+    // Disabled while loading so the URL-restored ?page=N isn't clobbered before data arrives.
+    useTablePageClamp(page, total, limit, setPage, !loading)
 
     const load = useCallback(async () => {
         const gen = ++genRef.current
@@ -220,7 +224,7 @@ export function DiscountsClientLayout() {
                     onDelete={handleDelete}
                     loading={loading}
                     // Pagination lives INSIDE the table card (F33 design) — shared <TablePagination>.
-                    footer={(
+                    footer={shouldShowTablePagination(total) ? (
                         <TablePagination
                             page={page}
                             total={total}
@@ -229,7 +233,7 @@ export function DiscountsClientLayout() {
                             onLimitChange={(n) => { setLimit(n); setPage(1) }}
                             labels={{ showing: d.showing, of: d.of, unit: d.codes, rowsPerPage: d.rowsPerPage }}
                         />
-                    )}
+                    ) : undefined}
                 />
             )}
 
