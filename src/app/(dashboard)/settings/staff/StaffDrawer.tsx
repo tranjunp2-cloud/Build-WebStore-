@@ -134,13 +134,13 @@ export function StaffDrawer({
         });
     };
 
-    // Backdrop: top-[56px] chừa TopHeader sáng (không đè header — GH-1593/PR #1601);
-    // z-[100] để vẫn phủ mờ + khoá tương tác sidebar (z-40) và content bên dưới.
+    // Backdrop inset-0 z-[100]: phủ mờ + khoá tương tác TOÀN màn hình — cao hơn
+    // TopHeader (z-50) và sidebar (z-40) để che kín cả header theo GH-1593.
     // !mt-0: root của StaffDirectoryClient dùng space-y-[28px] → leak margin-top vào
     // backdrop fixed này, đẩy mép overlay tụt 28px (nguyên nhân "che nửa header" GH-1593).
     return (
-        <div className="fixed inset-x-0 top-[56px] bottom-0 !mt-0 z-[100] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-88px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 !mt-0 z-[100] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
                     <h2 className="text-[24px] font-bold text-dash-text leading-[1.333em] font-['Inter']">
