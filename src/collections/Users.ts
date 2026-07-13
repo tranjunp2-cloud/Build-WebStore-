@@ -1,4 +1,10 @@
-import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeChangeHook } from 'payload'
+import type {
+    CollectionConfig,
+    CollectionAfterChangeHook,
+    CollectionBeforeChangeHook,
+    CollectionBeforeOperationHook,
+} from 'payload'
+import { APIError } from 'payload'
 import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
@@ -13,6 +19,56 @@ import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+/**
+ * Single source of truth for the `roles` select options — reused by the field
+ * definition below and by the invalid-filter guard so the two can never drift.
+ */
+const USER_ROLE_OPTIONS = [
+    { label: 'Super Admin', value: 'super-admin' },
+    { label: 'Tenant Owner', value: 'tenant-owner' },
+    { label: 'Editor', value: 'editor' },
+    { label: 'Viewer', value: 'viewer' },
+]
+const VALID_ROLE_VALUES = new Set(USER_ROLE_OPTIONS.map((o) => o.value))
+
+/**
+ * beforeOperation guard: reject any query that filters `roles` by a value outside the
+ * select enum (e.g. ?where[roles][in][]=buyer). Such a value reaches Postgres as
+ * `users_roles.value IN ('buyer')` against the enum-typed column → "invalid input value
+ * for enum" → Payload swallows it into a generic 500. Short-circuit with a clean 400 so a
+ * bad filter value never crashes /api/users. Valid role filters pass through untouched.
+ * (GH #1535 — Bug 1)
+ */
+const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
+    const where = (args as { where?: unknown }).where
+    const invalid = new Set<string>()
+
+    const scan = (node: unknown): void => {
+        if (!node || typeof node !== 'object') return
+        for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+            if ((key === 'and' || key === 'or') && Array.isArray(value)) {
+                value.forEach(scan)
+            } else if (key === 'roles' && value && typeof value === 'object') {
+                for (const opVal of Object.values(value as Record<string, unknown>)) {
+                    const vals = Array.isArray(opVal) ? opVal : [opVal]
+                    for (const v of vals) {
+                        if (typeof v === 'string' && !VALID_ROLE_VALUES.has(v)) invalid.add(v)
+                    }
+                }
+            }
+        }
+    }
+    scan(where)
+
+    if (invalid.size > 0) {
+        throw new APIError(
+            `Invalid roles filter value(s): ${[...invalid].join(', ')}. Valid roles: ${[...VALID_ROLE_VALUES].join(', ')}.`,
+            400,
+        )
+    }
+    return args
+}
 
 /**
  * beforeChange hook: auto-set createdBy (on create) and updatedBy (on create/update) from req.user.
@@ -146,6 +202,7 @@ export const Users: CollectionConfig = {
         description: 'Platform users — can be super-admins or tenant members.',
     },
     hooks: {
+        beforeOperation: [rejectInvalidRoleFilter],
         beforeChange: [setAuditFields],
         afterChange: [sendWelcomeEmailHook],
     },
@@ -1099,12 +1156,7 @@ export const Users: CollectionConfig = {
             hasMany: true,
             defaultValue: ['tenant-owner'],
             saveToJWT: true, // edge middleware checks role via decoded JWT (no DB call in edge runtime)
-            options: [
-                { label: 'Super Admin', value: 'super-admin' },
-                { label: 'Tenant Owner', value: 'tenant-owner' },
-                { label: 'Editor', value: 'editor' },
-                { label: 'Viewer', value: 'viewer' },
-            ],
+            options: USER_ROLE_OPTIONS,
             access: {
                 update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
             },

@@ -158,10 +158,15 @@ export async function GET(req: NextRequest) {
             drizzle: { execute: (q: unknown) => Promise<DrizzleQueryResult<unknown>> }
         }
 
+        // Bind tenant ids as a Postgres array LITERAL string ('{46,47}'), NOT a raw JS array.
+        // The pg driver serializes a JS-array param to a bare scalar → `ANY('46'::integer[])`
+        // → "malformed array literal" → 500. ids are validated integers, so join is safe.
+        // (Mirrors the fix already shipped in v1/discounts/export — GH #1535.)
+        const tenantArray = `{${tenantIds.join(',')}}`
+
         // 3. Row count check (hard cap)
-        // Use Drizzle template-literal parameterization — integers bound safely, no sql.raw
         const countQuery = tenantIds.length > 0
-            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(${tenantIds}::integer[])`
+            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(${tenantArray}::integer[])`
             : sql`SELECT COUNT(*) AS cnt FROM customers`
 
         const countResult = (await db.drizzle.execute(countQuery)) as DrizzleQueryResult<{ cnt: string | number }>
@@ -209,7 +214,7 @@ export async function GET(req: NextRequest) {
                                 (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id) AS addr_count,
                                 (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
                             FROM customers c
-                            WHERE c.tenant_id = ANY(${tenantIds}::integer[])
+                            WHERE c.tenant_id = ANY(${tenantArray}::integer[])
                             ORDER BY c.created_at DESC
                         `
                         : sql`

@@ -3,6 +3,7 @@ import { GET } from '@/app/api/notifications/route'
 import { POST } from '@/app/api/notifications/mark-read/route'
 import { NextRequest } from 'next/server'
 import type { Payload } from 'payload'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 // Mock payload
 vi.mock('payload', () => ({
@@ -14,7 +15,9 @@ vi.mock('payload', () => ({
             page: 1,
             limit: 20
         }),
-        update: vi.fn().mockResolvedValue({ id: 1, isRead: true })
+        update: vi.fn().mockResolvedValue({ id: 1, isRead: true }),
+        // mark-read now uses a single batched raw UPDATE via payload.db.drizzle (GH #1535)
+        db: { drizzle: { execute: vi.fn().mockResolvedValue({ rowCount: 2 }) } },
     }),
 }))
 
@@ -213,10 +216,45 @@ describe('/api/notifications', () => {
             expect(body.success).toBe(true)
         })
 
+        it('TC-GH1535-02a: mark_all UPDATE is scoped to caller user_id + tenant_id (no IDOR)', async () => {
+            // The raw batched UPDATE bypasses Payload access control, so the WHERE MUST
+            // pin the caller's own rows. Capture the executed query and assert the bound
+            // params carry the fake user's id (100) and tenant (200). Guards against a
+            // future regression that drops the ownership clause. (GH #1535 Bug 2)
+            const { getPayload } = await import('payload')
+            const captured: unknown[] = []
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                db: { drizzle: { execute: vi.fn(async (q: unknown) => { captured.push(q); return { rowCount: 3 } }) } },
+            } as unknown as Payload)
+
+            const res = await POST(createRequest('/api/notifications/mark-read', 'POST', { mark_all: true }))
+            expect(res.status).toBe(200)
+
+            const { params } = new PgDialect().sqlToQuery(captured[0] as never)
+            expect(params).toContain(100) // user_id
+            expect(params).toContain(200) // tenant_id
+        })
+
+        it('TC-GH1535-02b: notificationIds UPDATE also enforces user_id + tenant_id ownership', async () => {
+            const { getPayload } = await import('payload')
+            const captured: unknown[] = []
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                db: { drizzle: { execute: vi.fn(async (q: unknown) => { captured.push(q); return { rowCount: 2 } }) } },
+            } as unknown as Payload)
+
+            const res = await POST(createRequest('/api/notifications/mark-read', 'POST', { notificationIds: ['1', '2'] }))
+            expect(res.status).toBe(200)
+
+            const { params } = new PgDialect().sqlToQuery(captured[0] as never)
+            expect(params).toContain('{1,2}') // id list as integer[] literal
+            expect(params).toContain(100)     // user_id
+            expect(params).toContain(200)     // tenant_id
+        })
+
         it('returns 500 on internal failure', async () => {
             const { getPayload } = await import('payload')
             vi.mocked(getPayload).mockResolvedValueOnce({
-                find: vi.fn().mockRejectedValue(new Error('DB Bulk Error')),
+                db: { drizzle: { execute: vi.fn().mockRejectedValue(new Error('DB Bulk Error')) } },
             } as unknown as Payload)
 
             const res = await POST(createRequest('/api/notifications/mark-read', 'POST', {

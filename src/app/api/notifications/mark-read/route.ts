@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import type { MarkReadPayload } from '@/types/notification'
@@ -54,57 +55,53 @@ export const POST = withAuth(async (user, request) => {
             return NextResponse.json({ success: false, error: 'No tenant found' }, { status: 400 })
         }
 
-        if (body.mark_all) {
-            // Find all unread notifications for this user/tenant then bulk update
-            const unread = await payload.find({
-                collection: 'notifications',
-                where: {
-                    and: [
-                        { user: { equals: user.id } },
-                        { tenant: { equals: tenantId } },
-                        { isRead: { equals: false } },
-                    ],
-                },
-                limit: 200,
-                depth: 0,
-                user,
-                overrideAccess: false,
-            })
-
-            // Update each notification (Payload doesn't have bulk update in access-controlled mode)
-            await Promise.all(
-                unread.docs.map((doc) =>
-                    payload.update({
-                        collection: 'notifications',
-                        id: doc.id,
-                        data: { isRead: true },
-                        user,
-                        overrideAccess: false,
-                    })
-                )
+        const db = payload.db?.drizzle as
+            | { execute: (q: unknown) => Promise<{ rowCount?: number }> }
+            | undefined
+        if (!db) {
+            return NextResponse.json(
+                { success: false, error: { code: 'INTERNAL_ERROR', message: 'Database not available' } },
+                { status: 500 },
             )
+        }
 
-            return NextResponse.json({ success: true, updated: unread.docs.length })
+        const uid = Number(user.id)
+        const tid = Number(tenantId)
+
+        if (body.mark_all) {
+            // Single batched UPDATE instead of one round-trip per row. The old code
+            // ran up to 200 payload.update() calls in Promise.all → each grabbed a
+            // Neon connection → pool exhaustion under load (GH #1535), plus a silent
+            // 200-row cap that left the rest unread. Raw SQL bypasses Payload access,
+            // so the WHERE replicates the exact ownership + tenant scope the collection
+            // policy enforces — it can never touch another user's notifications.
+            const result = await db.execute(sql`
+                UPDATE notifications
+                SET is_read = true, updated_at = now()
+                WHERE user_id = ${uid} AND tenant_id = ${tid} AND is_read = false
+            `)
+            return NextResponse.json({ success: true, updated: Number(result?.rowCount ?? 0) })
         }
 
         if (!body.notificationIds || body.notificationIds.length === 0) {
             return NextResponse.json({ success: false, error: 'notificationIds required' }, { status: 400 })
         }
 
-        // Update specific notifications (access control ensures user owns them)
-        await Promise.all(
-            body.notificationIds.map((id) =>
-                payload.update({
-                    collection: 'notifications',
-                    id,
-                    data: { isRead: true },
-                    user,
-                    overrideAccess: false,
-                })
-            )
-        )
-
-        return NextResponse.json({ success: true, updated: body.notificationIds.length })
+        // Specific ids: bind as a Postgres integer[] literal ('{1,2}'), not a JS array
+        // (the pg driver serializes a JS array to a bare scalar → malformed array literal).
+        // The user_id + tenant_id clause enforces ownership — a user cannot mark another
+        // user's notifications even by guessing ids.
+        const ids = body.notificationIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+        if (ids.length === 0) {
+            return NextResponse.json({ success: false, error: 'notificationIds required' }, { status: 400 })
+        }
+        const idArray = `{${ids.join(',')}}`
+        const result = await db.execute(sql`
+            UPDATE notifications
+            SET is_read = true, updated_at = now()
+            WHERE id = ANY(${idArray}::integer[]) AND user_id = ${uid} AND tenant_id = ${tid} AND is_read = false
+        `)
+        return NextResponse.json({ success: true, updated: Number(result?.rowCount ?? 0) })
     } catch (error) {
         console.error('[Notifications Mark-Read Error]', error)
         return NextResponse.json(

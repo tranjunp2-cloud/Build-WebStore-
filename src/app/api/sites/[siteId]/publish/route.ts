@@ -313,8 +313,11 @@ export async function PATCH(
 
         if (failedPageIds.length > 0) {
             console.error(`[Publish] ${failedPageIds.length} page(s) failed to promote:`, failedPageIds)
-            // 500 (not 207) so fetch `res.ok` is false and the client surfaces
-            // the error to the user instead of cheerfully showing "published".
+            // 409 (not 500): a page failing to promote is a client/data condition
+            // (usually a required nested block field left blank — see the ValidationError
+            // path above), not a server fault. 409 is a 4xx, so `res.ok` stays false and
+            // the client still surfaces the error exactly as before — no client change
+            // needed. `failures[].validationErrors` tells the user which field to fix (GH #1535).
             return NextResponse.json(
                 {
                     success: false,
@@ -325,7 +328,7 @@ export async function PATCH(
                         failures: failureDetails,
                     },
                 },
-                { status: 500 },
+                { status: 409 },
             )
         }
 

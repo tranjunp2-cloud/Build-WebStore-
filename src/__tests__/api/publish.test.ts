@@ -605,7 +605,9 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
         const body = await res.json()
 
-        expect(res.status).toBe(500)
+        // GH #1535: partial publish failure now returns 409 (client/data condition),
+        // not 500. Still a 4xx so res.ok stays false → client behavior unchanged.
+        expect(res.status).toBe(409)
         expect(body.success).toBe(false)
         expect(body.error.code).toBe('PARTIAL_PUBLISH_FAILURE')
         expect(body.error.failedPages).toEqual(['page-793'])
@@ -649,7 +651,8 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
         const body = await res.json()
 
-        expect(res.status).toBe(500)
+        // GH #1535: partial publish failure now returns 409 (not 500).
+        expect(res.status).toBe(409)
         const failure = body.error.failures[0]
         expect(failure.errName).toBe('TypeError')
         expect(failure.errMsg).toContain("Cannot read properties of undefined")

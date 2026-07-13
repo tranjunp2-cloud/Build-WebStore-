@@ -16,10 +16,14 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         const { id } = await ctx.params
         const payload = await getPayload({ config })
 
+        // disableErrors: findByID throws NotFound on a missing id by default, which
+        // withSuperAdmin has no catch for → 500. With disableErrors it returns null,
+        // so the 404 branch below runs (GH #1535).
         const template = await payload.findByID({
             collection: 'templates',
             id,
             depth: 1,
+            disableErrors: true,
         })
 
         if (!template) {
