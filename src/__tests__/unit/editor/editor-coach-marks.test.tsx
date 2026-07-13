@@ -155,4 +155,30 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         // Assert — still visible; backdrop click no longer closes coach marks
         expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
     })
+
+    it('TC-F05-02-16h: Next/Done button pairs text-white with the teal bg on one element (GH-1584)', async () => {
+        // globals.css remaps `.editor-shell .text-white` to dark text in light mode
+        // and only keeps white for allow-listed backgrounds. The allow-list selector
+        // `.bg-[hsl(var(--primary))].text-white` needs BOTH classes on the same
+        // element — dropping either one re-introduces dark text on the teal button.
+        render(<Wrapper />)
+        await advanceCoachMarkTimers()
+
+        // Word-boundary match: toContain() is substring-based and would stay green
+        // for `text-white/90` or `hover:bg-[hsl(var(--primary))]` — variants the CSS
+        // allow-list selector does NOT match, so the dark-text bug would silently return.
+        const TEXT_WHITE = /(?:^|\s)text-white(?:\s|$)/
+        const TEAL_BG = /(?:^|\s)bg-\[hsl\(var\(--primary\)\)\](?:\s|$)/
+
+        const nextBtn = screen.getByText('Next')
+        expect(nextBtn.className).toMatch(TEXT_WHITE)
+        expect(nextBtn.className).toMatch(TEAL_BG)
+
+        fireEvent.click(nextBtn)
+        await advanceCoachMarkTimers()
+
+        const doneBtn = screen.getByText('Done')
+        expect(doneBtn.className).toMatch(TEXT_WHITE)
+        expect(doneBtn.className).toMatch(TEAL_BG)
+    })
 })
