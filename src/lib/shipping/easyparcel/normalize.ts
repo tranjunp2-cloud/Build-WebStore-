@@ -92,10 +92,12 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
  * Validates the POST-splitPhone number — the value actually sent to EP — not the
  * raw digits: raw '600000000' has 9 digits but emits '0000000' (the exact legacy
  * placeholder) once splitPhone strips the '60' prefix. Legit MY numbers are ≥8
- * digits after the prefix strip (mobile 9-10, shortest landline 8).
+ * digits after the prefix strip (mobile 9-10, shortest landline 8) and never
+ * start with 0 — the trunk 0 was the stripped prefix, so a leading zero here
+ * means double-prefix garbage the courier will reject.
  */
 export function hasUsablePhone(raw: string | null | undefined): boolean {
     const { number } = splitPhone(raw ?? '')
-    return number.length >= 8 && !/^0+$/.test(number)
+    return number.length >= 8 && !number.startsWith('0')
 }
 

@@ -47,6 +47,10 @@ describe('hasUsablePhone [TC-F36.186a]', () => {
         expect(hasUsablePhone('60000000')).toBe(false)        // 60 + zeros → '000000'
         expect(hasUsablePhone('60123456')).toBe(false)        // emits 6 digits — courier-invalid
         expect(hasUsablePhone('60412345678')).toBe(true)      // emits 9 digits — valid
+        // Post-split leading zero = double trunk prefix — a valid MY number never
+        // starts with 0 after the strip (review #1595 round 2).
+        expect(hasUsablePhone('0000000060')).toBe(false)      // emits '000000060'
+        expect(hasUsablePhone('00123456789')).toBe(false)     // double-0 typo → emits '0123456789'
     })
 })
 
