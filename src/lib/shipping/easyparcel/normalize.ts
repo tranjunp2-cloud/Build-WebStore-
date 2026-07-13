@@ -82,3 +82,15 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
     return { countryCode: '60', number: digits }
 }
 
+/**
+ * Whether a raw phone is usable as an EP shipment contact number. EP accepts a
+ * placeholder at submit time but the courier's AWB issuance rejects it later,
+ * stranding the shipment at "Pending AWB" with the wallet already charged
+ * (verified live 2026-07-13) — so callers must reject unusable phones BEFORE
+ * submit instead of substituting a placeholder.
+ */
+export function hasUsablePhone(raw: string | null | undefined): boolean {
+    const digits = (raw ?? '').replace(/\D/g, '')
+    return digits.length >= 8 && !/^0+$/.test(digits)
+}
+

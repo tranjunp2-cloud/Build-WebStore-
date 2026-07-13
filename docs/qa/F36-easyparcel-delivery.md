@@ -413,6 +413,14 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 | **TC-F36.166** | Money | Critical | /cancel guard label-free (review #1582 round 2-3) | /cancel chen vào cửa sổ claim→submit của create-label (order đang giữ `CLAIM:` hoặc shipment thật). | Cả 3 CAS tiến của /cancel có `AND easy_parcel_order_no IS NULL` → cancel thua khi label đang/đã book. CAS miss vì label → **409**: shipment thật → `LABEL_EXISTS` ("cancel the EP shipment first"); `CLAIM:` transient → `LABEL_IN_PROGRESS` (retry). 2 CAS rollback KHÔNG có guard (phải luôn restore được). Enum defensive `'paid'` trong db-setup. 3 unit tests + 1 SQL assertion trong test Stripe (TC-F10-03-26) khóa guard ở CAS xendit/stripe. | §3.18d |
 | **TC-F36.167** | Func | High | Crash-remnant self-heal trong nhánh alreadyCreated (review #1582 round 3) | create-label ghi shipment + flip status bằng 2 update riêng; crash giữa chừng → order pre-ship (`confirmed/paid/processing`) giữ shipment THẬT. Merchant bấm lại Ready to Ship. | Nhánh idempotency `alreadyCreated` CAS flip status → `ready_to_ship` (WHERE khớp đúng shipment đã đọc, không đụng cancelled/shipped) → UI ra state success, mở lại lối mark-shipment-cancelled → /cancel. Manual/api. | §3.18d |
 
+### 3.18e Phone guard — chặn placeholder phone gây kẹt Pending AWB (live 2026-07-13)
+
+> **Phát hiện live 2026-07-13:** buyer phone trống → code cũ điền placeholder `'0000000'` → EP submit VẪN THÀNH CÔNG (ví bị trừ) nhưng bước courier phát hành AWB reject số rác → shipment kẹt vĩnh viễn ở "Pending AWB" ("phone number missing a valid country calling code"). Order cũ có thể tạo trước khi checkout bắt buộc phone → không được giả định phone luôn có.
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.186** | Money | Critical | create-label guard `CUSTOMER_PHONE_MISSING` + bỏ placeholder phone | (a) `hasUsablePhone`: hợp lệ ≥8 digit không toàn 0 (chấp nhận `+60`/`0` prefix, ký tự cách/gạch); reject rỗng/`<8` digit/toàn 0. (b) Order thiếu/rác `customerPhone` → POST create-label. (c) Order phone hợp lệ → buildSubmitParams. | (a) đúng từng case; (b) 422 `CUSTOMER_PHONE_MISSING` TRƯỚC claim CAS — không charge ví, không CLAIM ghi xuống; (c) submit params KHÔNG bao giờ chứa `'0000000'` — phone thật pass-through qua `splitPhone`, sender/receiver đều vậy. `isWarehouseComplete` dùng chung `hasUsablePhone` (reject cả phone kho toàn 0). | §3.18e |
+
 ---
 
 ### 3.19 Additional Edge & Integration
