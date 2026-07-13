@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useTablePageClamp } from '@/components/ui/table-pagination'
 import { CustomersActionBar } from './customers-action-bar'
 import { CustomersTable } from './customers-table'
 import { CustomersCardList } from './customers-card-list'
@@ -31,36 +32,54 @@ export function CustomersClientLayout() {
     const [selected, setSelected] = useState<CustomerRecord | null>(null)
     const [pendingDelete, setPendingDelete] = useState<CustomerRecord | null>(null)
 
+    // Generation ref — stale fetch guard (same pattern as discounts layout): overlapping
+    // loads are otherwise last-resolve-wins, which can commit stale records.
+    const genRef = useRef(0)
+
     const load = useCallback(async () => {
+        const gen = ++genRef.current
         setLoading(true)
         try {
             const res = await getCustomersAction({ search, status, source, page, limit })
+            if (gen !== genRef.current) return
             setRecords(res.data)
             setTotal(res.meta.total)
         } catch {
+            if (gen !== genRef.current) return
             toast.error(c.loadFailed)
         } finally {
-            setLoading(false)
+            if (gen === genRef.current) setLoading(false)
         }
     }, [search, status, source, page, limit, c])
 
+    // Latest-load ref: post-delete reconciliation must fetch with the CURRENT
+    // page/filters, not the ones captured at confirm time (GH-1579 re-review M1).
+    const loadRef = useRef(load)
+    loadRef.current = load
+
     useEffect(() => { setPage(1) }, [status, source, search])
     const handleLimitChange = (n: number) => { setLimit(n); setPage(1) }
+    // GH-1579: snap back when deletions strand page past the last page
+    useTablePageClamp(page, total, limit, setPage, !loading)
     useEffect(() => { load() }, [load])
 
     async function confirmDelete() {
         if (!pendingDelete) return
         const record = pendingDelete
         setPendingDelete(null)
-        setRecords(prev => prev.filter(r => r.id !== record.id))
-        setTotal(n => n - 1)
-        if (selected?.id === record.id) setSelected(null)
         try {
             await deleteCustomerAction(record.rawId, record.source)
+            if (selected?.id === record.id) setSelected(null)
             toast.success(c.deleteSuccess)
         } catch {
-            load()
             toast.error(c.deleteFailed)
+        } finally {
+            // Refetch AFTER the server settles to reconcile records + total in one shot:
+            // a manual decrement strands the row on the next server page when a delete
+            // crosses the 11→10 hide boundary, and refetching post-commit means the
+            // GH-1579 clamp can never race an in-flight DELETE (ghost row). Via ref so
+            // it always uses the CURRENT page/filters, not confirm-time ones.
+            loadRef.current()
         }
     }
 

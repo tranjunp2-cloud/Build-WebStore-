@@ -10,8 +10,10 @@ import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
 import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
 import { clampCollectionDate } from '@/lib/shipping/easyparcel/pickup-schedule'
+import { hasUsablePhone } from '@/lib/shipping/easyparcel/normalize'
 import { buildSubmitParams } from './build-submit-params'
 import { verifyCodEligibilityLive } from './verify-cod-eligibility'
+import { resolveServiceForMethod, type CollectionMethod } from './resolve-collection-method'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -27,15 +29,18 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const orderId = Number.isFinite(Number(id)) ? Number(id) : id
         const payload = await getPayload({ config })
 
-        // Parse optional body (parcel weight override, collection date)
+        // Parse optional body (parcel weight override, collection date, collection method)
         let parcelWeightGrams: number | undefined
         let collectionDate: string | undefined
+        let method: CollectionMethod | undefined
         try {
             const body = await request.json()
             if (typeof body?.parcelWeightGrams === 'number') parcelWeightGrams = body.parcelWeightGrams
             if (typeof body?.collectionDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.collectionDate)) {
                 collectionDate = body.collectionDate
             }
+            // Absent method = legacy client → skip resolution, submit the stored service as-is
+            if (body?.method === 'pickup' || body?.method === 'dropoff') method = body.method
         } catch { /* empty body is fine */ }
 
         // Load order with depth=2 to resolve tenant
@@ -64,6 +69,26 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // shipment — treat it as not-yet-created so it falls through to the CAS (which returns
         // 409 for an active claim, or reclaims a stale one). Only a real shipment_number counts.
         if (existingShipmentNo && !existingShipmentNo.startsWith('CLAIM:')) {
+            // Crash-remnant self-heal (review #1582 round 3): the shipment write and the
+            // ready_to_ship flip below are two separate updates — a crash/DB hiccup between
+            // them leaves a pre-ship order holding a REAL shipment, which the label guards
+            // (claim CAS status filter + /cancel label guard) would otherwise strand. Flip
+            // it on the retry the merchant inevitably makes; the CAS keeps it race-safe
+            // (matches the exact shipment read above, never touches cancelled/shipped).
+            if (['confirmed', 'paid', 'processing'].includes((order as any).status)) {
+                await (payload.db.drizzle as any).execute(sql`
+                    UPDATE orders SET status = 'ready_to_ship', updated_at = NOW()
+                    WHERE id = ${orderId}
+                      AND status IN ('confirmed', 'paid', 'processing')
+                      AND easy_parcel_order_no = ${existingShipmentNo}
+                `).catch((err: unknown) => {
+                    // Non-fatal: the next retry heals it — but leave a trace for ops.
+                    payload.logger.warn(
+                        { orderId, err: err instanceof Error ? err.message : String(err) },
+                        '[create-label] crash-remnant status heal failed',
+                    )
+                })
+            }
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }
 
@@ -126,6 +151,24 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
+        // Reject unusable buyer phones BEFORE submit — a placeholder passes EP submit but
+        // the courier's AWB issuance rejects it later, stranding the shipment at "Pending
+        // AWB" with the wallet already charged (live 2026-07-13). Old orders can predate
+        // the phone-required checkout, so this cannot be assumed present.
+        const customerPhone = String((order as any).customerPhone ?? '')
+        if (!hasUsablePhone(customerPhone)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'CUSTOMER_PHONE_MISSING',
+                        message: 'Order has no valid customer phone number — couriers require one to deliver. Fulfill this order manually, or contact support to update the buyer\'s phone.',
+                    },
+                },
+                { status: 422 },
+            )
+        }
+
         const shippingServiceId = (order as any).shippingServiceId as string | undefined
         if (!shippingServiceId) {
             return NextResponse.json(
@@ -137,13 +180,61 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const courier = (order as any).shippingCourier as string | undefined
         const weightGrams = parcelWeightGrams ?? ((order as any).parcelWeight as number | undefined) ?? 500
 
+        // Read COD amount server-side — never trust client body. (Read here, above the
+        // method resolver, because variant selection must prefer COD-capable services.)
+        const codAmountSen = (order as any).codAmount as number | null | undefined
+
+        // US-F36-07 correction: honor the merchant's pickup/drop-off choice. EP has no method
+        // flag on submit — the service_id variant decides collection, and checkout stored the
+        // cheapest variant (often drop-off). Resolve BEFORE the CAS claim (read-only quote, no
+        // claim to release) and use the effective service for the COD gate + submit below.
+        let effectiveServiceId = shippingServiceId
+        let serviceSwitched: { serviceName: string; priceRm: number | null } | null = null
+        // false only when method was requested but the verification quote failed (fail-open):
+        // the label still books, but the collection method could not be confirmed.
+        let methodResolved = true
+        if (method) {
+            const resolved = await resolveServiceForMethod({
+                token,
+                senderPostcode: warehouse.postcode ?? '',
+                senderState: warehouse.state ?? '',
+                receiverPostcode: shippingAddress.postcode,
+                receiverState: shippingAddress.state ?? '',
+                weightGrams,
+                parcelValueRm: (order as any).total ?? 0,
+                serviceId: shippingServiceId,
+                method,
+                codRequired: codAmountSen != null && codAmountSen > 0,
+            })
+            if (!resolved.ok) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'METHOD_NOT_SUPPORTED',
+                            message: `This courier does not support ${method} on this route`,
+                            supported: resolved.supported,
+                        },
+                    },
+                    { status: 422 },
+                )
+            }
+            if (resolved.changed) {
+                effectiveServiceId = resolved.serviceId
+                serviceSwitched = { serviceName: resolved.serviceName, priceRm: resolved.priceRm }
+                payload.logger.info(
+                    { orderId, from: shippingServiceId, to: resolved.serviceId, method },
+                    '[create-label] service switched to match collection method',
+                )
+            }
+            methodResolved = resolved.verified
+        }
+
         // US-F36-07 AC-3b: never trust the client's collection date — re-compute the
         // earliest (cut-off aware, MYT) at request time and clamp past/weekend dates.
         // The shifted flag is returned so the UI can tell the merchant the date moved.
         const collection = clampCollectionDate(courier ?? '', collectionDate)
 
-        // Read COD amount server-side — never trust client body
-        const codAmountSen = (order as any).codAmount as number | null | undefined
         const codAmountRm = (codAmountSen != null && codAmountSen > 0) ? codAmountSen / 100 : undefined
 
         // COD live re-check (PD-021 mirror gate): limits/cod.available may have changed since
@@ -158,7 +249,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 weightGrams,
                 parcelValueRm: (order as any).total ?? 0,
                 codAmountSen,
-                serviceId: shippingServiceId,
+                serviceId: effectiveServiceId,
             })
             if (!codCheck.ok) {
                 return NextResponse.json(
@@ -180,9 +271,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             warehouse,
             shippingAddress,
             customerName: (order as any).customerName ?? '',
-            customerPhone: (order as any).customerPhone ?? '',
+            customerPhone,
             total: (order as any).total ?? 0,
-            shippingServiceId,
+            shippingServiceId: effectiveServiceId,
             shippingCourier: courier,
             weightGrams,
             collectionDate: collection.date,
@@ -202,15 +293,32 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const CLAIM_TTL_MS = 120_000
         const claimToken = `CLAIM:${Date.now()}:${Math.random().toString(36).slice(2)}`
         const staleBefore = Date.now() - CLAIM_TTL_MS
+        // Status guard INSIDE the claim CAS (review #1582): a /cancel racing this request
+        // (both exits are open after mark-shipment-cancelled) could refund the buyer and
+        // cancel the order between our read above and the submit below — without the guard
+        // the claim would still win, charge the EP wallet, then resurrect the cancelled
+        // order to ready_to_ship. 'paid'/'processing' kept for legacy Stripe orders whose
+        // transitions still allow shipping.
         const claimResult = await (payload.db.drizzle as any).execute(sql`
             UPDATE orders SET easy_parcel_order_no = ${claimToken}
             WHERE id = ${orderId}
+              AND status IN ('confirmed', 'paid', 'processing')
               AND (easy_parcel_order_no IS NULL
                    OR (easy_parcel_order_no LIKE 'CLAIM:%'
                        AND (split_part(easy_parcel_order_no, ':', 2))::bigint < ${staleBefore}))
             RETURNING id
         `)
         if (!claimResult.rows?.length) {
+            // Distinguish "another request holds the claim" (409, retryable) from "the
+            // order left a shippable status" (422, e.g. cancelled by a concurrent /cancel).
+            const recheck = await payload.findByID({ collection: 'orders', id: orderId, overrideAccess: true, depth: 0 }).catch(() => null)
+            const currentStatus = (recheck as any)?.status as string | undefined
+            if (currentStatus && !['confirmed', 'paid', 'processing'].includes(currentStatus)) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'INVALID_TRANSITION', message: `Cannot create a label for an order in "${currentStatus}" status` } },
+                    { status: 422 },
+                )
+            }
             return NextResponse.json(
                 { success: false, error: { code: 'LABEL_IN_PROGRESS', message: 'Label creation is already in progress for this order' } },
                 { status: 409 },
@@ -306,6 +414,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 // shown as the locked "Pickup · DD/MM" line on the order detail.
                 pickupScheduledAt: collection.date,
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
+                // Method resolution booked a different service variant — keep the order's
+                // service in sync with what EP actually charged/booked.
+                ...(effectiveServiceId !== shippingServiceId ? { shippingServiceId: effectiveServiceId } : {}),
             } as any,
         })
 
@@ -324,6 +435,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 labelUrl,
                 collectionDate: collection.date,
                 collectionDateShifted: collection.shifted,
+                // Non-null when the stored service couldn't do the requested method and a
+                // same-courier variant was booked instead (wallet charged that variant's price)
+                serviceSwitched,
+                // false = method verification quote failed (fail-open): label booked with the
+                // stored service, collection method NOT confirmed against EP
+                ...(method ? { methodResolved } : {}),
             },
         })
     } catch (error: unknown) {

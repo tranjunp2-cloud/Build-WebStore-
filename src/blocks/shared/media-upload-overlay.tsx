@@ -263,7 +263,7 @@ export function MediaUploadOverlay({
                                 <button
                                     type="button"
                                     onClick={() => imageFileRef.current?.click()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors whitespace-nowrap"
                                 >
                                     <ImagePlus className="w-4 h-4" />
                                     Change Image
@@ -274,7 +274,7 @@ export function MediaUploadOverlay({
                                     type="button"
                                     onClick={() => videoFileRef.current?.click()}
                                     title={`MP4 or WebM, max ${uploadLimitLabel('video')}`}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors whitespace-nowrap"
                                 >
                                     <Film className="w-4 h-4" />
                                     Change Video

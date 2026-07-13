@@ -97,6 +97,10 @@ export async function getRates(
                     codMinSen: rmStringToSen(codFeature?.min_cod_amount),
                     codMaxSen: rmStringToSen(codFeature?.max_cod_amount),
                     estDelivery: q.courier.delivery_duration ?? '3–5 business days',
+                    // Preserve collection capability — pickup vs drop-off is a property of the
+                    // SERVICE variant; create-label needs it to honor the merchant's method choice.
+                    isPickup: q.courier.is_pickup,
+                    isDropoff: q.courier.is_dropoff,
                 }
             })
             // F10 (review #1434): EP sometimes sends "" / non-numeric total_amount →

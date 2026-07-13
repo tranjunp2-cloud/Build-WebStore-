@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { PreviewScripts, replaceDropHintCSS } from '@/components/editor/PreviewScripts'
+import { PreviewScripts, BuilderLinkScripts, replaceDropHintCSS } from '@/components/editor/PreviewScripts'
 
 describe('PreviewScripts', () => {
     let mockPostMessage: ReturnType<typeof vi.fn>
@@ -500,5 +500,42 @@ describe('PreviewScripts', () => {
 
             expect(result).toBe(css)
         })
+    })
+})
+
+// ── TC-GH1461-CUR: BuilderLinkScripts readonly-cursor injection (GH-1461) ──
+// QA doc: docs/qa/F04-block-renderer.md §7
+describe('[TC-GH1461-CUR] BuilderLinkScripts — readonly cursor injection', () => {
+    const injectedCursorStyle = () =>
+        Array.from(document.head.querySelectorAll('style')).find(
+            (s) => s.textContent?.includes('cursor: default')
+        )
+
+    afterEach(() => {
+        document.head.querySelectorAll('style').forEach((s) => s.remove())
+    })
+
+    it('TC-GH1461-CUR-01: injects html cursor:default style into document head on mount', () => {
+        // Act
+        const { unmount } = render(<BuilderLinkScripts />)
+
+        // Assert — arrow cursor forced on the whole readonly preview document
+        const style = injectedCursorStyle()
+        expect(style).toBeDefined()
+        expect(style?.textContent).toContain('html { cursor: default; }')
+
+        unmount()
+    })
+
+    it('TC-GH1461-CUR-02: removes the injected cursor style on unmount', () => {
+        // Arrange
+        const { unmount } = render(<BuilderLinkScripts />)
+        expect(injectedCursorStyle()).toBeDefined()
+
+        // Act
+        unmount()
+
+        // Assert — no leftover style tag once the preview surface goes away
+        expect(injectedCursorStyle()).toBeUndefined()
     })
 })

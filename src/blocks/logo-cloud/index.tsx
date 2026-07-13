@@ -43,22 +43,37 @@ function LogoFrame({ size, children }: { size: 'grid' | 'row'; children: ReactNo
     )
 }
 
-/** Text placeholder for logos without valid image URL — shows initials centered in the frame.
- *  data-image-index enables editor image-replace on placeholder click (no real <img> present). */
-function LogoPlaceholder({ name, imageIndex }: { name?: string; imageIndex?: number }) {
-    const initials = (name ?? '')
-        .split(/\s+/)
-        .map((w) => w[0] ?? '')
+/** GH-1185: monogram for logo-less brand tiles — single word → first 2 letters
+ *  ("Aeon" → "AE"); multi-word → first letter of up to 3 words
+ *  ("Bank Negara Malaysia" → "BNM"); empty/undefined → "?". */
+function computeMonogram(name?: string): string {
+    const words = (name ?? '').trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return '?'
+    // Array.from splits by code point, not UTF-16 unit — string indexing would
+    // tear surrogate pairs (e.g. emoji-leading names) into broken half-chars.
+    if (words.length === 1) return Array.from(words[0]).slice(0, 2).join('').toUpperCase()
+    return words
+        .slice(0, 3)
+        .map((w) => Array.from(w)[0])
         .join('')
-        .slice(0, 2)
-        .toUpperCase() || '?'
+        .toUpperCase()
+}
+
+/** Uniform brand-color tile for logos without a valid image URL — shows a monogram
+ *  centered in the frame. data-image-index enables editor image-replace on
+ *  placeholder click (no real <img> present). */
+function LogoPlaceholder({ name, imageIndex }: { name?: string; imageIndex?: number }) {
+    const monogram = computeMonogram(name)
     return (
         <span
-            className="flex h-full w-full items-center justify-center text-base font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-            style={{ color: 'var(--brand-primary)' }}
+            className="flex h-full w-full items-center justify-center rounded-lg text-base font-bold uppercase tracking-wider cursor-pointer"
+            style={{
+                background: 'rgba(var(--brand-primary-rgb), 0.12)',
+                color: 'var(--brand-primary)',
+            }}
             data-image-index={imageIndex}
         >
-            {initials}
+            {monogram}
         </span>
     )
 }
@@ -90,15 +105,19 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <LogoHeadline text={headline} />
                 <div className={`flex flex-wrap items-center justify-center ${gap} max-w-5xl mx-auto`}>
                     {logos.map((item, i) => (
-                        <MediaUploadOverlay key={i} field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
-                            <LogoFrame size={size}>
-                                {item.logo?.url ? (
-                                    <LogoImage item={item} index={i} />
-                                ) : (
-                                    <LogoPlaceholder name={item.name} imageIndex={i} />
-                                )}
-                            </LogoFrame>
-                        </MediaUploadOverlay>
+                        // MediaUploadOverlay tracks hover on its parentElement — each tile needs
+                        // its own wrapper, or hovering one logo shows the overlay on all of them.
+                        <div key={i}>
+                            <MediaUploadOverlay field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
+                                <LogoFrame size={size}>
+                                    {item.logo?.url ? (
+                                        <LogoImage item={item} index={i} />
+                                    ) : (
+                                        <LogoPlaceholder name={item.name} imageIndex={i} />
+                                    )}
+                                </LogoFrame>
+                            </MediaUploadOverlay>
+                        </div>
                     ))}
                 </div>
             </SectionWrapper>

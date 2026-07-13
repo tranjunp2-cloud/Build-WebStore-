@@ -22,6 +22,7 @@ import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { ensureCartGlobalBlock, ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -395,6 +396,9 @@ export const POST = withAuth(async (user, req) => {
                 const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
                 const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
 
+                // Final layouts written back to pages — feeds the cart auto-add check below
+                const reskinnedLayouts: Array<{ layout?: unknown[] }> = []
+
                 // 2. Smart Mapping: replace layout with template blocks, map user content
                 //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
                 for (const page of existingPages.docs) {
@@ -489,14 +493,26 @@ export const POST = withAuth(async (user, req) => {
                         id: page.id,
                         data: { layout: normalizedLayout },
                     })
+                    reskinnedLayouts.push({ layout: normalizedLayout })
                     _createdPagesCount++
                 }
 
-                // 3. Mark completed
+                // 3. Mark completed (+ auto-add floating cart when the re-skinned
+                // layouts contain commerce blocks and no cart is configured yet).
+                // Pending-aware: a stale pendingGlobalBlocks draft (e.g. unpublished
+                // cart deletion) would shadow the live cart in the editor.
                 await payload.update({
                     collection: 'sites',
                     id: Number(siteId),
-                    data: { generationStatus: 'completed' },
+                    data: {
+                        generationStatus: 'completed',
+                        ...ensureCartGlobalBlockWithPending(
+                            (existingSite as { globalBlocks?: Record<string, unknown> | null }).globalBlocks,
+                            (existingSite as { pendingGlobalBlocks?: Record<string, unknown> | null }).pendingGlobalBlocks,
+                            reskinnedLayouts,
+                            (existingSite as { headerBlock?: unknown }).headerBlock,
+                        ),
+                    },
                 })
             } catch (applyError) {
                 // ROLLBACK (BR-06): restore previous theme + page layouts
@@ -626,11 +642,15 @@ export const POST = withAuth(async (user, req) => {
         })
         _createdPagesCount++
 
-        // Mark generation completed
+        // Mark generation completed (+ auto-add floating cart when template
+        // pages contain commerce blocks — fresh site, so no prior cart config)
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
-            data: { generationStatus: 'completed' },
+            data: {
+                generationStatus: 'completed',
+                ...ensureCartGlobalBlock(null, pagesToCreate),
+            },
         })
 
         // Increment template usage count (non-critical)

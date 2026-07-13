@@ -106,7 +106,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-09 | Product Image Upload: Kéo thả, max 5 ảnh. Khối lượng <= 5MB/ảnh tuân thủ chuẩn Editor. Format JPG/PNG/WEBP. AI auto scale/compress. | US-F08-01 | P0 | |
 | FR-10 | Bulk AI Create (Tạo hàng loạt): Nhập 1 list item -> AI parse ra Name, Price, Category, Variants. Hiển thị Bảng Preview để Edit ngang hàng (Data Grid). Khi duyệt xong lưu thành Draft, bỏ qua hình ảnh. | US-F08-04 | P0 | NLP Array parser |
 | FR-11 | Default product image: Khi không có ảnh, hiển thị placeholder hình "Thùng hàng carton dễ thương". | US-F08-04 | P1 | Fallback UI |
-| FR-12 | Category Management: CRUD danh mục. Hỗ trợ Parent-Child tree (Tối đa 3 level sâu: L1 > L2 > L3). Gán n-Category cho 1 Product. Bố trí nút/menu Direct "Quản lý Danh mục" bên cạnh nút "Add Product". | US-F08-05 | P0 | Nested Set Model / ParentID |
+| FR-12 | Category Management: CRUD danh mục. Hỗ trợ Parent-Child tree (Tối đa 3 level sâu: L1 > L2 > L3). Gán 1 danh mục cho 1 Product (single-select). Bố trí nút/menu Direct "Quản lý Danh mục" bên cạnh nút "Add Product". Hard-block delete nếu danh mục có SP gán trực tiếp; con trực tiếp được đẩy lên top-level. | US-F08-05 | P0 | Nested Set Model / ParentID |
 | FR-13 | Dynamic Attributes: Ô thêm/xóa Key-Value tùy biến (VD: "Chất liệu": "Cotton"). Gen thành SEO Rich Snippets ngoài storefront. | US-F08-06 | P0 | Key-Value Array / JSON |
 | FR-14 | Storefront PLP Layout: View danh sách Grid/List, Sidebar Filters (Menu theo Category 3-Level, Khoảng Giá, Attributes). | US-F08-06 | P0 | F09 Dependency |
 | FR-15 | Storefront PDP Layout: Breadcrumbs (L1 > L2), Gallery ảnh (Trái), Thông tin (Phải). Khối Attributes Table ở nửa dưới trang. | US-F08-06 | P0 | F09 Dependency |
@@ -124,7 +124,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | **Compare At Price**| `number` (> `Price`). Tùy chọn, có thể bỏ trống. | "Compare at price must be greater than the regular price." |
 | **SKU** | `string` (Max 50 chars). Chỉ nhận Alpha-numeric. Unique. | "SKU already exists or is invalid." |
 | **Stock** | `integer` (>= 0). Không điền số thập phân. | "Stock cannot be negative." |
-| **Category** | `array/select` (Min length = 1). Ít nhất 1 danh mục. | "Product must belong to at least one category." |
+| **Category** | `single-select` (Exactly 1 danh mục bắt buộc). | "Product must belong to exactly one category." |
 | **Weight** | `number` (> 0). Bắt buộc để tính phí Vận chuyển (F14). | "Weight must be greater than 0."|
 | **Length (L)** | `number` (>= 0). Đơn vị cm. | "Length must be greater than or equal to 0." |
 | **Width (W)** | `number` (>= 0). Đơn vị cm. | "Width must be greater than or equal to 0." |
@@ -144,6 +144,10 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 - **BR-04:** Price = 0 allowed (free products)
 - **BR-05:** Halal badge chỉ hiện trên storefront khi cert được upload
 - **BR-06 (Out-of-Stock UX):** Nếu Stock = 0, TUYỆT ĐỐI KHÔNG tự động chuyển Status sang Draft/Archived (giữ nguyên Active để bảo tồn Link SEO). Thay vào đó, ngoài Storefront F09 hiển thị nhãn `[Hết hàng]` và vô hiệu hóa nút Add to Cart. Trên Dashboard F08, đưa ra Cảnh báo Đỏ tại cột Stock. Thể tích (Dimensions) và Cân nặng là bắt buộc để liên kết với Module tính phí Vận Chuyển F14 sau này.
+- **BR-07 (Category: 1–1 Product):** Mỗi sản phẩm thuộc đúng 1 danh mục (single-select). Dữ liệu DB vẫn sử dụng `hasMany: true` ở trên `products_rels` (chi tiết lưu trữ); UI + validation bảo đảm đúng 1 danh mục.
+- **BR-08 (Category Delete Integrity):** Hard-block xóa danh mục nếu có SP gán TRỰC TIẾP (direct-only, không đệ quy). Nếu xóa được phép: danh mục con trực tiếp được đẩy lên top-level (`parent = null`), rồi soft-delete danh mục đó.
+- **BR-09 (Category Cycle Prevention):** Không cho đặt `parent` là chính nó hoặc bất kỳ descendant của nó (chặn vòng lặp cây).
+- **BR-10 (Category Dedup per Tenant):** Slug unique theo tenant (không unique global). Tên danh mục unique trong phạm vi `(parent, tenant)`, so sánh case-insensitive + trim.
 
 ---
 
@@ -227,7 +231,14 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 - **Empty State:** Icon khay hàng trống + CTA "Hãy tạo sản phẩm đầu tiên".
 - **Loading State:** Skeleton table trong Data list. Spin icon trong các Nút Save và các Button AI Generate.
 - **Error State / Edge Cases:** Highlight đỏ đường kẻ viền TextInput nếu Submit form mà Name trống / Price < 0. Nếu Stock = 0, Cột list nổi bật đỏ (High Attention).
-- **Modals (nếu có):** Nút Delete gọi màn hình Confirmation Modal "Bạn có chắc muốn xóa mềm phẩm này? Hành động này có thể hồi phục từ Archive.". Bulk AI Modal (Bảng Preview Table) sinh ra sau khi gọi tính năng Bulk Create Chat AI để user xác nhận trước DB Commit.
+- **Modals (nếu có):** 
+  - Delete Confirmation: "Bạn có chắc muốn xóa mềm phẩm này? Hành động này có thể hồi phục từ Archive."
+  - Delete Category: Hard-block với thông báo "Cannot delete this category. There are X products still assigned to it. Please reassign your products first." nếu có SP gán trực tiếp.
+  - Bulk AI Modal (Bảng Preview Table) sinh ra sau khi gọi tính năng Bulk Create Chat AI để user xác nhận trước DB Commit.
+  - **Add Category Modal (Issue1·mục2):** 
+    - **Contextual Title:** "Add New Category" (từ toolbar); "Add Subcategory" (từ nút + trên dòng danh mục).
+    - **Parent Field:** Auto-filled khi mở từ nút +; disabled trong subcategory mode (khóa parent). Editable khi tạo từ toolbar hoặc edit.
+    - **Parent Dropdown:** Thụt lề theo level (L1→L2→L3); L3 node hiển thị nhưng disabled (không thể chọn làm parent); loại trừ self + descendants (cycle prevention).
 
 ---
 ### 10.4. Giao diện Hiển thị Storefront (PLP & PDP)
@@ -247,7 +258,7 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 ```gherkin
 GIVEN user ở /products
 WHEN  click "Thêm sản phẩm"
-THEN  form hiện: tên, giá (RM), category, mô tả, ảnh (max 5, max 5MB/ảnh), stock
+THEN  form hiện: tên, giá (RM), category (single-select, đúng 1), mô tả, ảnh (max 5, max 5MB/ảnh), stock
 ```
 
 ### AC-2: AI Data Generators (SEO & Description)

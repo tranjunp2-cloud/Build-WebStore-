@@ -3,10 +3,21 @@ export type StockSeverity = 'destructive' | 'warning' | 'success'
 export type StockBreakdownItem = { name: string; stock: number }
 
 export type StockDisplay = {
+    /** Plain number as a string — never includes i18n words. For a variant
+     * product this is the summed total (master inventory), not a min-max range;
+     * the caller appends "1 variant" / "{count} variants" (i18n, singular-aware)
+     * when `showVariantCount` is true, mirroring how `getDisplayPrice`'s "From "
+     * prefix is composed by the caller rather than baked into this pure helper. */
     label: string
-    isRange: boolean
+    /** True whenever the product has 1+ variants — `label` is the total, and the
+     * caller should render it as `"{label} / {variantCount} variant(s)"`. */
+    showVariantCount: boolean
     min: number
     max: number
+    /** Sum of all variant stocks (variant product), or same as `min`/`max` otherwise. */
+    total: number
+    /** Number of variant rows; 0 when the product has no variants. */
+    variantCount: number
     severity: StockSeverity
     /** Per-variant stock rows, or `null` when the product has no variants. */
     breakdown: StockBreakdownItem[] | null
@@ -33,9 +44,13 @@ function rangeSeverity(min: number, max: number): StockSeverity {
  * Pure helper computing the Stock column display for a product list row.
  * Mirrors the `getDisplayPrice` pattern (loose/structural input, no side effects).
  *
- * - No variants (or empty variants array) → single number from `inventory`.
- * - Exactly 1 variant / all variants equal stock → single number (breakdown still populated).
- * - Variants with differing stock → `"{min} - {max}"` range label.
+ * - No variants (or empty variants array) → single number from `inventory`, no suffix.
+ * - 1+ variants → master inventory total as the label (`showVariantCount: true`); the
+ *   caller renders `"{label} / {variantCount} variant(s)"`. No longer a `"{min} - {max}"`
+ *   range — replaced per product decision (was ambiguous vs. the actual saved total).
+ *   Severity is unchanged: still derived from the per-variant min/max spread, not the
+ *   total — a healthy-looking total can hide a fully-dead variant. For exactly 1 variant
+ *   `min === max === total`, so this is equivalent to `singleSeverity`.
  */
 export function computeStockDisplay(p: {
     hasVariants?: boolean
@@ -48,9 +63,11 @@ export function computeStockDisplay(p: {
         const inv = Math.max(0, Number(p.inventory) || 0)
         return {
             label: String(inv),
-            isRange: false,
+            showVariantCount: false,
             min: inv,
             max: inv,
+            total: inv,
+            variantCount: 0,
             severity: singleSeverity(inv),
             breakdown: null,
         }
@@ -65,25 +82,15 @@ export function computeStockDisplay(p: {
     // reduce, not Math.min/max(...stocks) — a spread blows the call stack on very large arrays
     const min = stocks.reduce((a, b) => Math.min(a, b))
     const max = stocks.reduce((a, b) => Math.max(a, b))
-    const isRange = breakdown.length > 1 && min !== max
-
-    if (!isRange) {
-        const single = breakdown[0]?.stock ?? 0
-        return {
-            label: String(single),
-            isRange: false,
-            min: single,
-            max: single,
-            severity: singleSeverity(single),
-            breakdown,
-        }
-    }
+    const total = stocks.reduce((a, b) => a + b, 0)
 
     return {
-        label: `${min} - ${max}`,
-        isRange: true,
+        label: String(total),
+        showVariantCount: true,
         min,
         max,
+        total,
+        variantCount: breakdown.length,
         severity: rangeSeverity(min, max),
         breakdown,
     }

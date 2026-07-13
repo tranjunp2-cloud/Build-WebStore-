@@ -293,12 +293,12 @@ THEN  hệ thống chấp nhận "Áo Sơ Mi" là Level 3.
   AND nếu cố lấy Level 3 "Áo Sơ Mi" làm cha, hệ thống cảnh báo "Chỉ hỗ trợ tối đa 3 cấp độ danh mục".
 ```
 
-#### AC-2: Gán danh mục cho Sản phẩm
+#### AC-2: Gán danh mục cho Sản phẩm (Single-select)
 ```gherkin
 GIVEN user đang ở trang Thêm/Sửa Sản Phẩm
 WHEN  user mở phần Tổ chức (Organization)
 THEN  có dropdown Tree-select hiển thị cây danh mục
-  AND user có thể tick chọn 1 hoặc nhiều danh mục giao nhau cho sản phẩm đó.
+  AND user phải chọn đúng 1 danh mục (single-select) cho sản phẩm đó.
 ```
 
 ### Definition of Done

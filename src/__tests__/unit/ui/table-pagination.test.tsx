@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, renderHook } from '@testing-library/react'
 import React from 'react'
 
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 
 afterEach(cleanup)
 
@@ -81,10 +81,74 @@ describe('[TC-DS1222-05-05] TablePagination rows-per-page', () => {
     })
 })
 
-// ── TC-DS1222-05-06 — total=0 shows 0–0 ─────────────────────────────────────
+// ── TC-DS1222-05-06 — empty dataset renders nothing ─────────────────────────
 describe('[TC-DS1222-05-06] TablePagination empty dataset', () => {
-    it('shows 0–0 of 0 when there is no data', () => {
-        render(<TablePagination page={1} total={0} limit={10} onPageChange={vi.fn()} />)
-        expect(screen.getByText('0–0')).toBeInTheDocument()
+    it('renders nothing when there is no data (GH-1579 hide rule)', () => {
+        const { container } = render(
+            <TablePagination page={1} total={0} limit={10} onPageChange={vi.fn()} />,
+        )
+        expect(container.firstChild).toBeNull()
+    })
+})
+
+// ── TC-DS1222-05-07 — hidden when total fits one default page ────────────────
+describe('[TC-DS1222-05-07] TablePagination hidden for small datasets', () => {
+    it('renders nothing when total equals the smallest rows option', () => {
+        const { container } = render(
+            <TablePagination page={1} total={10} limit={10} onPageChange={vi.fn()} />,
+        )
+        expect(container.firstChild).toBeNull()
+    })
+
+    it('renders nothing when total is below the smallest rows option', () => {
+        const { container } = render(
+            <TablePagination page={1} total={5} limit={10} onPageChange={vi.fn()} />,
+        )
+        expect(container.firstChild).toBeNull()
+    })
+})
+
+// ── TC-DS1222-05-08 — boundary: total=11 shows the bar ──────────────────────
+describe('[TC-DS1222-05-08] TablePagination boundary shows at 11', () => {
+    it('renders the bar when total is one above the smallest rows option', () => {
+        render(<TablePagination page={1} total={11} limit={10} onPageChange={vi.fn()} />)
+        expect(screen.getByText('1–10')).toBeInTheDocument()
+        expect(screen.getAllByRole('button').length).toBeGreaterThan(0)
+    })
+})
+
+// ── TC-DS1222-05-09 — rows-per-page select shows a chevron icon ──────────────
+describe('[TC-DS1222-05-09] TablePagination rows-per-page chevron', () => {
+    it('renders a dropdown arrow next to the rows-per-page select', () => {
+        const { container } = render(
+            <TablePagination
+                page={1}
+                total={50}
+                limit={10}
+                onPageChange={vi.fn()}
+                onLimitChange={vi.fn()}
+            />,
+        )
+        expect(container.querySelector('svg.lucide-chevron-down')).toBeTruthy()
+    })
+})
+
+// ── TC-DS1222-05-10 — page clamp when total shrinks (stranded page) ──────────
+describe('[TC-DS1222-05-10] useTablePageClamp stranded page', () => {
+    it('snaps back to the last valid page when total shrinks below the current page', () => {
+        const onPageChange = vi.fn()
+        const { rerender } = renderHook(
+            ({ total }) => useTablePageClamp(2, total, 10, onPageChange),
+            { initialProps: { total: 12 } },
+        )
+        expect(onPageChange).not.toHaveBeenCalled()
+        rerender({ total: 10 })
+        expect(onPageChange).toHaveBeenCalledWith(1)
+    })
+
+    it('does nothing while disabled (e.g. data still loading)', () => {
+        const onPageChange = vi.fn()
+        renderHook(() => useTablePageClamp(3, 0, 10, onPageChange, false))
+        expect(onPageChange).not.toHaveBeenCalled()
     })
 })

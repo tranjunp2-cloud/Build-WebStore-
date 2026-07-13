@@ -35,6 +35,8 @@ type AuthUserShape = {
 }
 
 const EXPORT_ROW_CAP = 10_000
+// Postgres int4 upper bound — a larger tenant id overflows the `::integer[]` cast → 500.
+const INT4_MAX = 2147483647
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -85,21 +87,22 @@ function resolveTenantIds(
 ): TenantResolutionResult {
     const isSuperAdmin = user.roles?.includes('super-admin') ?? false
 
-    // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer)
+    // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer).
+    // Cap at INT4_MAX so an out-of-range id can't overflow the `::integer[]` cast → 500.
     const userTenantIds: number[] = (user.tenants ?? []).map((t) => {
         const tenant = t.tenant
         if (typeof tenant === 'object' && tenant != null) return Number(tenant.id)
         return Number(tenant)
-    }).filter((id) => Number.isFinite(id) && id > 0)
+    }).filter((id) => Number.isInteger(id) && id > 0 && id <= INT4_MAX)
 
     if (isSuperAdmin) {
         if (requestedTenantId) {
-            // Validate: must be a positive integer string
-            if (!/^\d+$/.test(requestedTenantId)) {
-                // Return sentinel — caller will 400
+            // Validate: must be a positive integer string within int4 range (else the
+            // `::integer[]` bind overflows → 500). Return sentinel → caller 400s.
+            const id = parseInt(requestedTenantId, 10)
+            if (!/^\d+$/.test(requestedTenantId) || id > INT4_MAX) {
                 return { tenantIds: [-1], tenantLabel: '', isSuperAdmin: true }
             }
-            const id = parseInt(requestedTenantId, 10)
             return { tenantIds: [id], tenantLabel: String(id), isSuperAdmin: true }
         }
         // Super-admin without filter — export all (empty array signals no WHERE clause)
@@ -158,10 +161,15 @@ export async function GET(req: NextRequest) {
             drizzle: { execute: (q: unknown) => Promise<DrizzleQueryResult<unknown>> }
         }
 
+        // Bind tenant ids as a Postgres array LITERAL string ('{46,47}'), NOT a raw JS array.
+        // The pg driver serializes a JS-array param to a bare scalar → `ANY('46'::integer[])`
+        // → "malformed array literal" → 500. ids are validated integers, so join is safe.
+        // (Mirrors the fix already shipped in v1/discounts/export — GH #1535.)
+        const tenantArray = `{${tenantIds.join(',')}}`
+
         // 3. Row count check (hard cap)
-        // Use Drizzle template-literal parameterization — integers bound safely, no sql.raw
         const countQuery = tenantIds.length > 0
-            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(${tenantIds}::integer[])`
+            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(${tenantArray}::integer[])`
             : sql`SELECT COUNT(*) AS cnt FROM customers`
 
         const countResult = (await db.drizzle.execute(countQuery)) as DrizzleQueryResult<{ cnt: string | number }>
@@ -209,7 +217,7 @@ export async function GET(req: NextRequest) {
                                 (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id) AS addr_count,
                                 (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
                             FROM customers c
-                            WHERE c.tenant_id = ANY(${tenantIds}::integer[])
+                            WHERE c.tenant_id = ANY(${tenantArray}::integer[])
                             ORDER BY c.created_at DESC
                         `
                         : sql`

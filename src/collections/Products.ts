@@ -529,7 +529,7 @@ export const Products: CollectionConfig = {
             name: 'aiReviewPending',
             type: 'checkbox',
             defaultValue: false,
-            admin: { description: 'Marks a product created via AI bulk-create as pending human review. Cleared on manual edit or activation.' },
+            admin: { description: 'Marks a product created via AI bulk-create as pending human review. Cleared as soon as the product is opened for editing.' },
         },
         {
             name: 'halalCertImage',

@@ -7,6 +7,8 @@
  * module transparently falls back to it so existing configs keep working without a data migration.
  */
 
+import { hasUsablePhone } from './normalize'
+
 export interface Warehouse {
     id?: string
     label?: string
@@ -53,10 +55,9 @@ export function getDefaultWarehouse(ep: EpIntegrationLike | null | undefined): W
 /** A pickup address is usable as an EP shipment sender only when EP's mandatory fields are present. */
 export function isWarehouseComplete(w: Warehouse | null | undefined): boolean {
     if (!w) return false
-    const phoneDigits = (w.phone ?? '').replace(/\D/g, '')
     return (
         !!(w.label || w.name)?.trim() &&
-        phoneDigits.length >= 8 &&
+        hasUsablePhone(w.phone) &&
         !!w.address1?.trim() &&
         !!w.state?.trim() &&
         !!w.postcode?.trim()
