@@ -760,6 +760,11 @@ html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0
 .editor-shell .bg-blue-500 .text-white,
 .editor-shell .bg-blue-600 .text-white { color: #fff !important; }
 
+/* solid teal primary accent giữ chữ trắng cả 2 theme (nút Next/Done coach marks) —
+   bg-[hsl(var(--primary))] là teal đặc cố định, không bị remap theo theme (GH-1584) */
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\].text-white,
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\] .text-white { color: #fff !important; }
+
 /* dark scrim overlays (bg-black/NN) keep white text/icons both themes — hover
    preview overlay (TemplateCard), upload-progress overlay (BlockImageEditor) —
    these always sit on a dark backdrop regardless of theme. */
