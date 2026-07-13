@@ -51,6 +51,9 @@ describe('hasUsablePhone [TC-F36.186a]', () => {
         // starts with 0 after the strip (review #1595 round 2).
         expect(hasUsablePhone('0000000060')).toBe(false)      // emits '000000060'
         expect(hasUsablePhone('00123456789')).toBe(false)     // double-0 typo → emits '0123456789'
+        // Length cap: multi-number paste in legacy data emits a >11-digit blob
+        // the courier cannot dial (review #1595 round 3).
+        expect(hasUsablePhone('0123456789 / 0198765432')).toBe(false)
     })
 })
 
