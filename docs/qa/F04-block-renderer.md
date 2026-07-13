@@ -143,7 +143,19 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 4. Hành Trình E2E UAT Flow
+## 4. Logo Cloud — Monogram Placeholder (GH-1185, plan `plans/260709-1404-GH-1185-image-business-context-logo-cloud/`)
+
+> Logo Cloud block uses placeholder monograms when brand logos are missing. Monogram rules: single-word names → first 2 letters ("Aeon" → "AE"); multi-word → first letter of ≤3 words ("Bank Negara Malaysia" → "BNM"); empty → "?". Both placeholder and real logo preserve `data-image-index` for editor replace.
+
+| TC-ID | Loại | Mô tả | Kỳ vọng | Status |
+|---|---|---|---|---|
+| **TC-F04.LC1** | `[Positive]` | `LogoPlaceholder` monogram: single-word "Aeon"→"AE", "Maxis"→"MA" | Render <LogoPlaceholder name="Aeon"> → monogram displays "AE"; name="Maxis" → "MA" | [ ] |
+| **TC-F04.LC2** | `[Positive]` | Multi-word "Bank Negara Malaysia"→"BNM" (≤3); empty→"?" | name="Bank Negara Malaysia" → "BNM"; name="" → "?"; name="   " (whitespace) → "?" | [ ] |
+| **TC-F04.LC3** | `[Positive]` | Real logo (`logo.url` present) → `LogoImage` renders; `data-image-index` preserved on both paths | {logo: {url: 'https://example.com/logo.png'}} → <LogoImage> renders with data-image-index; no logo → <LogoPlaceholder> with data-image-index | [ ] |
+
+---
+
+## 5. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |
 |:---:|:---|:---|
@@ -155,7 +167,7 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 5. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
+## 6. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
 
 | Nhóm Kiểm Thử | Trạng Thái | Ghi Chú |
 |---|---|---|
@@ -171,7 +183,7 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 6. GH-1367 Editor Toolbar & Text Selection (TC-EDIT-01..09)
+## 7. GH-1367 Editor Toolbar & Text Selection (TC-EDIT-01..09)
 
 **Scope:** Editor UI regression tests for Bug 1 (text-hit detection guard) + Bug 2 (light/dark theme toolbar). Mapped to Block Renderer feature family (F04 blocks are edited via this toolbar).
 

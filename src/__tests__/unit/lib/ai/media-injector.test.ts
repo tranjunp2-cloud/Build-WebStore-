@@ -129,6 +129,20 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(needs.length).toBe(1)
             expect(needs[0]!.blockType).toBe('hero')
         })
+
+        it('TC-F38-RAW-21: logo-cloud skipped even when PIXABAY_BLOCKS=all', () => {
+            // GH-1185: logo-cloud is NO_STOCK_BLOCKS — should not emit image needs
+            // even with PIXABAY_BLOCKS=all
+            process.env.PIXABAY_BLOCKS = 'all'
+            const blocks = [
+                { blockType: 'logo-cloud', logos: [{ name: 'Brand A' }, { name: 'Brand B' }] },
+                { blockType: 'hero', headline: 'H' },
+            ]
+            const needs = planImageNeeds(blocks)
+            // Only hero should need images, logo-cloud skipped
+            expect(needs.length).toBe(1)
+            expect(needs[0]!.blockType).toBe('hero')
+        })
     })
 
     describe('cleanupNonNumericImageFields', () => {

@@ -24,7 +24,7 @@ import {
 } from '@/lib/ai/image-pool'
 import { deriveKeywords } from '@/lib/ai/image-keywords'
 import { THEME_MOODS } from '@/lib/ai/theme-moods'
-import type { PixabayPhoto } from '@/lib/ai/pixabay-client'
+import { PixabayError, type PixabayPhoto } from '@/lib/ai/pixabay-client'
 
 // ── Mock Pixabay client ─────────────────────────────────────────────────────
 
@@ -532,5 +532,106 @@ describe('TC-F01-W.18 — buildImagePool honors explicit bucket sizes', () => {
     expect(pool.landscape.length).toBe(0)
     expect(pool.square.length).toBe(0)
     expect(pool.underfill).toBe(false)
+  })
+})
+
+// ── TC-F38-RAW-23: non-VN tier-3 category fallback (GH-1185 Malay gap) ──────
+describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keyword', () => {
+  it('Malay keywords 0-hit on primary + relaxed → tier-3 queries CATEGORY_BASE_KEYWORDS[category][0]', async () => {
+    // Arrange — Malay office-supplies terms have no Pixabay tag coverage:
+    // primary (all terms joined, AND-matched) and relaxed (first term) both
+    // return 0. Pre-fix, non-VN queries had NO tier-3 → empty pool → GPT's
+    // hallucinated stock URLs survived injection untouched.
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary landscape
+      .mockResolvedValueOnce([]) // relaxed landscape
+      .mockResolvedValueOnce(landscapeFixture) // tier-3 landscape
+
+    // Act — squareSize 0 keeps the mock queue landscape-only.
+    const pool = await buildImagePool(baseCtx({
+      category: 'ecommerce',
+      topProduct: undefined,
+      products: ['pen dan pensel', 'buku nota'],
+      mood: undefined,
+      squareSize: 0,
+    }))
+
+    // Assert — tier-3 query = EN category base keyword, default lang (no vi)
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
+    expect(mockSearchPhotos.mock.calls[2]![0]).toBe('product photography')
+    const tier3Opts = mockSearchPhotos.mock.calls[2]![2] as { lang?: string }
+    expect(tier3Opts.lang).toBeUndefined()
+    expect(pool.landscape.length).toBeGreaterThan(0)
+    expect(pool.underfill).toBe(true)
+  })
+
+  it('VN zero-hit still uses curated VN phrase with lang=vi (unchanged)', async () => {
+    // Arrange
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary landscape
+      .mockResolvedValueOnce([]) // relaxed landscape (broadens to category)
+      .mockResolvedValueOnce(landscapeFixture) // tier-3 landscape
+
+    // Act
+    await buildImagePool(baseCtx({
+      category: 'restaurant',
+      topProduct: 'phở bò',
+      mood: undefined,
+      squareSize: 0,
+    }))
+
+    // Assert — VN path unchanged: curated phrase + explicit lang=vi
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
+    expect(mockSearchPhotos.mock.calls[2]![0]).toBe('ẩm thực việt nam')
+    const tier3Opts = mockSearchPhotos.mock.calls[2]![2] as { lang?: string }
+    expect(tier3Opts.lang).toBe('vi')
+  })
+})
+
+// ── TC-F38-RAW-25: 429 short-circuits the fallback ladder ───────────────────
+describe('TC-F38-RAW-25 — RATE_LIMITED short-circuits the pool fallback ladder', () => {
+  it('tier-1 RATE_LIMITED → no tier-2/tier-3 calls, underfill=true', async () => {
+    // Arrange — Pixabay rate-limits the primary search (already retried once
+    // inside the client). Any further tier is a guaranteed-fail request.
+    mockSearchPhotos.mockRejectedValueOnce(new PixabayError('RATE_LIMITED', 429, true))
+
+    // Act
+    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+
+    // Assert — ladder stops after tier-1
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(pool.landscape).toEqual([])
+    expect(pool.underfill).toBe(true)
+  })
+
+  it('tier-2 RATE_LIMITED → tier-3 skipped, tier-1 partial photos preserved', async () => {
+    // Arrange — tier-1 returns a thin (below-minCount) result, tier-2 429s.
+    mockSearchPhotos
+      .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // tier-1: partial
+      .mockRejectedValueOnce(new PixabayError('RATE_LIMITED', 429, true)) // tier-2
+
+    // Act
+    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+
+    // Assert — no tier-3 call after the 429; the partial result is kept
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+    expect(pool.landscape.map((p) => p.id)).toEqual(['L0'])
+    expect(pool.underfill).toBe(true)
+  })
+
+  it('non-429 tier-1 error → ladder continues to tier-2 and tier-3', async () => {
+    // Arrange — transient server error must NOT abort the ladder
+    mockSearchPhotos
+      .mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 500, true)) // tier-1
+      .mockResolvedValueOnce([]) // tier-2: 0 hits
+      .mockResolvedValueOnce(landscapeFixture) // tier-3
+
+    // Act
+    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+
+    // Assert — all 3 tiers fired, tier-3 filled the bucket
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
+    expect(pool.landscape.length).toBeGreaterThan(0)
+    expect(pool.underfill).toBe(true)
   })
 })

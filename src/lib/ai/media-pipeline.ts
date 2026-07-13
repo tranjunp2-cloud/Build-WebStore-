@@ -37,6 +37,7 @@ interface SizePreset {
 }
 
 import { normalizeComposerCategory } from './composer-category-resolver'
+import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
 
@@ -436,10 +437,12 @@ export async function getAvatarMedia(
  * PUBLIC: fetch N images for a given block type + keyword set.
  *
  * Fallback chain:
- *   1. Unsplash search with given keywords (orientation + content_filter=high)
- *   2. Unsplash search with broadened keywords (keyword[0] only) — for hero only
- *   3. Hardcoded Unsplash stock URL — for hero only
- *   4. Return empty result — caller decides whether to drop the block
+ *   1. Pixabay search with given keywords (orientation + VN relevance gate)
+ *   2. Pixabay search with broadened keywords (keyword[0] only)
+ *   3. Category fallback — curated VN phrase (VN query) or English category
+ *      base keyword (non-VN query)
+ *   4. Hardcoded Unsplash stock URL — for hero only
+ *   5. Return empty result — caller decides whether to drop the block
  */
 export async function getMediaForBlock(
     blockType: string,
@@ -473,23 +476,32 @@ export async function getMediaForBlock(
         }
         return kept
     }
-    // Tier 3 for VN queries: trusted Vietnamese category phrase, ungated —
-    // mirrors image-pool searchBucket so the legacy path degrades to
-    // on-category photos instead of off-topic AND-match noise.
-    const vnCategoryFallback = async (): Promise<BatchFetchResult> => {
-        const vnQuery = VN_CATEGORY_QUERIES[composerCategory]
-        if (isVN && vnQuery && vnQuery !== query) {
-            // lang:'vi' explicit — mirrors image-pool searchBucket; curated
-            // phrases like "quán cà phê" are not script-detectable.
-            const photos = await searchPhotos(vnQuery, Math.max(count * 2, 10), {
+    // Tier 3: trusted category phrase, ungated — mirrors image-pool
+    // searchBucket so the legacy path degrades to on-category photos instead
+    // of off-topic AND-match noise. VN queries use the curated Vietnamese
+    // phrase (lang=vi); non-VN queries (Malay/English zero-hit) fall to the
+    // English category base keyword — an empty result here means the block
+    // keeps whatever URL GPT hallucinated into it (GH-1185 QC retest).
+    const categoryFallback = async (): Promise<BatchFetchResult> => {
+        const vnQuery = isVN ? VN_CATEGORY_QUERIES[composerCategory] : undefined
+        const fallbackQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[composerCategory]?.[0]
+        // `!== keywords[0]` guard: tier-2 broadens to keywords[0], and on the
+        // scaffolding path deriveKeywords puts a random CATEGORY_BASE_KEYWORDS
+        // entry there — re-issuing the byte-identical just-failed search
+        // wastes a rate-limited Pixabay call.
+        if (fallbackQuery && fallbackQuery !== query && fallbackQuery !== keywords[0]?.trim()) {
+            // lang:'vi' explicit for VN phrases — mirrors image-pool
+            // searchBucket; curated phrases like "quán cà phê" are not
+            // script-detectable. EN base keywords use the default lang.
+            const photos = await searchPhotos(fallbackQuery, Math.max(count * 2, 10), {
                 orientation,
                 width: targetWidth,
                 category: pixCategory,
-                lang: 'vi',
+                ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
             if (photos.length > 0) {
                 console.info(
-                    `[Media Pipeline] ${blockType} VN category fallback "${vnQuery}": ${photos.length} photo(s)`,
+                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${photos.length} photo(s)`,
                 )
                 return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
             }
@@ -523,16 +535,16 @@ export async function getMediaForBlock(
                     broadQuery,
                 )
                 if (broader.length === 0) {
-                    // `await` is load-bearing: vnCategoryFallback can throw
+                    // `await` is load-bearing: categoryFallback can throw
                     // (unguarded searchPhotos) — without it the rejection
                     // escapes this try/catch and hero loses its fallback chain.
-                    return await vnCategoryFallback()
+                    return await categoryFallback()
                 }
                 const picks = pickRandomN(broader, count)
                 return batchFetch(picks, blockType, ctx, payload)
             }
             // See comment above — `await` keeps the rejection inside this catch.
-            return await vnCategoryFallback()
+            return await categoryFallback()
         }
         const picks = pickRandomN(photos, count)
         const result = await batchFetch(picks, blockType, ctx, payload)
