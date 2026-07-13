@@ -921,6 +921,53 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-058: Subdomain edit — response check về muộn (sau khi revert input) bị bỏ, không đè UI
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583, review PR #1596)
+- **Scenario Reference:** — (race: fetch in-flight vs revert)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", fetch mock deferred (không resolve ngay)
+- **Steps:**
+  1. Gõ `"shop-race"` → chờ debounce → fetch được dispatch (chưa resolve)
+  2. Revert input về đúng slug hiện tại → status reset `idle`
+  3. Resolve fetch (kết quả `unavailable`)
+- **Expected:** Seq guard bỏ response cũ — KHÔNG hiện `"Already taken"` cạnh slug hiện tại (chống biến thể race của #1583); cơ chế này đồng thời chặn 2 fetch chồng nhau resolve ngược thứ tự
+- **Test Data:** deferred fetch, `"shop-race"` → revert `"mywebstore"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-059: Subdomain edit — gõ tiếp sau verdict `available` thì Save disable ngay lập tức
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596)
+- **Scenario Reference:** — (cửa sổ 400ms debounce: Save sáng với status của slug cũ)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", fetch mock trả `available: true`
+- **Steps:**
+  1. Gõ `"shop-a"` → chờ check → Save enabled
+  2. Gõ thêm 1 ký tự (`"shop-ab"`) → assert Save disabled NGAY (không chờ debounce)
+- **Expected:** Verdict cũ hết hiệu lực ngay khi input đổi — user không thể Save slug chưa được check
+- **Test Data:** `"shop-a"` (available) → `"shop-ab"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-060: Subdomain edit — dừng gõ giữa IME composition không bắn check; check chạy sau compositionEnd
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596, liên quan #1459 IME)
+- **Scenario Reference:** — (debounce fire với raw buffer IME)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", đang composition (IME tiếng Việt)
+- **Steps:**
+  1. `compositionStart` → `change` với buffer `"shopd"` → đợi > 400ms (vẫn đang composition)
+  2. Assert fetch KHÔNG được gọi
+  3. `compositionEnd` với `"shopd"` (sanitize xong không đổi giá trị)
+- **Expected:** Không có request nào cho buffer chưa chốt; sau compositionEnd check vẫn chạy cho giá trị đã chốt (state `isComposingSlug` đảm bảo effect re-run kể cả khi input không đổi)
+- **Test Data:** `"shopd"` (buffer ASCII — case khó: sanitize không đổi)
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1091,6 +1138,7 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 57 Test Cases — 15 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 60 Test Cases — 18 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
 *TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
 *TC-F23-056..057 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile + message lỗi treo khi gõ về slug hiện tại).*
+*TC-F23-058..060 bổ sung từ adversarial review PR #1596 (seq guard chống response về muộn, Save disable ngay khi gõ tiếp, IME composition không bắn check).*

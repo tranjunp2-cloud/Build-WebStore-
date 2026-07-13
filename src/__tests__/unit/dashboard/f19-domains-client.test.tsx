@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import React from 'react';
 
 vi.mock('@/app/(dashboard)/settings/domains/actions', () => ({
@@ -430,8 +430,9 @@ describe('F23 subdomain slug input (#1459)', () => {
         expect(row.children).toHaveLength(1);
 
         // <3 chars → invalid after the 400ms debounce (no fetch involved).
+        // timeout 2000: real 400ms debounce + CI scheduling jitter headroom.
         fireEvent.change(input, { target: { value: 'ab' } });
-        const msg = await waitFor(() => screen.getByText('At least 3 characters'));
+        const msg = await waitFor(() => screen.getByText('At least 3 characters'), { timeout: 2000 });
 
         expect(msg.className).toContain('break-words');
         const statusDiv = msg.parentElement as HTMLElement;
@@ -443,13 +444,68 @@ describe('F23 subdomain slug input (#1459)', () => {
         const input = enterEditMode();
 
         fireEvent.change(input, { target: { value: 'ab' } });
-        await waitFor(() => screen.getByText('At least 3 characters'));
+        await waitFor(() => screen.getByText('At least 3 characters'), { timeout: 2000 });
 
         // Back to the untouched slug: the debounce effect's early-return branch
         // must reset status to idle instead of leaving the old error hanging.
         fireEvent.change(input, { target: { value: 'mywebstore' } });
-        await waitFor(() =>
-            expect(screen.queryByText('At least 3 characters')).not.toBeInTheDocument()
+        await waitFor(
+            () => expect(screen.queryByText('At least 3 characters')).not.toBeInTheDocument(),
+            { timeout: 2000 }
+        );
+    });
+
+    it('[TC-F23-058] stale in-flight check response is discarded after reverting input (#1583)', async () => {
+        let resolveFetch!: (v: unknown) => void;
+        const deferredFetch = vi.fn(() => new Promise((res) => { resolveFetch = res; }));
+        vi.stubGlobal('fetch', deferredFetch as unknown as typeof fetch);
+
+        const input = enterEditMode();
+        fireEvent.change(input, { target: { value: 'shop-race' } });
+        await waitFor(() => expect(deferredFetch).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+        // Revert to the current slug while the response is still in flight.
+        fireEvent.change(input, { target: { value: 'mywebstore' } });
+
+        // Late response lands — the seq guard must drop it instead of painting
+        // a verdict next to the untouched current slug (the #1583 race variant).
+        resolveFetch({ ok: false, status: 500, json: async () => ({ available: false }) });
+        await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+        expect(screen.queryByText('Already taken')).not.toBeInTheDocument();
+    });
+
+    it('[TC-F23-059] typing again after an available verdict disables Save immediately', async () => {
+        const input = enterEditMode(); // beforeEach stub resolves { available: true }
+        const save = screen.getByRole('button', { name: /^save$/i });
+
+        fireEvent.change(input, { target: { value: 'shop-a' } });
+        await waitFor(() => expect(save).not.toBeDisabled(), { timeout: 2000 });
+
+        // One more keystroke: the old 'available' no longer describes the input,
+        // so Save must drop back to disabled without waiting for the next debounce.
+        fireEvent.change(input, { target: { value: 'shop-ab' } });
+        expect(save).toBeDisabled();
+    });
+
+    it('[TC-F23-060] mid-composition pause never fires the check; it runs after compositionEnd', async () => {
+        const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ available: true }) }));
+        vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+        const input = enterEditMode();
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopd' } });
+
+        // Pause well past the 400ms debounce while still composing — no request may fire
+        // (the raw IME buffer is not a slug candidate).
+        await act(async () => { await new Promise((r) => setTimeout(r, 550)); });
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        // Committing the composition must still trigger the check, even though the
+        // sanitized buffer ('shopd') equals the pre-commit input state.
+        fireEvent.compositionEnd(input, { target: { value: 'shopd' } });
+        await waitFor(
+            () => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('slug=shopd')),
+            { timeout: 2000 }
         );
     });
 });
