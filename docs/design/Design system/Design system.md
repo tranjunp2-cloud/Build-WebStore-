@@ -113,7 +113,7 @@
 - **page-padding:** `{spacing.xl}` (`32px`)
 - **card-padding:** `{spacing.md}` (`16px`)
 - **section-margin:** `{spacing.2xl}` (`48px`)
-- **input-height:** `40px`
+- **field-height (scale):** `36px` (sm) / `40px` (base — default) / `48px` (lg) — chi tiết ở §Inputs → *Field Height Scale*
 - **button-height:** `40px`
 - **avatar-md:** `32px`
 
@@ -150,10 +150,28 @@
 - **Icon Button:** Form vuông vức bo cong tiêu chuẩn, chứa icon Send, Edit, Delete...
 
 ### Inputs
-- **Text Input:** Chiều cao 40px, góc bo `md` (`8px`), viền mỏng theo mode tông xám (`#E2E8F0` Light / `#1F2937` Dark). Focus chuyển vòng màu sang màu Primary (Teal `#2DD4BF`).
+- **Text Input:** Góc bo `md` (`8px`), viền mỏng theo mode tông xám (`#E2E8F0` Light / `#1F2937` Dark), nền `--card`. Focus đổi viền + ring sang màu Primary (Teal `#2DD4BF`). Chiều cao theo *Field Height Scale* bên dưới.
 - **Textarea:** Form tự động đa dòng như text input cho khung nhập Description.
 - **Chat Input:** Khung Input nâng cao chứa button Send bo góc nằm bên phải. Cực kì quan trọng cho Workflow AI.
 - **Disabled State:** Giảm Opacity xuống 50%, tắt khả năng tương tác, hiện trỏ chuột `cursor-not-allowed`.
+
+#### Field Height Scale
+
+Chuẩn 3 bậc cho mọi input / select / phone-code / action-button trong dashboard. Tất cả dùng radius `md` (`8px`), shadow `0 1px 1px rgba(0,0,0,0.1)`, text `14px`.
+
+| Bậc | Height | Tailwind | Dùng cho |
+|-----|--------|----------|----------|
+| **sm** | `36px` | `h-9` | Bảng dày, filter inline, default của primitive `<Input>` |
+| **base** (mặc định) | `40px` | `h-10` / `h-[40px]` | Form CMS tiêu chuẩn (discount, product, store config…) |
+| **lg** | `48px` | `h-[48px]` | Form nổi bật, ưu tiên chạm: **Account/Profile, Payments, Onboarding, SSO** |
+
+> Không dùng ngoài scale (`44 / 52 / 56px` đang rải rác trong code là nợ kỹ thuật → gom dần về 3 bậc trên).
+
+**Trạng thái sync với code (`chore/ux-audit-system-wide`, 2026-07-13):**
+- `components/ui/input.tsx` (primitive) = `h-9` (**36px**) → là bậc **sm**, nhưng đang là default cho phần lớn form CMS (discount/product/order dùng `<Input>` trần).
+- Trang **Profile** & **Payments** override `h-[48px]` (bậc **lg**).
+- ⚠️ Toàn CMS chưa nhất quán (36/40/44/48 lẫn lộn).
+- ✅ **Đã chốt (2026-07-13):** canonical form CMS = **base 40px**; giữ **lg 48px** cho nhóm settings ưu tiên chạm (Profile, Payments, Onboarding, SSO). Code migrate dần về scale này (đổi `<Input>` primitive default `h-9` → `h-10`, gom các field 44px về 40/48).
 
 ### Cards
 - **Standard Card:** Background phân mảnh (`#161E2E` cho Dark và Trắng `#FFFFFF` cho Light), sử dụng border viền rất mỏng 1px với form bo góc `lg` (`12px`).

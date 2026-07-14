@@ -5,393 +5,263 @@
 > **Interactive Demo:** [F23-profile-ui-demo.html](F23-profile-ui-demo.html)
 > - [Figma Design](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=31543-4488&t=5iRs7zduIFWCE9h3-1)
 
-Tài liệu này cung cấp bản vẽ Wireframe chi tiết và luồng người dùng (User Flow) cho tính năng Hồ sơ Cá nhân (F23), bám sát PRD và User Stories. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái và Topbar giữ nguyên).
+Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ Cá nhân (F23), bám sát PRD, User Stories và **demo tương tác** ở trên. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái + Topbar) và [Design System](Design%20system.md).
+
+> **⚠️ Trạng thái (2026-07-13, branch `chore/ux-audit-system-wide`):** Đây là **thiết kế mục tiêu (redesign)** sau vòng UX audit — **single-page, đã bỏ sub-tabs**. Code hiện tại (`src/app/(dashboard)/settings/profile/`) vẫn là bản tab cũ; việc migrate code theo bản này là task riêng, chưa thực hiện.
+
+**Thay đổi cốt lõi so với bản cũ:**
+- **Bỏ sub-tabs** "General Info / Security". Cả Staff và Owner đều là **1 trang cuộn dọc**.
+- **Staff:** 2 section card xếp dọc — *Personal Information* + *Password & Security*, mỗi card có save bar riêng (chỉ hiện khi dirty).
+- **Owner:** 1 trang read-only — *Account Information card* (bên trái) + *SSO widget* (bên phải), 1 CTA duy nhất ra SSO.
+- **Banner compact** (avatar 72px), bỏ chỉ báo "Active Now" (trước đây hard-code).
 
 ---
 
 ## 1. User Flow
 
-### 1.1 Luồng Truy Cập Profile
+### 1.1 Truy cập Profile
 
 ```
-[CMS Dashboard — Bất kỳ trang nào]
-    │
+[CMS Dashboard — bất kỳ trang nào]
+    │  Click Avatar trên Global Top Header (F18-02)
     ▼
-[Click Avatar trên Global Top Header (F18-02)]
-    │
+[Dropdown: My Profile ◄ / Language / Workspace / Logout]
+    │  Click "My Profile"
     ▼
-[Dropdown Menu hiện ra]
-    │ ├── My Profile ◄── Click vào đây
-    │ ├── Language (BM/EN)
-    │ ├── Workspace
-    │ └── Logout
-    │
-    ▼
-[Route → /profile]
-    │
-    ▼
-[Profile Page Load — Tab "General Info" mặc định]
+[Route → /settings/profile]  → render theo Role (Staff | Owner)
 ```
 
-### 1.2 Luồng Staff — Chỉnh Sửa Thông Tin
+### 1.2 Staff — Chỉnh sửa thông tin (card *Personal Information*)
 
 ```
-[Tab: General Info — Staff View]
-    │
-    ├── Upload Avatar
-    │   ├── Click Avatar → File Picker
-    │   ├── File hợp lệ (JPG/PNG, ≤ 2MB)?
-    │   │   ├── ✅ Yes → Upload → Avatar cập nhật ngay → Toast Success
-    │   │   └── ❌ No → Toast Error ("Chỉ chấp nhận JPG/PNG dưới 2MB")
-    │
-    ├── Edit Name / Phone
-    │   ├── Sửa First Name, Last Name, Phone (với Country Code dropdown)
-    │   ├── Click "Save Changes"
-    │   ├── Validation pass?
-    │   │   ├── ✅ Yes → API Update → Toast Success
-    │   │   └── ❌ No → Inline Error đỏ trên field lỗi
-    │   │       ├── Name: "Tên phải từ 2–50 ký tự"
-    │   │       └── Phone: "Số điện thoại không hợp lệ"
-    │
-    └── Email → Luôn Disabled (Login Identity)
+├── Upload Avatar
+│   ├── Click Avatar → File Picker
+│   └── Hợp lệ (JPG/PNG, ≤ 2MB)? ✅ Upload → Toast success · ❌ Toast error
+│
+├── Edit First / Last Name, Phone (Country Code +60/+84)
+│   ├── Field dirty → Save bar hiện (Save Change / Cancel)
+│   └── Click "Save Change" → validation?
+│       ├── ✅ PATCH /api/users/me → Toast "Profile updated"
+│       └── ❌ Inline error đỏ dưới field lỗi
+│
+└── Email → luôn Disabled (Login Identity, 🔒)
 ```
 
-### 1.3 Luồng Staff — Đổi Mật Khẩu
+### 1.3 Staff — Đổi mật khẩu (card *Password & Security*)
 
 ```
-[Tab: Security — Staff View]
-    │
-    ├── Nhập Current Password
-    ├── Nhập New Password → Strength Meter cập nhật real-time
-    │   ├── Checklist: ≥ 8 chars, 1 Upper, 1 Lower, 1 Number, 1 Special
-    ├── Nhập Confirm New Password
-    │
-    ├── Click "Update Password"
-    │   ├── Validation pass?
-    │   │   ├── ✅ Yes → API Update → Toast Success
-    │   │   │   └── Đăng xuất tất cả phiên khác (trừ phiên hiện tại)
-    │   │   └── ❌ No → Inline Error
-    │   │       ├── Current PW trống: "Vui lòng nhập mật khẩu hiện tại"
-    │   │       ├── New PW yếu: "Mật khẩu chưa đáp ứng yêu cầu bảo mật"
-    │   │       └── Confirm ≠ New: "Mật khẩu xác nhận không khớp"
+├── Current Password (👁 toggle)
+├── New Password + Confirm New Password (👁 toggle)
+│   └── Checklist realtime (3 rule): ≥ 8 ký tự · 1 chữ hoa · 1 chữ số
+├── Field dirty → Save bar (Update Password / Cancel)
+└── Click "Update Password" → validation?
+    ├── ✅ POST /api/users/me/password → Toast "Password changed successfully"
+    │       (server đăng xuất các phiên khác)
+    └── ❌ Inline error:
+        ├── Current sai        → "Current password is incorrect"
+        ├── New = Current      → "New password must differ from current password"
+        └── Confirm ≠ New      → "Passwords do not match"
 ```
 
-### 1.4 Luồng Owner — Xem Thông Tin (Read-Only)
+### 1.4 Owner — Xem thông tin & điều hướng SSO (view-only, 1 trang)
 
 ```
-[Tab: General Info — Owner View]
+[Owner Profile — không có sub-tabs]
     │
-    ├── Upload Avatar → Hoạt động bình thường (Avatar độc lập SSO)
+    ├── Upload Avatar → hoạt động bình thường (Avatar độc lập SSO)
     │
-    ├── Xem Name / Phone / Email
-    │   ├── ALL DISABLED + Lock Icon 🔒
-    │   ├── SSO Notice Box hiện ở trên form:
-    │   │   "Thông tin được đồng bộ bởi hệ thống SSO. Bạn không thể sửa đổi tại đây."
-    │   └── CTA: "Manage Account in SSO →" → Mở tab mới
+    ├── Account Information Card (read-only, không editable)
+    │   ├── Personal Details: Full Name · Email · Phone (mỗi ô có 🔒)
+    │   └── Security & Auth:  Password (••••••) · 2FA: Enabled *(đề xuất)*
     │
-    └── Không có nút "Save Changes"
-```
-
-### 1.5 Luồng Owner — Bảo Mật SSO
-
-```
-[Tab: Security — Owner View]
-    │
-    ├── SSO Protected Account Guard Box
-    │   ├── Thông báo: Mật khẩu và bảo mật được quản lý bởi SSO
-    │   └── CTA: "Manage SSO Account →" → Mở tab mới → SSO Portal
-    │
-    └── Account Info hiển thị:
-        ├── Auth Provider: SSO (PrimeID)
-        ├── Last Login: timestamp
-        ├── 2FA Status: Enabled/Disabled
-        └── Sessions: số phiên đang hoạt động
+    └── SSO Widget (sidebar)
+        ├── "Account Managed by SSO" + mô tả đồng bộ
+        └── CTA duy nhất: [ Go to SSO Portal ↗ ] → mở tab mới
 ```
 
 ---
 
-## 2. Wireframe: Profile Banner & Tab Navigation
+## 2. Wireframe: Compact Banner
 
-*Phần đầu trang Profile. Banner gradient chứa Avatar (có nút upload), tên, email, role badge. Bên dưới là Tab switcher.*
+*Banner nền `--background` + viền, bo `16px`. Avatar 72px (nền `--info`, viền glow). Tên + role badge inline; email ngay dưới. **Không** còn "Active Now".*
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ [≡ Logo]  Search...                       [🔔 3] [👤 ▼]│
-├──────────────┬──────────────────────────────────────────┤
-│ 📊 Dashboard │ Personal Profile                         │
-│ 🌐 Webstore  │ Quản lý thông tin cá nhân và bảo mật.   │
-│ 📦 Products  │                                          │
-│ 🛒 Orders    │ ┌─── Profile Banner ──────────────────┐ │
-│ ⚙️ Config    │ │  ┌────┐                              │ │
-│              │ │  │ 📷 │  Trần Dũng                   │ │
-│              │ │  │ TD │  trandung@example.com         │ │
-│              │ │  └────┘  [STAFF]                      │ │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │ [ General Info ]  [ Security ]            │
-│              │ ════════════════                          │
-│              │                                          │
-│              │ ...Tab Content Renders Below...           │
-│              │                                          │
-│ 💬 Help (WA) │                                          │
+┌──────────────┬──────────────────────────────────────────┐
+│ 📊 Dashboard │ Account Settings                          │
+│ 🌐 Webstore  │                                          │
+│ 📦 Products  │ ┌─ Banner ───────────────────────────┐  │
+│ 🛒 Orders    │ │ ┌────┐  Jun Tran-02   [ OWNER ]     │  │
+│ ⚙️ Config    │ │ │ J📷│  juntran02@yopmail.com       │  │
+│              │ │ └────┘                              │  │
+│              │ └─────────────────────────────────────┘  │
+│              │ ...Nội dung theo Role render bên dưới... │
 └──────────────┴──────────────────────────────────────────┘
 ```
+- Avatar 72px · initial 30px · nút camera bo `10px` (nền `--primary`).
+- Role badge: pill `--primary`/10 + viền `--primary`/20, chữ 10px uppercase.
+- Email hiện cho **cả Staff và Owner**.
 
 ---
 
-## 3. Wireframe: Tab "General Info" — Staff View
+## 3. Wireframe: Staff — Single Page (2 section card)
 
-*Staff có thể chỉnh sửa First Name, Last Name, Phone (kèm Country Code dropdown). Email luôn Disabled.*
+*Không tabs. Hai card xếp dọc, mỗi card tiêu đề + mô tả riêng. Save bar chỉ hiện khi form dirty, nằm **trong** card (không trôi nổi).*
+
+### 3.1 Card — Personal Information
 
 ```text
 ┌─ Personal Information ───────────────────────────────────┐
-│ Cập nhật thông tin cá nhân của bạn.                      │
-│ ─────────────────────────────────────────────────────── │
+│ Your name and contact details.                           │
 │                                                          │
 │  First Name                    Last Name                 │
-│  [ Dũng                    ]   [ Trần                 ]  │
+│  [ Nguyen                  ]   [ Van A               ]  │
 │                                                          │
-│  Email Address 🔒                                         │
-│  [ trandung@example.com    ]  ← Disabled                 │
-│  "Email không thể thay đổi (Login Identity)"             │
+│  Phone Number                  Email Address 🔒          │
+│  [ 🇲🇾 +60 ▼ ][ 123456789 ]   [ staff@…asia ] Disabled  │
+│                                "Email cannot be changed   │
+│                                 (Login identity)"         │
 │                                                          │
-│  Phone Number                                            │
-│  [ 🇻🇳 +84 ▼ ] [ 912345678                           ]  │
-│                                                          │
-│ ─────────────────────────────────────────────────────── │
-│  [ 🎨 Save Changes ]   [ Cancel ]                        │
+│ ──────────────── (chỉ hiện khi dirty) ────────────────── │
+│                          [ ↺ Cancel ]  [ ✓ Save Change ] │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Validation Error State (Staff):**
-```text
-│  First Name                        Last Name             │
-│  [ D                          ]    [ Trần             ]  │
-│  ╔══ viền đỏ ══╗                                         │
-│  🔴 Tên phải từ 2–50 ký tự                               │
-│                                                          │
-│  Phone Number                                            │
-│  [ 🇻🇳 +84 ▼ ] [ abc              ]                     │
-│  ╔══ viền đỏ ══╗                                         │
-│  🔴 Số điện thoại không hợp lệ                            │
-```
+**Error state:** field lỗi đổi viền `--destructive`, helper đỏ 12px bên dưới ("First name must be 2–50 characters" / "Please enter a valid phone number").
 
----
+### 3.2 Card — Password & Security (collapse mặc định)
 
-## 4. Wireframe: Tab "General Info" — Owner View
-
-*Owner thấy tất cả fields bị Disabled (trừ Avatar). SSO Notice Box hiển thị ở trên form. CTA điều hướng SSO thay nút Save.*
+*Mặc định thu gọn để trang ngắn/sạch — chỉ 1 dòng tóm tắt + nút outline. Click "Change Password" mới expand form 3 ô.*
 
 ```text
-┌─ 🔒 SSO Notice ─────────────────────────────────────────┐
-│  Thông tin được quản lý bởi SSO                          │
-│  Các trường thông tin cá nhân được đồng bộ từ hệ thống   │
-│  SSO. Bạn không thể chỉnh sửa tại đây.                  │
-│  ⚠️ Để thay đổi, vui lòng truy cập cổng SSO              │
+Collapsed (mặc định):
+┌─ Password & Security ────────────────────────────────────┐
+│  Password was last changed 3 months ago.  [ Change Password ]│
 └──────────────────────────────────────────────────────────┘
 
-┌─ Personal Information ───────────────────────────────────┐
-│ Cập nhật thông tin cá nhân của bạn.                      │
-│ ─────────────────────────────────────────────────────── │
-│                                                          │
-│  First Name 🔒                     Last Name 🔒           │
-│  [ Quân              ]  ← Disabled [ Nguyễn Minh ]      │
-│                                                          │
-│  Email Address 🔒                                         │
-│  [ owner@example.com ]  ← Disabled                       │
-│                                                          │
-│  Phone Number 🔒                                          │
-│  [ 🇲🇾 +60 ▼ ] [ 123456789 ]  ← Disabled                │
-│                                                          │
-│ ─────────────────────────────────────────────────────── │
-│  [ 🔗 Manage Account in SSO → ]   ← Mở tab mới          │
-└──────────────────────────────────────────────────────────┘
-```
-
----
-
-## 5. Wireframe: Tab "Security" — Staff View
-
-*Form đổi mật khẩu Native gồm 3 trường: Current, New (kèm Strength Meter), Confirm. Bảng yêu cầu mật khẩu ở dưới.*
-
-```text
-┌─ Change Password ────────────────────────────────────────┐
-│ Đổi mật khẩu đăng nhập. Mật khẩu mới phải đáp ứng       │
-│ tiêu chuẩn bảo mật.                                     │
-│ ─────────────────────────────────────────────────────── │
-│                                                          │
+Expanded (sau khi click):
+┌─ Password & Security ────────────────────────────────────┐
 │  Current Password                                        │
 │  [ ●●●●●●●●                                     ] [👁]  │
 │                                                          │
-│  New Password                                            │
-│  [ ●●●●●●                                       ] [👁]  │
-│  [ ████░░░░ ] ← Strength: Medium                        │
+│  New Password                  Confirm New Password      │
+│  [ ●●●●●●             ] [👁]   [ ●●●●●●         ] [👁]  │
 │                                                          │
-│  Confirm New Password                                    │
-│  [ ●●●●●●                                       ] [👁]  │
+│  ✓ At least 8 characters   ✕ One uppercase   ✕ One number│
+│   (✓ = teal khi đạt · ✕ = xám khi chưa đạt)              │
 │                                                          │
-│ ─────────────────────────────────────────────────────── │
-│  [ 🎨 Update Password ]   [ Cancel ]                     │
-└──────────────────────────────────────────────────────────┘
-
-┌─ Password Requirements ─────────────────────────────────┐
-│  ○ Ít nhất 8 ký tự          ○ 1 chữ hoa (A-Z)          │
-│  ○ 1 chữ thường (a-z)       ○ 1 chữ số (0-9)           │
-│  ○ 1 ký tự đặc biệt (!@#...)                           │
-│                                                          │
-│  ✓ = Xanh lá (pass)    ○ = Xám (chưa pass)              │
+│ ──────────────── (chỉ hiện khi dirty) ────────────────── │
+│                       [ ↺ Cancel ]  [ ✓ Update Password ]│
 └──────────────────────────────────────────────────────────┘
 ```
+- **Collapse trigger:** nút `Change Password` (Outline, height 40px). Cancel / đổi thành công / rời trang → tự thu gọn lại.
+> **Lưu ý (fix vs bản cũ):** chỉ **3 rule** (≥8 / 1 hoa / 1 số) đúng theo code (`passwordBaseSchema`). **Không** Strength Meter, **không** chữ thường / ký tự đặc biệt. Ô mật khẩu **không** có icon khóa bên trái (khóa trái = hiểu nhầm disabled) — chỉ có 👁 bên phải.
 
 ---
 
-## 6. Wireframe: Tab "Security" — Owner View
+## 4. Wireframe: Owner — Single Page (view-only)
 
-*Không có form password. Chỉ hiện SSO Guard Box kèm CTA và bảng Account Info.*
+*Layout 2 cột `2fr / 1fr`, `align-items:stretch` (2 card cao bằng nhau). **Banner trên bị ẩn** — identity gộp vào card trái. Mobile xếp dọc.*
 
 ```text
-┌─ Account Security ──────────────────────────────────────┐
-│ Tài khoản được bảo mật thông qua hệ thống SSO.          │
-│ ─────────────────────────────────────────────────────── │
-│                                                          │
-│  ┌─ 🛡️ SSO Protected Account ──────────────────────┐     │
-│  │                                                  │     │
-│  │  Mật khẩu và cài đặt bảo mật của bạn được quản   │     │
-│  │  lý bởi hệ thống Single Sign-On (SSO). Để thay  │     │
-│  │  đổi mật khẩu, bật 2FA, hoặc cập nhật bảo mật,  │     │
-│  │  vui lòng truy cập cổng quản lý SSO.             │     │
-│  │                                                  │     │
-│  └──────────────────────────────────────────────────┘     │
-│                                                          │
-│  [ 🔗 Manage SSO Account → ]   ← Full-width button      │
-│                                                          │
-│ ─────────────────────────────────────────────────────── │
-│                                                          │
-│  Account Info                                            │
-│  ──────────────                                          │
-│  Auth Provider  : SSO (PrimeID)                          │
-│  Last Login     : 01/04/2026 14:30                       │
-│  2FA Status     : ✓ Enabled (Xanh)                       │
-│  Sessions       : 2 active                               │
-└──────────────────────────────────────────────────────────┘
+┌─ Profile Card (2/3) ──────────────────────┐  ┌─ SSO Widget (1/3) ───┐
+│ ( J )  Jun Tran-02   [ OWNER ]            │  │ 🔒                    │
+│ ───────────────────────────────────────── │  │ Account Managed by   │
+│  EMAIL ADDRESS          PHONE NUMBER      │  │ SSO                  │
+│  juntran02@yopmail.com  094448462579      │  │                      │
+│                                           │  │ Your personal profile│
+│  PASSWORD               TWO-FACTOR (2FA)  │  │ fields, password &   │
+│  ••••••••••••           ● Enabled         │  │ security are managed │
+│                                           │  │ centrally by SSO.    │
+│                                           │  │                      │
+│                                           │  │ [ Go to SSO Portal ↗]│
+└───────────────────────────────────────────┘  └──────────────────────┘
 ```
+- **Card trái gộp identity + info:** avatar 72px + tên + tag OWNER trên cùng; divider (24px trên/dưới); rồi info **text thuần** dạng grid 2 cột đều — Email | Phone (hàng 1), Password | 2FA (hàng 2).
+- **KHÔNG dùng ô input xám, KHÔNG icon 🔒.** Nhãn nhỏ (uppercase, dim) trên — giá trị (đậm hơn) dưới → user hiểu ngay là trang "xem", không phải form điền.
+- **2FA**: tag tĩnh (chấm xanh + "Enabled"). *Đề xuất — chưa có trong data model.*
+- **SSO widget (phải):** full-height bằng card trái; 1 button `--info` "Go to SSO Portal ↗" neo đáy (mở tab mới). Thay cho 2 text-link rời rạc bản cũ.
+- **Đã bỏ:** banner riêng ở trên, bảng "Account Info" cũ (Auth Provider / Last Login / Sessions), các ô xám + khóa.
 
 ---
 
-## 7. Mobile Responsive View (≤ 768px)
+## 5. Mobile Responsive (≤ 768px)
 
-*Sidebar ẩn → Hamburger. Form chuyển sang single-column. Banner avatar stack dọc.*
+*Sidebar → Hamburger. Banner giữ hàng ngang gọn (avatar không stack vì đã nhỏ). Các card single-column. Owner: 2 cột → xếp dọc, SSO widget hết trôi (static).*
 
 ```text
-📱 Mobile — General Info (Staff)
-┌─────────────────────────────┐
-│ ☰  PrimeWeb        [🔔][👤]│
-├─────────────────────────────┤
-│                             │
-│         ┌────┐              │
-│         │ TD │              │
-│         │ 📷 │              │
-│         └────┘              │
-│       Trần Dũng             │
-│   trandung@example.com      │
-│         [STAFF]             │
-│                             │
-│ [General Info] [Security]   │
-│ ═══════════════             │
-│                             │
-│ ┌─ Personal Information ──┐ │
-│ │                          │ │
-│ │ First Name               │ │
-│ │ [ Dũng               ]  │ │
-│ │                          │ │
-│ │ Last Name                │ │
-│ │ [ Trần               ]  │ │
-│ │                          │ │
-│ │ Email Address 🔒          │ │
-│ │ [ trandung@example.. ]  │ │
-│ │                          │ │
-│ │ Phone Number             │ │
-│ │ [+84▼] [912345678    ]  │ │
-│ │                          │ │
-│ │ [Save Changes] [Cancel]  │ │
-│ └──────────────────────────┘ │
-└─────────────────────────────┘
-
-📱 Mobile — Security (Owner)
-┌─────────────────────────────┐
-│ ☰  PrimeWeb        [🔔][👤]│
-├─────────────────────────────┤
-│ [General Info] [Security]   │
-│               ═════════     │
-│                             │
-│ ┌─ Account Security ──────┐ │
-│ │                          │ │
-│ │ 🛡️ SSO Protected Account │ │
-│ │ Mật khẩu và bảo mật     │ │
-│ │ được quản lý bởi SSO.   │ │
-│ │                          │ │
-│ │ [Manage SSO Account →]   │ │
-│ │                          │ │
-│ │ Auth Provider: SSO       │ │
-│ │ Last Login: 01/04/2026   │ │
-│ │ 2FA: ✓ Enabled           │ │
-│ │ Sessions: 2 active       │ │
-│ └──────────────────────────┘ │
-└─────────────────────────────┘
+📱 Staff                         📱 Owner (banner ẩn)
+┌───────────────────────┐        ┌───────────────────────┐
+│ ☰ PrimeWeb      [👤]  │        │ ☰ PrimeWeb      [👤]  │
+├───────────────────────┤        ├───────────────────────┤
+│ [ N📷 ] Nguyen· STAFF │        │ ┌ Profile Card ─────┐ │
+│ staff@…asia           │        │ │ (J) Jun · OWNER   │ │
+│ ┌ Personal Info ────┐ │        │ │ ───────────────   │ │
+│ │ First / Last …    │ │        │ │ Email / Phone     │ │
+│ │ Phone / Email 🔒   │ │        │ │ Password / 2FA    │ │
+│ └───────────────────┘ │        │ │ (text thuần)      │ │
+│ ┌ Password & Security┐│        │ └───────────────────┘ │
+│ │ [Change Password]  ││        │ ┌ SSO Widget ───────┐ │
+│ │ (collapse mặc định)││        │ │ Account Managed…  │ │
+│ └───────────────────┘ │        │ │ [Go to SSO ↗]     │ │
+└───────────────────────┘        └───────────────────────┘
 ```
 
 ---
 
-## 8. UI States & Component Summary
+## 6. UI States & Component Summary
 
-### 8.1 States Matrix
+### 6.1 States Matrix
 
-| Component | Default | Hover | Focus | Disabled | Error |
-|-----------|---------|-------|-------|----------|-------|
-| Text Input | Border `#1F2937` | — | Border `#3B82F6` | Opacity 50%, `cursor-not-allowed` | Border `#EF4444` + helper đỏ |
-| Primary Button | Gradient Blue→Teal | Opacity 90%, `translateY(-1px)` | — | — | — |
-| SSO CTA Button | BG `rgba(59,130,246,.15)` | BG `.25` | — | — | — |
-| Avatar Upload | Camera icon | Scale 1.1 | — | — | — |
-| Tab | Color `#9CA3AF` | Color `#FFFFFF` | — | — | Active: `#3B82F6` + underline |
-| Password Strength | — | — | — | — | Bars: Weak(đỏ) / Medium(vàng) / Strong(xanh) |
+| Component | Default | Hover | Focus | Disabled / Read-only | Error |
+|-----------|---------|-------|-------|----------------------|-------|
+| Text Input | Border `#2A3645`, nền `#161E2E` | — | Border + ring **Teal `#2DD4BF`** (1px) | Nền `#1F2937`, `cursor-not-allowed`, 🔒 | Border `#EF4444` + helper đỏ |
+| Primary Button (Save/Update) | Gradient **Blue→Teal** (`#3B82F6`→`#2DD4BF`), chữ trắng | Opacity 90% | ring | — | — |
+| SSO CTA Button | Nền `--info` `#3B82F6`, chữ trắng, icon ↗ | Opacity 90% | — | — | — |
+| Avatar Upload | Camera icon (nền `--primary`) | Opacity 90% | — | Spinner khi uploading | Toast error |
+| 2FA Status (Owner) | Badge tĩnh: ● + "Enabled" (xanh) | — | — | — | — |
+| Password rule | ✕ xám (chưa đạt) | — | — | — | ✓ Teal (đạt) |
 
-### 8.2 Toast Notifications
+### 6.2 Toast Notifications (i18n `profile.*`, EN)
 
 | Event | Type | Message |
 |-------|------|---------|
-| Avatar upload success | ✅ Success | "Avatar đã được cập nhật thành công!" |
-| Avatar invalid file | ❌ Error | "Chỉ chấp nhận file JPG hoặc PNG dưới 2MB" |
-| Save info success | ✅ Success | "Thông tin cá nhân đã được cập nhật!" |
-| Password update success | ✅ Success | "Mật khẩu đã được cập nhật! Các phiên khác đã bị đăng xuất." |
-| SSO redirect | ℹ️ Info | "Đang mở cổng SSO trong tab mới..." |
+| Avatar upload success | ✅ | "Click to upload avatar" *(banner.uploadAvatar)* |
+| Avatar sai định dạng | ❌ | "Avatar must be JPG or PNG" |
+| Avatar quá lớn | ❌ | "Avatar must be 2MB or smaller" |
+| Save info success | ✅ | "Profile updated" |
+| Password update success | ✅ | "Password changed successfully" |
+| Save/network fail | ❌ | "Failed to save profile" / "Network error. Please try again." |
 
-### 8.3 Validation Rules (Zod Schema)
+### 6.3 Validation Rules (Zod — `src/lib/profile/schemas.ts`)
 
-| Field | Rule | Client-side | Server-side |
-|-------|------|-------------|-------------|
-| First Name | 2–50 chars, no XSS | ✅ Inline error | ✅ Reject |
-| Last Name | 2–50 chars, no XSS | ✅ Inline error | ✅ Reject |
-| Phone | Country code + regex by region | ✅ Inline error | ✅ Reject |
-| Avatar | MIME `image/jpeg\|png`, ≤ 2048 KB | ✅ Toast error | ✅ Reject |
-| New Password | ≥ 8 chars, 1 Upper, 1 Lower, 1 Num, 1 Special | ✅ Inline + strength | ✅ Reject |
-| Confirm Password | Exact match New Password | ✅ Inline error | ✅ Reject |
+| Field | Rule | Client | Server |
+|-------|------|--------|--------|
+| First / Last Name | 2–50 ký tự | ✅ Inline | ✅ Reject |
+| Phone | `+code` (+60/+84) + 8–15 chữ số (E.164), cho phép chỉ mã vùng | ✅ Inline | ✅ Reject |
+| Avatar | MIME `image/jpeg\|png`, ≤ 2 MB | ✅ Toast | ✅ Reject |
+| New Password | ≥ 8 ký tự, 1 chữ hoa, 1 chữ số | ✅ Inline + checklist | ✅ Reject |
+| New Password | ≠ Current Password | ✅ Inline | ✅ Reject |
+| Confirm Password | khớp New Password | ✅ Inline | — |
 
 ---
 
-## 9. Design System Compliance
+## 7. Design System Compliance
 
-Tất cả components tuân thủ [Design System](Design%20system.md):
+Bám [Design System](Design%20system.md) (dark theme tokens):
 
-| Token | Value Applied |
-|-------|---------------|
-| Background | `#0B1120` |
-| Surface (Card) | `#161E2E` |
-| Border | `#1F2937` |
-| Primary Blue | `#3B82F6` |
-| Primary Teal | `#2DD4BF` |
-| Error | `#EF4444` |
-| Success | `#10B981` |
-| Font | Inter, sans-serif |
-| Input Height | 40px |
-| Card Radius | 12px |
-| Button Radius | 8px |
+| Token | Value | Ghi chú |
+|-------|-------|---------|
+| Background | `#0B1120` | `--background` |
+| Surface (Card) | `#161E2E` | `--card` |
+| Secondary (read-only bg) | `#1F2937` | `--secondary` |
+| Border / Input border | `#2A3645` | `--border` = `--input-border` (dark) |
+| **Primary (Teal)** | `#2DD4BF` | badge, focus ring, password ✓, status dot |
+| **Info (Blue)** | `#3B82F6` | avatar bg, SSO widget + CTA |
+| Destructive | `#EF4444` | error border/helper |
+| Muted text | `#9CA3AF` | label, helper, placeholder |
+| Font | Inter | — |
+| **Field height** | **48px** (lg) | theo *Field Height Scale* — profile = nhóm touch-priority |
+| Card radius | `16px` (banner, card) · `8px` (input) · `12px` (badge/camera) | — |
+| Save/Update button | radius `10px`, height `48px` | dashPrimary gradient |
+
+> **Sửa vs bản cũ:** Primary = **Teal** (không phải Blue `#3B82F6` — blue chỉ là `--info`); Border `#2A3645` (không phải `#1F2937`); Field height **48px** (không phải 40px); bỏ token "Success `#10B981`" (không dùng ở màn này).
