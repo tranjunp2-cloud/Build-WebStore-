@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Lock, X, Check, RotateCcw } from 'lucide-react'
+import { Eye, EyeOff, Lock, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useI18n } from '@/i18n'
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { ProfileSaveBar } from './profile-save-bar'
 
 const formSchema = passwordBaseSchema.extend({
     confirmPassword: z.string().min(1),
@@ -25,8 +26,8 @@ const formSchema = passwordBaseSchema.extend({
 
 type FormValues = z.infer<typeof formSchema>
 
-// Geometry only — colors/border/focus from shared <Input> primitive
-const inputCls = 'h-[48px] pl-10 pr-10 text-[14px] rounded-[8px] shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
+// Icon slots only — size/colors/border/focus from shared <Input> primitive
+const inputCls = 'pl-10 pr-10'
 
 function PasswordRule({ met, label }: { met: boolean; label: string }) {
     return (
@@ -181,33 +182,14 @@ export function PasswordChangeForm() {
                 <PasswordRule met={hasNumber}    label={t.profile.security.ruleNumber} />
             </div>
 
-            {/* Action bar — only visible when dirty */}
+            {/* Floating save bar — only visible when dirty (same template as edit-discount) */}
             {formState.isDirty && (
-                <div className="flex items-center justify-end gap-3 h-[72px] bg-[hsl(var(--background)/0.5)] rounded-[12px] px-6 mt-2">
-                    <Button
-                        type="button"
-                        onClick={() => reset()}
-                        disabled={formState.isSubmitting}
-                        variant="dashSecondary"
-                        className="h-[48px] rounded-[10px] px-[10px] font-medium"
-                    >
-                        <RotateCcw className="h-4 w-4" />
-                        {t.profile.general.cancel}
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={formState.isSubmitting}
-                        variant="dashPrimary"
-                        className="h-[48px] min-w-[187px] rounded-[10px] px-[10px] font-medium"
-                    >
-                        {formState.isSubmitting ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        ) : (
-                            <Check className="h-4 w-4" />
-                        )}
-                        {formState.isSubmitting ? t.profile.security.changing : t.profile.security.updatePassword}
-                    </Button>
-                </div>
+                <ProfileSaveBar
+                    saving={formState.isSubmitting}
+                    saveLabel={t.profile.security.updatePassword}
+                    savingLabel={t.profile.security.changing}
+                    onCancel={() => reset()}
+                />
             )}
         </form>
     )

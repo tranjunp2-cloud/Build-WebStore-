@@ -4874,6 +4874,9 @@
             "saveFailed": "Gagal menyimpan profil",
             "networkError": "Ralat rangkaian. Sila cuba lagi.",
             "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Tinggalkan tab ini?"
+        },
+        "saveBar": {
+            "unsavedChanges": "Perubahan belum disimpan"
         }
     }
 }

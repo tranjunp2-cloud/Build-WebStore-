@@ -31,8 +31,10 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
         setUser(prev => ({ ...prev, ...partial }))
     }
 
+    // GH-1538 pattern: ProfileSaveBar is position:fixed and doesn't push content —
+    // pb-24 keeps the last row (password rules, field errors) reachable while dirty.
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8 pb-24">
             {!hideHeading && (
                 <h1 className="text-[32px] font-black text-[hsl(var(--foreground))] tracking-[-0.9px] leading-10">
                     {t.profile.accountSettings}

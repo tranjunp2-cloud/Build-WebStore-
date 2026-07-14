@@ -4874,6 +4874,9 @@
             "saveFailed": "Failed to save profile",
             "networkError": "Network error. Please try again.",
             "unsavedChanges": "You have unsaved changes. Leave this tab?"
+        },
+        "saveBar": {
+            "unsavedChanges": "Unsaved changes"
         }
     }
 }
