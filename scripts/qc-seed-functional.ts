@@ -52,35 +52,47 @@ async function enablePaymentAndShipping(payload: Payload, tenantId: number, site
   })
 }
 
+interface CustomerSnapshot {
+  id: number
+  email: string
+  name: string
+  phone: string
+}
+
 async function seedCustomers(
   payload: Payload,
   tenantId: number,
   tenantIdx: number,
-): Promise<number[]> {
-  const ids: number[] = []
+): Promise<CustomerSnapshot[]> {
+  const snapshots: CustomerSnapshot[] = []
   for (let i = 1; i <= 3; i++) {
     const email = `customer-${tenantIdx}-${i}@qc.primeweb.local`
+    const name = `Customer ${tenantIdx}-${i}`
+    const phone = `+60123456${String(tenantIdx * 10 + i).padStart(3, '0')}`
     const existing = await payload.find({
       collection: 'customers',
       where: { and: [{ tenant: { equals: tenantId } }, { email: { equals: email } }] },
       limit: 1,
       overrideAccess: true,
     })
-    if (existing.docs.length) { ids.push(existing.docs[0].id as number); continue }
+    if (existing.docs.length) {
+      snapshots.push({ id: existing.docs[0].id as number, email, name, phone })
+      continue
+    }
     const created = await payload.create({
       collection: 'customers',
       data: {
         tenant: tenantId,
         email,
-        name: `Customer ${tenantIdx}-${i}`,
-        phone: `+60123456${String(tenantIdx * 10 + i).padStart(3, '0')}`,
+        name,
+        phone,
         rank: (['bronze', 'silver', 'gold'] as const)[i - 1],
       } as never,
       overrideAccess: true,
     })
-    ids.push(created.id as number)
+    snapshots.push({ id: created.id as number, email, name, phone })
   }
-  return ids
+  return snapshots
 }
 
 const ORDER_STATUS_MIX: Array<{ status: string; paymentStatus: string; paymentMethod: string }> = [
@@ -95,11 +107,11 @@ async function seedOrders(
   payload: Payload,
   tenantId: number,
   siteId: number,
-  customerIds: number[],
+  customers: CustomerSnapshot[],
   productIds: number[],
   tenantIdx: number,
 ): Promise<number> {
-  if (!productIds.length) return 0
+  if (!productIds.length || !customers.length) return 0
   let created = 0
   for (let i = 0; i < ORDER_STATUS_MIX.length; i++) {
     const orderNumber = `QC-T${tenantIdx}-O${i + 1}`
@@ -112,7 +124,7 @@ async function seedOrders(
     if (existing.docs.length) continue
     const mix = ORDER_STATUS_MIX[i]
     const product = productIds[i % productIds.length]
-    const customer = customerIds[i % customerIds.length]
+    const buyer = customers[i % customers.length]
     const unitPrice = 5000 + i * 1000 // RM 50, 60, 70, 80, 90 in sen
     const quantity = 1 + (i % 3)
     const subtotal = unitPrice * quantity
@@ -133,7 +145,10 @@ async function seedOrders(
         status: mix.status,
         paymentStatus: mix.paymentStatus,
         paymentMethod: mix.paymentMethod,
-        customer,
+        customerEmail: buyer.email,
+        customerName: buyer.name,
+        customerPhone: buyer.phone,
+        customer: buyer.id,
       } as never,
       overrideAccess: true,
     })
@@ -145,7 +160,7 @@ async function seedOrders(
 async function seedDiscounts(payload: Payload, tenantId: number, siteId: number, tenantIdx: number): Promise<number> {
   const codes = [
     { code: `QC${tenantIdx}PCT10`, type: 'percentage', value: 10, description: '10% off (QC test)' },
-    { code: `QC${tenantIdx}FIX50`, type: 'fixed_amount', value: 5000, description: 'RM 50 off (QC test)' },
+    { code: `QC${tenantIdx}FIX50`, type: 'fixed', value: 5000, description: 'RM 50 off (QC test)' },
   ]
   let created = 0
   for (const spec of codes) {
@@ -173,20 +188,24 @@ async function main(): Promise<void> {
 
   console.log(`🎨 Enriching first ${FUNCTIONAL_COUNT} tenants with full CMS setup...`)
 
-  // Fetch first N tenants ordered by name (deterministic; qc-shop-1..N)
-  const tenants = await payload.find({
-    collection: 'tenants',
-    where: { slug: { like: 'qc-shop-' } },
-    sort: 'name',
-    limit: FUNCTIONAL_COUNT,
-    overrideAccess: true,
-  })
-
+  // Fetch tenants by exact slug qc-shop-1..N — avoids the alphabetical
+  // sort trap where "qc-shop-10" would come before "qc-shop-2".
   let customers = 0, orders = 0, discounts = 0
-  for (let idx = 0; idx < tenants.docs.length; idx++) {
-    const tenant = tenants.docs[idx]
+  let processed = 0
+  for (let tenantIdx = 1; tenantIdx <= FUNCTIONAL_COUNT; tenantIdx++) {
+    const tenantResult = await payload.find({
+      collection: 'tenants',
+      where: { slug: { equals: `qc-shop-${tenantIdx}` } },
+      limit: 1,
+      overrideAccess: true,
+    })
+    if (!tenantResult.docs.length) {
+      console.warn(`  ! qc-shop-${tenantIdx}: tenant not found — skip`)
+      continue
+    }
+    const tenant = tenantResult.docs[0]
     const tenantId = tenant.id as number
-    const tenantIdx = idx + 1
+    processed++
 
     const sites = await payload.find({
       collection: 'sites',
@@ -206,15 +225,15 @@ async function main(): Promise<void> {
     const productIds = products.docs.map((p) => p.id as number)
 
     await enablePaymentAndShipping(payload, tenantId, siteId)
-    const customerIds = await seedCustomers(payload, tenantId, tenantIdx)
-    customers += customerIds.length
-    orders += await seedOrders(payload, tenantId, siteId, customerIds, productIds, tenantIdx)
+    const customerSnapshots = await seedCustomers(payload, tenantId, tenantIdx)
+    customers += customerSnapshots.length
+    orders += await seedOrders(payload, tenantId, siteId, customerSnapshots, productIds, tenantIdx)
     discounts += await seedDiscounts(payload, tenantId, siteId, tenantIdx)
-    console.log(`  ✓ tenant ${tenantIdx} (${tenant.name}): payment+shipping on, ${customerIds.length} customers, orders + discounts`)
+    console.log(`  ✓ tenant ${tenantIdx} (${tenant.name}): payment+shipping on, ${customerSnapshots.length} customers, orders + discounts`)
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
-  console.log(`✅ Functional enrichment done in ${elapsed}s. Totals: ${customers} customers, ${orders} orders, ${discounts} discounts across ${tenants.docs.length} tenants.`)
+  console.log(`✅ Functional enrichment done in ${elapsed}s. Totals: ${customers} customers, ${orders} orders, ${discounts} discounts across ${processed} tenants.`)
   process.exit(0)
 }
 
