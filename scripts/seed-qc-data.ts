@@ -28,55 +28,13 @@ import { getPayload, type Payload } from 'payload'
 import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
 import { seedTenantProducts, seedTenantExtraPages } from './qc-seed-products'
-
-// Role values MUST match `src/collections/Users.ts` field `roles` options.
-// Values: super-admin | tenant-owner | editor | viewer.
-type UserRole = 'super-admin' | 'tenant-owner' | 'editor' | 'viewer'
-
-// Membership role MUST match Users.tenants[].role field values.
-// Values: owner | admin | editor | viewer | custom.
-type TenantRole = 'owner' | 'admin' | 'editor' | 'viewer'
-
-// Tenant status MUST match `src/collections/Tenants.ts` field `status`.
-type TenantStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'suspended'
-
-interface UserSpec {
-  email: string
-  firstName: string
-  lastName: string
-  roles: UserRole[]
-}
-
-interface TenantSpec {
-  name: string
-  slug: string
-  status: TenantStatus
-  ownerEmail: string
-  membershipRole: TenantRole
-}
-
-const USERS: UserSpec[] = [
-  { email: 'qc-admin-1@primeweb.local', firstName: 'QC', lastName: 'Admin1', roles: ['super-admin'] },
-  { email: 'qc-admin-2@primeweb.local', firstName: 'QC', lastName: 'Admin2', roles: ['super-admin'] },
-  { email: 'qc-owner-1@primeweb.local', firstName: 'QC', lastName: 'Owner1', roles: ['tenant-owner'] },
-  { email: 'qc-owner-2@primeweb.local', firstName: 'QC', lastName: 'Owner2', roles: ['tenant-owner'] },
-  { email: 'qc-owner-3@primeweb.local', firstName: 'QC', lastName: 'Owner3', roles: ['tenant-owner'] },
-  { email: 'qc-owner-4@primeweb.local', firstName: 'QC', lastName: 'Owner4', roles: ['tenant-owner'] },
-  { email: 'qc-owner-5@primeweb.local', firstName: 'QC', lastName: 'Owner5', roles: ['tenant-owner'] },
-  // "Staff" concept mapped to `editor` — closest existing role. There is
-  // no `tenant-staff` role in the current schema.
-  { email: 'qc-staff-1@primeweb.local', firstName: 'QC', lastName: 'Editor1', roles: ['editor'] },
-  { email: 'qc-staff-2@primeweb.local', firstName: 'QC', lastName: 'Editor2', roles: ['editor'] },
-  { email: 'qc-staff-3@primeweb.local', firstName: 'QC', lastName: 'Viewer1', roles: ['viewer'] },
-]
-
-const TENANTS: TenantSpec[] = [
-  { name: 'QC Tenant 1', slug: 'qc-shop-1', status: 'active', ownerEmail: 'qc-owner-1@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 2', slug: 'qc-shop-2', status: 'active', ownerEmail: 'qc-owner-2@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 3', slug: 'qc-shop-3', status: 'trialing', ownerEmail: 'qc-owner-3@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 4', slug: 'qc-shop-4', status: 'past_due', ownerEmail: 'qc-owner-4@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 5', slug: 'qc-shop-5', status: 'suspended', ownerEmail: 'qc-owner-5@primeweb.local', membershipRole: 'owner' },
-]
+import {
+  buildTenants,
+  buildUsers,
+  readMerchantCount,
+  type TenantSpec,
+  type UserSpec,
+} from './qc-fixtures'
 
 type IdMap = Record<string, string | number>
 
@@ -90,9 +48,9 @@ function readSeedPassword(): string {
   return pw
 }
 
-async function seedUsers(payload: Payload, password: string): Promise<IdMap> {
+async function seedUsers(payload: Payload, users: UserSpec[], password: string): Promise<IdMap> {
   const idsByEmail: IdMap = {}
-  for (const spec of USERS) {
+  for (const spec of users) {
     const existing = await payload.find({
       collection: 'users',
       where: { email: { equals: spec.email } },
@@ -121,9 +79,9 @@ async function seedUsers(payload: Payload, password: string): Promise<IdMap> {
   return idsByEmail
 }
 
-async function seedTenants(payload: Payload): Promise<IdMap> {
+async function seedTenants(payload: Payload, tenants: TenantSpec[]): Promise<IdMap> {
   const tenantIdsByName: IdMap = {}
-  for (const spec of TENANTS) {
+  for (const spec of tenants) {
     const existing = await payload.find({
       collection: 'tenants',
       where: { name: { equals: spec.name } },
@@ -152,10 +110,11 @@ async function seedTenants(payload: Payload): Promise<IdMap> {
 
 async function linkOwnerships(
   payload: Payload,
+  tenants: TenantSpec[],
   userIds: IdMap,
   tenantIds: IdMap,
 ): Promise<void> {
-  for (const spec of TENANTS) {
+  for (const spec of tenants) {
     const userId = userIds[spec.ownerEmail]
     const tenantId = tenantIds[spec.name]
     if (!userId || !tenantId) {
@@ -190,6 +149,46 @@ async function linkOwnerships(
     })
     console.log(`  + linked ${spec.ownerEmail} → ${spec.name} as ${spec.membershipRole}`)
   }
+}
+
+async function seedPlanSubscriptions(
+  payload: Payload,
+  tenants: TenantSpec[],
+  tenantIds: IdMap,
+): Promise<number> {
+  let created = 0
+  const now = new Date()
+  const oneYearLater = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+  for (const spec of tenants) {
+    const tid = tenantIds[spec.name]
+    if (!tid) continue
+    const existing = await payload.find({
+      collection: 'plan-subscriptions',
+      where: { tenant: { equals: tid } },
+      limit: 1,
+      overrideAccess: true,
+    })
+    if (existing.docs.length) continue
+    // packCode = first segment of plan value (STARTER / STANDARD /
+    // PROFESSIONAL). Mirrors what SSO webhook sends in the real flow so
+    // enforcement-layer lookups behave the same way against seeded data.
+    const packCode = spec.plan.split('_')[0]
+    await payload.create({
+      collection: 'plan-subscriptions',
+      data: {
+        tenant: tid as number,
+        name: 'main',
+        plan: spec.plan,
+        status: 'active',
+        startsAt: now.toISOString(),
+        endsAt: oneYearLater.toISOString(),
+        packCode,
+      },
+      overrideAccess: true,
+    })
+    created++
+  }
+  return created
 }
 
 async function seedTenantContent(
@@ -234,30 +233,45 @@ async function seedTenantContent(
 async function main(): Promise<void> {
   assertQcEnv()
   const password = readSeedPassword()
+  const merchantCount = readMerchantCount()
+  const users = buildUsers(merchantCount)
+  const tenants = buildTenants(merchantCount)
+
   const t0 = Date.now()
   const payload = await getPayload({ config })
 
-  console.log('🌱 Seeding QC test data...')
+  console.log(`🌱 Seeding QC test data (merchants=${merchantCount})...`)
   console.log('  Users:')
-  const userIds = await seedUsers(payload, password)
+  const userIds = await seedUsers(payload, users, password)
   console.log('  Tenants:')
-  const tenantIds = await seedTenants(payload)
+  const tenantIds = await seedTenants(payload, tenants)
   console.log('  Owner ↔ tenant memberships:')
-  await linkOwnerships(payload, userIds, tenantIds)
+  await linkOwnerships(payload, tenants, userIds, tenantIds)
+  console.log('  Plan subscriptions (active):')
+  const subscriptionsCreated = await seedPlanSubscriptions(payload, tenants, tenantIds)
+  console.log(`    + ${subscriptionsCreated} active subscriptions created`)
   console.log('  Per-tenant content:')
   let totalProducts = 0
   let totalExtraPages = 0
-  for (const spec of TENANTS) {
+  let idx = 0
+  for (const spec of tenants) {
+    idx++
     const tid = tenantIds[spec.name]
     if (!tid) continue
     const { productsCreated, extraPagesCreated } = await seedTenantContent(payload, tid, spec.name)
     totalProducts += productsCreated
     totalExtraPages += extraPagesCreated
+    // Progress heartbeat every 10 tenants — critical at scale (300+)
+    // so operators can tell the loop is alive vs stalled on Neon pool.
+    if (idx % 10 === 0) {
+      const elapsedSec = ((Date.now() - t0) / 1000).toFixed(0)
+      console.log(`    [progress] ${idx}/${tenants.length} tenants (${elapsedSec}s elapsed)`)
+    }
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
   console.log(
-    `✅ Seed done in ${elapsed}s. Summary: ${Object.keys(userIds).length} users, ${Object.keys(tenantIds).length} tenants, ${totalProducts} products, ${totalExtraPages} extra pages.`,
+    `✅ Seed done in ${elapsed}s. Summary: ${Object.keys(userIds).length} users, ${Object.keys(tenantIds).length} tenants, ${subscriptionsCreated} subscriptions, ${totalProducts} products, ${totalExtraPages} extra pages.`,
   )
   console.log('   Password sourced from QC_SEED_PASSWORD. Order seed deferred — schema complexity.')
   process.exit(0)
