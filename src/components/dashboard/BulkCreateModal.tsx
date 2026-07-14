@@ -248,7 +248,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             })
 
             const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'parseError')
+            if (!res.ok) throw new Error(JSON.stringify(data))
 
             if (data.products && Array.isArray(data.products)) {
                 const initProducts = data.products.map((p: ParsedProduct) => {
@@ -298,10 +298,30 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             }
         } catch (error) {
             const errBase = error as Error
+            // Non-ok fetch responses throw JSON.stringify(data) (see the isSkuConflictError /
+            // SKU-retry convention above) so 429's resetAt survives the throw — parse once here,
+            // falling back to the raw message as the code when it isn't JSON (e.g. a network error).
+            let parsed: { error?: string; resetAt?: number } | null = null
+            try {
+                parsed = JSON.parse(errBase.message)
+            } catch {
+                parsed = null
+            }
+            const code = parsed?.error ?? errBase.message
+
             let errMsg = t.dashboard?.products?.bulkCreate?.parseError || 'Failed to parse products summary'
-            if (errBase.message === 'aiQuotaExceeded') errMsg = t.dashboard?.products?.bulkCreate?.aiQuotaExceeded || 'AI system overloaded'
-            else if (errBase.message === 'aiTimeout') errMsg = t.dashboard?.products?.bulkCreate?.aiTimeout || 'AI timeout'
-            
+            if (code === 'rateLimitExceeded') {
+                // resetAt comes from an untrusted-in-principle JSON response — guard the same way
+                // coerceFiniteNumber already guards untrusted AI numeric output above, so a
+                // malformed/non-numeric resetAt degrades to "1 min" instead of showing "NaN min".
+                const resetAt = coerceFiniteNumber(parsed?.resetAt, Date.now())
+                const minutes = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000))
+                const tmpl = t.dashboard?.products?.bulkCreate?.rateLimitExceeded
+                    || "You've used all your AI generation attempts this hour. Try again in {minutes} min."
+                errMsg = tmpl.replace('{minutes}', String(minutes))
+            } else if (code === 'aiQuotaExceeded') errMsg = t.dashboard?.products?.bulkCreate?.aiQuotaExceeded || 'AI system overloaded'
+            else if (code === 'aiTimeout') errMsg = t.dashboard?.products?.bulkCreate?.aiTimeout || 'AI timeout'
+
             toast.error(errMsg)
         } finally {
             setIsParsing(false)

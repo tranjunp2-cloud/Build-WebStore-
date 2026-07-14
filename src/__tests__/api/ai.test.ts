@@ -9,6 +9,7 @@ import { POST as BulkParsePOST } from '@/app/api/ai/products-bulk-parse/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -874,14 +875,18 @@ describe('AI Streaming APIs', () => {
     })
 
     describe('POST /api/ai/products-bulk-parse (TC-F08-04-01 & TC-F08.18)', () => {
-        it('returns 429 when rate limit is hit (Stress Protection)', async () => {
+        it('returns 429 with rateLimitExceeded code + resetAt when rate limit is hit (Stress Protection)', async () => {
             mockRateLimitAllowed = false
             const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
                 method: 'POST',
                 body: JSON.stringify({ promptText: 'Áo thun 50k' })
             })
             const res = await BulkParsePOST(req)
+            const json = await res.json()
             expect(res.status).toBe(429)
+            expect(json.error).toBe('rateLimitExceeded')
+            expect(typeof json.resetAt).toBe('number')
+            expect(vi.mocked(checkRateLimit)).toHaveBeenCalledWith('ai-bulk-parse:user-xyz', 10)
         })
 
         it('returns fallback data when OPENAI_API_KEY is completely missing', async () => {

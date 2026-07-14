@@ -1942,6 +1942,7 @@
                 "parseError": "Ralat pemprosesan",
                 "aiQuotaExceeded": "Sistem AI terlalu sibuk atau kuota habis. Sila cuba lagi nanti.",
                 "aiTimeout": "Sistem AI memberi respons terlalu lambat (Masa Tamat). Sila cuba lagi dengan teks yang lebih pendek.",
+                "rateLimitExceeded": "Anda telah menggunakan semua percubaan penjanaan AI untuk jam ini. Cuba lagi dalam {minutes} minit.",
                 "previewTitle": "Grid Pratonton (Diproses AI)",
                 "previewSubtitle": "Imej kosong akan menggunakan ikon karton lalai apabila disimpan",
                 "colImage": "Imej",
