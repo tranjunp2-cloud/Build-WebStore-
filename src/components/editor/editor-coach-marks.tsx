@@ -39,7 +39,14 @@ function useAnchorRect(step: Step, isCompact: boolean): DOMRect | null {
 
     useEffect(() => {
         hasScrolledRef.current = false
-        if (step === 0) { setRect(null); return }
+        // Reset on EVERY step change, not just step===0 — step 1 and step 2 point at
+        // mutually-exclusive anchors in compact (EditorToolsSheet mounts one tab's panel at
+        // a time), so without this the OLD rect lingers through the new resolve window: the
+        // backdrop/spotlight highlight the wrong region, and — worse — the transparent
+        // click-blocker div stays sized to the OLD (possibly much larger) anchor, potentially
+        // covering the freshly-mounted panel underneath until the new anchor resolves.
+        setRect(null)
+        if (step === 0) return
 
         const selector = step === 1 ? '[data-coach="page-library"]' : '[data-coach="menu-settings"]'
         const resolve = () => {
@@ -77,11 +84,12 @@ function useAnchorRect(step: Step, isCompact: boolean): DOMRect | null {
             pollTimeoutId = window.setTimeout(stopPolling, ANCHOR_POLL_TIMEOUT_MS)
         }, initialDelay)
 
-        window.addEventListener('resize', resolve)
+        const handleResize = () => { if (resolve()) stopPolling() }
+        window.addEventListener('resize', handleResize)
         return () => {
             window.clearTimeout(timer)
             stopPolling()
-            window.removeEventListener('resize', resolve)
+            window.removeEventListener('resize', handleResize)
         }
     }, [step, isCompact])
 
@@ -98,6 +106,10 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, onFinish, mountDe
     // the LATEST callback — isCompactLayout (parent) is false on first render and flips true
     // shortly after mount via matchMedia, so a closure frozen at mount would call openTools()
     // with a stale `false` and the compact anchor would never mount (GH-1607 regression).
+    // The parent's key={isCompactLayout ? 'compact' : 'desktop'} remount is the PRIMARY guard
+    // in practice (it forces a fresh mount once isCompactLayout resolves, before this timer
+    // can fire) — this ref is defense-in-depth for mountDelayMs≈0 or if that key prop is ever
+    // removed, not the sole fix. Keep both; don't assume this ref alone is load-bearing.
     const onEnterStep1Ref = useRef(onEnterStep1)
     useEffect(() => { onEnterStep1Ref.current = onEnterStep1 })
 
@@ -236,13 +248,16 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, onFinish, mountDe
                 aria-hidden="true"
             />
 
-            {/* Popover card */}
+            {/* Popover card — button row is a shrink-0 footer OUTSIDE the scrollable content
+                region so Next/Done/Back stay reachable even when maxHeight clips body copy
+                (e.g. the compact floor case, MIN_CARD_MAX_HEIGHT) instead of scrolling out of
+                reach with no visible affordance. */}
             <div
                 ref={cardRef}
                 role="dialog"
                 aria-modal="false"
                 aria-label={step === 1 ? cm.step1Title : cm.step2Title}
-                className="fixed z-[70] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[var(--editor-surface-elevated)] p-4 shadow-2xl"
+                className="fixed z-[70] flex w-[300px] flex-col overflow-hidden rounded-xl border border-white/10 bg-[var(--editor-surface-elevated)] shadow-2xl"
                 style={{
                     top: popoverTop,
                     left: popoverLeft,
@@ -251,14 +266,16 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, onFinish, mountDe
                     maxHeight: cardMaxHeight,
                 }}
             >
-                <p className="text-[11px] font-medium uppercase tracking-wide text-cyan-400">{step}/2</p>
-                <p className="mt-1 text-sm font-semibold text-white">
-                    {step === 1 ? cm.step1Title : cm.step2Title}
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-gray-300">
-                    {step === 1 ? cm.step1Body : cm.step2Body}
-                </p>
-                <div className="mt-4 flex items-center justify-between">
+                <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-cyan-400">{step}/2</p>
+                    <p className="mt-1 text-sm font-semibold text-white">
+                        {step === 1 ? cm.step1Title : cm.step2Title}
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-gray-300">
+                        {step === 1 ? cm.step1Body : cm.step2Body}
+                    </p>
+                </div>
+                <div className="flex shrink-0 items-center justify-between p-4">
                     {step === 2 ? (
                         <button
                             type="button"

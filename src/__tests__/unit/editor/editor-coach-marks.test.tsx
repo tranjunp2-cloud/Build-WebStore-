@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
@@ -43,6 +44,24 @@ function DelayedAnchorWrapper({ anchorPresent }: { anchorPresent: boolean }) {
             {anchorPresent && <div data-coach="page-library" style={{ position: 'fixed', top: 0, left: 0, width: 280, height: 600 }} />}
             <div data-coach="menu-settings" style={{ position: 'fixed', top: 0, right: 0, width: 320, height: 600 }} />
             <EditorCoachMarks mountDelayMs={0} onEnterStep1={vi.fn()} onEnterStep2={vi.fn()} isCompact />
+        </I18nProvider>
+    )
+}
+
+/** Mirrors production: EditorToolsSheet mounts exactly ONE tab's panel (and its anchor) at a
+ * time, swapped via openTools() — unlike Wrapper, which renders both anchors permanently. */
+function MutexAnchorWrapper() {
+    const [activeAnchor, setActiveAnchor] = useState<'pages' | 'settings'>('pages')
+    return (
+        <I18nProvider defaultLocale="en">
+            {activeAnchor === 'pages' && <div data-coach="page-library" style={{ position: 'fixed', top: 0, left: 0, width: 280, height: 600 }} />}
+            {activeAnchor === 'settings' && <div data-coach="menu-settings" style={{ position: 'fixed', top: 0, right: 0, width: 320, height: 600 }} />}
+            <EditorCoachMarks
+                mountDelayMs={0}
+                isCompact
+                onEnterStep1={() => setActiveAnchor('pages')}
+                onEnterStep2={() => setActiveAnchor('settings')}
+            />
         </I18nProvider>
     )
 }
@@ -431,5 +450,39 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
 
         // Assert
         expect(scrollIntoViewSpy).not.toHaveBeenCalled()
+    })
+
+    it('TC-F05-02-16t: stepping 1→2 clears the stale rect immediately instead of rendering against the OLD (now-unmounted) anchor for the whole resolve window (code-review regression: backdrop/spotlight/click-blocker would linger at step 1\'s position — potentially covering the freshly-mounted step-2 panel — until the new anchor resolved)', async () => {
+        // Arrange — mutex anchors mirror production (EditorToolsSheet mounts one panel at a time)
+        render(<MutexAnchorWrapper />)
+        await advanceCoachMarkTimers()
+        expect(screen.getByRole('dialog')).toBeInTheDocument() // step 1 resolved
+
+        // Act — advance to step 2: unmounts the step-1 anchor, mounts step-2's, but the new
+        // anchor hasn't resolved yet (resolve timer/poll hasn't fired)
+        fireEvent.click(screen.getByText('Next'))
+
+        // Assert — nothing renders during the gap (no stale card/backdrop/spotlight at the
+        // old, now-unmounted anchor's coordinates) — the component's own !rect guard hides
+        // everything until the new anchor resolves, rather than showing a mismatched one
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+        // Once the new (step-2) anchor resolves, the overlay reappears correctly
+        await advanceCoachMarkTimers()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-16u: Next/Done button row sits OUTSIDE the scrollable content region, not inside it (code-review fix: buttons must stay reachable even when body copy is clipped by maxHeight, not scroll out of reach with no visible affordance)', async () => {
+        // Arrange
+        render(<Wrapper isCompact />)
+        await advanceCoachMarkTimers()
+
+        // Act
+        const nextBtn = screen.getByText('Next')
+        const scrollRegion = document.querySelector('.overflow-y-auto')
+
+        // Assert
+        expect(scrollRegion).not.toBeNull()
+        expect(scrollRegion?.contains(nextBtn)).toBe(false)
     })
 })
