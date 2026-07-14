@@ -51,6 +51,8 @@
 | **TC-F06.10** | `Logic` | `Sec` | **[Negative]** API Patch Flag bị lỗi mạng | 1. Giả lập mạng lỗi khi nhấn "Khám phá CMS ngay". | - Modal **không đóng**.<br>- Hiển thị Toast Error "Lỗi kết nối".<br>- Cho phép user thử lại. | Medium | [ ] |
 | **TC-F06.11** | `UX` | `Logic` | **[Positive]** Wizard hiện lại sau khi Reload (F5) | 1. Đang xem Wizard, nhấn F5 để reload trang. | - Wizard hiển thị lại (trạng thái DB vẫn là `false`).<br>- Không mất tiến trình đã xem. | High | [ ] |
 | **TC-F06.12** | `BR-01` | `Logic` | **[Boundary]** Không hiện Wizard cho Legacy Users | 1. Login tài khoản cũ đã có site.<br>2. Vào Dashboard. | - Wizard **không** hiển thị.<br>- Dashboard hiện ra bình thường. | High | [x] |
+| **TC-F06.20** | `GH-1609` | `Logic` | **[Positive]** Nút X đóng tạm (không persist) | 1. Wizard đang mở, nhấn nút **X**. | - Modal đóng.<br>- **KHÔNG** gọi API `/api/user/dismiss-wizard` (DB flag giữ nguyên `false`).<br>- Event `wizard-closed` vẫn phát ở mức `window` (handoff sang PushOptInPrompt chưa test integration — gate `[data-wizard-open]` hiện là dead code, xem follow-up). | High | [x] |
+| **TC-F06.21** | `GH-1609` | `Logic` | **[Positive]** Wizard hiện lại sau X khi quay về Dashboard | 1. Nhấn X đóng Wizard.<br>2. Điều hướng sang Orders/Products (soft-nav).<br>3. Quay lại Dashboard.<br>4. Lặp lại nhưng đóng bằng "Skip instructions" hoặc "Explore". | - Bước 3: Wizard **hiện lại** (không cần F5).<br>- Bước 4: Wizard **không** hiện lại (đã persist vĩnh viễn).<br>- Sub-route `/dashboard/settings`: **không** reopen (exact-match `/dashboard`). | High | [x] |
 
 ---
 
