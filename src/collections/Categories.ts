@@ -103,10 +103,11 @@ export const Categories: CollectionConfig = {
                         });
 
                         // Cross-tenant guard: only check the immediate parent (first hop, before
-                        // candidateId advances to the next ancestor). Super-admin exempt.
+                        // candidateId advances to the next ancestor). Super-admin exempt, and
+                        // system/Local-API writes with no req.user exempt (GH-1587 M7 — see below).
                         if (!checkedParentTenant) {
                             checkedParentTenant = true
-                            if (!isSuperAdmin) {
+                            if (!isSuperAdmin && req.user) {
                                 const parentTenantId = candidateDoc?.tenant
                                     ? (typeof candidateDoc.tenant === 'object' ? candidateDoc.tenant.id : candidateDoc.tenant)
                                     : null
@@ -131,6 +132,12 @@ export const Categories: CollectionConfig = {
                                     throw new Error('CATEGORY_PARENT_TENANT_MISMATCH');
                                 }
                             }
+                            // else: either isSuperAdmin (already exempt pre-M7) or no req.user —
+                            // the latter is a trusted system/Local-API write (seed script, AI
+                            // generate-site), not a client request. Collection access.create
+                            // already returns false for `!req.user`, so the only way to reach this
+                            // hook without a user is trusted internal code with no client tenant
+                            // identity to check against — skip, don't throw. (GH-1587 M7)
                         }
 
                         candidateId = candidateDoc?.parent
@@ -147,14 +154,18 @@ export const Categories: CollectionConfig = {
                 // create lock (see field configs below), so both can arrive together in the same
                 // create payload — nothing else validates that `site` actually belongs to `tenant`.
                 // Only reachable pre-auto-inject when both are explicitly supplied, which after
-                // field-access stripping is super-admin-only; a sidebar mis-pick would otherwise
-                // persist a structurally corrupt category (site.tenant !== category.tenant).
+                // field-access stripping is super-admin (client write) or system/Local-API code
+                // (seed script, AI generate-site — no req.user, tenant/site always self-consistent
+                // there); a sidebar mis-pick would otherwise persist a structurally corrupt category
+                // (site.tenant !== category.tenant). overrideAccess:true here is a system-internal
+                // truth lookup, not a read on behalf of req.user (which may be undefined for system
+                // writes and would otherwise 403 against Sites' `!req.user → false` read access).
+                // (GH-1587 M6)
                 if (data?.tenant && data?.site) {
                     const siteDoc = await req.payload.findByID({
                         collection: 'sites',
                         id: data.site,
-                        user: req.user,
-                        overrideAccess: false,
+                        overrideAccess: true,
                     });
                     const siteTenantId = siteDoc?.tenant
                         ? (typeof siteDoc.tenant === 'object' ? (siteDoc.tenant as { id: string | number }).id : siteDoc.tenant)

@@ -537,6 +537,99 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             await expect(
                 hook({ data, operation: 'create', req } as any)
             ).resolves.not.toThrow()
+
+            // Assert: internal site lookup uses overrideAccess:true, not user-scoped access
+            // (GH-1587 M6 — a `user: req.user, overrideAccess: false` lookup would 403 for
+            // system/Local-API writes where req.user is undefined, since Sites' own read access
+            // denies anonymous).
+            expect(req.payload.findByID).toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'sites', id: 'site-456', overrideAccess: true })
+            )
+        })
+
+        it('TC-F08-05-16: System write (no req.user) with tenant+site — does not throw despite no user', async () => {
+            // Regression (GH-1587 M6): seed.ts / AI generate-site call payload.create with
+            // tenant+site but no `user`. Before the fix, the internal site lookup used
+            // `user: req.user, overrideAccess: false` — with req.user undefined, Sites' own
+            // `access.read` (`!req.user → false`) made findByID throw Forbidden, breaking both
+            // paths. overrideAccess:true bypasses that entirely.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: undefined,
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'site-456',
+                        tenant: 'tenant-456',
+                    }),
+                },
+            }
+
+            const data = { name: 'Seed Category', tenant: 'tenant-456', site: 'site-456' }
+            await expect(
+                hook({ data, operation: 'create', req } as any)
+            ).resolves.not.toThrow()
+        })
+
+        it('TC-F08-05-17: System write (no req.user) nesting under a parent — skips cross-tenant check instead of throwing', async () => {
+            // Regression (GH-1587 M7): seed.ts creates nested categories (parent chains) with no
+            // `user`. Before the fix, `ownerTenantId` derived from `req.user?.tenants` was always
+            // `undefined` when req.user is absent, so the mismatch check fired unconditionally —
+            // breaking `npm run seed`. No req.user means no client tenant identity to protect,
+            // so the check should no-op rather than throw.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: undefined,
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-456',
+                        parent: null,
+                        tenant: 'tenant-456',
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    // `site` intentionally omitted — isolates this test to the parent-tenant
+                    // guard; TC-F08-05-16 covers the separate site-tenant guard.
+                    data: { name: 'Nested Seed Category', parent: 'parent-456', tenant: 'tenant-456' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).resolves.not.toThrow()
+        })
+
+        it('TC-F08-05-18: System write (no req.user) re-parenting on UPDATE — skips cross-tenant check instead of throwing', async () => {
+            // Regression (GH-1587 M7, update-path coverage): the `!isSuperAdmin && req.user`
+            // guard condition applies on both create and update. No current caller re-parents
+            // without a user today, but nothing prevents one — this locks in the same no-throw
+            // behavior for the update branch so a future system write doesn't regress silently.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: undefined,
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-789',
+                        parent: null,
+                        tenant: 'tenant-OTHER', // deliberately a different tenant than originalDoc
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { parent: 'parent-789' },
+                    operation: 'update',
+                    originalDoc: { id: 'cat-123', tenant: 'tenant-456' },
+                    req,
+                } as any)
+            ).resolves.not.toThrow()
         })
     })
 })
