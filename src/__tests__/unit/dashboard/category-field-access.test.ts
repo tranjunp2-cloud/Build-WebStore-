@@ -380,27 +380,30 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
         })
 
-        it('TC-F08-05-11: CREATE-path field-strip belt-and-suspenders — tenant/site fields have access.create: () => false', async () => {
+        it('TC-F08-05-11: CREATE-path field-strip belt-and-suspenders — tenant/site fields deny create for tenant users, exempt super-admin', async () => {
             // Regression: Belt-and-suspenders enforcement: even if a hook mistakenly allowed forged
-            // tenant/site to pass, the field-level access: { create: () => false } strips them before
-            // persisting to DB. This verifies the field configuration is correct.
+            // tenant/site to pass, the field-level access.create strips them before persisting to DB
+            // for tenant users. Super-admin is exempt (GH-1587 M5) so they can pick a tenant in the
+            // admin sidebar — this grants no new privilege since super-admin already bypasses
+            // collection-level access checks.
             const { Categories } = await import('@/collections/Categories')
 
-            // Assert: tenant and site fields have access.create: () => false
             const tenantField = Categories.fields?.find((f: any) => f.name === 'tenant') as any
             const siteField = Categories.fields?.find((f: any) => f.name === 'site') as any
 
             expect(tenantField).toBeDefined()
             expect(tenantField.access).toBeDefined()
             expect(tenantField.access.create).toBeDefined()
-            // Verify the access rule denies create
-            expect(tenantField.access.create()).toBe(false)
+            // Tenant user (no super-admin role): denied
+            expect(tenantField.access.create({ req: { user: { roles: [] } } })).toBe(false)
+            // Super-admin: exempt
+            expect(tenantField.access.create({ req: { user: { roles: ['super-admin'] } } })).toBe(true)
 
             expect(siteField).toBeDefined()
             expect(siteField.access).toBeDefined()
             expect(siteField.access.create).toBeDefined()
-            // Verify the access rule denies create
-            expect(siteField.access.create()).toBe(false)
+            expect(siteField.access.create({ req: { user: { roles: [] } } })).toBe(false)
+            expect(siteField.access.create({ req: { user: { roles: ['super-admin'] } } })).toBe(true)
         })
 
         it('TC-F08-05-12: Legitimate CREATE still works — tenant/site auto-injected from req.user when omitted', async () => {
@@ -485,6 +488,55 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
                     req,
                 } as any)
             ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
+        })
+    })
+
+    describe('TC-F08-05-14/15: Site/Tenant Consistency Guard (GH-1587 M5 adversarial follow-up)', () => {
+        it('TC-F08-05-14: Super-admin supplying mismatched tenant+site — throws CATEGORY_SITE_TENANT_MISMATCH', async () => {
+            // Regression: M5 exempted super-admin from the tenant/site field-level create lock,
+            // making it newly possible for both to arrive in the same create payload (e.g. an
+            // admin-panel sidebar mis-pick). Nothing previously checked that `site` actually
+            // belongs to `tenant` — this guard closes that gap.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [], roles: ['super-admin'] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'site-999',
+                        tenant: 'tenant-OTHER', // site actually belongs to a different tenant
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { name: 'Mismatched', tenant: 'tenant-456', site: 'site-999' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).rejects.toThrow('CATEGORY_SITE_TENANT_MISMATCH')
+        })
+
+        it('TC-F08-05-15: Super-admin supplying consistent tenant+site — no error thrown', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [], roles: ['super-admin'] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'site-456',
+                        tenant: 'tenant-456', // matches data.tenant
+                    }),
+                },
+            }
+
+            const data = { name: 'Consistent', tenant: 'tenant-456', site: 'site-456' }
+            await expect(
+                hook({ data, operation: 'create', req } as any)
+            ).resolves.not.toThrow()
         })
     })
 })

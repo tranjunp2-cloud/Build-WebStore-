@@ -142,6 +142,27 @@ export const Categories: CollectionConfig = {
                         throw new Error('CATEGORY_MAX_DEPTH_ERROR');
                     }
                 }
+
+                // GH-1587 M5 follow-up: super-admin is exempt from the tenant/site field-level
+                // create lock (see field configs below), so both can arrive together in the same
+                // create payload — nothing else validates that `site` actually belongs to `tenant`.
+                // Only reachable pre-auto-inject when both are explicitly supplied, which after
+                // field-access stripping is super-admin-only; a sidebar mis-pick would otherwise
+                // persist a structurally corrupt category (site.tenant !== category.tenant).
+                if (data?.tenant && data?.site) {
+                    const siteDoc = await req.payload.findByID({
+                        collection: 'sites',
+                        id: data.site,
+                        user: req.user,
+                        overrideAccess: false,
+                    });
+                    const siteTenantId = siteDoc?.tenant
+                        ? (typeof siteDoc.tenant === 'object' ? (siteDoc.tenant as { id: string | number }).id : siteDoc.tenant)
+                        : null;
+                    if (siteTenantId == null || String(siteTenantId) !== String(data.tenant)) {
+                        throw new Error('CATEGORY_SITE_TENANT_MISMATCH');
+                    }
+                }
                 return data;
             }
         ],
@@ -202,12 +223,19 @@ export const Categories: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The tenant this category belongs to', position: 'sidebar' },
-            // Absolute lock on both create and update — no exempt branch, not even
-            // super-admin. Locking create too closes GH-1587 C1: without it a tenant user
-            // could forge `tenant` in a create payload to smuggle a category into another
-            // tenant. Legitimate assignment happens via the beforeChange auto-inject below
-            // (create) or raw SQL/script outside the Payload API (reassignment). (GH-1587 H2)
-            access: { create: () => false, update: () => false },
+            // Locked for tenant users — closes GH-1587 C1: without it a tenant user could
+            // forge `tenant` in a create payload to smuggle a category into another tenant.
+            // Legitimate tenant-user assignment happens via the beforeChange auto-inject
+            // below. Super-admin is exempt on create only (no `tenants` of their own to
+            // auto-inject from, and collection-level access already grants them full
+            // cross-tenant create/read/update) so they can pick a tenant in the admin
+            // sidebar — this grants no new privilege since super-admin already bypasses
+            // collection-level access checks. Update stays locked for everyone (no
+            // reassignment path via the API). (GH-1587 H2 / M5)
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'site',
@@ -216,8 +244,21 @@ export const Categories: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The site this category is listed on', position: 'sidebar' },
-            // Absolute lock — same rationale as `tenant` above. (GH-1587 H2 / C1)
-            access: { create: () => false, update: () => false },
+            // Same rationale as `tenant` above. (GH-1587 H2 / C1 / M5)
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
+            // Scope the admin sidebar dropdown to the selected tenant so a super-admin can't
+            // even see cross-tenant sites to pick from (UX layer; the beforeValidate hook above
+            // is the enforced guard). Mirrors the `parent` field's filterOptions pattern below.
+            filterOptions: ({ data }) => {
+                const tenant = (data as { tenant?: string | { id: string } } | undefined)?.tenant
+                if (tenant) {
+                    return { tenant: { equals: typeof tenant === 'object' ? tenant.id : tenant } }
+                }
+                return true
+            },
         },
         {
             name: 'name',
@@ -263,7 +304,10 @@ export const Categories: CollectionConfig = {
             admin: { readOnly: true, description: 'Soft delete timestamp' },
             // Absolute lock — soft-delete only happens via deleteCategoryAction's internal write
             // (overrideAccess:true, gated by its own findByID access check upfront). (GH-1587 H1)
-            access: { update: () => false },
+            // create locked too: REST create could otherwise set deletedAt directly (blast
+            // radius was low — self-created invisible category in one's own tenant — but
+            // locked for consistency with update).
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'dna',
