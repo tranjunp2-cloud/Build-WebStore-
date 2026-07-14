@@ -12,8 +12,7 @@ import {
   isBusinessDateString,
   courierCutoffLabel,
   maxCollectionDate,
-  nextBusinessDateString,
-  prevBusinessDateString,
+  recommendedBusinessDate,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 import type { EpWalletInfo } from './use-ep-shipping-info'
 import { CourierLogo } from './courier-logo'
@@ -73,13 +72,12 @@ export function CreateLabelFlow({
 
   // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
   const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
-  // Weekend banner suggests the weekday NEAREST TO THE PICKED DATE (not `earliest`, which is
-  // usually today and would read as "go back 5 days"). Prefers the following Monday; falls back
-  // to the preceding Friday when Monday would fall outside the ~2-week window.
-  const recommendedDate = useMemo(() => {
-    const after = nextBusinessDateString(collectionDate)
-    return after <= maxDate ? after : prevBusinessDateString(collectionDate)
-  }, [collectionDate, maxDate])
+  // Weekend banner suggests the weekday nearest the PICKED date (shared helper — the decision
+  // and its window fallback live in pickup-schedule.ts, where they are unit-tested).
+  const recommendedDate = useMemo(
+    () => recommendedBusinessDate(collectionDate, maxDate),
+    [collectionDate, maxDate],
+  )
   const recommendedDateObj = useMemo(() => new Date(`${recommendedDate}T00:00:00`), [recommendedDate])
   const dateToStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

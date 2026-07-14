@@ -16,6 +16,7 @@ import {
   maxCollectionDate,
   nextBusinessDateString,
   prevBusinessDateString,
+  recommendedBusinessDate,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 
 // Mon 2026-07-06 10:00 MYT (02:00 UTC) — weekday, before every cut-off
@@ -80,6 +81,21 @@ describe('nextBusinessDateString / prevBusinessDateString (weekend-warning recom
   it('[TC-F36.194] month rollover', () => {
     expect(nextBusinessDateString('2026-08-01')).toBe('2026-08-03') // Sat → Mon (next month kept)
     expect(prevBusinessDateString('2026-08-01')).toBe('2026-07-31') // Sat → Fri (prev month)
+  })
+
+  // The banner's actual DECISION (was inline in create-label-flow.tsx → untestable; a swapped
+  // comparison used to keep the suite green while the banner regressed to past dates).
+  it('[TC-F36.194] recommends the FOLLOWING business day when it fits the window', () => {
+    // today Mon 2026-07-13 → max 2026-07-26; merchant picks Sat 18 → Mon 20 (not earliest=13)
+    expect(recommendedBusinessDate('2026-07-18', '2026-07-26')).toBe('2026-07-20')
+    expect(recommendedBusinessDate('2026-07-19', '2026-07-26')).toBe('2026-07-20')
+  })
+
+  it('[TC-F36.194] weekend at the window edge → falls back to the PRECEDING business day', () => {
+    // Sat 25 / Sun 26 sit at max=26: the following Mon (27) is outside the window and would be
+    // unclickable in the picker → recommend Fri 24, which is still selectable.
+    expect(recommendedBusinessDate('2026-07-25', '2026-07-26')).toBe('2026-07-24')
+    expect(recommendedBusinessDate('2026-07-26', '2026-07-26')).toBe('2026-07-24')
   })
 })
 

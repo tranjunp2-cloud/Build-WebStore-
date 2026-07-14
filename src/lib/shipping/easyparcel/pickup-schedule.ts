@@ -103,6 +103,19 @@ export function prevBusinessDateString(dateStr: string): string {
     return toMytDateString(d)
 }
 
+/**
+ * Weekday to recommend when the merchant picks a weekend (the soft-warning banner).
+ * Relative to the PICKED date — never `earliest`, which is usually today and would read as
+ * "we recommend a date 5 days in the past". Prefers the following business day; falls back to
+ * the preceding one when the following would land outside the ~2-week window (weekend picked
+ * at the window edge). The result is always a business day inside [picked-2, picked+2] and,
+ * for any selectable `dateStr`, inside the picker's own [earliest, max] window.
+ */
+export function recommendedBusinessDate(dateStr: string, maxDate: string): string {
+    const after = nextBusinessDateString(dateStr)
+    return after <= maxDate ? after : prevBusinessDateString(dateStr)
+}
+
 export interface ClampedCollectionDate {
     /** The date actually usable for submit_orders ("YYYY-MM-DD"). */
     date: string
