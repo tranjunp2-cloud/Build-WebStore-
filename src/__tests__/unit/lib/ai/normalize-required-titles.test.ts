@@ -109,6 +109,18 @@ describe('[TC-F01.PGRID] normalizeChangesRequiredFields()', () => {
         normalizeChangesRequiredFields(changes, { blockType: 'testimonials' })
         expect(changes.testimonials).toEqual([{ quote: 'Great!', name: 'Bob' }])
     })
+
+    it('TC-F01.PGRID-21 — GH-1621 code-review follow-up: property-card.properties[].title backfilled (Critical gap missed by the original audit)', () => {
+        // property-card IS in BLOCK_IMAGE_SPEC (media-injector.ts, minCount:3) and
+        // Pages.ts marks properties[].title required:true — the exact criterion the
+        // GH-1621 audit itself used, but property-card was missed. Caught by
+        // adversarial code review on PR #1629, fixed here.
+        const changes = { properties: [{ title: 'Real Property' }, {}] }
+        normalizeChangesRequiredFields(changes, { blockType: 'property-card' })
+        const properties = changes.properties as Record<string, unknown>[]
+        expect(properties[0]!.title).toBe('Real Property')
+        expect(properties[1]!.title).toBe('Property 2')
+    })
 })
 
 describe('[TC-F01.PGRID] coerceServiceItems()', () => {
@@ -143,8 +155,19 @@ describe('[TC-F01.PGRID] sanitizeTestimonialItems()', () => {
         ])
     })
 
-    it('TC-F01.PGRID-17 — non-object items are dropped (no quote possible)', () => {
-        const result = sanitizeTestimonialItems(['just a string', { quote: 'Real' }])
+    it('TC-F01.PGRID-17 — bare string item becomes the quote, not discarded (regression: was mistaken for an empty object and dropped)', () => {
+        // The edit-block prompt gives no shape guidance for `testimonials` either
+        // (same gap as portfolio-grid/TC-F01.PGRID-11) — a bare string AI response
+        // is realistic and must keep its text as the quote, not vanish.
+        const result = sanitizeTestimonialItems(['Fantastic team, delivered early!', { quote: 'Real' }])
+        expect(result).toEqual([
+            { quote: 'Fantastic team, delivered early!', name: 'Customer 1' },
+            { quote: 'Real', name: 'Customer 2' },
+        ])
+    })
+
+    it('TC-F01.PGRID-17b — non-object, non-string items (e.g. null/number) are dropped (no quote possible)', () => {
+        const result = sanitizeTestimonialItems([null, 42, { quote: 'Real' }])
         expect(result).toEqual([{ quote: 'Real', name: 'Customer 1' }])
     })
 })

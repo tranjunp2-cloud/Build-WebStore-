@@ -7,6 +7,7 @@ import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subs
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { sanitizeBlocksRequiredFields } from '@/lib/ai/normalize-required-titles'
 import { blockRegistry } from '@/blocks/registry'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
@@ -32,6 +33,10 @@ const ARRAY_ITEM_LABELS: Record<string, string> = {
     videos: 'Video',
     caseStudies: 'Case Study',
     steps: 'Step',
+    categories: 'Category',
+    testimonials: 'Testimonial',
+    plans: 'Plan',
+    faqs: 'FAQ',
 }
 
 /**
@@ -50,8 +55,14 @@ function friendlyValidationLocation(path: string, layout: unknown[]): string | n
     const blockType = typeof block?.blockType === 'string' ? block.blockType : undefined
     const blockLabel = blockType ? (blockRegistry.getBlockMeta(blockType)?.name ?? blockType) : `Block ${blockIndex + 1}`
 
-    // layout.<blockIndex>.<arrayField>.<itemIndex>.<fieldName> — nested array item
-    if (segments.length >= 5) {
+    // layout.<blockIndex>.<arrayField>.<itemIndex>.<fieldName> — exactly ONE
+    // array level. Guarded to === 5 (not >=5): a doubly-nested array (e.g.
+    // menu-food/menu-display's `categories[].items[].name`, 7 segments) would
+    // otherwise read segments[4] ("items", the nested array's field name) as if
+    // it were the leaf field — a confidently WRONG label, worse than falling
+    // through to the field-name-only case below (which is always correct, just
+    // less specific about which item).
+    if (segments.length === 5) {
         const arrayField = segments[2]
         const itemIndex = Number(segments[3])
         const fieldName = segments[4]
@@ -61,7 +72,9 @@ function friendlyValidationLocation(path: string, layout: unknown[]): string | n
         }
     }
 
-    // layout.<blockIndex>.<fieldName> — top-level block field
+    // layout.<blockIndex>.<fieldName> (top-level block field) OR deeper nesting
+    // than this function resolves an item label for — the leaf field name (last
+    // path segment) is always correct regardless of depth, so use that alone.
     const fieldName = segments[segments.length - 1]
     return `${blockLabel} → ${fieldName}`
 }
@@ -299,6 +312,15 @@ export async function PATCH(
                         // may still have removed variant strings ('expanded', 'mega-footer')
                         // that cause ValidationError → 500 on publish.
                         data.layout = normalizeBlocksForPersistence(data.layout as Record<string, unknown>[])
+                        // GH-1621: backfill/drop required array-item fields (portfolio-grid
+                        // projects[].title, team members[].name, etc — see
+                        // normalize-required-titles.ts for full coverage + rationale) right
+                        // before this is validated by payload.update below. Deliberately
+                        // placed HERE, not on every draft autosave — this is the one point
+                        // where "the draft is about to become the live site" is actually
+                        // true, so nothing gets silently rewritten while the user is still
+                        // mid-edit.
+                        data.layout = sanitizeBlocksRequiredFields(data.layout as Record<string, unknown>[])
                     }
 
                     await payload.update({
@@ -341,8 +363,16 @@ export async function PATCH(
 
                     // GH-1621 P1: build a human-readable location for the toast, e.g.
                     // "About Us → Portfolio Grid → Project 5 → Title" instead of the raw
-                    // "title" field name — uses `pg.layout` (the draft's own content, same
-                    // one validation ran against) to resolve the failing block's type.
+                    // "title" field name — uses `pg.layout` (the ORIGINAL draft, not the
+                    // `data.layout` derived from it above) to resolve the failing block's
+                    // type + item index. Safe because blockType at a given index never
+                    // changes across stripArrayItemIds/normalizeBlocksForPersistence/
+                    // sanitizeBlocksRequiredFields (all pure, order-preserving `.map()`s —
+                    // sanitizeTestimonialItems is the one exception that can drop items,
+                    // but only for testimonials' OWN required fields, which by definition
+                    // can no longer be the cause of a validation error reaching this catch
+                    // block, since sanitizeBlocksRequiredFields already fixed them above).
+                    // `pg.layout` is also simpler to reach here — `data` is try-block-scoped.
                     const firstPathSegments = validationErrors[0]?.path
                     const pageTitle = typeof (pg as Record<string, unknown>).title === 'string' ? (pg as Record<string, unknown>).title as string : undefined
                     const pageLayout = Array.isArray((pg as Record<string, unknown>).layout) ? (pg as Record<string, unknown>).layout as unknown[] : []

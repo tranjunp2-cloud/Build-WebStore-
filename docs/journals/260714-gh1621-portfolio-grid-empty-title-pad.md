@@ -1,9 +1,9 @@
 # GH-1621: Editor Publish Fails 409 — Portfolio Grid Projects Missing Required Title
 
-**Date**: 2026-07-14 14:44 (corrected 15:30 after adversarial code review — see "Correction" section below, read it before trusting the rest of this entry)
+**Date**: 2026-07-14 14:44 (corrected 15:30 after adversarial code review pre-PR; corrected again 17:15 after `/code-review #1629` post-PR — see both "Correction" sections below, read them before trusting the rest of this entry)
 **Severity**: Critical (P0, blocks AI-generated sites from publishing)
 **Component**: AI image injection pipeline + Payload page draft validation boundary
-**Status**: Fixed (code verified, awaiting commit) — **but which fix actually closes GH-1621's live gap turned out to be different from the original root-cause claim below. Read the Correction section first.**
+**Status**: Fixed, reviewed twice, all confirmed findings resolved, PR #1629 open against `staging`. Sanitizer runs at publish-time only (not every autosave) after Correction #2 below.
 
 ## Correction (260714 15:30, after adversarial code review — READ THIS FIRST)
 
@@ -24,6 +24,28 @@ Two real gaps the adversarial review also found and got fixed in the same pass (
 2. The new portfolio-grid regression test in `media-injector.test.ts` asserted `title` was always non-empty on items whose titles were never touched by the code under test — a passing-either-way assertion that didn't prove what its own comment claimed. Rewritten to test what the function actually does (never pads, never touches `title`).
 
 **The meta-lesson**: a GitHub issue that says "root cause (đã verify trong code)" with specific line numbers is still a claim, not a fact, until *you* verify it against current code — including tracing the full call chain (is this data path even reachable the way the writeup assumes?), not just confirming the cited lines exist. I verified the two code snippets GH-1621 cited were accurate, and treated that as "root cause confirmed" — but accurate-snippets is not the same as accurate-mechanism. The adversarial review step is what caught the gap; this is exactly why it's a mandatory stage, not a formality.
+
+## Correction #2 (260714 17:15, after `/code-review #1629` on the pushed PR)
+
+The PR (fix + audit + P0.2, all pushed and opened as #1629) went through a full `/code-review` — spec compliance + code-quality + adversarial, two independent reviewers on the full diff. This caught real, code-verified problems that survived the first review round because they were added *after* it. Not a formality either — this is the second time in one fix that a dedicated review pass found something a careful implementation pass missed.
+
+**Critical: `property-card.properties[].title` was missed by my own "fully audited" claim.** It's in `BLOCK_IMAGE_SPEC` (`media-injector.ts`, `minCount: 3`) with a `required: true` title field in `Pages.ts` — the *exact* criterion the audit (Correction/Follow-up above) used to find team/doctor-profile/testimonials. I audited the table and still missed a row. Fixed: added to `REQUIRED_ARRAY_FIELDS`.
+
+**The audit's scope boundary was itself wrong.** I used "blocks in `BLOCK_IMAGE_SPEC`" as the audit universe, because that's what GH-1621's own P1.4 item asked for. But `BLOCK_IMAGE_SPEC` is about *image injection* — it has nothing to do with which blocks have required text fields. Code review found `pricing.plans[].name`+`.price` and `faq.faqs[].question`+`.answer` are both required, both AI-editable (`aiVisible` not `false`), and both entirely outside `BLOCK_IMAGE_SPEC` (no image fields), so they were never going to be found by an audit scoped that way. Decision: **did not rush these in.** `pricing` has 2 required fields including `price` — a fabricated fallback price is actively misleading on a live storefront in a way a fabricated title/name isn't, and needs its own design decision (drop the plan? require price before allowing publish? something else). Documented as a known, out-of-scope gap in the module's own header comment and in the QA doc, recommending a separate issue rather than a rushed fourth pass at "now I've *really* audited everything."
+
+**A real, code-review-confirmed data-loss bug in what I'd built for P0.2.** Two independent reviewers, unprompted, converged on the same root problem from different angles:
+- Reviewer A: `sanitizeBlocksRequiredFields()` wired into *every* autosave silently rewrote blank fields on blocks the user wasn't even editing — the client never sees it happen (save response doesn't return the sanitized layout), so a user who clears a field mid-retype, then switches pages or reloads before finishing, comes back to fabricated placeholder content with zero indication anything changed.
+- Reviewer B: traced the actual client behavior — `SettingsPanel`'s testimonial fields only commit to store state on `onBlur` (not per-keystroke), and autosave debounces ~3s from the last store change. A user who clears an existing quote to retype it, blurs to tab to another field, then keeps typing for 3+ seconds before blurring again, can have the *entire testimonial* (not just the quote) permanently dropped from the DB by an autosave that fires while they're still composing — invisible until they reload.
+
+Both reviewers, independently, recommended the same fix: **don't run this on every autosave — run it once, at the moment a page's draft is actually promoted to published.** That's the one point where "the user is done editing and wants this live" is actually true. Implemented: removed the sanitizer entirely from `/api/sites/[siteId]/save/route.ts` (reverted to its pre-P0.2 state), added it to `/api/sites/[siteId]/publish/route.ts` instead — right after the existing `stripArrayItemIds`/`normalizeBlocksForPersistence` chain, applied to `data.layout` immediately before `payload.update(..., draft: false)`. This still satisfies P0.2's actual goal (whatever's in a draft by the time someone hits Publish gets sanitized, regardless of whether it got there via AI or manual editing) with none of the mid-edit mutation/loss risk, since nothing runs until the user has explicitly asked to go live.
+
+**A regression in the exact fix pattern this PR itself established.** `sanitizeTestimonialItems` mapped any non-object item straight to `{}` before checking for a quote — so a bare-string AI response (`testimonials: ["Fantastic team, delivered early!"]`, the same no-shape-guidance situation already fixed for `portfolio-grid` via `toFieldObject`) got misread as "no quote" and silently discarded, throwing away real AI-generated content. The PR's own new test (`sanitizeTestimonialItems(['just a string', ...])` expecting the string dropped) *encoded and endorsed* this bug. Fixed: `sanitizeTestimonialItems` now uses the same `toFieldObject()` string-normalization as everything else before checking `quote`.
+
+**`friendlyValidationLocation()`'s nested-array parsing was actively worse than the code it replaced, for a real block.** It assumed exactly one array level (`layout.<i>.<arrayField>.<itemIndex>.<fieldName>`, 5 segments) and used `segments.length >= 5` as the guard. `menu-food`/`menu-display`'s `categories[].items[].name` is genuinely two levels deep (7 segments) — the old guard read `segments[4]` ("items", the *nested array's field name*) as if it were the leaf field, producing a confidently wrong toast like `"Food Menu → Category 2 → items: This field is required."` The pre-PR fallback (`path.split('.').pop()`) would have correctly said `"name"`. Since this PR made the new message *win* over the old fallback whenever the server supplies one, this was a strict regression for that block, not just an imprecision. Fixed: tightened the guard to `segments.length === 5` exactly; anything deeper falls through to the field-name-only case, which is always correct (just less specific about which item) instead of confidently wrong.
+
+**Also fixed, lower severity:** simplified `REQUIRED_ARRAY_FIELDS` back to one-rule-per-block (the `RequiredFieldRule[]` array-of-rules shape was unused speculative generality — every real entry has exactly one required field, testimonials' two-field case was already bespoke — and had a latent bug where a hypothetical second rule's `altFields` lookup could read an earlier rule's already-written fallback text as if it were real content); added `categories`/`testimonials`/`plans`/`faqs` to the pluralization label map (`ARRAY_ITEM_LABELS`) so a toast for those arrays doesn't misfire the naive `/s$/`-stripping fallback.
+
+**The meta-lesson, again, sharper this time**: the first correction was "verify a claim before accepting it." This one is "verify your *own* claim before repeating it in a journal and a PR description." I wrote "audited every block... found 3 more vulnerable blocks" and treated that as closed. It wasn't a lie — I did audit, I did find 3 — but "audited every block [that matched my self-chosen boundary]" quietly became "audited every block" by the time it reached the PR body. A second, independent review pass — on code I'd already convinced myself was complete — is what caught it. This is the concrete case for adversarial review as a mandatory gate rather than a courtesy: the failure mode it catches isn't "sloppy work," it's "confident, careful work with an unexamined boundary."
 
 ---
 
@@ -185,40 +207,42 @@ All three already had a defensive fallback in `generate-site/route.ts`'s local s
 
 ## Next Steps
 
-**Current status**: Code implements the FULL issue #1621 fix list (P0.1, P0.2, P1 items 3 and 4), verified on branch `fix/1621-portfolio-grid-empty-title-pad`:
-- P0.1: removed padding logic from media-injector.ts
-- P0.2: `sanitizeBlocksRequiredFields()` runs before every draft save (`/api/sites/[siteId]/save/route.ts`) — catches AI generate, AI edit-block, AND manual UI edits in one place
-- Confirmed-live-gap fix: `normalize-required-titles.ts`, wired into edit-block/route.ts's `update_block`/`update_multiple_blocks` actions — now covers portfolio-grid, service-cards, team, doctor-profile, testimonials
-- P1.3: publish toast now resolves block/item/page (`friendlyValidationLocation()` in publish/route.ts)
-- P1.4: audited every block in `BLOCK_IMAGE_SPEC` against `Pages.ts` required fields — found and fixed 3 more vulnerable blocks (see Follow-up section above)
-- 40+ new/updated unit + integration test cases across 6 test files
-- Full repo test suite: 593 files, 10328+ tests, 100% pass, zero regressions (re-verified after each round of changes)
+**Current status**: PR #1629 open against `staging`, two full `/code-review` passes done (pre-PR and post-PR), all Critical/High/Medium findings from both fixed:
+- P0.1: removed padding logic from media-injector.ts (defensive, not the confirmed live-gap fix — see Correction #1)
+- P0.2: `sanitizeBlocksRequiredFields()` runs ONCE, at publish-time (`/api/sites/[siteId]/publish/route.ts`), NOT on every draft autosave — moved there in Correction #2 after review found the autosave-wiring version could silently mutate/drop content mid-edit
+- Confirmed-live-gap fix: `normalize-required-titles.ts`, wired into edit-block/route.ts's `update_block`/`update_multiple_blocks` actions — covers portfolio-grid, service-cards, team, doctor-profile, property-card, testimonials
+- P1.3: publish toast resolves block/item/page (`friendlyValidationLocation()`), including a fix for doubly-nested arrays (menu-food/menu-display) that the first PR version mis-parsed
+- P1.4: audited `BLOCK_IMAGE_SPEC` blocks against `Pages.ts` required fields — found 4 vulnerable blocks total (team, doctor-profile, testimonials in round 1; property-card added in round 2 after code review caught the miss). `pricing`/`faq` identified as a real but out-of-`BLOCK_IMAGE_SPEC`-scope gap, documented, not rushed in — recommend a follow-up issue.
+- 45+ new/updated unit + integration test cases across 7 test files
+- Full repo test suite: 593 files, 10341 tests, 100% pass, zero regressions (re-verified after every round of changes, including the post-review rework)
 - TypeScript: `tsc --noEmit` pass. Lint: 0 warnings.
 - QA docs updated (docs/qa/F38-image-provider-multi-source.md + docs/qa/F01-ai-chat-builder.md)
 
 **Only P1.5 and process items remain**:
-1. **Commit & push**: Awaiting go-ahead from requester
-2. **Confirm actual mechanism for page 3710** (still open): check whether the page was ever edited via the in-editor AI chat or manual UI vs. generated once and never touched. Without this, GH-1621's specific Sentry incident should not be treated as fully root-caused — only "the confirmed defect class was found, closed everywhere it's reachable, and audited for siblings."
-3. **P1.5 — Data backfill**: Site 430, page 3710 (and any other already-broken sites) still have corrupt data in production DB. Needs a separate migration/backfill step — requires DB access, not done this session.
-4. **Live reproduction**: No manual repro run against real API keys. Unit + integration tests directly exercise every code path instead.
+1. **Merge**: PR #1629 open, mergeable, awaiting approval.
+2. **Follow-up issue for `pricing`/`faq`**: not filed yet — both have required array-item fields outside this PR's audit scope; `pricing.plans[].price` specifically needs a design decision before any auto-backfill (a fake price is user-facing-harmful in a way a fake title isn't).
+3. **Confirm actual mechanism for page 3710** (still open): check whether the page was ever edited via the in-editor AI chat or manual UI vs. generated once and never touched. Without this, GH-1621's specific Sentry incident should not be treated as fully root-caused — only "the confirmed defect class was found, closed everywhere it's reachable, and audited for siblings (twice)."
+4. **P1.5 — Data backfill**: Site 430, page 3710 (and any other already-broken sites) still have corrupt data in production DB. Needs a separate migration/backfill step — requires DB access, not done this session.
+5. **Live reproduction**: No manual repro run against real API keys. Unit + integration tests directly exercise every code path instead.
 
 **Future refactors (tech debt, log for later)**:
-1. **Consolidate all three backfill functions** (`pages-schema.ts`, `generate-site/route.ts` local, `normalize-required-titles.ts`) into one shared module, driven by reading required fields off the block registry (not separate config maps) — `normalize-required-titles.ts` itself is now config-driven internally, but is still a 4th independently-maintained source of truth relative to the other two
-2. ~~Add draft-save validation hook that runs before every draft save~~ — **done in the follow-up above** (`sanitizeBlocksRequiredFields()` in `/api/sites/[siteId]/save/route.ts`)
-3. **Unit test every AI code path** with portfolio-grid (and other blocks with required array-item fields) as regression guards — partially done (media-injector + normalize-required-titles have direct unit coverage now); `generate-site`'s own local sanitizer still has zero dedicated tests (noted in the original debugger report too)
+1. **Consolidate all three-going-on-four backfill functions** (`pages-schema.ts`, `generate-site/route.ts` local, `normalize-required-titles.ts`) into one shared module, driven by reading required fields off the block registry (not separate config maps) — the repeated "audit missed a block" pattern across BOTH review rounds is exactly the failure mode this would prevent structurally instead of relying on manual audits
+2. ~~Add draft-save validation hook that runs before every draft save~~ — attempted, reverted after review found it unsafe; **done correctly at publish-time instead** (`sanitizeBlocksRequiredFields()` in `/api/sites/[siteId]/publish/route.ts`)
+3. **Unit test every AI code path** with portfolio-grid (and other blocks with required array-item fields) as regression guards — partially done; `generate-site`'s own local sanitizer still has zero dedicated tests
 4. **Clean up dead `BLOCK_IMAGE_SPEC` entries** (`case-study`, `event-card`, `blog-posts` — nonexistent blockTypes; `products-grid`/`products-featured`'s `products` field — doesn't exist on those blocks' schema)
+5. **File the `pricing`/`faq` follow-up issue** (see Next Steps #2)
 
 ## Verification Checklist
 
-- [x] Removed padding logic from media-injector.ts lines 24–148 (minCount reserved for pool sizing only)
-- [x] New normalize-required-titles.ts module created, config-driven, covers portfolio-grid + service-cards
+- [x] Removed padding logic from media-injector.ts (minCount reserved for pool sizing only)
+- [x] `normalize-required-titles.ts` — config-driven, single-rule-per-block table (simplified after review flagged the array-of-rules shape as unused/latent-buggy), covers portfolio-grid, team, doctor-profile, property-card, service-cards, testimonials
 - [x] Integrated into edit-block/route.ts before `update_block`/`update_multiple_blocks` apply changes
-- [x] Unit tests: 20 new/updated cases (18 original + 2 added after adversarial review), all pass
-- [x] Full test suite: 10324 tests, 100% pass (pre-correction baseline; affected files re-run 80/80 pass after correction)
-- [x] TypeScript strict mode: 0 errors
-- [x] Lint (changed files): 0 warnings
-- [x] QA docs: TC-F01.PGRID-01 through TC-F01.PGRID-12 added to docs/qa/F01-ai-chat-builder.md, TC-F38-RAW-26 corrected in F38 doc
+- [x] Integrated into publish/route.ts, once, right before promote (NOT into save/route.ts — reverted after review)
+- [x] Unit + integration tests: 45+ new/updated cases across 7 files, all pass
+- [x] Full test suite: 593 files / 10341 tests, 100% pass (re-verified after the post-review rework, not just the original implementation)
+- [x] TypeScript strict mode: 0 errors. Lint: 0 warnings.
+- [x] QA docs: TC-F01.PGRID-01 through TC-F01.PGRID-21 in docs/qa/F01-ai-chat-builder.md, TC-F38-RAW-26 in F38 doc
 - [x] Verify rendering components handle variable array lengths (portfolio-grid, gallery, team all tested — no layout break)
-- [x] Adversarial code review (`/code-review`, Stage 2 + Stage 3) run on the full pending diff — see Correction section for what it found and what got fixed as a result
-- [x] Fixed: portfolio-grid string-shorthand silently discarded (Finding 2) — normalize-required-titles.ts
-- [x] Fixed: tautological test assertion that didn't prove what it claimed (Finding 3) — media-injector.test.ts
+- [x] Adversarial + code-quality review run TWICE: pre-PR (Correction #1) and post-PR on #1629 (Correction #2) — both rounds' findings fixed, not just acknowledged
+- [x] Fixed round 1: portfolio-grid string-shorthand discarded, tautological media-injector test
+- [x] Fixed round 2: property-card missing from audit (Critical), autosave-wiring data-loss risk (High ×2, moved sanitizer to publish-time), testimonials string-shorthand discarded (same bug class as round 1's portfolio-grid fix, missed for testimonials), doubly-nested-array toast mis-parse (Medium)
