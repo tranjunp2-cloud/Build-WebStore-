@@ -23,6 +23,8 @@
     "qc:seed-scaled": "bash scripts/qc-remote.sh db:seed-qc-scaled",
     "qc:seed": "bash scripts/qc-remote.sh db:seed-qc",
     "qc:reset": "bash scripts/qc-remote.sh db:reset-qc",
+    "qc:seed-functional": "bash scripts/qc-remote.sh db:seed-qc-functional",
+    "db:seed-qc-functional": "tsx --require ./scripts/seed-preload.cjs scripts/qc-seed-functional.ts",
     "db:migrate:global-blocks": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-global-blocks-from-inline.ts",
     "test": "vitest run",
     "test:watch": "vitest",
