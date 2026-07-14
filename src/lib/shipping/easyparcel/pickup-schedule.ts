@@ -52,6 +52,18 @@ export function isBusinessDateString(dateStr: string): boolean {
 /**
  * Return earliest pickup date for a courier as "YYYY-MM-DD" (MYT).
  * If current MYT time is past cut-off, advances to next business day.
+ *
+ * The weekend skip below is DELIBERATE — do not "fix" it into a plain next-calendar-day.
+ * This value is both the picker's floor AND its DEFAULT (`useState(earliest)` in
+ * create-label-flow), so a merchant opening an order on a Saturday would otherwise get
+ * Saturday pre-selected and book a weekend pickup by reflex — and EP's own warning says a
+ * weekend date "may prevent AWB number generation" (the failure mode that once stranded a
+ * shipment: wallet charged, no AWB, cancel + rebook). Weekends ARE selectable, just never the
+ * default: any weekend after `earliest` can be picked deliberately, and the picker then shows
+ * the warning banner. Consequence, accepted 2026-07-14: the CURRENT weekend can't be booked
+ * (Sat/Sun today, or Friday past cut-off → floor lands on Monday). EP's Help Centre documents
+ * no rule either way — it only says couriers collect "usually on working days (Monday-Friday)".
+ *
  * @param courier - courier id (e.g. 'jnt', 'flash', 'poslaju')
  * @param nowUtc - current UTC time (defaults to Date.now())
  */
@@ -76,18 +88,60 @@ export function earliestPickupDate(courier: string, nowUtc: Date = new Date()): 
     return toMytDateString(pickup)
 }
 
+// EP's own dashboard caps the pickup-date picker at ~2 weeks out (today + 13 → a 14-day
+// inclusive window; EP live 2026-07-13 showed today 13 → last selectable 26 = today + 13).
+export const MAX_PICKUP_WINDOW_DAYS = 13
+
+/** Latest selectable pickup date as "YYYY-MM-DD" (MYT) — today + MAX_PICKUP_WINDOW_DAYS. */
+export function maxCollectionDate(nowUtc: Date = new Date()): string {
+    return toMytDateString(new Date(nowUtc.getTime() + MAX_PICKUP_WINDOW_DAYS * 24 * 3600 * 1000))
+}
+
+/** Nearest MYT business day AT OR AFTER "YYYY-MM-DD" (returns dateStr itself when it is one). */
+export function nextBusinessDateString(dateStr: string): string {
+    let d = new Date(`${dateStr}T00:00:00+08:00`)
+    while (!isMytBusinessDay(d)) {
+        d = new Date(d.getTime() + 24 * 3600 * 1000)
+    }
+    return toMytDateString(d)
+}
+
+/** Nearest MYT business day AT OR BEFORE "YYYY-MM-DD" (returns dateStr itself when it is one). */
+export function prevBusinessDateString(dateStr: string): string {
+    let d = new Date(`${dateStr}T00:00:00+08:00`)
+    while (!isMytBusinessDay(d)) {
+        d = new Date(d.getTime() - 24 * 3600 * 1000)
+    }
+    return toMytDateString(d)
+}
+
+/**
+ * Weekday to recommend when the merchant picks a weekend (the soft-warning banner).
+ * Relative to the PICKED date — never `earliest`, which is usually today and would read as
+ * "we recommend a date 5 days in the past". Prefers the following business day; falls back to
+ * the preceding one when the following would land outside the ~2-week window (weekend picked
+ * at the window edge). The result is always a business day inside [picked-2, picked+2] and,
+ * for any selectable `dateStr`, inside the picker's own [earliest, max] window.
+ */
+export function recommendedBusinessDate(dateStr: string, maxDate: string): string {
+    const after = nextBusinessDateString(dateStr)
+    return after <= maxDate ? after : prevBusinessDateString(dateStr)
+}
+
 export interface ClampedCollectionDate {
     /** The date actually usable for submit_orders ("YYYY-MM-DD"). */
     date: string
-    /** True when the requested date was moved (past/cut-off/weekend) — UI shows "moved to DD/MM". */
+    /** True when the requested date was clamped into [earliest, max] — UI shows "moved to DD/MM". */
     shifted: boolean
 }
 
 /**
- * Server-side clamp (AC-3b): re-compute the earliest date AT REQUEST TIME and never
- * trust the client's date — a picker opened before cut-off can be submitted after it.
- * Rules: requested < earliest → earliest; weekend → next business day; no requested
- * date → earliest (default). "YYYY-MM-DD" strings compare correctly lexicographically.
+ * Server-side clamp (AC-3b): re-compute the valid window AT REQUEST TIME and never trust
+ * the client's date — a picker opened before cut-off can be submitted after it. Clamps
+ * `requested` into [earliest, max]. Weekends are NOT force-shifted: EP's dashboard itself
+ * allows weekend pickup dates (shows a soft warning, may delay AWB), so we mirror that and
+ * let EP bump to the next working day if the courier doesn't run that day.
+ * "YYYY-MM-DD" strings compare correctly lexicographically.
  */
 export function clampCollectionDate(
     courier: string,
@@ -95,9 +149,8 @@ export function clampCollectionDate(
     nowUtc: Date = new Date(),
 ): ClampedCollectionDate {
     const earliest = earliestPickupDate(courier, nowUtc)
+    const max = maxCollectionDate(nowUtc)
     let date = requested && requested > earliest ? requested : earliest
-    if (!isBusinessDateString(date)) {
-        date = toMytDateString(nextBusinessDay(new Date(`${date}T00:00:00+08:00`)))
-    }
+    if (date > max) date = max
     return { date, shifted: requested != null && date !== requested }
 }

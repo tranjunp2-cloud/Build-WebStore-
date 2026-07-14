@@ -1469,7 +1469,7 @@
                 "collectionDateLabel": "Tarikh pengambilan",
                 "cutoffHint": "Cipta sebelum {time} (MYT) untuk pengambilan hari yang sama",
                 "dropoffHint": "Hantar bungkusan ke pusat kurier pada tarikh ini",
-                "weekendWarning": "Pengambilan hanya pada hari bekerja — pilih hari bekerja",
+                "weekendWarning": "Peringatan mesra: Tidak semua perkhidmatan kurier beroperasi pada hujung minggu, yang mungkin menghalang penjanaan nombor AWB atau melambatkan pengambilan anda. Kami cadangkan pilih {date} sebaliknya.",
                 "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)",
                 "methodNoPickup": "Kurier ini hanya menyokong drop-off untuk laluan ini",
                 "methodNoDropoff": "Kurier ini hanya menyokong pengambilan untuk laluan ini",

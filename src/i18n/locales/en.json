@@ -1469,7 +1469,7 @@
                 "collectionDateLabel": "Collection date",
                 "cutoffHint": "Create before {time} (MYT) for same-day collection",
                 "dropoffHint": "Drop the parcel at the courier's point on this date",
-                "weekendWarning": "Collections run on business days — pick a weekday",
+                "weekendWarning": "Friendly reminder: Not all courier services operate on weekends, which may prevent AWB number generation or cause your pickup to be delayed. We recommend selecting {date} instead.",
                 "dateShifted": "Collection date moved to {date} (earliest available)",
                 "methodNoPickup": "This courier only supports drop-off on this route",
                 "methodNoDropoff": "This courier only supports pickup on this route",

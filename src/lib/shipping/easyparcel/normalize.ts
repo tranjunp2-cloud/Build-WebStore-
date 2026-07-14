@@ -19,9 +19,11 @@ export function aggregateWeightKg(weightGrams: number): number {
     return Math.max(0.1, Math.ceil(kg * 10) / 10)
 }
 
-// Pickup/collection-date math moved to ./pickup-schedule (pure, client-safe — the
-// Ready-to-Ship date picker imports it too). Re-exported here for server callers.
-export { earliestPickupDate, clampCollectionDate, courierCutoffLabel, isBusinessDateString } from './pickup-schedule'
+// Pickup/collection-date math lives in ./pickup-schedule (pure, client-safe — the Ready-to-Ship
+// date picker imports it directly). Only re-export what a server caller actually reaches for:
+// this module is `server-only`, so every name re-exported here is an invitation for a client
+// component to pull it in through the wrong door and break `next build` (as warehouse.ts once did).
+export { earliestPickupDate } from './pickup-schedule'
 
 // MY state name → ISO 3166-2 subdivision code (New EP API)
 const SUBDIVISION_CODE_MAP: Record<string, string> = {
