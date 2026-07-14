@@ -250,22 +250,35 @@ async function main(): Promise<void> {
   console.log('  Plan subscriptions (active):')
   const subscriptionsCreated = await seedPlanSubscriptions(payload, tenants, tenantIds)
   console.log(`    + ${subscriptionsCreated} active subscriptions created`)
-  console.log('  Per-tenant content:')
+  // Content phase — batch-parallel to speed up 300-tenant runs. Sequential
+  // baseline was ~0.5 tenants/min (12 write ops/tenant × Neon latency).
+  // Concurrency=8 keeps well under Neon Free tier pool (~25 conn) and cuts
+  // 300-tenant runs from ~6h to ~45min. Per-tenant ops still sequential
+  // inside seedTenantContent — parallelism is BETWEEN tenants.
+  const rawConcurrency = Number(process.env.QC_SEED_CONCURRENCY ?? 1)
+  const contentConcurrency = Number.isFinite(rawConcurrency) && rawConcurrency >= 1
+    ? Math.min(Math.floor(rawConcurrency), 20)
+    : 1
+  console.log(`  Per-tenant content (concurrency=${contentConcurrency}):`)
   let totalProducts = 0
   let totalExtraPages = 0
-  let idx = 0
-  for (const spec of tenants) {
-    idx++
-    const tid = tenantIds[spec.name]
-    if (!tid) continue
-    const { productsCreated, extraPagesCreated } = await seedTenantContent(payload, tid, spec.name)
-    totalProducts += productsCreated
-    totalExtraPages += extraPagesCreated
-    // Progress heartbeat every 10 tenants — critical at scale (300+)
-    // so operators can tell the loop is alive vs stalled on Neon pool.
-    if (idx % 10 === 0) {
+  for (let batchStart = 0; batchStart < tenants.length; batchStart += contentConcurrency) {
+    const batch = tenants.slice(batchStart, batchStart + contentConcurrency)
+    const batchResults = await Promise.all(
+      batch.map((spec) => {
+        const tid = tenantIds[spec.name]
+        if (!tid) return Promise.resolve({ productsCreated: 0, extraPagesCreated: 0 })
+        return seedTenantContent(payload, tid, spec.name)
+      }),
+    )
+    for (const r of batchResults) {
+      totalProducts += r.productsCreated
+      totalExtraPages += r.extraPagesCreated
+    }
+    const done = batchStart + batch.length
+    if (done % 20 === 0 || done === tenants.length) {
       const elapsedSec = ((Date.now() - t0) / 1000).toFixed(0)
-      console.log(`    [progress] ${idx}/${tenants.length} tenants (${elapsedSec}s elapsed)`)
+      console.log(`    [progress] ${done}/${tenants.length} tenants (${elapsedSec}s elapsed)`)
     }
   }
 
