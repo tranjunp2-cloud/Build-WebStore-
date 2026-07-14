@@ -270,6 +270,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const submitParams = buildSubmitParams({
             warehouse,
             shippingAddress,
+            orderNumber: (order as any).orderNumber ?? undefined,
             customerName: (order as any).customerName ?? '',
             customerPhone,
             customerEmail: (order as any).customerEmail ?? undefined,

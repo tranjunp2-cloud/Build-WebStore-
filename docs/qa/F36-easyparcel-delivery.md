@@ -443,6 +443,24 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 | **TC-F36.193** | Func | High | Pickup date: cho chọn weekend + warning + cap ~2 tuần (align EP dashboard, verify 2026-07-13) | (a) `clampCollectionDate` với weekend trong window → giữ nguyên (không bump). (b) date > `today+13` → clamp xuống `maxCollectionDate`. (c) picker: weekend selectable + `weekendWarning`, ngày ngoài [earliest, max] bị disable (max INCLUSIVE), CTA enable với weekend. | (a) Sat/Sun trong window KHÔNG force-shift (`shifted:false`) — trước đây bump sang T2; giờ khớp EP (EP cho chọn weekend, tự bump nếu courier không chạy). (b) `maxCollectionDate(now)=now+13d` (window 14 ngày inclusive, khớp EP today+13); ngày xa hơn → clamp max, `shifted:true`. (c) `dateValid = earliest ≤ date ≤ max` (bỏ điều kiện business-day); disable = function matcher so chuỗi `YYYY-MM-DD` `date < earliest || date > max` (max chọn được, tránh react-day-picker boundary edge). Nguồn: EP docs API chỉ nói format YYYY-MM-DD; Help Centre "usually working days"; **dashboard EP thực tế cho chọn weekend + cap 2 tuần**. | §3.18g |
 | **TC-F36.194** | Func | Med | Weekend warning gợi ý ngày làm việc **gần ngày đã chọn**, không phải `earliest` (fix review PR #1610) | `nextBusinessDateString` / `prevBusinessDateString`: Sat/Sun → T2 kế / T6 trước; business day → giữ nguyên; qua tháng. Banner: chọn Sat 18/07 khi hôm nay T2 13/07. | Banner khuyến nghị **T2 20/07** (ngày làm việc sau ngày đã chọn), KHÔNG phải `earliest`=13/07 (lùi 5 ngày về quá khứ → merchant đọc thành bug). Nếu T2 kế vượt `maxCollectionDate` (chọn weekend ở rìa window) → fallback T6 trước đó, vẫn nằm trong window. | §3.18g |
 
+#### §3.18i — `reference` + ngày pickup hiển thị trên EP dashboard
+
+**`reference` (TC-F36.196):** `submit_orders` có field optional `reference`. Không gửi → dòng trên EP dashboard không mang định danh nào của ECH, phải dò AWB bằng mắt để đối chiếu. Nay gửi `reference = order.orderNumber`; EP hiện ở mục "References/Remarks" (verify live 2026-07-14, shipment `ES-2607-3SVVM`).
+
+**Ngày pickup lệch −1 trên EP dashboard — KHÔNG PHẢI BUG (điều tra 2026-07-14, đóng):** EP hiển thị ngày pickup sớm hơn ngày ECH gửi đúng 1 ngày, 3/3 lần. Nguyên nhân: **EP render theo timezone của TRÌNH DUYỆT người xem** (trang EasyTrack tự in *"Last Update Date: … GMT+7 (Asia/Saigon)"*). EP lưu `collection_date` là **nửa đêm giờ Malaysia (UTC+8)**; xem từ máy ở VN (UTC+7) → lùi 1 tiếng → rơi sang 23:00 **ngày hôm trước** → phần ngày hiện −1.
+
+| ECH gửi | EP lưu (MYT) | Render ở UTC+7 | Dashboard hiện |
+|---|---|---|---|
+| 2026-07-14 | 14/07 00:00 | 13/07 23:00 | 13/07 |
+| 2026-07-15 | 15/07 00:00 | 14/07 23:00 | 14/07 |
+| 2026-07-20 | 20/07 00:00 | 19/07 23:00 | 19/07 |
+
+**KHÔNG được bù +1 ngày trong code.** ECH gửi đúng, EP lưu đúng; chỉ màn hình của người xem ngoài múi giờ MY là lệch. Merchant Malaysia (UTC+8) thấy đúng ngày. Bù +1 sẽ khiến courier lấy hàng **trễ thật 1 ngày** cho merchant MY. Xác minh: đổi timezone máy sang `Asia/Kuala_Lumpur` → dashboard hiện đúng ngày.
+
+| ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
+|---|---|---|---|---|---|---|
+| **TC-F36.196** | Func | Med | Gửi mã đơn ECH làm EP `reference` | `buildSubmitParams` với `orderNumber='ORD-MRKAXJO1'`; và không có orderNumber / chuỗi rỗng. | Có → `params.reference = 'ORD-MRKAXJO1'` (EP hiện ở "References/Remarks"). Không có / rỗng → **omit** field (EP coi là optional). | §3.18i |
+
 #### §3.18h — Trang tracking của buyer khi EP huỷ shipment
 
 Khi EP huỷ (code 0), `applyTrackingUpdate` reopen đơn (`status → confirmed`) và **NULL toàn bộ field EP**, gồm `awbNo`. Card "Shipment Tracking" của buyer khoá theo `awbNo`, nên buyer rơi vào dòng chung *"being prepared"* và **mất sạch lịch sử courier** đã thấy trước đó — như thể đơn chưa từng được gửi đi.
