@@ -11,13 +11,19 @@ export async function getCategoriesAction() {
     }
 
     const payload = await getPayload({ config: configPromise })
-    
+
+    // Security: Payload's Local API defaults `overrideAccess` to `true` when omitted — this call
+    // was missing the explicit `false`, so Categories.ts's `read` access control (tenant-scoped
+    // `{tenant:{in:tenantIds}}` Where-filter) was silently bypassed entirely. Any logged-in user
+    // saw every tenant's categories + aggregated cross-tenant product counts on this dashboard
+    // page. Pre-existing bug, unrelated to GH-1587's own changes — found via manual QA on this PR.
     const res = await payload.find({
         collection: 'categories',
         user,
         where: { deletedAt: { exists: false } },
         depth: 1,
         limit: 1000,
+        overrideAccess: false,
     })
 
     const getDescendantIds = (parentId: string | number, allCats: Array<{ id: string | number; parent?: string | number | { id: string | number } | null }>): (string | number)[] => {

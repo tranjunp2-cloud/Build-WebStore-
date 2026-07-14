@@ -81,3 +81,24 @@ describe('Products collection config [TC-F08-01-01]', () => {
         }
     })
 })
+
+// GH-1587 Phase 02: Anonymous read block for Products (TC-F09-SEC-01)
+describe('Products anonymous read access block [TC-F09-SEC-01]', () => {
+    it('TC-F09-SEC-01: Anonymous request (req.user = undefined) returns false', () => {
+        const req = { user: undefined } as any
+        const access = Products.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F09-SEC-01: Anonymous request (req.user = null) returns false', () => {
+        const req = { user: null } as any
+        const access = Products.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F09-SEC-01: Authenticated user gets tenant-scoped access', () => {
+        const req = { user: { tenants: [{ tenant: 'tenant-1' }] } } as any
+        const access = Products.access!.read!({ req } as any)
+        expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
+    })
+})

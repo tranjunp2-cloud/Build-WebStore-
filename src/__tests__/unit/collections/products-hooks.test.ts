@@ -171,7 +171,7 @@ describe('Products Collection Hooks (TC-F08)', () => {
             const access = Products.access!.read!({ req } as any)
             expect(access).toBe(true)
         })
-        
+
         it('TC-F08-G-03: Users can only update products matching their tenant', async () => {
             // Mock multiple find() calls: plan-subscriptions and plan-features
             const req = {
@@ -206,11 +206,103 @@ describe('Products Collection Hooks (TC-F08)', () => {
             const access = await Products.access!.update!({ req } as any)
             expect(access).toEqual({ tenant: { in: ['tenant-1', 'tenant-2'] } })
         })
-        
+
         it('TC-F08-G-03: Users without tenant mapping receive false for update', async () => {
             const req = { user: { tenants: [] } } as any
             const access = await Products.access!.update!({ req } as any)
             expect(access).toBe(false)
+        })
+    })
+})
+
+// GH-1587 Phase 01c: Tenant/site field spoof fix in Products (TC-F09-SEC-02)
+describe('Products Collection Hooks — Tenant/Site Field Spoof (TC-F09-SEC-02)', () => {
+    describe('beforeChangeHook — force tenant to actor\'s own', () => {
+        const hook = Products.hooks!.beforeChange![0] as CollectionBeforeChangeHook
+
+        it('TC-F09-SEC-02: Non-admin user spoofing tenant via {tenant:<victim>} PATCH gets forced back to own tenant on update', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'prod-1', tenant: 'tenant-A', site: 'site-1', name: 'Product' }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Tenant forced back to original tenant-A
+            expect(result.tenant).toBe('tenant-A')
+        })
+
+        it('TC-F09-SEC-02: Multi-site validation — update with new site belonging to same tenant preserves it', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 'site-3' }] })
+                }
+            }
+            const originalDoc = { id: 'prod-1', tenant: 'tenant-A', site: 'site-2', name: 'Product' }
+
+            const result = await hook({
+                data: { name: 'Updated', site: 'site-3' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.site).toBe('site-3')
+            expect(req.payload.find).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: { equals: 'site-3' }, tenant: { equals: 'tenant-A' } }
+                })
+            )
+        })
+
+        it('TC-F09-SEC-02: Multi-site validation — update with site NOT belonging to tenant reverts to original', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [] })
+                }
+            }
+            const originalDoc = { id: 'prod-1', tenant: 'tenant-A', site: 'site-2', name: 'Product' }
+
+            const result = await hook({
+                data: { name: 'Updated', site: 'victim-site' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Rejected spoof, reverts to original
+            expect(result.site).toBe('site-2')
+        })
+
+        it('TC-F09-SEC-02: Super-admin passthrough — no forcing of tenant', async () => {
+            const req = {
+                user: { id: 'admin', roles: ['super-admin'], tenants: [] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'prod-1', tenant: 'tenant-A', site: 'site-1', name: 'Product' }
+
+            const result = await hook({
+                data: { tenant: 'any-tenant', site: 'any-site' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Super-admin gets their data unchanged
+            expect(result.tenant).toBe('any-tenant')
+            expect(result.site).toBe('any-site')
         })
     })
 })

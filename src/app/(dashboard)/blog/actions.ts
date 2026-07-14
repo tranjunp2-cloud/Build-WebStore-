@@ -8,7 +8,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 // ─── Types & Helpers ──────────────────────────────────────────────────────
 type TenantEntry = { tenant: { id: string } | string; role?: string; status?: string }
-type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[] }
+type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[]; roles?: string[] }
 
 /** Payload expects its internal User type — our auth user is compatible at runtime */
 type PayloadUser = PayloadRequest['user']
@@ -17,6 +17,15 @@ function getTenantId(user: UserWithTenants): string | undefined {
     const entry = user.tenants?.[0]
     if (!entry?.tenant) return undefined
     return typeof entry.tenant === 'object' ? entry.tenant?.id : entry.tenant
+}
+
+// GH-1587: `if (tenantId && ownerTenantId && mismatch)` fails OPEN when tenantId is falsy —
+// reachable in production for a user just removed from their only tenant (still-valid session,
+// getCurrentUser() re-fetches fresh, tenants:[]). Every tenant-ownership check in this file must
+// use `!isSuperAdmin(user) && (!tenantId || !ownerTenantId || mismatch)` — fail closed, with an
+// explicit super-admin passthrough instead of relying on the fail-open gap as an accidental one.
+function isSuperAdmin(user: UserWithTenants): boolean {
+    return Boolean(user.roles?.includes('super-admin'))
 }
 
 // ─── Blog Categories ───────────────────────────────────────────────────────
@@ -136,8 +145,10 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
 
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
-        if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-            return { error: 'Unauthorized access' }
+        if (!isSuperAdmin(user as UserWithTenants)) {
+            if (!tenantId || !catTenantId || String(tenantId) !== String(catTenantId)) {
+                return { error: 'Unauthorized access' }
+            }
         }
 
         const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
@@ -201,8 +212,10 @@ export async function deleteBlogCategoryAction(id: string) {
 
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
-        if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-            return { error: 'ERR_UNAUTHORIZED' }
+        if (!isSuperAdmin(user as UserWithTenants)) {
+            if (!tenantId || !catTenantId || String(tenantId) !== String(catTenantId)) {
+                return { error: 'ERR_UNAUTHORIZED' }
+            }
         }
 
         // Unset category from all posts referencing this category
@@ -335,6 +348,19 @@ export async function saveBlogAction(data: {
             return { error: msg.includes('required') || msg.includes('invalid') ? msg : 'Failed to save blog' }
         }
     } else {
+        // GH-1587: verify the actor owns this blog before writing to it. Every other
+        // write path in this file does this check (updateBlogStatusAction, deleteBlogAction,
+        // updateBlogCategoryAction) — this was the one missing it, so any authenticated user
+        // could update any tenant's blog post by ID (Local API defaults overrideAccess:true).
+        // Fail-closed via isSuperAdmin() — see its definition for why (fail-open gap).
+        if (!isSuperAdmin(user as UserWithTenants)) {
+            const existing = await payload.findByID({ collection: 'blogs', id: data.id! })
+            const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+            if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
+                return { error: 'Unauthorized update access' }
+            }
+        }
+
         try {
             const result = await payload.update({
                 collection: 'blogs',
@@ -422,8 +448,10 @@ export async function deleteBlogAction(id: string) {
     const existing = await payload.findByID({ collection: 'blogs', id })
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
-    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
-        throw new Error('Unauthorized delete access')
+    if (!isSuperAdmin(user as UserWithTenants)) {
+        if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
+            throw new Error('Unauthorized delete access')
+        }
     }
 
     await payload.delete({
@@ -450,6 +478,14 @@ export async function bulkDeleteBlogsAction(ids: string[]) {
         if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
             return { deleted: 0, error: 'Content management is not available on your current plan.' }
         }
+    }
+
+    // GH-1587: previously only added the tenant filter `if (tenantId)` — when falsy (non-admin
+    // with an unresolvable tenant), the delete ran with NO tenant scope at all: a mass delete by
+    // ID list across every tenant. Refuse outright rather than fail open; super-admin keeps the
+    // existing unscoped-by-design behavior (bulk ops across tenants are a legitimate admin need).
+    if (!isSuperAdmin(user as UserWithTenants) && !tenantId) {
+        return { deleted: 0, error: 'Unauthorized delete access' }
     }
 
     // Single query: delete all matching IDs scoped to tenant
@@ -486,8 +522,10 @@ export async function updateBlogStatusAction(id: string, status: string) {
     const existing = await payload.findByID({ collection: 'blogs', id })
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
-    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
-        throw new Error('Unauthorized update access')
+    if (!isSuperAdmin(user as UserWithTenants)) {
+        if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
+            throw new Error('Unauthorized update access')
+        }
     }
 
     const result = await payload.update({
@@ -515,8 +553,10 @@ export async function getBlogByIdAction(id: string) {
     const tenantId = getTenantId(user as UserWithTenants)
     const blogTenantId = typeof result.tenant === 'object' ? result.tenant?.id : result.tenant
 
-    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
-        throw new Error('Unauthorized access')
+    if (!isSuperAdmin(user as UserWithTenants)) {
+        if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
+            throw new Error('Unauthorized access')
+        }
     }
 
     return JSON.parse(JSON.stringify(result))

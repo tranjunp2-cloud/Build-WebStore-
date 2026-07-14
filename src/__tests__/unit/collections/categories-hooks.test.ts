@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Categories } from '../../../collections/Categories'
+import { Blogs } from '../../../collections/Blogs'
+import { BlogCategories } from '../../../collections/BlogCategories'
 
 describe('Categories Collection Hooks (TC-F08-05)', () => {
     describe('beforeValidate hook — Cycle Prevention (TC-F08-05-09)', () => {
@@ -7,6 +9,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-09: Self-parent cycle — setting category as its own parent throws error', async () => {
             const req = {
+                user: { roles: ['super-admin'] },
                 payload: {
                     findByID: vi.fn()
                 }
@@ -23,6 +26,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-09: Descendant-as-parent cycle — setting descendant as parent throws error', async () => {
             const req = {
+                user: { roles: ['super-admin'] },
                 payload: {
                     // Only one findByID call actually happens: fetching cat-B's own record shows
                     // its parent is cat-A (= selfId) — the hook's ancestor walk throws on THAT
@@ -43,6 +47,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-09: Valid parent with no cycle — accepts parent change', async () => {
             const req = {
+                user: { roles: ['super-admin'] },
                 payload: {
                     findByID: vi.fn()
                         .mockResolvedValueOnce({ id: 'cat-B', parent: null })
@@ -61,6 +66,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-02: Depth limit — rejects 4th level category', async () => {
             const req = {
+                user: { roles: ['super-admin'] },
                 payload: {
                     findByID: vi.fn()
                         .mockResolvedValueOnce({ id: 'Level3', parent: 'Level2' })
@@ -78,6 +84,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-02: Depth limit — accepts 3rd level category', async () => {
             const req = {
+                user: { roles: ['super-admin'] },
                 payload: {
                     findByID: vi.fn()
                         .mockResolvedValueOnce({ id: 'Level2', parent: 'Level1' })
@@ -93,5 +100,296 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
             } as any)
             expect(result).toBe(data)
         })
+
+        // GH-1587 Phase 01: Cross-tenant parent IDOR fix (TC-F08-05-14)
+        describe('beforeValidate hook — Cross-tenant parent IDOR (TC-F08-05-14)', () => {
+            it('TC-F08-05-14: Non-admin user setting parent to cross-tenant category rejects with "thuộc cùng thương hiệu" error', async () => {
+                const req = {
+                    user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                    payload: {
+                        find: vi.fn().mockResolvedValueOnce({ docs: [] }) // Cross-tenant lookup returns empty
+                    }
+                }
+
+                await expect(hook({
+                    data: { name: 'Category', parent: 'victim-cat-id' },
+                    operation: 'create',
+                    req
+                } as any)).rejects.toThrow(/thuộc cùng thương hiệu/)
+            })
+
+            it('TC-F08-05-14: Non-admin user setting parent to same-tenant category succeeds', async () => {
+                const req = {
+                    user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                    payload: {
+                        find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 'parent-cat', parent: null, tenant: 'tenant-A' }] })
+                    }
+                }
+
+                const data = { name: 'Child', parent: 'parent-cat' }
+                const result = await hook({
+                    data,
+                    operation: 'create',
+                    req
+                } as any)
+                expect(result.name).toBe('Child')
+                expect(req.payload.find).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        where: { id: { equals: 'parent-cat' }, tenant: { equals: 'tenant-A' } }
+                    })
+                )
+            })
+
+            it('TC-F08-05-14: Non-admin user with no resolvable tenant throws fail-safe error before lookup', async () => {
+                const req = {
+                    user: { id: 'user-1', tenants: [] }, // Empty tenants
+                    payload: {
+                        find: vi.fn()
+                    }
+                }
+
+                await expect(hook({
+                    data: { name: 'Orphan', parent: 'some-cat' },
+                    operation: 'create',
+                    req
+                } as any)).rejects.toThrow(/xác định thương hiệu/)
+
+                expect(req.payload.find).not.toHaveBeenCalled()
+            })
+
+            it('TC-F08-05-14: Super-admin can set parent to any category (passthrough)', async () => {
+                const req = {
+                    user: { roles: ['super-admin'] },
+                    payload: {
+                        findByID: vi.fn().mockResolvedValueOnce({ id: 'any-tenant-cat', parent: null })
+                    }
+                }
+
+                const data = { name: 'Admin Category', parent: 'any-tenant-cat' }
+                const result = await hook({
+                    data,
+                    operation: 'create',
+                    req
+                } as any)
+                expect(result.name).toBe('Admin Category')
+                // Super-admin should use findByID, not find with tenant filter
+                expect(req.payload.findByID).toHaveBeenCalledWith({ collection: 'categories', id: 'any-tenant-cat' })
+            })
+        })
+    })
+})
+
+// GH-1587 Phase 01b: Tenant/site field spoof fix (TC-F08-05-16)
+describe('Categories Collection Hooks — Tenant/Site Field Spoof (TC-F08-05-16)', () => {
+    describe('beforeChange hook — force tenant to actor\'s own', () => {
+        const hook = Categories.hooks!.beforeChange![0] as any
+
+        it('TC-F08-05-16: Non-admin user attempting to spoof tenant via bare {tenant:<victim>} PATCH gets forced back to own tenant on update', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [] }) // Site validation
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-1', name: 'Existing', parent: null }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Tenant forced back to original tenant-A, not spoofed to victim-tenant-B
+            expect(result.tenant).toBe('tenant-A')
+        })
+
+        it('TC-F08-05-16: Non-admin user without spoof attempt preserves same tenant on update', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-1', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { name: 'Updated Cat' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+        })
+
+        it('TC-F08-05-16: Multi-site preservation — update without site change keeps originalDoc.site', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-2', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { name: 'Updated', site: undefined },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Site should not be called since data.site is undefined
+            expect(result.site).toBe('site-2')
+        })
+
+        it('TC-F08-05-16: Multi-site preservation — update with same site ID preserves it', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-2', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { name: 'Updated', site: 'site-2' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Same site, should not trigger lookup
+            expect(result.site).toBe('site-2')
+            expect(req.payload.find).not.toHaveBeenCalled()
+        })
+
+        it('TC-F08-05-16: Multi-site validation — update with new site belonging to same tenant preserves it', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 'site-3' }] }) // Validates site-3 belongs to tenant-A
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-2', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { name: 'Updated', site: 'site-3' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.site).toBe('site-3')
+            expect(req.payload.find).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: { equals: 'site-3' }, tenant: { equals: 'tenant-A' } }
+                })
+            )
+        })
+
+        it('TC-F08-05-16: Multi-site validation — update with site NOT belonging to tenant reverts to original', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [] }) // Spoof site not found in tenant-A
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-2', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { name: 'Updated', site: 'victim-site' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Rejected spoof, reverts to original site-2
+            expect(result.site).toBe('site-2')
+        })
+
+        it('TC-F08-05-16: Super-admin passthrough — no forcing of tenant or site', async () => {
+            const req = {
+                user: { id: 'admin', roles: ['super-admin'], tenants: [] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', site: 'site-1', name: 'Cat', parent: null }
+
+            const result = await hook({
+                data: { tenant: 'any-tenant', site: 'any-site' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            // Super-admin gets their data unchanged
+            expect(result.tenant).toBe('any-tenant')
+            expect(result.site).toBe('any-site')
+        })
+    })
+})
+
+// GH-1587 Phase 02: Anonymous read block for Categories (TC-F08-05-15)
+describe('Categories anonymous read access block [TC-F08-05-15]', () => {
+    it('TC-F08-05-15: Anonymous request (req.user = undefined) returns false', () => {
+        const req = { user: undefined } as any
+        const access = Categories.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F08-05-15: Anonymous request (req.user = null) returns false', () => {
+        const req = { user: null } as any
+        const access = Categories.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F08-05-15: Authenticated user gets tenant-scoped access', () => {
+        const req = { user: { tenants: [{ tenant: 'tenant-1' }] } } as any
+        const access = Categories.access!.read!({ req } as any)
+        expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
+    })
+})
+
+// GH-1587 Phase 02: Anonymous read block for Blogs (TC-F17-SEC-01)
+describe('Blogs anonymous read access block [TC-F17-SEC-01]', () => {
+    it('TC-F17-SEC-01: Anonymous request (req.user = undefined) returns false', () => {
+        const req = { user: undefined } as any
+        const access = Blogs.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F17-SEC-01: Anonymous request (req.user = null) returns false', () => {
+        const req = { user: null } as any
+        const access = Blogs.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F17-SEC-01: Authenticated user gets tenant-scoped access', () => {
+        const req = { user: { tenants: [{ tenant: 'tenant-1' }] } } as any
+        const access = Blogs.access!.read!({ req } as any)
+        expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
+    })
+})
+
+// GH-1587 Phase 02: Anonymous read block for BlogCategories (TC-F17-SEC-02)
+describe('BlogCategories anonymous read access block [TC-F17-SEC-02]', () => {
+    it('TC-F17-SEC-02: Anonymous request (req.user = undefined) returns false', () => {
+        const req = { user: undefined } as any
+        const access = BlogCategories.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F17-SEC-02: Anonymous request (req.user = null) returns false', () => {
+        const req = { user: null } as any
+        const access = BlogCategories.access!.read!({ req } as any)
+        expect(access).toBe(false)
+    })
+
+    it('TC-F17-SEC-02: Authenticated user gets tenant-scoped access', () => {
+        const req = { user: { tenants: [{ tenant: 'tenant-1' }] } } as any
+        const access = BlogCategories.access!.read!({ req } as any)
+        expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
     })
 })

@@ -1,4 +1,4 @@
-import type { CollectionConfig, Where } from 'payload'
+import type { CollectionConfig } from 'payload'
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
@@ -32,10 +32,10 @@ export const Blogs: CollectionConfig = {
     access: {
         create: ({ req }) => Boolean(req.user),
         read: ({ req }) => {
-            // Public read — only published posts
-            if (!req.user) {
-                return { status: { equals: 'published' } } as Where
-            }
+            // GH-1587 Phase 02: no live consumer reads this collection unauthenticated
+            // (storefront uses /api/storefront/blogs with overrideAccess:true + tenant filter).
+            // Block anonymous entirely rather than leak cross-tenant blog content.
+            if (!req.user) return false
             // Authenticated — tenant-scoped
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>

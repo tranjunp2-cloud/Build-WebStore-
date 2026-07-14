@@ -1,4 +1,4 @@
-import type { CollectionConfig, Where, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
+import type { CollectionConfig, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
 import { APIError } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
@@ -105,12 +105,44 @@ export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc
 }
 
 // Auto-inject tenant and site from logged-in user if not provided by client
-const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation }) => {
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+    // GH-1587: force tenant/site to the actor's own tenant on every write. access.update's
+    // `{tenant:{in:tenantIds}}` Where only gates which product row can be targeted — it does
+    // not constrain what the update body can write. Without this, a non-admin could relocate
+    // their own product into another tenant's namespace via `{tenant:<victim-id>}`. Mirrors
+    // the same fix applied to Categories.ts (same root cause, same Sites multi-site handling).
+    const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
+    if (req.user && !isSuperAdmin) {
+        const safeTenantId = operation === 'update'
+            ? (typeof originalDoc?.tenant === 'object' ? originalDoc.tenant?.id : originalDoc?.tenant)
+            : (typeof req.user.tenants?.[0]?.tenant === 'object'
+                ? req.user.tenants[0].tenant?.id
+                : req.user.tenants?.[0]?.tenant)
+        if (!safeTenantId) {
+            throw new APIError('Không thể xác định thương hiệu (tenant) của sản phẩm', 400)
+        }
+        data.tenant = safeTenantId
+
+        const originalSiteId = operation === 'update'
+            ? (typeof originalDoc?.site === 'object' ? originalDoc.site?.id : originalDoc?.site)
+            : undefined
+        if (data.site != null && String(data.site) !== String(originalSiteId ?? '')) {
+            const siteCheck = await req.payload.find({
+                collection: 'sites',
+                where: { id: { equals: data.site }, tenant: { equals: safeTenantId } },
+                limit: 1,
+            })
+            data.site = siteCheck.docs.length > 0 ? data.site : originalSiteId
+        } else if (originalSiteId != null) {
+            data.site = originalSiteId
+        }
+    }
+
     if (operation === 'create' && req.user) {
         // If client didn't specify tenant, try to grab the first active tenant from user
         if (!data.tenant && req.user.tenants?.length > 0) {
-            data.tenant = typeof req.user.tenants[0].tenant === 'object' 
-                ? req.user.tenants[0].tenant?.id 
+            data.tenant = typeof req.user.tenants[0].tenant === 'object'
+                ? req.user.tenants[0].tenant?.id
                 : req.user.tenants[0].tenant
         }
 
@@ -252,13 +284,10 @@ export const Products: CollectionConfig = {
             } catch { return false }
         },
         read: ({ req }) => {
-            // Public read for storefront — only active, non-deleted products
-            if (!req.user) {
-                return {
-                    status: { equals: 'active' },
-                    deletedAt: { exists: false },
-                } as Where
-            }
+            // GH-1587 Phase 02: no live consumer reads this collection unauthenticated
+            // (storefront uses /api/storefront/products with overrideAccess:true + site filter).
+            // Block anonymous entirely rather than leak cross-tenant pricing/SKU/inventory data.
+            if (!req.user) return false
             // Authenticated: tenant-scoped read (dashboard)
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = getTenantIds(req.user)

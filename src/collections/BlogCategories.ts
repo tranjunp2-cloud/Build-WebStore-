@@ -9,7 +9,9 @@ export const BlogCategories: CollectionConfig = {
     access: {
         create: ({ req }) => Boolean(req.user),
         read: ({ req }) => {
-            if (!req.user) return true
+            // GH-1587 Phase 02: previously returned true unconditionally for anonymous callers,
+            // leaking ALL tenants' blog categories. No live consumer needs public reads here.
+            if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
