@@ -12,6 +12,7 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
+import { sanitizeBlocksRequiredFields } from '@/lib/ai/normalize-required-titles'
 import { buildEnumSets } from '@/lib/theme/enums'
 import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
 
@@ -125,7 +126,13 @@ export async function PATCH(
                 }
             }
         }
-        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
+        // GH-1621 P0.2: last line of defense before ANY draft save (AI edit-block,
+        // manual SettingsPanel edits, anything else) — draft saves skip Payload's
+        // required-field validation, so this is the one place that catches every
+        // path at once, regardless of how the blocks were produced.
+        const normalizedBlocks = blocks
+            ? sanitizeBlocksRequiredFields(normalizeBlocksForPersistence(blocks as Record<string, unknown>[]))
+            : undefined
 
         type SiteUpdateData = Partial<{
             theme: unknown;

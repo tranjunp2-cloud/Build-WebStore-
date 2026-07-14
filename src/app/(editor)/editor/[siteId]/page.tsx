@@ -1797,6 +1797,7 @@ export default function EditorPage() {
                             pgColumn?: string
                             pgTable?: string
                             causeMsg?: string
+                            friendlyDetail?: string
                             validationErrors?: Array<{ path?: string; message?: string }>
                         }>
                     }
@@ -1804,7 +1805,11 @@ export default function EditorPage() {
                 const firstFailure = body?.error?.failures?.[0]
                 const firstValidation = firstFailure?.validationErrors?.[0]
                 let detail: string | undefined
-                if (firstValidation?.path) {
+                if (firstFailure?.friendlyDetail) {
+                    // GH-1621 P1: server already resolved the failing block/item, e.g.
+                    // "Portfolio Grid → Project 5 → Title: This field is required."
+                    detail = firstFailure.friendlyDetail
+                } else if (firstValidation?.path) {
                     detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
                 } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
                     detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
@@ -1925,6 +1930,7 @@ export default function EditorPage() {
                             pgColumn?: string
                             pgTable?: string
                             causeMsg?: string
+                            friendlyDetail?: string
                             validationErrors?: Array<{ path?: string; message?: string }>
                         }>
                     }
@@ -1932,7 +1938,11 @@ export default function EditorPage() {
                 const firstFailure = body?.error?.failures?.[0]
                 const firstValidation = firstFailure?.validationErrors?.[0]
                 let detail: string | undefined
-                if (firstValidation?.path) {
+                if (firstFailure?.friendlyDetail) {
+                    // GH-1621 P1: server already resolved the failing block/item, e.g.
+                    // "Portfolio Grid → Project 5 → Title: This field is required."
+                    detail = firstFailure.friendlyDetail
+                } else if (firstValidation?.path) {
                     detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
                 } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
                     detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``

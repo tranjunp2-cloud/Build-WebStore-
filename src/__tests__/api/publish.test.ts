@@ -622,6 +622,64 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         ])
     })
 
+    it('TC-F01-pub-16: GH-1621 P1 — failures[].friendlyDetail resolves block/item/page from the raw path instead of a bare field name', async () => {
+        // Regression: the old toast only ever showed "title: This field is
+        // required." with zero indication of WHICH block/item/page — exactly
+        // the GH-1621 complaint. friendlyDetail must resolve the actual block
+        // type + 1-indexed item position + page title from the failing page's
+        // own layout (the only place that data is knowable from).
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: layout.6.projects.4.title')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [
+                        { path: 'layout.6.projects.4.title', message: 'This field is required.' },
+                    ],
+                }
+            }
+        }
+
+        const failingPageLayout = Array.from({ length: 7 }, (_, i) =>
+            i === 6
+                ? { blockType: 'portfolio-grid', projects: [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }, {}, {}] }
+                : { blockType: 'hero' },
+        )
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-3710', title: 'About Us', _status: 'draft', site: 'site-123', layout: failingPageLayout },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'pages' && id === 'page-3710') throw new FakeValidationError()
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        const failure = body.error.failures[0]
+        expect(failure.pageTitle).toBe('About Us')
+        // Block 6 (index) is portfolio-grid; item index 4 → "Project 5" (1-indexed).
+        expect(failure.friendlyDetail).toBe('About Us → Portfolio → Project 5 → title: This field is required.')
+    })
+
     it('TC-F01-pub-11: surfaces generic errors without .cause in failures[] (errName + errMsg always present)', async () => {
         // Sister-case to TC-F01-pub-10 — a plain TypeError (no .cause, no
         // .data.errors) still needs to return something actionable, not an

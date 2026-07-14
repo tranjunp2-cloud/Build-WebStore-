@@ -157,4 +157,27 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
 
         expect(mockUpdate).not.toHaveBeenCalled()
     })
+
+    it('TC-F01-pub-17 — GH-1621 P0.2: draft save backfills a blank Payload-required array-item field before persisting (last line of defense)', async () => {
+        // Regression: manual SettingsPanel edits (not just AI edit-block) can blank
+        // out an existing required field via onBlur — this is the ONE place that
+        // must catch it regardless of how the blocks were produced.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: '42', site: 1, _status: 'draft', layout: [] })
+
+        const blocks = [{
+            blockType: 'portfolio-grid',
+            projects: [{ title: 'Real Project' }, { title: '' }, {}],
+        }]
+        const res = await PATCH(makeReq('1', '42', { blocks, isDraft: true }), makeParams('1'))
+
+        expect(res.status).toBe(200)
+        const savedLayout = mockUpdate.mock.calls[0][0].data.layout
+        expect(savedLayout[0].projects).toEqual([
+            { title: 'Real Project' },
+            { title: 'Project 2' },
+            { title: 'Project 3' },
+        ])
+    })
 })
