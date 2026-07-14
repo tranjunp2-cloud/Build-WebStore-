@@ -21,7 +21,7 @@ export function aggregateWeightKg(weightGrams: number): number {
 
 // Pickup/collection-date math moved to ./pickup-schedule (pure, client-safe — the
 // Ready-to-Ship date picker imports it too). Re-exported here for server callers.
-export { earliestPickupDate, clampCollectionDate, courierCutoffLabel, isBusinessDateString, maxCollectionDate } from './pickup-schedule'
+export { earliestPickupDate, clampCollectionDate, courierCutoffLabel, isBusinessDateString, maxCollectionDate, nextBusinessDateString, prevBusinessDateString } from './pickup-schedule'
 
 // MY state name → ISO 3166-2 subdivision code (New EP API)
 const SUBDIVISION_CODE_MAP: Record<string, string> = {

@@ -12,6 +12,8 @@ import {
   isBusinessDateString,
   courierCutoffLabel,
   maxCollectionDate,
+  nextBusinessDateString,
+  prevBusinessDateString,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 import type { EpWalletInfo } from './use-ep-shipping-info'
 import { CourierLogo } from './courier-logo'
@@ -71,7 +73,14 @@ export function CreateLabelFlow({
 
   // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
   const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
-  const earliestDate = useMemo(() => new Date(`${earliest}T00:00:00`), [earliest])
+  // Weekend banner suggests the weekday NEAREST TO THE PICKED DATE (not `earliest`, which is
+  // usually today and would read as "go back 5 days"). Prefers the following Monday; falls back
+  // to the preceding Friday when Monday would fall outside the ~2-week window.
+  const recommendedDate = useMemo(() => {
+    const after = nextBusinessDateString(collectionDate)
+    return after <= maxDate ? after : prevBusinessDateString(collectionDate)
+  }, [collectionDate, maxDate])
+  const recommendedDateObj = useMemo(() => new Date(`${recommendedDate}T00:00:00`), [recommendedDate])
   const dateToStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
@@ -373,7 +382,7 @@ export function CreateLabelFlow({
         <div className="alert warning" style={{ marginTop: 10 }} role="note">
           <TriangleAlert className="lead" />
           <div className="a-body">
-            {ti(cl.weekendWarning, { date: format(earliestDate, 'EEE, dd MMM') })}
+            {ti(cl.weekendWarning, { date: format(recommendedDateObj, 'EEE, dd MMM') })}
           </div>
         </div>
       )}

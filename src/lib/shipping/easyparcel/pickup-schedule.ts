@@ -85,6 +85,24 @@ export function maxCollectionDate(nowUtc: Date = new Date()): string {
     return toMytDateString(new Date(nowUtc.getTime() + MAX_PICKUP_WINDOW_DAYS * 24 * 3600 * 1000))
 }
 
+/** Nearest MYT business day AT OR AFTER "YYYY-MM-DD" (returns dateStr itself when it is one). */
+export function nextBusinessDateString(dateStr: string): string {
+    let d = new Date(`${dateStr}T00:00:00+08:00`)
+    while (!isMytBusinessDay(d)) {
+        d = new Date(d.getTime() + 24 * 3600 * 1000)
+    }
+    return toMytDateString(d)
+}
+
+/** Nearest MYT business day AT OR BEFORE "YYYY-MM-DD" (returns dateStr itself when it is one). */
+export function prevBusinessDateString(dateStr: string): string {
+    let d = new Date(`${dateStr}T00:00:00+08:00`)
+    while (!isMytBusinessDay(d)) {
+        d = new Date(d.getTime() - 24 * 3600 * 1000)
+    }
+    return toMytDateString(d)
+}
+
 export interface ClampedCollectionDate {
     /** The date actually usable for submit_orders ("YYYY-MM-DD"). */
     date: string

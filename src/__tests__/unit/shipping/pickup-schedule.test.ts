@@ -14,6 +14,8 @@ import {
   isBusinessDateString,
   courierCutoffLabel,
   maxCollectionDate,
+  nextBusinessDateString,
+  prevBusinessDateString,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 
 // Mon 2026-07-06 10:00 MYT (02:00 UTC) — weekday, before every cut-off
@@ -57,6 +59,27 @@ describe('isBusinessDateString / courierCutoffLabel', () => {
   it('[TC-F14.156] cut-off label per courier, default for unknown codes', () => {
     expect(courierCutoffLabel('jnt')).toBe('13:50')
     expect(courierCutoffLabel('EP-CR0DW')).toBe('12:00')
+  })
+})
+
+describe('nextBusinessDateString / prevBusinessDateString (weekend-warning recommendation)', () => {
+  // TC-F36.194: the weekend banner must recommend a weekday RELATIVE TO THE PICKED DATE,
+  // not `earliest` (which is usually today → "we recommend a date 5 days in the past").
+  it('[TC-F36.194] weekend → following Monday / preceding Friday', () => {
+    expect(nextBusinessDateString('2026-07-18')).toBe('2026-07-20') // Sat → Mon
+    expect(nextBusinessDateString('2026-07-19')).toBe('2026-07-20') // Sun → Mon
+    expect(prevBusinessDateString('2026-07-18')).toBe('2026-07-17') // Sat → Fri
+    expect(prevBusinessDateString('2026-07-19')).toBe('2026-07-17') // Sun → Fri
+  })
+
+  it('[TC-F36.194] a business day is returned unchanged (at-or-after / at-or-before)', () => {
+    expect(nextBusinessDateString('2026-07-17')).toBe('2026-07-17') // Fri
+    expect(prevBusinessDateString('2026-07-20')).toBe('2026-07-20') // Mon
+  })
+
+  it('[TC-F36.194] month rollover', () => {
+    expect(nextBusinessDateString('2026-08-01')).toBe('2026-08-03') // Sat → Mon (next month kept)
+    expect(prevBusinessDateString('2026-08-01')).toBe('2026-07-31') // Sat → Fri (prev month)
   })
 })
 
