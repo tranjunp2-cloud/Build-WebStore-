@@ -98,15 +98,16 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
       })
     }
 
-    window.dispatchEvent(new CustomEvent('wizard-closed'))
+    window.dispatchEvent(new CustomEvent('wizard-closed', { detail: { permanent: true } }))
   }
 
   // Close for the current session only (X button) — no API call, so the wizard
   // returns on the next visit to the dashboard home. Still announces 'wizard-closed'
-  // so PushOptInPrompt can take its turn. (GH #1609)
+  // so PushOptInPrompt can take its turn — detail.permanent lets listeners tell this
+  // apart from a real dismissal (GH #1609).
   const closeForNow = () => {
     setIsOpen(false)
-    window.dispatchEvent(new CustomEvent('wizard-closed'))
+    window.dispatchEvent(new CustomEvent('wizard-closed', { detail: { permanent: false } }))
   }
 
   const handleNext = () => {

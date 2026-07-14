@@ -224,7 +224,7 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
     })
 
-    it('[TC-F06.21] Explore ở slide cuối cũng persist vĩnh viễn — không reopen khi quay lại /dashboard', () => {
+    it('[TC-F06.22] Explore ở slide cuối cũng persist vĩnh viễn — không reopen khi quay lại /dashboard', () => {
         vi.useFakeTimers()
         const { rerender } = render(<AIDiscoveryWizard userId="u-123" />)
 
