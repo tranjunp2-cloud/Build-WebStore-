@@ -73,6 +73,64 @@ function toSnakeCase(str) {
   return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
 }
 
+// Scans the CURRENT full collection source (not just the diff) for field names
+// nested under an `array` ancestor. The diff-only scope tracker in
+// getNewFieldsFromDiff() only sees an array ancestor when the array's own
+// `type: 'array'` line is itself part of the added diff — if a PR adds a new
+// sibling field to an array that already existed pre-PR (e.g. Sites.ts's
+// `openingHours` array gaining `opens`/`closes` after `dayOfWeek`/`isClosed`
+// already shipped), the ancestor line is unchanged/absent from the diff and
+// the new field is misdetected as a top-level column. Cross-checking the full
+// current file's indentation-based structure catches this regardless of diff
+// shape. GH-1587 CI run surfaced this false positive on Sites.ts opens/closes.
+function getArrayNestedFieldNames(source) {
+  const nested = new Set()
+  const lines = source.split('\n')
+  const scopeStack = [] // { indent, type }
+
+  for (let i = 0; i < lines.length; i++) {
+    // Match `name:` anywhere on the line (not just line-start) — compact
+    // single-line field syntax (`{ name: 'x', type: 'y' },`) puts `name:`
+    // after a leading `{ `. Indent is measured from LEADING WHITESPACE, not
+    // from `name:`'s own position, so scope tracking stays correct either way
+    // (mirrors the diff-based heuristic in getNewFieldsFromDiff() below).
+    const wsMatch = lines[i].match(/^(\s*)/)
+    const nameMatch = lines[i].match(/name:\s*['"](\w+)['"]/)
+    if (!nameMatch) continue
+    const indent = wsMatch[1].length
+    const fieldName = nameMatch[1]
+
+    while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
+      scopeStack.pop()
+    }
+
+    if (scopeStack.some((s) => s.type === 'array')) {
+      nested.add(fieldName)
+    }
+
+    let ownType = null
+    const inlineTypeMatch = lines[i].match(/type:\s*['"](\w+)['"]/)
+    if (inlineTypeMatch) {
+      ownType = inlineTypeMatch[1]
+    } else {
+      for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 8); j++) {
+        if (j === i) continue
+        const typeMatch = lines[j].match(/^(\s*)type:\s*['"](\w+)['"]/)
+        if (typeMatch && typeMatch[1].length === indent) {
+          ownType = typeMatch[2]
+          break
+        }
+      }
+    }
+
+    if (ownType === 'group' || ownType === 'array') {
+      scopeStack.push({ indent, type: ownType })
+    }
+  }
+
+  return nested
+}
+
 function getNewFieldsFromDiff() {
   const newFields = []
 
@@ -143,6 +201,14 @@ function getNewFieldsFromDiff() {
           skipFieldNames.add(fieldName) // groups/arrays have no direct column themselves
           scopeStack.push({ indent, type: ownType })
         }
+      }
+
+      // Cross-check against the CURRENT full file — catches fields newly added
+      // inside an array whose own declaration pre-dates this diff (see
+      // getArrayNestedFieldNames doc comment).
+      const currentSource = fs.readFileSync(path.join(__dirname, '..', filePath), 'utf8')
+      for (const name of getArrayNestedFieldNames(currentSource)) {
+        skipFieldNames.add(name)
       }
 
       // Extract field names from added `name:` lines, skipping group/array
@@ -756,4 +822,8 @@ function main() {
   process.exit(hasErrors ? 1 : 0)
 }
 
-main()
+if (require.main === module) {
+  main()
+}
+
+module.exports = { getArrayNestedFieldNames }
