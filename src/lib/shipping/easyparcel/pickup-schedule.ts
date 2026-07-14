@@ -52,6 +52,18 @@ export function isBusinessDateString(dateStr: string): boolean {
 /**
  * Return earliest pickup date for a courier as "YYYY-MM-DD" (MYT).
  * If current MYT time is past cut-off, advances to next business day.
+ *
+ * The weekend skip below is DELIBERATE — do not "fix" it into a plain next-calendar-day.
+ * This value is both the picker's floor AND its DEFAULT (`useState(earliest)` in
+ * create-label-flow), so a merchant opening an order on a Saturday would otherwise get
+ * Saturday pre-selected and book a weekend pickup by reflex — and EP's own warning says a
+ * weekend date "may prevent AWB number generation" (the failure mode that once stranded a
+ * shipment: wallet charged, no AWB, cancel + rebook). Weekends ARE selectable, just never the
+ * default: any weekend after `earliest` can be picked deliberately, and the picker then shows
+ * the warning banner. Consequence, accepted 2026-07-14: the CURRENT weekend can't be booked
+ * (Sat/Sun today, or Friday past cut-off → floor lands on Monday). EP's Help Centre documents
+ * no rule either way — it only says couriers collect "usually on working days (Monday-Friday)".
+ *
  * @param courier - courier id (e.g. 'jnt', 'flash', 'poslaju')
  * @param nowUtc - current UTC time (defaults to Date.now())
  */
