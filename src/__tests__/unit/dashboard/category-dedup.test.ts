@@ -108,8 +108,15 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             // Act
             const available = await checkCategoryNameAvailable('Shirts', 'different-parent-789')
 
-            // Assert
+            // Assert: verify scoping — query must include parent_id in WHERE clause
             expect(available).toBe(true)
+            expect(mockExecute).toHaveBeenCalled()
+            // Verify the SQL contains the parent_id condition (actual value passed as param)
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(sqlCall).toBeDefined()
+            // Check queryChunks for parent_id reference — proves scoping is applied
+            const sqlText = JSON.stringify(sqlCall)
+            expect(sqlText).toContain('parent_id')
         })
 
         it('TC-F08-05-05: Allows same name in DIFFERENT tenant', async () => {
@@ -119,8 +126,15 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             // Act
             const available = await checkCategoryNameAvailable('Fashion', null) // different tenant checked by tenantIdForQuery
 
-            // Assert
+            // Assert: verify tenant_id scoping in WHERE clause
             expect(available).toBe(true)
+            expect(mockExecute).toHaveBeenCalled()
+            // Verify the SQL contains the tenant_id condition (proves tenant scoping is applied)
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(sqlCall).toBeDefined()
+            // Check queryChunks for tenant_id reference
+            const sqlText = JSON.stringify(sqlCall)
+            expect(sqlText).toContain('tenant_id')
         })
 
         it('TC-F08-05-05: Allows duplicate when excludeId matches existing record', async () => {

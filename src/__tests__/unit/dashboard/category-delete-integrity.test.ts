@@ -146,19 +146,20 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             // Assert: mockUpdate called 3 times (2x re-parent children, 1x soft-delete self)
             expect(mockUpdate).toHaveBeenCalledTimes(3)
             // First two updates: re-parent children to null
+            // overrideAccess:true — access already gated by findByID check above (GH-1587 H1)
             expect(mockUpdate).toHaveBeenNthCalledWith(1, {
                 collection: 'categories',
                 id: 'child-1',
                 data: { parent: null },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
             expect(mockUpdate).toHaveBeenNthCalledWith(2, {
                 collection: 'categories',
                 id: 'child-2',
                 data: { parent: null },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
         })
 
@@ -172,7 +173,9 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             // Act
             await deleteCategoryAction('cat-123')
 
-            // Assert: third update call deletes the parent category
+            // Assert: second update call deletes the parent category
+            // overrideAccess:true — `deletedAt` now carries `access: { update: () => false }`
+            // Access already verified by findByID check (GH-1587 H1)
             expect(mockUpdate).toHaveBeenNthCalledWith(2, {
                 collection: 'categories',
                 id: 'cat-123',
@@ -180,7 +183,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
                     deletedAt: expect.any(String),
                 },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
             // Verify deletedAt is an ISO timestamp
             const lastCall = mockUpdate.mock.calls[1][0]
@@ -199,6 +202,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             await deleteCategoryAction('cat-123')
 
             // Assert: only one update call (soft-delete, no re-parent)
+            // overrideAccess:true — access already verified by findByID, `deletedAt` field access denied (GH-1587 H1)
             expect(mockUpdate).toHaveBeenCalledTimes(1)
             expect(mockUpdate).toHaveBeenCalledWith({
                 collection: 'categories',
@@ -207,7 +211,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
                     deletedAt: expect.any(String),
                 },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
         })
     })

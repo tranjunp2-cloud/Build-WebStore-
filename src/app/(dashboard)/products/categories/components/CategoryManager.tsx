@@ -313,6 +313,12 @@ export default function CategoryManager() {
                 toast.error(errMsg)
             } else if (message === 'CATEGORY_SLUG_DUPLICATE') {
                 toast.error(t.dashboard.products.categories.form.errors?.slugDuplicate || 'This URL slug is already used in your store.')
+            } else if (message === 'CATEGORY_CYCLE_ERROR') {
+                toast.error(t.dashboard.products.categories.toast.cycleError)
+            } else if (message === 'CATEGORY_MAX_DEPTH_ERROR') {
+                toast.error(t.dashboard.products.categories.toast.maxDepthError)
+            } else if (message === 'CATEGORY_PARENT_TENANT_MISMATCH') {
+                toast.error(t.dashboard.products.categories.toast.parentTenantMismatch)
             } else {
                 toast.error(message || t.dashboard.products.categories.toast.saveError)
             }

@@ -66,12 +66,18 @@ export async function getCategoriesAction() {
 
 import { z } from 'zod';
 
+// Explicit allowlist (GH-1587 M1) — replaces the former `.passthrough()`, which let a client
+// smuggle arbitrary extra keys (`dna`, `tenant`, `site`, `deletedAt`, ...) into `rawData`. Zod's
+// default object mode already strips unrecognized keys, so listing exactly the 5 real
+// user-editable fields here is sufficient; no `.strict()` needed (that would throw instead of
+// stripping, which risks breaking a legitimate caller that sends a harmless extra field).
 const CategoryServerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     slug: z.string().optional(),
     parent: z.union([z.number(), z.string(), z.record(z.unknown())]).nullable().optional(),
-    depth: z.number().optional()
-}).passthrough();
+    depth: z.number().optional(),
+    description: z.string().optional(),
+});
 
 // Name dedup pre-check: case-insensitive + trimmed, scoped to (parent, tenant). Backend source
 // of truth for CATEGORY_NAME_DUPLICATE — the client's debounced check is UX-only and races are
@@ -138,19 +144,18 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
     const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
 
-    // Security: CategoryServerSchema is `.passthrough()`, so a client could otherwise smuggle
-    // `tenant`/`site` fields through this server action and plant/move a category into another
-    // tenant's namespace (access.create has no `data` visibility to block it; access.update's
-    // Where-filter only gates WHICH doc can be targeted, not what fields the request writes to
-    // it; beforeChange's tenant auto-inject only fires on create AND only when absent). Always
-    // force the server-derived tenant, ignoring anything the client supplied. `site` is stripped
+    // Security (GH-1587 H2/M1): `CategoryServerSchema` no longer accepts `tenant`/`site` at all
+    // (allowlist above strips them), and both fields also carry `access: { update: () => false }`
+    // on the collection now — so this is defense-in-depth, not the primary guard. Always force
+    // the server-derived tenant, ignoring anything the client supplied. `site` is stripped
     // outright — it's never user-facing in this form; create's existing beforeChange hook
     // auto-derives it from `data.tenant`, and update never needs to change it.
-    delete (data as Record<string, unknown>).site
+    const writeData = data as Record<string, unknown>
+    delete writeData.site
     if (tenantId) {
-        data.tenant = tenantId
+        writeData.tenant = tenantId
     } else {
-        delete (data as Record<string, unknown>).tenant
+        delete writeData.tenant
     }
 
     if (tenantId) {
@@ -246,15 +251,21 @@ export async function deleteCategoryAction(id: string | number) {
         overrideAccess: false,
     })
     for (const child of children.docs) {
+        // overrideAccess:true — access already gated by the findByID check above; skips the
+        // (async, subscription-plan-checking) collection-level access.update re-evaluation per
+        // child since this is an internal system write, not a client-driven one. (GH-1587 H1)
         await payload.update({
             collection: 'categories',
             id: child.id,
             data: { parent: null },
             user,
-            overrideAccess: false,
+            overrideAccess: true,
         })
     }
 
+    // overrideAccess:true — `deletedAt` now carries `access: { update: () => false }` (GH-1587
+    // H1), which would silently strip this write under overrideAccess:false. Access to this
+    // category was already verified by the findByID check at the top of this function.
     const res = await payload.update({
         collection: 'categories',
         id,
@@ -262,7 +273,7 @@ export async function deleteCategoryAction(id: string | number) {
             deletedAt: new Date().toISOString(),
         },
         user,
-        overrideAccess: false,
+        overrideAccess: true,
     })
     return JSON.parse(JSON.stringify(res));
 }

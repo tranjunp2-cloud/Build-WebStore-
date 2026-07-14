@@ -70,44 +70,83 @@ export const Categories: CollectionConfig = {
     hooks: {
         beforeValidate: [
             async ({ data, req, operation, originalDoc }) => {
-                // Depth + cycle check: walk the ancestor chain from the candidate parent up to
-                // the root ONCE, checking two things per hop: (1) does this ancestor equal the
-                // node's own id — a cycle (self-as-parent or descendant-as-parent), and (2) how
+                // Depth + cycle + cross-tenant check: walk the ancestor chain from the candidate
+                // parent up to the root ONCE, checking three things: (1) does any ancestor equal
+                // the node's own id — a cycle (self-as-parent or descendant-as-parent), (2) how
                 // many levels deep is the candidate parent — reject if placing a child under it
-                // would exceed 3 levels. Only relevant on update (create has no existing id, so
-                // no cycle is possible). Capped at 5 hops as a safety net against a pre-existing
-                // corrupted cycle in the data causing an infinite loop.
+                // would exceed 3 levels, and (3) on the immediate parent only — does its tenant
+                // match this category's tenant (GH-1587 H2: prevents nesting a category under
+                // another tenant's category). Cycle check only relevant on update (create has no
+                // existing id, so no cycle is possible); tenant check applies to create + update.
+                // Capped at 5 hops as a safety net against a pre-existing corrupted cycle in the
+                // data causing an infinite loop.
                 if (data?.parent) {
                     const selfId = operation === 'update' ? originalDoc?.id : undefined
+                    const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
 
                     let candidateId: string | number | null | undefined = data.parent
                     let depth = 0
                     let hops = 0
+                    let checkedParentTenant = false
                     while (candidateId != null) {
                         hops++
                         if (hops > 5) break
                         if (selfId != null && String(candidateId) === String(selfId)) {
-                            throw new Error('Không thể đặt danh mục làm cha của chính nó hoặc của danh mục con/cháu của nó');
+                            throw new Error('CATEGORY_CYCLE_ERROR');
                         }
                         depth++;
                         const candidateDoc = await req.payload.findByID({
                             collection: 'categories',
                             id: candidateId,
+                            user: req.user,
+                            overrideAccess: false,
                         });
+
+                        // Cross-tenant guard: only check the immediate parent (first hop, before
+                        // candidateId advances to the next ancestor). Super-admin exempt.
+                        if (!checkedParentTenant) {
+                            checkedParentTenant = true
+                            if (!isSuperAdmin) {
+                                const parentTenantId = candidateDoc?.tenant
+                                    ? (typeof candidateDoc.tenant === 'object' ? candidateDoc.tenant.id : candidateDoc.tenant)
+                                    : null
+                                // Owner tenant MUST come from an authoritative source, never from
+                                // client-supplied `data.tenant` (GH-1587 C1: a forged `data.tenant`
+                                // in the create payload would otherwise let the check "validate"
+                                // an attacker-chosen tenant instead of blocking it). On create, use
+                                // the authenticated user's own tenant — same source access.create
+                                // trusts. On update, use the already-persisted originalDoc.tenant.
+                                let ownerTenantId: string | number | null | undefined
+                                if (operation === 'update') {
+                                    ownerTenantId = originalDoc?.tenant
+                                        ? (typeof originalDoc.tenant === 'object' ? (originalDoc.tenant as { id: string | number }).id : originalDoc.tenant)
+                                        : undefined
+                                } else {
+                                    const tenantIds = req.user?.tenants?.map((t: { tenant: string | { id: string } }) =>
+                                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                                    ) ?? []
+                                    ownerTenantId = tenantIds[0]
+                                }
+                                if (parentTenantId == null || ownerTenantId == null || String(parentTenantId) !== String(ownerTenantId)) {
+                                    throw new Error('CATEGORY_PARENT_TENANT_MISMATCH');
+                                }
+                            }
+                        }
+
                         candidateId = candidateDoc?.parent
                             ? (typeof candidateDoc.parent === 'object' ? candidateDoc.parent.id : candidateDoc.parent as string)
                             : null;
                     }
                     // If the parent is already level 3, the child would be level 4, which is not allowed.
                     if (depth >= 3) {
-                        throw new Error('Chỉ hỗ trợ tối đa 3 cấp độ danh mục');
+                        throw new Error('CATEGORY_MAX_DEPTH_ERROR');
                     }
                 }
                 return data;
             }
         ],
         beforeChange: [
-            async ({ data, req, operation }) => {
+            async ({ data, req, operation, originalDoc }) => {
                 // Auto-inject tenant & site
                 if (operation === 'create' && req.user) {
                     if (!data.tenant && req.user.tenants?.length > 0) {
@@ -119,7 +158,9 @@ export const Categories: CollectionConfig = {
                         const siteRes = await req.payload.find({
                             collection: 'sites',
                             where: { tenant: { equals: data.tenant } },
-                            limit: 1
+                            limit: 1,
+                            user: req.user,
+                            overrideAccess: false,
                         })
                         if (siteRes.docs.length > 0) {
                             data.site = siteRes.docs[0].id
@@ -131,15 +172,20 @@ export const Categories: CollectionConfig = {
                     data.slug = slugify(data.name, { lower: true, strict: true })
                 }
 
-                // Generate breadcrumb for UX usage
-                let breadcrumbs = data.name;
+                // Generate breadcrumb for UX usage. Fall back to originalDoc.name for partial
+                // updates (e.g. a re-parent-only payload `{ parent: null }`) so we don't stomp
+                // the breadcrumb with "undefined" when `data.name` isn't part of this write.
+                const name = data.name ?? originalDoc?.name;
+                let breadcrumbs = name;
                 if (data.parent) {
                     const parentDoc = await req.payload.findByID({
                         collection: 'categories',
                         id: data.parent,
+                        user: req.user,
+                        overrideAccess: false,
                     });
                     if (parentDoc?.breadcrumbs) {
-                        breadcrumbs = `${parentDoc.breadcrumbs} > ${data.name}`;
+                        breadcrumbs = `${parentDoc.breadcrumbs} > ${name}`;
                     }
                 }
                 data.breadcrumbs = breadcrumbs;
@@ -156,6 +202,12 @@ export const Categories: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The tenant this category belongs to', position: 'sidebar' },
+            // Absolute lock on both create and update — no exempt branch, not even
+            // super-admin. Locking create too closes GH-1587 C1: without it a tenant user
+            // could forge `tenant` in a create payload to smuggle a category into another
+            // tenant. Legitimate assignment happens via the beforeChange auto-inject below
+            // (create) or raw SQL/script outside the Payload API (reassignment). (GH-1587 H2)
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'site',
@@ -164,6 +216,8 @@ export const Categories: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The site this category is listed on', position: 'sidebar' },
+            // Absolute lock — same rationale as `tenant` above. (GH-1587 H2 / C1)
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'name',
@@ -207,12 +261,25 @@ export const Categories: CollectionConfig = {
             name: 'deletedAt',
             type: 'date',
             admin: { readOnly: true, description: 'Soft delete timestamp' },
+            // Absolute lock — soft-delete only happens via deleteCategoryAction's internal write
+            // (overrideAccess:true, gated by its own findByID access check upfront). (GH-1587 H1)
+            access: { update: () => false },
         },
         {
             name: 'dna',
             type: 'json',
             admin: {
                 description: 'Category DNA — block signature, order, forbidden, personality hints. Edited via Studio → Categories.',
+            },
+            // Super-admin only, both create and update — closes the create-path smuggling vector
+            // (a tenant user could otherwise plant a `dna` value on category creation). The DNA
+            // route (src/app/api/admin/categories/[id]/dna/route.ts) uses payload.update with no
+            // explicit overrideAccess → Local API default `overrideAccess:true` → bypasses this
+            // field access, so it stays functional and super-admin-only via its own withSuperAdmin
+            // wrapper. (GH-1587 H1)
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
             },
         },
     ],

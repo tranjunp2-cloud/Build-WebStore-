@@ -2053,7 +2053,8 @@
                     "saveError": "Gagal menyimpan kategori",
                     "deleteError": "Gagal memadamkan kategori",
                     "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap",
-                    "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri."
+                    "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri.",
+                    "parentTenantMismatch": "Tidak boleh memindahkan kategori ke hierarki penyewa lain"
                 }
             },
             "subtitle": "Urus produk kedai"

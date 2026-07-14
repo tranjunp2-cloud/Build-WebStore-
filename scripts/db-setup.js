@@ -4968,9 +4968,21 @@ const MIGRATIONS = [
   },
   {
     name: 'categories.drop_global_slug_unique',
-    sql: `DROP INDEX IF EXISTS categories_slug_idx;
-          DROP INDEX IF EXISTS categories_slug_unique;
-          DROP INDEX IF EXISTS categories_slug_key;`,
+    // GH-1587 cleanup: only DROP when a UNIQUE index of that name still exists — avoids
+    // re-running a no-op DROP (log churn) on every deploy once already dropped, and avoids
+    // ever touching a plain non-unique index that happens to share the name.
+    sql: `DO $$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_idx' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_idx';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_unique' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_unique';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_key' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_key';
+            END IF;
+          END $$;`,
   },
   {
     name: 'categories.tenant_slug_unique',
