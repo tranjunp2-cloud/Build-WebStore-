@@ -282,14 +282,45 @@ function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingS
     )
 }
 
+/** Courier event history (newest first). Rendered whether or not an AWB is currently held:
+ *  an EP-cancelled shipment clears awbNo, and dropping the history with it would erase every
+ *  update the buyer had already seen. */
+function OtTrackingHistory({ entries }: { entries: EpTrackingHistoryEntry[] }) {
+    if (!entries.length) return null
+    return (
+        <ul className="ot-timeline" style={{ marginTop: '1rem' }}>
+            {[...entries].reverse().map((entry, idx) => (
+                <li key={idx} className={`ot-tl-item ${idx === 0 ? 'latest' : 'completed'}`}>
+                    <span className="ot-tl-node"><Package size={13} /></span>
+                    <div className="ot-tl-body">
+                        <div className="ot-tl-title">{entry.description}</div>
+                    </div>
+                    <div className="ot-tl-stamp">
+                        {entry.eventTime && (
+                            <span className="date">
+                                {new Date(entry.eventTime).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                        )}
+                    </div>
+                </li>
+            ))}
+        </ul>
+    )
+}
+
 function OtEpTracking({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const { awbNo, shippingCourier, shippingTrackingHistory } = order
     const isDelivered = trackingStatus === 'delivered'
+    const history = shippingTrackingHistory ?? []
 
     if (!awbNo) {
         // No AWB yet — show a "preparing" placeholder only for non-terminal states
         if (trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed') return null
+        // EP cancelled the shipment: the reopen wipes awbNo, so without this the buyer would
+        // read the generic "being prepared" line and watch their tracking history vanish —
+        // as if the order had never shipped. Say what happened and keep the history.
+        const shipmentCancelled = order.shippingTrackingStatus === 'cancelled'
         return (
             <div className="ot-card">
                 <div className="ot-card-head">
@@ -297,8 +328,11 @@ function OtEpTracking({ order, trackingStatus }: { order: OrderData; trackingSta
                     <span className="ot-card-aux"><ScanBarcode size={12} /> EasyParcel</span>
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)', margin: '0.5rem 0' }}>
-                    Your order is being prepared — tracking number will appear once picked up.
+                    {shipmentCancelled
+                        ? 'The earlier shipment was cancelled. Your order is safe — the seller is arranging a new delivery, and a new tracking number will appear here.'
+                        : 'Your order is being prepared — tracking number will appear once picked up.'}
                 </p>
+                <OtTrackingHistory entries={history} />
             </div>
         )
     }
@@ -332,25 +366,7 @@ function OtEpTracking({ order, trackingStatus }: { order: OrderData; trackingSta
                 </div>
             )}
 
-            {shippingTrackingHistory && shippingTrackingHistory.length > 0 && (
-                <ul className="ot-timeline" style={{ marginTop: '1rem' }}>
-                    {[...shippingTrackingHistory].reverse().map((entry, idx) => (
-                        <li key={idx} className={`ot-tl-item ${idx === 0 ? 'latest' : 'completed'}`}>
-                            <span className="ot-tl-node"><Package size={13} /></span>
-                            <div className="ot-tl-body">
-                                <div className="ot-tl-title">{entry.description}</div>
-                            </div>
-                            <div className="ot-tl-stamp">
-                                {entry.eventTime && (
-                                    <span className="date">
-                                        {new Date(entry.eventTime).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                    </span>
-                                )}
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <OtTrackingHistory entries={history} />
 
             {!isDelivered && (
                 <p style={{ fontSize: '0.75rem', color: 'var(--f4, #6b7280)', marginTop: '0.75rem', marginBottom: 0 }}>
