@@ -2649,12 +2649,24 @@ export default function EditorPage() {
                 isPublishing={isPublishing}
             />
 
-            {!isCompactLayout && (
-                <EditorCoachMarks
-                    onEnterStep1={() => setActiveSidebarTab('pages')}
-                    onEnterStep2={() => setSettingsRequestedTab({ tab: 'menu', key: Date.now() })}
-                />
-            )}
+            <EditorCoachMarks
+                // Force a clean remount when crossing the compact/desktop breakpoint mid-tour
+                // (e.g. tablet rotation) — the anchor DOM node from the old layout is gone and
+                // nothing else re-resolves it, so a stale rect would otherwise point at nothing.
+                key={isCompactLayout ? 'compact' : 'desktop'}
+                onEnterStep1={() => {
+                    setActiveSidebarTab('pages')
+                    if (isCompactLayout) openTools('pages')
+                }}
+                onEnterStep2={() => {
+                    setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
+                    if (isCompactLayout) openTools('settings')
+                }}
+                onFinish={() => {
+                    if (isCompactLayout) closeTools()
+                }}
+                isCompact={isCompactLayout}
+            />
 
             <EditorTemplateModal
                 isOpen={isTemplateModalOpen}
