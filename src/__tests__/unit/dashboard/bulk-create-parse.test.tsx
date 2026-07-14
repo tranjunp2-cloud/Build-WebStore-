@@ -74,7 +74,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         vi.clearAllMocks()
     })
 
-    it('429 rateLimitExceeded → toast shows the real i18n string with computed minutes-until-reset', async () => {
+    it('TC-GH1599-01: 429 rateLimitExceeded → toast shows the real i18n string with computed minutes-until-reset', async () => {
         // Arrange: resetAt 5 minutes from now
         mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() + 5 * 60000 })
 
@@ -88,7 +88,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         })
     })
 
-    it('429 rateLimitExceeded with an already-past resetAt clamps to a minimum of 1 minute (no "0 min"/negative)', async () => {
+    it('TC-GH1599-02: 429 rateLimitExceeded with an already-past resetAt clamps to a minimum of 1 minute (no "0 min"/negative)', async () => {
         mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() - 60000 })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
@@ -99,7 +99,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         })
     })
 
-    it('429 rateLimitExceeded with a malformed/non-numeric resetAt clamps to 1 minute instead of showing "NaN min"', async () => {
+    it('TC-GH1599-03: 429 rateLimitExceeded with a malformed/non-numeric resetAt clamps to 1 minute instead of showing "NaN min"', async () => {
         // Code-review adversarial finding: Math.max(1, NaN) is NaN (not 1) — a non-numeric
         // resetAt must be coerced BEFORE the minutes arithmetic, matching the coerceFiniteNumber
         // guard already used elsewhere in this file for untrusted numeric input.
@@ -114,7 +114,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         expect(mockToastError).not.toHaveBeenCalledWith(expect.stringContaining('NaN'))
     })
 
-    it('500 aiQuotaExceeded → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
+    it('TC-GH1599-04: 500 aiQuotaExceeded → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
         mockParseApiError(500, { error: 'aiQuotaExceeded' })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
@@ -124,7 +124,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         })
     })
 
-    it('500 aiTimeout → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
+    it('TC-GH1599-05: 500 aiTimeout → regression guard: still resolves the correct toast after the JSON-throw refactor', async () => {
         mockParseApiError(500, { error: 'aiTimeout' })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
@@ -134,7 +134,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         })
     })
 
-    it('unrecognized error code → falls back to the generic parseError toast', async () => {
+    it('TC-GH1599-06: unrecognized error code → falls back to the generic parseError toast', async () => {
         mockParseApiError(500, { error: 'somethingUnexpected' })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)

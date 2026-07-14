@@ -886,7 +886,7 @@ describe('AI Streaming APIs', () => {
             expect(res.status).toBe(429)
             expect(json.error).toBe('rateLimitExceeded')
             expect(typeof json.resetAt).toBe('number')
-            expect(vi.mocked(checkRateLimit)).toHaveBeenCalledWith('user-xyz', 10)
+            expect(vi.mocked(checkRateLimit)).toHaveBeenCalledWith('ai-bulk-parse:user-xyz', 10)
         })
 
         it('returns fallback data when OPENAI_API_KEY is completely missing', async () => {

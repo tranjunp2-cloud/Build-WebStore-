@@ -14,7 +14,10 @@ function getOpenAI(): OpenAI | null {
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate limit: 10 bulk AI tasks per hour (heavy resource usage)
-        const rateLimit = await checkRateLimit(String(user.id), 10)
+        // Namespaced key — bare user.id would share a single bucket with every other
+        // AI route (edit-block, product-description, etc.), making this limit meaningless
+        // (see PR #1608 review). Matches this codebase's `{feature}:${user.id}` convention.
+        const rateLimit = await checkRateLimit(`ai-bulk-parse:${user.id}`, 10)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'rateLimitExceeded', resetAt: rateLimit.resetAt },
