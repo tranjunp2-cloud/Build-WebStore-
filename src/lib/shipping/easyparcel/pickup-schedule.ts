@@ -76,8 +76,9 @@ export function earliestPickupDate(courier: string, nowUtc: Date = new Date()): 
     return toMytDateString(pickup)
 }
 
-// EP's own dashboard caps the pickup-date picker at ~2 weeks out. Match that window.
-export const MAX_PICKUP_WINDOW_DAYS = 14
+// EP's own dashboard caps the pickup-date picker at ~2 weeks out (today + 13 → a 14-day
+// inclusive window; EP live 2026-07-13 showed today 13 → last selectable 26 = today + 13).
+export const MAX_PICKUP_WINDOW_DAYS = 13
 
 /** Latest selectable pickup date as "YYYY-MM-DD" (MYT) — today + MAX_PICKUP_WINDOW_DAYS. */
 export function maxCollectionDate(nowUtc: Date = new Date()): string {

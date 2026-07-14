@@ -93,9 +93,9 @@ describe('clampCollectionDate (AC-3b server clamp)', () => {
   })
 
   it('[TC-F36.193] date beyond the ~2-week window → clamped down to max, shifted', () => {
-    // earliest = 2026-07-06, max = 2026-07-20 (earliest window 14 days from now)
-    expect(maxCollectionDate(MON_MORNING)).toBe('2026-07-20')
+    // now = 2026-07-06, max = today + 13 = 2026-07-19 (14-day inclusive window)
+    expect(maxCollectionDate(MON_MORNING)).toBe('2026-07-19')
     expect(clampCollectionDate('jnt', '2026-08-15', MON_MORNING)) // far future
-      .toEqual({ date: '2026-07-20', shifted: true })
+      .toEqual({ date: '2026-07-19', shifted: true })
   })
 })

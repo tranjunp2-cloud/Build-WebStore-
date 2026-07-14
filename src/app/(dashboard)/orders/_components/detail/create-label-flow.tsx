@@ -72,7 +72,6 @@ export function CreateLabelFlow({
   // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
   const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
   const earliestDate = useMemo(() => new Date(`${earliest}T00:00:00`), [earliest])
-  const maxDateObj = useMemo(() => new Date(`${maxDate}T00:00:00`), [maxDate])
   const dateToStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
@@ -334,18 +333,12 @@ export function CreateLabelFlow({
                   {format(selectedDate, 'EEE, dd/MM/yyyy')}
                   <CalendarDays />
                 </span>
-                {!dateIsBusiness ? (
-                  <span className="cd-note warn">
-                    <TriangleAlert /> {cl.weekendWarning}
-                  </span>
-                ) : (
-                  <span className="cd-note">
-                    <Info />
-                    {method === 'pickup'
-                      ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
-                      : cl.dropoffHint}
-                  </span>
-                )}
+                <span className="cd-note">
+                  <Info />
+                  {method === 'pickup'
+                    ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
+                    : cl.dropoffHint}
+                </span>
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -357,7 +350,13 @@ export function CreateLabelFlow({
                 mode="single"
                 selected={selectedDate}
                 defaultMonth={selectedDate}
-                disabled={[{ before: earliestDate }, { after: maxDateObj }]}
+                // Function matcher on the "YYYY-MM-DD" string — unambiguous calendar-date
+                // comparison (no react-day-picker boundary/timezone edge). max (today + 13,
+                // the ~2-week window) is INCLUSIVE; only strictly-later days are disabled.
+                disabled={(day) => {
+                  const s = dateToStr(day)
+                  return s < earliest || s > maxDate
+                }}
                 onSelect={(d) => {
                   if (d) setCollectionDate(dateToStr(d))
                   setDateOpen(false)
@@ -367,6 +366,17 @@ export function CreateLabelFlow({
           </Popover>
         </div>
       </div>
+
+      {/* Weekend picked: full-width warning banner below the row (mirrors EP's dashboard —
+          the date card is too narrow for this copy). Recommends the nearest weekday. */}
+      {!dateIsBusiness && (
+        <div className="alert warning" style={{ marginTop: 10 }} role="note">
+          <TriangleAlert className="lead" />
+          <div className="a-body">
+            {ti(cl.weekendWarning, { date: format(earliestDate, 'EEE, dd MMM') })}
+          </div>
+        </div>
+      )}
 
       <div className="ship-foot">
         <div className="help">
