@@ -17,37 +17,37 @@ import { buildSiteAltKey, siteAltKeyPrefix } from './image-library-keys'
 // ── Search query per category+slot type ─────────────────────────────────────
 
 const GALLERY_QUERIES: Record<string, string> = {
-    fnb:        'cafe coffee latte barista',
+    fnb: 'cafe coffee latte barista',
     restaurant: 'restaurant dining gourmet food',
-    ecommerce:  'fashion retail boutique products',
-    beauty:     'beauty salon skincare spa',
-    fitness:    'gym fitness workout exercise',
-    health:     'healthcare clinic medical wellness',
-    education:  'classroom education learning school',
+    ecommerce: 'fashion retail boutique products',
+    beauty: 'beauty salon skincare spa',
+    fitness: 'gym fitness workout exercise',
+    health: 'healthcare clinic medical wellness',
+    education: 'classroom education learning school',
     realestate: 'luxury home real estate interior',
-    events:     'wedding flowers event venue',
-    travel:     'travel destination hotel resort',
-    creative:   'creative studio art portfolio',
-    tech:       'technology startup modern office',
-    business:   'business corporate professional office',
-    blog:       'creative workspace writing desk',
+    events: 'wedding flowers event venue',
+    travel: 'travel destination hotel resort',
+    creative: 'creative studio art portfolio',
+    tech: 'technology startup modern office',
+    business: 'business corporate professional office',
+    blog: 'creative workspace writing desk',
 }
 
 const HERO_QUERIES: Record<string, string> = {
-    fnb:        'cafe interior coffee shop ambiance',
+    fnb: 'cafe interior coffee shop ambiance',
     restaurant: 'restaurant elegant interior dining',
-    ecommerce:  'fashion store boutique window display',
-    beauty:     'beauty spa interior luxurious',
-    fitness:    'gym interior fitness equipment',
-    health:     'clinic hospital bright modern',
-    education:  'school campus learning environment',
+    ecommerce: 'fashion store boutique window display',
+    beauty: 'beauty spa interior luxurious',
+    fitness: 'gym interior fitness equipment',
+    health: 'clinic hospital bright modern',
+    education: 'school campus learning environment',
     realestate: 'luxury home architecture modern',
-    events:     'wedding venue ballroom elegant',
-    travel:     'resort hotel luxury destination',
-    creative:   'creative studio artist workspace',
-    tech:       'modern tech office open space',
-    business:   'corporate office building professional',
-    blog:       'home office desk creative setup',
+    events: 'wedding venue ballroom elegant',
+    travel: 'resort hotel luxury destination',
+    creative: 'creative studio artist workspace',
+    tech: 'modern tech office open space',
+    business: 'corporate office building professional',
+    blog: 'home office desk creative setup',
 }
 
 // ── Slot definitions ─────────────────────────────────────────────────────────
@@ -60,9 +60,12 @@ interface SlotDef {
     orientation: 'landscape' | 'portrait' | 'squarish'
 }
 
-function buildSlots(category: string): SlotDef[] {
-    const galleryQ = GALLERY_QUERIES[category] ?? GALLERY_QUERIES['business']!
-    const heroQ = HERO_QUERIES[category] ?? HERO_QUERIES['business']!
+function buildSlots(category: string, productTerms?: string | null): SlotDef[] {
+    const baseGalleryQ = GALLERY_QUERIES[category] ?? GALLERY_QUERIES['business']!
+    const baseHeroQ = HERO_QUERIES[category] ?? HERO_QUERIES['business']!
+
+    const galleryQ = productTerms ? `${productTerms} ${baseGalleryQ}`.trim() : baseGalleryQ
+    const heroQ = productTerms ? `${productTerms} ${baseHeroQ}`.trim() : baseHeroQ
     return [
         ...Array.from({ length: 6 }, (_, i) => ({
             slot: `gallery[${i}]`, query: galleryQ, imgixW: 800, imgixH: 800, orientation: 'squarish' as const,
@@ -85,7 +88,7 @@ function buildSlots(category: string): SlotDef[] {
 class Semaphore {
     private queue: Array<() => void> = []
     private active = 0
-    constructor(private readonly max: number) {}
+    constructor(private readonly max: number) { }
 
     async run<T>(fn: () => Promise<T>): Promise<T> {
         if (this.active >= this.max) {
@@ -126,6 +129,7 @@ export async function seedImageLibraryForSite(
     siteId: number | string,
     category: string,
     slotFilter?: (slot: string) => boolean,
+    productTerms?: string | null,
 ): Promise<SeededImageMapping> {
     const start = Date.now()
     const mapping: SeededImageMapping = { hero: [], gallery: [], about: null, team: [], features: [] }
@@ -165,7 +169,7 @@ export async function seedImageLibraryForSite(
             }
         }
 
-        const allSlots = buildSlots(category)
+        const allSlots = buildSlots(category, productTerms)
         const slots = slotFilter ? allSlots.filter(s => slotFilter(s.slot)) : allSlots
         const sem = new Semaphore(CONCURRENCY)
         let uploaded = 0
