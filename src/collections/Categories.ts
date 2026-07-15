@@ -102,7 +102,7 @@ export const Categories: CollectionConfig = {
                     const selfId = operation === 'update' ? originalDoc?.id : undefined
                     const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
 
-                    let candidateId: string | number | null | undefined = data.parent
+                    let candidateId: string | number | null | undefined = unwrapRelationId(data.parent)
                     let depth = 0
                     let hops = 0
                     let checkedParentTenant = false

@@ -180,7 +180,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
 
             // Assert: deletedAt was successfully set despite field-level access rule
             expect(mockUpdate).toHaveBeenCalled()
-            const updateCall = mockUpdate.mock.calls[0][0]
+            const updateCall = mockUpdate.mock.calls[1][0]
             expect(updateCall.data.deletedAt).toBeDefined()
             expect(updateCall.data.deletedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
             // Verify it was an internal write with overrideAccess:true
