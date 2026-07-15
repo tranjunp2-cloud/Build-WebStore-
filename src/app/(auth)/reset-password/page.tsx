@@ -82,7 +82,7 @@ function ResetPasswordForm() {
                     {t.auth.reset.invalidLinkDesc}
                 </p>
                 <div className="mt-8 space-y-4 w-full">
-                    <Button asChild className="h-9 w-full">
+                    <Button asChild className="h-10 w-full">
                         <Link href="/forgot-password" style={{ textDecoration: 'none' }}>
                             {t.auth.reset.requestNewLink}
                         </Link>
@@ -212,7 +212,7 @@ function ResetPasswordForm() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.reset.newPasswordPlaceholder}
-                            className={`h-12 pl-9 pr-9${errors.password ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`h-10 pl-9 pr-9${errors.password ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('password')}
                             autoFocus
                         />
@@ -266,7 +266,7 @@ function ResetPasswordForm() {
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={`h-12 pl-9 pr-9${errors.confirmPassword ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`h-10 pl-9 pr-9${errors.confirmPassword ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('confirmPassword')}
                         />
                         <button
@@ -298,7 +298,7 @@ function ResetPasswordForm() {
                 </div>
 
                 {/* Submit */}
-                <Button type="submit" disabled={isSubmitting} className="mt-5 h-9 w-full">
+                <Button type="submit" disabled={isSubmitting} className="mt-5 h-10 w-full">
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -338,7 +338,7 @@ function LoginFormContent() {
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className={`h-12 pl-9${errors.email ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
+                            className={`h-10 pl-9${errors.email ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('email')}
                         />
                     </div>
@@ -362,7 +362,7 @@ function LoginFormContent() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={`h-12 pl-9 pr-9${errors.password ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
+                            className={`h-10 pl-9 pr-9${errors.password ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('password')}
                         />
                         <button
@@ -395,7 +395,7 @@ function LoginFormContent() {
                 {/* ─── Bottom Actions (Button & Lang) ─── */}
                 <div className="flex flex-col w-full" style={{ gap: 16, marginTop: 40 }}>
                     {/* ─── Sign In Button — shared DS Button (default gradient) ─── */}
-                    <Button type="submit" disabled={isSubmitting} className="h-9 w-full">
+                    <Button type="submit" disabled={isSubmitting} className="h-10 w-full">
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="h-4 w-4 animate-spin" />
