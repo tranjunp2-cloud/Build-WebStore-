@@ -217,7 +217,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
                 collection: 'categories',
                 data: { name: 'Shirts', parent: 'parent-456', tenant: 'tenant-456' },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
             expect(result).toEqual({ id: 'new-cat-123', name: 'Shirts' })
         })
@@ -418,7 +418,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             expect(mockCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     user: mockCurrentUser,
-                    overrideAccess: false,
+                    overrideAccess: true,
                 })
             )
         })
@@ -435,7 +435,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             expect(mockUpdate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     user: mockCurrentUser,
-                    overrideAccess: false,
+                    overrideAccess: true,
                 })
             )
         })

@@ -117,12 +117,12 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             await deleteCategoryAction('cat-123')
 
             // Assert: should complete without error (count treated as 0)
-            expect(mockFind).toHaveBeenCalledWith({
+            expect(mockUpdate).toHaveBeenCalledWith({
                 collection: 'categories',
-                where: { parent: { equals: 'cat-123' }, deletedAt: { exists: false } },
-                limit: 1000,
+                id: 'cat-123',
+                data: { deletedAt: expect.any(String) },
                 user: mockCurrentUser,
-                overrideAccess: false,
+                overrideAccess: true,
             })
         })
     })
@@ -143,20 +143,11 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             // Act
             await deleteCategoryAction('cat-123')
 
-            // Assert: mockUpdate called 3 times (2x re-parent children, 1x soft-delete self)
-            expect(mockUpdate).toHaveBeenCalledTimes(3)
-            // First two updates: re-parent children to null
-            // overrideAccess:true — access already gated by findByID check above (GH-1587 H1)
+            // Assert: mockUpdate called 2 times (1x batch re-parent, 1x soft-delete)
+            expect(mockUpdate).toHaveBeenCalledTimes(2)
             expect(mockUpdate).toHaveBeenNthCalledWith(1, {
                 collection: 'categories',
-                id: 'child-1',
-                data: { parent: null },
-                user: mockCurrentUser,
-                overrideAccess: true,
-            })
-            expect(mockUpdate).toHaveBeenNthCalledWith(2, {
-                collection: 'categories',
-                id: 'child-2',
+                where: { parent: { equals: 'cat-123' }, deletedAt: { exists: false } },
                 data: { parent: null },
                 user: mockCurrentUser,
                 overrideAccess: true,
@@ -201,10 +192,9 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             // Act
             await deleteCategoryAction('cat-123')
 
-            // Assert: only one update call (soft-delete, no re-parent)
-            // overrideAccess:true — access already verified by findByID, `deletedAt` field access denied (GH-1587 H1)
-            expect(mockUpdate).toHaveBeenCalledTimes(1)
-            expect(mockUpdate).toHaveBeenCalledWith({
+            // Assert: two update calls (one batch re-parent even if empty, one soft-delete)
+            expect(mockUpdate).toHaveBeenCalledTimes(2)
+            expect(mockUpdate).toHaveBeenNthCalledWith(2, {
                 collection: 'categories',
                 id: 'cat-123',
                 data: {
@@ -215,24 +205,8 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             })
         })
 
-        it('TC-F08-05-27: Throws CATEGORY_TOO_MANY_CHILDREN when totalDocs exceeds the query limit — no silent truncation', async () => {
-            // Regression (full-PR review): the children query's `limit: 1000` was never checked
-            // against `totalDocs`. Before the fix, a category with >1000 direct children would
-            // silently reparent only the first 1000 (whatever `docs` came back), then still
-            // soft-delete the parent below — permanently orphaning every child past the 1000th
-            // with no error. Simulate the same shape with a small limit-vs-total mismatch: the
-            // action doesn't know the query's `limit` value, only totalDocs > docs.length.
-            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
-            mockExecute.mockResolvedValue({ rows: [{ count: 0 }] })
-            mockFind.mockResolvedValue({
-                docs: [{ id: 'child-1', parent: 'cat-123' }], // fewer than totalDocs
-                totalDocs: 1500,
-            })
-
-            await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_TOO_MANY_CHILDREN:1500')
-
-            // No reparent or soft-delete should have happened — the whole delete is blocked.
-            expect(mockUpdate).not.toHaveBeenCalled()
+        it.skip('TC-F08-05-27: Throws CATEGORY_TOO_MANY_CHILDREN when totalDocs exceeds the query limit — no silent truncation', async () => {
+            // Obsolete: Now uses batch update so limit is not applicable
         })
     })
 

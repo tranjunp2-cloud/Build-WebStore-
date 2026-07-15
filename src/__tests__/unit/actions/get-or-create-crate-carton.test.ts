@@ -294,7 +294,8 @@ describe('getOrCreateCrateCartonIdAction', () => {
     })
 
     it('[TC-F08-04-04] NEXT_PUBLIC_S3_ENDPOINT unset → returns existing id without S3 check', async () => {
-        // Arrange — no env stub, so env is undefined
+        // Arrange — explicitly unset env in case it's populated globally
+        vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', '')
         mockFind.mockResolvedValue({
             docs: [{ id: 5, url: 'https://whatever.internal/x.png' }],
             totalDocs: 1,
@@ -510,7 +511,8 @@ describe('getOrCreateCrateCartonIdAction', () => {
     it('[TC-F08-04-04] S3_ENDPOINT or S3_BUCKET unset → skips S3 check, trusts existing record', async () => {
         // Arrange — S3_BUCKET not set
         vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', S3_ENDPOINT)
-        // S3_BUCKET intentionally not set
+        vi.stubEnv('S3_BUCKET', '') // intentionally unset
+        vi.stubEnv('S3_ENDPOINT', '') // explicitly unset
         mockFind.mockResolvedValue({
             docs: [{ id: 5, url: `${S3_ENDPOINT}/primeweb-media/crate-carton.png` }],
             totalDocs: 1,
