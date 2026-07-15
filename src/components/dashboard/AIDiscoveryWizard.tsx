@@ -79,6 +79,16 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     }
   }, [pathname])
 
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = originalStyle
+      }
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const stepData = WIZARD_STEPS[currentStep]
@@ -107,6 +117,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   // apart from a real dismissal (GH #1609).
   const closeForNow = () => {
     setIsOpen(false)
+    setCurrentStep(0)
     window.dispatchEvent(new CustomEvent('wizard-closed', { detail: { permanent: false } }))
   }
 
