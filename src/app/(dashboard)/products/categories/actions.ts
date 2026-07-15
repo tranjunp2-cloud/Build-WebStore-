@@ -15,29 +15,36 @@ export async function getCategoriesAction() {
     const res = await payload.find({
         collection: 'categories',
         user,
+        overrideAccess: false,
         where: { deletedAt: { exists: false } },
         depth: 1,
         limit: 1000,
     })
 
-    const getDescendantIds = (parentId: string | number, allCats: Array<{ id: string | number; parent?: string | number | { id: string | number } | null }>): (string | number)[] => {
+    const getDescendantIds = (parentId: string | number, allCats: Array<{ id: string | number; parent?: string | number | { id: string | number } | null }>, visited = new Set<string>()): (string | number)[] => {
+        if (visited.has(String(parentId))) return [];
+        visited.add(String(parentId));
         const children = allCats.filter(c => {
             const pId = typeof c.parent === 'object' && c.parent !== null ? c.parent.id : c.parent;
             return pId === parentId;
         });
         const childIds = children.map(c => c.id);
-        const descendantIds = childIds.flatMap(id => getDescendantIds(id, allCats));
+        const descendantIds = childIds.flatMap(id => getDescendantIds(id, allCats, visited));
         return [...childIds, ...descendantIds];
     };
 
     // Solve N+1 & Compute Efficiently: Group by in Database to prevent loading all Product records to RAM
     const { sql } = await import('drizzle-orm')
+    // Payload DB adapter types do not expose the drizzle instance directly
+    const tId = tenantIdForQuery(user)
+    const tenantFilter = tId ? sql`AND c.tenant_id = ${tId}` : sql``
+
     const countResult = await (payload.db as any).drizzle.execute(
         sql`SELECT r.categories_id as category_id, COUNT(DISTINCT r.parent_id)::int as count
             FROM products_rels r
             JOIN products p ON p.id = r.parent_id
             JOIN categories c ON c.id = r.categories_id
-            WHERE r.path = 'category' AND p.deleted_at IS NULL AND c.tenant_id = p.tenant_id
+            WHERE r.path = 'category' AND p.deleted_at IS NULL ${tenantFilter}
             GROUP BY r.categories_id`
     )
 
@@ -77,7 +84,7 @@ const CategoryServerSchema = z.object({
     // payload.create/update as a blank name with no friendly error translated for it.
     name: z.string().trim().min(1, 'Name is required'),
     slug: z.string().optional(),
-    parent: z.union([z.number(), z.string(), z.record(z.unknown())]).nullable().optional(),
+    parent: z.union([z.number(), z.string(), z.object({ id: z.union([z.number(), z.string()]) })]).nullable().optional(),
     depth: z.number().optional(),
     description: z.string().optional(),
 });
@@ -184,7 +191,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
                 id,
                 data,
                 user,
-                overrideAccess: false,
+                overrideAccess: true, // GH-1587: Bypasses field-level access that would strip 'tenant'
             })
             return JSON.parse(JSON.stringify(res));
         } catch (updateErr) {
@@ -196,7 +203,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
                 collection: 'categories',
                 data,
                 user,
-                overrideAccess: false,
+                overrideAccess: true, // GH-1587: Bypasses field-level access that would strip 'tenant'
             })
             return JSON.parse(JSON.stringify(res));
         } catch (createErr) {
@@ -228,6 +235,7 @@ export async function deleteCategoryAction(id: string | number) {
     // direct children are re-parented to top-level below, so descendant products no longer
     // sit under this node once the delete completes). [Decision: direct-only, confirmed 2026-07-10]
     const { sql } = await import('drizzle-orm')
+    // Payload DB adapter types do not expose the drizzle instance directly
     const countResult = await (payload.db as any).drizzle.execute(
         sql`SELECT COUNT(DISTINCT r.parent_id)::int as count
             FROM products_rels r
@@ -246,32 +254,13 @@ export async function deleteCategoryAction(id: string | number) {
     // the accepted "no DB backstop for name dedup" limitation already documented in Phase 04 —
     // low blast radius (no crash, name isn't DB-unique), not fixed here to avoid scope creep
     // beyond GH-1587's stated requirements.
-    const children = await payload.find({
+    await payload.update({
         collection: 'categories',
         where: { parent: { equals: id }, deletedAt: { exists: false } },
-        limit: 1000,
+        data: { parent: null },
         user,
-        overrideAccess: false,
+        overrideAccess: true,
     })
-    // Guard against silent truncation: without this check, a category with more than 1000
-    // direct children would only reparent the first 1000 (query `limit`), then still
-    // soft-delete the parent below — permanently orphaning every child past the 1000th with no
-    // error and no recovery path via this action. Block the whole delete instead.
-    if (children.totalDocs > children.docs.length) {
-        throw new Error(`CATEGORY_TOO_MANY_CHILDREN:${children.totalDocs}`)
-    }
-    for (const child of children.docs) {
-        // overrideAccess:true — access already gated by the findByID check above; skips the
-        // (async, subscription-plan-checking) collection-level access.update re-evaluation per
-        // child since this is an internal system write, not a client-driven one. (GH-1587 H1)
-        await payload.update({
-            collection: 'categories',
-            id: child.id,
-            data: { parent: null },
-            user,
-            overrideAccess: true,
-        })
-    }
 
     // overrideAccess:true — `deletedAt` now carries `access: { update: () => false }` (GH-1587
     // H1), which would silently strip this write under overrideAccess:false. Access to this

@@ -402,6 +402,7 @@ export default function CategoryManager() {
                         <button
                             type="button"
                             onClick={() => toggleExpand(node.id)}
+                            aria-expanded={isExpanded}
                             className={cn(
                                 'w-6 h-6 shrink-0 flex items-center justify-center text-[var(--dash-text-muted)] transition-transform cursor-pointer border-none bg-transparent p-0',
                                 !hasChildren && 'opacity-0 pointer-events-none'
@@ -427,7 +428,7 @@ export default function CategoryManager() {
                                     levelTextColors[node.level as keyof typeof levelTextColors] || levelTextColors[1]
                                 )}
                             >
-                                L{node.level}
+                                L{node.level || '?'}
                             </Badge>
                         </div>
                         <div className="w-[100px] text-[12px] text-[var(--dash-text-muted)] text-left hidden sm:flex items-center">
@@ -600,7 +601,13 @@ export default function CategoryManager() {
             {isFormOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
-                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh]"
+                        role="dialog"
+                        aria-modal="true"
+                        onKeyDown={(e) => { if (e.key === 'Escape') setIsFormOpen(false) }}
+                        // Auto-focus the modal container when it mounts
+                        ref={(el) => { if (el) el.focus() }}
+                        tabIndex={-1}
+                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh] outline-none"
                         style={{ border: '1px solid var(--dash-border)' }}
                     >
                         <div
