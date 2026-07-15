@@ -138,7 +138,11 @@ export async function POST(request: NextRequest) {
                     locale: siteTyped.locale ?? 'en',
                     customerEmail: customer.email, customerName: customer.name, customerPhone: customer.phone || '',
                     // EP shipping fields — only written when a real EP courier is selected (TC-F36.29)
-                    ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
+                    ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
                     ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                     parcelWeight: totalWeightGrams,
                 } as Record<string, unknown>,
@@ -166,7 +170,11 @@ export async function POST(request: NextRequest) {
                 // EP shipping fields — only written when a real EP courier is selected (TC-F36.29).
                 // Without these the order detail derives 'self-delivery' and create-label 422s
                 // on MISSING_SERVICE_ID even though the buyer paid an EP-quoted rate.
-                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
+                ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
                 ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                 parcelWeight: totalWeightGrams,
             } as Record<string, unknown>,

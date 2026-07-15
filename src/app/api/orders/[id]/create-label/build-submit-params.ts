@@ -37,6 +37,8 @@ const DEFAULT_PARCEL_DIM_CM: ParcelDimensionsCm = { width: 10, length: 10, heigh
 interface BuildSubmitParamsInput {
     warehouse: Warehouse
     shippingAddress: ShippingAddress
+    /** ECH order number → EP `reference`; the only thing tying an EP dashboard row back to an order. */
+    orderNumber?: string
     customerName: string
     customerPhone: string
     customerEmail?: string   // buyer email → receiver.email (checkout-required, omitted if absent)
@@ -55,6 +57,7 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
     const {
         warehouse,
         shippingAddress,
+        orderNumber,
         customerName,
         customerPhone,
         customerEmail,
@@ -85,6 +88,9 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
     }
 
     const params: EpSubmitOrderParams = {
+        // Optional per EP spec, but without it an EP dashboard row carries no ECH identifier —
+        // reconciling a shipment back to an order means matching on AWB by eye.
+        ...(orderNumber ? { reference: orderNumber } : {}),
         service_id: shippingServiceId,
         collection_date: collectionDate ?? earliestPickupDate(shippingCourier ?? ''),
         weight: weightKg,

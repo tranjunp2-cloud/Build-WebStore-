@@ -39,6 +39,7 @@ const mockQuotationsSuccess = (rates: Omit<RateOption, 'degraded'>[]) => {
             courier_id: r.courier,
             service_id: r.serviceId,
             courier_name: r.courierName,
+            courier_logo: r.courierLogo,
             service_name: r.serviceName,
             delivery_duration: r.estDelivery,
             is_pickup: r.isPickup,
@@ -116,6 +117,36 @@ describe('getRates', () => {
             const result = await getRates(baseParams, null, flatConfig)
             expect(result.rates[0].isPickup).toBeUndefined()
             expect(result.rates[0].isDropoff).toBeUndefined()
+        })
+    })
+
+    // TC-F36.199: courier_logo IS on the quotation (live probe 2026-07-14: 23/23 couriers), so
+    // checkout captures it here. Buyers have no EP token, and the merchant courier endpoint that
+    // used to serve logos also returns the EP wallet balance — it must never back a public page.
+    describe('[TC-F36.199] carries the courier logo from the quotation', () => {
+        it('maps courier_logo onto RateOption', async () => {
+            mockQuotationsSuccess([
+                { courier: 'pos', serviceId: 'pos-melplus', courierName: 'Pos Malaysia', serviceName: 'Melplus', priceSen: 622, codAvailable: false, estDelivery: '2–3 days', courierLogo: 'https://s3-ap-southeast-1.amazonaws.com/pos.png' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].courierLogo).toBe('https://s3-ap-southeast-1.amazonaws.com/pos.png')
+        })
+
+        it('nulls the logo when EP omits it — never undefined-into-the-DB', async () => {
+            mockQuotationsSuccess([
+                { courier: 'pos', serviceId: 'pos-melplus', courierName: 'Pos Malaysia', serviceName: 'Melplus', priceSen: 622, codAvailable: false, estDelivery: '2–3 days' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].courierLogo).toBeNull()
+        })
+
+        it('leaves the logo absent on flat-rate fallback (not an EP courier)', async () => {
+            const result = await getRates(baseParams, null, flatConfig)
+            expect(result.rates[0].courierLogo).toBeUndefined()
         })
     })
 
