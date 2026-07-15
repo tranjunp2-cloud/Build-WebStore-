@@ -279,7 +279,7 @@ export default function ForgotPasswordPage() {
                             id="email"
                             type="email"
                             placeholder={t.auth.forgot.emailPlaceholder}
-                            className={`pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`h-12 pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('email')}
                         />
                     </div>

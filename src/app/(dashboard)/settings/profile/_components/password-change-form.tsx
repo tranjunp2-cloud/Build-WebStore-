@@ -27,7 +27,7 @@ const formSchema = passwordBaseSchema.extend({
 type FormValues = z.infer<typeof formSchema>
 
 // Icon slots only — size/colors/border/focus from shared <Input> primitive
-const inputCls = 'pl-10 pr-10'
+const inputCls = 'h-12 pl-10 pr-10'
 
 function PasswordRule({ met, label }: { met: boolean; label: string }) {
     return (

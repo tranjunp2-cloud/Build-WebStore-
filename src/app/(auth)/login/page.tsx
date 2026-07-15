@@ -338,7 +338,7 @@ function LoginFormContent() {
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className={`pl-9${errors.email ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
+                            className={`h-12 pl-9${errors.email ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('email')}
                         />
                     </div>
@@ -362,7 +362,7 @@ function LoginFormContent() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={`pl-9 pr-9${errors.password ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
+                            className={`h-12 pl-9 pr-9${errors.password ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('password')}
                         />
                         <button

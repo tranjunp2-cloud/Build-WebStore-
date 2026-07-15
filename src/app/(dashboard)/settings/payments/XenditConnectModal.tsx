@@ -46,13 +46,13 @@ function SecretField({ label, requiredLabel, value, onChange, placeholder, show,
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[13px] font-mono font-medium min-w-0 focus:outline-none placeholder:text-gray-400"
+                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[13px] font-mono font-medium min-w-0 focus:outline-none placeholder:text-gray-400"
                     style={{ color: 'var(--dash-text)' }}
                 />
                 <button
                     type="button"
                     onClick={onToggleShow}
-                    className="px-3 h-[40px] grid place-items-center transition-colors shrink-0"
+                    className="px-3 h-12 grid place-items-center transition-colors shrink-0"
                     style={{ borderLeft: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                 >
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

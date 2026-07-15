@@ -2748,7 +2748,7 @@ function SettingsPanelInner({
                                                 const showPhoneError = phoneEmpty && phoneTouched
                                                 return (
                                                     <>
-                                                        <div className={cn('mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border bg-[var(--editor-bg)] px-[6px] py-[4px]', showPhoneError ? 'border-red-500/50' : 'border-[hsl(var(--primary)/0.04)]')}>
+                                                        <div className={cn('mt-1.5 flex h-10 items-center gap-3 rounded-[10px] border bg-[var(--editor-bg)] px-[6px] py-[4px]', showPhoneError ? 'border-red-500/50' : 'border-[hsl(var(--primary)/0.04)]')}>
                                                             <PhoneCountryPicker
                                                                 value={waCode}
                                                                 onChange={code => {
