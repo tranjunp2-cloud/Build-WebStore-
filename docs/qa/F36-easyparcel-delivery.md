@@ -461,6 +461,56 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 |---|---|---|---|---|---|---|
 | **TC-F36.196** | Func | Med | Gửi mã đơn ECH làm EP `reference` | `buildSubmitParams` với `orderNumber='ORD-MRKAXJO1'`; và không có orderNumber / chuỗi rỗng. | Có → `params.reference = 'ORD-MRKAXJO1'` (EP hiện ở "References/Remarks"). Không có / rỗng → **omit** field (EP coi là optional). | §3.18i |
 
+#### §3.18j — Courier name + ETA trên trang tracking buyer
+
+**Lỗi đang chạy:** `shippingCourier` lưu **mã máy của EP** (`EP-CR0DW`), và trang buyer render nó **thô** → buyer đang đọc một định danh nội bộ của EasyParcel làm tên hãng vận chuyển. Tên đẹp `shippingCourierName` (`"Pos Malaysia Berhad (Melplus)"`) **đã có trong DB** nhưng `page.tsx` không truyền xuống client. Fix: truyền xuống + render, fallback về mã chỉ khi đơn cũ chưa có tên.
+
+**ETA — ĐÃ ẨN KHỎI UI (2026-07-14).** Ô "Estimated Delivery" bị comment lại trong `OrderTrackingClient`, KHÔNG hiển thị. Lý do đến từ probe live quotation của EP (tenant thật, 23 courier, 2026-07-14):
+
+| Sự thật đo được | Hệ quả |
+|---|---|
+| **18/23 courier trả `delivery_duration = null`** — gồm cả Pos Malaysia (Melplus), courier của đơn đang test | Tính năng ETA sẽ **trống ở đa số đơn** |
+| 5 courier có giá trị thì trả **JSON**: `{"type":"days","value":"3"}` | KHÔNG phải chuỗi văn xuôi như docs EP ngụ ý. Render thẳng → buyer đọc được nguyên JSON |
+| EP **không publish ngày giao ở bất kỳ endpoint nào** (quotation, submit, tracking, cả 5 webhook topic) | Muốn ra ngày phải **tự tính**, tự chịu trách nhiệm |
+| Duration đếm từ **pickup**, không phải từ lúc đặt hàng | Trước khi mua label còn chưa biết ngày pickup |
+
+Kết luận: không có con số trung thực nào để đặt vào ô đó → **thà không hiển thị còn hơn hiển thị một ngày do ta bịa mà buyer sẽ bắt đền**. Cột `orders.shipping_est_delivery` (thêm rồi lại gỡ trong cùng nhánh) đã bị xoá — nó được thiết kế trên giả định sai rằng EP trả chuỗi kiểu `"1-2 working days"`; chuỗi đó **không tồn tại**.
+
+> **Nợ kỹ thuật đã biết (ngoài scope nhánh này):** `ConfirmClient.tsx:340` đang hiện *"Est. Delivery"* bằng cách cộng **3–5 ngày làm việc kể từ hôm nay** — không liên quan EP, không liên quan ngày pickup. Đây là số **hoàn toàn bịa**, đang chạy production. Cần quyết riêng.
+>
+> `get-rates.ts:110` cũng đang gán `estDelivery = delivery_duration ?? '3–5 business days'` → với 5 courier có duration, giá trị này là **JSON thô**; với phần còn lại là **hằng số ta tự đặt**. Hiện chưa ai render `estDelivery` nên chưa lộ ra ngoài, nhưng đây là mìn.
+
+| ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
+|---|---|---|---|---|---|---|
+| **TC-F36.197** | Func | High | Buyer thấy tên courier, không thấy mã EP | Render trang buyer với `shippingCourier='EP-CR0DW'` + `shippingCourierName='Pos Malaysia Berhad (Melplus)'`; và ca chỉ có mã (đơn cũ). | Hiện **tên đẹp**, chuỗi `EP-CR0DW` **không xuất hiện**. Chỉ có mã → fallback hiện mã (còn hơn để trống). | §3.18j |
+
+#### §3.18k — Gộp "Shipping Information" + "Shipment Tracking" thành một card
+
+Hai card tách rời, mà với shipment EP thì **AWB và tracking number là cùng một chuỗi** → buyer đọc `RMC002322989MY` **hai lần**, còn courier / ETA / lịch sử thì rải rác qua cả hai card. Gộp về một card theo design: courier tile (logo + tên) → tracking no. → mini map. (Ô ETA bị ẩn — xem §3.18j.)
+
+**Lịch sử courier về Activity Timeline (2026-07-14):** sự kiện courier là **log**, không phải thông tin shipment — trước đây trang có **hai timeline** (order journey + courier history) và buyer phải đọc cả hai. Nay merge vào Activity Timeline theo thứ tự thời gian: lifecycle → courier events → order cancel/refund. Note *"Updates every 30–60 min"* đi theo xuống chân card đó. Quy tắc highlight rút về **một dòng duy nhất**: entry cuối = `latest` (entries dựng theo thứ tự thời gian) — tái lập đúng hành vi cũ của từng nhánh mà không phải giữ đồng bộ 2 bộ luật.
+
+| ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
+|---|---|---|---|---|---|---|
+| **TC-F36.198** | UI | Med | Một card shipping, không lặp mã tracking | Render trang buyer với `awbNo` = `trackingNumber` = `'RMC002322989MY'`, có `shippingCourierName` + history. | (a) Chuỗi `RMC002322989MY` xuất hiện **đúng 1 lần**. (b) Có heading **"Shipping Information"**, KHÔNG còn heading "Shipment Tracking". (c) Courier name + lịch sử courier **vẫn còn** — chúng vốn nằm ở card bị xoá, gộp mà rơi mất là hỏng. | §3.18k |
+| **TC-F36.199** | UI | Med | Logo courier thật trên tile của buyer | (a) Render với `shippingCourierLogo='…/pos.png'`; và ca `null` (đơn cũ / EP không trả logo). (b) `getRates` map `courier_logo` từ quotation; ca EP omit; ca flat fallback. | (a) Có `<img>` trỏ đúng URL, `alt` = tên courier. Không có logo → **không emit `<img>` gãy**, fallback icon, tên courier vẫn hiện. (b) `courierLogo` = URL; EP omit → `null` (không phải `undefined`); flat → absent. | §3.18k |
+
+#### §3.18l — Re-ship sau khi EP cancel: timeline bị hụt sự kiện
+
+**Lỗi:** cancel + tạo label lại → **không entry nào được ghi cho shipment mới** cho tới khi courier thật sự lấy hàng. `create-label` seed `shippingTrackingStatus='pending_pickup'`, mà webhook đầu tiên của shipment mới là **code 2 (To Be Collected) → cũng map ra `pending_pickup`** → rơi trúng guard idempotency của `applyTrackingUpdate` (`if (order.shippingTrackingStatus === mapped.internal) return 'unchanged'`) → append gì cả. Buyer thấy card có **AWB mới** nhưng dòng mới nhất trong timeline vẫn là *"Shipment Cancelled"* — mâu thuẫn.
+
+**Fix:** `create-label` tự append `shipmentCreatedEntry(awbNo)` vào `shippingTrackingHistory`. AWB nằm trong description vì entry **không mang shipment id** — một đơn ship 2 lần thì đó là thứ duy nhất phân biệt sự kiện của kiện cũ với kiện mới. History được **re-read ngay trước khi ghi** (cùng lý do F8 review #1434: `order` load trước 2 vòng gọi EP, webhook đến muộn có thể đã append vào giữa).
+
+Không có gì xoá `shippingTrackingHistory` — cả nhánh cancel (`apply-tracking-update.ts`, `[...currentHistory, newEntry]`) lẫn create-label đều **append**, nên lịch sử tích luỹ qua các lần ship.
+
+| ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
+|---|---|---|---|---|---|---|
+| **TC-F36.200** | Func | High | Timeline ghi nhận shipment mới sau re-ship | (a) `shipmentCreatedEntry('RMC002322989MY')`; và ca AWB `null` (courier cấp AWB bất đồng bộ). (b) Append vào history của shipment đã cancel. (c) Assert `mapShipmentStatusCode(2).internal` = status mà create-label seed. | (a) `status='pending_pickup'`, description **chứa AWB**; AWB null → `'Shipment created'`. (b) 3 entry, 2 entry cũ **còn nguyên**, entry mới **đứng cuối** (= `latest` trên UI). (c) Trùng `pending_pickup` — **đây chính là lý do** entry phải tồn tại; nếu EP đổi map code 2 thì test đỏ để review lại thay vì lặng lẽ nhân đôi event thật. | §3.18l |
+
+**Logo courier (2026-07-14):** trang buyer không có EP token, và route logo của merchant (`/api/tenant/[id]/easyparcel-couriers`) **trả kèm số dư ví EP** → tuyệt đối không được làm nguồn cho một trang công khai. Nên logo phải **persist trên order**: cột `orders.shipping_courier_logo`.
+
+Bắt logo **tại checkout, từ chính quotation** — probe live 2026-07-14 xác nhận `courier_logo` có ở **23/23 courier** trong response quotation (type `EpQuotationItem` trước đó **bỏ sót field này**, khiến ta tưởng phải gọi `GET /courier/list`). Không tốn thêm request nào, và không nhét thêm dependency EP vào đường tạo label đã trừ tiền ví. Áp dụng cho cả `checkout` lẫn `xendit-checkout`. EP không trả logo → lưu `null` → UI fallback icon (đơn cũ cũng vậy).
+
 #### §3.18h — Trang tracking của buyer khi EP huỷ shipment
 
 Khi EP huỷ (code 0), `applyTrackingUpdate` reopen đơn (`status → confirmed`) và **NULL toàn bộ field EP**, gồm `awbNo`. Card "Shipment Tracking" của buyer khoá theo `awbNo`, nên buyer rơi vào dòng chung *"being prepared"* và **mất sạch lịch sử courier** đã thấy trước đó — như thể đơn chưa từng được gửi đi.

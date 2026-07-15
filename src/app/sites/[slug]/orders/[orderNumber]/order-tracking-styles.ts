@@ -126,6 +126,11 @@ export const OT_CSS = `
 /* Shipping card */
 .ot-ship-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(220px,240px);gap:16px;align-items:stretch;}
 .ot-ship-info{display:flex;flex-direction:column;gap:10px;}
+.ot-courier-tile{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--inp);border:1px solid var(--bd);border-radius:12px;}
+.ot-courier-icon{display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;border-radius:9px;background:var(--tl5);color:var(--tl7);}
+.ot-courier-icon svg{width:18px;height:18px;}
+.ot-courier-logo{width:34px;height:34px;flex-shrink:0;border-radius:9px;object-fit:contain;background:#fff;border:1px solid var(--bd2);}
+.ot-courier-name{font-size:14px;font-weight:700;color:var(--f1);min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .ot-tracking-row{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--bd);border-radius:12px;}
 .ot-tr-label{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
 .ot-tr-label svg{width:12px;height:12px;color:var(--f4);}
