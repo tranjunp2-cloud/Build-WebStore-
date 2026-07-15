@@ -450,6 +450,16 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             await expect(saveCategoryAction({})).rejects.toThrow()
         })
 
+        it('TC-F08-05-28: Rejects a whitespace-only name (full-PR review)', async () => {
+            // Regression: `z.string().min(1)` validates the RAW string length — "   " has
+            // length 3, so it passed validation before the fix and only became an empty string
+            // after `data.name.trim()` ran, reaching payload.create/update as a blank name with
+            // no friendly error mapped for it. `.trim()` now runs inside the schema itself,
+            // before `.min(1)`, so this is rejected at the Zod layer.
+            await expect(saveCategoryAction({ name: '   ' })).rejects.toThrow()
+            expect(mockCreate).not.toHaveBeenCalled()
+        })
+
         it('TC-F08-05-05: Allows optional slug and parent fields', async () => {
             // Arrange
             mockExecute.mockResolvedValue({ rows: [] })

@@ -72,7 +72,10 @@ import { z } from 'zod';
 // user-editable fields here is sufficient; no `.strict()` needed (that would throw instead of
 // stripping, which risks breaking a legitimate caller that sends a harmless extra field).
 const CategoryServerSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
+    // .trim() before .min() — otherwise a whitespace-only name (length >= 1 untrimmed) passes
+    // validation here and only becomes empty after the `data.name.trim()` call below, reaching
+    // payload.create/update as a blank name with no friendly error translated for it.
+    name: z.string().trim().min(1, 'Name is required'),
     slug: z.string().optional(),
     parent: z.union([z.number(), z.string(), z.record(z.unknown())]).nullable().optional(),
     depth: z.number().optional(),
@@ -250,6 +253,13 @@ export async function deleteCategoryAction(id: string | number) {
         user,
         overrideAccess: false,
     })
+    // Guard against silent truncation: without this check, a category with more than 1000
+    // direct children would only reparent the first 1000 (query `limit`), then still
+    // soft-delete the parent below — permanently orphaning every child past the 1000th with no
+    // error and no recovery path via this action. Block the whole delete instead.
+    if (children.totalDocs > children.docs.length) {
+        throw new Error(`CATEGORY_TOO_MANY_CHILDREN:${children.totalDocs}`)
+    }
     for (const child of children.docs) {
         // overrideAccess:true — access already gated by the findByID check above; skips the
         // (async, subscription-plan-checking) collection-level access.update re-evaluation per

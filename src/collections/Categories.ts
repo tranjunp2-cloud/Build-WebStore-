@@ -3,6 +3,16 @@ import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 
+// Unwraps a Payload relationship value (populated object, raw id, or unset) to its id.
+// `typeof x === 'object'` alone is unsafe — `typeof null === 'object'` is `true` in JS, so a
+// relationship Payload resolves as `null` (e.g. pointing at a deleted/orphaned doc) would throw
+// on `.id` instead of falling through to `null`/`undefined`. Every relationship unwrap in this
+// file goes through this helper so that failure mode can't slip back in via a new call site.
+function unwrapRelationId(value: string | number | { id: string | number } | null | undefined): string | number | null | undefined {
+    if (value == null) return value
+    return typeof value === 'object' ? value.id : value
+}
+
 export const Categories: CollectionConfig = {
     slug: 'categories',
     admin: {
@@ -14,7 +24,7 @@ export const Categories: CollectionConfig = {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                unwrapRelationId(t.tenant)
             ) ?? []
             const tenantId = tenantIds[0]
             if (!tenantId) return false
@@ -31,16 +41,24 @@ export const Categories: CollectionConfig = {
             }
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                unwrapRelationId(t.tenant)
             ) ?? []
             if (tenantIds.length === 0) return false
-            return { tenant: { in: tenantIds } }
+            // Excludes soft-deleted categories, matching the anonymous branch above — without
+            // this, a soft-deleted category was still resolvable (findByID for the ancestor
+            // walk, or the native admin panel's relationship picker) by any tenant user, letting
+            // a new category get nested under an invisible parent and silently vanish from the
+            // dashboard tree (getCategoriesAction filters deletedAt, so the child matches no
+            // node there). Super-admin stays unrestricted (`true` above) — may legitimately need
+            // to see soft-deleted docs for management/undelete tooling.
+            const query: Where = { and: [{ tenant: { in: tenantIds } }, { deletedAt: { exists: false } }] }
+            return query
         },
         update: async ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                unwrapRelationId(t.tenant)
             ) ?? []
             if (tenantIds.length === 0) return false
             const tenantId = tenantIds[0]
@@ -55,7 +73,7 @@ export const Categories: CollectionConfig = {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                unwrapRelationId(t.tenant)
             ) ?? []
             if (tenantIds.length === 0) return false
             const tenantId = tenantIds[0]
@@ -95,11 +113,22 @@ export const Categories: CollectionConfig = {
                             throw new Error('CATEGORY_CYCLE_ERROR');
                         }
                         depth++;
+                        // disableErrors:true — Payload's findByID THROWS (Forbidden/NotFound) by
+                        // default when access.read's Where-filter excludes the target doc, not
+                        // just when access.read returns a hard `false` (verified empirically
+                        // against a real Payload instance). Without this, a cross-tenant parent
+                        // (parent's filterOptions doesn't scope by tenant, so a tenant user CAN
+                        // pick one via the admin panel) or a soft-deleted parent (access.read now
+                        // excludes deletedAt for tenant users) makes this throw a raw
+                        // Forbidden/NotFound instead of resolving `undefined` — which would abort
+                        // the write with an untranslated error instead of the intended
+                        // CATEGORY_PARENT_TENANT_MISMATCH below.
                         const candidateDoc = await req.payload.findByID({
                             collection: 'categories',
                             id: candidateId,
                             user: req.user,
                             overrideAccess: false,
+                            disableErrors: true,
                         });
 
                         // Cross-tenant guard: only check the immediate parent (first hop, before
@@ -107,10 +136,18 @@ export const Categories: CollectionConfig = {
                         // system/Local-API writes with no req.user exempt (GH-1587 M7 — see below).
                         if (!checkedParentTenant) {
                             checkedParentTenant = true
+                            // Soft-deleted parent is invalid for EVERYONE, not just tenant users.
+                            // access.read's deletedAt exclusion only blocks this implicitly for
+                            // tenant users (their read is filtered, so candidateDoc resolves
+                            // undefined and the tenant-mismatch check below catches it) — but
+                            // super-admin and system/Local-API writes have unrestricted read
+                            // access, so candidateDoc WOULD still resolve a soft-deleted doc for
+                            // them without this explicit check.
+                            if (candidateDoc?.deletedAt) {
+                                throw new Error('CATEGORY_PARENT_SOFT_DELETED');
+                            }
                             if (!isSuperAdmin && req.user) {
-                                const parentTenantId = candidateDoc?.tenant
-                                    ? (typeof candidateDoc.tenant === 'object' ? candidateDoc.tenant.id : candidateDoc.tenant)
-                                    : null
+                                const parentTenantId = unwrapRelationId(candidateDoc?.tenant) ?? null
                                 // Owner tenant MUST come from an authoritative source, never from
                                 // client-supplied `data.tenant` (GH-1587 C1: a forged `data.tenant`
                                 // in the create payload would otherwise let the check "validate"
@@ -119,12 +156,10 @@ export const Categories: CollectionConfig = {
                                 // trusts. On update, use the already-persisted originalDoc.tenant.
                                 let ownerTenantId: string | number | null | undefined
                                 if (operation === 'update') {
-                                    ownerTenantId = originalDoc?.tenant
-                                        ? (typeof originalDoc.tenant === 'object' ? (originalDoc.tenant as { id: string | number }).id : originalDoc.tenant)
-                                        : undefined
+                                    ownerTenantId = unwrapRelationId(originalDoc?.tenant as string | number | { id: string | number } | null | undefined)
                                 } else {
                                     const tenantIds = req.user?.tenants?.map((t: { tenant: string | { id: string } }) =>
-                                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                                        unwrapRelationId(t.tenant)
                                     ) ?? []
                                     ownerTenantId = tenantIds[0]
                                 }
@@ -140,9 +175,7 @@ export const Categories: CollectionConfig = {
                             // identity to check against — skip, don't throw. (GH-1587 M7)
                         }
 
-                        candidateId = candidateDoc?.parent
-                            ? (typeof candidateDoc.parent === 'object' ? candidateDoc.parent.id : candidateDoc.parent as string)
-                            : null;
+                        candidateId = unwrapRelationId(candidateDoc?.parent) ?? null;
                     }
                     // If the parent is already level 3, the child would be level 4, which is not allowed.
                     if (depth >= 3) {
@@ -167,9 +200,7 @@ export const Categories: CollectionConfig = {
                         id: data.site,
                         overrideAccess: true,
                     });
-                    const siteTenantId = siteDoc?.tenant
-                        ? (typeof siteDoc.tenant === 'object' ? (siteDoc.tenant as { id: string | number }).id : siteDoc.tenant)
-                        : null;
+                    const siteTenantId = unwrapRelationId(siteDoc?.tenant) ?? null;
                     if (siteTenantId == null || String(siteTenantId) !== String(data.tenant)) {
                         throw new Error('CATEGORY_SITE_TENANT_MISMATCH');
                     }
@@ -182,9 +213,7 @@ export const Categories: CollectionConfig = {
                 // Auto-inject tenant & site
                 if (operation === 'create' && req.user) {
                     if (!data.tenant && req.user.tenants?.length > 0) {
-                        data.tenant = typeof req.user.tenants[0].tenant === 'object'
-                            ? req.user.tenants[0].tenant?.id
-                            : req.user.tenants[0].tenant
+                        data.tenant = unwrapRelationId(req.user.tenants[0].tenant)
                     }
                     if (!data.site && data.tenant && req.payload) {
                         const siteRes = await req.payload.find({
@@ -209,12 +238,26 @@ export const Categories: CollectionConfig = {
                 // the breadcrumb with "undefined" when `data.name` isn't part of this write.
                 const name = data.name ?? originalDoc?.name;
                 let breadcrumbs = name;
-                if (data.parent) {
+                // Use the EFFECTIVE parent, not just `data.parent`: a partial update that omits
+                // `parent` entirely (e.g. the DNA route's `payload.update({ data: { dna: ... } })`,
+                // which never sets `parent`) must preserve the existing ancestor chain, not treat
+                // the write as a top-level re-parent. `data.parent === null` (an explicit
+                // re-parent-to-top-level payload) is still respected as "no parent" — only an
+                // ABSENT key falls back to `originalDoc.parent`.
+                const rawParent = data.parent !== undefined ? data.parent : originalDoc?.parent;
+                const effectiveParentId = unwrapRelationId(rawParent);
+                if (effectiveParentId) {
+                    // disableErrors:true — same rationale as the ancestor-walk lookup above:
+                    // without it, an inaccessible parent (cross-tenant, or now soft-deleted) makes
+                    // this throw instead of resolving `undefined`, which would abort even a
+                    // partial write that has nothing to do with `parent` (e.g. a DNA-only PATCH)
+                    // purely because the persisted ancestor reference isn't currently readable.
                     const parentDoc = await req.payload.findByID({
                         collection: 'categories',
-                        id: data.parent,
+                        id: effectiveParentId,
                         user: req.user,
                         overrideAccess: false,
+                        disableErrors: true,
                     });
                     if (parentDoc?.breadcrumbs) {
                         breadcrumbs = `${parentDoc.breadcrumbs} > ${name}`;
@@ -264,9 +307,9 @@ export const Categories: CollectionConfig = {
             // even see cross-tenant sites to pick from (UX layer; the beforeValidate hook above
             // is the enforced guard). Mirrors the `parent` field's filterOptions pattern below.
             filterOptions: ({ data }) => {
-                const tenant = (data as { tenant?: string | { id: string } } | undefined)?.tenant
-                if (tenant) {
-                    return { tenant: { equals: typeof tenant === 'object' ? tenant.id : tenant } }
+                const tenantId = unwrapRelationId((data as { tenant?: string | { id: string } } | undefined)?.tenant)
+                if (tenantId) {
+                    return { tenant: { equals: tenantId } }
                 }
                 return true
             },
@@ -291,11 +334,19 @@ export const Categories: CollectionConfig = {
             name: 'parent',
             type: 'relationship',
             relationTo: 'categories',
+            // Excludes soft-deleted categories from the picker for everyone (including
+            // super-admin, unlike `access.read` above) — nesting under an invisible parent is
+            // always structurally wrong, not an access-control question. Enforcement for tenant
+            // users comes from `access.read`'s deletedAt filter cascading into the beforeValidate
+            // ancestor-walk (a soft-deleted parent resolves to null there, tripping the existing
+            // cross-tenant mismatch throw); this filterOptions is the UX-layer guard, matching
+            // the `site` field's filterOptions pattern above.
             filterOptions: ({ id }) => {
+                const conditions: Where[] = [{ deletedAt: { exists: false } }]
                 if (id) {
-                    return { id: { not_equals: id } }
+                    conditions.push({ id: { not_equals: id } })
                 }
-                return true
+                return conditions.length > 1 ? { and: conditions } : conditions[0]
             },
             admin: { description: 'Danh mục cha (Tối đa 3 level)' },
         },

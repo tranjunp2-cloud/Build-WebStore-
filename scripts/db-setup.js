@@ -4949,46 +4949,6 @@ const MIGRATIONS = [
     name: 'enum_analytics_event.add_local_business_data_saved',
     sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
   },
-  // ── F08 issue #14: category slug uniqueness global → per-tenant ──
-  // Dedupe existing rows before creating unique index (keep newest, soft-delete older duplicates).
-  // Verified live index name via `psql \d categories`: the field's `unique:true` produced a single
-  // UNIQUE btree index named `categories_slug_idx` (not a separate plain lookup index as originally
-  // assumed) — dropping it removes the only index on slug until Phase 04 removes `unique:true` from
-  // the Payload field (keeps `index:true`), which lets pushDevSchema recreate a plain `categories_slug_idx`.
-  {
-    name: 'categories.dedupe_tenant_slug',
-    sql: `UPDATE categories SET deleted_at = NOW()
-      WHERE deleted_at IS NULL
-        AND slug IS NOT NULL
-        AND id NOT IN (
-          SELECT DISTINCT ON (tenant_id, slug) id
-          FROM categories WHERE deleted_at IS NULL AND slug IS NOT NULL
-          ORDER BY tenant_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
-        );`,
-  },
-  {
-    name: 'categories.drop_global_slug_unique',
-    // GH-1587 cleanup: only DROP when a UNIQUE index of that name still exists — avoids
-    // re-running a no-op DROP (log churn) on every deploy once already dropped, and avoids
-    // ever touching a plain non-unique index that happens to share the name.
-    sql: `DO $$
-          BEGIN
-            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_idx' AND indexdef LIKE 'CREATE UNIQUE%') THEN
-              EXECUTE 'DROP INDEX categories_slug_idx';
-            END IF;
-            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_unique' AND indexdef LIKE 'CREATE UNIQUE%') THEN
-              EXECUTE 'DROP INDEX categories_slug_unique';
-            END IF;
-            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_key' AND indexdef LIKE 'CREATE UNIQUE%') THEN
-              EXECUTE 'DROP INDEX categories_slug_key';
-            END IF;
-          END $$;`,
-  },
-  {
-    name: 'categories.tenant_slug_unique',
-    sql: `CREATE UNIQUE INDEX IF NOT EXISTS categories_tenant_slug_uniq
-          ON categories (tenant_id, slug) WHERE deleted_at IS NULL;`,
-  },
   // ── F08 issue #1587: drop unused Category Image field (YAGNI, stored but never rendered) ──
   {
     name: 'categories.drop_image_id',
@@ -5006,6 +4966,69 @@ async function runMigrations(pool) {
       // Log but don't fail — column might already exist with different type etc.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
+  }
+}
+
+/**
+ * F08 issue #14 / GH-1587: category slug uniqueness global → per-tenant. Dedupe existing
+ * rows (keep newest, soft-delete older duplicates), drop the old global unique index, then
+ * create the new per-tenant composite unique index — as ONE transaction, not three separate
+ * warn-and-continue MIGRATIONS entries. These three steps are causally linked: if the new
+ * index creation fails (e.g. the dedupe didn't fully resolve every (tenant_id, slug)
+ * collision), the old dedupe + index-drop must NOT stay committed on their own — that would
+ * leave the database strictly worse than before the deploy (categories silently soft-deleted
+ * AND zero slug-uniqueness enforcement), with `verifyCriticalIndexes()` only failing the
+ * *build* afterward, not undoing the already-committed damage. Wrapping in BEGIN/COMMIT with
+ * a ROLLBACK on any failure keeps the DB at its pre-migration state so the (unchanged)
+ * verify-guard below still catches the missing index and fails the build loudly, exactly as
+ * before, but now without any partial, worse-than-before side effect left behind.
+ *
+ * Verified live index name via `psql \d categories`: the field's `unique:true` produced a
+ * single UNIQUE btree index named `categories_slug_idx` (not a separate plain lookup index as
+ * originally assumed) — dropping it removes the only index on slug until Phase 04 removes
+ * `unique:true` from the Payload field (keeps `index:true`), which lets pushDevSchema recreate
+ * a plain `categories_slug_idx`.
+ */
+async function runCategorySlugTenantMigration(pool) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const dedupeRes = await client.query(`UPDATE categories SET deleted_at = NOW()
+      WHERE deleted_at IS NULL
+        AND slug IS NOT NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (tenant_id, slug) id
+          FROM categories WHERE deleted_at IS NULL AND slug IS NOT NULL
+          ORDER BY tenant_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
+        )
+      RETURNING id;`);
+    if (dedupeRes.rowCount > 0) {
+      console.log(`[db-setup] categories.dedupe_tenant_slug soft-deleted ${dedupeRes.rowCount} duplicate row(s): ids=${dedupeRes.rows.map((r) => r.id).join(',')}`);
+    }
+    // Only DROP when a UNIQUE index of that name still exists — avoids re-running a no-op
+    // DROP (log churn) on every deploy once already dropped, and avoids ever touching a plain
+    // non-unique index that happens to share the name.
+    await client.query(`DO $$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_idx' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_idx';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_unique' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_unique';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'categories_slug_key' AND indexdef LIKE 'CREATE UNIQUE%') THEN
+              EXECUTE 'DROP INDEX categories_slug_key';
+            END IF;
+          END $$;`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS categories_tenant_slug_uniq
+          ON categories (tenant_id, slug) WHERE deleted_at IS NULL;`);
+    await client.query('COMMIT');
+    console.log('[db-setup] ✅ categories.tenant_slug_migration (transactional)');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.warn(`[db-setup] ⚠️ categories.tenant_slug_migration (rolled back): ${e.message}`);
+  } finally {
+    client.release();
   }
 }
 
@@ -5174,6 +5197,7 @@ async function checkDB() {
     // Run direct SQL migrations (idempotent — always safe)
     if (tableCount > 0) {
       await runMigrations(pool);
+      await runCategorySlugTenantMigration(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
     }
@@ -5384,6 +5408,7 @@ async function main() {
 
       if (tableCount > 0) {
         await runMigrations(pool);
+        await runCategorySlugTenantMigration(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);

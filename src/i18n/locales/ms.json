@@ -2041,6 +2041,7 @@
                     "subCategoryWarning": "Kategori ini mempunyai kategori anak. Ia akan dipindahkan ke tahap teratas (tidak dipadamkan secara kekal).",
                     "productsWarning": "Produk dalam kategori ini tidak akan dipadamkan, tetapi akan kehilangan tag kategori ini.",
                     "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
+                    "tooManyChildrenError": "Tidak dapat memadamkan kategori ini. Ia mempunyai {count} subkategori, lebih daripada yang boleh dipindahkan dengan selamat sekaligus. Sila pindahkan sebahagian subkategori terlebih dahulu.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."
@@ -2054,7 +2055,8 @@
                     "deleteError": "Gagal memadamkan kategori",
                     "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap",
                     "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri.",
-                    "parentTenantMismatch": "Tidak boleh memindahkan kategori ke hierarki penyewa lain"
+                    "parentTenantMismatch": "Tidak boleh memindahkan kategori ke hierarki penyewa lain",
+                    "parentSoftDeleted": "Tidak boleh menyarangkan di bawah kategori yang dipadamkan"
                 }
             },
             "subtitle": "Urus produk kedai"

@@ -64,12 +64,19 @@ const generateSlug = (text: string) => {
         .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
 }
 
-// Helper to calculate depth of a category before saving
-const getCategoryDepth = (parentId: string | number | null, flatList: Category[]): number => {
+// Helper to calculate depth of a category before saving. Capped at 5 hops — same safety
+// margin as isDescendant below — so a cyclic ancestor chain (pre-existing data corruption,
+// not otherwise reachable via the backend guard) can't spin this loop forever and freeze the
+// tab; the backend beforeValidate hook remains the source of truth for actual enforcement.
+// Exported for direct unit testing (pure function, no component render needed).
+export const getCategoryDepth = (parentId: string | number | null, flatList: Category[]): number => {
     if (!parentId) return 1
     let depth = 1
     let currentParent = flatList.find(c => c.id === parentId)
+    let hops = 0
     while (currentParent) {
+        hops++
+        if (hops > 5) break
         depth++
         const nextParentId = typeof currentParent.parent === 'object' && currentParent.parent !== null
             ? currentParent.parent.id
@@ -80,11 +87,24 @@ const getCategoryDepth = (parentId: string | number | null, flatList: Category[]
     return depth
 }
 
+// Search results must show each match's REAL level, not a hardcoded 1 — the badge display and
+// the L3-add-lock (isLevel3) both derive from `level`, so a hardcoded 1 mislabeled real L2/L3
+// matches and incorrectly re-enabled the "+ Add Subcategory" button for an actual L3 category
+// (which then always failed the depth check on save — a guaranteed dead-end interaction).
+// Exported for direct unit testing (pure function, no component render needed).
+export const annotateSearchMatchLevel = (category: Category, flatList: Category[]): Category => {
+    const parentId = typeof category.parent === 'object' && category.parent !== null
+        ? category.parent.id
+        : (category.parent ?? null)
+    const level = getCategoryDepth(parentId, flatList)
+    return { ...category, level, children: [] }
+}
+
 // Client-side mirror of the backend cycle guard (Categories.ts beforeValidate): walks UP the
 // ancestor chain from candidateId; true if selfId is reached (covers both "parent = self" and
 // "parent = descendant of self", since a descendant's ancestor chain passes through self).
 // UX-only guard — backend hook is the source of truth. Capped at 5 hops, same safety margin.
-const isDescendant = (candidateId: string | number | null, selfId: string | number | null | undefined, flatList: Category[]): boolean => {
+export const isDescendant = (candidateId: string | number | null, selfId: string | number | null | undefined, flatList: Category[]): boolean => {
     if (candidateId == null || selfId == null) return false
     let currentId: string | number | null = candidateId
     let hops = 0
@@ -213,8 +233,7 @@ export default function CategoryManager() {
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase()
             const matched = categories.filter(c => c.name.toLowerCase().includes(query))
-            // Minimal filtering: just return matched as flat list or pseudo-tree
-            return matched.map(m => ({...m, level: 1, children: []}))
+            return matched.map(m => annotateSearchMatchLevel(m, categories))
         }
 
         return buildTree(categories, null, 1)
@@ -319,6 +338,8 @@ export default function CategoryManager() {
                 toast.error(t.dashboard.products.categories.toast.maxDepthError)
             } else if (message === 'CATEGORY_PARENT_TENANT_MISMATCH') {
                 toast.error(t.dashboard.products.categories.toast.parentTenantMismatch)
+            } else if (message === 'CATEGORY_PARENT_SOFT_DELETED') {
+                toast.error(t.dashboard.products.categories.toast.parentSoftDeleted)
             } else {
                 toast.error(message || t.dashboard.products.categories.toast.saveError)
             }
@@ -343,6 +364,10 @@ export default function CategoryManager() {
                 const count = message.split(':')[1]
                 toast.error(t.dashboard.products.categories.deleteModal.hasProductsError.replace('{count}', count))
                 // Keep modal open so the user can reassign products before retrying.
+            } else if (message.startsWith('CATEGORY_TOO_MANY_CHILDREN:')) {
+                const count = message.split(':')[1]
+                toast.error(t.dashboard.products.categories.deleteModal.tooManyChildrenError.replace('{count}', count))
+                // Keep modal open — same rationale as CATEGORY_HAS_PRODUCTS above.
             } else {
                 toast.error(t.dashboard.products.categories.toast.deleteError)
                 setIsDeleteOpen(false)

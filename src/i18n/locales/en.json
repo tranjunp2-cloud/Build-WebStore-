@@ -2041,6 +2041,7 @@
                     "subCategoryWarning": "This category has child categories. They will be moved to the top level (not permanently deleted).",
                     "productsWarning": "Products in this category will not be deleted, but will lose this category tag.",
                     "hasProductsError": "Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.",
+                    "tooManyChildrenError": "Cannot delete this category. It has {count} subcategories, more than can be safely moved at once. Please move some subcategories out first.",
                     "cancel": "Cancel",
                     "confirm": "Delete",
                     "deleting": "Deleting..."
@@ -2054,7 +2055,8 @@
                     "deleteError": "Failed to delete category",
                     "maxDepthError": "Cannot nest deeper than 3 levels",
                     "cycleError": "Cannot set a category as a child of its own subcategory.",
-                    "parentTenantMismatch": "Cannot move category to a different tenant's hierarchy"
+                    "parentTenantMismatch": "Cannot move category to a different tenant's hierarchy",
+                    "parentSoftDeleted": "Cannot nest under a deleted category"
                 }
             },
             "subtitle": "Manage store products"

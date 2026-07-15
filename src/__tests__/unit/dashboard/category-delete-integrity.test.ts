@@ -214,6 +214,26 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
                 overrideAccess: true,
             })
         })
+
+        it('TC-F08-05-27: Throws CATEGORY_TOO_MANY_CHILDREN when totalDocs exceeds the query limit — no silent truncation', async () => {
+            // Regression (full-PR review): the children query's `limit: 1000` was never checked
+            // against `totalDocs`. Before the fix, a category with >1000 direct children would
+            // silently reparent only the first 1000 (whatever `docs` came back), then still
+            // soft-delete the parent below — permanently orphaning every child past the 1000th
+            // with no error. Simulate the same shape with a small limit-vs-total mismatch: the
+            // action doesn't know the query's `limit` value, only totalDocs > docs.length.
+            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+            mockExecute.mockResolvedValue({ rows: [{ count: 0 }] })
+            mockFind.mockResolvedValue({
+                docs: [{ id: 'child-1', parent: 'cat-123' }], // fewer than totalDocs
+                totalDocs: 1500,
+            })
+
+            await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_TOO_MANY_CHILDREN:1500')
+
+            // No reparent or soft-delete should have happened — the whole delete is blocked.
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
     })
 
     describe('Return Value', () => {

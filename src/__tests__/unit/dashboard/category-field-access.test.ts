@@ -632,4 +632,268 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             ).resolves.not.toThrow()
         })
     })
+
+    describe('TC-F08-05-19/20: Breadcrumb Effective-Parent Fix (full-PR review — partial update)', () => {
+        it('TC-F08-05-19: Partial update omitting `parent` (e.g. DNA-only PATCH) preserves the existing breadcrumb prefix', async () => {
+            // Regression: the DNA route (`dna/route.ts`) calls payload.update with only
+            // `{ data: { dna: ... } }` — no `parent` key at all. Before the fix, the breadcrumb
+            // hook gated on `if (data.parent)`, so an ABSENT key (not just an explicit null) fell
+            // through to `data.breadcrumbs = name` — silently stripping the ancestor prefix from
+            // every DNA edit on a nested category. The fix uses the effective parent
+            // (data.parent !== undefined ? data.parent : originalDoc?.parent) instead.
+            const { Categories } = await import('@/collections/Categories')
+            const beforeChangeHook = Categories.hooks?.beforeChange?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-456',
+                        breadcrumbs: 'Parent Category',
+                    }),
+                },
+            }
+
+            const result = await beforeChangeHook({
+                data: { dna: { signatureBlocks: ['hero'] } }, // `parent` intentionally omitted
+                operation: 'update',
+                originalDoc: {
+                    id: 'cat-123',
+                    name: 'Child Category',
+                    parent: 'parent-456',
+                    breadcrumbs: 'Parent Category > Child Category',
+                },
+                req,
+            } as any)
+
+            expect(result.breadcrumbs).toBe('Parent Category > Child Category')
+            expect(req.payload.findByID).toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'categories', id: 'parent-456' })
+            )
+        })
+
+        it('TC-F08-05-20: Explicit `parent: null` (real re-parent-to-top-level) still produces a bare-name breadcrumb', async () => {
+            // Regression guard: the fix must not treat an explicit `{ parent: null }` re-parent
+            // payload the same as an omitted key — null still means "no parent."
+            const { Categories } = await import('@/collections/Categories')
+            const beforeChangeHook = Categories.hooks?.beforeChange?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: { findByID: vi.fn() },
+            }
+
+            const result = await beforeChangeHook({
+                data: { parent: null },
+                operation: 'update',
+                originalDoc: {
+                    id: 'cat-123',
+                    name: 'Child Category',
+                    parent: 'parent-456',
+                    breadcrumbs: 'Parent Category > Child Category',
+                },
+                req,
+            } as any)
+
+            expect(result.breadcrumbs).toBe('Child Category')
+            expect(req.payload.findByID).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('TC-F08-05-21/22: Soft-Deleted Categories Excluded From Parent Selection (full-PR review)', () => {
+        it('TC-F08-05-21: Tenant user read access excludes soft-deleted categories', async () => {
+            // Regression: without this, a soft-deleted category was still resolvable by any
+            // tenant user (ancestor-walk findByID, or the native admin panel's relationship
+            // picker), letting a new category get nested under an invisible parent and silently
+            // vanish from the dashboard tree.
+            const { Categories } = await import('@/collections/Categories')
+            const readAccess = Categories.access?.read as any
+
+            const result = readAccess({ req: { user: { tenants: [{ tenant: 'tenant-456' }], roles: [] } } })
+
+            expect(result).toEqual({
+                and: [{ tenant: { in: ['tenant-456'] } }, { deletedAt: { exists: false } }],
+            })
+        })
+
+        it('TC-F08-05-21: Super-admin read access stays unrestricted (still `true`)', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const readAccess = Categories.access?.read as any
+
+            const result = readAccess({ req: { user: { roles: ['super-admin'] } } })
+
+            expect(result).toBe(true)
+        })
+
+        it('TC-F08-05-22: `parent` field filterOptions excludes soft-deleted categories', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const parentField = Categories.fields?.find((f: any) => f.name === 'parent') as any
+
+            const resultNoId = parentField.filterOptions({ id: undefined })
+            expect(resultNoId).toEqual({ deletedAt: { exists: false } })
+
+            const resultWithId = parentField.filterOptions({ id: 'cat-123' })
+            expect(resultWithId).toEqual({
+                and: [{ deletedAt: { exists: false } }, { id: { not_equals: 'cat-123' } }],
+            })
+        })
+    })
+
+    describe('TC-F08-05-23: Null-Safe Relationship Unwrap (full-PR review)', () => {
+        it('TC-F08-05-23: A relationship that resolves to null does not throw — cross-tenant guard still fires safely', async () => {
+            // Regression: `typeof x === 'object'` is `true` for `null` in JS. Before the fix,
+            // `candidateDoc.tenant === null` (e.g. Payload resolving a broken/orphaned relation)
+            // would throw `TypeError: Cannot read properties of null` on `.id` instead of falling
+            // through to the fail-closed CATEGORY_PARENT_TENANT_MISMATCH throw.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-456',
+                        parent: null,
+                        tenant: null, // relationship resolved to null, not an id or populated object
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { name: 'Child', parent: 'parent-456', tenant: 'tenant-456' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
+        })
+    })
+
+    describe('TC-F08-05-29/30: disableErrors on parent/breadcrumb lookups (full-PR review)', () => {
+        it('TC-F08-05-29: Ancestor-walk findByID is called with disableErrors:true', async () => {
+            // Regression: Payload's findByID THROWS (Forbidden/NotFound) by default when
+            // access.read's Where-filter excludes the target doc — verified empirically against
+            // a real Payload instance, not just assumed. Without disableErrors:true, a
+            // cross-tenant or soft-deleted parent would throw a raw error instead of resolving
+            // undefined, aborting the write before CATEGORY_PARENT_TENANT_MISMATCH could fire.
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({ id: 'parent-456', parent: null, tenant: 'tenant-456' }),
+                },
+            }
+
+            await hook({
+                data: { name: 'Child', parent: 'parent-456', tenant: 'tenant-456' },
+                operation: 'create',
+                req,
+            } as any)
+
+            expect(req.payload.findByID).toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'categories', id: 'parent-456', disableErrors: true })
+            )
+        })
+
+        it('TC-F08-05-29: Breadcrumb findByID is called with disableErrors:true', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const beforeChangeHook = Categories.hooks?.beforeChange?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({ id: 'parent-456', breadcrumbs: 'Parent' }),
+                },
+            }
+
+            await beforeChangeHook({
+                data: { name: 'Child', parent: 'parent-456' },
+                operation: 'update',
+                originalDoc: { id: 'cat-123', name: 'Child' },
+                req,
+            } as any)
+
+            expect(req.payload.findByID).toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'categories', id: 'parent-456', disableErrors: true })
+            )
+        })
+
+        it('TC-F08-05-29: Inaccessible parent (findByID resolves undefined via disableErrors) throws CATEGORY_PARENT_TENANT_MISMATCH for a tenant user, not a raw error', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    // Simulates disableErrors:true resolving undefined for an inaccessible parent
+                    findByID: vi.fn().mockResolvedValueOnce(undefined),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { name: 'Child', parent: 'parent-999', tenant: 'tenant-456' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
+        })
+
+        it('TC-F08-05-30: Nesting under a soft-deleted parent throws CATEGORY_PARENT_SOFT_DELETED — even for super-admin', async () => {
+            // Regression: access.read's deletedAt exclusion only blocks this implicitly for
+            // tenant users (their read is filtered, findByID resolves undefined). Super-admin's
+            // read access is unrestricted (`true`), so candidateDoc WOULD still resolve a
+            // soft-deleted doc without this explicit check — contradicting the stated invariant
+            // that nesting under a deleted parent is "structurally wrong for everyone."
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { roles: ['super-admin'] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-456',
+                        parent: null,
+                        tenant: 'tenant-456',
+                        deletedAt: '2026-01-01T00:00:00.000Z',
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { name: 'Child', parent: 'parent-456', tenant: 'tenant-456' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).rejects.toThrow('CATEGORY_PARENT_SOFT_DELETED')
+        })
+
+        it('TC-F08-05-30: Nesting under a non-deleted parent does not throw CATEGORY_PARENT_SOFT_DELETED', async () => {
+            const { Categories } = await import('@/collections/Categories')
+            const hook = Categories.hooks?.beforeValidate?.[0] as any
+
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-456' }], roles: [] },
+                payload: {
+                    findByID: vi.fn().mockResolvedValueOnce({
+                        id: 'parent-456',
+                        parent: null,
+                        tenant: 'tenant-456',
+                        // no deletedAt
+                    }),
+                },
+            }
+
+            await expect(
+                hook({
+                    data: { name: 'Child', parent: 'parent-456', tenant: 'tenant-456' },
+                    operation: 'create',
+                    req,
+                } as any)
+            ).resolves.not.toThrow()
+        })
+    })
 })
