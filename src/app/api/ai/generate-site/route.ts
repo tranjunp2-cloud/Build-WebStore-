@@ -1296,7 +1296,14 @@ export async function POST(req: NextRequest) {
         let productsCreatedCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         try {
-            const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
+            // GH-1190 profiling: this await is the untracked critical-path tail
+            // — sample-product gen (Pixabay image search ×N products) kicked at
+            // AI-start but often outlasts the ai+media+db window, so the remaining
+            // wait here was mislabeled "SSE overhead". Track it: it scales with
+            // product count (VN 20-product sites are the slowest), pinpointing
+            // the real long pole for the staging benchmark.
+            const { products: sampleProducts, stats: imgStats } =
+                await trackPhase('products', () => sampleProductsPromise)
             productImageStats = imgStats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
@@ -1464,10 +1471,14 @@ export async function POST(req: NextRequest) {
         // (grace 0 disables inline-persist entirely, always falling to after()).
         const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 15_000
         let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
-        const preparedBlogs = await Promise.race([
+        // GH-1190 profiling: the grace race blocks `done` for up to
+        // BLOG_PREP_GRACE_MS when blog prep (gated on sample-products Pixabay)
+        // is still running — a second untracked tail. Track it so the DONE log
+        // separates it from the products wait above.
+        const preparedBlogs = await trackPhase('blog_grace', () => Promise.race([
             blogPrepPromise,
             new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
-        ])
+        ]))
         if (blogGraceTimer) clearTimeout(blogGraceTimer)
         if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
             const blogsCreated = await persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id)
@@ -1539,12 +1550,20 @@ export async function POST(req: NextRequest) {
             // Plan 260415 F01-gen-audit — single summary line per gen so ops can
             // scan Vercel logs for phase breakdown without correlating manually.
             // Use compact key=value so grep/jq can pull it out easily.
+            // GH-1190: `products` + `blog_grace` were previously folded into
+            // `other` (the "SSE overhead ~30s" in the F01 re-profile). Surface
+            // them and subtract from `other` so the residual is true glue time.
             const phaseOther = Math.max(
                 0,
-                timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
+                timeMs
+                    - (phaseTimings.ai ?? 0)
+                    - (phaseTimings.media ?? 0)
+                    - (phaseTimings.db ?? 0)
+                    - (phaseTimings.products ?? 0)
+                    - (phaseTimings.blog_grace ?? 0),
             )
             console.info(
-                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
+                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms products=${phaseTimings.products ?? 0}ms blog_grace=${phaseTimings.blog_grace ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
             )
 
             return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
