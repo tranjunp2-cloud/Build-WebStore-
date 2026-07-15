@@ -4805,10 +4805,6 @@
     "profile": {
         "title": "Profil Saya",
         "accountSettings": "Tetapan Akaun",
-        "tabs": {
-            "general": "Maklumat Umum",
-            "security": "Keselamatan"
-        },
         "teamTabs": {
             "profile": "Profil Akaun",
             "staff": "Kakitangan",
@@ -4872,11 +4868,7 @@
             "ownerForbidden": "Akaun pemilik mesti mengemas kini profil melalui SSO",
             "uploadFailed": "Muat naik avatar gagal",
             "saveFailed": "Gagal menyimpan profil",
-            "networkError": "Ralat rangkaian. Sila cuba lagi.",
-            "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Tinggalkan tab ini?"
-        },
-        "saveBar": {
-            "unsavedChanges": "Perubahan belum disimpan"
+            "networkError": "Ralat rangkaian. Sila cuba lagi."
         }
     }
 }

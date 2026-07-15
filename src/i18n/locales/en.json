@@ -4805,10 +4805,6 @@
     "profile": {
         "title": "My Profile",
         "accountSettings": "Account Settings",
-        "tabs": {
-            "general": "General Info",
-            "security": "Security"
-        },
         "teamTabs": {
             "profile": "Account Profile",
             "staff": "Staff",
@@ -4872,11 +4868,7 @@
             "ownerForbidden": "Owner accounts must update profile via SSO",
             "uploadFailed": "Avatar upload failed",
             "saveFailed": "Failed to save profile",
-            "networkError": "Network error. Please try again.",
-            "unsavedChanges": "You have unsaved changes. Leave this tab?"
-        },
-        "saveBar": {
-            "unsavedChanges": "Unsaved changes"
+            "networkError": "Network error. Please try again."
         }
     }
 }

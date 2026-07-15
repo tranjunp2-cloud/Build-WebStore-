@@ -45,8 +45,13 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
             })
 
             if (!res.ok) {
-                const body = await res.json().catch(() => ({})) as { error?: string }
-                toast.error(body.error ?? t.profile.errors.saveFailed)
+                const body = await res.json().catch(() => ({})) as { error?: string | { message?: string } }
+                const errMsg = typeof body.error === 'string'
+                    ? body.error
+                    : typeof body.error === 'object' && body.error?.message
+                        ? body.error.message
+                        : t.profile.errors.saveFailed
+                toast.error(errMsg)
                 return
             }
 
