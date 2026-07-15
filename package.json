@@ -18,7 +18,7 @@
     "db:seed-sso": "tsx --require ./scripts/seed-preload.cjs scripts/seed-sso-account.ts",
     "db:reset": "tsx --require ./scripts/seed-preload.cjs scripts/reset-account.ts",
     "db:seed-qc": "tsx --require ./scripts/seed-preload.cjs scripts/seed-qc-data.ts",
-    "db:seed-qc-scaled": "QC_MERCHANT_COUNT=300 tsx --require ./scripts/seed-preload.cjs scripts/seed-qc-data.ts",
+    "db:seed-qc-scaled": "QC_MERCHANT_COUNT=300 QC_SEED_CONCURRENCY=8 tsx --require ./scripts/seed-preload.cjs scripts/seed-qc-data.ts",
     "db:reset-qc": "tsx --require ./scripts/seed-preload.cjs scripts/reset-qc-data.ts",
     "qc:seed-scaled": "bash scripts/qc-remote.sh db:seed-qc-scaled",
     "qc:seed": "bash scripts/qc-remote.sh db:seed-qc",

@@ -1,6 +1,6 @@
 ---
 owner: QC lead
-last_updated: 2026-07-06
+last_updated: 2026-07-15
 ---
 
 # QC Test Environment Runbook
@@ -168,6 +168,61 @@ QC-scoped tests. Keep this table in sync when adding new QC-only test files.
 - `.jmx-config/qc-test.properties.example` — JMeter template
 - `.github/workflows/ci.yml` — `Deploy: Vercel (qc-test)` job
 - `.github/branch-protection.md` — branch push rules
+
+## 300 VU load test handover (2026-07-15)
+
+Snapshot handover cho QA lead sau khi scale seed hoàn tất. Cập nhật khi
+cấu hình thay đổi (rotate password, thêm tenants, đổi domain).
+
+### Environment
+
+| Item | Value |
+|------|-------|
+| Domain | `https://ech-prime-web-v2-qc.vercel.app` |
+| Firewall bypass | IP `115.79.143.204` (System Bypass rule, scope QC domain) |
+| Rate limit bypass | `QC_RATELIMIT_BYPASS_ENABLED=true` — single-IP không bị throttle |
+| Password login endpoint | `POST /api/users/login` — Payload local strategy |
+| OTP login endpoint | `POST /api/users/send-otp` → `POST /api/users/verify-otp` |
+
+### Credentials (lấy từ Vercel Env, không paste chat)
+
+- `QC_SEED_PASSWORD` — dùng cho login mọi user seed
+- `QC_OTP_BYPASS_CODE` — code cố định cho OTP flow, chỉ nhận email `@primeweb.local`
+
+Reveal: Vercel Dashboard → Project → Settings → Environment Variables → scope `Preview qc-test`.
+
+### Data ranges
+
+| Range | Content level | Test scope |
+|-------|--------------|------------|
+| `qc-shop-1..10` | Full CMS: payment COD + shipping enabled + 3 customers + 5 orders (mix status) + 2 discount codes | Functional CMS end-to-end: checkout, order fulfillment, discount redeem |
+| `qc-shop-11..300` | Site + home + 2 extra pages + ~8 products | Storefront render, CRUD API load, list/detail paths |
+
+Owners: `qc-owner-1@primeweb.local` → `qc-owner-300@primeweb.local`.
+Admins: `qc-admin-1..2@primeweb.local`. Staff: `qc-staff-1..3@primeweb.local`.
+
+### Suggested test plan
+
+1. Functional CMS (Ary, manual):
+   - Login `qc-owner-1..10` → verify admin có full data setup
+   - Flow: storefront checkout COD → admin approve → mark shipped → completed
+   - Test discount code `QC{N}PCT10` (10% off), `QC{N}FIX50` (RM 50 off) với N = 1..10
+
+2. 300 VU load (JMeter):
+   - Round-robin login `qc-owner-1..300` với `QC_SEED_PASSWORD`
+   - Mix workload: 40% list / 30% detail read / 20% create / 10% update
+   - 5 min soak per run, xuất report capacity
+
+3. Bug report format:
+   - Screenshot response header (`x-vercel-id`, `x-vercel-mitigated`, status)
+   - Repro steps + expected vs actual
+   - Gửi dev channel — Vercel runtime logs realtime available
+
+### Reseed / rotate
+
+- `npm run qc:seed-scaled` — idempotent, resume nếu dừng giữa chừng
+- `npm run qc:reset` + `qc:seed-scaled` — full wipe + reseed (dùng khi rotate `QC_SEED_PASSWORD`)
+- `npm run qc:seed-functional` — refresh 10 tenants đầu (functional data)
 
 ## Related
 
