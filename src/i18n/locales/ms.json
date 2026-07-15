@@ -4818,11 +4818,11 @@
         "banner": {
             "roleOwner": "Pemilik",
             "roleStaff": "Kakitangan",
-            "uploadAvatar": "Klik untuk muat naik avatar",
-            "status": "Status",
-            "activeNow": "Aktif Sekarang"
+            "uploadAvatar": "Klik untuk muat naik avatar"
         },
         "general": {
+            "title": "Maklumat Peribadi",
+            "subtitle": "Nama dan butiran hubungan anda.",
             "firstName": "Nama Pertama",
             "lastName": "Nama Akhir",
             "email": "Alamat E-mel",
@@ -4834,6 +4834,8 @@
             "cancel": "Batal"
         },
         "security": {
+            "title": "Kata Laluan & Keselamatan",
+            "summary": "Kekalkan keselamatan akaun anda dengan kata laluan yang kukuh.",
             "currentPassword": "Kata Laluan Semasa",
             "newPassword": "Kata Laluan Baharu",
             "confirmPassword": "Sahkan Kata Laluan Baharu",
@@ -4847,15 +4849,13 @@
             "ruleNumber": "Satu nombor"
         },
         "sso": {
-            "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
-            "manageButton": "Urus Akaun dalam SSO",
             "urlMissing": "URL portal SSO tidak dikonfigurasi. Hubungi pentadbir.",
-            "generalTitle": " Maklumat diuruskan oleh SSO",
-            "generalNotice": "Medan maklumat peribadi disegerakkan daripada sistem SSO. Anda tidak boleh mengeditnya di sini.",
-            "generalLink": "Untuk membuat perubahan, sila lawati portal SSO",
-            "securityTitle": "Akaun Dilindungi SSO",
-            "securityNotice": "Kata laluan dan tetapan keselamatan anda diuruskan oleh sistem Single Sign-On (SSO). Untuk menukar kata laluan, mendayakan pengesahan dua faktor (2FA), atau mengemas kini sebarang tetapan keselamatan, sila lawati portal pengurusan SSO.",
-            "securityLink": "Urus Akaun SSO"
+            "widgetTitle": "Akaun Dilindungi SSO",
+            "widgetDescription": "Medan profil peribadi, kata laluan, dan konfigurasi keselamatan anda diuruskan secara berpusat oleh sistem Single Sign-On. Perubahan yang dibuat di sana akan disegerakkan di sini secara automatik.",
+            "goToPortal": "Pergi ke Portal SSO"
+        },
+        "owner": {
+            "passwordLabel": "Kata Laluan"
         },
         "errors": {
             "invalidPhone": "Sila masukkan nombor telefon yang sah",
