@@ -127,7 +127,7 @@ export const Categories: CollectionConfig = {
                             collection: 'categories',
                             id: candidateId,
                             user: req.user,
-                            overrideAccess: false,
+                            overrideAccess: true,
                             disableErrors: true,
                         });
 

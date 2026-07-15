@@ -5004,6 +5004,14 @@ async function runCategorySlugTenantMigration(pool) {
       RETURNING id;`);
     if (dedupeRes.rowCount > 0) {
       console.log(`[db-setup] categories.dedupe_tenant_slug soft-deleted ${dedupeRes.rowCount} duplicate row(s): ids=${dedupeRes.rows.map((r) => r.id).join(',')}`);
+      const deletedIds = dedupeRes.rows.map((r) => r.id);
+      const rescueRes = await client.query(
+        `UPDATE categories SET parent_id = NULL WHERE parent_id = ANY($1::int[]) AND deleted_at IS NULL RETURNING id;`,
+        [deletedIds]
+      );
+      if (rescueRes.rowCount > 0) {
+        console.log(`[db-setup] categories.dedupe_tenant_slug rescued ${rescueRes.rowCount} child category(s) by re-parenting to top-level.`);
+      }
     }
     // Only DROP when a UNIQUE index of that name still exists — avoids re-running a no-op
     // DROP (log churn) on every deploy once already dropped, and avoids ever touching a plain
