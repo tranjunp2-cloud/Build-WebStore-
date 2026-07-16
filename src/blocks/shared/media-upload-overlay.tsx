@@ -207,6 +207,16 @@ export function MediaUploadOverlay({
         if (!videoField) return
         try {
             const uploaded = await uploadVideo(file, { alt: 'video' })
+            // Attach the ACK listener before changing the editor state so a fast
+            // save response cannot be missed. Do not show an uploaded video until
+            // its block value has been persisted by the parent editor.
+            const ack = waitForFieldChangeResult(callback.blockIndex, videoField)
+            callback.onFieldChange(videoField, uploaded.url)
+            const result = await ack
+            if (!result.ok) {
+                parentToast.error(result.error ?? 'Failed to save video — please try again')
+                return
+            }
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: swap src in-place — no React re-render, no flicker.
@@ -216,7 +226,6 @@ export function MediaUploadOverlay({
                 // First upload: no <video> yet — let the block render it from state.
                 onVideoUploaded?.(uploaded.url)
             }
-            callback.onFieldChange(videoField, uploaded.url)
             parentToast.success('Video updated')
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Video upload failed')

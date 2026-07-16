@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { HeadObjectCommand } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getCurrentUser } from '@/lib/auth'
 import { checkUploadSize } from '@/lib/media/upload-limits'
 import { buildS3Client } from '@/lib/media/s3-client'
@@ -15,6 +15,17 @@ import { registerUploadedMedia } from '@/lib/media/register-media'
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
 
 export const maxDuration = 60
+
+async function deleteUnregisteredObject(
+    s3: NonNullable<ReturnType<typeof buildS3Client>>,
+    key: string,
+): Promise<void> {
+    try {
+        await s3.client.send(new DeleteObjectCommand({ Bucket: s3.bucket, Key: key }))
+    } catch (err) {
+        console.error('[/api/media/register] Failed to remove unregistered upload:', err)
+    }
+}
 
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
@@ -52,10 +63,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!VIDEO_MIMES.has(mimeType)) {
+        await deleteUnregisteredObject(s3, key)
         return NextResponse.json({ error: 'Only MP4 and WebM videos are supported' }, { status: 415 })
     }
     const sizeError = checkUploadSize(mimeType, size)
-    if (sizeError) return NextResponse.json({ error: sizeError }, { status: 413 })
+    if (sizeError) {
+        await deleteUnregisteredObject(s3, key)
+        return NextResponse.json({ error: sizeError }, { status: 413 })
+    }
 
     try {
         const payload = await getPayload({ config: configPromise })
@@ -64,6 +79,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error('[/api/media/register] Failed to register media:', msg)
+        await deleteUnregisteredObject(s3, key)
         return NextResponse.json({ error: 'Could not register upload' }, { status: 500 })
     }
 }
