@@ -4815,10 +4815,6 @@
     "profile": {
         "title": "My Profile",
         "accountSettings": "Account Settings",
-        "tabs": {
-            "general": "General Info",
-            "security": "Security"
-        },
         "teamTabs": {
             "profile": "Account Profile",
             "staff": "Staff",
@@ -4828,11 +4824,11 @@
         "banner": {
             "roleOwner": "Owner",
             "roleStaff": "Staff",
-            "uploadAvatar": "Click to upload avatar",
-            "status": "Status",
-            "activeNow": "Active Now"
+            "uploadAvatar": "Click to upload avatar"
         },
         "general": {
+            "title": "Personal Information",
+            "subtitle": "Your name and contact details.",
             "firstName": "First Name",
             "lastName": "Last Name",
             "email": "Email Address",
@@ -4844,6 +4840,8 @@
             "cancel": "Cancel"
         },
         "security": {
+            "title": "Password & Security",
+            "summary": "Keep your account secure with a strong password.",
             "currentPassword": "Current Password",
             "newPassword": "New Password",
             "confirmPassword": "Confirm New Password",
@@ -4857,15 +4855,13 @@
             "ruleNumber": "One number"
         },
         "sso": {
-            "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
-            "manageButton": "Manage Account in SSO",
             "urlMissing": "SSO portal URL is not configured. Contact admin.",
-            "generalTitle": " Information managed by SSO",
-            "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
-            "generalLink": "To make changes, please visit the SSO portal",
-            "securityTitle": " SSO Protected Account",
-            "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
-            "securityLink": "Manage SSO Account"
+            "widgetTitle": "SSO Protected Account",
+            "widgetDescription": "Your personal profile fields, password, and security configurations are managed centrally by the Single Sign-On system. Changes made there will sync here automatically.",
+            "goToPortal": "Go to SSO Portal"
+        },
+        "owner": {
+            "passwordLabel": "Password"
         },
         "errors": {
             "invalidPhone": "Please enter a valid phone number",
@@ -4882,11 +4878,7 @@
             "ownerForbidden": "Owner accounts must update profile via SSO",
             "uploadFailed": "Avatar upload failed",
             "saveFailed": "Failed to save profile",
-            "networkError": "Network error. Please try again.",
-            "unsavedChanges": "You have unsaved changes. Leave this tab?"
-        },
-        "saveBar": {
-            "unsavedChanges": "Unsaved changes"
+            "networkError": "Network error. Please try again."
         }
     }
 }
