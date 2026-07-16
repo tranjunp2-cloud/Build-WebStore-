@@ -23,7 +23,7 @@ import {
     searchPhotos,
     downloadPhotoBuffer,
     detectQueryLang,
-    photoMatchesQuery,
+    photoMatchesTerms,
     PIXABAY_CATEGORY_BY_COMPOSER,
     PIXABAY_ORIENTATION_BY_BLOCK,
     PixabayError,
@@ -462,16 +462,25 @@ export async function getMediaForBlock(
     // GH-1185: domain filter — keeps loose/fallback matches on-topic (see
     // PixabaySearchOptions.category). Unmapped composer categories → no filter.
     const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[composerCategory]
-    // GH-1185: Vietnamese queries get the same relevance gate as the pool
-    // path — Pixabay AND-matching is loose ("phở bò" hits a moose photo
-    // tagged "bò đực"), so every query word must appear in the photo tags.
+    // GH-1185: queries get the same relevance gate as the pool path — Pixabay
+    // AND-matching is loose ("phở bò" hits a moose photo tagged "bò đực").
+    // GH-1611: gate EVERY language (the gate used to run for Vietnamese only,
+    // while the default pipeline searches in English) and gate on the keyword
+    // TERMS rather than the joined query, so a multi-product query does not
+    // demand one photo satisfy every product at once.
     const isVN = detectQueryLang(query) === 'vi'
-    const gateVN = (photos: PixabayPhoto[], q: string): PixabayPhoto[] => {
-        if (!isVN) return photos
-        const kept = photos.filter((p) => photoMatchesQuery(p.alt, q))
+    // Gate ONLY on the user's product terms (the raw-keyword path). On the
+    // scaffolding path `keywords` is category base + block modifier + mood
+    // adjectives — gating on those would both admit off-industry photos (a
+    // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
+    // on-industry ones, leaving non-hero blocks with no image at all.
+    const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
+        if (terms.length === 0) return photos
+        const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {
             console.info(
-                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${q}"`,
+                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${terms.join(' | ')}"`,
             )
         }
         return kept
@@ -512,13 +521,13 @@ export async function getMediaForBlock(
     }
     try {
         // Request 2x count to have random pool, then pickRandomN
-        const photos = gateVN(
+        const photos = gateTerms(
             await searchPhotos(query, Math.max(count * 2, 10), {
                 orientation,
                 width: targetWidth,
                 category: pixCategory,
             }),
-            query,
+            subjectTerms,
         )
         if (photos.length === 0) {
             // Broaden: try first keyword only. Skip when the query was already
@@ -526,13 +535,16 @@ export async function getMediaForBlock(
             // call (raw 1-term keywords are common after GH-1185).
             if (keywords[0] && keywords[0].trim() !== query) {
                 const broadQuery = keywords[0].trim()
-                const broader = gateVN(
+                const broader = gateTerms(
                     await searchPhotos(broadQuery, Math.max(count * 2, 10), {
                         orientation,
                         width: targetWidth,
                         category: pixCategory,
                     }),
-                    broadQuery,
+                    // Broadening keeps the product subject only on the raw path;
+                    // on the scaffolding path broadQuery is a category keyword and
+                    // must not be used as a gate term (see subjectTerms).
+                    subjectTerms.length > 0 ? [broadQuery] : [],
                 )
                 if (broader.length === 0) {
                     // `await` is load-bearing: categoryFallback can throw

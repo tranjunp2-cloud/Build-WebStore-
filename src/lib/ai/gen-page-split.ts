@@ -17,7 +17,7 @@ import type OpenAI from 'openai'
 import { getNavLabels, type NavLabels } from './block-i18n'
 import { selectModel } from './config'
 import { buildNavigation } from './template-composer'
-import { resolveComposerCategory } from './composer-category-resolver'
+import { normalizeComposerCategory } from './composer-category-resolver'
 import type { BusinessSample } from './content/types'
 import { composeTemplateResult } from './fallback-adapter'
 import type { BusinessInfoInput } from './system-prompt'
@@ -218,7 +218,9 @@ export function applyDeterministicChrome(
     const nav = buildNavigation(
         { name: businessInfo.businessName } as BusinessSample,
         slugs,
-        resolveComposerCategory(businessInfo.industry ?? ''),
+        // GH-1611: industry arrives as a resolved composer key from the builder
+        // form — normalize (idempotent); re-resolving turns 'fnb' into 'business'.
+        normalizeComposerCategory(businessInfo.industry),
         undefined,
         blockLang,
     )
