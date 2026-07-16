@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import sharp from 'sharp'
 import { s3Storage } from '@payloadcms/storage-s3'
+import { s3PublicUrl } from './lib/media/s3-public-url'
 
 import { Tenants } from './collections/Tenants'
 import { Users } from './collections/Users'
@@ -189,13 +190,8 @@ export default buildConfig({
               media: {
                 disableLocalStorage: true,
                 disablePayloadAccessControl: true,
-                generateFileURL: ({ filename, prefix }: { filename: string; prefix?: string }) => {
-                  const s3Endpoint = process.env.S3_ENDPOINT || ''
-                  const publicEndpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || s3Endpoint
-                  const bucket = process.env.S3_BUCKET || ''
-                  
-                  return `${publicEndpoint}/${bucket}/${prefix ? `${prefix}/` : ''}${filename}`
-                }
+                generateFileURL: ({ filename, prefix }: { filename: string; prefix?: string }) =>
+                  s3PublicUrl(filename, prefix)
               },
             },
             bucket: process.env.S3_BUCKET as string,

@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
+import { useDirectUpload } from '@/hooks/use-direct-upload'
 
 const parentToast = {
     success: (msg: string) => window.parent.postMessage({ type: 'SHOW_TOAST', variant: 'success', message: msg }, window.location.origin),
@@ -42,7 +43,12 @@ export function HeroMediaOverlay({
     const containerRef = useRef<HTMLDivElement>(null)
     const imageFileRef = useRef<HTMLInputElement>(null)
     const videoFileRef = useRef<HTMLInputElement>(null)
-    const { upload, progress, isUploading: uploading } = useUploadProgress()
+    const { upload, progress: imgProgress, isUploading: imgUploading } = useUploadProgress()
+    // Video uses direct-to-S3 (bypasses the 4.5MB Vercel body limit — GH-1284).
+    const { upload: uploadVideo, progress: vidProgress, isUploading: vidUploading } = useDirectUpload()
+    // The two flows never run at once (one file at a time), so share one bar.
+    const uploading = imgUploading || vidUploading
+    const progress = vidUploading ? vidProgress : imgProgress
     const [isTextEditing, setIsTextEditing] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
@@ -135,10 +141,8 @@ export function HeroMediaOverlay({
         }
         if (!videoField) return
         try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('alt', 'Hero video')
-            const uploaded = await upload(formData)
+            // Direct-to-S3 (GH-1284): video bypasses the 4.5MB Vercel body limit.
+            const uploaded = await uploadVideo(file, { alt: 'Hero video' })
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: update src in-place — no React re-render, no flicker
