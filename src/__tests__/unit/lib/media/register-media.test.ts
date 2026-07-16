@@ -6,7 +6,7 @@
  * QA doc: docs/qa/F30-hero-media-overlay.md
  */
 import { describe, it, expect, vi } from 'vitest'
-import { registerUploadedMedia } from '@/lib/media/register-media'
+import { findRegisteredMedia, registerUploadedMedia } from '@/lib/media/register-media'
 
 function makePayload(insertedId: number) {
     const query = vi.fn().mockResolvedValue({ rows: [{ id: insertedId }] })
@@ -43,5 +43,15 @@ describe('TC-F30-HMO-015: registerUploadedMedia inserts the row and returns the 
             mimeType: 'video/mp4',
             filesize: 16_600_000,
         })
+    })
+
+    it('finds an existing registration by filename', async () => {
+        const { payload, query, findByID } = makePayload(8168)
+
+        const result = await findRegisteredMedia(payload, 'file.mp4')
+
+        expect(query).toHaveBeenCalledWith('SELECT id FROM media WHERE filename = $1 LIMIT 1', ['file.mp4'])
+        expect(findByID).toHaveBeenCalledWith({ collection: 'media', id: 8168 })
+        expect(result?.id).toBe(8168)
     })
 })

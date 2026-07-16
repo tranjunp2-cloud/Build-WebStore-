@@ -5,7 +5,7 @@ import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getCurrentUser } from '@/lib/auth'
 import { checkUploadSize } from '@/lib/media/upload-limits'
 import { buildS3Client } from '@/lib/media/s3-client'
-import { registerUploadedMedia } from '@/lib/media/register-media'
+import { findRegisteredMedia, registerUploadedMedia } from '@/lib/media/register-media'
 
 // GH-1284 — second half of the direct-upload flow. After the browser POSTs the
 // video straight to S3 (via /api/media/presign), it calls this to create the
@@ -72,14 +72,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: sizeError }, { status: 413 })
     }
 
+    let payload: Awaited<ReturnType<typeof getPayload>> | undefined
     try {
-        const payload = await getPayload({ config: configPromise })
+        payload = await getPayload({ config: configPromise })
+        const existing = await findRegisteredMedia(payload, key)
+        if (existing) return NextResponse.json(existing)
+
         const media = await registerUploadedMedia(payload, { alt, filename: key, mimeType, filesize: size })
         return NextResponse.json(media)
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error('[/api/media/register] Failed to register media:', msg)
-        await deleteUnregisteredObject(s3, key)
+
+        // A retry may lose a uniqueness race after another request has already
+        // registered this key. Never delete an object while its DB state is
+        // unknown: doing so would leave that successful media row dangling.
+        if (payload) {
+            try {
+                const existing = await findRegisteredMedia(payload, key)
+                if (existing) return NextResponse.json(existing)
+                await deleteUnregisteredObject(s3, key)
+            } catch (lookupErr) {
+                console.error('[/api/media/register] Failed to verify media registration state:', lookupErr)
+            }
+        }
         return NextResponse.json({ error: 'Could not register upload' }, { status: 500 })
     }
 }
