@@ -284,8 +284,8 @@ So that tôi có thể tổ chức sơ đồ sản phẩm gọn gàng, khách h�
 ```gherkin
 GIVEN user đang ở trang Quản lý Danh mục (`/products/categories`)
 WHEN  user click "Thêm Mới"
-THEN  form yêu cầu nhập Tên Danh mục (Name), Slug, Ảnh đại diện (nếu có)
-  AND có một dropdown "Chọn Danh mục Cha" (Parent Category).
+THEN  form yêu cầu nhập 4 trường: Tên Danh mục (Name)*, Danh mục Cha (Parent), Mô tả (Description), URL Slug
+  AND có một dropdown "Chọn Danh mục Cha" (Parent Category) với thụt lề theo level và cycle prevention.
 WHEN  user chọn "Thời Trang" (Level 1) làm cha
 THEN  danh mục mới trở thành Level 2 "Nam".
 WHEN  Level 2 "Nam" làm cha, tạo "Áo Sơ Mi"
@@ -299,6 +299,44 @@ GIVEN user đang ở trang Thêm/Sửa Sản Phẩm
 WHEN  user mở phần Tổ chức (Organization)
 THEN  có dropdown Tree-select hiển thị cây danh mục
   AND user phải chọn đúng 1 danh mục (single-select) cho sản phẩm đó.
+```
+
+#### AC-3: Delete Category với Data Integrity Checks
+```gherkin
+GIVEN user đang ở trang Quản lý Danh mục
+  AND danh mục X có 5 sản phẩm gán trực tiếp
+  AND danh mục X có con (Level 2)
+WHEN  click Delete trên danh mục X
+THEN  hệ thống chặn deletion với lỗi "Cannot delete this category. There are 5 products still assigned to it. Please reassign your products first."
+  AND hiển thị exact count (5) của sản phẩm phụ thuộc
+WHEN  reassign tất cả 5 sản phẩm sang danh mục khác
+  AND click Delete lại
+THEN  danh mục X bị xóa (soft delete)
+  AND con của X (Level 2) tự động re-parent thành top-level (parent = null)
+  AND những sản phẩm gán Level 2 vẫn nằm dưới Level 2 (không bị orphan).
+```
+
+#### AC-4: Cycle Prevention
+```gherkin
+GIVEN user đang edit danh mục L3 (có parent là L2, parent của L2 là L1)
+WHEN  click "Change Parent" dropdown
+THEN  các nút L1, L2, L3, và toàn bộ descendants bị disabled/loại trừ
+  AND chỉ có thể chọn các danh mục khác không phải ancestor/descendant
+WHEN  thử gắn L3.parent = L1 (ancestor)
+THEN  hệ thống báo lỗi "Cycle detected: cannot set ancestor as parent"
+  AND ngăn lưu.
+```
+
+#### AC-5: Deduplication per Tenant
+```gherkin
+GIVEN Tenant A tạo danh mục "Fashion" với slug "fashion"
+  AND Tenant B tạo danh mục "Fashion" với slug "fashion"
+THEN  cả 2 được tạo thành công (slug unique per-tenant, không global unique)
+GIVEN Tenant A, Parent L1, tạo danh mục "Shirts"
+  AND thử tạo "shirts" (khác case) trong cùng Parent L1
+THEN  bị chặn lỗi "Name already exists in this category"
+GIVEN Tenant A tạo "Shirts" trong Parent L2 (khác parent)
+THEN  được tạo thành công (name dedup per-(parent, tenant)).
 ```
 
 ### Definition of Done

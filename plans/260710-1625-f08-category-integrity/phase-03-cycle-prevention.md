@@ -1,6 +1,6 @@
 # Phase 03 — Cycle Prevention (#11)
 
-**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** pending
+**PR:** 1 · **Migration:** No · **Priority:** P1 · **Status:** done
 
 ## Context
 
@@ -58,11 +58,15 @@ beforeValidate (update, data.parent set, has id):
 
 ## Todo
 
-- [ ] Merge cycle check into `beforeValidate` upward walk (capped iterations)
-- [ ] Throw on self-parent and descendant-parent
-- [ ] Client `isDescendant` helper + guard in `handleSave`
-- [ ] Filter parent Select to exclude self + descendants
-- [ ] i18n `cycleError` EN + MS
+- [x] Merge cycle check into `beforeValidate` upward walk (capped iterations)
+- [x] Throw on self-parent and descendant-parent
+- [x] Client `isDescendant` helper + guard in `handleSave`
+- [x] Filter parent Select to exclude self + descendants
+- [x] i18n `cycleError` EN + MS
+
+## Phase 05b Coordination Note
+
+Phase 05b will layer indentation and L3-disable logic onto the parent `<Select>` in `CategoryManager.tsx`. The descendant-exclusion filter added in this phase (`.filter(c => !formData.id || !isDescendant(c.id, formData.id, categories))`) is already in place. When Phase 05b runs, extend that filter rather than replace it to preserve cycle prevention.
 
 ## Success Criteria
 

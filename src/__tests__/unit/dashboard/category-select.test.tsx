@@ -92,6 +92,16 @@ describe('TC-F08-05-03 — Leaf-node selection', () => {
         const calls = onChange.mock.calls
         calls.forEach(([ids]) => expect(ids.length).toBeGreaterThan(0))
     })
+
+    it('TC-F08-05-11: selectLeaf/handleL3Select REPLACES selection with single value (single-select, not append)', () => {
+        const { onChange } = renderSelect(cats3Level, ['l1-leaf'])
+        fireEvent.click(screen.getByText('Accessories'))
+        fireEvent.mouseEnter(screen.getByText('Fashion').closest('[class*="cursor-pointer"]') as Element)
+        fireEvent.click(screen.getByText('Men').closest('[class*="cursor-pointer"]') as Element)
+        fireEvent.click(screen.getByText('T-Shirts').closest('[class*="cursor-pointer"]') as Element)
+        // onChange should be called with [l3] only, not ['l1-leaf', 'l3'] (replaces, not appends)
+        expect(onChange).toHaveBeenLastCalledWith(['l3'])
+    })
 })
 
 describe('TC-F08-05-03 — Col 1 panel: parent categories show ChevronRight', () => {

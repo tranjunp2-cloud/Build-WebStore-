@@ -144,7 +144,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 - **BR-04:** Price = 0 allowed (free products)
 - **BR-05:** Halal badge chỉ hiện trên storefront khi cert được upload
 - **BR-06 (Out-of-Stock UX):** Nếu Stock = 0, TUYỆT ĐỐI KHÔNG tự động chuyển Status sang Draft/Archived (giữ nguyên Active để bảo tồn Link SEO). Thay vào đó, ngoài Storefront F09 hiển thị nhãn `[Hết hàng]` và vô hiệu hóa nút Add to Cart. Trên Dashboard F08, đưa ra Cảnh báo Đỏ tại cột Stock. Thể tích (Dimensions) và Cân nặng là bắt buộc để liên kết với Module tính phí Vận Chuyển F14 sau này.
-- **BR-07 (Category: 1–1 Product):** Mỗi sản phẩm thuộc đúng 1 danh mục (single-select). Dữ liệu DB vẫn sử dụng `hasMany: true` ở trên `products_rels` (chi tiết lưu trữ); UI + validation bảo đảm đúng 1 danh mục.
+- **BR-07 (Category: 1–1 Product):** Mỗi sản phẩm thuộc đúng 1 danh mục (single-select). **Intentional Design Trade-off:** Dữ liệu DB vẫn sử dụng `hasMany: true` ở trên `products_rels` (chi tiết lưu trữ); UI + validation bảo đảm đúng 1 danh mục được gán. Flipping to `hasMany: false` would require data migration for zero functional gain since UI already enforces exactly one. This trade-off is documented to prevent future "fix" attempts that would create unnecessary schema churn.
 - **BR-08 (Category Delete Integrity):** Hard-block xóa danh mục nếu có SP gán TRỰC TIẾP (direct-only, không đệ quy). Nếu xóa được phép: danh mục con trực tiếp được đẩy lên top-level (`parent = null`), rồi soft-delete danh mục đó.
 - **BR-09 (Category Cycle Prevention):** Không cho đặt `parent` là chính nó hoặc bất kỳ descendant của nó (chặn vòng lặp cây).
 - **BR-10 (Category Dedup per Tenant):** Slug unique theo tenant (không unique global). Tên danh mục unique trong phạm vi `(parent, tenant)`, so sánh case-insensitive + trim.
@@ -235,10 +235,13 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
   - Delete Confirmation: "Bạn có chắc muốn xóa mềm phẩm này? Hành động này có thể hồi phục từ Archive."
   - Delete Category: Hard-block với thông báo "Cannot delete this category. There are X products still assigned to it. Please reassign your products first." nếu có SP gán trực tiếp.
   - Bulk AI Modal (Bảng Preview Table) sinh ra sau khi gọi tính năng Bulk Create Chat AI để user xác nhận trước DB Commit.
-  - **Add Category Modal (Issue1·mục2):** 
-    - **Contextual Title:** "Add New Category" (từ toolbar); "Add Subcategory" (từ nút + trên dòng danh mục).
-    - **Parent Field:** Auto-filled khi mở từ nút +; disabled trong subcategory mode (khóa parent). Editable khi tạo từ toolbar hoặc edit.
-    - **Parent Dropdown:** Thụt lề theo level (L1→L2→L3); L3 node hiển thị nhưng disabled (không thể chọn làm parent); loại trừ self + descendants (cycle prevention).
+  - **Add Category Modal (Issue GH-1587):** 
+    - **Contextual Title:** "Add New Category" (từ toolbar); "Add Subcategory" (từ nút + trên dòng danh mục); "Edit Category" khi sửa.
+    - **Parent Field:** Auto-filled khi mở từ nút + trên dòng; disabled/locked trong subcategory mode. Editable khi tạo từ toolbar hoặc edit category.
+    - **Parent Dropdown:** Thụt lề theo level (L1→L2→L3, visual hierarchy); L3 node hiển thị nhưng disabled (không thể chọn làm parent, max 3 levels); loại trừ self + toàn bộ descendants (cycle prevention).
+    - **Single Add-Subcategory Affordance:** Chỉ có 1 nút "+" icon per row (ẩn ở L3). Không còn duplicate "+ Add subcategory" inline.
+    - **Level Badges:** 3 màu riêng biệt — L1 teal, L2 blue, L3 violet.
+    - **Category Image Field:** REMOVED (unused, never rendered anywhere). Modal chỉ còn 4 fields: Name*, Parent, Description, URL Slug.
 
 ---
 ### 10.4. Giao diện Hiển thị Storefront (PLP & PDP)

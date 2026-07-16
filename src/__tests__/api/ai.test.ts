@@ -425,10 +425,11 @@ describe('AI Streaming APIs', () => {
              const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
              const resolvedPayload = await mockPayload
              const createCalls = vi.mocked(resolvedPayload.create).mock.calls
-             const siteCreateCall = createCalls.find(
+             const siteCreateCalls = createCalls.filter(
                  (c: [{ collection: string; data?: { generationLocale?: string } }]) =>
                      c[0].collection === 'sites'
              )
+             const siteCreateCall = siteCreateCalls.at(-1)
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
