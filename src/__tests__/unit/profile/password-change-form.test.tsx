@@ -81,7 +81,7 @@ describe('PasswordChangeForm', () => {
         expect(screen.getByRole('button', { name: 'Update Password' })).toBeInTheDocument()
     })
 
-    // TC-F23-04-28: Update Password stays disabled until all 3 fields have a value
+    // TC-F23-04-28: Update Password stays disabled while the form is still invalid
     it('keeps Update Password disabled while any field is empty', () => {
         // Arrange
         const { container } = render(<PasswordChangeForm onDone={mockOnDone} onCancel={mockOnCancel} />)
@@ -95,8 +95,21 @@ describe('PasswordChangeForm', () => {
         expect(submitBtn).toBeDisabled()
     })
 
-    // TC-F23-04-28: Update Password enables once all 3 fields have a value
-    it('enables Update Password once current/new/confirm are all filled', () => {
+    // TC-F23-04-28: Update Password remains disabled for weak or mismatched passwords
+    it('keeps Update Password disabled when password rules or confirm match are not satisfied', () => {
+        // Arrange
+        const { container } = render(<PasswordChangeForm onDone={mockOnDone} onCancel={mockOnCancel} />)
+        const submitBtn = screen.getByRole('button', { name: 'Update Password' })
+
+        // Act — all fields filled, but password is weak and confirm mismatches
+        fillAll(container, { current: 'oldpass1', next: 'short', confirm: 'different' })
+
+        // Assert
+        expect(submitBtn).toBeDisabled()
+    })
+
+    // TC-F23-04-28: Update Password enables once the full form is valid
+    it('enables Update Password once current/new/confirm satisfy all validation rules', () => {
         // Arrange
         const { container } = render(<PasswordChangeForm onDone={mockOnDone} onCancel={mockOnCancel} />)
         const submitBtn = screen.getByRole('button', { name: 'Update Password' })
@@ -105,7 +118,9 @@ describe('PasswordChangeForm', () => {
         fillAll(container, { current: 'oldpass1', next: 'Newpass1', confirm: 'Newpass1' })
 
         // Assert
-        expect(submitBtn).not.toBeDisabled()
+        return waitFor(() => {
+            expect(submitBtn).not.toBeDisabled()
+        })
     })
 
     // TC-F23-04-29: Cancel resets the form and notifies the parent to collapse
@@ -131,6 +146,9 @@ describe('PasswordChangeForm', () => {
         fillAll(container, { current: 'oldpass1', next: 'Newpass1', confirm: 'Newpass1' })
 
         // Act
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Update Password' })).not.toBeDisabled()
+        })
         fireEvent.click(screen.getByRole('button', { name: 'Update Password' }))
 
         // Assert
@@ -149,6 +167,9 @@ describe('PasswordChangeForm', () => {
         fillAll(container, { current: 'wrongpass', next: 'Newpass1', confirm: 'Newpass1' })
 
         // Act
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Update Password' })).not.toBeDisabled()
+        })
         fireEvent.click(screen.getByRole('button', { name: 'Update Password' }))
 
         // Assert

@@ -104,7 +104,7 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
                         <Input
                             type="email"
                             value={user.email}
-                            readOnly
+                            disabled
                             className="bg-[hsl(var(--secondary))] cursor-not-allowed"
                         />
                         <p className="text-[10px] italic text-[hsl(var(--muted-foreground))] tracking-[1px]">

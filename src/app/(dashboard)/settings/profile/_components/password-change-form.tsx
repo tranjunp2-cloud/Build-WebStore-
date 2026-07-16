@@ -60,16 +60,14 @@ export function PasswordChangeForm({ onDone, onCancel }: Props) {
     const { register, handleSubmit, watch, reset, setError, formState } =
         useForm<FormValues>({
             resolver: zodResolver(formSchema),
+            mode: 'onChange',
             defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
         })
 
-    const currentPassword = watch('currentPassword') ?? ''
     const newPassword = watch('newPassword') ?? ''
-    const confirmPassword = watch('confirmPassword') ?? ''
     const hasMinLength  = newPassword.length >= 8
     const hasUppercase  = /[A-Z]/.test(newPassword)
     const hasNumber     = /\d/.test(newPassword)
-    const canSubmit = currentPassword.length > 0 && newPassword.length > 0 && confirmPassword.length > 0
 
     async function onSubmit(values: FormValues) {
         try {
@@ -190,10 +188,10 @@ export function PasswordChangeForm({ onDone, onCancel }: Props) {
                 <PasswordRule met={hasNumber}    label={t.profile.security.ruleNumber} />
             </div>
 
-            {/* Inline action bar — always visible; Update Password disabled until all rules pass */}
+            {/* Inline action bar — always visible; Update Password stays disabled until the full form is valid. */}
             <CardActionBar
                 saving={formState.isSubmitting}
-                disabled={!canSubmit}
+                disabled={!formState.isValid}
                 saveLabel={t.profile.security.updatePassword}
                 savingLabel={t.profile.security.changing}
                 onCancel={() => {

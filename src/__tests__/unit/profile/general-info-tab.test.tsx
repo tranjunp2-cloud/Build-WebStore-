@@ -115,8 +115,8 @@ describe('GeneralInfoTab', () => {
         expect(screen.getByTestId('cancel-btn')).toBeInTheDocument()
     })
 
-    // TC-F23-02-02: Email field is always readonly
-    it('renders email field as readonly with help text', () => {
+    // TC-F23-02-02: Email field is always disabled
+    it('renders email field as disabled with help text', () => {
         // Arrange / Act
         render(
             <GeneralInfoTab
@@ -127,7 +127,7 @@ describe('GeneralInfoTab', () => {
 
         // Assert
         const emailInput = screen.getByDisplayValue('john@test.com') as HTMLInputElement
-        expect(emailInput.readOnly).toBe(true)
+        expect(emailInput.disabled).toBe(true)
         expect(screen.getByText('Email cannot be changed (Login identity)')).toBeInTheDocument()
     })
 
