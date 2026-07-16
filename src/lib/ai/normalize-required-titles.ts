@@ -119,7 +119,7 @@ export function coerceServiceItems(services: unknown[]): Record<string, unknown>
 export function sanitizeTestimonialItems(items: unknown[]): Record<string, unknown>[] {
     return items
         .map((it) => toFieldObject(it, 'quote'))
-        .flatMap((it) => {
+        .flatMap<Record<string, unknown>>((it) => {
             const quote = getNonBlankString(it.quote)
             if (!quote) return []
             return [{ ...it, quote }]
