@@ -14,6 +14,8 @@ import {
   recordUsage,
   reduceUsage,
   getConsumed,
+  clearUsage,
+  upsertPlanSubscription,
 } from '@/lib/subscriptions/plan-subscription'
 
 // ── getPlanCode ───────────────────────────────────────────────────────────────
@@ -175,5 +177,94 @@ describe('getConsumed', () => {
     const payload = makePayload([{ id: 5, used: 7 }])
     const result = await getConsumed(payload as any, 10, 'staff_limit')
     expect(result).toBe(7)
+  })
+})
+
+describe('clearUsage', () => {
+  it('[TC-SUB-044] deletes existing usage rows with overrideAccess enabled', async () => {
+    const payload = makePayload([{ id: 5 }, { id: 6 }])
+
+    await clearUsage(payload as any, 10)
+
+    expect(payload.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        overrideAccess: true,
+        where: { subscription: { equals: 10 } },
+      }),
+    )
+    expect(payload.delete).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        id: 5,
+        overrideAccess: true,
+      }),
+    )
+    expect(payload.delete).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        id: 6,
+        overrideAccess: true,
+      }),
+    )
+  })
+})
+
+describe('upsertPlanSubscription', () => {
+  it('[TC-SUB-045] update-path clears stale usage with overrideAccess before recounting staff', async () => {
+    const payload = {
+      find: vi
+        .fn()
+        .mockResolvedValueOnce({ docs: [{ id: 99 }] })
+        .mockResolvedValueOnce({ docs: [{ id: 5 }, { id: 6 }] })
+        .mockResolvedValueOnce({
+          docs: [
+            { id: 'owner', tenants: [{ tenant: 42, role: 'owner' }] },
+            { id: 'staff-1', tenants: [{ tenant: 42, role: 'admin' }] },
+          ],
+        })
+        .mockResolvedValueOnce({ docs: [] }),
+      create: vi.fn().mockResolvedValue({ id: 1 }),
+      update: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    }
+
+    await upsertPlanSubscription(payload as any, 42, {
+      subscriptionCode: 'professional',
+      subscriptionType: 1,
+      startDate: '2026-07-01 00:00:00',
+      endDate: '2026-08-01 00:00:00',
+    })
+
+    expect(payload.delete).toHaveBeenCalledTimes(2)
+    expect(payload.delete).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        id: 5,
+        overrideAccess: true,
+      }),
+    )
+    expect(payload.delete).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        id: 6,
+        overrideAccess: true,
+      }),
+    )
+    expect(payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'plan-subscription-usages',
+        overrideAccess: true,
+        data: expect.objectContaining({
+          subscription: 99,
+          featureCode: 'staff_limit',
+          used: 1,
+        }),
+      }),
+    )
   })
 })

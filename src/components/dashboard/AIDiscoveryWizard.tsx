@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 
 export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const { t } = useI18n()
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
+  // True once Skip/Explore persisted the dismissal — blocks the reopen-on-navigation effect below
+  const dismissedPermanently = useRef(false)
 
   const WIZARD_STEPS = [
     {
@@ -66,13 +71,25 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     return () => window.removeEventListener('keydown', handleEsc)
   }, [lightboxSrc])
 
+  // X only hides the wizard for the current session. The (dashboard) layout never
+  // remounts on soft navigation, so reopen here when the user returns to the
+  // dashboard home — unless Skip/Explore dismissed it permanently. (GH #1609)
+  useEffect(() => {
+    if (pathname === '/dashboard' && !dismissedPermanently.current) {
+      setIsOpen(true)
+    }
+  }, [pathname])
+
+  useLockBodyScroll(isOpen)
+
   if (!isOpen) return null
 
   const stepData = WIZARD_STEPS[currentStep]
   const isLastStep = currentStep === WIZARD_STEPS.length - 1
 
-  // Dismiss wizard permanently — close UI + persist has_seen_ai_wizard=true to DB
+  // Dismiss wizard permanently (Skip / Explore only) — close UI + persist has_seen_ai_wizard=true to DB
   const dismissWizard = () => {
+    dismissedPermanently.current = true
     setIsOpen(false)
 
     if (userId) {
@@ -84,7 +101,17 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
       })
     }
 
-    window.dispatchEvent(new CustomEvent('wizard-closed'))
+    window.dispatchEvent(new CustomEvent('wizard-closed', { detail: { permanent: true } }))
+  }
+
+  // Close for the current session only (X button) — no API call, so the wizard
+  // returns on the next visit to the dashboard home. Still announces 'wizard-closed'
+  // so PushOptInPrompt can take its turn — detail.permanent lets listeners tell this
+  // apart from a real dismissal (GH #1609).
+  const closeForNow = () => {
+    setIsOpen(false)
+    setCurrentStep(0)
+    window.dispatchEvent(new CustomEvent('wizard-closed', { detail: { permanent: false } }))
   }
 
   const handleNext = () => {
@@ -147,7 +174,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
             {t.onboarding.wizard.title}
           </h2>
           <button
-            onClick={dismissWizard}
+            onClick={closeForNow}
             className="flex-shrink-0 text-white/40 hover:text-white transition-colors bg-transparent border-none p-1 m-0 cursor-pointer flex items-center justify-center mt-1"
             aria-label="Close"
           >
@@ -311,4 +338,3 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     </div>
   )
 }
-

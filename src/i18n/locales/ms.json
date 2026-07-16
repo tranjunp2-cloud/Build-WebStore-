@@ -1217,7 +1217,8 @@
                 "loadFailed": "Gagal memuatkan pesanan",
                 "bulkSuccess": "Berjaya mengesahkan {count} pesanan",
                 "bulkFailed": "{count} pesanan gagal (aliran kerja tidak sah)",
-                "updateFailed": "Gagal mengemaskini pesanan"
+                "updateFailed": "Gagal mengemaskini pesanan",
+                "shipmentCancelledOnEp": "Penghantaran ini telah dibatalkan di dashboard EasyParcel — sila cipta label baharu untuk menghantar semula."
             },
             "pageTitle": "Pesanan",
             "pageSubtitle": "Urus dan jejak pesanan anda",
@@ -1421,13 +1422,6 @@
                 "courier": "Kurier",
                 "trackingAwb": "Nombor penjejakan (AWB)",
                 "awbPending": "Sedang dijana oleh kurier — akan dipaparkan di sini secara automatik",
-                "markCancelled": "Saya telah membatalkan penghantaran ini di EasyParcel",
-                "markCancelledConfirmTitle": "Tandakan penghantaran sebagai dibatalkan?",
-                "markCancelledConfirmDesc": "Sahkan hanya jika anda telah membatalkan penghantaran ini di dashboard EasyParcel (kos penghantaran dikembalikan ke dompet EP anda). Pesanan kembali ke status Confirmed — anda boleh cipta label baharu atau batalkan pesanan. Menempah semula semasa penghantaran lama masih aktif akan mengecaj dompet anda dua kali.",
-                "markCancelledYes": "Ya, penghantaran telah dibatalkan",
-                "markCancelledNo": "Kekalkan label",
-                "markCancelledDone": "Penghantaran ditanda sebagai dibatalkan — cipta label baharu atau batalkan pesanan",
-                "markCancelledFailed": "Tidak dapat menanda penghantaran sebagai dibatalkan",
                 "copy": "Salin",
                 "copied": "Disalin!",
                 "printLabel": "Cetak label (PDF)",
@@ -1462,7 +1456,6 @@
                 "stepReserving": "Menempah slot",
                 "stepCharging": "Menolak dompet",
                 "courierLabel": "Kurier",
-                "fromSettings": "dari Tetapan",
                 "epCost": "Kos EasyParcel: {amount}",
                 "epCostNote": "Ditetapkan semasa daftar keluar — caj sebenar mungkin berbeza sedikit.",
                 "walletBalanceLabel": "Baki dompet",
@@ -1476,7 +1469,7 @@
                 "collectionDateLabel": "Tarikh pengambilan",
                 "cutoffHint": "Cipta sebelum {time} (MYT) untuk pengambilan hari yang sama",
                 "dropoffHint": "Hantar bungkusan ke pusat kurier pada tarikh ini",
-                "weekendWarning": "Pengambilan hanya pada hari bekerja — pilih hari bekerja",
+                "weekendWarning": "Peringatan mesra: Tidak semua perkhidmatan kurier beroperasi pada hujung minggu, yang mungkin menghalang penjanaan nombor AWB atau melambatkan pengambilan anda. Kami cadangkan pilih {date} sebaliknya.",
                 "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)",
                 "methodNoPickup": "Kurier ini hanya menyokong drop-off untuk laluan ini",
                 "methodNoDropoff": "Kurier ini hanya menyokong pengambilan untuk laluan ini",
@@ -1949,6 +1942,7 @@
                 "parseError": "Ralat pemprosesan",
                 "aiQuotaExceeded": "Sistem AI terlalu sibuk atau kuota habis. Sila cuba lagi nanti.",
                 "aiTimeout": "Sistem AI memberi respons terlalu lambat (Masa Tamat). Sila cuba lagi dengan teks yang lebih pendek.",
+                "rateLimitExceeded": "Anda telah menggunakan semua percubaan penjanaan AI untuk jam ini. Cuba lagi dalam {minutes} minit.",
                 "previewTitle": "Grid Pratonton (Diproses AI)",
                 "previewSubtitle": "Imej kosong akan menggunakan ikon karton lalai apabila disimpan",
                 "colImage": "Imej",
@@ -2041,6 +2035,8 @@
                     "subCategoryWarning": "Kategori ini mempunyai kategori anak. Ia akan dipindahkan ke tahap teratas (tidak dipadamkan secara kekal).",
                     "productsWarning": "Produk dalam kategori ini tidak akan dipadamkan, tetapi akan kehilangan tag kategori ini.",
                     "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
+                    "tooManyChildrenError": "Tidak dapat memadamkan kategori ini. Ia mempunyai {count} subkategori, lebih daripada yang boleh dipindahkan dengan selamat sekaligus. Sila pindahkan sebahagian subkategori terlebih dahulu.",
+                    "reparentNameConflictError": "Kategori ini belum boleh dipadamkan. Memindahkan subkategorinya ke tahap teratas akan mewujudkan {count} konflik nama kategori pendua. Sila namakan semula atau pindahkan subkategori yang bercanggah terlebih dahulu.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."
@@ -2053,7 +2049,9 @@
                     "saveError": "Gagal menyimpan kategori",
                     "deleteError": "Gagal memadamkan kategori",
                     "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap",
-                    "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri."
+                    "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri.",
+                    "parentTenantMismatch": "Tidak boleh memindahkan kategori ke hierarki penyewa lain",
+                    "parentSoftDeleted": "Tidak boleh menyarangkan di bawah kategori yang dipadamkan"
                 }
             },
             "subtitle": "Urus produk kedai"
@@ -4221,6 +4219,10 @@
             "postcodePlaceholder": "55100",
             "state": "Negeri / Wilayah Persekutuan",
             "selectState": "-- Pilih negeri --",
+            "selectCity": "-- Pilih bandar/daerah --",
+            "selectPostcode": "-- Pilih poskod --",
+            "loadingOption": "Memuatkan...",
+            "legacyValueHint": "Nilai tersimpan",
             "country": "Negara",
             "countryMalaysia": "Malaysia",
             "coordinatesGroupLabel": "Lokasi (Koordinat)",
@@ -4254,6 +4256,17 @@
             "openingHoursDayFr": "Jum",
             "openingHoursDaySa": "Sab",
             "openingHoursDaySu": "Ahd",
+            "openingHoursModalTitle": "Pilih hari dan waktu",
+            "openingHoursOpen24": "Buka 24 jam",
+            "openingHoursAddRange": "Tambah waktu",
+            "openingHoursRemoveRange": "Buang waktu ini",
+            "openingHoursInvalidRange": "Waktu tutup mesti selepas waktu buka",
+            "openingHoursEditAll": "Edit semua waktu",
+            "openingHoursEditWeekdays": "Edit Isnin–Jumaat",
+            "openingHoursEditWeekend": "Edit Sabtu–Ahad",
+            "openingHoursEditDayAria": "Edit {day}",
+            "openingHoursSave": "Simpan",
+            "openingHoursCancel": "Batal",
             "checklistTitle": "Asas SEO Tempatan",
             "checklistAddressSaved": "Alamat disimpan",
             "checklistHoursSaved": "Waktu operasi disimpan",
@@ -4600,7 +4613,6 @@
             "primaryColorLabel": "Pemilih warna utama",
             "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?",
             "phoneRequired": "Nombor telefon diperlukan",
-            "invalidPostcode": "Poskod Malaysia mesti tepat 5 digit",
             "invalidLatitude": "Latitud mesti di antara -90 dan 90",
             "invalidLongitude": "Longitud mesti di antara -180 dan 180"
         },
@@ -4803,10 +4815,6 @@
     "profile": {
         "title": "Profil Saya",
         "accountSettings": "Tetapan Akaun",
-        "tabs": {
-            "general": "Maklumat Umum",
-            "security": "Keselamatan"
-        },
         "teamTabs": {
             "profile": "Profil Akaun",
             "staff": "Kakitangan",
@@ -4816,11 +4824,11 @@
         "banner": {
             "roleOwner": "Pemilik",
             "roleStaff": "Kakitangan",
-            "uploadAvatar": "Klik untuk muat naik avatar",
-            "status": "Status",
-            "activeNow": "Aktif Sekarang"
+            "uploadAvatar": "Klik untuk muat naik avatar"
         },
         "general": {
+            "title": "Maklumat Peribadi",
+            "subtitle": "Nama dan butiran hubungan anda.",
             "firstName": "Nama Pertama",
             "lastName": "Nama Akhir",
             "email": "Alamat E-mel",
@@ -4832,6 +4840,8 @@
             "cancel": "Batal"
         },
         "security": {
+            "title": "Kata Laluan & Keselamatan",
+            "summary": "Kekalkan keselamatan akaun anda dengan kata laluan yang kukuh.",
             "currentPassword": "Kata Laluan Semasa",
             "newPassword": "Kata Laluan Baharu",
             "confirmPassword": "Sahkan Kata Laluan Baharu",
@@ -4845,15 +4855,13 @@
             "ruleNumber": "Satu nombor"
         },
         "sso": {
-            "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
-            "manageButton": "Urus Akaun dalam SSO",
             "urlMissing": "URL portal SSO tidak dikonfigurasi. Hubungi pentadbir.",
-            "generalTitle": " Maklumat diuruskan oleh SSO",
-            "generalNotice": "Medan maklumat peribadi disegerakkan daripada sistem SSO. Anda tidak boleh mengeditnya di sini.",
-            "generalLink": "Untuk membuat perubahan, sila lawati portal SSO",
-            "securityTitle": "Akaun Dilindungi SSO",
-            "securityNotice": "Kata laluan dan tetapan keselamatan anda diuruskan oleh sistem Single Sign-On (SSO). Untuk menukar kata laluan, mendayakan pengesahan dua faktor (2FA), atau mengemas kini sebarang tetapan keselamatan, sila lawati portal pengurusan SSO.",
-            "securityLink": "Urus Akaun SSO"
+            "widgetTitle": "Akaun Dilindungi SSO",
+            "widgetDescription": "Medan profil peribadi, kata laluan, dan konfigurasi keselamatan anda diuruskan secara berpusat oleh sistem Single Sign-On. Perubahan yang dibuat di sana akan disegerakkan di sini secara automatik.",
+            "goToPortal": "Pergi ke Portal SSO"
+        },
+        "owner": {
+            "passwordLabel": "Kata Laluan"
         },
         "errors": {
             "invalidPhone": "Sila masukkan nombor telefon yang sah",
@@ -4870,8 +4878,7 @@
             "ownerForbidden": "Akaun pemilik mesti mengemas kini profil melalui SSO",
             "uploadFailed": "Muat naik avatar gagal",
             "saveFailed": "Gagal menyimpan profil",
-            "networkError": "Ralat rangkaian. Sila cuba lagi.",
-            "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Tinggalkan tab ini?"
+            "networkError": "Ralat rangkaian. Sila cuba lagi."
         }
     }
 }

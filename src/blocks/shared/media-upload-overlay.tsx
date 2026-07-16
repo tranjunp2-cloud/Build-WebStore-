@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
+import { useDirectUpload } from '@/hooks/use-direct-upload'
 import { compressImage } from '@/lib/media/compress-image'
 import { checkUploadSize, uploadLimitLabel } from '@/lib/media/upload-limits'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
@@ -89,7 +90,12 @@ export function MediaUploadOverlay({
     const containerRef = useRef<HTMLDivElement>(null)
     const imageFileRef = useRef<HTMLInputElement>(null)
     const videoFileRef = useRef<HTMLInputElement>(null)
-    const { upload, progress, isUploading: uploading } = useUploadProgress()
+    const { upload, progress: imgProgress, isUploading: imgUploading } = useUploadProgress()
+    // Video uses direct-to-S3 (bypasses the Vercel request body limit — GH-1284).
+    const { upload: uploadVideo, progress: vidProgress, isUploading: vidUploading } = useDirectUpload()
+    // Image and video flows are single-file interactions, so the toolbar can share one progress bar.
+    const uploading = imgUploading || vidUploading
+    const progress = vidUploading ? vidProgress : imgProgress
     const [isTextEditing, setIsTextEditing] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
@@ -200,10 +206,17 @@ export function MediaUploadOverlay({
         }
         if (!videoField) return
         try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('alt', 'video')
-            const uploaded = await upload(formData)
+            const uploaded = await uploadVideo(file, { alt: 'video' })
+            // Attach the ACK listener before changing the editor state so a fast
+            // save response cannot be missed. Do not show an uploaded video until
+            // its block value has been persisted by the parent editor.
+            const ack = waitForFieldChangeResult(callback.blockIndex, videoField)
+            callback.onFieldChange(videoField, uploaded.url)
+            const result = await ack
+            if (!result.ok) {
+                parentToast.error(result.error ?? 'Failed to save video — please try again')
+                return
+            }
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: swap src in-place — no React re-render, no flicker.
@@ -213,7 +226,6 @@ export function MediaUploadOverlay({
                 // First upload: no <video> yet — let the block render it from state.
                 onVideoUploaded?.(uploaded.url)
             }
-            callback.onFieldChange(videoField, uploaded.url)
             parentToast.success('Video updated')
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Video upload failed')

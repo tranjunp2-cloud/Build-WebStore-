@@ -178,9 +178,10 @@ describe('POST /api/webhooks/easyparcel', () => {
 
   // ───────────────────────────────────────────────────────────────────
   // TC-F36.OD.046: REAL EP payload (topic shipment.status.update) numeric
-  // shipment_status_code:0 (Cancel) → mapped to cancelled, no auto-complete
+  // shipment_status_code:0 (Cancel) → cancelled tracking + reopen order to
+  // 'confirmed' with EP fields cleared (mirrors manual mark-shipment-cancelled).
   // ───────────────────────────────────────────────────────────────────
-  it('[TC-F36.OD.046] real status-update payload with shipment_status_code:0 → cancelled tracking, no auto-complete', async () => {
+  it('[TC-F36.OD.046] real status-update payload with shipment_status_code:0 → cancelled tracking + reopen to confirmed', async () => {
     // Arrange
     process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
     mockFind.mockResolvedValue({
@@ -206,13 +207,56 @@ describe('POST /api/webhooks/easyparcel', () => {
     })
     const body = await res.json()
 
-    // Assert
+    // Assert — tracking = cancelled AND order reopened for re-ship / cancel (TC-F36.188)
     expect(res.status).toBe(200)
     expect(body.matched).toBe(true)
     expect(body.result).toBe('updated')
     const updateArg = mockUpdate.mock.calls[0][0]
     expect(updateArg.data.shippingTrackingStatus).toBe('cancelled')
+    expect(updateArg.data.status).toBe('confirmed')
+    expect(updateArg.data.easyParcelOrderNo).toBeNull()
+    expect(updateArg.data.awbNo).toBeNull()
+    expect(updateArg.data.trackingNumber).toBeNull()
+    expect(updateArg.data.labelUrl).toBeNull()
+    expect(updateArg.data.pickupScheduledAt).toBeNull()
+    expect(updateArg.data.codStatus).toBeNull()
+  })
+
+  // ───────────────────────────────────────────────────────────────────
+  // TC-F36.188: cancel webhook must NOT reopen a terminal/closed order —
+  // a late "cancelled" on a delivered→completed order records tracking only.
+  // ───────────────────────────────────────────────────────────────────
+  it('[TC-F36.188] shipment_status_code:0 on a completed order → tracking cancelled, status untouched', async () => {
+    // Arrange
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+    mockFind.mockResolvedValue({
+      docs: [
+        {
+          id: 'order-188',
+          status: 'completed',
+          shippingTrackingStatus: 'in_transit',
+          shippingTrackingHistory: [],
+        },
+      ],
+    })
+    mockUpdate.mockResolvedValue({ id: 'order-188' })
+
+    // Act
+    const res = await callPost('my-secret', {
+      topic: 'shipment.status.update',
+      awb_number: '238725129086',
+      shipment_number: 'ES-2504-G7FDF',
+      shipment_status: 'Cancelled',
+      shipment_status_code: 0,
+    })
+    const body = await res.json()
+
+    // Assert — completed is not a reopen-from state, so status stays put
+    expect(res.status).toBe(200)
+    const updateArg = mockUpdate.mock.calls[0][0]
+    expect(updateArg.data.shippingTrackingStatus).toBe('cancelled')
     expect(updateArg.data.status).toBeUndefined()
+    expect(updateArg.data.easyParcelOrderNo).toBeUndefined()
   })
 
   // ───────────────────────────────────────────────────────────────────

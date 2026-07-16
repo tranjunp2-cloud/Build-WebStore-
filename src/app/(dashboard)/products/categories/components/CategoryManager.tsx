@@ -64,12 +64,19 @@ const generateSlug = (text: string) => {
         .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
 }
 
-// Helper to calculate depth of a category before saving
-const getCategoryDepth = (parentId: string | number | null, flatList: Category[]): number => {
+// Helper to calculate depth of a category before saving. Capped at 5 hops — same safety
+// margin as isDescendant below — so a cyclic ancestor chain (pre-existing data corruption,
+// not otherwise reachable via the backend guard) can't spin this loop forever and freeze the
+// tab; the backend beforeValidate hook remains the source of truth for actual enforcement.
+// Exported for direct unit testing (pure function, no component render needed).
+export const getCategoryDepth = (parentId: string | number | null, flatList: Category[]): number => {
     if (!parentId) return 1
     let depth = 1
     let currentParent = flatList.find(c => c.id === parentId)
+    let hops = 0
     while (currentParent) {
+        hops++
+        if (hops > 5) break
         depth++
         const nextParentId = typeof currentParent.parent === 'object' && currentParent.parent !== null
             ? currentParent.parent.id
@@ -80,11 +87,24 @@ const getCategoryDepth = (parentId: string | number | null, flatList: Category[]
     return depth
 }
 
+// Search results must show each match's REAL level, not a hardcoded 1 — the badge display and
+// the L3-add-lock (isLevel3) both derive from `level`, so a hardcoded 1 mislabeled real L2/L3
+// matches and incorrectly re-enabled the "+ Add Subcategory" button for an actual L3 category
+// (which then always failed the depth check on save — a guaranteed dead-end interaction).
+// Exported for direct unit testing (pure function, no component render needed).
+export const annotateSearchMatchLevel = (category: Category, flatList: Category[]): Category => {
+    const parentId = typeof category.parent === 'object' && category.parent !== null
+        ? category.parent.id
+        : (category.parent ?? null)
+    const level = getCategoryDepth(parentId, flatList)
+    return { ...category, level, children: [] }
+}
+
 // Client-side mirror of the backend cycle guard (Categories.ts beforeValidate): walks UP the
 // ancestor chain from candidateId; true if selfId is reached (covers both "parent = self" and
 // "parent = descendant of self", since a descendant's ancestor chain passes through self).
 // UX-only guard — backend hook is the source of truth. Capped at 5 hops, same safety margin.
-const isDescendant = (candidateId: string | number | null, selfId: string | number | null | undefined, flatList: Category[]): boolean => {
+export const isDescendant = (candidateId: string | number | null, selfId: string | number | null | undefined, flatList: Category[]): boolean => {
     if (candidateId == null || selfId == null) return false
     let currentId: string | number | null = candidateId
     let hops = 0
@@ -213,8 +233,7 @@ export default function CategoryManager() {
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase()
             const matched = categories.filter(c => c.name.toLowerCase().includes(query))
-            // Minimal filtering: just return matched as flat list or pseudo-tree
-            return matched.map(m => ({...m, level: 1, children: []}))
+            return matched.map(m => annotateSearchMatchLevel(m, categories))
         }
 
         return buildTree(categories, null, 1)
@@ -313,6 +332,14 @@ export default function CategoryManager() {
                 toast.error(errMsg)
             } else if (message === 'CATEGORY_SLUG_DUPLICATE') {
                 toast.error(t.dashboard.products.categories.form.errors?.slugDuplicate || 'This URL slug is already used in your store.')
+            } else if (message === 'CATEGORY_CYCLE_ERROR') {
+                toast.error(t.dashboard.products.categories.toast.cycleError)
+            } else if (message === 'CATEGORY_MAX_DEPTH_ERROR') {
+                toast.error(t.dashboard.products.categories.toast.maxDepthError)
+            } else if (message === 'CATEGORY_PARENT_TENANT_MISMATCH') {
+                toast.error(t.dashboard.products.categories.toast.parentTenantMismatch)
+            } else if (message === 'CATEGORY_PARENT_SOFT_DELETED') {
+                toast.error(t.dashboard.products.categories.toast.parentSoftDeleted)
             } else {
                 toast.error(message || t.dashboard.products.categories.toast.saveError)
             }
@@ -337,6 +364,14 @@ export default function CategoryManager() {
                 const count = message.split(':')[1]
                 toast.error(t.dashboard.products.categories.deleteModal.hasProductsError.replace('{count}', count))
                 // Keep modal open so the user can reassign products before retrying.
+            } else if (message.startsWith('CATEGORY_TOO_MANY_CHILDREN:')) {
+                const count = message.split(':')[1]
+                toast.error(t.dashboard.products.categories.deleteModal.tooManyChildrenError.replace('{count}', count))
+                // Keep modal open — same rationale as CATEGORY_HAS_PRODUCTS above.
+            } else if (message.startsWith('CATEGORY_REPARENT_NAME_CONFLICT:')) {
+                const count = message.split(':')[1]
+                toast.error(t.dashboard.products.categories.deleteModal.reparentNameConflictError.replace('{count}', count))
+                // Keep modal open so the user can resolve the conflicting top-level names first.
             } else {
                 toast.error(t.dashboard.products.categories.toast.deleteError)
                 setIsDeleteOpen(false)
@@ -371,6 +406,7 @@ export default function CategoryManager() {
                         <button
                             type="button"
                             onClick={() => toggleExpand(node.id)}
+                            aria-expanded={isExpanded}
                             className={cn(
                                 'w-6 h-6 shrink-0 flex items-center justify-center text-[var(--dash-text-muted)] transition-transform cursor-pointer border-none bg-transparent p-0',
                                 !hasChildren && 'opacity-0 pointer-events-none'
@@ -396,7 +432,7 @@ export default function CategoryManager() {
                                     levelTextColors[node.level as keyof typeof levelTextColors] || levelTextColors[1]
                                 )}
                             >
-                                L{node.level}
+                                L{node.level || '?'}
                             </Badge>
                         </div>
                         <div className="w-[100px] text-[12px] text-[var(--dash-text-muted)] text-left hidden sm:flex items-center">
@@ -569,7 +605,13 @@ export default function CategoryManager() {
             {isFormOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
-                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh]"
+                        role="dialog"
+                        aria-modal="true"
+                        onKeyDown={(e) => { if (e.key === 'Escape') setIsFormOpen(false) }}
+                        // Auto-focus the modal container when it mounts
+                        ref={(el) => { if (el) el.focus() }}
+                        tabIndex={-1}
+                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh] outline-none"
                         style={{ border: '1px solid var(--dash-border)' }}
                     >
                         <div

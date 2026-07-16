@@ -19,8 +19,8 @@ interface DiscountSaveBarProps {
 // renders it always means "there's something unsaved right now" — no need
 // for the old isNew/upToDate status-text branching.
 // `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
-// regardless of content length. `--dash-content-pl` (CMSLayoutClient) clears the
-// sidebar at lg+.
+// regardless of content length. `--dash-content-pl` (globals.css, GH-1592) aligns the
+// left edge with the content column (sidebar + p-8 gutter) at lg+.
 export function DiscountSaveBar({ isNew, saving, onCancel, onSave }: DiscountSaveBarProps) {
     const { t } = useI18n()
     const d = t.dashboard.discounts.saveBar

@@ -86,12 +86,24 @@ export async function getRates(
         const rates: RateOption[] = (firstResult.quotations ?? [])
             .map((q) => {
                 const codFeature = q.features?.find((f: any) => f.cod != null)?.cod
+                // Charge exactly what EP debits the wallet at submit. Per submit_orders (docs
+                // 2026-06): total_paid_amount = shipment_price + shipment_tax + submitted-feature
+                // price + byoc − coupon. For ECH this reduces to shipment_price + shipment_tax —
+                // all EP features are submitted OFF, BYOC couriers are excluded (usableRates
+                // filter below), and no EP coupon is applied. NOT pricing.total_amount, which
+                // bundles quoted add-on features we never submit (live: 6.22 quote vs 5.62 billed).
+                // Parse with rmStringToSen (→ sen, prefix-tolerant): COD sibling fields in the SAME
+                // response are "MYR…"-prefixed, so shipment_price/tax may be too. shipment_tax
+                // absent/"" → 0; an unparseable base → NaN → dropped by the .filter below.
+                const baseSen = rmStringToSen(q.pricing.shipment_price)
+                const priceSen = baseSen != null ? baseSen + (rmStringToSen(q.pricing.shipment_tax) ?? 0) : NaN
                 return {
                     courier: q.courier.courier_id,
                     serviceId: q.courier.service_id,
                     courierName: q.courier.courier_name,
+                    courierLogo: q.courier.courier_logo ?? null,
                     serviceName: q.courier.service_name,
-                    priceSen: Math.round(parseFloat(q.pricing.total_amount) * 100),
+                    priceSen,
                     codAvailable: codFeature?.available ?? false,
                     // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
                     codMinSen: rmStringToSen(codFeature?.min_cod_amount),
@@ -141,7 +153,11 @@ export async function getRates(
             }
         }
 
-        console.warn('[get-rates] EP returned 0 quotations, falling back to flat rate')
+        // Distinguish "EP sent nothing" from "all rates dropped" (unparseable prices → the
+        // prefix-tolerance failure mode, or all BYOC) so the flat-rate fallback is diagnosable.
+        console.warn(
+            `[get-rates] no usable EP rate (raw=${(firstResult.quotations ?? []).length}, parsed=${rates.length}, non-byoc=${usableRates.length}) — flat-rate fallback`,
+        )
     } catch (err) {
         // Never throw to caller — degrade silently, surface via degraded flag
         console.error('[get-rates] EP quotation failed, falling back:', (err as Error).message)

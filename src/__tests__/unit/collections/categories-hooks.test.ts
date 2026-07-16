@@ -9,7 +9,7 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-09: Self-parent cycle — setting category as its own parent throws error', async () => {
             const req = {
-                user: { roles: ['super-admin'] },
+                user: { tenants: [{ tenant: 'tenant-456' }] },
                 payload: {
                     findByID: vi.fn()
                 }
@@ -17,48 +17,48 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
             // Update operation: trying to set cat-A's parent to itself
             await expect(hook({
-                data: { name: 'Category A', parent: 'cat-A' },
+                data: { name: 'Category A', parent: 'cat-A', tenant: 'tenant-456' },
                 operation: 'update',
-                originalDoc: { id: 'cat-A' },
+                originalDoc: { id: 'cat-A', tenant: 'tenant-456' },
                 req
-            } as any)).rejects.toThrow(/Không thể đặt danh mục làm cha của chính nó/)
+            } as any)).rejects.toThrow(/CATEGORY_CYCLE_ERROR/)
         })
 
         it('TC-F08-05-09: Descendant-as-parent cycle — setting descendant as parent throws error', async () => {
             const req = {
-                user: { roles: ['super-admin'] },
+                user: { tenants: [{ tenant: 'tenant-456' }] },
                 payload: {
                     // Only one findByID call actually happens: fetching cat-B's own record shows
                     // its parent is cat-A (= selfId) — the hook's ancestor walk throws on THAT
                     // hop, before ever needing to fetch a second level up.
                     findByID: vi.fn()
-                        .mockResolvedValueOnce({ id: 'cat-B', parent: 'cat-A' })
+                        .mockResolvedValueOnce({ id: 'cat-B', parent: 'cat-A', tenant: 'tenant-456' })
                 }
             }
 
             // Editing cat-A to have parent cat-B (where B is descendant of A)
             await expect(hook({
-                data: { name: 'Category A', parent: 'cat-B' },
+                data: { name: 'Category A', parent: 'cat-B', tenant: 'tenant-456' },
                 operation: 'update',
-                originalDoc: { id: 'cat-A' },
+                originalDoc: { id: 'cat-A', tenant: 'tenant-456' },
                 req
-            } as any)).rejects.toThrow(/Không thể đặt danh mục làm cha của chính nó/)
+            } as any)).rejects.toThrow(/CATEGORY_CYCLE_ERROR/)
         })
 
         it('TC-F08-05-09: Valid parent with no cycle — accepts parent change', async () => {
             const req = {
-                user: { roles: ['super-admin'] },
+                user: { tenants: [{ tenant: 'tenant-456' }] },
                 payload: {
                     findByID: vi.fn()
-                        .mockResolvedValueOnce({ id: 'cat-B', parent: null })
+                        .mockResolvedValueOnce({ id: 'cat-B', parent: null, tenant: 'tenant-456' })
                 }
             }
 
-            const data = { name: 'Category A', parent: 'cat-B' }
+            const data = { name: 'Category A', parent: 'cat-B', tenant: 'tenant-456' }
             const result = await hook({
                 data,
                 operation: 'update',
-                originalDoc: { id: 'cat-A' },
+                originalDoc: { id: 'cat-A', tenant: 'tenant-456' },
                 req
             } as any)
             expect(result).toBe(data)
@@ -66,33 +66,33 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         it('TC-F08-05-02: Depth limit — rejects 4th level category', async () => {
             const req = {
-                user: { roles: ['super-admin'] },
+                user: { tenants: [{ tenant: 'tenant-456' }] },
                 payload: {
                     findByID: vi.fn()
-                        .mockResolvedValueOnce({ id: 'Level3', parent: 'Level2' })
-                        .mockResolvedValueOnce({ id: 'Level2', parent: 'Level1' })
-                        .mockResolvedValueOnce({ id: 'Level1', parent: null })
+                        .mockResolvedValueOnce({ id: 'Level3', parent: 'Level2', tenant: 'tenant-456' })
+                        .mockResolvedValueOnce({ id: 'Level2', parent: 'Level1', tenant: 'tenant-456' })
+                        .mockResolvedValueOnce({ id: 'Level1', parent: null, tenant: 'tenant-456' })
                 }
             }
 
             await expect(hook({
-                data: { name: 'Level4', parent: 'Level3' },
+                data: { name: 'Level4', parent: 'Level3', tenant: 'tenant-456' },
                 operation: 'create',
                 req
-            } as any)).rejects.toThrow(/tối đa 3 cấp độ/)
+            } as any)).rejects.toThrow(/CATEGORY_MAX_DEPTH_ERROR/)
         })
 
         it('TC-F08-05-02: Depth limit — accepts 3rd level category', async () => {
             const req = {
-                user: { roles: ['super-admin'] },
+                user: { tenants: [{ tenant: 'tenant-456' }] },
                 payload: {
                     findByID: vi.fn()
-                        .mockResolvedValueOnce({ id: 'Level2', parent: 'Level1' })
-                        .mockResolvedValueOnce({ id: 'Level1', parent: null })
+                        .mockResolvedValueOnce({ id: 'Level2', parent: 'Level1', tenant: 'tenant-456' })
+                        .mockResolvedValueOnce({ id: 'Level1', parent: null, tenant: 'tenant-456' })
                 }
             }
 
-            const data = { name: 'Level3', parent: 'Level2' }
+            const data = { name: 'Level3', parent: 'Level2', tenant: 'tenant-456' }
             const result = await hook({
                 data,
                 operation: 'create',
@@ -103,11 +103,11 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
 
         // GH-1587 Phase 01: Cross-tenant parent IDOR fix (TC-F08-05-14)
         describe('beforeValidate hook — Cross-tenant parent IDOR (TC-F08-05-14)', () => {
-            it('TC-F08-05-14: Non-admin user setting parent to cross-tenant category rejects with "thuộc cùng thương hiệu" error', async () => {
+            it('TC-F08-05-14: Non-admin user setting parent to cross-tenant category rejects with CATEGORY_PARENT_TENANT_MISMATCH', async () => {
                 const req = {
                     user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
                     payload: {
-                        find: vi.fn().mockResolvedValueOnce({ docs: [] }) // Cross-tenant lookup returns empty
+                        findByID: vi.fn().mockResolvedValueOnce(undefined)
                     }
                 }
 
@@ -115,14 +115,14 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
                     data: { name: 'Category', parent: 'victim-cat-id' },
                     operation: 'create',
                     req
-                } as any)).rejects.toThrow(/thuộc cùng thương hiệu/)
+                } as any)).rejects.toThrow(/CATEGORY_PARENT_TENANT_MISMATCH/)
             })
 
             it('TC-F08-05-14: Non-admin user setting parent to same-tenant category succeeds', async () => {
                 const req = {
                     user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
                     payload: {
-                        find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 'parent-cat', parent: null, tenant: 'tenant-A' }] })
+                        findByID: vi.fn().mockResolvedValueOnce({ id: 'parent-cat', parent: null, tenant: 'tenant-A' })
                     }
                 }
 
@@ -133,18 +133,21 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
                     req
                 } as any)
                 expect(result.name).toBe('Child')
-                expect(req.payload.find).toHaveBeenCalledWith(
+                expect(req.payload.findByID).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        where: { id: { equals: 'parent-cat' }, tenant: { equals: 'tenant-A' } }
+                        collection: 'categories',
+                        id: 'parent-cat',
+                        overrideAccess: true,
+                        disableErrors: true,
                     })
                 )
             })
 
             it('TC-F08-05-14: Non-admin user with no resolvable tenant throws fail-safe error before lookup', async () => {
                 const req = {
-                    user: { id: 'user-1', tenants: [] }, // Empty tenants
+                    user: { id: 'user-1', tenants: [] },
                     payload: {
-                        find: vi.fn()
+                        findByID: vi.fn()
                     }
                 }
 
@@ -154,10 +157,10 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
                     req
                 } as any)).rejects.toThrow(/xác định thương hiệu/)
 
-                expect(req.payload.find).not.toHaveBeenCalled()
+                expect(req.payload.findByID).not.toHaveBeenCalled()
             })
 
-            it('TC-F08-05-14: Super-admin can set parent to any category (passthrough)', async () => {
+            it('TC-F08-05-14: Super-admin can set parent to any category when no tenant is being enforced', async () => {
                 const req = {
                     user: { roles: ['super-admin'] },
                     payload: {
@@ -172,8 +175,14 @@ describe('Categories Collection Hooks (TC-F08-05)', () => {
                     req
                 } as any)
                 expect(result.name).toBe('Admin Category')
-                // Super-admin should use findByID, not find with tenant filter
-                expect(req.payload.findByID).toHaveBeenCalledWith({ collection: 'categories', id: 'any-tenant-cat' })
+                expect(req.payload.findByID).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        collection: 'categories',
+                        id: 'any-tenant-cat',
+                        overrideAccess: true,
+                        disableErrors: true,
+                    })
+                )
             })
         })
     })
@@ -348,7 +357,7 @@ describe('Categories anonymous read access block [TC-F08-05-15]', () => {
     it('TC-F08-05-15: Authenticated user gets tenant-scoped access', () => {
         const req = { user: { tenants: [{ tenant: 'tenant-1' }] } } as any
         const access = Categories.access!.read!({ req } as any)
-        expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
+        expect(access).toEqual({ and: [{ tenant: { in: ['tenant-1'] } }, { deletedAt: { exists: false } }] })
     })
 })
 

@@ -39,12 +39,19 @@ const mockQuotationsSuccess = (rates: Omit<RateOption, 'degraded'>[]) => {
             courier_id: r.courier,
             service_id: r.serviceId,
             courier_name: r.courierName,
+            courier_logo: r.courierLogo,
             service_name: r.serviceName,
             delivery_duration: r.estDelivery,
             is_pickup: r.isPickup,
             is_dropoff: r.isDropoff,
         },
-        pricing: { total_amount: (r.priceSen / 100).toString() },
+        // total_amount is padded with a +0.60 feature delta that MUST be ignored — the
+        // charged price derives from shipment_price + shipment_tax (base EP bills at submit).
+        pricing: {
+            total_amount: (r.priceSen / 100 + 0.6).toFixed(2),
+            shipment_price: (r.priceSen / 100).toString(),
+            shipment_tax: '0.00',
+        },
         features: r.codAvailable
             ? [{
                 cod: {
@@ -110,6 +117,36 @@ describe('getRates', () => {
             const result = await getRates(baseParams, null, flatConfig)
             expect(result.rates[0].isPickup).toBeUndefined()
             expect(result.rates[0].isDropoff).toBeUndefined()
+        })
+    })
+
+    // TC-F36.199: courier_logo IS on the quotation (live probe 2026-07-14: 23/23 couriers), so
+    // checkout captures it here. Buyers have no EP token, and the merchant courier endpoint that
+    // used to serve logos also returns the EP wallet balance — it must never back a public page.
+    describe('[TC-F36.199] carries the courier logo from the quotation', () => {
+        it('maps courier_logo onto RateOption', async () => {
+            mockQuotationsSuccess([
+                { courier: 'pos', serviceId: 'pos-melplus', courierName: 'Pos Malaysia', serviceName: 'Melplus', priceSen: 622, codAvailable: false, estDelivery: '2–3 days', courierLogo: 'https://s3-ap-southeast-1.amazonaws.com/pos.png' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].courierLogo).toBe('https://s3-ap-southeast-1.amazonaws.com/pos.png')
+        })
+
+        it('nulls the logo when EP omits it — never undefined-into-the-DB', async () => {
+            mockQuotationsSuccess([
+                { courier: 'pos', serviceId: 'pos-melplus', courierName: 'Pos Malaysia', serviceName: 'Melplus', priceSen: 622, codAvailable: false, estDelivery: '2–3 days' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].courierLogo).toBeNull()
+        })
+
+        it('leaves the logo absent on flat-rate fallback (not an EP courier)', async () => {
+            const result = await getRates(baseParams, null, flatConfig)
+            expect(result.rates[0].courierLogo).toBeUndefined()
         })
     })
 
@@ -288,7 +325,7 @@ describe('getRates', () => {
                     status: 'success',
                     quotations: [{
                         courier: { courier_id: 'pos', service_id: 'std', courier_name: 'Pos Malaysia Berhad', service_name: 'Standard', delivery_duration: '3–5 days' },
-                        pricing: { total_amount: '8.00' },
+                        pricing: { total_amount: '8.00', shipment_price: '8.00', shipment_tax: '0.00' },
                         features: [{ cod: { available: true, min_cod_amount: '', max_cod_amount: '' } }],
                     }],
                 }],
@@ -314,7 +351,7 @@ describe('getRates', () => {
                     status: 'success',
                     quotations: [{
                         courier: { courier_id: 'jnt', service_id: 'std', courier_name: 'J&T Express', service_name: 'Standard', delivery_duration: '2–3 days' },
-                        pricing: { total_amount: '6.23' },
+                        pricing: { total_amount: '6.23', shipment_price: '6.23', shipment_tax: '0.00' },
                         features: [{ cod: { available: true, min_cod_amount: 'MYR10.00', max_cod_amount: 'MYR1,000.00' } }],
                     }],
                 }],
@@ -329,6 +366,65 @@ describe('getRates', () => {
             expect(result.rates[0].codMinSen).toBe(1000)      // "MYR10.00" → 1000 sen
             expect(result.rates[0].codMaxSen).toBe(100_000)   // "MYR1,000.00" → 100000 sen
             expect(result.codIneligible).toBe('under_min')    // limit ENFORCED, not dropped
+        })
+    })
+
+    describe('EP pricing formula — charge shipment_price + shipment_tax [TC-F36.192]', () => {
+        it('charges base + tax (5.62), ignoring the feature-padded total_amount (6.22)', async () => {
+            // Live numbers: total_amount bundles ~0.60 of add-on features ECH submits OFF;
+            // EP actually debits the wallet shipment_price + shipment_tax = 5.62 at submit.
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'pos', service_id: 'melplus', courier_name: 'Pos Malaysia', service_name: 'Melplus', delivery_duration: '2–3 days' },
+                        pricing: { total_amount: '6.22', shipment_price: '5.30', shipment_tax: '0.32' },
+                        features: [],
+                    }],
+                }],
+            })
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].priceSen).toBe(562)   // 5.30 + 0.32 — NOT 622 (total_amount)
+            expect(result.degraded).toBe(false)
+        })
+
+        it('is currency-prefix tolerant — parses "MYR5.30"/"MYR0.32" (review #1598)', async () => {
+            // COD sibling fields in the same response are "MYR…"-prefixed; shipment_price/tax
+            // may be too. rmStringToSen strips the prefix so the rate is NOT dropped.
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'pos', service_id: 'melplus', courier_name: 'Pos Malaysia', service_name: 'Melplus', delivery_duration: '2–3 days' },
+                        pricing: { total_amount: 'MYR6.22', shipment_price: 'MYR5.30', shipment_tax: 'MYR0.32' },
+                        features: [],
+                    }],
+                }],
+            })
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.degraded).toBe(false)           // NOT dropped to flat rate
+            expect(result.rates[0].priceSen).toBe(562)
+        })
+
+        it('treats a missing shipment_tax as 0', async () => {
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'jnt', service_id: 'std', courier_name: 'J&T', service_name: 'Standard', delivery_duration: '3–5 days' },
+                        pricing: { total_amount: '9.00', shipment_price: '8.50' },   // no shipment_tax field
+                        features: [],
+                    }],
+                }],
+            })
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].priceSen).toBe(850)   // 8.50 + 0 tax
         })
     })
 

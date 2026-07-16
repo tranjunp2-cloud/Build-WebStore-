@@ -51,3 +51,40 @@ describe('buildSubmitParams — parcel dimensions', () => {
         expect(p.item[0].length).toBe(10)
     })
 })
+
+describe('buildSubmitParams — COD placement [TC-F36.189]', () => {
+    it('puts COD inside feature.cod as an object (cod_amount + cod_currency), NOT top-level', () => {
+        const p = buildSubmitParams({ ...baseInput, codAmountRm: 50 }) as Record<string, unknown>
+
+        // EP 2026-06: COD is feature.cod { cod_amount, cod_currency } — a top-level
+        // cod_amount is silently ignored, producing a non-COD shipment.
+        expect(p.feature).toMatchObject({ cod: { cod_amount: 50, cod_currency: 'MYR' } })
+        expect(p.cod_amount).toBeUndefined()
+        expect(JSON.stringify(p)).not.toContain('"cod_amount":50,"feature"')
+    })
+
+    it('omits feature.cod entirely for a prepaid order', () => {
+        const p = buildSubmitParams(baseInput)
+
+        expect((p.feature as { cod?: unknown }).cod).toBeUndefined()
+    })
+
+    it('omits feature.cod when codAmountRm is 0', () => {
+        const p = buildSubmitParams({ ...baseInput, codAmountRm: 0 })
+
+        expect((p.feature as { cod?: unknown }).cod).toBeUndefined()
+    })
+})
+
+describe('buildSubmitParams — EP reference [TC-F36.196]', () => {
+    it('sends the ECH order number as EP `reference`', () => {
+        const p = buildSubmitParams({ ...baseInput, orderNumber: 'ORD-MRKAXJO1' })
+
+        expect(p.reference).toBe('ORD-MRKAXJO1')
+    })
+
+    it('omits reference when the order has no number (EP treats it as optional)', () => {
+        expect(buildSubmitParams(baseInput).reference).toBeUndefined()
+        expect(buildSubmitParams({ ...baseInput, orderNumber: '' }).reference).toBeUndefined()
+    })
+})

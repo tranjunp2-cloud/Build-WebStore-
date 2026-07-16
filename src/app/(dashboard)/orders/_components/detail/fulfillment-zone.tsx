@@ -154,9 +154,15 @@ function fmtMYR(rm: number): string {
 export function FulfillmentZone({
   order,
   onUpdate,
+  onLabelCreated,
 }: {
   order: FulfillmentOrder
   onUpdate: () => void
+  // Silent reconcile after label creation — refresh order state in place WITHOUT the
+  // full-page reload (router.refresh) that onUpdate does. The success card renders
+  // optimistically and the AWB fills in via polling, so no reload is needed. Falls
+  // back to onUpdate when not provided.
+  onLabelCreated?: () => void
 }) {
   const { t, ti } = useI18n()
   const f = t.dashboard.orders.fulfillment
@@ -174,12 +180,9 @@ export function FulfillmentZone({
   // Mark-shipment-cancelled (merchant attest — EP sends no webhook for dashboard cancels):
   // two-step inline confirm, then clear EP fields server-side → zone falls back to 'ready'
   // so the merchant re-creates a label through the normal existing flow.
-  const [markCancelOpen, setMarkCancelOpen] = useState(false)
-  const [markCancelBusy, setMarkCancelBusy] = useState(false)
-
   // Drop stale optimistic label state when the refetched order's EP fields are gone —
-  // e.g. mark-shipment-cancelled ran in another tab (review #1582: otherwise localCreated
-  // forces 'success' forever on this mount). Deps don't change in the post-create window
+  // e.g. an EP cancel webhook auto-reopened the order to 'confirmed' (review #1582:
+  // otherwise localCreated forces 'success' forever on this mount). Deps don't change in the post-create window
   // (order prop still stale), so the fresh optimistic state survives until refetch lands.
   useEffect(() => {
     if (!order.easyParcelOrderNo && !order.awbNo) {
@@ -364,7 +367,10 @@ export function FulfillmentZone({
             setLocalLabelUrl(newLabel)
             setLocalCreated(true)
             setForceMissing(false)
-            onUpdate()
+            // Wallet was charged for the label — invalidate the cached balance (parity with
+            // the main CreateLabelFlow success path).
+            invalidateEpShippingInfo(tenantId)
+            ;(onLabelCreated ?? onUpdate)()
           }}
           onError={(code) => {
             // If EP returns a different error from the weight form, just surface it
@@ -416,7 +422,9 @@ export function FulfillmentZone({
             setLocalCreated(true)
             // Wallet was charged for the label — refetch balance on next read
             invalidateEpShippingInfo(tenantId)
-            onUpdate()
+            // Silent reconcile (no page reload): the success card is already shown
+            // optimistically; an async AWB fills in via polling.
+            ;(onLabelCreated ?? onUpdate)()
           }}
           onCodBlocked={() => setForceCodBlocked(true)}
         />
@@ -475,11 +483,13 @@ export function FulfillmentZone({
                 </div>
               ) : (
                 // Async-AWB couriers (e.g. Pos): shipment created + wallet charged, AWB
-                // generated later and lands via webhook backfill. Print unlocks with it.
+                // generated later and lands via webhook backfill (surfaced by polling —
+                // no page reload). Spinner marks the AWB spot as actively loading; Print
+                // unlocks once it arrives.
                 <div className="st-field grow">
                   <div className="od-info-l">{f.trackingAwb}</div>
                   <div style={{ fontSize: 13, opacity: 0.75, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Clock style={{ width: 13, height: 13, flexShrink: 0 }} /> {f.awbPending}
+                    <span className="spin" style={{ width: 13, height: 13, flexShrink: 0 }} /> {f.awbPending}
                   </div>
                 </div>
               )}
@@ -516,69 +526,10 @@ export function FulfillmentZone({
             </div>
           </div>
 
-          {/* Merchant attest: shipment cancelled on the EP dashboard. EP dispatches NO
-              webhook for dashboard cancels (verified live 2026-07-10) and AWB-less
-              shipments can't be cron-polled — without this the order shows "Label
-              created" forever. Clearing re-arms the normal create-label flow. */}
-          {!markCancelOpen ? (
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ alignSelf: 'flex-start', marginTop: 8, opacity: 0.85 }}
-              onClick={() => setMarkCancelOpen(true)}
-            >
-              <XCircle style={{ width: 14, height: 14 }} /> {f.markCancelled}
-            </button>
-          ) : (
-            <div className="alert error" role="alertdialog" aria-labelledby="mark-cancel-title" style={{ marginTop: 8 }}>
-              <XCircle className="lead" style={{ width: 17, height: 17, flexShrink: 0, marginTop: 1 }} />
-              <div className="a-body">
-                <div className="a-t" id="mark-cancel-title">{f.markCancelledConfirmTitle}</div>
-                {f.markCancelledConfirmDesc}
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={markCancelBusy}
-                    onClick={async () => {
-                      setMarkCancelBusy(true)
-                      try {
-                        const res = await fetch(`/api/orders/${order.id}/mark-shipment-cancelled`, { method: 'POST' })
-                        const data = await res.json().catch(() => null)
-                        if (!res.ok || data?.success !== true) {
-                          const rawMsg = data?.error?.message
-                          toast.error(typeof rawMsg === 'string' ? rawMsg : f.markCancelledFailed)
-                          return
-                        }
-                        toast.success(f.markCancelledDone)
-                        // Reset the optimistic label state or the zone would stay 'success'
-                        setLocalAwb(null)
-                        setLocalLabelUrl(null)
-                        setLocalCreated(false)
-                        setMarkCancelOpen(false)
-                        onUpdate()
-                      } catch {
-                        toast.error(f.markCancelledFailed)
-                      } finally {
-                        setMarkCancelBusy(false)
-                      }
-                    }}
-                  >
-                    {markCancelBusy ? <span className="spin" /> : <XCircle style={{ width: 14, height: 14 }} />}
-                    {f.markCancelledYes}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={markCancelBusy}
-                    onClick={() => setMarkCancelOpen(false)}
-                  >
-                    {f.markCancelledNo}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* The manual "Mark shipment cancelled" button was removed from the UI (2026-07-13):
+              EP now dispatches cancel webhooks and applyTrackingUpdate auto-reopens the order
+              to 'confirmed'. The POST /api/orders/[id]/mark-shipment-cancelled route is kept
+              as a manual/emergency fallback for the rare case a cancel webhook never arrives. */}
         </div>
 
         {printOpen && (

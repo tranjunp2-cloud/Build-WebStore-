@@ -124,8 +124,8 @@ export function CustomersDetail({ customer }: Props) {
             {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (
                 <div
-                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
-                    style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
+                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm rounded-[10px]"
+                    style={{ background: 'hsl(var(--warning)/0.08)', border: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
                 >
                     <span>{cd.unsavedBanner}</span>
                     <button
@@ -192,7 +192,8 @@ export function CustomersDetail({ customer }: Props) {
                 default tab, just swapping "Unsaved changes" / "Up to date" text.
                 `position: fixed` (not `sticky`) — sticky only pins once you scroll past its
                 natural flow position, so it visibly drifted with the page instead of staying
-                put. `--dash-content-pl` (CMSLayoutClient) offsets it past the sidebar at lg+. */}
+                put. `--dash-content-pl` (globals.css, GH-1592) aligns it with the content column
+                (sidebar + p-8 gutter) at lg+. */}
             {activeTab === 'default' && dirty && (
                 <div
                     className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"

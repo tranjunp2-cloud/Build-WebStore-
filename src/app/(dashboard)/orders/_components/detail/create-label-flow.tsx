@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
+import { Info, Check, ExternalLink, RefreshCw, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -11,6 +11,8 @@ import {
   earliestPickupDate,
   isBusinessDateString,
   courierCutoffLabel,
+  maxCollectionDate,
+  recommendedBusinessDate,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
 import type { EpWalletInfo } from './use-ep-shipping-info'
 import { CourierLogo } from './courier-logo'
@@ -62,13 +64,21 @@ export function CreateLabelFlow({
   const [unsupported, setUnsupported] = useState<Array<'pickup' | 'dropoff'>>([])
   // Earliest date is cut-off aware per courier (shared helper — same math as the server clamp)
   const earliest = useMemo(() => earliestPickupDate(courierId ?? ''), [courierId])
+  const maxDate = useMemo(() => maxCollectionDate(), [])
   const [collectionDate, setCollectionDate] = useState(earliest)
+  // Weekend is a soft warning, NOT invalid (EP allows it) — only the [earliest, max] window gates.
   const dateIsBusiness = isBusinessDateString(collectionDate)
-  const dateValid = collectionDate >= earliest && dateIsBusiness
+  const dateValid = collectionDate >= earliest && collectionDate <= maxDate
 
   // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
   const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
-  const earliestDate = useMemo(() => new Date(`${earliest}T00:00:00`), [earliest])
+  // Weekend banner suggests the weekday nearest the PICKED date (shared helper — the decision
+  // and its window fallback live in pickup-schedule.ts, where they are unit-tested).
+  const recommendedDate = useMemo(
+    () => recommendedBusinessDate(collectionDate, maxDate),
+    [collectionDate, maxDate],
+  )
+  const recommendedDateObj = useMemo(() => new Date(`${recommendedDate}T00:00:00`), [recommendedDate])
   const dateToStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
@@ -257,9 +267,6 @@ export function CreateLabelFlow({
                 dark bg reads slightly larger than the tinted icon square at equal pixel size */}
             <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={32} />
             {displayName}
-            <span className="preset-tag">
-              <Lock style={{ width: 10, height: 10 }} /> {cl.fromSettings}
-            </span>
           </span>
         </div>
 
@@ -324,7 +331,8 @@ export function CreateLabelFlow({
         <div className="collect-col collect-date">
           <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionDateLabel}</div>
           {/* Date card mirrors the method tiles: value + its note live INSIDE the card.
-              shadcn Calendar disables past dates + weekends right on the grid. */}
+              Calendar disables past dates + dates beyond the ~2-week window; weekends stay
+              SELECTABLE (EP allows them) but surface a soft warning below (mirrors EP's UI). */}
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="collect-date-card">
@@ -332,18 +340,12 @@ export function CreateLabelFlow({
                   {format(selectedDate, 'EEE, dd/MM/yyyy')}
                   <CalendarDays />
                 </span>
-                {!dateIsBusiness ? (
-                  <span className="cd-note warn">
-                    <TriangleAlert /> {cl.weekendWarning}
-                  </span>
-                ) : (
-                  <span className="cd-note">
-                    <Info />
-                    {method === 'pickup'
-                      ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
-                      : cl.dropoffHint}
-                  </span>
-                )}
+                <span className="cd-note">
+                  <Info />
+                  {method === 'pickup'
+                    ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
+                    : cl.dropoffHint}
+                </span>
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -355,7 +357,13 @@ export function CreateLabelFlow({
                 mode="single"
                 selected={selectedDate}
                 defaultMonth={selectedDate}
-                disabled={[{ before: earliestDate }, { dayOfWeek: [0, 6] }]}
+                // Function matcher on the "YYYY-MM-DD" string — unambiguous calendar-date
+                // comparison (no react-day-picker boundary/timezone edge). max (today + 13,
+                // the ~2-week window) is INCLUSIVE; only strictly-later days are disabled.
+                disabled={(day) => {
+                  const s = dateToStr(day)
+                  return s < earliest || s > maxDate
+                }}
                 onSelect={(d) => {
                   if (d) setCollectionDate(dateToStr(d))
                   setDateOpen(false)
@@ -365,6 +373,17 @@ export function CreateLabelFlow({
           </Popover>
         </div>
       </div>
+
+      {/* Weekend picked: full-width warning banner below the row (mirrors EP's dashboard —
+          the date card is too narrow for this copy). Recommends the nearest weekday. */}
+      {!dateIsBusiness && (
+        <div className="alert warning" style={{ marginTop: 10 }} role="note">
+          <TriangleAlert className="lead" />
+          <div className="a-body">
+            {ti(cl.weekendWarning, { date: format(recommendedDateObj, 'EEE, dd MMM') })}
+          </div>
+        </div>
+      )}
 
       <div className="ship-foot">
         <div className="help">

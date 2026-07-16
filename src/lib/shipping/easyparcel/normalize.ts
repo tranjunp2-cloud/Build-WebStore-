@@ -19,9 +19,11 @@ export function aggregateWeightKg(weightGrams: number): number {
     return Math.max(0.1, Math.ceil(kg * 10) / 10)
 }
 
-// Pickup/collection-date math moved to ./pickup-schedule (pure, client-safe — the
-// Ready-to-Ship date picker imports it too). Re-exported here for server callers.
-export { earliestPickupDate, clampCollectionDate, courierCutoffLabel, isBusinessDateString } from './pickup-schedule'
+// Pickup/collection-date math lives in ./pickup-schedule (pure, client-safe — the Ready-to-Ship
+// date picker imports it directly). Only re-export what a server caller actually reaches for:
+// this module is `server-only`, so every name re-exported here is an invitation for a client
+// component to pull it in through the wrong door and break `next build` (as warehouse.ts once did).
+export { earliestPickupDate } from './pickup-schedule'
 
 // MY state name → ISO 3166-2 subdivision code (New EP API)
 const SUBDIVISION_CODE_MAP: Record<string, string> = {
@@ -71,34 +73,8 @@ export function mapSubdivisionName(code: string): string {
     return SUBDIVISION_NAME_MAP[code] ?? code
 }
 
-/**
- * Split a raw MY phone number into country code + local number for New EP API.
- * Strips non-digit chars, removes leading "60" or "0" prefix.
- */
-export function splitPhone(raw: string): { countryCode: string; number: string } {
-    const digits = raw.replace(/\D/g, '')
-    if (digits.startsWith('60')) return { countryCode: '60', number: digits.slice(2) }
-    if (digits.startsWith('0')) return { countryCode: '60', number: digits.slice(1) }
-    return { countryCode: '60', number: digits }
-}
-
-/**
- * Whether a raw phone is usable as an EP shipment contact number. EP accepts a
- * placeholder at submit time but the courier's AWB issuance rejects it later,
- * stranding the shipment at "Pending AWB" with the wallet already charged
- * (verified live 2026-07-13) — so callers must reject unusable phones BEFORE
- * submit instead of substituting a placeholder.
- *
- * Validates the POST-splitPhone number — the value actually sent to EP — not the
- * raw digits: raw '600000000' has 9 digits but emits '0000000' (the exact legacy
- * placeholder) once splitPhone strips the '60' prefix. Legit MY numbers are ≥8
- * digits after the prefix strip (mobile 9-10, shortest landline 8, capped at
- * 11 for slack) and never start with 0 — the trunk 0 was the stripped prefix,
- * so a leading zero here means double-prefix garbage the courier will reject.
- * The cap catches multi-number pastes ("0123... / 0198...") in legacy data.
- */
-export function hasUsablePhone(raw: string | null | undefined): boolean {
-    const { number } = splitPhone(raw ?? '')
-    return number.length >= 8 && number.length <= 11 && !number.startsWith('0')
-}
+// Phone helpers moved to ./phone (pure, client-safe — warehouse.ts is imported by
+// the client Settings → Shipping tab and needs hasUsablePhone). Re-exported here
+// for server callers, same as the pickup-schedule re-export above.
+export { splitPhone, hasUsablePhone } from './phone'
 

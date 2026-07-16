@@ -144,6 +144,9 @@ export default async function OrderTrackingPage({
         trackingNumber: order.trackingNumber ?? null,
         awbNo: order.awbNo ?? null,
         shippingCourier: order.shippingCourier ?? null,
+        // Without this the buyer's courier row rendered the raw EP code ("EP-CR0DW").
+        shippingCourierName: order.shippingCourierName ?? null,
+        shippingCourierLogo: order.shippingCourierLogo ?? null,
         shippingTrackingStatus: order.shippingTrackingStatus ?? null,
         shippingTrackingHistory: (order.shippingTrackingHistory ?? []).map((h: any) => ({
             description: h.description ?? '',

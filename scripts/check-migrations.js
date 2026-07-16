@@ -73,40 +73,50 @@ function toSnakeCase(str) {
   return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
 }
 
-// Scans the CURRENT full collection source (not just the diff) for field names
-// nested under an `array` ancestor. The diff-only scope tracker in
-// getNewFieldsFromDiff() only sees an array ancestor when the array's own
-// `type: 'array'` line is itself part of the added diff — if a PR adds a new
-// sibling field to an array that already existed pre-PR (e.g. Sites.ts's
-// `openingHours` array gaining `opens`/`closes` after `dayOfWeek`/`isClosed`
-// already shipped), the ancestor line is unchanged/absent from the diff and
-// the new field is misdetected as a top-level column. Cross-checking the full
-// current file's indentation-based structure catches this regardless of diff
-// shape. GH-1587 CI run surfaced this false positive on Sites.ts opens/closes.
 function getArrayNestedFieldNames(source) {
   const nested = new Set()
+  for (const role of getFieldRoles(source)) {
+    if (role.nested) nested.add(role.name)
+  }
+  return nested
+}
+
+/**
+ * Walk `source` once and return an array of `{ name, nested, isContainer }`
+ * — one entry per `name:` field declaration found ANYWHERE in the file
+ * (top-level, group-nested, or array-nested). `nested` = true iff the field
+ * has an ARRAY ancestor in its scope chain (group ancestors do NOT count —
+ * group sub-fields map to prefixed columns on the SAME table, matched via
+ * KNOWN_GROUP_PREFIXES downstream in getMigrationColumns()). `isContainer` =
+ * true iff the field is itself `type: 'group'`/`type: 'array'` (no direct
+ * column of its own). Handles both multi-line and compact single-line field
+ * declarations identically — the classification only needs the field's
+ * `name:` and its own/ancestors' `type:`, never the field's other content.
+ *
+ * A field name CAN legitimately appear more than once in the returned array
+ * (e.g. Products.ts nests `value` under both `variantConfigs.options` and
+ * `attributes` — two entries, both `nested: true`) — that's fine, both are
+ * treated identically by the caller.
+ */
+function getFieldRoles(source) {
+  const roles = []
   const lines = source.split('\n')
   const scopeStack = [] // { indent, type }
-
   for (let i = 0; i < lines.length; i++) {
-    // Match `name:` anywhere on the line (not just line-start) — compact
-    // single-line field syntax (`{ name: 'x', type: 'y' },`) puts `name:`
-    // after a leading `{ `. Indent is measured from LEADING WHITESPACE, not
-    // from `name:`'s own position, so scope tracking stays correct either way
-    // (mirrors the diff-based heuristic in getNewFieldsFromDiff() below).
+    // Support both multi-line (`name:` starts the line) and compact
+    // single-line (`{ name: 'x', type: 'y' },`) field definitions — the
+    // dominant style in collections like Products.ts. Indent = leading
+    // whitespace of the whole line, NOT the position of `name:` itself.
     const wsMatch = lines[i].match(/^(\s*)/)
     const nameMatch = lines[i].match(/name:\s*['"](\w+)['"]/)
     if (!nameMatch) continue
     const indent = wsMatch[1].length
-    const fieldName = nameMatch[1]
 
     while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
       scopeStack.pop()
     }
 
-    if (scopeStack.some((s) => s.type === 'array')) {
-      nested.add(fieldName)
-    }
+    const nested = scopeStack.some((s) => s.type === 'array')
 
     let ownType = null
     const inlineTypeMatch = lines[i].match(/type:\s*['"](\w+)['"]/)
@@ -122,13 +132,70 @@ function getArrayNestedFieldNames(source) {
         }
       }
     }
+    const isContainer = ownType === 'group' || ownType === 'array'
 
-    if (ownType === 'group' || ownType === 'array') {
+    roles.push({ name: nameMatch[1], nested, isContainer })
+
+    if (isContainer) {
       scopeStack.push({ indent, type: ownType })
     }
   }
+  return roles
+}
 
-  return nested
+/**
+ * Classify a `git show BASE:file` failure message: true iff the failure is
+ * git's own "this path did not exist at that ref" error (legitimate — the
+ * file is new to this PR, safe to treat as an empty baseline). Any other
+ * message (bad ref, network failure, corrupted repo, etc.) returns false —
+ * the caller must NOT treat that as "nothing existed before", since doing so
+ * would flag every field in the file as new (a false-positive storm across
+ * every tracked collection if BASE_BRANCH itself is misconfigured).
+ */
+function isPathMissingAtRef(gitErrorMessage) {
+  // "does not exist in" fires when the path never existed anywhere reachable
+  // from the ref; "exists on disk, but not in" is what git actually returns
+  // for the realistic case here — the file passed the existsSync() guard
+  // above (it's on disk, new in this PR) but isn't present at BASE_BRANCH yet.
+  // Verified against a real `git show <ref>:<path-new-on-disk>` invocation —
+  // matching only the first pattern silently fell through to the generic
+  // "could not read, skipping" branch, which SKIPS the file entirely instead
+  // of treating it as a new-file/empty-baseline (i.e. a brand-new tracked
+  // collection's fields would never get flagged for a missing migration).
+  return /does not exist in|exists on disk, but not in/.test(gitErrorMessage)
+}
+
+/**
+ * Given `getFieldRoles()` output for a base and a current file, return the
+ * names of fields that are new TOP-LEVEL (non-nested, non-container) columns
+ * in `currentRoles` — i.e. absent from `baseRoles` as a top-level role.
+ *
+ * A field's existence is tracked by identity (name, nested) — NOT by full
+ * line/block content. This is deliberate: comparing whole-file field roles
+ * (instead of parsing `git diff` line-by-line) sidesteps hunk-boundary loss
+ * entirely (the root cause of 3 prior false-negative rounds on this exact
+ * check — see git history/journal), AND keying by (name, nested) rather than
+ * full content means a purely cosmetic edit to an EXISTING field (admin
+ * text, maxLength, adding `required: true`) never triggers a false "new
+ * field" flag — only fields genuinely ABSENT from base as a top-level role
+ * are flagged.
+ *
+ * This is what safely resolves the Products.ts-style value/key collision: a
+ * brand-new TOP-LEVEL field and an unrelated NESTED field sharing a bare
+ * name get DIFFERENT (name, nested) identities, so the new one is never
+ * mistaken for "already existed, just nested".
+ */
+function diffNewTopLevelFieldNames(baseRoles, currentRoles) {
+  const baseTopLevelNames = new Set(
+    baseRoles.filter((r) => !r.nested && !r.isContainer).map((r) => r.name)
+  )
+  const newNames = []
+  for (const role of currentRoles) {
+    if (role.nested || role.isContainer) continue // array-row field or group/array wrapper — no direct column here
+    if (baseTopLevelNames.has(role.name)) continue // already existed as a top-level field — not new
+    newNames.push(role.name)
+  }
+  return newNames
 }
 
 function getNewFieldsFromDiff() {
@@ -141,92 +208,42 @@ function getNewFieldsFromDiff() {
       // Pages.ts has a unique shape handled by checkNewPagesBlockFields.
       if (filename === 'Pages.ts') continue
 
-      // Get full added-line diff to detect group fields (groups don't create DB columns).
-      const fullDiff = execSync(
-        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`,
-        { encoding: 'utf8' }
-      ).trim()
+      const currentFilePath = path.join(__dirname, '..', filePath)
+      if (!fs.existsSync(currentFilePath)) continue
+      const currentContent = fs.readFileSync(currentFilePath, 'utf8')
 
-      if (!fullDiff) continue
-
-      // Identify fields to skip when extracting new top-level columns:
-      // - Fields typed 'group'/'array' themselves (no direct column on this table).
-      // - Fields nested inside an 'array' ancestor (array-row fields live in a
-      //   separate {collection}_..._{field} table, never a column on this table).
-      // Group sub-fields are NOT skipped — they map to prefixed columns on this
-      // same table, matched via KNOWN_GROUP_PREFIXES in getMigrationColumns().
-      const diffLines = fullDiff.split('\n')
-      const skipFieldNames = new Set()
-      const scopeStack = [] // { indent, type }
-      for (let i = 0; i < diffLines.length; i++) {
-        // Support both multi-line (`name:` starts the line) and compact
-        // single-line (`{ name: 'x', type: 'y' },`) field definitions —
-        // indent = leading whitespace after '+'; `name:` may appear anywhere
-        // after that on the same added line.
-        const wsMatch = diffLines[i].match(/^\+(\s*)/)
-        if (!wsMatch) continue
-        const nameMatch = diffLines[i].slice(1).match(/name:\s*['"](\w+)['"]/)
-        if (!nameMatch) continue
-        const indent = wsMatch[1].length
-        const fieldName = nameMatch[1]
-
-        // Pop scopes we've exited (same or shallower indent than this field).
-        while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
-          scopeStack.pop()
-        }
-
-        // Nested inside an array ancestor → array-row field, different table.
-        if (scopeStack.some((s) => s.type === 'array')) {
-          skipFieldNames.add(fieldName)
-        }
-
-        // Determine this field's own type — same line first (compact form),
-        // then fall back to nearby lines at the same indent (multi-line form).
-        let ownType = null
-        const inlineTypeMatch = diffLines[i].match(/type:\s*['"](\w+)['"]/)
-        if (inlineTypeMatch) {
-          ownType = inlineTypeMatch[1]
+      // `git show` failing means one of two very different things: (a) the
+      // file genuinely didn't exist at BASE_BRANCH (legitimate — every field
+      // in current is new, baseContent stays '') or (b) something else went
+      // wrong (bad ref, network issue fetching a remote branch, corrupted
+      // git state) — in which case treating this as "nothing existed before"
+      // would flag EVERY field in the file as new, a false-positive storm
+      // across every tracked collection if BASE_BRANCH itself is broken.
+      // isPathMissingAtRef() distinguishes the two; only case (a) gets the
+      // empty baseline, case (b) skips this file with a warning, matching
+      // the old diff-based code's behavior on a failed `git diff`.
+      let baseContent = ''
+      try {
+        baseContent = execSync(`git show ${BASE_BRANCH}:${filePath} 2>&1`, { encoding: 'utf8' })
+      } catch (gitShowErr) {
+        const message = String(gitShowErr.stdout || gitShowErr.message || '')
+        if (isPathMissingAtRef(message)) {
+          baseContent = '' // (a) file is new to this PR — legitimate empty baseline
         } else {
-          for (let j = Math.max(0, i - 2); j <= Math.min(diffLines.length - 1, i + 8); j++) {
-            if (j === i) continue
-            const typeMatch = diffLines[j].match(/^\+(\s*)type:\s*['"](\w+)['"]/)
-            if (typeMatch && typeMatch[1].length === indent) {
-              ownType = typeMatch[2]
-              break
-            }
-          }
-        }
-
-        if (ownType === 'group' || ownType === 'array') {
-          skipFieldNames.add(fieldName) // groups/arrays have no direct column themselves
-          scopeStack.push({ indent, type: ownType })
+          console.error(`[migration-check] Warning: could not read ${filePath} at ${BASE_BRANCH}, skipping:`, message.trim())
+          continue // (b) unknown failure — do not assume "everything is new"
         }
       }
 
-      // Cross-check against the CURRENT full file — catches fields newly added
-      // inside an array whose own declaration pre-dates this diff (see
-      // getArrayNestedFieldNames doc comment).
-      const currentSource = fs.readFileSync(path.join(__dirname, '..', filePath), 'utf8')
-      for (const name of getArrayNestedFieldNames(currentSource)) {
-        skipFieldNames.add(name)
-      }
-
-      // Extract field names from added `name:` lines, skipping group/array
-      // fields and any field nested inside an array.
-      const nameDiff = diffLines.filter(l => l.includes('name:')).join('\n')
-      const regex = /name:\s*['"](\w+)['"]/g
-      let match
-      while ((match = regex.exec(nameDiff)) !== null) {
-        if (skipFieldNames.has(match[1])) continue
-        newFields.push({
-          field: match[1],
-          snake: toSnakeCase(match[1]),
-          table: tableName,
-          file: filename,
-        })
+      const newNames = diffNewTopLevelFieldNames(
+        getFieldRoles(baseContent),
+        getFieldRoles(currentContent)
+      )
+      for (const name of newNames) {
+        newFields.push({ field: name, snake: toSnakeCase(name), table: tableName, file: filename })
       }
     } catch (err) {
-      console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
+      console.error(`[migration-check] Warning: could not compare ${filePath}:`, err.message)
     }
   }
 
@@ -826,4 +843,9 @@ if (require.main === module) {
   main()
 }
 
-module.exports = { getArrayNestedFieldNames }
+module.exports = {
+  getArrayNestedFieldNames,
+  getFieldRoles,
+  isPathMissingAtRef,
+  diffNewTopLevelFieldNames,
+}

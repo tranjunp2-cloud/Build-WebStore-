@@ -5,10 +5,10 @@ import { useI18n } from '@/i18n'
 import { isOwner } from '@/lib/profile/role-utils'
 import { isStaging } from '@/lib/env'
 import type { PlatformUser } from '@/types/user'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ProfileBanner } from './profile-banner'
 import { GeneralInfoTab } from './general-info-tab'
 import { SecurityTab } from './security-tab'
+import { OwnerProfileView } from './owner-profile-view'
 import { ResetAccountCard } from '@/app/(dashboard)/dashboard/settings/ResetAccountCard'
 
 type Props = {
@@ -22,6 +22,7 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
     const { t } = useI18n()
     const [user, setUser] = useState<PlatformUser>(initialUser)
 
+    // SSO portal URL for the Owner SSO widget CTA — same route the old `SsoGuardBox` used.
     const ssoBase = (process.env.NEXT_PUBLIC_SSO_BASE_URL ?? '').replace(/\/$/, '')
     const ssoUrl = ssoBase ? `${ssoBase}/setting` : ''
 
@@ -39,32 +40,15 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
                 </h1>
             )}
 
-            <ProfileBanner user={user} role={role} onUserUpdate={onUserUpdate} />
-
-            <Tabs defaultValue="general" className="flex flex-col gap-8">
-                <TabsList variant="underline">
-                    <TabsTrigger value="general" variant="underline">
-                        {t.profile.tabs.general}
-                    </TabsTrigger>
-                    <TabsTrigger value="security" variant="underline">
-                        {t.profile.tabs.security}
-                    </TabsTrigger>
-                </TabsList>
-                <TabsContent value="general" className="mt-0">
-                    <GeneralInfoTab
-                        user={user}
-                        role={role}
-                        ssoUrl={ssoUrl}
-                        onUserUpdate={onUserUpdate}
-                    />
-                </TabsContent>
-                <TabsContent value="security" className="mt-0">
-                    <SecurityTab
-                        role={role}
-                        ssoUrl={ssoUrl}
-                    />
-                </TabsContent>
-            </Tabs>
+            {role === 'owner' ? (
+                <OwnerProfileView user={user} ssoUrl={ssoUrl} />
+            ) : (
+                <>
+                    <ProfileBanner user={user} role={role} onUserUpdate={onUserUpdate} />
+                    <GeneralInfoTab user={user} onUserUpdate={onUserUpdate} />
+                    <SecurityTab />
+                </>
+            )}
 
             {isStaging() && <ResetAccountCard />}
         </div>

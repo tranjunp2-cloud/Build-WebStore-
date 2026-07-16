@@ -108,8 +108,15 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             // Act
             const available = await checkCategoryNameAvailable('Shirts', 'different-parent-789')
 
-            // Assert
+            // Assert: verify scoping — query must include parent_id in WHERE clause
             expect(available).toBe(true)
+            expect(mockExecute).toHaveBeenCalled()
+            // Verify the SQL contains the parent_id condition (actual value passed as param)
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(sqlCall).toBeDefined()
+            // Check queryChunks for parent_id reference — proves scoping is applied
+            const sqlText = JSON.stringify(sqlCall)
+            expect(sqlText).toContain('parent_id')
         })
 
         it('TC-F08-05-05: Allows same name in DIFFERENT tenant', async () => {
@@ -119,8 +126,15 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             // Act
             const available = await checkCategoryNameAvailable('Fashion', null) // different tenant checked by tenantIdForQuery
 
-            // Assert
+            // Assert: verify tenant_id scoping in WHERE clause
             expect(available).toBe(true)
+            expect(mockExecute).toHaveBeenCalled()
+            // Verify the SQL contains the tenant_id condition (proves tenant scoping is applied)
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(sqlCall).toBeDefined()
+            // Check queryChunks for tenant_id reference
+            const sqlText = JSON.stringify(sqlCall)
+            expect(sqlText).toContain('tenant_id')
         })
 
         it('TC-F08-05-05: Allows duplicate when excludeId matches existing record', async () => {
@@ -434,6 +448,16 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             await expect(saveCategoryAction({ name: '' })).rejects.toThrow()
             // Missing field fails required check
             await expect(saveCategoryAction({})).rejects.toThrow()
+        })
+
+        it('TC-F08-05-28: Rejects a whitespace-only name (full-PR review)', async () => {
+            // Regression: `z.string().min(1)` validates the RAW string length — "   " has
+            // length 3, so it passed validation before the fix and only became an empty string
+            // after `data.name.trim()` ran, reaching payload.create/update as a blank name with
+            // no friendly error mapped for it. `.trim()` now runs inside the schema itself,
+            // before `.min(1)`, so this is rejected at the Zod layer.
+            await expect(saveCategoryAction({ name: '   ' })).rejects.toThrow()
+            expect(mockCreate).not.toHaveBeenCalled()
         })
 
         it('TC-F08-05-05: Allows optional slug and parent fields', async () => {

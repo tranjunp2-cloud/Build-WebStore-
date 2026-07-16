@@ -9,6 +9,7 @@ import { POST as BulkParsePOST } from '@/app/api/ai/products-bulk-parse/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -97,9 +98,20 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
-vi.mock('@/lib/ai/generate-sample-products', () => ({
-    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
-}))
+vi.mock('@/lib/ai/generate-sample-products', () => {
+    const generateSampleProducts = vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } })
+    return {
+        generateSampleProducts,
+        prepareSampleProducts: vi.fn().mockImplementation(async () => {
+            const generated = await generateSampleProducts()
+        return { products: generated.products, imageKeywords: [], category: 'business' }
+        }),
+        enrichSampleProductImages: vi.fn().mockImplementation(async (prepared) => ({
+            products: prepared.products,
+            stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+        })),
+    }
+})
 
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
 // prove seeding is DEFERRED (scheduled, not awaited in-request) and then
@@ -413,10 +425,11 @@ describe('AI Streaming APIs', () => {
              const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
              const resolvedPayload = await mockPayload
              const createCalls = vi.mocked(resolvedPayload.create).mock.calls
-             const siteCreateCall = createCalls.find(
+             const siteCreateCalls = createCalls.filter(
                  (c: [{ collection: string; data?: { generationLocale?: string } }]) =>
                      c[0].collection === 'sites'
              )
+             const siteCreateCall = siteCreateCalls.at(-1)
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
@@ -874,14 +887,18 @@ describe('AI Streaming APIs', () => {
     })
 
     describe('POST /api/ai/products-bulk-parse (TC-F08-04-01 & TC-F08.18)', () => {
-        it('returns 429 when rate limit is hit (Stress Protection)', async () => {
+        it('returns 429 with rateLimitExceeded code + resetAt when rate limit is hit (Stress Protection)', async () => {
             mockRateLimitAllowed = false
             const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
                 method: 'POST',
                 body: JSON.stringify({ promptText: 'Áo thun 50k' })
             })
             const res = await BulkParsePOST(req)
+            const json = await res.json()
             expect(res.status).toBe(429)
+            expect(json.error).toBe('rateLimitExceeded')
+            expect(typeof json.resetAt).toBe('number')
+            expect(vi.mocked(checkRateLimit)).toHaveBeenCalledWith('ai-bulk-parse:user-xyz', 10)
         })
 
         it('returns fallback data when OPENAI_API_KEY is completely missing', async () => {
@@ -1102,6 +1119,67 @@ describe('AI Streaming APIs', () => {
                 delete process.env.GEN_BLOG_PREP_GRACE_MS
             }
         })
+
+        it('[TC-GENPERF-PI-01] slow product image enrichment does not block catalog creation or mutate a regenerated product', async () => {
+            // Arrange — copy is ready, but the external image provider remains pending.
+            const { prepareSampleProducts, enrichSampleProductImages } = await import('@/lib/ai/generate-sample-products')
+            const { after } = await import('next/server')
+            vi.mocked(prepareSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Bread',
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    status: 'active',
+                }],
+                imageKeywords: ['artisan bread'],
+                category: 'food',
+            })
+            let resolveImages: (value: { products: Array<Record<string, unknown>>; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
+            vi.mocked(enrichSampleProductImages).mockReturnValueOnce(new Promise((resolve) => {
+                resolveImages = resolve
+            }) as ReturnType<typeof enrichSampleProductImages>)
+            // Act — response must not wait for the unresolved image promise.
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — product data persisted and a third after() task was queued
+            // alongside the existing blog and image-library tasks.
+            expect(res.status).toBe(200)
+            const mockPayload = await vi.mocked(getPayload).mock.results.at(-1)?.value
+            expect(vi.mocked(mockPayload.create).mock.calls.some((call) => call[0].collection === 'products')).toBe(true)
+            expect(vi.mocked(after).mock.calls.length).toBeGreaterThanOrEqual(3)
+
+            // Product enrichment is the first deferred task scheduled by the
+            // route. It must return its promise so Next/Vercel keeps the
+            // request lifecycle alive until image updates finish.
+            const deferredTasks = vi.mocked(after).mock.calls.map(([task]) => task as () => unknown)
+            const productImageTask = deferredTasks[0]!
+            const productImageTaskResult = productImageTask()
+            expect(productImageTaskResult).toBeInstanceOf(Promise)
+
+            resolveImages({
+                products: [{
+                    name: 'Sample Bread', sku: 'BREAD-001', imageId: 123,
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+            await productImageTaskResult
+            for (const task of deferredTasks.slice(1)) await task()
+
+            // The deferred task must update the product created by this request.
+            // Re-querying all products for the site by deterministic SKU would
+            // allow a prior generation to overwrite a regenerated product.
+            expect(vi.mocked(mockPayload.update)).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'products',
+                id: 'new-products-123',
+                data: expect.objectContaining({ images: [{ image: 123, alt: expect.any(String) }] }),
+            }))
+            expect(vi.mocked(mockPayload.find).mock.calls.some((call) =>
+                call[0].collection === 'products' && call[0].where?.site?.equals,
+            )).toBe(false)
+        }, 10_000)
     })
 
     describe('canonicalizePageSlug — trust canonical slug over title/content [GH-820 + dental /contact fix]', () => {

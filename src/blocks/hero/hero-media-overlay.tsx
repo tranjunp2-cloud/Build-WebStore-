@@ -1,5 +1,3 @@
-'use client'
-
 import { MediaUploadOverlay, type MediaUploadOverlayProps } from '@/blocks/shared/media-upload-overlay'
 
 // Thin wrapper kept so existing hero-variant imports stay unchanged. The upload overlay logic

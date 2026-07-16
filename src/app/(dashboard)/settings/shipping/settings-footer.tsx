@@ -17,8 +17,8 @@ type Props = {
 // natural+scroll-triggered-fixed-copy layout with a different background
 // token, which read as visually inconsistent with Payments.
 // `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
-// regardless of content length. `--dash-content-pl` (CMSLayoutClient) clears the
-// sidebar at lg+.
+// regardless of content length. `--dash-content-pl` (globals.css, GH-1592) aligns the
+// left edge with the content column (sidebar + p-8 gutter) at lg+.
 export function SettingsFooter({ isDirty, isSaving, onReset, onSave }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping

@@ -7,7 +7,7 @@
  * module transparently falls back to it so existing configs keep working without a data migration.
  */
 
-import { hasUsablePhone } from './normalize'
+import { hasUsablePhone } from './phone'
 
 export interface Warehouse {
     id?: string
