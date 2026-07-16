@@ -4938,6 +4938,9 @@ const MIGRATIONS = [
   { name: 'orders.pickup_slot', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot varchar;` },
   // ── GH-1333: persist friendly courier name from EP rate response (e.g. "J&T Express") ──
   { name: 'orders.shipping_courier_name', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_name text;` },
+  // ── GH-1333: persist the EP courier_logo captured at checkout so the buyer's tracking
+  //    page can render a real logo without holding an EP token. ──
+  { name: 'orders.shipping_courier_logo', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_logo text;` },
   // ── GH-1333 F36: print-label modal — per-format label URLs + printed marker ──
   { name: 'orders.label_urls', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_urls jsonb;` },
   { name: 'orders.label_printed_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_printed_at timestamp with time zone;` },

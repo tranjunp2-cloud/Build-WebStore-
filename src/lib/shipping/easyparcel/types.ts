@@ -18,6 +18,8 @@ export interface RateOption {
     courier: string       // courier_id
     serviceId: string
     courierName: string
+    /** EP courier_logo URL. Absent on the flat-rate fallback (not an EP courier). */
+    courierLogo?: string | null
     serviceName: string
     priceSen: number      // sen
     codAvailable: boolean
@@ -73,6 +75,12 @@ export interface EpQuotationItem {
         service_name: string
         courier_id: string
         courier_name: string
+        /** Present on every quotation in practice (live probe 2026-07-14: 23/23) — no need to
+         *  hit /courier/list for it. */
+        courier_logo?: string | null
+        /** EP sends a JSON-encoded object here, NOT prose: `{"type":"days","value":"3"}`. Live
+         *  probe 2026-07-14: null for 18 of 23 couriers. Do not render it raw — see
+         *  docs/qa/F36-easyparcel-delivery.md § 3.18j. */
         delivery_duration?: string | null
         is_pickup: boolean
         is_dropoff: boolean

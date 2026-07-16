@@ -101,6 +101,7 @@ export async function getRates(
                     courier: q.courier.courier_id,
                     serviceId: q.courier.service_id,
                     courierName: q.courier.courier_name,
+                    courierLogo: q.courier.courier_logo ?? null,
                     serviceName: q.courier.service_name,
                     priceSen,
                     codAvailable: codFeature?.available ?? false,

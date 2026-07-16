@@ -6,6 +6,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { submitOrder } from '@/lib/shipping/easyparcel/client'
+import { shipmentCreatedEntry, type TrackingHistoryEntry } from '@/lib/shipping/easyparcel/tracking-history'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
 import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
@@ -270,6 +271,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const submitParams = buildSubmitParams({
             warehouse,
             shippingAddress,
+            orderNumber: (order as any).orderNumber ?? undefined,
             customerName: (order as any).customerName ?? '',
             customerPhone,
             customerEmail: (order as any).customerEmail ?? undefined,
@@ -399,6 +401,16 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             ? { ...(byFormat.A4 ? { A4: byFormat.A4 } : {}), ...(byFormat.A6 ? { A6: byFormat.A6 } : {}) }
             : null
 
+        // Re-read the history immediately before writing: `order` was loaded before two EP round
+        // trips, and a late webhook for a previous (cancelled) shipment can have appended in the
+        // meantime. Same read-modify-write window applyTrackingUpdate documents (F8, review #1434).
+        const freshOrder = await payload
+            .findByID({ collection: 'orders', id: orderId, depth: 0, overrideAccess: true })
+            .catch(() => null)
+        const priorHistory = ((freshOrder as any)?.shippingTrackingHistory
+            ?? (order as any).shippingTrackingHistory
+            ?? []) as TrackingHistoryEntry[]
+
         // Persist shipment_number (idempotency key), AWB (nullable), label + tracking urls.
         await payload.update({
             collection: 'orders',
@@ -410,6 +422,10 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 labelUrl,
                 labelUrls,
                 shippingTrackingStatus: 'pending_pickup',
+                // Mark the new shipment in the buyer's timeline. EP's own "To Be Collected" webhook
+                // maps to the same 'pending_pickup' we just seeded, so applyTrackingUpdate skips it
+                // as unchanged and would leave "Shipment Cancelled" standing as the newest event.
+                shippingTrackingHistory: [...priorHistory, shipmentCreatedEntry(awbNo)],
                 // Seed the sync cursor so the cron's oldest-first (shippingTrackingLastUpdated ASC)
                 // ordering includes this order instead of parking it at NULLS-LAST and starving it.
                 shippingTrackingLastUpdated: new Date().toISOString(),

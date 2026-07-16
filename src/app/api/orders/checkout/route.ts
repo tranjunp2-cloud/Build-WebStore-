@@ -424,8 +424,14 @@ export async function POST(request: Request) {
                     discountCode: discountRow.code,
                     discountAmount: discountSen,
                 } : {}),
-                // EP shipping fields — only written when a real EP courier is selected (not flat fallback)
-                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
+                // EP shipping fields — only written when a real EP courier is selected (not flat fallback).
+                // courierLogo rides along from the same quotation (EP returns it there) so the buyer's
+                // tracking page can show a real logo without an EP token of its own.
+                ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
                 ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                 parcelWeight: totalWeightGrams,
                 // COD amount in sen — only for COD orders; final total after shipping is now known

@@ -425,6 +425,13 @@ export const Orders: CollectionConfig = {
             admin: { description: 'Friendly courier name from rate response, e.g. J&T Express' },
         },
         {
+            name: 'shippingCourierLogo',
+            type: 'text',
+            admin: {
+                description: "EP courier_logo URL, captured at checkout from the rate quotation (it IS on the quotation — live probe 2026-07-14: 23/23 couriers). Persisted because the buyer's tracking page has no EP token of its own. Cosmetic: absent on pre-existing orders and whenever EP omits it; the UI falls back to an icon.",
+            },
+        },
+        {
             name: 'shippingServiceId',
             type: 'text',
             admin: { description: 'EasyParcel service_id from rate response' },

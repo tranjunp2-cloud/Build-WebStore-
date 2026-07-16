@@ -75,3 +75,16 @@ describe('buildSubmitParams — COD placement [TC-F36.189]', () => {
         expect((p.feature as { cod?: unknown }).cod).toBeUndefined()
     })
 })
+
+describe('buildSubmitParams — EP reference [TC-F36.196]', () => {
+    it('sends the ECH order number as EP `reference`', () => {
+        const p = buildSubmitParams({ ...baseInput, orderNumber: 'ORD-MRKAXJO1' })
+
+        expect(p.reference).toBe('ORD-MRKAXJO1')
+    })
+
+    it('omits reference when the order has no number (EP treats it as optional)', () => {
+        expect(buildSubmitParams(baseInput).reference).toBeUndefined()
+        expect(buildSubmitParams({ ...baseInput, orderNumber: '' }).reference).toBeUndefined()
+    })
+})
