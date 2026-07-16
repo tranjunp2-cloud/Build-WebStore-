@@ -28,21 +28,22 @@
  * which IS fully validated at creation time, so it does not share this draft-skip
  * mechanism. See the GH-1621 journal entry for the full analysis.
  *
- * Coverage: portfolio-grid, team, doctor-profile, property-card (single required
- * field per array item — generic table below), service-cards (title + cosmetic
- * description/icon), testimonials (quote + name — bespoke, see below).
- * NOT covered (known gap, deliberately out of scope for GH-1621's audit — that
- * audit was scoped to BLOCK_IMAGE_SPEC blocks; these aren't in it): pricing
- * (`plans[].name`+`.price`, plus a further-nested `plans[].features[].text` —
- * multiple required fields incl. one where a fabricated fallback (a fake price)
- * could mislead a customer, needs its own design decision) and faq
- * (`faqs[].question`+`.answer`, both required). Track as a follow-up issue.
- * booking-widget is separately excluded — required field is `name` on
- * `services[]`, but `aiVisible: false` (not reachable via edit-block) and it
- * doesn't share service-cards' cosmetic shape.
+ * Coverage:
+ *   - safe single-field backfill: portfolio-grid, team, doctor-profile,
+ *     property-card
+ *   - safe bespoke rules: service-cards, testimonials
+ *   - publish-time filtering for incomplete items whose required fields are
+ *     unsafe to fabricate: features, stats, faq, pricing, pricing-table,
+ *     navigation, footer
+ *
+ * For the filter-only group, publish prefers "drop the broken row" over "invent
+ * deceptive content" (e.g. a fake price, fake FAQ answer, fake nav URL). Since
+ * this runs only at publish time, the draft itself stays untouched while the
+ * user is editing; only the live payload is sanitized.
  */
 
 type RequiredFieldRule = { requiredField: string; altFields?: string[]; fallbackPrefix: string }
+type RequiredShapeField = { name: string; altFields?: string[] }
 
 /** blockType → its array field + the one required field on each item. Add a new
  *  single-required-field block here (one line) — no new function needed. Blocks
@@ -53,6 +54,10 @@ const REQUIRED_ARRAY_FIELDS: Record<string, { arrayField: string } & RequiredFie
     team: { arrayField: 'members', requiredField: 'name', fallbackPrefix: 'Team Member' },
     'doctor-profile': { arrayField: 'doctors', requiredField: 'name', fallbackPrefix: 'Doctor' },
     'property-card': { arrayField: 'properties', requiredField: 'title', altFields: ['name', 'heading'], fallbackPrefix: 'Property' },
+}
+
+function getNonBlankString(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
 }
 
 /** The AI's edit-block prompt gives no shape guidance for array fields other than
@@ -68,10 +73,28 @@ function toFieldObject(it: unknown, primaryField: string): Record<string, unknow
 function backfillRequiredField(items: unknown[], rule: RequiredFieldRule): Record<string, unknown>[] {
     return items.map((it, i) => {
         const obj = toFieldObject(it, rule.requiredField)
-        if (obj[rule.requiredField]) return obj
-        const altValue = rule.altFields?.map((f) => obj[f]).find(Boolean)
+        const currentValue = getNonBlankString(obj[rule.requiredField])
+        if (currentValue) return { ...obj, [rule.requiredField]: currentValue }
+        const altValue = rule.altFields?.map((f) => getNonBlankString(obj[f])).find(Boolean)
         const fallback = altValue || `${rule.fallbackPrefix} ${i + 1}`
         return { ...obj, [rule.requiredField]: String(fallback) }
+    })
+}
+
+function sanitizeRequiredShapeItems(items: unknown[], fields: RequiredShapeField[]): Record<string, unknown>[] {
+    return items.flatMap((it) => {
+        const obj = typeof it === 'object' && it !== null ? { ...(it as Record<string, unknown>) } : {}
+        for (const field of fields) {
+            const currentValue = getNonBlankString(obj[field.name])
+            if (currentValue) {
+                obj[field.name] = currentValue
+                continue
+            }
+            const altValue = field.altFields?.map((name) => getNonBlankString(obj[name])).find(Boolean)
+            if (!altValue) return []
+            obj[field.name] = altValue
+        }
+        return [obj]
     })
 }
 
@@ -96,8 +119,75 @@ export function coerceServiceItems(services: unknown[]): Record<string, unknown>
 export function sanitizeTestimonialItems(items: unknown[]): Record<string, unknown>[] {
     return items
         .map((it) => toFieldObject(it, 'quote'))
-        .filter((it) => Boolean(it.quote))
-        .map((it, i) => (it.name ? it : { ...it, name: `Customer ${i + 1}` }))
+        .flatMap((it) => {
+            const quote = getNonBlankString(it.quote)
+            if (!quote) return []
+            return [{ ...it, quote }]
+        })
+        .map((it, i) => ({ ...it, name: getNonBlankString(it.name) || `Customer ${i + 1}` }))
+}
+
+function sanitizeFeatureItems(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'title', altFields: ['name', 'heading'] },
+        { name: 'description', altFields: ['text', 'body', 'content'] },
+    ])
+}
+
+function sanitizeStatItems(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'value' },
+        { name: 'label', altFields: ['name', 'title'] },
+    ])
+}
+
+function sanitizeFaqItems(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'question', altFields: ['title', 'name'] },
+        { name: 'answer', altFields: ['description', 'body', 'content', 'text'] },
+    ])
+}
+
+function sanitizePricingPlans(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'name', altFields: ['title', 'heading'] },
+        { name: 'price' },
+    ]).map((plan) => ({
+        ...plan,
+        features: Array.isArray(plan.features)
+            ? plan.features.flatMap((feature) => {
+                if (typeof feature === 'string') {
+                    const text = getNonBlankString(feature)
+                    return text ? [{ text }] : []
+                }
+                return sanitizeRequiredShapeItems([feature], [{ name: 'text' }])
+            })
+            : plan.features,
+    }))
+}
+
+function sanitizePricingTablePlans(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'name', altFields: ['title', 'heading'] },
+        { name: 'price' },
+    ])
+}
+
+function sanitizeNavLinks(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [
+        { name: 'label', altFields: ['name', 'title'] },
+        { name: 'url' },
+    ]).map((link) => ({
+        ...link,
+        children: Array.isArray(link.children) ? sanitizeNavLinks(link.children) : link.children,
+    }))
+}
+
+function sanitizeFooterColumns(items: unknown[]): Record<string, unknown>[] {
+    return sanitizeRequiredShapeItems(items, [{ name: 'title', altFields: ['name', 'heading'] }]).map((column) => ({
+        ...column,
+        links: Array.isArray(column.links) ? sanitizeNavLinks(column.links) : column.links,
+    }))
 }
 
 /** Applies the right required-field backfill to one block's own data (its actual
@@ -112,10 +202,46 @@ function sanitizeBlockRequiredFields(blockType: string, blockData: Record<string
         blockData.testimonials = sanitizeTestimonialItems(blockData.testimonials)
         return
     }
+    if (blockType === 'features' && Array.isArray(blockData.features)) {
+        blockData.features = sanitizeFeatureItems(blockData.features)
+        return
+    }
+    if (blockType === 'stats' && Array.isArray(blockData.stats)) {
+        blockData.stats = sanitizeStatItems(blockData.stats)
+        return
+    }
+    if (blockType === 'faq' && Array.isArray(blockData.faqs)) {
+        blockData.faqs = sanitizeFaqItems(blockData.faqs)
+        return
+    }
+    if (blockType === 'pricing' && Array.isArray(blockData.plans)) {
+        blockData.plans = sanitizePricingPlans(blockData.plans)
+        return
+    }
+    if (blockType === 'pricing-table' && Array.isArray(blockData.plans)) {
+        blockData.plans = sanitizePricingTablePlans(blockData.plans)
+        return
+    }
+    if (blockType === 'navigation' && Array.isArray(blockData.links)) {
+        blockData.links = sanitizeNavLinks(blockData.links)
+        return
+    }
+    if (blockType === 'footer' && Array.isArray(blockData.columns)) {
+        blockData.columns = sanitizeFooterColumns(blockData.columns)
+        return
+    }
     const rule = REQUIRED_ARRAY_FIELDS[blockType]
     if (rule && Array.isArray(blockData[rule.arrayField])) {
         blockData[rule.arrayField] = backfillRequiredField(blockData[rule.arrayField] as unknown[], rule)
     }
+}
+
+export function sanitizeSingleBlockRequiredFields(block: Record<string, unknown>): Record<string, unknown> {
+    const blockType = typeof block?.blockType === 'string' ? block.blockType : undefined
+    if (!blockType) return block
+    const copy = { ...block }
+    sanitizeBlockRequiredFields(blockType, copy)
+    return copy
 }
 
 /** Entry point 1 — walk `changes` (or one `updates[].changes` entry) and backfill
@@ -139,11 +265,5 @@ export function normalizeChangesRequiredFields(
  *  backfills required array-item fields. Returns a NEW array; does not mutate
  *  input. */
 export function sanitizeBlocksRequiredFields(blocks: Record<string, unknown>[]): Record<string, unknown>[] {
-    return blocks.map((block) => {
-        const blockType = typeof block?.blockType === 'string' ? block.blockType : undefined
-        if (!blockType) return block
-        const copy = { ...block }
-        sanitizeBlockRequiredFields(blockType, copy)
-        return copy
-    })
+    return blocks.map((block) => sanitizeSingleBlockRequiredFields(block))
 }

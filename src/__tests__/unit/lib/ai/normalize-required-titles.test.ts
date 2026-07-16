@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { normalizeChangesRequiredFields, coerceServiceItems, sanitizeTestimonialItems, sanitizeBlocksRequiredFields } from '@/lib/ai/normalize-required-titles'
+import {
+    normalizeChangesRequiredFields,
+    coerceServiceItems,
+    sanitizeTestimonialItems,
+    sanitizeBlocksRequiredFields,
+    sanitizeSingleBlockRequiredFields,
+} from '@/lib/ai/normalize-required-titles'
 
 beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -121,6 +127,51 @@ describe('[TC-F01.PGRID] normalizeChangesRequiredFields()', () => {
         expect(properties[0]!.title).toBe('Real Property')
         expect(properties[1]!.title).toBe('Property 2')
     })
+
+    it('TC-F01.PGRID-22 — filters incomplete faq items instead of publishing invalid question/answer rows', () => {
+        const changes = {
+            faqs: [
+                { question: 'What time do you open?', answer: '9am daily' },
+                { question: 'Incomplete question only' },
+                { answer: 'Incomplete answer only' },
+            ],
+        }
+        normalizeChangesRequiredFields(changes, { blockType: 'faq' })
+        expect(changes.faqs).toEqual([{ question: 'What time do you open?', answer: '9am daily' }])
+    })
+
+    it('TC-F01.PGRID-23 — filters incomplete pricing plans and nested feature rows with missing text', () => {
+        const changes = {
+            plans: [
+                { name: 'Starter', price: '29', features: [{ text: 'Feature A' }, { included: true }] },
+                { name: 'Broken Plan' },
+                { price: '99' },
+            ],
+        }
+        normalizeChangesRequiredFields(changes, { blockType: 'pricing' })
+        expect(changes.plans).toEqual([{ name: 'Starter', price: '29', features: [{ text: 'Feature A' }] }])
+    })
+
+    it('TC-F01.PGRID-24 — filters incomplete pricing-table plans before publish', () => {
+        const changes = { plans: [{ name: 'Pro', price: '59' }, { name: 'Missing price' }] }
+        normalizeChangesRequiredFields(changes, { blockType: 'pricing-table' })
+        expect(changes.plans).toEqual([{ name: 'Pro', price: '59' }])
+    })
+
+    it('TC-F01.PGRID-25 — filters incomplete navigation links recursively', () => {
+        const changes = {
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'About' },
+                { label: 'Services', url: '/services', children: [{ label: 'Child', url: '/services/child' }, { label: 'Broken child' }] },
+            ],
+        }
+        normalizeChangesRequiredFields(changes, { blockType: 'navigation' })
+        expect(changes.links).toEqual([
+            { label: 'Home', url: '/' },
+            { label: 'Services', url: '/services', children: [{ label: 'Child', url: '/services/child' }] },
+        ])
+    })
 })
 
 describe('[TC-F01.PGRID] coerceServiceItems()', () => {
@@ -199,5 +250,34 @@ describe('[TC-F01.PGRID] sanitizeBlocksRequiredFields()', () => {
         const blocks = [{ headline: 'No blockType here' }]
         expect(() => sanitizeBlocksRequiredFields(blocks)).not.toThrow()
         expect(sanitizeBlocksRequiredFields(blocks)).toEqual(blocks)
+    })
+
+    it('TC-F01.PGRID-26 — filters incomplete features/stats rows instead of publishing invalid arrays', () => {
+        const result = sanitizeBlocksRequiredFields([
+            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }, { title: 'Broken' }] },
+            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }, { value: '99%' }] },
+        ])
+        expect(result).toEqual([
+            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }] },
+            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }] },
+        ])
+    })
+})
+
+describe('[TC-F01.PGRID] sanitizeSingleBlockRequiredFields()', () => {
+    it('TC-F01.PGRID-27 — sanitizes footer columns + links for site-level publish blocks', () => {
+        const result = sanitizeSingleBlockRequiredFields({
+            blockType: 'footer',
+            columns: [
+                { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken' }] },
+                { links: [{ label: 'No title', url: '/x' }] },
+            ],
+        })
+        expect(result).toEqual({
+            blockType: 'footer',
+            columns: [
+                { title: 'Company', links: [{ label: 'About', url: '/about' }] },
+            ],
+        })
     })
 })

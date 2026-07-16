@@ -164,6 +164,62 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(body.data.domain).toContain('coffee-shop')
     })
 
+    it('TC-F01-pub-03b: sanitizes pending header/footer blocks before promoting site-level publish data', async () => {
+        const { getPayload } = await import('payload')
+        const siteRecordWithPending = {
+            ...mockSiteRecord,
+            pendingHeaderBlock: {
+                blockType: 'navigation',
+                links: [
+                    { label: 'Home', url: '/' },
+                    { label: 'Broken' },
+                ],
+            },
+            pendingFooterBlock: {
+                blockType: 'footer',
+                columns: [
+                    { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken link only' }] },
+                    { links: [{ label: 'Missing title', url: '/x' }] },
+                ],
+            },
+        }
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...siteRecordWithPending, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return siteRecordWithPending
+                }
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({ docs: [], hasNextPage: false }),
+            update: updateSpy,
+            db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [] }) } },
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const siteUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'sites')
+        expect(siteUpdate).toBeTruthy()
+        expect(siteUpdate![0].data.headerBlock).toEqual({
+            blockType: 'navigation',
+            links: [{ label: 'Home', url: '/' }],
+        })
+        expect(siteUpdate![0].data.footerBlock).toEqual({
+            blockType: 'footer',
+            columns: [{ title: 'Company', links: [{ label: 'About', url: '/about' }] }],
+        })
+    })
+
     it('TC-F01-pub-04: returns 401 when user is not authenticated', async () => {
         // Arrange — no authenticated user
         vi.mocked(getCurrentUser).mockResolvedValueOnce(null)

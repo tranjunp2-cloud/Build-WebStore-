@@ -7,7 +7,7 @@ import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subs
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
-import { sanitizeBlocksRequiredFields } from '@/lib/ai/normalize-required-titles'
+import { sanitizeBlocksRequiredFields, sanitizeSingleBlockRequiredFields } from '@/lib/ai/normalize-required-titles'
 import { blockRegistry } from '@/blocks/registry'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
@@ -77,6 +77,12 @@ function friendlyValidationLocation(path: string, layout: unknown[]): string | n
     // path segment) is always correct regardless of depth, so use that alone.
     const fieldName = segments[segments.length - 1]
     return `${blockLabel} → ${fieldName}`
+}
+
+function sanitizePublishScopedBlock(block: unknown): unknown {
+    return block && typeof block === 'object'
+        ? sanitizeSingleBlockRequiredFields(block as Record<string, unknown>)
+        : block
 }
 
 /**
@@ -462,23 +468,23 @@ export async function PATCH(
         }
 
         if (hasBodyHeaderBlock) {
-            publishData.headerBlock = bodyHeaderBlock
+            publishData.headerBlock = sanitizePublishScopedBlock(bodyHeaderBlock)
             publishData.pendingHeaderBlock = null
         } else {
             const pendingHb = sitePending?.pendingHeaderBlock
             if (pendingHb !== undefined && pendingHb !== null) {
-                publishData.headerBlock = pendingHb
+                publishData.headerBlock = sanitizePublishScopedBlock(pendingHb)
                 publishData.pendingHeaderBlock = null
             }
         }
 
         if (hasBodyFooterBlock) {
-            publishData.footerBlock = bodyFooterBlock
+            publishData.footerBlock = sanitizePublishScopedBlock(bodyFooterBlock)
             publishData.pendingFooterBlock = null
         } else {
             const pendingFb = sitePending?.pendingFooterBlock
             if (pendingFb !== undefined && pendingFb !== null) {
-                publishData.footerBlock = pendingFb
+                publishData.footerBlock = sanitizePublishScopedBlock(pendingFb)
                 publishData.pendingFooterBlock = null
             }
         }
