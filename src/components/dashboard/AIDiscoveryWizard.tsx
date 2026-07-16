@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 
 export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const { t } = useI18n()
@@ -79,15 +80,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     }
   }, [pathname])
 
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = window.getComputedStyle(document.body).overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = originalStyle
-      }
-    }
-  }, [isOpen])
+  useLockBodyScroll(isOpen)
 
   if (!isOpen) return null
 
@@ -345,4 +338,3 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     </div>
   )
 }
-

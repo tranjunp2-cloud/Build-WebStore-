@@ -108,6 +108,7 @@ describe('AIDiscoveryWizard', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         navMock.pathname = '/dashboard'
+        document.body.style.overflow = ''
         // Default Mock Fetch Implementation (Success)
         global.fetch = vi.fn().mockResolvedValue({
             ok: true,
@@ -185,10 +186,14 @@ describe('AIDiscoveryWizard', () => {
         }
     })
 
-    it('[TC-F06.21] Sau X quay lại /dashboard wizard hiện lại; sau Skip thì ẩn hẳn', async () => {
+    it('[TC-F06.21] Đóng ở slide 2/3 rồi quay lại /dashboard thì wizard mở lại tại slide 1; sau Skip thì ẩn hẳn', async () => {
+        vi.useFakeTimers()
         const { rerender } = render(<AIDiscoveryWizard userId="u-123" />)
 
-        // X-close while on /dashboard
+        // Move away from slide 1, then X-close while on /dashboard
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Content')).toBeVisible()
         fireEvent.click(screen.getByLabelText('Close'))
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
 
@@ -202,10 +207,28 @@ describe('AIDiscoveryWizard', () => {
         rerender(<AIDiscoveryWizard userId="u-123" />)
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
 
-        // Return to dashboard home — X was only a temporary close, wizard reopens
+        // Return to dashboard home — X was only a temporary close, wizard reopens at step 1
         navMock.pathname = '/dashboard'
         rerender(<AIDiscoveryWizard userId="u-123" />)
         expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        expect(screen.queryByText('AI Content')).not.toBeInTheDocument()
+
+        // Slide 3 behaves the same — close temporary, reopen reset to step 1
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        fireEvent.click(screen.getByLabelText('Close'))
+        navMock.pathname = '/orders'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        navMock.pathname = '/dashboard'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        expect(screen.queryByText('AI SEO')).not.toBeInTheDocument()
+
+        vi.useRealTimers()
 
         // Skip instructions — permanent dismissal, persisted to DB
         fireEvent.click(screen.getByText('Skip instructions'))
@@ -222,6 +245,15 @@ describe('AIDiscoveryWizard', () => {
         navMock.pathname = '/dashboard'
         rerender(<AIDiscoveryWizard userId="u-123" />)
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.23] Body overflow là hidden khi wizard mở và restore sau khi đóng', () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        expect(document.body.style.overflow).toBe('hidden')
+
+        fireEvent.click(screen.getByLabelText('Close'))
+        expect(document.body.style.overflow).toBe('')
     })
 
     it('[TC-F06.22] Explore ở slide cuối cũng persist vĩnh viễn — không reopen khi quay lại /dashboard', () => {
