@@ -14,6 +14,8 @@ import { registerUploadedMedia } from '@/lib/media/register-media'
 // over the client's claimed values.
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

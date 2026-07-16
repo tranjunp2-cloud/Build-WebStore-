@@ -12,6 +12,8 @@ import { s3PublicUrl } from '@/lib/media/s3-public-url'
 // JSON request below touches the function; the video never does.
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
         const post = await createVideoPresignedPost({
             key,
             contentType,
-            maxBytes: UPLOAD_LIMITS.video,
+            maxFileBytes: UPLOAD_LIMITS.video,
         })
         return NextResponse.json({
             url: post.url,
