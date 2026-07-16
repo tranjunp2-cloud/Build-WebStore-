@@ -346,7 +346,7 @@
 .sd-off { margin-top: 2px; font-size: 8px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: hsl(var(--warning)); }
 .sched-custom { margin-top: 8px; }
 .sched-custom input[type="date"] {
-  width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px;
+  width: 100%; box-sizing: border-box; height: 40px; padding: 0 10px;
   border: 1px solid var(--dash-border); border-radius: 8px;
   background: var(--dash-secondary-bg); color: var(--dash-text);
   font-size: 12.5px; font-family: inherit; color-scheme: dark;

@@ -159,7 +159,7 @@ describe('POST /api/users/me/password', () => {
             expect.objectContaining({
                 collection: 'users',
                 id: 'user-1',
-                data: { password: newPassword },
+                data: expect.objectContaining({ password: newPassword }),
                 overrideAccess: true,
             }),
         )

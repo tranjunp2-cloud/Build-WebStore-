@@ -643,7 +643,6 @@ export default function BlogEditorPage() {
                                 onChange={(e) => updateField('title', e.target.value)}
                                 maxLength={255}
                                 placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                className="h-9"
                             />
                         </div>
                     </div>
@@ -667,7 +666,7 @@ export default function BlogEditorPage() {
                                 // URL of an already-published (SEO-indexed) post breaks existing
                                 // links/rankings. Drafts (isNew, or not-yet-published) stay editable.
                                 disabled={!isNew && form.status === 'published'}
-                                className="flex-1 h-9"
+                                className="flex-1"
                             />
                         </div>
                         {!isNew && form.status === 'published' && (
@@ -774,7 +773,7 @@ export default function BlogEditorPage() {
                             </div>
                             <Popover open={isCategoryDropdownOpen} onOpenChange={setIsCategoryDropdownOpen}>
                                 <PopoverTrigger asChild>
-                                    <div className="w-full flex items-center justify-between h-9 bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground cursor-pointer outline-none">
+                                    <div className="w-full flex items-center justify-between h-10 bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground cursor-pointer outline-none">
                                         <span className="truncate">{categories.find(c => String(c.id) === String(form.category))?.name || t.dashboard.blog.editor.noCategory}</span>
                                         <ChevronDown className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))] shrink-0" />
                                     </div>
@@ -822,7 +821,7 @@ export default function BlogEditorPage() {
                                 <Label className="text-muted-foreground">{t.dashboard.blog.editor.author}</Label>
                             </div>
                             {/* Author is read-only — display shell intentionally kept as div */}
-                            <div className="flex flex-row items-center h-9 bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] gap-[10px]">
+                            <div className="flex flex-row items-center h-10 bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] gap-[10px]">
                                 <User className="w-[16px] h-[16px] text-muted-foreground" strokeWidth={1.5} />
                                 <span className="text-[14px] text-foreground">
                                     {getAuthorName()}
@@ -839,9 +838,9 @@ export default function BlogEditorPage() {
                                     <Button
                                         type="button"
                                         variant="ghost"
-                                        // Match the shared <Input>/category trigger look (h-9, card bg, input-border) so
+                                        // Match the shared <Input>/category trigger look (h-10, card bg, input-border) so
                                         // the date field is consistent with the rest of Post/SEO Settings.
-                                        className="flex flex-row items-center w-full h-9 px-3 gap-[10px] justify-start font-normal rounded-lg bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] hover:bg-[hsl(var(--card))] focus-visible:border-[hsl(var(--ring))]"
+                                        className="flex flex-row items-center w-full h-10 px-3 gap-[10px] justify-start font-normal rounded-lg bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] hover:bg-[hsl(var(--card))] focus-visible:border-[hsl(var(--ring))]"
                                     >
                                         <Calendar className="w-[16px] h-[16px] text-muted-foreground shrink-0" strokeWidth={1.5} />
                                         <span className={cn(
@@ -896,7 +895,6 @@ export default function BlogEditorPage() {
                                 onChange={e => updateField('seoTitle', e.target.value)}
                                 maxLength={60}
                                 placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
-                                className="h-9"
                             />
                             <div className="h-[16px] w-full flex items-center">
                                 <span className="text-[12px] text-muted-foreground">
@@ -975,7 +973,7 @@ export default function BlogEditorPage() {
                                     value={aiPrompt}
                                     onChange={e => setAiPrompt(e.target.value)}
                                     placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                    className="h-9 rounded-lg text-sm"
+                                    className="rounded-lg text-sm"
                                 />
                             </div>
 

@@ -24,7 +24,7 @@ const SelectTrigger = React.forwardRef<
       // only forces border-style on input/textarea/select, so declare it here for the button.
       // Hover matches the dashSecondary Button pattern (see Discounts "Export CSV") — a subtle
       // surface wash, not a border-color change.
-      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-white/[0.05] focus:outline-none focus:ring-1 focus:ring-ring data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[hsl(var(--card))] [&>span]:line-clamp-1",
+      "flex h-10 w-full items-center justify-between whitespace-nowrap rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-white/[0.05] focus:outline-none focus:ring-1 focus:ring-ring data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[hsl(var(--card))] [&>span]:line-clamp-1",
       className
     )}
     {...props}

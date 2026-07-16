@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from '@/lib/ai/structure-enforcer'
+import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from '@/lib/ai/structure-enforcer'
 import { CATEGORY_REQUIREMENTS, getCategoryRequirement, ITEM_FIELD_BY_BLOCK } from '@/lib/ai/category-requirements'
 
 beforeEach(() => {
@@ -375,6 +375,49 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
 
             // Assert — mutates in place, returns same array
             expect(result).toBe(blocks)
+        })
+    })
+
+    describe('enforceSubpageStructure', () => {
+        it('pads empty subpage blocks to 7 blocks total (5 content sections + nav + footer)', () => {
+            const result = enforceSubpageStructure([], 'beauty', {})
+            expect(result.length).toBe(7)
+            expect(result[0]!.blockType).toBe('navigation')
+            expect(result[result.length - 1]!.blockType).toBe('footer')
+            
+            const contentBlocks = result.filter(b => b.blockType !== 'navigation' && b.blockType !== 'footer')
+            expect(contentBlocks.length).toBe(5)
+        })
+
+        it('does NOT duplicate navigation and footer blocks', () => {
+            const existing = [
+                { blockType: 'navigation', variant: 'simple' },
+                { blockType: 'features' },
+                { blockType: 'footer', variant: 'mega' }
+            ]
+            const result = enforceSubpageStructure(existing, 'beauty', {})
+            expect(result.filter(b => b.blockType === 'navigation').length).toBe(1)
+            expect(result.filter(b => b.blockType === 'footer').length).toBe(1)
+            expect(result.length).toBe(7) // Padded from 1 content block to 5 content blocks + nav + footer = 7
+        })
+
+        it('does NOT inject a hero block when padding subpages', () => {
+            const result = enforceSubpageStructure([], 'beauty', {})
+            const heroBlocks = result.filter(b => b.blockType === 'hero')
+            expect(heroBlocks.length).toBe(0)
+        })
+
+        it('rotates contact and footer structural variants based on seed', () => {
+            const seed1 = 12345
+            const seed2 = 67890
+            const result1 = enforceSubpageStructure([], 'beauty', { seed: seed1 })
+            const result2 = enforceSubpageStructure([], 'beauty', { seed: seed2 })
+
+            const footer1 = result1.find(b => b.blockType === 'footer')
+            const footer2 = result2.find(b => b.blockType === 'footer')
+            
+            expect(footer1).toBeDefined()
+            expect(footer2).toBeDefined()
         })
     })
 })

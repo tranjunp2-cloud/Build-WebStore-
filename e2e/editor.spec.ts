@@ -133,6 +133,57 @@ test.describe('Editor & Storefront', () => {
         await expectNoServerError(page)
     })
 
+    test('[TC-F05.03b] publish failure shows friendly block/item detail from API', async ({ page }) => {
+        test.skip(!siteId, 'No site found')
+
+        await page.route('**/api/sites/*/publish', async (route) => {
+            await route.fulfill({
+                status: 409,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    success: false,
+                    error: {
+                        code: 'PARTIAL_PUBLISH_FAILURE',
+                        message: 'Failed to publish 1 page(s). Please try again.',
+                        failures: [
+                            {
+                                friendlyDetail: 'About Us → Pricing → Plan 2 → price: This field is required.',
+                                validationErrors: [{ path: 'layout.2.plans.1.price', message: 'This field is required.' }],
+                            },
+                        ],
+                    },
+                }),
+            })
+        })
+
+        await page.goto(`/editor/${siteId}`)
+        await page.waitForLoadState('networkidle')
+        await expectNoServerError(page)
+
+        const publishBtn = page.locator(
+            'button:has-text("Publish"), button:has-text("Update"), ' +
+            'button[data-testid*="publish"], button[data-testid*="republish"]'
+        ).first()
+
+        const hasPublish = await publishBtn.isVisible().catch(() => false)
+        if (!hasPublish) {
+            test.skip(true, 'Publish/Update button not found')
+            return
+        }
+
+        await publishBtn.click()
+
+        const confirmBtn = page.locator(
+            'button:has-text("Publish now"), button:has-text("Confirm"), ' +
+            'button:has-text("Publish"), button:has-text("Update")'
+        ).last()
+        if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+            await confirmBtn.click()
+        }
+
+        await expect(page.getByText('About Us → Pricing → Plan 2 → price: This field is required.')).toBeVisible({ timeout: 10_000 })
+    })
+
     test('[TC-F09.01] published storefront renders', async ({ page }) => {
         test.skip(!siteId, 'No site found')
 

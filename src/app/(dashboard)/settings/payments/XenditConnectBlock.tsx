@@ -85,7 +85,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         type="button"
                         onClick={() => setShowModal(true)}
                         disabled={!tenantId}
-                        className="h-[44px] gap-2 whitespace-nowrap"
+                        className="h-12 gap-2 whitespace-nowrap"
                     >
                         {pt.xenditConnectCta}
                         <ArrowRight className="w-4 h-4" />

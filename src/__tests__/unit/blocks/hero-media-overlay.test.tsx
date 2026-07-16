@@ -27,6 +27,10 @@ vi.mock('@/hooks/use-upload-progress', () => ({
     useUploadProgress: vi.fn(),
 }))
 
+vi.mock('@/hooks/use-direct-upload', () => ({
+    useDirectUpload: vi.fn(),
+}))
+
 vi.mock('@/lib/media/compress-image', () => ({
     compressImage: vi.fn(async (file: File) => file),
 }))
@@ -42,6 +46,7 @@ import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
+import { useDirectUpload } from '@/hooks/use-direct-upload'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const mockOnFieldChange = vi.fn()
@@ -52,6 +57,7 @@ function makeFile(type: string, name = 'photo.jpg'): File {
 }
 
 let mockUpload: Mock
+let mockDirectUpload: Mock
 
 beforeEach(() => {
     vi.clearAllMocks()
@@ -61,6 +67,13 @@ beforeEach(() => {
     mockUpload = vi.fn()
     vi.mocked(useUploadProgress).mockReturnValue({
         upload: mockUpload,
+        progress: 0,
+        isUploading: false,
+        reset: vi.fn(),
+    })
+    mockDirectUpload = vi.fn()
+    vi.mocked(useDirectUpload).mockReturnValue({
+        upload: mockDirectUpload,
         progress: 0,
         isUploading: false,
         reset: vi.fn(),

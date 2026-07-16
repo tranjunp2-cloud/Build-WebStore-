@@ -400,6 +400,34 @@ describe('Publish and Save Flows (TC-F05)', () => {
             })
         })
 
+        it('TC-F05.64: GH-1621 P1 — prefers server-computed friendlyDetail (block + item + page) over the bare field-name fallback', async () => {
+            ;(global.fetch as any).mockImplementation((url: string) => {
+                if (url.includes('/publish')) {
+                    return Promise.resolve({
+                        ok: false, status: 409,
+                        json: async () => ({
+                            error: {
+                                failures: [{
+                                    friendlyDetail: 'About Us → Portfolio → Project 5 → title: This field is required.',
+                                    validationErrors: [{ path: 'layout.6.projects.4.title', message: 'This field is required.' }],
+                                }]
+                            }
+                        })
+                    })
+                }
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+
+            await setupAndClickPublish()
+
+            await waitFor(() => {
+                expect(toast.error).toHaveBeenCalledWith(
+                    'Publish thất bại',
+                    expect.objectContaining({ description: 'About Us → Portfolio → Project 5 → title: This field is required.' })
+                )
+            })
+        })
+
         it('TC-F05.62: falls back to generic message when Payload returns non-JSON 500', async () => {
             ;(global.fetch as any).mockImplementation((url: string) => {
                 if (url.includes('/publish')) {

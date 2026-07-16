@@ -1,6 +1,6 @@
 # Phase 05b — Category Modal UX (Contextual title, Parent auto-fill/disable, Dropdown hierarchy)
 
-**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** pending · **Depends:** Phase 03 (shares the parent `<Select>`)
+**PR:** 1 · **Migration:** No · **Priority:** P2 · **Status:** done · **Depends:** Phase 03 (shares the parent `<Select>`)
 
 ## Context
 
@@ -61,13 +61,22 @@ Three UX refinements on the Add/Edit modal, all in `CategoryManager.tsx` (+ i18n
 
 ## Todo
 
-- [ ] `isSubcategoryMode` flag in formData + handleOpenForm (row-`+` only)
-- [ ] Contextual title (New / Edit / Add Subcategory)
-- [ ] Parent field disabled in subcategory mode (prefilled)
-- [ ] Parent dropdown: indent by level
-- [ ] Parent dropdown: disable L3 options
-- [ ] Reconcile with Phase 03 self+descendant exclusion (single Select edit)
-- [ ] i18n `addSubcategoryTitle` EN + MS
+- [x] `isSubcategoryMode` flag in formData + handleOpenForm (row-`+` only)
+- [x] Contextual title (New / Edit / Add Subcategory)
+- [x] Parent field disabled in subcategory mode (prefilled)
+- [x] Parent dropdown: indent by level
+- [x] Parent dropdown: disable L3 options
+- [x] Reconcile with Phase 03 self+descendant exclusion (single Select edit)
+- [x] i18n `addSubcategoryTitle` EN + MS
+
+## Scope Expansion
+
+Implementation scope was expanded beyond this phase file's original checklist to match the full GitHub issue #1587 text. The issue mapping table references "Issue1·mục2 → phase 05b", and the issue's mục 2 included two additional UX items that were not explicitly captured in this phase file's requirements but fell under Phase 05b's ownership (no other phase in the 12-phase plan owned them):
+
+1. **Badge colors refinement**: Changed L3 badge color from sharing L2's blue (`--info`) to a distinct violet (`--p-violet-300`). Previously L2 and L3 both rendered blue; now L1 is teal, L2 is blue, L3 is violet. (Backend `levelTextColors[3]` was already present; only the color value changed.)
+2. **Remove Category Image field**: Deleted the `image` field from the Add/Edit modal entirely (`CategoryManager.tsx`). The backend `image` column was already removed in earlier phases (02/04); the UI still had an orphaned `<ImageUploader>` control until this phase. Removed: `formData.image` state, image resolution in `handleOpenForm`, image payload in `handleSave`, the `<ImageUploader>` JSX, its imports, and the orphaned i18n key (`form.image` EN+MS).
+
+Both items were implemented and code-reviewed as part of Phase 05b.
 
 ## Success Criteria
 

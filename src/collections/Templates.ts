@@ -29,11 +29,17 @@ const recomputeComplianceHook: CollectionAfterChangeHook = async ({ doc, req, co
     if (categories.length === 0) return doc
 
     try {
-        // Fetch first matching category's DNA
+        // Fetch first matching category's DNA. `slug` is per-tenant unique (not global) since
+        // GH-1587 Phase 01, so any tenant can now create a category with a slug matching one of
+        // TEMPLATE_CATEGORY_OPTIONS (e.g. 'fnb'). Scope to dna:{exists:true} — the `dna` field is
+        // only ever set via the super-admin-only PATCH /api/admin/categories/[id]/dna route, so it
+        // reliably identifies the curated taxonomy category rather than an unrelated tenant's category
+        // that happens to share the slug. `sort` breaks ties deterministically if it ever matches >1.
         const categorySlug = categories[0]
         const catResult = await req.payload.find({
             collection: 'categories',
-            where: { slug: { equals: categorySlug } },
+            where: { slug: { equals: categorySlug }, dna: { exists: true } },
+            sort: '-updatedAt',
             limit: 1,
             depth: 0,
         })

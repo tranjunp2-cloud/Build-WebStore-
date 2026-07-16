@@ -365,6 +365,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [blocks, status, theme])
 
     const saveDraftNow = useCallback(async () => {
+        if (!hasUserEditsRef.current) return true
         if (!siteId || blocks.length === 0 || !theme) return true
 
         try {

@@ -168,6 +168,39 @@ describe('seedImageLibraryForSite [TC-GH-727-01]', () => {
         // downloadPhotoBuffer called for photos that were successfully assigned
         expect(mockDownload).toHaveBeenCalled()
     })
+
+    it('TC-GH-727-01e: uses product-focused search queries when productTerms are provided', async () => {
+        const payload = buildPayload()
+        mockSearch.mockResolvedValue(makePhotos(10))
+        mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
+        let id = 0
+        mockUpload.mockImplementation(async () => ++id)
+
+        await seedImageLibraryForSite(payload as never, 1, 10, 'creative', undefined, 'chibi animation')
+
+        const searchQueries = mockSearch.mock.calls.map(([query]) => query)
+        expect(searchQueries).toContain('chibi animation')
+        expect(searchQueries).not.toContain('chibi animation creative studio art portfolio')
+        expect(searchQueries).not.toContain('chibi animation creative studio artist workspace')
+    })
+
+    it('TC-GH-727-01f: retries with shorter product-focused queries when the primary search returns zero hits', async () => {
+        const payload = buildPayload()
+        mockSearch
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(makePhotos(10))
+            .mockResolvedValue(makePhotos(10))
+        mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
+        let id = 0
+        mockUpload.mockImplementation(async () => ++id)
+
+        const result = await seedImageLibraryForSite(payload as never, 1, 10, 'fnb', undefined, 'bread cafe coffee latte')
+
+        expect(result.gallery).toHaveLength(6)
+        expect(mockSearch.mock.calls[0]?.[0]).toBe('bread cafe coffee')
+        expect(mockSearch.mock.calls[1]?.[0]).toBe('bread cafe')
+        expect(mockSearch.mock.calls.some(([query]) => query === 'bread')).toBe(false)
+    })
 })
 
 /**

@@ -2007,8 +2007,9 @@
                 "maxLevelReached": "Maximum depth (Level 3) reached. Cannot add lower subcategories.",
                 "productsCount": "products",
                 "form": {
-                    "newTitle": "Add Category",
+                    "newTitle": "Add New Category",
                     "editTitle": "Edit Category",
+                    "addSubcategoryTitle": "Add Subcategory",
                     "name": "Category Name",
                     "namePlaceholder": "e.g. Electronics, Fashion",
                     "slug": "URL Slug",
@@ -2018,18 +2019,24 @@
                     "parentNone": "None (Top Level)",
                     "description": "Description",
                     "descriptionPlaceholder": "Short description for SEO (optional)",
-                    "image": "Category Image",
                     "cancel": "Cancel",
                     "save": "Save Category",
                     "saving": "Saving...",
-                    "optional": "(Optional)"
+                    "optional": "(Optional)",
+                    "errors": {
+                        "nameDuplicate": "Category name already exists in this level.",
+                        "slugDuplicate": "This URL slug is already used in your store."
+                    }
                 },
                 "deleteModal": {
                     "title": "Delete Category",
                     "warning1": "Are you sure you want to delete",
                     "warning2": "",
-                    "subCategoryWarning": "This category has child categories. They will be unlinked from the tree (not permanently deleted).",
+                    "subCategoryWarning": "This category has child categories. They will be moved to the top level (not permanently deleted).",
                     "productsWarning": "Products in this category will not be deleted, but will lose this category tag.",
+                    "hasProductsError": "Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.",
+                    "tooManyChildrenError": "Cannot delete this category. It has {count} subcategories, more than can be safely moved at once. Please move some subcategories out first.",
+                    "reparentNameConflictError": "Cannot delete this category yet. Moving its subcategories to the top level would create {count} duplicate category name conflict(s). Please rename or move the conflicting subcategories first.",
                     "cancel": "Cancel",
                     "confirm": "Delete",
                     "deleting": "Deleting..."
@@ -2041,7 +2048,10 @@
                     "loadError": "Failed to load categories",
                     "saveError": "Failed to save category",
                     "deleteError": "Failed to delete category",
-                    "maxDepthError": "Cannot nest deeper than 3 levels"
+                    "maxDepthError": "Cannot nest deeper than 3 levels",
+                    "cycleError": "Cannot set a category as a child of its own subcategory.",
+                    "parentTenantMismatch": "Cannot move category to a different tenant's hierarchy",
+                    "parentSoftDeleted": "Cannot nest under a deleted category"
                 }
             },
             "subtitle": "Manage store products"
@@ -3100,7 +3110,7 @@
             "sessionExpired": "Your session has expired. Please log in again."
         },
         "emailPlaceholder": "you@example.com",
-        "passwordPlaceholder": "••••••••",
+        "passwordPlaceholder": "Enter your password",
         "checking": "Checking...",
         "loading": "Loading...",
         "otpSentTitle": "Verification code sent!",
@@ -4805,10 +4815,6 @@
     "profile": {
         "title": "My Profile",
         "accountSettings": "Account Settings",
-        "tabs": {
-            "general": "General Info",
-            "security": "Security"
-        },
         "teamTabs": {
             "profile": "Account Profile",
             "staff": "Staff",
@@ -4818,11 +4824,11 @@
         "banner": {
             "roleOwner": "Owner",
             "roleStaff": "Staff",
-            "uploadAvatar": "Click to upload avatar",
-            "status": "Status",
-            "activeNow": "Active Now"
+            "uploadAvatar": "Click to upload avatar"
         },
         "general": {
+            "title": "Personal Information",
+            "subtitle": "Your name and contact details.",
             "firstName": "First Name",
             "lastName": "Last Name",
             "email": "Email Address",
@@ -4834,6 +4840,8 @@
             "cancel": "Cancel"
         },
         "security": {
+            "title": "Password & Security",
+            "summary": "Keep your account secure with a strong password.",
             "currentPassword": "Current Password",
             "newPassword": "New Password",
             "confirmPassword": "Confirm New Password",
@@ -4847,15 +4855,13 @@
             "ruleNumber": "One number"
         },
         "sso": {
-            "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
-            "manageButton": "Manage Account in SSO",
             "urlMissing": "SSO portal URL is not configured. Contact admin.",
-            "generalTitle": " Information managed by SSO",
-            "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
-            "generalLink": "To make changes, please visit the SSO portal",
-            "securityTitle": " SSO Protected Account",
-            "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
-            "securityLink": "Manage SSO Account"
+            "widgetTitle": "SSO Protected Account",
+            "widgetDescription": "Your personal profile fields, password, and security configurations are managed centrally by the Single Sign-On system. Changes made there will sync here automatically.",
+            "goToPortal": "Go to SSO Portal"
+        },
+        "owner": {
+            "passwordLabel": "Password"
         },
         "errors": {
             "invalidPhone": "Please enter a valid phone number",
@@ -4872,11 +4878,7 @@
             "ownerForbidden": "Owner accounts must update profile via SSO",
             "uploadFailed": "Avatar upload failed",
             "saveFailed": "Failed to save profile",
-            "networkError": "Network error. Please try again.",
-            "unsavedChanges": "You have unsaved changes. Leave this tab?"
-        },
-        "saveBar": {
-            "unsavedChanges": "Unsaved changes"
+            "networkError": "Network error. Please try again."
         }
     }
 }

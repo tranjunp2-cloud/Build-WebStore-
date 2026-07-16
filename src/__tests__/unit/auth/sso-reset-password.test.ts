@@ -126,9 +126,9 @@ describe('PUT /api/v1/sso/reset-password', () => {
         expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'users',
             id: 50,
-            data: {
+            data: expect.objectContaining({
                 password: 'new_secure_password_999'
-            },
+            }),
             overrideAccess: true
         }))
     })

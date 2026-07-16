@@ -54,6 +54,7 @@ export async function getActivePlanSubscription(
   tenantId: string | number,
 ) {
   const result = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscriptions',
     where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
     sort: '-createdAt',
@@ -72,6 +73,7 @@ export async function recordUsage(
   amount = 1,
 ): Promise<void> {
   const existing = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscription-usages',
     where: {
       and: [
@@ -85,13 +87,15 @@ export async function recordUsage(
   if (existing.docs.length > 0) {
     const current = existing.docs[0]
     await payload.update({
-      collection: 'plan-subscription-usages',
+    overrideAccess: true,
+    collection: 'plan-subscription-usages',
       id: current.id,
       data: { used: ((current.used as number) ?? 0) + amount },
     })
   } else {
     await payload.create({
-      collection: 'plan-subscription-usages',
+    overrideAccess: true,
+    collection: 'plan-subscription-usages',
       data: { subscription: subscriptionId, featureCode, used: amount },
     })
   }
@@ -105,6 +109,7 @@ export async function reduceUsage(
   amount = 1,
 ): Promise<void> {
   const existing = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscription-usages',
     where: {
       and: [
@@ -119,6 +124,7 @@ export async function reduceUsage(
   const current = existing.docs[0]
   const newUsed = Math.max(0, ((current.used as number) ?? 0) - amount)
   await payload.update({
+      overrideAccess: true,
     collection: 'plan-subscription-usages',
     id: current.id,
     data: { used: newUsed },
@@ -132,6 +138,7 @@ export async function getConsumed(
   featureCode: string,
 ): Promise<number> {
   const result = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscription-usages',
     where: {
       and: [
@@ -150,6 +157,7 @@ export async function clearUsage(
   subscriptionId: string | number,
 ): Promise<void> {
   const existing = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscription-usages',
     where: { subscription: { equals: subscriptionId } },
     pagination: false,
@@ -157,7 +165,7 @@ export async function clearUsage(
   await Promise.all(
     existing.docs.map((doc) =>
       payload
-        .delete({ collection: 'plan-subscription-usages', id: doc.id })
+        .delete({ collection: 'plan-subscription-usages', id: doc.id, overrideAccess: true })
         .catch((err: unknown) =>
           console.warn('[clearUsage] delete skipped (concurrent upsert?):', (err as Error).message),
         ),
@@ -174,6 +182,7 @@ export async function recountStaffUsage(
   tenantId: string | number,
 ): Promise<void> {
   const staffResult = await payload.find({
+      overrideAccess: true,
     collection: 'users',
     where: { 'tenants.tenant': { equals: tenantId } },
     pagination: false,
@@ -222,6 +231,7 @@ export async function upsertPlanSubscription(
   }
 
   const subs = await payload.find({
+      overrideAccess: true,
     collection: 'plan-subscriptions',
     where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
     limit: 1,
@@ -229,12 +239,18 @@ export async function upsertPlanSubscription(
 
   if (subs.docs.length > 0) {
     const subId = Number(subs.docs[0].id)
-    await payload.update({ collection: 'plan-subscriptions', id: subId, data: updateData })
+    await payload.update({
+        overrideAccess: true,
+      collection: 'plan-subscriptions',
+      id: subId,
+      data: updateData,
+    })
     await clearUsage(payload, subId)
     await recountStaffUsage(payload, subId, tenantId)
   } else {
     await payload.create({
-      collection: 'plan-subscriptions',
+    overrideAccess: true,
+    collection: 'plan-subscriptions',
       data: {
         tenant: tenantId,
         name: 'main',
@@ -248,6 +264,7 @@ export async function upsertPlanSubscription(
 
   // Sync Tenants.plan 4-tier field (used by ai/generate-site to gate AI generation for free users)
   await payload.update({
+      overrideAccess: true,
     collection: 'tenants',
     id: tenantId,
     data: { plan: mapPlanCodeToTier(planCode) },
@@ -263,6 +280,7 @@ export async function getFeatureValue(
   featureCode: string,
 ): Promise<string | null> {
   const result = await payload.find({
+      overrideAccess: true,
     collection: 'plan-features',
     where: {
       and: [{ planCode: { equals: planCode } }, { featureCode: { equals: featureCode } }],
@@ -313,6 +331,7 @@ export async function getFeatureSettings(
   featureCode: string,
 ): Promise<Record<string, unknown> | null> {
   const result = await payload.find({
+      overrideAccess: true,
     collection: 'plan-features',
     where: {
       and: [{ planCode: { equals: planCode } }, { featureCode: { equals: featureCode } }],

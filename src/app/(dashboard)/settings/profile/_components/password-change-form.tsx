@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Lock, X, Check } from 'lucide-react'
+import { Eye, EyeOff, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useI18n } from '@/i18n'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { ProfileSaveBar } from './profile-save-bar'
+import { CardActionBar } from './card-action-bar'
 
 const formSchema = passwordBaseSchema.extend({
     confirmPassword: z.string().min(1),
@@ -26,8 +26,8 @@ const formSchema = passwordBaseSchema.extend({
 
 type FormValues = z.infer<typeof formSchema>
 
-// Icon slots only — size/colors/border/focus from shared <Input> primitive
-const inputCls = 'pl-10 pr-10'
+// Right icon slot only (eye toggle) — size/colors/border/focus from shared <Input> primitive
+const inputCls = 'pr-10'
 
 function PasswordRule({ met, label }: { met: boolean; label: string }) {
     return (
@@ -44,7 +44,14 @@ function PasswordRule({ met, label }: { met: boolean; label: string }) {
     )
 }
 
-export function PasswordChangeForm() {
+type Props = {
+    /** Called after a successful password update (post toast + reset) so the parent card can collapse. */
+    onDone: () => void
+    /** Called when Cancel is clicked (post reset) so the parent card can collapse. */
+    onCancel: () => void
+}
+
+export function PasswordChangeForm({ onDone, onCancel }: Props) {
     const { t } = useI18n()
     const [showCurrent, setShowCurrent] = useState(false)
     const [showNew, setShowNew]         = useState(false)
@@ -53,6 +60,7 @@ export function PasswordChangeForm() {
     const { register, handleSubmit, watch, reset, setError, formState } =
         useForm<FormValues>({
             resolver: zodResolver(formSchema),
+            mode: 'onChange',
             defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
         })
 
@@ -84,6 +92,7 @@ export function PasswordChangeForm() {
 
             toast.success(t.profile.security.changed)
             reset()
+            onDone()
         } catch {
             toast.error(t.profile.errors.networkError)
         }
@@ -97,7 +106,6 @@ export function PasswordChangeForm() {
                     {t.profile.security.currentPassword}
                 </Label>
                 <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                     <Input
                         {...register('currentPassword')}
                         type={showCurrent ? 'text' : 'password'}
@@ -126,7 +134,6 @@ export function PasswordChangeForm() {
                         {t.profile.security.newPassword}
                     </Label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                         <Input
                             {...register('newPassword')}
                             type={showNew ? 'text' : 'password'}
@@ -152,7 +159,6 @@ export function PasswordChangeForm() {
                         {t.profile.security.confirmPassword}
                     </Label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                         <Input
                             {...register('confirmPassword')}
                             type={showConfirm ? 'text' : 'password'}
@@ -182,15 +188,17 @@ export function PasswordChangeForm() {
                 <PasswordRule met={hasNumber}    label={t.profile.security.ruleNumber} />
             </div>
 
-            {/* Floating save bar — only visible when dirty (same template as edit-discount) */}
-            {formState.isDirty && (
-                <ProfileSaveBar
-                    saving={formState.isSubmitting}
-                    saveLabel={t.profile.security.updatePassword}
-                    savingLabel={t.profile.security.changing}
-                    onCancel={() => reset()}
-                />
-            )}
+            {/* Inline action bar — always visible; Update Password stays disabled until the full form is valid. */}
+            <CardActionBar
+                saving={formState.isSubmitting}
+                disabled={!formState.isValid}
+                saveLabel={t.profile.security.updatePassword}
+                savingLabel={t.profile.security.changing}
+                onCancel={() => {
+                    reset()
+                    onCancel()
+                }}
+            />
         </form>
     )
 }

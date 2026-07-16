@@ -1,12 +1,14 @@
 # Phase 04 — Dedup Name + Slug Scope (#14)
 
-**PR:** 1 · **Migration:** No (app-layer; DB index from Phase 01) · **Priority:** P1 · **Status:** pending · **Depends:** Phase 01
+**PR:** 1 · **Migration:** No (app-layer; DB index from Phase 01) · **Priority:** P1 · **Status:** done · **Depends:** Phase 01
 
 ## Context
 
 - `Categories.ts` slug field (`:161-166`) has `unique: true` (global). Phase 01 replaces the DB constraint with per-tenant composite; THIS phase removes `unique: true` from the field so Payload stops re-creating the global index.
 - No current dedup on **name**. Two categories can share a name in the same level/tenant.
 - Save path: `CategoryManager.tsx handleSave` (`:216-253`) → `saveCategoryAction` (`actions.ts:76-104`).
+
+> **NOTE (2026-07-13):** The unused `image` upload field removal from `Categories.ts` (originally planned here) was **already completed in Phase 02** as an emergency unblock. Phase 01's migration dropped the `image_id` DB column, which broke `payload.create`/`payload.update` at runtime until the field was removed from the collection schema. Skip the image field removal step in Phase 04 — all other scope (slug unique:true removal, name dedup, etc.) remains unchanged.
 
 ## Overview
 
@@ -69,13 +71,13 @@ Client async name-check: on name blur / debounced change, call a lightweight ser
 
 ## Todo
 
-- [ ] Remove `unique:true` from slug field (keep index) — coordinate w/ Phase 01
-- [ ] tenantId resolution in `saveCategoryAction`
-- [ ] Name pre-check query (parent+tenant scoped, exclude self)
-- [ ] Map Postgres 23505 slug violation → friendly error
-- [ ] `checkCategoryNameAvailable` server action
-- [ ] Client debounced async name check + inline red error
-- [ ] i18n `nameDuplicate` + `slugDuplicate` EN + MS
+- [x] Remove `unique:true` from slug field (keep index) — coordinate w/ Phase 01
+- [x] tenantId resolution in `saveCategoryAction`
+- [x] Name pre-check query (parent+tenant scoped, exclude self)
+- [x] Map Postgres 23505 slug violation → friendly error
+- [x] `checkCategoryNameAvailable` server action
+- [x] Client debounced async name check + inline red error
+- [x] i18n `nameDuplicate` + `slugDuplicate` EN + MS
 
 ## Success Criteria
 

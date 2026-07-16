@@ -907,7 +907,6 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
 
     expect(pool.landscape.map((p) => p.id)).toEqual(['c1'])
   })
-
   it('[TC-GH1611-15] fallback is gated by product terms when products are provided (rejecting lookalike clothing)', async () => {
     const clothingHit = fakePhoto('x1', 1920, 1080, 'dress, clothing, product photography')
     const handbagHit = fakePhoto('h1', 1920, 1080, 'leather handbag, product photography')
@@ -944,4 +943,3 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
     expect(pool.landscape).toEqual([])
   })
 })
-
