@@ -89,7 +89,7 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         const tier3Photo = {
             id: 'cat-1',
             url: 'https://pixabay.com/get/cat-1_1280.jpg',
-            alt: 'stationery flatlay',
+            alt: 'stationery flatlay product photography',
             photographer: 'Bob',
             width: 1920,
             height: 1080,
@@ -126,6 +126,40 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         expect(tier3Opts?.lang).toBeUndefined()
         expect(result.failures).toEqual([])
         expect(result.mediaIds).toEqual([7])
+    })
+
+    it('gallery: unmapped category fallback returns off-topic photos → gates them out, returning empty', async () => {
+        // Arrange — unmapped category 'ecommerce' has no Pixabay category mapping.
+        // The fallback returns an off-topic photo (e.g. clothing/dress) which gets gated out.
+        const offTopicPhoto = {
+            id: 'off-1',
+            url: 'https://pixabay.com/get/off-1_1280.jpg',
+            alt: 'red dress clothing garment',
+            photographer: 'Alice',
+            width: 1920,
+            height: 1080,
+        }
+        vi.mocked(searchPhotos)
+            .mockResolvedValueOnce([]) // primary
+            .mockResolvedValueOnce([]) // broadened
+            .mockResolvedValueOnce([offTopicPhoto] as never) // tier-3 EN category fallback
+        // Re-arm mock:
+        createMock.mockResolvedValue({ id: 7 })
+        const msCtx = {
+            businessName: 'Kedai Seri Bestari',
+            tenantId: '1',
+            category: 'ecommerce',
+            language: 'ms' as const,
+        }
+
+        // Act
+        const result = await getMediaForBlock(
+            'gallery', ['pen dan pensel', 'buku nota'], 1, msCtx as never, payloadStub,
+        )
+
+        // Assert — gated out, resolves to empty result
+        expect(result.mediaIds).toEqual([])
+        expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(3)
     })
 
     it('non-hero non-VN: tier-3 also returns 0 → resolves empty (no infinite ladder)', async () => {

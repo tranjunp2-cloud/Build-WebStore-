@@ -508,11 +508,15 @@ export async function getMediaForBlock(
                 category: pixCategory,
                 ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
-            if (photos.length > 0) {
+            const curatedGateTerms = pixCategory
+                ? []
+                : [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory]
+            const gatedPhotos = gateTerms(photos, curatedGateTerms)
+            if (gatedPhotos.length > 0) {
                 console.info(
-                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${photos.length} photo(s)`,
+                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
                 )
-                return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+                return batchFetch(pickRandomN(gatedPhotos, count), blockType, ctx, payload)
             }
         }
         return blockType === 'hero'
