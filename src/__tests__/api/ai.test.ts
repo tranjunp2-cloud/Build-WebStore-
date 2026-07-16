@@ -955,6 +955,14 @@ describe('AI Streaming APIs', () => {
             // Post-response: captured after() tasks run the seeder exactly once
             await runCapturedAfterTasks()
             expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledWith(
+                expect.anything(),
+                'tenant-1',
+                expect.any(String),
+                'ecommerce',
+                undefined,
+                'Bread',
+            )
         })
 
         it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {

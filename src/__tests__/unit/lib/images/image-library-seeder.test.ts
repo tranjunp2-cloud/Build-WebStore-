@@ -168,6 +168,20 @@ describe('seedImageLibraryForSite [TC-GH-727-01]', () => {
         // downloadPhotoBuffer called for photos that were successfully assigned
         expect(mockDownload).toHaveBeenCalled()
     })
+
+    it('TC-GH-727-01e: prefixes gallery and hero search queries with productTerms when provided', async () => {
+        const payload = buildPayload()
+        mockSearch.mockResolvedValue(makePhotos(10))
+        mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
+        let id = 0
+        mockUpload.mockImplementation(async () => ++id)
+
+        await seedImageLibraryForSite(payload as never, 1, 10, 'creative', undefined, 'chibi animation')
+
+        const searchQueries = mockSearch.mock.calls.map(([query]) => query)
+        expect(searchQueries).toContain('chibi animation creative studio art portfolio')
+        expect(searchQueries).toContain('chibi animation creative studio artist workspace')
+    })
 })
 
 /**
