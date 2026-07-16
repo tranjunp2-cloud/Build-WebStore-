@@ -24,6 +24,10 @@ vi.mock('@/hooks/use-upload-progress', () => ({
     useUploadProgress: vi.fn(),
 }))
 
+vi.mock('@/hooks/use-direct-upload', () => ({
+    useDirectUpload: vi.fn(),
+}))
+
 vi.mock('@/lib/media/compress-image', () => ({
     compressImage: vi.fn(async (file: File) => file),
 }))
@@ -38,6 +42,7 @@ import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
+import { useDirectUpload } from '@/hooks/use-direct-upload'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const mockOnFieldChange = vi.fn()
@@ -57,12 +62,20 @@ function dispatchFieldChangeAck(blockIndex: number, field: string, ok: boolean, 
 }
 
 let mockUpload: Mock
+let mockDirectUpload: Mock
 
 beforeEach(() => {
     vi.clearAllMocks()
     mockUpload = vi.fn()
+    mockDirectUpload = vi.fn()
     vi.mocked(useUploadProgress).mockReturnValue({
         upload: mockUpload,
+        progress: 0,
+        isUploading: false,
+        reset: vi.fn(),
+    })
+    vi.mocked(useDirectUpload).mockReturnValue({
+        upload: mockDirectUpload,
         progress: 0,
         isUploading: false,
         reset: vi.fn(),
@@ -336,11 +349,12 @@ describe('TC-GH1381-UO-010: invalid video file type rejected', () => {
     })
 })
 
-describe('TC-GH1381-UO-011: video upload calls onFieldChange and onVideoUploaded', () => {
-    it('sends url string to videoField and fires callback', async () => {
+describe('TC-GH1381-UO-011: video upload waits for parent persistence', () => {
+    it('updates the video only after a successful field-change ACK', async () => {
+        // Arrange
         vi.mocked(useIsOwner).mockReturnValue(true)
         vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
-        mockUpload.mockResolvedValue({ id: 201, url: 'https://cdn/video.mp4' })
+        mockDirectUpload.mockResolvedValue({ id: 201, url: 'https://cdn/video.mp4' })
         const onVideoUploaded = vi.fn()
         const { container } = render(
             <MediaUploadOverlay field="image" showVideoButton={true} videoField="videoUrl" onVideoUploaded={onVideoUploaded}>
@@ -348,11 +362,51 @@ describe('TC-GH1381-UO-011: video upload calls onFieldChange and onVideoUploaded
             </MediaUploadOverlay>
         )
         const input = container.querySelector('input[accept="video/mp4,video/webm"]') as HTMLInputElement
+
+        // Act
         fireEvent.change(input, { target: { files: [makeFile('video/mp4')] } })
         await waitFor(() => {
             expect(mockOnFieldChange).toHaveBeenCalledWith('videoUrl', 'https://cdn/video.mp4')
         })
+        expect(onVideoUploaded).not.toHaveBeenCalled()
+        dispatchFieldChangeAck(0, 'videoUrl', true)
+
+        // Assert
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'success', message: 'Video updated' },
+                expect.any(String),
+            )
+        })
         expect(onVideoUploaded).toHaveBeenCalledWith('https://cdn/video.mp4')
+    })
+
+    it('shows an error and does not update the preview when the parent rejects the save', async () => {
+        // Arrange
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        mockDirectUpload.mockResolvedValue({ id: 202, url: 'https://cdn/video.mp4' })
+        const onVideoUploaded = vi.fn()
+        const { container } = render(
+            <MediaUploadOverlay field="image" showVideoButton={true} videoField="videoUrl" onVideoUploaded={onVideoUploaded}>
+                <div />
+            </MediaUploadOverlay>
+        )
+        const input = container.querySelector('input[accept="video/mp4,video/webm"]') as HTMLInputElement
+
+        // Act
+        fireEvent.change(input, { target: { files: [makeFile('video/mp4')] } })
+        await waitFor(() => expect(mockOnFieldChange).toHaveBeenCalled())
+        dispatchFieldChangeAck(0, 'videoUrl', false, 'Could not save the change')
+
+        // Assert
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'error', message: 'Could not save the change' },
+                expect.any(String),
+            )
+        })
+        expect(onVideoUploaded).not.toHaveBeenCalled()
     })
 })
 
