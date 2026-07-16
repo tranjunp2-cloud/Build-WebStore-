@@ -25,7 +25,7 @@ import type { GenerationResult } from './generate-blocks'
 import { logAiUsage } from './log-usage'
 
 const HOME_MAX_TOKENS = 5000
-const SUBPAGE_BATCH_MAX_TOKENS = 6000
+const SUBPAGE_BATCH_MAX_TOKENS = 9000
 // 3-call split (home ∥ batch1 ∥ batch2). Measured 2026-07-03: a single
 // 4-subpage call produced ~6000+ output tokens for vi content — it truncated
 // at max_tokens AND was the long pole (~80s ≈ no win over the mega-call,
@@ -140,8 +140,12 @@ async function runSplitCall(
             max_tokens: maxTokens,
             response_format: { type: 'json_object' },
         })
-        const content = completion.choices[0]?.message?.content
+        const choice = completion.choices[0]
+        const content = choice?.message?.content
         if (!content) throw new Error('Empty AI response')
+        if (choice?.finish_reason === 'length') {
+            console.warn(`[gen-page-split] AI response truncated due to token limit (finish_reason: length)`)
+        }
         const usage = completion.usage
         return { parsed: safeParseJson(content), model: completion.model, tokensIn: usage?.prompt_tokens ?? 0, tokensOut: usage?.completion_tokens ?? 0, durationMs: Date.now() - start }
     } catch (err) {

@@ -12,10 +12,10 @@ import { generateBlocks, type GenerationResult, type GeneratedBlock, type Genera
 import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
 import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
-import { isUnsupportedBlock } from './unsupported-blocks'
+import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
+import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
@@ -290,10 +290,10 @@ export async function generateSiteWithAI(
                     temperature: 0.7,
                     // Plan 260416: 6000 was too tight — 5-page sites need
                     // ~6500-7500 tokens, so JSON was truncated on every gen
-                    // causing 100% fallback to legacy composer. 10000 gives
+                    // causing 100% fallback to legacy composer. 12000 gives
                     // safe headroom. Cost unchanged (GPT charges actual output,
                     // not the cap — typical output stays ~5200-7000 tokens).
-                    max_tokens: 10000,
+                    max_tokens: 12000,
                     response_format: { type: 'json_object' },
                 })
             } catch (err) {
@@ -346,9 +346,13 @@ export async function generateSiteWithAI(
                 success: true,
             })
 
-            const content = completion.choices[0]?.message?.content
+            const choice = completion.choices[0]
+            const content = choice?.message?.content
             if (!content) {
                 throw new Error('Empty AI response')
+            }
+            if (choice?.finish_reason === 'length') {
+                console.warn(`[AI] WARNING: AI response was truncated due to max_tokens limit (${completion.usage?.completion_tokens} tokens used).`)
             }
 
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
@@ -404,8 +408,15 @@ export async function generateSiteWithAI(
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
                 const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
-                const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
+                let blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
                 if (!blockType) continue
+
+                if (UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]) {
+                    const replacement = UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]!
+                    console.warn(`[AI] Replacing "${blockType}" with "${replacement}"`)
+                    sanitized.blockType = replacement
+                    blockType = replacement
+                }
 
                 if (isUnsupportedBlock(blockType)) {
                     console.warn(`[AI] Dropping "${blockType}" block — needs media pipeline or not in Payload schema`)
@@ -506,21 +517,26 @@ export async function generateSiteWithAI(
                 // twice or inject mandatory blocks that don't belong on /about
                 // etc. Sub-pages still get item padding + grid alignment via the
                 // other enforcers below (plan 1.3 B5 fix).
-                if (detectedCategory) {
-                    if (p === 0) {
-                        pageBlocks = enforceMinimumStructure(
-                            pageBlocks as Record<string, unknown>[],
-                            detectedCategory,
-                            enforcerCtx,
-                        ) as typeof pageBlocks
-                    }
-                    pageBlocks = enforceMinItems(
+                const enforcerCategory = presetCategory || detectedCategory || 'business'
+                if (p === 0) {
+                    pageBlocks = enforceMinimumStructure(
                         pageBlocks as Record<string, unknown>[],
-                        detectedCategory,
+                        enforcerCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
-                    enforceGridAlignment(pageBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
+                } else {
+                    pageBlocks = enforceSubpageStructure(
+                        pageBlocks as Record<string, unknown>[],
+                        enforcerCategory,
+                        enforcerCtx,
+                    ) as typeof pageBlocks
                 }
+                pageBlocks = enforceMinItems(
+                    pageBlocks as Record<string, unknown>[],
+                    enforcerCategory,
+                    enforcerCtx,
+                ) as typeof pageBlocks
+                enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
                 generatedPages.push({
@@ -2233,6 +2249,7 @@ async function generateTemplateFirst(
                 continue
             }
             let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = enforceSubpageStructure(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
             page.blocks = pageBlocks as GeneratedBlock[]

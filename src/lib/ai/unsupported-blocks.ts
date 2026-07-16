@@ -61,6 +61,22 @@ export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
     'social-proof',
 ])
 
+export const UNSUPPORTED_BLOCK_REPLACEMENTS: Record<string, string> = {
+    'menu-display': 'menu-food',
+    'booking-widget': 'contact',
+    'pricing-table': 'pricing',
+    'google-maps': 'contact',
+    'countdown-timer': 'cta',
+    'gallery-masonry': 'gallery',
+    'before-after': 'gallery',
+    'property-card': 'service-cards',
+    'class-schedule': 'service-cards',
+    'step-process': 'features',
+    'doctor-profile': 'team',
+    'download-cta': 'cta',
+    'social-proof': 'testimonials',
+}
+
 /**
  * Returns true if the given blockType should be dropped before reaching Payload.
  * All lists OR'd together — the union is what ends up being rejected.
@@ -70,8 +86,8 @@ export function isUnsupportedBlock(blockType: string): boolean {
 }
 
 /**
- * Filter an array of blocks, removing any that match the drop list.
- * Logs a warning for each dropped block so ops can trace SSE event count drops.
+ * Filter an array of blocks, replacing or removing any that match the drop list.
+ * Logs a warning for each dropped/replaced block so ops can trace SSE event count drops.
  */
 export function filterUnsupportedBlocks<T extends { blockType?: unknown }>(
     blocks: readonly T[],
@@ -79,8 +95,22 @@ export function filterUnsupportedBlocks<T extends { blockType?: unknown }>(
 ): T[] {
     const out: T[] = []
     for (const block of blocks) {
-        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        let blockType = typeof block.blockType === 'string' ? block.blockType : ''
         if (!blockType) continue
+
+        if (UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]) {
+            const replacement = UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]!
+            console.warn(
+                `[${context === 'ai' ? 'AI' : 'Fallback'}] Replacing "${blockType}" with "${replacement}"`,
+            )
+            blockType = replacement
+            out.push({
+                ...block,
+                blockType: replacement,
+            } as unknown as T)
+            continue
+        }
+
         if (isUnsupportedBlock(blockType)) {
             console.warn(
                 `[${context === 'ai' ? 'AI' : 'Fallback'}] Dropping "${blockType}" — needs media pipeline or not in Payload schema`,

@@ -69,9 +69,9 @@ export type AITask =
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
     // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
     'site-generation':    'gpt-4.1-mini',
-    // gen-perf phase-08: Contact+Blog batch is formulaic → nano (~4x cheaper,
-    // faster). Quality gate: eval before enabling in the split; env-overridable.
-    'site-generation-subpages-light': 'gpt-4.1-nano',
+    // gen-perf phase-08: Contact+Blog batch is formulaic → mini is better than nano
+    // to avoid truncation and improve content depth.
+    'site-generation-subpages-light': 'gpt-4.1-mini',
     // Template-first: GPT only personalizes 4 fields (hero headline/sub, SEO).
     // nano is cheapest + fastest (~2-3s for ~200 tokens).
     'personalize':        'gpt-4.1-nano',

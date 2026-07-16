@@ -64,9 +64,8 @@ describe('filterUnsupportedBlocks', () => {
     it('drops unsupported + keeps supported in order', () => {
         const input = [
             { blockType: 'hero' },
-            { blockType: 'google-maps' },
-            { blockType: 'features' },
             { blockType: 'review-cards' },
+            { blockType: 'features' },
             { blockType: 'footer' },
         ]
         const out = filterUnsupportedBlocks(input, 'fallback')
@@ -75,11 +74,26 @@ describe('filterUnsupportedBlocks', () => {
             { blockType: 'features' },
             { blockType: 'footer' },
         ])
-        expect(warnSpy).toHaveBeenCalledTimes(2)
+        expect(warnSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('replaces unsupported blocks with supported equivalents when mapped', () => {
+        const input = [
+            { blockType: 'menu-display', customField: 123 },
+            { blockType: 'booking-widget' },
+            { blockType: 'pricing-table' },
+        ]
+        const out = filterUnsupportedBlocks(input, 'fallback')
+        expect(out).toEqual([
+            { blockType: 'menu-food', customField: 123 },
+            { blockType: 'contact' },
+            { blockType: 'pricing' },
+        ])
+        expect(warnSpy).toHaveBeenCalledTimes(3)
     })
 
     it('logs fallback prefix when context="fallback"', () => {
-        filterUnsupportedBlocks([{ blockType: 'google-maps' }], 'fallback')
+        filterUnsupportedBlocks([{ blockType: 'review-cards' }], 'fallback')
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[Fallback]'))
     })
 
