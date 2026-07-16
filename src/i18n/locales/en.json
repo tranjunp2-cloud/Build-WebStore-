@@ -3100,7 +3100,7 @@
             "sessionExpired": "Your session has expired. Please log in again."
         },
         "emailPlaceholder": "you@example.com",
-        "passwordPlaceholder": "••••••••",
+        "passwordPlaceholder": "Enter your password",
         "checking": "Checking...",
         "loading": "Loading...",
         "otpSentTitle": "Verification code sent!",

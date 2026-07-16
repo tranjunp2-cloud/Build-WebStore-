@@ -3100,7 +3100,7 @@
             "sessionExpired": "Sesi anda telah tamat tempoh. Sila log masuk semula."
         },
         "emailPlaceholder": "anda@contoh.com",
-        "passwordPlaceholder": "••••••••",
+        "passwordPlaceholder": "Masukkan kata laluan anda",
         "checking": "Menyemak...",
         "loading": "Memuatkan...",
         "otpSentTitle": "Kod pengesahan dihantar!",
