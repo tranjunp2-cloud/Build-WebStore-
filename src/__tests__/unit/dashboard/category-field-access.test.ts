@@ -285,8 +285,8 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
         })
 
-        it('TC-F08-05-09: Super-admin CAN nest under different tenant parent (exempt from cross-tenant check)', async () => {
-            // Arrange: super-admin bypasses tenant-mismatch check
+        it('TC-F08-05-09: Super-admin CANNOT nest under different tenant parent (not exempt from cross-tenant check)', async () => {
+            // Arrange: super-admin is also subject to tenant-mismatch check
             const { Categories } = await import('@/collections/Categories')
             const hook = Categories.hooks?.beforeValidate?.[0] as any
 
@@ -301,16 +301,15 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
                 },
             }
 
-            // Act: super-admin can nest under any parent, even cross-tenant
+            // Act & Assert: super-admin CANNOT nest under different tenant's category
             const data = { name: 'Child', parent: 'parent-999', tenant: 'tenant-456' }
-            const result = await hook({
-                data,
-                operation: 'create',
-                req,
-            } as any)
-
-            // Assert: no error thrown; data returned unchanged
-            expect(result).toBe(data)
+            await expect(
+                hook({
+                    data,
+                    operation: 'create',
+                    req,
+                } as any)
+            ).rejects.toThrow('CATEGORY_PARENT_TENANT_MISMATCH')
         })
 
         it('TC-F08-05-09: Same-tenant nesting allowed — no CATEGORY_PARENT_TENANT_MISMATCH error', async () => {
@@ -894,6 +893,93 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
                     req,
                 } as any)
             ).resolves.not.toThrow()
+        })
+    })
+
+    describe('Action Layer Security (saveCategoryAction)', () => {
+        it('TC-F08-05-31: saveCategoryAction does NOT bypass collection-level access.create/update (overrideAccess: false)', async () => {
+            // Arrange
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockCreate.mockResolvedValue({ id: 'cat-123' })
+            mockUpdate.mockResolvedValue({ id: 'cat-123' })
+            
+            // Act
+            await saveCategoryAction({ name: 'New Cat' } as any)
+            await saveCategoryAction({ name: 'Updated Cat' } as any, 'cat-123')
+
+            // Assert: overrideAccess must be false so Payload's collection access.create/update runs 
+            // (which enforces the product_management plan check).
+            expect(mockCreate).toHaveBeenCalled()
+            expect(mockCreate.mock.calls[0][0].overrideAccess).toBe(false)
+            
+            expect(mockUpdate).toHaveBeenCalled()
+            expect(mockUpdate.mock.calls[0][0].overrideAccess).toBe(false)
+        })
+
+        it('TC-F08-05-32: saveCategoryAction cannot update a foreign-tenant category by known id', async () => {
+            // Arrange: emulate Payload Local API enforcing Categories.access.update against
+            // the target doc. This should reject if the action tries to update tenant B's
+            // category while authenticated as tenant A.
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockFind.mockImplementation(async (args: { collection: string }) => {
+                if (args.collection === 'plan-subscriptions') {
+                    return {
+                        docs: [{ id: 'sub-123', plan: 'PROFESSIONAL_TM_USER', status: 'active', endsAt: '2099-01-01T00:00:00.000Z' }],
+                    }
+                }
+                if (args.collection === 'plan-features') {
+                    return { docs: [{ value: 'YES' }] }
+                }
+                throw new Error('Unexpected collection: ' + args.collection)
+            })
+
+            const { Categories } = await import('@/collections/Categories')
+            const updateAccess = Categories.access?.update as NonNullable<typeof Categories.access>['update']
+            expect(updateAccess).toBeTypeOf('function')
+
+            mockUpdate.mockImplementation(async (args: {
+                id: string
+                user?: typeof mockCurrentUser
+                overrideAccess?: boolean
+            }) => {
+                if (args.overrideAccess !== false || !args.user) {
+                    throw new Error('TEST_SETUP_BROKEN')
+                }
+
+                const accessResult = await updateAccess({ req: { user: args.user, payload: mockPayload } } as any)
+                if (accessResult === false) {
+                    throw new Error('Forbidden')
+                }
+                if (
+                    typeof accessResult === 'object' &&
+                    'tenant' in accessResult &&
+                    args.id === 'cat-tenant-b'
+                ) {
+                    const allowedTenantIds = Array.isArray((accessResult as any).tenant?.in)
+                        ? (accessResult as any).tenant.in.map(String)
+                        : []
+                    const targetTenantId = 'tenant-b'
+                    if (!allowedTenantIds.includes(targetTenantId)) {
+                        throw new Error('Forbidden')
+                    }
+                }
+
+                return { id: args.id }
+            })
+
+            // Act + Assert: tenant A must not be able to update tenant B's category, even
+            // if they know its id, because the action leaves access enforcement on.
+            await expect(
+                saveCategoryAction({ name: 'Hijack Attempt' } as any, 'cat-tenant-b')
+            ).rejects.toThrow('Forbidden')
+
+            expect(mockUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'cat-tenant-b',
+                    user: mockCurrentUser,
+                    overrideAccess: false,
+                })
+            )
         })
     })
 })

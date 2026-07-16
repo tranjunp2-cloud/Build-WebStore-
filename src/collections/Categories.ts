@@ -65,8 +65,12 @@ export const Categories: CollectionConfig = {
             try {
                 const sub = await getActivePlanSubscription(req.payload, tenantId)
                 if (!sub) return false
-                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
-            } catch { return false }
+                const hasFeature = await canUse(req.payload, sub.plan as PlanCode, 'product_management')
+                if (!hasFeature) return false
+            } catch {
+                return false
+            }
+
             return { tenant: { in: tenantIds } }
         },
         delete: async ({ req }) => {
@@ -146,29 +150,34 @@ export const Categories: CollectionConfig = {
                             if (candidateDoc?.deletedAt) {
                                 throw new Error('CATEGORY_PARENT_SOFT_DELETED');
                             }
-                            if (!isSuperAdmin && req.user) {
+                            if (req.user) {
                                 const parentTenantId = unwrapRelationId(candidateDoc?.tenant) ?? null
                                 // Owner tenant MUST come from an authoritative source, never from
                                 // client-supplied `data.tenant` (GH-1587 C1: a forged `data.tenant`
                                 // in the create payload would otherwise let the check "validate"
                                 // an attacker-chosen tenant instead of blocking it). On create, use
                                 // the authenticated user's own tenant — same source access.create
-                                // trusts. On update, use the already-persisted originalDoc.tenant.
+                                // trusts. For super-admin, since they can freely set `tenant`,
+                                // `data.tenant` is the authoritative source. On update, use the
+                                // already-persisted originalDoc.tenant.
                                 let ownerTenantId: string | number | null | undefined
                                 if (operation === 'update') {
                                     ownerTenantId = unwrapRelationId(originalDoc?.tenant as string | number | { id: string | number } | null | undefined)
                                 } else {
-                                    const tenantIds = req.user?.tenants?.map((t: { tenant: string | { id: string } }) =>
-                                        unwrapRelationId(t.tenant)
-                                    ) ?? []
-                                    ownerTenantId = tenantIds[0]
+                                    if (isSuperAdmin && data?.tenant) {
+                                        ownerTenantId = unwrapRelationId(data.tenant)
+                                    } else {
+                                        const tenantIds = req.user?.tenants?.map((t: { tenant: string | { id: string } }) =>
+                                            unwrapRelationId(t.tenant)
+                                        ) ?? []
+                                        ownerTenantId = tenantIds[0]
+                                    }
                                 }
                                 if (parentTenantId == null || ownerTenantId == null || String(parentTenantId) !== String(ownerTenantId)) {
                                     throw new Error('CATEGORY_PARENT_TENANT_MISMATCH');
                                 }
                             }
-                            // else: either isSuperAdmin (already exempt pre-M7) or no req.user —
-                            // the latter is a trusted system/Local-API write (seed script, AI
+                            // else: no req.user — trusted system/Local-API write (seed script, AI
                             // generate-site), not a client request. Collection access.create
                             // already returns false for `!req.user`, so the only way to reach this
                             // hook without a user is trusted internal code with no client tenant

@@ -191,7 +191,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
                 id,
                 data,
                 user,
-                overrideAccess: true, // GH-1587: Bypasses field-level access that would strip 'tenant'
+                overrideAccess: false,
             })
             return JSON.parse(JSON.stringify(res));
         } catch (updateErr) {
@@ -203,7 +203,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
                 collection: 'categories',
                 data,
                 user,
-                overrideAccess: true, // GH-1587: Bypasses field-level access that would strip 'tenant'
+                overrideAccess: false,
             })
             return JSON.parse(JSON.stringify(res));
         } catch (createErr) {
