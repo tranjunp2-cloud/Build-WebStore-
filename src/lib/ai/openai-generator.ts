@@ -12,7 +12,7 @@ import { generateBlocks, type GenerationResult, type GeneratedBlock, type Genera
 import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
 import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
-import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS } from './unsupported-blocks'
+import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBlocks } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
@@ -405,33 +405,24 @@ export async function generateSiteWithAI(
         // Unsupported block drop list lives in ./unsupported-blocks for reuse
         // between happy path (here) and fallback path (fallback-adapter).
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
+            const sanitizedBlocks = rawBlocks.map((block) =>
+                sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
+            )
+            const filtered = filterUnsupportedBlocks(sanitizedBlocks, 'ai')
             const valid: Record<string, unknown>[] = []
-            for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
-                let blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
+            for (const blockData of filtered) {
+                const blockType = typeof blockData.blockType === 'string' ? blockData.blockType : ''
                 if (!blockType) continue
 
-                if (UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]) {
-                    const replacement = UNSUPPORTED_BLOCK_REPLACEMENTS[blockType]!
-                    console.warn(`[AI] Replacing "${blockType}" with "${replacement}"`)
-                    sanitized.blockType = replacement
-                    blockType = replacement
-                }
-
-                if (isUnsupportedBlock(blockType)) {
-                    console.warn(`[AI] Dropping "${blockType}" block — needs media pipeline or not in Payload schema`)
-                    continue
-                }
-
                 if (blockRegistry.has(blockType)) {
-                    const validation = blockRegistry.validate(blockType, sanitized)
-                    const blockData = validation.success ? validation.data as Record<string, unknown> : sanitized
+                    const validation = blockRegistry.validate(blockType, blockData)
+                    const validatedData = validation.success ? validation.data as Record<string, unknown> : blockData
 
                     // GH-1219: drop menu-food blocks with empty categories — blank section on page
                     // !Array.isArray covers the sanitized fallback path; on Zod-success path
                     // categories is always an array (schema uses .default([]))
                     if (blockType === 'menu-food') {
-                        const cats = blockData.categories
+                        const cats = validatedData.categories
                         if (!Array.isArray(cats) || cats.length === 0) {
                             console.warn('[AI] Dropping "menu-food" block — categories empty (AI failed to generate content)')
                             continue
@@ -442,7 +433,7 @@ export async function generateSiteWithAI(
                         valid.push(validation.data as Record<string, unknown>)
                     } else {
                         console.warn(`[AI] Block "${blockType}" validation warning:`, validation.error)
-                        valid.push(sanitized)
+                        valid.push(blockData)
                     }
                 } else {
                     console.warn(`[AI] Unknown block type: ${blockType}, skipping`)
