@@ -47,8 +47,8 @@ function ColPanel({
                         className={cn(
                             "flex items-center justify-between px-4 py-2.5 text-[14px] cursor-pointer transition-colors select-none",
                             selectedId === cat.id
-                                ? "bg-muted text-foreground"
-                                : "text-popover-foreground hover:bg-muted hover:text-foreground"
+                                ? "bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] font-medium"
+                                : "text-popover-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
                         )}
                     >
                         <span className="truncate">{cat.name}</span>

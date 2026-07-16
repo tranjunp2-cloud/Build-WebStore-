@@ -29,8 +29,11 @@ describe('ORDER_STATUS_TRANSITIONS [TC-F10.09, TC-F10.32]', () => {
         expect(ORDER_STATUS_TRANSITIONS.confirmed).toContain('cancelled')
     })
 
-    it('ready_to_ship → shipped', () => {
+    it('ready_to_ship → shipped ONLY (BR-Cancel-02: no cancel after label bought)', () => {
         expect(ORDER_STATUS_TRANSITIONS.ready_to_ship).toContain('shipped')
+        // BR-Cancel-02 (chốt 2026-07-07): cancel chỉ ở pending/confirmed — đơn đã mua
+        // label thì /cancel bị chặn, xử lý qua refund flow (US-F36-11)
+        expect(ORDER_STATUS_TRANSITIONS.ready_to_ship).not.toContain('cancelled')
     })
 
     it('shipped → completed, refunded', () => {

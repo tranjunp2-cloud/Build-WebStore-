@@ -877,7 +877,11 @@ export default function EditorPage() {
             // Exclude locale-control fields too — they are site-wide, not per-locale content.
             // Snapshotting them into _localeContent[gen] would freeze a stale secondaryLocale/
             // switcher state and re-apply it on save+reload, silently reverting Remove/Make Default.
-            const SKIP = new Set(['id', 'blockType', 'logo', '_localeContent', '__localeInit', ...STRUCTURAL_BLOCK_FIELDS])
+            // GH-1381: media fields must be skipped as well (mirrors NON_TRANSLATABLE_FIELDS'
+            // media group) — snapshotting `images` freezes the array into localeOverrides, and
+            // since getDisplayBlock merges override-over-flat, a later image upload (which only
+            // updates the flat block) would be masked by the stale snapshot even across reloads.
+            const SKIP = new Set(['id', 'blockType', 'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', '_localeContent', '__localeInit', ...STRUCTURAL_BLOCK_FIELDS])
             const extractContent = (block: BlockData) =>
                 Object.fromEntries(
                     Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
@@ -2062,7 +2066,22 @@ export default function EditorPage() {
         }
     }, [])
 
-    const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
+    const handleMobileBlockSelect = useCallback((blockIndex: number | null, blockType?: string) => {
+        // GH-1557 Bug 7: nav/footer/breadcrumb aren't in `blocks`/`globalBlocks` (no
+        // currentBlock resolves for them) — route to SettingsPanel's Menu tab like desktop's
+        // handleBlockSelectWithContext, but still open the compact sheet (unlike desktop,
+        // whose SettingsPanel is always mounted, this sheet only mounts on demand).
+        if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
+            setSelectedBlock(null)
+            setSelectedGlobalBlockType(null)
+            const sectionMap: Record<string, string> = { breadcrumb: 'breadcrumb', footer: 'footer' }
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: sectionMap[blockType] })
+            if (isCompactLayout) {
+                setIsMobileSettingsOpen(true)
+                setToolsSheetOpen(false) // Phase 03: XOR — block sheet takes over from the Tools sheet
+            }
+            return
+        }
         setSelectedBlock(blockIndex)
         // Floating blocks route via onEditGlobalBlock → handleBlockSelectWithContext, not here.
         // Guard clears global type state when switching to a page block (index >= 0 or null).
@@ -2630,12 +2649,24 @@ export default function EditorPage() {
                 isPublishing={isPublishing}
             />
 
-            {!isCompactLayout && (
-                <EditorCoachMarks
-                    onEnterStep1={() => setActiveSidebarTab('pages')}
-                    onEnterStep2={() => setSettingsRequestedTab({ tab: 'menu', key: Date.now() })}
-                />
-            )}
+            <EditorCoachMarks
+                // Force a clean remount when crossing the compact/desktop breakpoint mid-tour
+                // (e.g. tablet rotation) — the anchor DOM node from the old layout is gone and
+                // nothing else re-resolves it, so a stale rect would otherwise point at nothing.
+                key={isCompactLayout ? 'compact' : 'desktop'}
+                onEnterStep1={() => {
+                    setActiveSidebarTab('pages')
+                    if (isCompactLayout) openTools('pages')
+                }}
+                onEnterStep2={() => {
+                    setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
+                    if (isCompactLayout) openTools('settings')
+                }}
+                onFinish={() => {
+                    if (isCompactLayout) closeTools()
+                }}
+                isCompact={isCompactLayout}
+            />
 
             <EditorTemplateModal
                 isOpen={isTemplateModalOpen}

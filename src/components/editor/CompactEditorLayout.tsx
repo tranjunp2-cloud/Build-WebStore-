@@ -170,13 +170,42 @@ export function CompactEditorLayout({
         return () => observer.disconnect()
     }, [])
 
+    // GH-1557 Bug 4: lock background canvas scroll while either mobile sheet is open.
+    // Single effect keyed on BOTH flags (not one per sheet) — page.tsx already enforces
+    // isMobileSettingsOpen/toolsSheetOpen are mutually exclusive (see XOR note above), but
+    // two independent effects toggling the same document.body.style.overflow could still
+    // race across the open-A→open-B transition depending on cleanup/effect ordering. One
+    // effect with an OR condition has no such race.
+    useEffect(() => {
+        if (!isMobileSettingsOpen && !toolsSheetOpen) return
+        document.body.style.overflow = 'hidden'
+        return () => {
+            document.body.style.overflow = ''
+        }
+    }, [isMobileSettingsOpen, toolsSheetOpen])
+
+    // GH-1557 Bug 7: navigation/footer/breadcrumb have no entry in `blocks` or `globalBlocks`
+    // (unlike cartWidget/whatsapp-button/social), so `currentBlock` is null for them — but the
+    // sheet must still open, driven by `settingsRequestedTab` alone. Desktop's SettingsPanel is
+    // always mounted so `block=null` there is a non-issue; this compact sheet only mounts when
+    // `currentBlock` is truthy, hence the dedicated mode below.
+    const navFooterMenuMode = !currentBlock && settingsRequestedTab?.tab === 'menu'
+    const navFooterMenuLabel = settingsRequestedTab?.section === 'breadcrumb'
+        ? 'Breadcrumb'
+        : settingsRequestedTab?.section === 'footer'
+            ? 'Footer'
+            : 'Navigation'
+
     const blockLabel = currentBlock
         ? blockRegistry.getBlockMeta(currentBlock.blockType)?.name || currentBlock.blockType
-        : ''
+        : navFooterMenuMode
+            ? navFooterMenuLabel
+            : ''
     // Floating global widgets (cartWidget/whatsapp-button/social) use negative indices and
     // aren't part of the page's block flow — move/delete don't apply to them (their own
     // enable/disable + variant controls live in the SettingsPanel block view below).
-    const isGlobalWidget = selectedBlock !== null && selectedBlock < 0
+    // Nav/footer/breadcrumb menu mode has no block at all, so it hides the same way.
+    const isGlobalWidget = (selectedBlock !== null && selectedBlock < 0) || navFooterMenuMode
     const canMoveUp = selectedBlock !== null && selectedBlock > 0
     const canMoveDown = selectedBlock !== null && selectedBlock >= 0 && selectedBlock < totalBlocks - 1
     // F05 screen 11: empty new-page state — FAB is the ONLY screen showing it, and it
@@ -284,8 +313,9 @@ export function CompactEditorLayout({
                 panelProps={toolsPanelProps}
             />
 
-            {/* F05 screen 4: block-settings bottom sheet (bsBlock) — auto-opens on tap-select */}
-            {isMobileSettingsOpen && currentBlock && (
+            {/* F05 screen 4: block-settings bottom sheet (bsBlock) — auto-opens on tap-select.
+                GH-1557 Bug 7: also opens for nav/footer/breadcrumb, which have no `currentBlock`. */}
+            {isMobileSettingsOpen && (currentBlock || navFooterMenuMode) && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center">
                     <div
                         className="absolute inset-0 bg-black/60"

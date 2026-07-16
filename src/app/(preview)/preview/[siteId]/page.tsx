@@ -290,8 +290,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         isEditorIframe={isEditorIframe}
                     />
 
-                    {/* Editor listeners (full) or builder-preview link handler (lightweight) */}
-                    {builder ? <BuilderLinkScripts /> : <PreviewScripts />}
+                    {/* Editor iframe gets the full editing listeners; every other context —
+                        builder preview AND the standalone preview opened from the editor
+                        toolbar — is review-only, so it gets the lightweight link handler
+                        (GH-1461: PreviewScripts here made the toolbar preview hover text
+                        with an I-beam cursor + inline-editable, looking like an editor). */}
+                    {editor ? <PreviewScripts /> : <BuilderLinkScripts />}
                 </div>
             </AppShell>
         )

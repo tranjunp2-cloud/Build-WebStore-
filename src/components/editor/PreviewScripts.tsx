@@ -118,6 +118,9 @@ export function PreviewScripts() {
             const imgEl = target.tagName === 'IMG' ? target
                 : (target.getAttribute('data-image-index') !== null ? target : null)
             if (imgEl) {
+                // GH-1381: overlay-managed images handle their own hover affordance — skip the
+                // parent-frame IMAGE_HOVERED hint so it doesn't compete with the overlay button.
+                if (imgEl.closest('[data-media-overlay]')) return
                 const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
                 if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
                     if (hoverTimer) clearTimeout(hoverTimer)
@@ -541,9 +544,34 @@ export function PreviewScripts() {
                 return
             }
 
+            // GH-1557 Bug 3/6: reused by both the block-select check below (to skip it on an
+            // editable-image tap) and the image-click branch further down (to detect the same
+            // thing) — a single source of truth for "is this an editable image" so a future new
+            // excluded/read-only block type only needs to be added in one place.
+            const resolveEditableImageBlock = (el: HTMLElement) => {
+                const isImgTarget = el.tagName === 'IMG' || el.getAttribute('data-image-index') !== null
+                if (!isImgTarget) return null
+                const blockContainer = el.closest('[data-block-index]')
+                if (!blockContainer) return null
+                const blockType = blockContainer.getAttribute('data-block-type')
+                if (blockType && excludedBlockTypes.includes(blockType)) return null
+                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return null
+                return { blockContainer, blockType }
+            }
+
+            // GH-1557 Bug 3/6: on compact/mobile, a tap on an editable image also matches
+            // `[data-block-index]` below, so without this check BLOCK_CONTAINER_CLICKED (→
+            // full-screen block-settings sheet, posted here) and IMAGE_EDITING_STARTED (→
+            // small Change-Image toolbar, posted further down) both fired for the same tap —
+            // the sheet visually buried the toolbar. Desktop has no such sheet (SettingsPanel
+            // is an always-visible side panel, not an overlay) — selecting the block AND
+            // showing the image toolbar together there is intentional, so this is scoped to
+            // `isCompactPreview` only.
+            const isEditableImageClick = isCompactPreview && resolveEditableImageBlock(target) !== null
+
             // Notify parent which block was clicked → opens block settings tab
             const clickedBlock = target.closest('[data-block-index]')
-            if (clickedBlock) {
+            if (clickedBlock && !isEditableImageClick) {
                 const blockIndex = parseInt(clickedBlock.getAttribute('data-block-index') || '-1', 10)
                 const blockType = clickedBlock.getAttribute('data-block-type')
                 const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
@@ -564,7 +592,7 @@ export function PreviewScripts() {
                         },
                     }, parentOrigin)
                 }
-            } else {
+            } else if (!clickedBlock) {
                 // Clicked outside any block → deselect
                 window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, parentOrigin)
             }
@@ -610,16 +638,17 @@ export function PreviewScripts() {
             const imgEl = target.tagName === 'IMG' ? target
                 : (target.getAttribute('data-image-index') !== null ? target : null)
             if (imgEl) {
+                // GH-1381: images wrapped by MediaUploadOverlay are edited via the in-iframe overlay
+                // button (Path A). Skip the parent-frame ImageToolbar (Path B) so both don't fire —
+                // that double-trigger is the inconsistent left/right "Change Image" bug. Path B stays
+                // active as a fallback for surfaces not yet wrapped by an overlay.
+                if (imgEl.closest('[data-media-overlay]')) return
                 e.preventDefault()
                 e.stopPropagation()
-                const blockContainer = imgEl.closest('[data-block-index]')
-                if (!blockContainer) return
-
+                const resolved = resolveEditableImageBlock(imgEl)
+                if (!resolved) return
+                const { blockContainer, blockType } = resolved
                 const blockIndex = parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
-                const blockType = blockContainer.getAttribute('data-block-type')
-
-                if (blockType && excludedBlockTypes.includes(blockType)) return
-                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return
 
                 const rect = imgEl.getBoundingClientRect()
                 const imageIndexAttr = imgEl.getAttribute('data-image-index')
@@ -1307,8 +1336,15 @@ export function PreviewScripts() {
 }
 
 /**
- * Lightweight click handler for builder preview mode (builder=1).
- * Opens external links in a new tab; lets internal nav links navigate normally.
+ * Lightweight scripts for every review-only preview surface: builder preview
+ * (builder=1), the standalone preview opened from the editor toolbar (no params),
+ * and blog preview pages (mounted unconditionally there).
+ *
+ * Does two things:
+ * 1. Opens external links in a new tab; internal nav links navigate normally.
+ * 2. Forces `cursor: default` on the whole document (GH-1461) — the UA I-beam
+ *    over text reads as "editable here" on a surface that cannot edit. Links
+ *    keep the pointer cursor (UA sets it on `a[href]` explicitly).
  */
 export function BuilderLinkScripts() {
     useEffect(() => {
@@ -1326,7 +1362,20 @@ export function BuilderLinkScripts() {
             } catch { /* invalid URL — let browser handle */ }
         }
         document.addEventListener('click', onClick)
-        return () => document.removeEventListener('click', onClick)
+
+        // GH-1461 rework: this document is the review-only builder preview — the default
+        // `cursor: auto` shows the text I-beam over copy, which reads as "editable here".
+        // Force the arrow instead. Links keep the pointer cursor (UA stylesheet sets it
+        // on <a> explicitly, so it isn't overridden by this inherited value), as do
+        // elements with their own cursor-* utility classes.
+        const style = document.createElement('style')
+        style.textContent = 'html { cursor: default; }'
+        document.head.appendChild(style)
+
+        return () => {
+            document.removeEventListener('click', onClick)
+            style.remove()
+        }
     }, [])
     return null
 }

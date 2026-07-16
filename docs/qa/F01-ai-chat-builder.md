@@ -322,6 +322,20 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.STUCK-09 | AC5 | UI | **[UI]** beforeunload cảnh báo khi đang streaming | Đang gen → thử close tab / navigate away | Browser hiện cảnh báo "Leave page?" | Medium | [ ] |
 | TC-F01.STUCK-10 | AC2 | Sec | **[Security]** Cross-user: reset clears userId | User A gen → reload → login User B | State User A không còn. `userId` và `businessInfo` cleared | Critical | [ ] |
 
+### 3.x. Auto-add Cart khi generate site có block product (branch feat/auto-add-cart-block-on-product-generation)
+
+_Unit: `src/__tests__/unit/lib/ai/ensure-cart-global-block.test.ts` (`ensureCartGlobalBlock`). Áp dụng cho cả AI generate (`generate-site/route.ts`) và apply-template (`apply-template/route.ts` — 2 path: re-skin + tạo site mới)._
+
+| TC ID | Nguồn | Loại | Mô tả | Bước thực hiện | Kết quả mong đợi | Ưu tiên | Trạng thái |
+|---|---|---|---|---|---|---|---|
+| TC-F01.CART-01 | US | Unit | **[Unit]** Page có commerce block → patch chứa cartWidget floating mặc định | Gọi `ensureCartGlobalBlock(undefined, pages có products-grid)` | Trả về `{ globalBlocks: { cartWidget: { blockType:'cartWidget', variant:'floating', label:'Cart', showLabel:false } } }` | Critical | [ ] |
+| TC-F01.CART-02 | US | Unit | **[Unit]** Không có commerce block → không đổi gì | Gọi với pages chỉ hero/about | Trả về `{}` (spread vào data không thêm key) | Critical | [ ] |
+| TC-F01.CART-03 | US | Unit | **[Unit]** cartWidget đã config sẵn → giữ nguyên, không ghi đè | `existingGlobalBlocks = { cartWidget: {...custom} }` + pages có products-featured | Trả về `{}` | High | [ ] |
+| TC-F01.CART-04 | US | Unit | **[Unit]** Giữ các global block khác (whatsapp/social) khi merge cart | `existingGlobalBlocks = { whatsappButton: {...} }` + commerce pages | Patch chứa cả `whatsappButton` cũ lẫn `cartWidget` mới | High | [ ] |
+| TC-F01.CART-05 | US | Unit | **[Unit]** Header đã có cart (showCart) → không thêm floating cart | `headerBlock = { showCart: true }` + commerce pages | Trả về `{}` | Medium | [ ] |
+| TC-F01.CART-06 | US | E2E | **[E2E]** Generate site ecommerce → cart hiện trong editor + storefront | Generate site ngành ecommerce (có products-grid) → mở editor → publish | `site.globalBlocks.cartWidget` tồn tại trong DB; floating cart hiện ở editor canvas và site published | Critical | [ ] |
+| TC-F01.CART-07 | Review | Unit | **[Unit]** Pending draft cũ không che cart mới khi regenerate/re-skin | `pendingGlobalBlocks = { cartWidget: null }` (user xóa cart trong draft chưa publish) + regenerate commerce pages → gọi `ensureCartGlobalBlockWithPending` | Patch chứa cả `globalBlocks.cartWidget` lẫn `pendingGlobalBlocks.cartWidget` (editor/preview đọc pending trước); các key pending khác giữ nguyên; pending đã config cart hoặc pending null → không thêm `pendingGlobalBlocks` vào patch | Critical | [ ] |
+
 ---
 
 ## 4. Hành Trình Trải Nghiệm End-to-End (E2E UAT Flow)

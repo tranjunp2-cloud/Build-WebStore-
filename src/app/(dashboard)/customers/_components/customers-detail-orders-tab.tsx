@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ShoppingBag, WifiOff, RefreshCw, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import {
     Table,
@@ -131,8 +131,8 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
 
     // Pagination rendered inside the Table card (footer slot) — shared <TablePagination>.
     // Fixed page size (25), so no rows-per-page selector (onLimitChange omitted).
-    // Shown whenever there are orders (even a single page) for consistency with other tables.
-    const footer = total > 0 ? (
+    // Hidden for totals <=10 per the global GH-1579 rule.
+    const footer = shouldShowTablePagination(total) ? (
         <TablePagination
             page={page}
             total={total}

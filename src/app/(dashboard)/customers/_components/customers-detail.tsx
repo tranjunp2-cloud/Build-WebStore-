@@ -124,8 +124,8 @@ export function CustomersDetail({ customer }: Props) {
             {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (
                 <div
-                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
-                    style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
+                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm rounded-[10px]"
+                    style={{ background: 'hsl(var(--warning)/0.08)', border: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
                 >
                     <span>{cd.unsavedBanner}</span>
                     <button
@@ -186,14 +186,18 @@ export function CustomersDetail({ customer }: Props) {
             }
 
             {/* Save bar — GH-1509: aligned to the same template as PaymentsFormClient.tsx /
-                Shipping's SettingsFooter (sticky floating rounded card, `--save-bar-bg`, amber
+                Shipping's SettingsFooter (floating rounded card, `--save-bar-bg`, amber
                 "unsaved changes" indicator, size="sm" buttons) instead of the old full-width
                 fixed bar. Also only renders while dirty — was previously always visible on the
-                default tab, just swapping "Unsaved changes" / "Up to date" text. */}
+                default tab, just swapping "Unsaved changes" / "Up to date" text.
+                `position: fixed` (not `sticky`) — sticky only pins once you scroll past its
+                natural flow position, so it visibly drifted with the page instead of staying
+                put. `--dash-content-pl` (globals.css, GH-1592) aligns it with the content column
+                (sidebar + p-8 gutter) at lg+. */}
             {activeTab === 'default' && dirty && (
                 <div
-                    className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
-                    style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+                    className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
+                    style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
                 >
                     <div className="flex items-center gap-2 text-[13px]">
                         <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />

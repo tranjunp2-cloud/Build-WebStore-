@@ -15,7 +15,38 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F36 — Order Detail Redesign (Full-Page 2-Column with EasyParcel Fulfillment, GH-1333)
+
+**Order fulfillment CMS screen moved from right-slide drawer to full-page route:**
+
+- **Routing:** New full-page route `src/app/(dashboard)/orders/[id]/page.tsx` (2-column layout). Old drawer removed from OrdersClientLayout; OrdersTable row click now navigates to `/orders/[id]`. Legacy `?order=` deep-link redirects via route handler.
+- **Schema:** New fields on Orders collection: `selfDeliveryCourier` (text, manual courier for self-delivery), `pickupScheduledAt` (date, seller-selected pickup), `pickupSlot` (text, e.g. "08:00–12:00", informational). Migration in `scripts/db-setup.js` MIGRATIONS array per schema rule (CI hard-gate `check-migrations.js`).
+- **Fulfillment State Machine:** 7 states based on order status + EasyParcel + label creation + tracking:
+  - **pending→confirm** — weight wizard → create label
+  - **ready→create-label** — missing weight form
+  - **success** — print label modal + schedule pickup popover + COD recovery (if applicable)
+  - **shipping/completed** — tracking timeline from `shippingTrackingHistory`
+  - **cancelled** — reason display
+  - **cod-blocked** — East Malaysia (Sabah/Sarawak/Labuan) COD orders recover via self-delivery only
+  - **missing-weight** — parcelWeight input + confirm
+- **New API Routes:** `POST /api/orders/[id]/self-deliver` (body: `{courier, trackingNumber}`), `POST /api/orders/[id]/pickup` (body: `{scheduledAt, slot}`). Both handler-authenticated.
+- **New Components** under `src/app/(dashboard)/orders/_components/detail/`: fulfillment-zone (dispatcher), create-label-flow, schedule-pickup-popover, print-label-modal, missing-weight-form, self-delivery-zone, cod-recovery, tracking-timeline, order-items-card (SKU/weight/thumbnail), customer-card, payment-card, order-actions-card, courier-logo. Styles: order-detail.css, fulfillment.css, items-table.css, side.css using `--dash-*` design tokens.
+- **Helper Module** `src/lib/shipping/cod-block.ts` exports `isCodBlocked(order): boolean` — detects COD + East MY state for recovery routing.
+- **i18n:** 9 new key groups under `dashboard.orders` + extended detail.* (en.json + ms.json): fulfillment, createLabel, pickup, printLabel, missingWeight, selfDelivery, codRecovery, tracking + milestone statuses (pending, confirmed, picked-up, in-transit, out-for-delivery, delivered).
+- **Note:** EasyParcel create-label is single-step (returns awbNo + labelUrl PDF). Pickup scheduling is local-state only (no EP reschedule API call). Wallet balance not shown (API doesn't return it).
+
+**Files modified:** `src/collections/Orders.ts` (schema), `src/app/(dashboard)/orders/**` (routing + layout changes), `src/app/(dashboard)/orders/[id]/page.tsx` (RSC), `src/app/(dashboard)/orders/_components/detail/**` (12 new components), `src/app/api/orders/[id]/{self-deliver,pickup}/route.ts` (2 new endpoints), `src/lib/shipping/cod-block.ts` (new helper), `scripts/db-setup.js` (migration), `src/i18n/locales/{en,ms}.json` (9 key groups). **Tests:** Unit + component tests in `src/__tests__/unit/dashboard/` + `src/__tests__/api/` covering state machine, COD detection, API routes. See `docs/qa/F14-shipping.md` § 3.16+ for new TC-IDs (F36 order detail tests). See `docs/architecture/F14-shipping.md` § 16 for full architecture.
+
+---
+
 ### Bug Fixes
+
+- **PR #1591 pre-merge** fix(F37): 3 bugs from code review — Code-review adversarial pass on PR #1591 (US-F37-02 + Opening Hours redesign + Geo-cascade) found and fixed 3 bugs, all verified red→green: (1) **opening-hours Zod refine incomplete** — `.refine()` covered schema-level validation but some paths to `opens`/`closes` fields remained uncovered. Fixed by switching to `.superRefine()` (allows per-error granularity) + added cross-field field-level validate in `src/collections/Sites.ts` using `siblingData` to access `isClosed` state. **Impact:** pre-fix bug allowed invalid rows (missing/malformed times on open days) to persist, silently rejected by save API. Tests: TC-F37-02-25 (3 new cases in `sites-local-business.test.ts`). (2) **geo-cascade race condition** — `bootstrap()` async reverse-resolve on mount could complete after user manually selected a cascade value, silently overwriting the choice. Fixed by adding `userInteractedRef` guard — bootstrap skips writes if user has interacted. **Impact:** on rapid edit of existing address, pre-fill could clobber user's manual selection. Tests: TC-F37-01-25 (added to `geo-cascade-fields.test.tsx`). (3) **check-migrations.js false-negative risk + compact-form miss** — (a) caller `getNewFieldsFromDiff()` was skipping field names that appeared both in diff AND somewhere as array-nested in the file (poor intersection logic), now explicit intersect prevents false-negative when a field is both newly top-level AND happens to be array-nested elsewhere; (b) `getArrayNestedFieldNames()` regex missed compact single-line field forms (`{ name: 'x', type: 'y' }`), only detected multi-line. Fixed by adding compact form regex branch. Also refactored for testability: `module.exports` + `require.main === module` guard. **Impact:** edge-case false-negatives where newly-added array-nested fields were skipped or compact forms missed. Tests: TC-F37-03-CHECK-01..03 (3 new in new `check-migrations.test.ts`). Full suite: all 3 fixes verified independently fail-without-fix / pass-with-fix; tsc clean; docs updated § 3.7–3.11 `docs/qa/F37-local-seo.md`.
+
+- **PR #1591 pre-merge, round 2** fix: check-migrations.js redesign + 3 bugs from a second code review — `check-migrations.js`'s new-field detection was fully redesigned (base-vs-current file comparison by `(name, nested)` identity, replacing diff-line parsing entirely — closes 4 rounds of false-negatives from lost hunk boundaries; see `docs/journals/260713-pr1591-f37-02-three-bug-fixes.md`). A second adversarial review of that redesign + the round-1 fixes above raised 3 more concerns: **(C1, reported HIGH, investigated and found ALREADY FIXED)** the reviewer flagged that the 4 state-name fixes in `scripts/data/malaysia-geo.json` (`W.P. Kuala Lumpur→Kuala Lumpur`, `W.P. Labuan→Labuan`, `Pulau Pinang→Penang`, `W.P. Putrajaya→Putrajaya`) would never reach an already-seeded staging/prod DB, since `seed-malaysia-geo-boot.js` skips entirely once `malaysia_states` has rows. A migration was initially added to `scripts/db-setup.js` to cover this — but a follow-up question surfaced that `db-setup.js` already contains an equivalent normalize migration (`malaysia_states.normalize_penang/kl/putrajaya/labuan`, commit `d5c03917`, 2026-05-25) that predates this PR and is already merged into `staging` (`git merge-base --is-ancestor d5c03917 origin/staging` confirms). Since `runMigrations()` re-runs every entry on every deploy (not version-tracked), staging's `malaysia_states.name` has already been normalized on every deploy since 2026-05-25. The newly-added migration was therefore a pure duplicate and was removed. **Process gap identified:** neither the original reviewer, nor the initial fix, nor the Stage 2/Stage 3 code-review passes caught this — all traced `seed-malaysia-geo-boot.js`'s skip-if-seeded behavior and `db-setup.js`'s execution order in detail, but none grepped the full `MIGRATIONS` array for an existing `malaysia_states` entry before concluding a new one was needed. **(C2, Medium-High)** `sanitizeLegacyOpeningHours` (added in round 1's fix) only ran when `patch.openingHours` was absent — but `applyBatchSave` passes every day NOT being edited through unchanged, so a legacy-invalid row on an untouched day still 400'd a modal save. Also, orphan rows with no `dayOfWeek` were kept unconditionally by `applyBatchSave` (correct for local edits) but are invisible in the UI (`groupRowsByDay` never matches them) and unfixable by the user, silently exhausting the 21-row cap. Fixed by calling the sanitize unconditionally (no-op for `encodeDay`'s well-formed output) and dropping no-`dayOfWeek` rows at the save boundary. Tests: TC-F37-02-26, TC-F37-02-27. **(C3, Medium)** `isPathMissingAtRef`'s regex only matched `does not exist in`, but the realistic git error for the redesign's actual code path (file passed `existsSync()`, absent at base) is `exists on disk, but not in '<ref>'` — a brand-new tracked collection file would silently skip the new-field check entirely instead of getting flagged. Fixed regex + added TC-check-migrations-08 with the real captured message. Also answered the reviewer's Q2 (not just C1-C3): added a `beforeValidate` hook (`sanitizeOpeningHoursOnValidate`) to `src/collections/Sites.ts` reusing the same `sanitizeLegacyOpeningHours`, so a direct Payload admin-panel edit (bypasses the custom Editor UI's client-side sanitize entirely) gets the same self-heal — closing the same C2 bug class for that write path too. **Stage 3 adversarial pass** on this whole round-2 fix set (traced live Payload CMS source inside the running container to verify the `beforeValidate` hook's spread/merge never wipes sibling `localBusiness` fields on a partial PATCH — confirmed safe by tracing `fields-level beforeValidate` backfill order, not assumed) found one real Medium gap: the new hook itself had zero direct test coverage (only the pure function it delegates to was tested). Fixed: exported `sanitizeOpeningHoursOnValidate`, added `sites-opening-hours-sanitize-hook.test.ts` (TC-F37-02-28, 8 tests incl. sibling/top-level-field non-mutation guard). Full suite verified clean (140/140 across all F37 + check-migrations + hook test files); docs updated §3.12–3.13, §4.8–4.9 `docs/qa/F37-local-seo.md`.
+- **GH-1579** fix(pagination): hide table pagination bar when total ≤ 10 — **Shared `TablePagination` component** (`src/components/ui/table-pagination.tsx`) now returns `null` when dataset fits on first default page (total ≤ 10), avoiding empty bordered footer and orphaned padding. **New exported helpers:** `shouldShowTablePagination(total, rowsOptions?)` — gates 11 dashboard table caller wrappers so no empty div remains; `useTablePageClamp(page, total, limit, onPageChange, enabled?)` — snaps stranded page back to last valid page when shrinking dataset (e.g., after deletion), wired into products/staff/categories/blog/contact-leads/discounts (list + usage history)/orders; delete flows refetch after the server commit so records+total reconcile atomically (no rows stranded when a delete crosses the 11→10 hide boundary, no DELETE race). **UX refinement:** rows-per-page `<select>` now displays lucide `ChevronDown` icon (muted, non-interactive) for visual consistency. **Intentional behavior changes:** customers-detail-orders-tab pager now hidden for total 1–10 (previously always shown); blog card-view pager gate changed from dynamic `total > limit` to fixed `total > 10` (identical at default limit 10; with limit 25/50/100 and 10 < total ≤ limit the pager now shows instead of hiding). **Tests:** TC-DS1222-05-06 updated (total=0 → null); added TC-DS1222-05-07..10 (hide/show boundaries, icon, page-clamp edge cases). See `docs/qa/F-DS-1222-table-standardization.md` § NHÓM 05.
+
+- **GH-1557** fix(editor): mobile editor UX/interaction bugs (4 of 7 fixed) — QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[siteId]`). **Bug 1 (iOS auto-zoom) — not fixed, by decision:** after discussion, this is standard iOS Safari behavior (auto-zoom on focusing a sub-16px input), not treated as a bug to fix here; `input.tsx` left unchanged. **Bug 2 (Template picker Preview button legibility):** already fixed by unrelated commit `076b24e8d` (#1538) before this branch started — no new change needed. **Bug 4 (scroll lock):** `CompactEditorLayout.tsx` gained a single `useEffect` locking `document.body.style.overflow` while either the block-settings sheet or Tools sheet is open, keyed on `(isMobileSettingsOpen || toolsSheetOpen)` to avoid a two-writers race across sheet transitions. **Bug 7 (nav/footer tap routing):** `handleMobileBlockSelect` (`page.tsx`) now routes `navigation`/`footer`/`breadcrumb` taps to the Settings panel's Menu tab like desktop's `handleBlockSelectWithContext`; `CompactEditorLayout.tsx` needed an additional `navFooterMenuMode` fix (not in the original plan) since `currentBlock` never resolves for these block types and the sheet only mounted `if (currentBlock)`. **Bug 3/6 (image tap opens a buried toolbar):** `PreviewScripts.tsx`'s `onClick` now skips posting `BLOCK_CONTAINER_CLICKED` for taps that land on an editable image (shared `resolveEditableImageBlock()` helper, also used by the pre-existing `IMAGE_EDITING_STARTED` branch to avoid duplicated detection logic), so the full-screen block-settings sheet no longer covers the small Change-Image toolbar. Scoped to `?compact=1` (mobile/tablet) only — desktop's always-visible SettingsPanel intentionally shows both the block selection and the image toolbar together, unchanged. No change needed to `hero-media-overlay.tsx`/`LogoImageOverlay.tsx`/`gallery/index.tsx` — an initial attempt at a touch-visibility CSS fix for Hero's own overlay button was reverted after code review found it actually broke the fix above (its `pointer-events-auto` scrim sat on top of the real `<img>`, diverting taps away from it); the generic mutual-exclusion fix alone already covers Hero via the existing floating `ImageToolbar`. **Bug 5 (mobile inline text-edit) — not implemented, confirmed with PM as intentional:** would have reversed a deliberate decision from PR #1485/#1472 (commit `7d035d55`); PM confirmed mobile has no inline text edit by design — only block/component editing via the settings sheet, matching current behavior. Bugs 1 and 5 both stay open on the issue tracker as won't-fix (product decisions, not silently dropped). **Tests:** 11 new unit tests (TC-GH1557-04-01/02, 05-01..04, 06-01/02, 07-01..03) across 3 new files in `src/__tests__/unit/editor/`; full suite 469 files / 8587 tests passing, `tsc --noEmit` clean. See `docs/qa/F05-ai-editor-testcases.md` § GH-1557 and `plans/260709-1659-GH-1557-mobile-editor-ux-bugs/`.
 
 - **GH-1337** fix(contact-leads): badge figma redesign + font portal fix — **Badges:** new `_lib/badge-tokens.ts` is the single source of truth for tinted rgba colors (STATUS_COLORS + SOURCE_COLORS, Figma node-id 32179-5360/5364). `customer-status-badge.tsx` + `customer-source-badge.tsx` rewritten: dropped shadcn Badge variants, now use inline `style={}` from badge-tokens (pill shape, rgba bg/border/text per status/source). `customer-detail-panel.tsx` removed duplicate STATUS_COLORS definition, imports from badge-tokens; StatusDropdown and text sizes normalized to Tailwind semantic tokens (`text-sm`, `text-xs`, `text-lg`, `text-xl`, `text-2xl`). Tests: TC-CUST-26..29 assertions migrated from `className.toContain()` to `toHaveStyle({ color })` (7/7 pass). **Font:** `src/lib/fonts/variables.ts` aggregates all next/font CSS variable class names; applied to `<html>` in root layout so `--font-*` vars are available in portals (CustomerDetailPanel createPortal). Removed `--font-inter/outfit: system-ui` fallback from `globals.css` `:root` that was overriding Inter via equal CSS specificity. **Impact:** Contact Leads badges exactly match Figma spec; Inter font renders correctly in portal-rendered detail panel.
 
@@ -127,6 +158,110 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 **Non-breaking:** All tests are read-only; no code changes in Phase 06 beyond tests themselves.
 
 **Impact:** US-F37-01 (Local Business Data Model) now complete across all 6 phases: Phase 01 (schema), Phase 02 (validation), Phase 03 (UI data entry), Phase 04 (JSON-LD emission), Phase 05 (score backend), Phase 06 (permanent test coverage). Ready for US-F37-04 (Local SEO Score Dashboard widget) and Phase 2 (GBP OAuth) dependency work.
+
+---
+
+### US-F37-03 — AI Crawler Permissions & llms.txt
+
+**AI crawler default-allow + dynamic content-contract route. First phase of Local SEO feature.**
+
+**Implementation complete (46 new/passing SEO unit tests, 2 adversarial review passes):**
+- **New field:** `aiCrawlersEnabled` boolean on Sites collection (`src/collections/Sites.ts`, default `true`, migration in `scripts/db-setup.js`) — seller opt-out toggle for AI crawler access.
+- **robots.txt dynamic defaults:** `src/app/sites/[slug]/robots.txt/route.ts` fetches site config and honors the toggle. Default behavior: GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot are allowed (Disallow rules removed); scraper bots (Amazonbot, Bytespider, etc.) always blocked. When toggle is `false`, only the 5 AI bots get `Disallow: /` rule. Googlebot and other standard crawlers unaffected by toggle. Cache TTL kept short (10 min / 1h stale) so toggle changes propagate quickly.
+- **New llms.txt route:** `src/app/sites/[slug]/llms.txt/route.ts` serves dynamic markdown content-contract per tenant, scoped by `site.id` (not just tenant) for pages/products/blogs to avoid cross-site leakage on multi-site tenants. Includes: business name, description, 5+ key URLs (floored via static routes for sparse new sites), contact info, opening hours (from US-F37-01's `site.localBusiness.openingHours`, once that merged into this branch), experimental-standard notice. Response cached 5 minutes. 404 on missing tenant/site.
+- **API toggle endpoint:** `src/app/api/seo/ai-crawlers-toggle/route.ts` (POST) — owner-auth + tenant-ownership check (403 prevention on cross-tenant IDOR). Validates `siteId` presence (400 on missing) and rejects string values for `enabled`.
+- **Dashboard UI:** AI-crawler toggle in `src/components/dashboard/revamp/seo-tools.tsx`, wired via `src/lib/dashboard/seo-data.ts` → `src/lib/dashboard/dashboard-types.ts` → `src/app/(dashboard)/dashboard/page.tsx`. Fires analytics event `ai_crawler_toggle_changed` client-side on successful persist. i18n strings under `dashboard.revamp.tools.aiCrawlers*` in `src/i18n/locales/en.json` and `ms.json`.
+- **Tests:** All 46 new tests passing (TC-F37-03-01 through TC-F37-03-46 provisional IDs; QC backfill required post-merge, see Open Blockers).
+
+**Acceptance Criteria (from US-F37-03 story):**
+- AC-4: robots.txt allows GPTBot/ClaudeBot by default, blocks scrapers always, respects toggle ✓
+- AC-5: /llms.txt serves markdown per-tenant, 5-min cache, 404 on missing site ✓
+- AC-6: POST toggle endpoint enforces auth + tenant-ownership, logs analytics ✓
+
+**Related:** PRD `docs/prd/F37-local-seo-search-performance.md` (FR-07/08/09), stories `docs/stories/F37-local-seo-stories.md` (US-F37-03). Plan detail `plans/260708-1112-GH-03-ai-crawler-llms-txt/`.
+
+**QC NOTE:** Test case IDs use provisional TC-F37-03-01 through 46 format. QC/PM must backfill official TC-IDs in `docs/qa/F37-local-seo.md` post-merge (file does not yet exist; copy story acceptance criteria as scaffold).
+
+**Known follow-ups (from adversarial + independent PR review, deferred — not blocking):** (1) Schema allows 2+ published sites per tenant (no unique constraint); `robots.txt`/`llms.txt` site lookup now sorts by `createdAt` for determinism, but `aiCrawlersEnabled` is per-site while the route resolves per-tenant — a sibling site's compliance opt-out could silently not apply if a tenant genuinely has multiple published sites (pre-existing pattern shared with `sitemap.xml`). No current product flow creates this configuration, so it's a best-effort mitigation, not a guarantee. Revisit with real domain-based per-site resolution if multi-site-per-tenant becomes supported. (2) `ai-crawlers-toggle` ownership check accepts any tenant in the user's full tenant list while `withFeatureGuard` only checks `tenants[0]` — same mismatch pre-exists in the sibling `auto-meta-toggle` route. Confirmed with PM: current product reality is 1 tenant per user, so not actively exploitable today; revisit if multi-tenant-per-user becomes supported (needs a coordinated fix across both routes at that point).
+---
+
+### F37 — Opening Hours Editor Redesign (Google Maps-style List View + Edit Modal, Multi-day Batch & Split-shift)
+
+**Local Business opening-hours editor redesigned from fixed 7-row inline table to Google Maps-style list view + modal, enabling multi-day batch edits and split-shift support (3 time ranges/day).**
+
+**Deliverables:**
+
+- **New pure-logic utilities module:** `src/components/editor/local-business/opening-hours-utils.ts` (1:1 row-data model, no canonicalization). Exports:
+  - `groupRowsByDay(rows)` — flatten array into day→ranges[] map for UI rendering
+  - `rangesFromDay(day, rows)` — extract time ranges for a single day
+  - `applyBatchSave(rows, selectedDays, ranges)` — atomic overwrite: drop all rows of selected days, re-insert from new ranges (Google parity)
+  - `defaultWeek()` — suggested default (Mon–Fri open, weekend closed)
+  - `describeDay(day)` — human label for day code
+
+- **New edit modal component:** `src/components/editor/local-business/opening-hours-edit-modal.tsx` (Radix Dialog, multi-day select toggle buttons, 3 time-range add/edit slots, closed/open-24h/custom modes). Features:
+  - Multi-day selector (7 day-toggle buttons, wraps at ~320px width)
+  - Mode picker: Closed / Open 24h (00:00–23:59) / Custom (N time ranges, N ≤ 3)
+  - Add Range button (up to 3 per day in modal)
+  - Save overwrites selected days atomically; Cancel discards changes
+
+- **Redesigned list-view editor:** Renamed `src/components/editor/local-business/opening-hours-table.tsx` → `opening-hours-editor.tsx`; component export `OpeningHoursTable` → `OpeningHoursEditor`. Now renders:
+  - One row per day (Mo–Su), height scales with number of time ranges (split-shift support)
+  - "Closed" badge for closed days, multi-line time ranges for open days
+  - Edit pencil icon → opens modal
+  - Quick-actions: "Edit all" (pre-fill from Monday), "Edit Mon–Fri" (batch weekday edit)
+  - Old fixed-7-row table deleted
+
+- **Validation cap increase:** `src/collections/Sites.ts` + `src/lib/validations/sites.ts` raised `openingHours.maxRows` from 7 to 21 (7 days × 3 shifts max). Zod cap synced with collection schema; enforced invariant prevents overflow.
+
+- **SettingsPanel wiring:** `src/components/editor/SettingsPanel.tsx` updated: 1-line import swap (`OpeningHoursEditor` imports + tag name change). Contract unchanged (same `onChange(rows)` callback).
+
+- **i18n updates:** `src/i18n/locales/en.json`, `ms.json` — 9 new keys (editAllHours, editWeekdaysHours, addTimeRange, multipleTimeRanges, openingTime, closingTime, etc.).
+
+- **No DB migration:** `day_of_week` has no unique constraint; 1:1 row mapping to new flat array model — existing data loads without loss.
+
+- **Architecture notes:**
+  - Save semantics: **overwrite, not merge**. Selecting Mon/Wed and saving new ranges drops all Mon/Wed rows, inserts new ones (Google Calendar parity).
+  - Encoding: closed = 1 row `{isClosed:true}`; open-24h = `{opens:'00:00', closes:'23:59'}`; split = N rows, same day, different times.
+  - Cap: 3 ranges/day in modal → 7×3 = 21 total rows (invariant).
+  - JSON-LD emission unchanged (already split-shift compatible; Phase 04's `OpeningHoursSpecification` generator handles 1:1 row mapping).
+
+**Tests:** 75/75 F37 test suite passing (49 before, +26 new tests). Unit + component coverage for list-view, modal, batch-save logic, validation. See `docs/qa/F37-local-seo.md` (v2.5) for TC-IDs.
+
+**Files created:** `src/components/editor/local-business/opening-hours-utils.ts`, `src/components/editor/local-business/opening-hours-edit-modal.tsx`. **Files deleted:** `src/components/editor/local-business/opening-hours-table.tsx`. **Files modified:** `src/components/editor/SettingsPanel.tsx`, `src/collections/Sites.ts`, `src/lib/validations/sites.ts`, `src/i18n/locales/{en,ms}.json`, `src/__tests__/unit/seo/local-business-json-ld.test.ts` (no changes to JSON-LD logic; test count reflects full suite).
+
+**Non-breaking:** Existing 1-row/day sites load with zero data loss. Field is optional. Max-row validation only blocks saves exceeding 21, doesn't regress earlier <7-row data.
+
+**Related:** Phase 04 (JSON-LD, Phase 05 scoring) already released and compatible with split-shift; no changes needed there. QA doc `docs/qa/F37-local-seo.md` already updated to v2.5 by QC; no duplicate work.
+
+---
+
+### F37 — Local Business Info: State→District→Postcode Cascade + hasMap JSON-LD (US-F37-01 Data Quality Follow-up & US-F37-02 Enhancement)
+
+**Data quality improvement: Sellers now enter standardized location data via DB-backed state/district/postcode cascade instead of freetext inputs. Enhanced JSON-LD now includes `hasMap` field for richer local search signals.**
+
+**F37-01 Data Quality Deliverables:**
+
+- **New cascade component:** `src/components/editor/local-business/geo-cascade-fields.tsx` — reusable State→District→Postcode cascade (forward cascade + reverse pre-fill resolution) using checkout's live `/api/geo/*` endpoints. Handles DB lookups (state/district names → ids), forward cascading (state change → reset district), and legacy pre-fill resolution (for edit mode on already-saved state/city/postcode strings).
+- **Removed dead code:** Deleted `src/components/editor/local-business/state-select.tsx` (single-select State field, superseded by cascade).
+- **SettingsPanel wiring:** `src/components/editor/SettingsPanel.tsx` updated to use new geo-cascade component; removed old city/postcode `<Input>` fields and postcode regex validation state.
+- **i18n updates:** `src/i18n/locales/en.json`, `ms.json` — added `selectCity`, `selectPostcode`, `loadingOption`, `legacyValueHint` cascade labels; removed the now-orphaned `invalidPostcode` validation key (postcode is selected from a DB-backed list, no longer freetext-validated).
+- **Tests:** `src/__tests__/unit/editor/geo-cascade-fields.test.tsx` — 8 unit tests covering forward cascade, reverse pre-fill, legacy degradation, and API error handling. All passing.
+
+**F37-02 Enhancement Deliverables:**
+
+- **Enhanced JSON-LD:** `src/lib/seo/json-ld.ts` added `hasMap` field (a Google Maps URL string, e.g. `https://www.google.com/maps?q={lat},{lng}`) to the LocalBusiness schema. Derived from the site's saved `latitude`/`longitude` as a fallback until GBP/Waze connect (US-F37-05/09); omitted entirely when coordinates are absent — improves local search signal richness for Google crawlers.
+
+**Files modified:** `src/components/editor/SettingsPanel.tsx`, `src/lib/seo/json-ld.ts`, `src/i18n/locales/{en,ms}.json`. **Files created:** `src/components/editor/local-business/geo-cascade-fields.tsx`, `src/__tests__/unit/editor/geo-cascade-fields.test.tsx`. **Files deleted:** `src/components/editor/local-business/state-select.tsx`. **Tests:** 8 new unit tests (all passing); 0 regressions on existing test suite.
+
+**Impact:** Local business location data now guaranteed to be valid and consistent with live geo database (no typos, postcodes tied to real districts). Reduces future data-quality issues and improves JSON-LD signal reliability for search engines. Sellers benefit from simplified, guided form UX instead of manual text entry.
+
+**Post-Implementation Follow-up Fixes (2026-07-10):**
+
+- **State-name mismatch:** `scripts/data/malaysia-geo.json` corrected 4 state names (KUL/LBN/PNG/PJY) to match `MY_STATES` enum, fixing seller address save failures in Kuala Lumpur/Penang/Labuan/Putrajaya on fresh-seed. Test: `src/__tests__/unit/scripts/malaysia-geo-seed-data.test.ts` (2 cases, both TC-F37-01-23).
+
+- **Geo-cascade race condition:** `src/components/editor/local-business/geo-cascade-fields.tsx` added ref-based stale-response guard in state/district select handlers, preventing concurrent rapid selections from overwriting district list with outdated API response. Test: added to `src/__tests__/unit/editor/geo-cascade-fields.test.tsx` (now 9 total, TC-F37-01-24).
+
+**Tests:** Full suite 9882 pass, 0 regressions. Fixes verified via `/code-review` adversarial pass + test fail-without-fix/pass-with-fix validation.
 
 ---
 

@@ -5,7 +5,7 @@ import { DiscountsClientLayout } from './_components/discounts-client-layout'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-    title: 'Discounts | PrimeWeb',
+    title: 'Discounts | Web Store',
 }
 
 export default function DiscountsPage() {

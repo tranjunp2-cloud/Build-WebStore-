@@ -5,6 +5,24 @@ import config from '@payload-config'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 
+// Map internal tracking enum → buyer-facing label
+// (we store internal enum in shippingTrackingStatus, not raw EP string)
+const INTERNAL_TO_LABEL: Record<string, string> = {
+    order_created: 'Order Created',
+    pending_pickup: 'Waiting for Pickup',
+    picked_up: 'Parcel Picked Up',
+    in_transit: 'In Transit',
+    out_for_delivery: 'Out for Delivery',
+    delivered: 'Delivered',
+    failed_delivery: 'Delivery Attempted',
+    returned_to_sender: 'Returned to Sender',
+    lost: 'Parcel Lost',
+    cancelled: 'Shipment Cancelled',
+    exception: 'Delivery Exception',
+    processing: 'Processing',
+    unknown: 'Processing',
+}
+
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
 
 export async function GET(
@@ -63,11 +81,23 @@ export async function GET(
         const order = result.docs[0] as any
         if (!order) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+        const trackingStatus: string | undefined = (order as any).shippingTrackingStatus
+
         return NextResponse.json({
             status: order.status,
             paymentStatus: order.paymentStatus,
             trackingNumber: order.trackingNumber ?? null,
             terminal: TERMINAL_STATUSES.has(order.status),
+            // EP shipping fields — buyer-safe only (no labelUrl, easyParcelOrderNo, apiKey, authKey)
+            awbNo: (order as any).awbNo ?? null,
+            shippingCourier: (order as any).shippingCourier ?? null,
+            shippingTrackingBuyerLabel: trackingStatus
+                ? (INTERNAL_TO_LABEL[trackingStatus] ?? 'Processing')
+                : null,
+            shippingTrackingHistory: ((order as any).shippingTrackingHistory ?? []).map((h: any) => ({
+                description: h.description ?? '',
+                eventTime: h.eventTime ?? '',
+            })),
         })
     } catch {
         return NextResponse.json({ error: 'server_error' }, { status: 500 })

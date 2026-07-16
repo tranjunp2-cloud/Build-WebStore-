@@ -5,7 +5,11 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
-import { getShippingRate } from '@/lib/shipping'
+import { getRates } from '@/lib/shipping/get-rates'
+import { evaluateCodEligibility } from '@/lib/shipping/cod-eligibility'
+import { productWeightToGrams } from '@/lib/shipping/product-weight'
+import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -101,6 +105,8 @@ export async function POST(request: Request) {
         const hasVariantsMap = new Map<string, boolean>()
         let subtotal = 0
         let currency = 'MYR'
+        // Parcel weight: Products.weight is KG (GH-1458); pipeline runs in grams, 500 g default
+        let totalWeightGrams = 0
 
         for (const item of aggregatedItems) {
             const productLookupId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
@@ -181,6 +187,7 @@ export async function POST(request: Request) {
 
             currency = p.currency || 'MYR'
             subtotal += unitPrice * item.quantity
+            totalWeightGrams += productWeightToGrams(p.weight) * item.quantity
 
             orderItems.push({
                 product: productLookupId,
@@ -267,11 +274,66 @@ export async function POST(request: Request) {
         }
         const discountRM = discountSen / 100
 
-        // Shipping: rates stored in sen, subtotal is RM-float → convert for calc, result back to RM.
-        // Free-ship gates on the POST-discount subtotal (F33 phase-07): a discount that drops the cart
-        // below `freeAbove` now charges shipping. Discount amount itself stays on the original subtotal.
+        // Shipping: EP-aware hybrid router — falls back to flat rate when EP is disabled or fails.
+        // Free-ship gates on the POST-discount subtotal (F33 phase-07).
         const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
-        const shippingFeeSen = getShippingRate(customer.address.state, (site as any).shippingConfig, effSubtotalSen)
+
+        // Resolve EP token from tenant integration settings (tenantForSlug already fetched above)
+        const epIntegration = (tenantForSlug as any)?.easyParcelIntegration ?? {}
+        let epToken: string | null = null
+        const defaultWarehouse = getDefaultWarehouse(epIntegration)
+        const warehouseState = defaultWarehouse.state ?? ''
+        if (epIntegration.enabled && isEpReady(epIntegration)) {
+            try {
+                epToken = await getValidToken(epIntegration, tenantId, payload)
+            } catch {
+                // token expired or not connected — silent fallback to flat rate
+            }
+        }
+
+        // For COD rate queries: use effSubtotalSen as an approximation of the cart total.
+        // The exact total (subtotal + shipping) is not yet known at rate-check time.
+        // EP uses the COD amount only to filter eligible couriers — an estimate is sufficient.
+        const rateResult = await getRates(
+            {
+                weightGrams: totalWeightGrams,
+                destPostcode: customer.address?.postcode ?? '',
+                destState: customer.address?.state ?? '',
+                senderPostcode: defaultWarehouse.postcode ?? '47500',
+                senderState: warehouseState,
+                subtotalSen: effSubtotalSen,
+                codAmountSen: paymentMethod === 'cod' ? effSubtotalSen : undefined,
+            },
+            epToken,
+            (site as any).shippingConfig ?? {},
+            customer.address?.state,
+        )
+        const bestRate = rateResult.rates[0]
+
+        // COD hard-gate (PD-021 R1/R2/R3): the EP quotation succeeded but no courier can
+        // collect this COD amount on this route. The storefront disables the COD option in
+        // this case — reject here too so a direct API call cannot bypass the gate. EP-off
+        // stores and EP outages (degraded without codIneligible) keep the manual-COD path.
+        if (paymentMethod === 'cod' && rateResult.codIneligible) {
+            const codIneligibleMessages: Record<string, string> = {
+                no_cod_courier: 'No courier in this store\'s list supports COD for this address',
+                over_max: 'Order total exceeds the courier COD limit',
+                under_min: 'Order total is below the courier COD minimum',
+            }
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'COD_NOT_ELIGIBLE',
+                        message: codIneligibleMessages[rateResult.codIneligible],
+                        reason: rateResult.codIneligible,
+                    },
+                },
+                { status: 422 }
+            )
+        }
+
+        const shippingFeeSen = bestRate.priceSen
         const shippingFee = shippingFeeSen / 100
 
         // SST tax removed at checkout (F33 phase-06) — kept as 0 so the column stays populated;
@@ -280,6 +342,39 @@ export async function POST(request: Request) {
 
         // Shared gateway-agnostic total (F33): total = max(0, subtotal − discount) + shipping, sen-exact.
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
+
+        // F3: re-verify COD eligibility against the FINAL amount that will actually be collected
+        // and persisted as `codAmount` below (Math.round(total * 100)) — the earlier getRates gate
+        // above only had `effSubtotalSen` (pre-shipping, pre-discount-adjusted) to work with, since
+        // shipping isn't known until the rate is picked. That smaller/different estimate could pass
+        // while the real total fails (or vice versa) at a courier's COD min/max boundary, letting a
+        // checkout succeed that create-label's live re-check then hard-rejects post-order. Re-check
+        // locally (no extra EP call) against the already-quoted bestRate's live cod limits.
+        // Only when a REAL EP courier was picked — flat-rate fallback (bestRate.courier === 'flat')
+        // carries no courier COD limits and COD is always allowed there (same sentinel as the EP
+        // field writes below, and consistent with the first gate which keys off rateResult.codIneligible).
+        if (paymentMethod === 'cod' && bestRate.courier !== 'flat') {
+            const finalCodAmountSen = Math.round(total * 100)
+            const finalCodCheck = evaluateCodEligibility([bestRate], finalCodAmountSen)
+            if (finalCodCheck.eligible.length === 0) {
+                const codIneligibleMessages: Record<string, string> = {
+                    no_cod_courier: 'No courier in this store\'s list supports COD for this address',
+                    over_max: 'Order total exceeds the courier COD limit',
+                    under_min: 'Order total is below the courier COD minimum',
+                }
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'COD_NOT_ELIGIBLE',
+                            message: codIneligibleMessages[finalCodCheck.reason!],
+                            reason: finalCodCheck.reason,
+                        },
+                    },
+                    { status: 422 }
+                )
+            }
+        }
 
         // Compute bank_transfer-specific fields (before create)
         let paymentReference: string | undefined
@@ -329,6 +424,18 @@ export async function POST(request: Request) {
                     discountCode: discountRow.code,
                     discountAmount: discountSen,
                 } : {}),
+                // EP shipping fields — only written when a real EP courier is selected (not flat fallback).
+                // courierLogo rides along from the same quotation (EP returns it there) so the buyer's
+                // tracking page can show a real logo without an EP token of its own.
+                ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
+                ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                parcelWeight: totalWeightGrams,
+                // COD amount in sen — only for COD orders; final total after shipping is now known
+                ...(paymentMethod === 'cod' ? { codAmount: Math.round(total * 100) } : {}),
                 locale: (site as any).locale ?? 'en',
             } as any,
         })

@@ -1,6 +1,6 @@
 # PRD Overview: EasyParcel Delivery Integration — Malaysia (F36)
 
-> **Version:** 2.0 | **Updated:** 2026-06-25 | **Owner:** Domin (Product)
+> **Version:** 2.1 | **Updated:** 2026-07-03 | **Owner:** Domin (Product)
 > **Priority:** P1 | **Size:** XL
 > **Depends on:** F09 Storefront Commerce ✅, F10 Order lifecycle + cancel-restock ✅, F34 Xendit Payment (song hành — luồng tiền hàng)
 > **Provider:** **EasyParcel** (aggregator MY) — OAuth 2.0 Authorization-Code per merchant, non-custody (platform RM0 chi phí).
@@ -23,6 +23,27 @@ Phase-specific Functional Requirements and Acceptance Criteria have been merged 
 | **D** | Returns + refund + cancel + manual buyer-return with fee tracking | US-F36-10, US-F36-11, US-F36-12 | [F10-orders-management.md § 20.3](./F10-orders-management.md#easyparcel--returns--cancel) |
 
 Sub-PRDs have been merged into their home PRDs; this file is the overview + index. Shared context (NFR, architecture, cost, resolved questions) lives here.
+
+---
+
+## Related Documents Index
+
+**Design & Implementation:**
+- [`docs/design/F36-easyparcel-delivery-design.md`](../design/F36-easyparcel-delivery-design.md) — Wireframes + UI specs (Settings, Checkout COD gating, Label modal, Tracking)
+- [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md) — User stories + acceptance criteria (US-F36-01 to US-F36-12)
+
+**Host PRDs (where F36 phases are embedded):**
+- [`docs/prd/F10-orders-management.md § 20.2`](./F10-orders-management.md) — EasyParcel COD order runtime: creation, fields, codAmount, codStatus
+- [`docs/prd/F19-store-configuration.md § EasyParcel COD`](./F19-store-configuration.md) — COD eligibility gating + fee disclosure, R1–R5 rules
+- [`docs/prd/F14-shipping.md § 20`](./F14-shipping.md) — Flat-rate fallback, EasyParcel integration overview
+
+**Verified Decision & Evidence (source of truth for COD rules):**
+- [`docs/plans/reports/260703-ep-cod-proof/brief.md`](../plans/reports/260703-ep-cod-proof/brief.md) — **Primary:** empirical UI-vs-API proof (Cases A–D), R1–R5 verified with screenshots, follow-EP decision
+- [`plans/reports/decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) — Dev handoff: R1–R5 rules, NO region hardcode, code enforces all COD validation
+- [`plans/reports/ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) — EasyParcel sandbox empirical probe: COD-capable courier coverage by route (W→W, W→E, E→W, E→E)
+
+**Architecture:**
+- [`docs/architecture/F14-shipping.md`](../architecture/F14-shipping.md) — Shipping architecture: `cod-block.ts`, fulfillment states, EasyParcel client (F36-specific arch doc not yet split out)
 
 ---
 
@@ -50,9 +71,9 @@ Sub-PRDs have been merged into their home PRDs; this file is the overview + inde
 Tích hợp **EasyParcel** làm courier aggregator, mỗi merchant kết nối **tài khoản EasyParcel riêng** qua **OAuth 2.0 Authorization-Code flow**:
 
 - Merchant clicks **"Connect with EasyParcel"** button → redirected to `https://api.easyparcel.com/oauth/login` → logs in + grants access → callback returns `code` → backend exchanges for access + refresh token (10h + 1yr), stored securely per tenant.
-- Checkout gọi **rate real-time** (`POST /shipment/quotations`, OAuth Bearer auth) theo origin postcode + dest postcode + cân nặng → trả **giá thật của courier shop đã chọn** (buyer không phải chọn courier). **Hybrid**: chưa kết nối → fallback flat West/East hiện tại (không phá merchant cũ).
-- Merchant **mua nhãn vận đơn (AWB)** qua API (`POST /shipment/submit_orders` → `POST /shipment/list` để fetch `awb_url`) — cước trừ thẳng từ **ví EasyParcel của merchant** (wallet auto-deducted on submit). Tracking đồng bộ qua **webhook listeners** (primary, topics 1/2/3) hoặc **polling cron** qua `POST /shipment/details` + `POST /shipment/tracking_status`.
-- **COD** qua EasyParcel COD service: courier thu hộ → settle thẳng về merchant. **Platform RM0, không giữ tiền cước, không markup** (giá hiển thị = giá EasyParcel raw). **Deferred to post-MVP** — spec 2026-03 exposes COD pricing in quotation but submit_orders request doesn't have explicit COD amount field; verify param format with EasyParcel support.
+- Checkout gọi **rate real-time** (`POST /shipment/quotations`, OAuth Bearer auth) theo origin postcode + dest postcode + cân nặng → trả **giá thật của courier shop đã chọn + COD info** (buyer không phải chọn courier). **Hybrid**: chưa kết nối → fallback flat West/East hiện tại (không phá merchant cũ).
+- Merchant **mua nhãn vận đơn (AWB)** qua API (`POST /shipment/submit_orders` với `cod_amount` nếu COD enabled) — cước + COD phí trừ thẳng từ **ví EasyParcel của merchant** (wallet auto-deducted on submit). Tracking đồng bộ qua **polling** `GET /shipment/tracking` (Phase B); webhook listeners (Phase C, forward-looking).
+- **COD** qua EasyParcel COD service: merchant chọn courier hỗ trợ + kích hoạt COD ở checkout → param `cod_amount` (RM float, read from quotation `features[].cod.available`) gửi submit_orders → courier thu hộ → settle thẳng về merchant. **Platform RM0, không giữ tiền cước, không markup** (giá hiển thị = giá EasyParcel raw). **NO hardcoded region block — COD eligibility is decided PER-ROUTE, LIVE from quotation response** per R1–R5 below. **EP does NOT validate COD eligibility — code enforces both UI + server-side gating (R1–R5 rules)**. Evidence: `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md`, `plans/reports/ep-cod-matrix-260702.md`.
 
 > **Decision (kiến trúc):** Codebase đã có `src/lib/shipping/` (flat rate) — giữ nguyên làm **fallback**. Thêm EasyParcel = **file mới** (`src/lib/shipping/easyparcel/*` + API routes), 0 phá flat-rate logic. OAuth token per merchant = mirror `echIntegration.oauthTokens`. Rủi ro kỹ thuật: **thấp**.
 
@@ -69,7 +90,7 @@ Tích hợp **EasyParcel** làm courier aggregator, mỗi merchant kết nối *
 
 > EasyParcel: phủ rộng nhất + free + chuẩn de-facto SME MY (~1tr user). Per-merchant OAuth account giữ non-custody, platform RM0.
 
-> **Lưu ý độ phủ vs picker:** "60+ courier" là **độ phủ của EasyParcel** (aggregator), KHÔNG phải số courier seller chọn được. Vì COD là **mặc định toàn platform (non-negotiable)**, courier picker ở settings **chỉ list 4 courier hỗ trợ COD** (Flash/DHL/J&T/Aramex). Xem `PD-020` (`docs/decisions/decisions-log.md`) + [F14-shipping.md § 20.1](./F14-shipping.md#easyparcel--connect--settings) FR-A-3.
+> **Lưu ý độ phủ vs picker & COD capability:** "60+ courier" là **độ phủ của EasyParcel** (aggregator). Courier picker ở settings **list tất cả courier live** từ `GET /courier/list?country_code=MY` (không cố định số lượng). **COD-capable couriers are determined LIVE per route** from `POST /shipment/quotations` response `features[].cod.available` + per-courier `min_cod_amount` / `max_cod_amount`. KHÔNG hardcode danh sách 4 courier (sandbox showed 7 COD couriers; list varies by account). Courier picker **filters to COD couriers only** khi merchant bật COD (Phase F). Ref: `plans/reports/ep-cod-matrix-260702.md`.
 
 ### Mô hình tiền (2 luồng tách biệt)
 
@@ -89,7 +110,7 @@ Platform **không đụng** cả 3 luồng → sạch liability, RM0 chi phí.
 | OAuth setup (no additional cost) | — | **Miễn phí** |
 | Cước ship | **Merchant** | trừ ví prepaid; 1kg West MY ~**RM4-8** (J&T từ RM5.42) |
 | Nạp ví | Merchant | tùy ý từ RM20, credit hạn 365 ngày, **không có API topup** |
-| COD phí | Merchant | max(flat, 4%) trừ vào tiền thu hộ; Flash RM5, DHL RM6, J&T RM7, Aramex RM10; **West MY only**; chỉ 4 courier này hỗ trợ (Pos Laju/Ninja/SPX/City-Link không). Hạn mức + settlement T+X KHÁC theo courier. **[DEFERRED — xác nhận COD param name với EasyParcel support trước khi implement]** |
+| COD phí + limits | Merchant | **Per-courier min/max + per-route availability** (live from quotation response, not fixed values). Example sandbox: J&T 7.5–1000 RM, DHL 6.5–2000 RM, Aramex 11–1000 RM, Pos/Poslaju 7.5–2000 RM, Lazada/SPX varies. Fee: max(flat, 4%) trừ vào tiền thu hộ. **R1–R5 rules determine eligibility per-route per-courier** (NO region hardcode). Code enforces R1–R5 validation; EP does NOT. Hạn mức + settlement T+X differ per courier. COD param = `cod_amount` (RM float); full COD gating/validation = Prime responsibility (Phase B/C/F). Ref: GH-1333, decision-260702-1503, ep-cod-matrix-260702. |
 | **Platform** | — | **RM0** (vs Xendit RM7.50/merchant/tháng) |
 
 > EasyParcel kiếm tiền bằng margin gộp sẵn trong giá cước (mua sỉ volume) — merchant thường trả **rẻ hơn** đi thẳng courier. Giá rate-check (quotation response) = giá all-in, không hidden fees.
@@ -98,30 +119,53 @@ Platform **không đụng** cả 3 luồng → sạch liability, RM0 chi phí.
 
 ## 4. Architecture (high-level)
 
+**Phase A + B (built):**
 ```
+Merchant ──settings──> Connect with EasyParcel (OAuth) + warehouses[] + select allowed couriers + test connection
+   ▼
+order.tenant.easyParcelIntegration = { enabled, accessToken, refreshToken, warehouses[], selectedCouriers[], selectedCourier*, ... }
+   ▼
 Buyer ──checkout──> [Next.js storefront]
    │  POST /api/orders/calculate-shipping { siteId, dest postcode, items(weight) }
    ▼
-getRates() ──┬─ tenant.easyParcelIntegration.connected + oauthTokens.accessToken + warehouse?
-             │     └─YES─> POST /shipment/quotations (origin↔dest, weight, dims) cho selectedCourier ──> EasyParcel
-             │              → giá RM (÷100 → sen) + ETA của đúng 1 courier shop chọn
+getRates() ──┬─ tenant.easyParcelIntegration.enabled + accessToken + allowedCouriers[]
+             │     └─YES─> POST /shipment/quotations (origin↔dest, weight, dims) ──> EasyParcel
+             │              → filter by allowedCouriers[] → pick cheapest; COD orders → cheapest COD-capable
+             │              → giá RM (÷100 → sen) + COD available/max + ETA của courier auto-pick
              └─NO──> flat West/East (getShippingRate hiện tại)          [HYBRID FALLBACK]
    ▼
-order lưu shippingCourier + shippingServiceId + shippingFee (buyer KHÔNG chọn courier)
+order lưu shippingCourier + shippingServiceId + shippingFee + codAmount (buyer KHÔNG chọn courier)
    ▼  (buyer trả tiền hàng qua F34/F13 → order paid)
    ▼
-[Merchant dashboard] Nút "Ready to Ship" (action inline có sẵn trong OrderDetailPanel)
-   │  EP tenant → mở modal tạo label; non-EP → flip status như cũ (no modal). KHÔNG màn riêng.
-   │  POST /api/orders/[id]/create-label → POST /shipment/submit_orders (OAuth Bearer token)
-   │     → trừ ví EasyParcel merchant (wallet auto-deduct) → trả shipment_number + awb_number + tracking_url
-   ▼  lưu shipmentNumber + awbNumber + trackingUrl; trackingNumber = awbNumber; order → ready_to_ship
-   ▼  In label (PDF — fetch awb_url async via webhook + /shipment/details) + Pickup/dropoff (collection_date)
-   ▼  Nút "Ship Order" (có sẵn): EP → xác nhận courier pickup → shipped (KHÔNG nhập tracking tay)
-Webhook listeners (topic 1 status + topic 2 awb + topic 3 tracking) ──> cập nhật order realtime
-   └─ FALLBACK: Cron /api/cron/sync-tracking ──POST /shipment/details + /shipment/tracking_status──> sync tracking (numeric status code)
-   ▼  delivered (code 5) → merchant tự bấm completed (KHÔNG auto-complete)
-Buyer xem tracking trên trang đơn (dual-field: order.status lifecycle vs shippingTrackingStatus display)
+Buyer xem tracking trên trang đơn (shippingTrackingStatus = pending khi đơn mới)
+
+* selectedCourier (legacy text field) coalesced via getAllowedCouriers() for back-compat; selectedCouriers[] is current model.
 ```
+
+**Phase C + D (NOT BUILT — forward-looking):**
+Create label → submit order → tracking sync via webhooks/polling → returns/refund.
+```
+
+### Data Schema — `Tenant.easyParcelIntegration`
+
+| Field | Type | Constraint | Purpose |
+|---|---|---|---|
+| `enabled` | boolean | — | Master toggle; OFF = fallback flat rate |
+| `accessToken`* | text | server-only | OAuth access token; 10h expiry |
+| `refreshToken`* | text | server-only | OAuth refresh token; 1yr expiry |
+| `tokenExpiresAt`* | timestamp | server-only | Access token expiry; auto-refresh if <60s to expiry |
+| `tokenRefreshExpiresAt`* | timestamp | server-only | Refresh token expiry; needs reconnect if expired |
+| `selectedCouriers` | json array | current | **Allowlist of courier IDs** (e.g., `["flash", "jnt", "poslaju"]`). Checkout auto-quotes cheapest allowlisted courier serving route; COD orders → cheapest COD-capable. UX default/recommend 1 courier, multiple allowed. |
+| `selectedCourier` | text | legacy | Deprecated: Merchant's single chosen courier (e.g., "flash"). Coalesced via `getAllowedCouriers()` for back-compat if `selectedCouriers` empty; will phase-out after migration. |
+| `warehouses` | json (array) | current | `[{id?, label?, phone, address1, address2?, city, state, postcode, country, isDefault?}]` — multiple pickup addresses; one marked `isDefault` (origin for rates/labels) |
+| `warehouse` | json | legacy | Deprecated single warehouse field; phase-out after migration |
+| `testedAt`* | timestamp | readOnly | Last successful test-connection; shows merchant connection health |
+| `accountName`* | text | readOnly | Merchant's EasyParcel account name (from `GET /account/get_account_information`) |
+| `accountEmail`* | text | readOnly | Merchant's EasyParcel account email (from account endpoint) |
+
+\* = server-only, never leak to public API / front-end session.
+
+**Multiple warehouse support (Phase B):** Merchant can add/edit/delete warehouses; one `isDefault` is the rate-check + label origin. Phase C will allow per-order warehouse selection.
 
 **Tái dùng (0 phá hành vi):**
 - `src/lib/shipping/calculate-fee.ts` + `constants.ts` — flat rate, làm nhánh fallback.
@@ -136,7 +180,23 @@ Buyer xem tracking trên trang đơn (dual-field: order.status lifecycle vs ship
   - **Recommend (DRY):** tách cascade inline của `CheckoutAddressForm.tsx` thành component dùng chung (`AddressCascadeFields`) cho cả checkout + warehouse; né rủi ro đụng checkout → F36 gọi thẳng 4 endpoint trên.
   > **Ranh giới native vs build mới:** 4 geo endpoint + dataset = **reuse**. Backend EasyParcel (test-connection, save `easyParcelIntegration`, rate/label/tracking) = **build mới** (chưa có dòng easyparcel nào trong `src/`).
 
-**File mới:** `src/lib/shipping/easyparcel/{client,types,normalize}.ts`, `src/lib/shipping/get-rates.ts`, `src/app/api/orders/[id]/create-label/route.ts`, `src/app/api/cron/sync-tracking/route.ts`. Mở rộng: `calculate-shipping/route.ts`, settings shipping, `CheckoutClient.tsx`, `OrderDetailPanel` (gắn tạo label vào nút "Ready to Ship"), `ShipOrderModal.tsx` (giữ nhánh manual non-EP). **Reuse 0 đổi:** `api/orders/[id]/{refund,cancel}/route.ts`.
+**Phase A+B files (built):**
+- `src/lib/shipping/easyparcel/{client,types,normalize}.ts` — EP API client + helpers
+- `src/lib/shipping/get-rates.ts` — rate calculation (EP + flat fallback)
+- `src/app/api/tenant/[id]/easyparcel-oauth-start/route.ts` — OAuth start
+- `src/app/api/easyparcel/oauth-callback/route.ts` — OAuth callback + token exchange
+- `src/app/api/tenant/[id]/easyparcel-save/route.ts` — Save warehouse + courier
+- `src/app/api/tenant/[id]/easyparcel-test/route.ts` — Test connection
+- `src/app/api/tenant/[id]/easyparcel-couriers/route.ts` — List live couriers + wallet
+- `src/app/api/tenant/[id]/easyparcel-disconnect/route.ts` — Disconnect
+- `src/app/api/orders/calculate-shipping/route.ts` — Mở rộng with EP logic
+- Settings shipping UI — warehouse CRUD + courier picker
+
+**Phase C+D files (NOT BUILT yet):**
+- `src/app/api/orders/[id]/create-label/route.ts`
+- `src/app/api/cron/sync-tracking/route.ts`
+- OrderDetailPanel (label modal)
+- Tracking sync webhook listeners
 
 **Routing auth:** mọi call EasyParcel dùng **OAuth access token của merchant** (`Authorization: Bearer`) lấy từ `tenant.easyParcelIntegration.accessToken` → cước vào đúng ví merchant.
 
@@ -149,24 +209,26 @@ Buyer xem tracking trên trang đơn (dual-field: order.status lifecycle vs ship
 
 ## 5. Scope & Roadmap
 
+> **Build Status (2026-07-01):** Phase A + B are **fully implemented** (Connect+Settings + Rate@Checkout live). Phase C + D are **NOT BUILT** — forward-looking design below.
+
 ```
-Phase A (Connect) ─▶ Phase B (Rate@Checkout) ─▶ Phase C (Fulfillment) ─▶ Phase D (Returns) ─▶ staging
+Phase A (Connect) ─▶ Phase B (Rate@Checkout) ─▶ [PHASE C+D — NOT BUILT]
 ```
 
 | Phase | Tên | Nội dung chính | Out |
 |---|---|---|---|
-| **A** | Connect + Settings | Connect with EasyParcel (OAuth redirect) + warehouse + chọn 1 courier (trong 4 courier hỗ trợ COD — COD mặc định toàn platform) + test connection | Tự dựng UI EasyParcel · auto label · default parcel · courier non-COD |
-| **B** | Rate @ Checkout | Real-time rate (đúng 1 courier shop chọn) + lưu order; hybrid fallback flat | Markup cước · buyer chọn courier |
-| **C** | Fulfillment | Mua label gắn vào nút "Ready to Ship" có sẵn + in label + pickup/dropoff + COD + tracking sync cron | Multi-warehouse · auto label · auto-complete · show số dư ví · màn tạo vận đơn riêng · tab toggle manual |
-| **D** | Returns + Refund | Reuse `/refund` & `/cancel` + restock có sẵn; Case A auto-return (courier) + Case B manual buyer-return with fee tracking (tracking code + fee + payer recorded on order for reference only — not added to financial/analytics reports). Reuse F10 /refund & /cancel. | Auto refund cước · RMA collection · buyer return-request UI · return fee in financial reports |
+| **A** ✅ | Connect + Settings | Connect with EasyParcel (OAuth redirect) + multiple warehouses + chọn 1 courier (tất cả live couriers) + test connection | Tự dựng UI EasyParcel · auto label · default parcel |
+| **B** ✅ | Rate @ Checkout | Real-time rate (đúng 1 courier shop chọn) + COD info + lưu order; hybrid fallback flat | Markup cước · buyer chọn courier |
+| **C** ⚠️ NOT BUILT | Fulfillment | Mua label gắn vào nút "Ready to Ship" có sẵn + in label + pickup/dropoff + tracking sync webhook | Multi-warehouse select · auto label · auto-complete · show số dư ví · màn tạo vận đơn riêng · tab toggle manual |
+| **D** ⚠️ NOT BUILT | Returns + Refund | Reuse `/refund` & `/cancel` + restock có sẵn; Case A auto-return (courier) + Case B manual buyer-return with fee tracking. Reuse F10 /refund & /cancel. | Auto refund cước · RMA collection · buyer return-request UI · return fee in financial reports |
 
 ### Out of Scope (toàn feature)
 - **Markup cước** (giá hiển thị = raw EasyParcel).
 - **Insurance / parcel protection** (addon EasyParcel).
 - **Delyva** + provider khác (chỉ EasyParcel MVP).
 - API nạp ví (EasyParcel không hỗ trợ — merchant tự nạp trên dashboard EasyParcel).
-- Multi-warehouse per merchant (1 origin/merchant cho MVP).
-- COD ngoài West Malaysia (giới hạn của EasyParcel COD).
+- **Multi-warehouse routing per order** (1 default warehouse dùng cho rate/label; Phase B select warehouse; Phase C multi-warehouse per order TBD).
+- COD eligibility follows **R1–R5 rules** per-route LIVE from EasyParcel quotation response, **NOT hardcoded by region** (see §8 "Key API Contract Decisions — COD Validation Responsibility").
 - EasyParcel-native reverse label is NOT used — returns use a manual model (see [F10-orders-management.md § 20.3](./F10-orders-management.md#easyparcel--returns--cancel)).
 
 ---
@@ -196,14 +258,20 @@ Sub-PRDs reference these NFRs by ID. No duplication needed.
 
 **Chi phí platform = RM0.** Merchant chịu cước + phí COD (xem §3).
 
-### Top risks
+### Top risks (Phase A+B)
 1. **Currency sen↔RM (NFR-1):** sai = lệch 100×. Test sandbox 1 đơn nhỏ trước khi go-live.
-2. **Ví merchant hết tiền:** create-label fail giữa chừng → cần UX cảnh báo + link nạp rõ ràng (không có API topup).
-3. **Pickup:** dùng `collection_date` trong `POST /shipment/submit_orders` (không có endpoint đặt pickup riêng — đã resolved §8).
-4. **Webhook tracking:** primary qua webhook (topics 1/2/3). Rủi ro: signature chưa rõ + có thể trễ/miss → cần verify signature ở sandbox và giữ polling `POST /shipment/tracking_status` làm fallback.
-5. **Return logistics:** F36 does NOT use EasyParcel reverse label. Case A = courier auto-returns to sender (no new label needed); Case B = manual buyer-return (any courier, free-text tracking code + fee + payer recorded for reference only — not wired into financials). Handled in [F10-orders-management.md § 20.3](./F10-orders-management.md#easyparcel--returns--cancel).
-6. **Rate limit:** giả định ≤100 req/min — thêm backoff ở cron + checkout.
-7. **Double-charge ví:** create-label phải idempotent theo `awbNo`.
+2. **Rate timeout:** checkout rate-check must p95 < 4s; timeout → fallback flat (KHÔNG chặn checkout).
+3. **Token refresh:** auto-refresh trước khi hết; thrown `AUTH_EXPIRED` → user must reconnect.
+4. **Hybrid fallback:** EasyParcel disabled/error → flat West/East (KHÔNG phá checkout merchant cũ).
+5. **Phone normalization:** raw input → "60XXXXXXXXX" format (not "MY" + "0" prefix); test all input patterns.
+6. **Multiple warehouses:** 1 warehouse marked `isDefault` → origin cho rate/label (Phase C sẽ allow per-order warehouse select).
+
+### Top risks (Phase C/D — NOT BUILT yet)
+7. **Ví merchant hết tiền:** create-label fail → cần UX cảnh báo + link nạp.
+8. **Webhook tracking:** signature + ordering (Phase C feature).
+9. **Rate limit on cron:** backoff + batch logic (Phase C feature).
+10. **Double-charge ví:** create-label idempotent (Phase C feature).
+11. **Return logistics:** no EasyParcel reverse label; manual model (Phase D feature).
 
 ---
 
@@ -211,43 +279,73 @@ Sub-PRDs reference these NFRs by ID. No duplication needed.
 
 > **Source:** EasyParcel OpenAPI v2026-03 (GitHub official: https://github.com/easyparcel/OpenAPI, main branch)
 
-**Auth:** OAuth 2.0 Authorization-Code. No API keys. Merchant redirects to `https://api.easyparcel.com/oauth/login`, logs in, grants scope, callback returns `code`. Backend POSTs to `https://api.easyparcel.com/oauth/token` with `code` + Basic auth `client_id:client_secret` → receives access token (10h) + refresh token (1yr). All API calls use `Authorization: Bearer {access_token}`.
+**Auth:** OAuth 2.0 Authorization-Code. No API keys. Merchant redirects to `https://api.easyparcel.com/oauth/login`, logs in, grants scope, callback returns `code`. Backend POSTs to `https://api.easyparcel.com/oauth/token` with `code` + Basic auth `client_id:client_secret` → receives access token (10h) + refresh token (1yr). All API calls use `Authorization: Bearer {access_token}`. **Sandbox = same base URL; use sandbox OAuth credentials only.**
 
-**Base URL:** `https://api.easyparcel.com/open_api/2026-03/` (production). Sandbox = same base URL, sandbox OAuth creds only.
+**Base URL:** `https://api.easyparcel.com/open_api/2026-03/` (production + sandbox). No separate sandbox base URL — credentials determine environment.
 
-**Quotation:** `POST /shipment/quotations` → body `{shipment: [{sender, receiver, weight, width, length, height, parcel_value}]}` → response `data[].quotations[].courier.service_id` + `pricing.total_amount` (RM string) + `features[].cod`.
+**Quotation:** `POST /shipment/quotations` → body `{shipment: [{sender, receiver, weight, width, length, height, parcel_value}]}` → response includes `data[].quotations[].courier.service_id` + `pricing.total_amount` (RM string) + `features[].cod` (availability + min/max).
 
-**Submit order (single step, wallet auto-deduct):** `POST /shipment/submit_orders` → body `{shipment: [{reference, service_id, collection_date, weight, width/length/height, item, sender, receiver, feature}]}` → response `data[].shipment_number` + `order_number` + `awb_number` + `tracking_url`. AWB PDF (`awb_url`) assigned **async** → arrives via webhook topic 2 (shipment.awb.update) or polling `POST /shipment/list`/`POST /shipment/details`.
+**Submit order (single step, wallet auto-deduct):** `POST /shipment/submit_orders` → body `{shipment: [{reference, service_id, collection_date, weight, width/length/height, item, sender, receiver, feature{sms_tracking?, email_tracking?, whatsapp_tracking?, cod_amount?}}]}`. `cod_amount` = RM float (enabled if COD selected). Response: `data[].shipment_number` + `order_number` + `awb_number` + `tracking_url` (awb_url assigned async via webhook or polling). **CRITICAL:** EP sandbox accepts invalid COD (under-min, over-max, non-COD courier, East-MY) with **zero server-side validation**. **Prime MUST hard-gate COD eligibility at BOTH UI (courier picker filter) and server (order submit validation)** — see decision-260702-1503-GH-1333-cod-handoff.md.
 
-**Params (key mapping changes from legacy):**
-- `subdivision_code`: ISO 3166-2 (e.g., "MY-07" Penang, "MY-14" Kuala Lumpur) — not 3-letter state code
-- `phone_number_country_code`: separate field (e.g., "MY")
-- `phone_number`: separate field, digits-only no +60 prefix (e.g., "0122134567")
+**Params (key mapping):**
+- `subdivision_code`: ISO 3166-2 (e.g., "MY-07" Penang, "MY-14" Kuala Lumpur)
+- `phone_number`: 60-prefixed format (e.g., "60122134567"); normalized from raw input
 - `address_1` / `address_2`: separate fields
 - `city`: required
-- `weight`: kg (double), not grams
+- `weight`: kg (double), min 0.1, max 50 (varies per courier); round to 2 decimals
 
-**Status codes (numeric, not strings):** 0=Cancel, 2=To Be Collected, 3=Collected, 4=Delivery In Transit, 5=Delivered, 6=Returned, 7=Schedule In Arrangement, 8=On Hold, 11=Drop Off. Map to existing dual-field: `order.status` (lifecycle) vs `shippingTrackingStatus` (display, 13 normalized statuses EasyParcel).
+**Tracking (Phase B — polling):** `GET /shipment/tracking?tracking_number=…` → returns shipment status object. **Primary for Phase B**: polls individual tracking on demand. **Webhooks (Phase C):** topics 1 (status), 2 (awb), 3 (tracking event) — forward-looking, not implemented yet.
 
-**Tracking:** Primary = webhooks (topics 1 status update, 2 awb update, 3 tracking event). Fallback = polling `POST /shipment/details` + `POST /shipment/tracking_status` (batch 100 AWBs). Both return numeric `shipment_status_code`.
+**Account info:** `GET /open_api/2026-03/account/get_account_information` — returns merchant account name, email, pickup addresses (empty until configured in EP dashboard).
 
-**Cancel:** `POST /shipment/cancel` → body `{cancel_list: [{shipment_number, remark}]}` (7-day window from collection). HTTP 200 with per-item `status: "success"` or `"error"`. **MVP product decision:** không wire programmatic cancel — merchant tự hủy shipment trên dashboard EasyParcel (credit hoàn ví) hoặc gọi support. Endpoint có sẵn cho phase sau.
+**Wallet:** `GET /open_api/2026-03/wallet` — returns array of wallet objects (by currency).
 
-**COD:** Spec shows COD availability + pricing in quotation response but submit_orders request doesn't expose explicit COD amount field. **Deferred — verify param format (likely `cod_enabled: boolean`, `cod_amount: double` in RM) with EasyParcel support before implementing payment-method-specific logic.**
+**Cancel (Phase D in-scope):** `POST /shipment/cancel` → body `{cancel_list: [{shipment_number, remark}]}` (7-day window). Use `shipment_number = order.easyParcelOrderNo`; do **NOT** use `awbNo`, `tracking_number`, or `shipment[{tracking_number}]`. Before cancel, refresh EP tracking and allow only pre-pickup statuses (`order_created`, `pending_pickup`). EP HTTP/status_code 200 can still contain item-level failures — Prime must inspect each `data[].status`; only item success allows local `/api/orders/[id]/cancel` refund/restock/email to continue. Picked-up or later is blocked and handled by Refund/Return.
+
+**COD (Phase B — resolved):** `cod_amount` (RM float) param in submit_orders when COD enabled. Rate quotation exposes COD availability + pricing via `features[].cod` (available/min/max per courier). **NO region hardcode — COD eligibility follows rules R1–R5 PER-ROUTE, LIVE from quotation response.**
+
+**COD Validation Responsibility (CRITICAL for Phase B/F) — R1 through R5 verified rules:**
+
+| Rule | Description | Verified | Enforcement |
+|---|---|---|---|
+| **R1** | `codAmount ≤ courier.max_cod_amount` | J&T max RM1,000 | UI + server gate |
+| **R2** | `codAmount ≥ courier.min_cod_amount` | J&T min RM7.50 | UI + server gate |
+| **R3** | `courier.cod.available = true` (from quotation) | Live per-route | Courier picker filters; server validates |
+| **R4** | NO region hardcode — follow LIVE `cod.available` per-route | Case D: J&T + Sarawak accepted | Both UI + server follow quotation response |
+| **R5** | COD fee = max(4% × amount, RM7.00), informational only | Per courier in quotation | Display only; never block |
+
+**Key points:**
+- **EP behavior:** submit_orders accepts ANY amount/courier/destination combo; sandbox accepted under-min, over-max, non-COD courier, East-MY without validation.
+- **Prime enforcement:** Code enforces R1–R5 server-side + mirrors in UI (courier picker filter, COD option gating).
+- **Decision authority:** `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md` (dev handoff doc).
+- **Evidence:** `plans/reports/ep-cod-matrix-260702.md` (sandbox validation sweep; couriers vary per-route, NOT fixed list).
+- **Issue:** GH-1333.
+
+**COD Courier Coverage (reference snapshot — code reads LIVE, never hardcode):**
+
+| Direction | COD-capable couriers | Typical count |
+|---|---|---|
+| West→West | Aramex, DHL eCommerce, J&T, Lazada, Pos Malaysia, Poslaju, SPX | 7 |
+| West→East | DHL eCommerce, J&T, Pos Malaysia, Poslaju, SPX (Labuan: fewer) | 4–6 |
+| East→West | DHL eCommerce, J&T, Pos Malaysia, Poslaju | 4 |
+| East→East | DHL eCommerce, J&T, Pos Malaysia, Poslaju (Labuan: fewer) | 3–4 |
+
+Source: `plans/reports/ep-cod-matrix-260702.md` (empirical sandbox probe, 2026-07-02). **Common to all routes:** DHL eCommerce, Pos Malaysia, Poslaju. **Caveat:** Sandbox ≠ production end-to-end COD remittance proof — authoritative signal is `cod.available=true` per-route per-courier. Confirm East MY COD settlement in production before relying operationally.
 
 ---
 
-## 9. Open Items — Verify in Sandbox Before Go-Live
+## 9. Open Items — Verify Before Each Phase Deployment
 
-The following items require confirmation with EasyParcel sandbox (same base URL, sandbox OAuth creds) before production deployment.
+Items marked ✅ RESOLVED are confirmed by as-built code (Phase A+B). Items marked ⏳ DEFER are Phase C/D forward-looking.
 
-| # | Item | What is known | Action |
-|---|---|---|---|
-| 1 | **COD param in submit_orders** | Spec 2026-03 exposes COD availability in quotation response (`features[].cod.available`, min/max amounts, charging rate). But submit_orders request spec doesn't show explicit COD fields. Likely candidate: `shipment[].feature.cod_enabled` (bool) + `shipment[].feature.cod_amount` (double, RM). **Spec silent — MUST verify with EasyParcel support.** | Contact EasyParcel API support; verify exact param names + types for specifying COD in submit request. Update AC in US-F36-08 AC-5 once confirmed. |
-| 2 | **Webhook signature verification** | Spec 2026-03 §9 lists webhook topics + payloads but does NOT mention HMAC signing, request signature headers, or callback validation. | Test webhook delivery in sandbox: does EP send X-EasyParcel-Signature header or similar? Implement validation accordingly before go-live. |
-| 3 | **All 16 MY subdivision codes (ISO 3166-2)** | 6 confirmed from spec examples (MY-07 Penang, MY-14 Kuala Lumpur, MY-02, MY-10, etc.). 10 inferred follow ISO standard but not directly tested. | Test rate-check + submit for all 16 states in sandbox (`POST /shipment/quotations` with each subdivision_code); reject any failing. Create const mapping. |
-| 4 | **AWB PDF delivery timing** | Spec shows `awb_url` assigned async after submit (via webhook topic 2 shipment.awb.update). But response at submit may include `awb_url` field (possibly null). | Test submit_orders response: does `awb_url` appear immediately or remain null until webhook fires? Determine if polling loop needed or webhook sufficient. |
-| 5 | **Rate limiting headers** | Spec §11 notes rate limit not explicitly documented; implementation assumes ~100 req/min. Response headers (X-RateLimit-Remaining, etc.) not mentioned. | Monitor sandbox requests for any 429 responses; log response headers. Implement exponential backoff if 429 observed. |
+| # | Item | Status | Details | Action |
+|---|---|---|---|---|
+| 1 | **COD param in submit_orders** | ✅ RESOLVED | Param: `shipment[].feature.cod_amount` (double, RM float). Code confirmed; passed to EP on submit. | None — implemented. |
+| 2 | **Webhook signature verification** | ⏳ DEFER (Phase C) | Phase B uses polling `GET /shipment/tracking` only. Webhooks (signature, topics 1/2/3) forward-looking. | Test webhook delivery + signing in sandbox when Phase C starts. |
+| 3 | **All 16 MY subdivision codes (ISO 3166-2)** | ⏳ TBD | 6 confirmed from spec + geo dataset. 10 inferred — test coverage pending Phase C full integration. | Test rate-check + submit for all 16 states; verify against `malaysia_states` seed table. |
+| 4 | **AWB PDF delivery timing** | ⏳ DEFER (Phase C) | Phase B does not wire create-label; Phase C will handle async `awb_url` delivery. | Test submit_orders response when Phase C implements label creation. |
+| 5 | **Rate limiting + backoff** | ⏳ DEFER (Phase C) | Phase B rate-check is per-checkout (user-initiated). Phase C cron will require backoff. Spec assumes ~100 req/min. | Implement exponential backoff in Phase C cron; monitor sandbox for 429 responses. |
+| 6 | **Sandbox base URL toggle** | ✅ RESOLVED | Same base URL (`https://api.easyparcel.com/open_api/2026-03/`) for sandbox + prod; OAuth credentials determine environment. | None — confirmed. |
 
 **Confirmed field spec** (source: report above; high confidence from official docs + PHP wrapper):
 
@@ -296,14 +394,15 @@ The following items require confirmation with EasyParcel sandbox (same base URL,
 **Key spec files used in this PRD:**
 - `_authentication.md` — OAuth 2.0 flow, token endpoints, refresh token
 - `_quotation.md` — POST /shipment/quotations request/response
-- `_submitorder.md` — POST /shipment/submit_orders (wallet auto-deduct, single-step)
+- `_submitorder.md` — POST /shipment/submit_orders (wallet auto-deduct, single-step, cod_amount param)
 - `_shipmentlisting.md` — POST /shipment/list with pagination
-- `_shipmentdetail.md` — POST /shipment/details (fetch awb_url async)
-- `_tracking_status.md` — POST /shipment/tracking_status + numeric status codes
+- `_shipmentdetail.md` — POST /shipment/details (fetch awb_url async — Phase C deferred)
+- `_tracking.md` — GET /shipment/tracking (Phase B primary) + polling fallback
+- `_tracking_status.md` — POST /shipment/tracking_status (Phase C deferred)
 - `_cancelshipment.md` — POST /shipment/cancel (7-day window)
-- `_webhooks.md` — Topics 1/2/3 payloads (status, awb update, tracking event)
-- `_wallet.md` — GET /wallet balance check
-- `_account.md` — POST /account/get_account_information
+- `_webhooks.md` — Topics 1/2/3 payloads (Phase C deferred)
+- `_wallet.md` — GET /wallet balance check (merchant account)
+- `_account.md` — GET /account/get_account_information (merchant profile)
 
 **Research report (analysis of spec 2026-03):**
 - `/plans/reports/Explore-260625-1527-easyparcel-openapi-spec.md` — complete spec contract summary + implementation notes

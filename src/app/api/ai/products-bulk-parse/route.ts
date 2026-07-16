@@ -13,11 +13,14 @@ function getOpenAI(): OpenAI | null {
 
 export const POST = withAuth(async (user, req) => {
     try {
-        // Rate limit: 5 bulk AI tasks per hour (heavy resource usage)
-        const rateLimit = await checkRateLimit(String(user.id), 5)
+        // Rate limit: 10 bulk AI tasks per hour (heavy resource usage)
+        // Namespaced key — bare user.id would share a single bucket with every other
+        // AI route (edit-block, product-description, etc.), making this limit meaningless
+        // (see PR #1608 review). Matches this codebase's `{feature}:${user.id}` convention.
+        const rateLimit = await checkRateLimit(`ai-bulk-parse:${user.id}`, 10)
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Try again later.' },
+                { error: 'rateLimitExceeded', resetAt: rateLimit.resetAt },
                 { status: 429 }
             )
         }
@@ -77,6 +80,7 @@ Each product item MUST have:
   Each variant object MUST have:
     - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
     - price: (number) same as base price unless specified per variant
+    - compareAtPrice: (number) same as the product-level compareAtPrice unless specified per variant, or omit if the product-level compareAtPrice was omitted
     - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
     - stock: (number) default to 0 per variant (out of stock until the merchant confirms real stock)
   If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].

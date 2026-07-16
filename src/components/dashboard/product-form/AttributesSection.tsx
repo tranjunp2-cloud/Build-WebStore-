@@ -17,7 +17,7 @@ export function AttributesSection() {
     const sectionsT = t.dashboard.products.form.sections
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-5">
+        <div className="rounded-2xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[hsl(var(--card))] p-[25px] flex flex-col gap-5">
             <div className="flex items-center justify-between">
                 <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">
                     {sectionsT?.attributes || 'Extended Information (Attributes)'}

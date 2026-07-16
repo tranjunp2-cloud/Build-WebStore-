@@ -17,3 +17,8 @@ Sentry.init({
         return event
     },
 })
+
+// Required by @sentry/nextjs v9+ to instrument App Router client navigations.
+// Next.js calls this hook on each route transition; without it the SDK prints an
+// "ACTION REQUIRED" warning on every boot and cannot trace client-side navigation.
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart

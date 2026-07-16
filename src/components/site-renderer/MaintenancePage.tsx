@@ -15,10 +15,10 @@ export function MaintenancePage({ siteName }: { siteName?: string }) {
                     </svg>
                 </div>
                 <h1 className="mb-3 text-2xl font-bold text-slate-900">
-                    {siteName ? `${siteName} đang bảo trì` : 'Website đang bảo trì'}
+                    {siteName ? `${siteName} is under maintenance` : 'Website is under maintenance'}
                 </h1>
                 <p className="text-base leading-relaxed text-slate-600">
-                    Chúng tôi đang cập nhật website để mang đến trải nghiệm tốt hơn. Vui lòng quay lại sau.
+                    We&apos;re updating the website. Please check back later.
                 </p>
             </div>
         </div>

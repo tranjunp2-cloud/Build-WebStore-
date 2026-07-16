@@ -1,6 +1,6 @@
 /**
  * Forgot Password email HTML template.
- * Sent when a user requests a password reset on PrimeWeb.
+ * Sent when a user requests a password reset on Web Store.
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  *
  * Design: Teal gradient header · White card body · Amber expiry notice · Light footer

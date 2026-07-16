@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const cookieStore = await cookies()
     const isMs = (cookieStore.get('prefer_lang')?.value ?? 'en') === 'ms'
     return {
-        title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
+        title: isMs ? 'Papan Pemuka | Web Store' : 'Dashboard | Web Store',
         description: isMs
             ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
             : 'Monitor your store performance and manage your online business.',
@@ -144,7 +144,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'seo':
                 return seo ? <SeoHealth key="seo" data={seo} /> : null
             case 'tools':
-                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} /> : null
+                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} aiCrawlersEnabled={seo.aiCrawlersEnabled} /> : null
             case 'orders':
                 return <PendingOrders key="orders" />
             default:

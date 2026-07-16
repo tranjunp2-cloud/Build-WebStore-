@@ -15,7 +15,7 @@ import {
     TableCell,
     TableActionButton,
 } from '@/components/ui/table'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import type { CustomerRecord } from '../_lib/customer-record'
 
 type Props = {
@@ -54,7 +54,7 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
     const { t } = useI18n()
     const c = t.dashboard.customers
 
-    const footer = !loading && total > 0
+    const footer = !loading && shouldShowTablePagination(total)
         ? (
             <TablePagination
                 page={page}
@@ -68,7 +68,7 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
 
     if (!loading && records.length === 0) {
         return (
-            <TableEmptyState icon={<Users />} title={c.empty} />
+            <TableEmptyState icon={<Users />} title={c.empty} subtitle={c.emptySubtitle} />
         )
     }
 

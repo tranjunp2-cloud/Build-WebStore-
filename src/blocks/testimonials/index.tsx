@@ -17,6 +17,7 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
@@ -141,7 +142,19 @@ function AuthorMeta({
     return (
         <div className={`flex items-center gap-3 ${className}`.trim()}>
             {showAvatar && (
-                <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
+                imageIndex !== undefined ? (
+                    <MediaUploadOverlay
+                        field={`testimonials.${imageIndex}.avatar`}
+                        altText={name}
+                        valueShape="media"
+                        buttonPosition="top-center"
+                        positionClass="relative inline-block"
+                    >
+                        <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
+                    </MediaUploadOverlay>
+                ) : (
+                    <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
+                )
             )}
             <div>
                 <RichText text={name} as="p" className={nameClass} />
@@ -314,7 +327,15 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                 </div>
                                             </>
                                         ) : (
-                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i, s3Map)} name={t.name} size={120} imageIndex={i} />
+                                            <MediaUploadOverlay
+                                                field={`testimonials.${i}.avatar`}
+                                                altText={t.name}
+                                                valueShape="media"
+                                                buttonPosition="top-center"
+                                                positionClass="relative inline-block"
+                                            >
+                                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i, s3Map)} name={t.name} size={120} imageIndex={i} />
+                                            </MediaUploadOverlay>
                                         )}
                                     </div>
                                     {/* Text side */}
@@ -398,13 +419,21 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                             }}
                         >
                             <div className="shrink-0 mt-1">
-                                <AvatarRing
-                                    color={CSS_VARS.primary}
-                                    src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
-                                    name={t.name}
-                                    size={40}
-                                    imageIndex={i}
-                                />
+                                <MediaUploadOverlay
+                                    field={`testimonials.${i}.avatar`}
+                                    altText={t.name}
+                                    valueShape="media"
+                                    buttonPosition="top-center"
+                                    positionClass="relative inline-block"
+                                >
+                                    <AvatarRing
+                                        color={CSS_VARS.primary}
+                                        src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
+                                        name={t.name}
+                                        size={40}
+                                        imageIndex={i}
+                                    />
+                                </MediaUploadOverlay>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <StarRating count={t.rating || 5} className="flex gap-0.5 mb-2" />
@@ -544,7 +573,15 @@ function TestimonialsSpotlight({
                         }}
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx, s3Map)} name={center.name} size={72} imageIndex={centerIdx} />
+                            <MediaUploadOverlay
+                                field={`testimonials.${centerIdx}.avatar`}
+                                altText={center.name}
+                                valueShape="media"
+                                buttonPosition="top-center"
+                                positionClass="relative inline-block"
+                            >
+                                <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx, s3Map)} name={center.name} size={72} imageIndex={centerIdx} />
+                            </MediaUploadOverlay>
                         </div>
                         <StarRating count={center.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-4" />
                         <Body size="lg" className="opacity-70 mb-6 italic">
@@ -647,7 +684,15 @@ function TestimonialsMinimalQuote({
                             &ldquo;{t.quote}&rdquo;
                         </blockquote>
                         <div className="flex items-center justify-center gap-3">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={48} imageIndex={currentIndex} />
+                            <MediaUploadOverlay
+                                field={`testimonials.${currentIndex}.avatar`}
+                                altText={t.name}
+                                valueShape="media"
+                                buttonPosition="top-center"
+                                positionClass="relative inline-block"
+                            >
+                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={48} imageIndex={currentIndex} />
+                            </MediaUploadOverlay>
                             <AuthorMeta
                                 name={t.name}
                                 title={t.title}
@@ -813,7 +858,15 @@ function TestimonialsCarousel({
                         aria-atomic="true"
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={72} imageIndex={currentIndex} />
+                            <MediaUploadOverlay
+                                field={`testimonials.${currentIndex}.avatar`}
+                                altText={t.name}
+                                valueShape="media"
+                                buttonPosition="top-center"
+                                positionClass="relative inline-block"
+                            >
+                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={72} imageIndex={currentIndex} />
+                            </MediaUploadOverlay>
                         </div>
                         <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-5" />
                         <Body size="lg" className="italic opacity-70 mb-6">
@@ -879,13 +932,21 @@ function TestimonialsAvatarRow({
                         aria-label={`View ${t.name}'s testimonial`}
                         aria-current={i === selectedIndex}
                     >
-                        <AvatarRing
-                            color={CSS_VARS.primary}
-                            src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
-                            name={t.name}
-                            size={56}
-                            imageIndex={i}
-                        />
+                        <MediaUploadOverlay
+                            field={`testimonials.${i}.avatar`}
+                            altText={t.name}
+                            valueShape="media"
+                            buttonPosition="top-center"
+                            positionClass="relative inline-block"
+                        >
+                            <AvatarRing
+                                color={CSS_VARS.primary}
+                                src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
+                                name={t.name}
+                                size={56}
+                                imageIndex={i}
+                            />
+                        </MediaUploadOverlay>
                     </button>
                 ))}
             </div>
@@ -974,7 +1035,15 @@ function TestimonialsSingle({
                         }}
                     >
                         <div className="flex justify-center mb-8">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, safeIndex, s3Map)} name={t.name} size={88} imageIndex={safeIndex} />
+                            <MediaUploadOverlay
+                                field={`testimonials.${safeIndex}.avatar`}
+                                altText={t.name}
+                                valueShape="media"
+                                buttonPosition="top-center"
+                                positionClass="relative inline-block"
+                            >
+                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, safeIndex, s3Map)} name={t.name} size={88} imageIndex={safeIndex} />
+                            </MediaUploadOverlay>
                         </div>
                         <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-1 mb-6" />
                         <blockquote className="text-xl md:text-2xl italic opacity-70 leading-relaxed mb-8">

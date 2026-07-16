@@ -15,6 +15,8 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -68,6 +70,7 @@ const ASPECT_CLASS = {
  */
 function GalleryImageCard({ item, index, aspect = 'square', className = '', overlayClickable = false }: GalleryImageCardProps) {
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const aspectCls = ASPECT_CLASS[aspect]
 
     if (item.image?.url) {
@@ -112,7 +115,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
                         <span className="opacity-0 group-hover:opacity-100 text-white text-2xl transition-opacity duration-300" aria-hidden="true">⊕</span>
                     </div>
                 )}
-                {isOwner && !overlayClickable && (
+                {isOwner && !isBuilderPreview && !overlayClickable && (
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center pointer-events-none">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 rounded-full p-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -137,7 +140,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
             aria-hidden="true"
         >
             <span className="text-2xl opacity-20">📷</span>
-            {isOwner && (
+            {isOwner && !isBuilderPreview && (
                 <div className="absolute inset-0 group-hover:bg-black/10 transition-colors duration-300 rounded-2xl flex items-center justify-center pointer-events-none">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 rounded-full p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -204,7 +207,9 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
             <StaggerGrid className="flex flex-wrap justify-center gap-4">
                 {images.map((item, i) => (
                     <StaggerItem key={i} className="group shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]">
-                        <GalleryImageCard item={item} index={i} aspect="square" />
+                        <MediaUploadOverlay field={`images.${i}.image`} altText={item.caption || `Gallery image ${i + 1}`} valueShape="media">
+                            <GalleryImageCard item={item} index={i} aspect="square" />
+                        </MediaUploadOverlay>
                     </StaggerItem>
                 ))}
             </StaggerGrid>
@@ -223,7 +228,9 @@ function MasonryGallery({ headline, sectionLabel, images, theme: _theme }: { hea
             <div className="max-w-5xl mx-auto columns-2 md:columns-3 gap-4">
                 {images.map((item, i) => (
                     <div key={i} className="group break-inside-avoid mb-4">
-                        <GalleryImageCard item={item} index={i} aspect="auto" />
+                        <MediaUploadOverlay field={`images.${i}.image`} altText={item.caption || `Gallery image ${i + 1}`} valueShape="media">
+                            <GalleryImageCard item={item} index={i} aspect="auto" />
+                        </MediaUploadOverlay>
                     </div>
                 ))}
             </div>
@@ -279,15 +286,20 @@ function CarouselGallery({ headline, sectionLabel, images, theme: _theme }: { he
                     >
                         {slides.map((slideImages, slideIdx) => (
                             <div key={slideIdx} className="w-full flex-shrink-0 flex gap-2">
-                                {slideImages.map((item, itemIdx) => (
-                                    <div key={itemIdx} className="basis-1/3 shrink-0 min-w-0 group">
-                                        <GalleryImageCard
-                                            item={item}
-                                            index={slideIdx * CAROUSEL_ITEMS_PER_SLIDE + itemIdx}
-                                            aspect="4/3"
-                                        />
-                                    </div>
-                                ))}
+                                {slideImages.map((item, itemIdx) => {
+                                    const absIdx = slideIdx * CAROUSEL_ITEMS_PER_SLIDE + itemIdx
+                                    return (
+                                        <div key={itemIdx} className="basis-1/3 shrink-0 min-w-0 group">
+                                            <MediaUploadOverlay field={`images.${absIdx}.image`} altText={item.caption || `Gallery image ${absIdx + 1}`} valueShape="media">
+                                                <GalleryImageCard
+                                                    item={item}
+                                                    index={absIdx}
+                                                    aspect="4/3"
+                                                />
+                                            </MediaUploadOverlay>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         ))}
                     </motion.div>
@@ -434,7 +446,9 @@ function LightboxGallery({ headline, sectionLabel, images, theme: _theme }: { he
                 <StaggerGrid className="flex flex-wrap justify-center gap-4">
                     {images.map((item, i) => (
                         <StaggerItem key={i} className="group cursor-pointer shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]" onClick={() => setSelectedIndex(i)}>
-                            <GalleryImageCard item={item} index={i} aspect="square" overlayClickable />
+                            <MediaUploadOverlay field={`images.${i}.image`} altText={item.caption || `Gallery image ${i + 1}`} valueShape="media">
+                                <GalleryImageCard item={item} index={i} aspect="square" overlayClickable />
+                            </MediaUploadOverlay>
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
@@ -530,41 +544,43 @@ function FilmstripGallery({ headline, sectionLabel, images, theme: _theme }: { h
 
             {/* Main image */}
             <div className="relative aspect-video rounded-xl overflow-hidden mb-4 max-w-4xl mx-auto">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeIndex}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="absolute inset-0"
-                    >
-                        {images[activeIndex]?.image?.url ? (
-                            <Image
-                                src={images[activeIndex].image.url}
-                                alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
-                                data-image-index={activeIndex}
-                                fill
-                                className="object-cover"
-                            />
-                        ) : (
-                            <div
-                                className="w-full h-full flex items-center justify-center"
-                                style={{
-                                    background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                }}
-                                aria-hidden="true"
-                            >
-                                <span className="text-4xl opacity-20">📷</span>
-                            </div>
-                        )}
-                    </motion.div>
-                </AnimatePresence>
-                {images[activeIndex]?.caption && (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                        <Body size="small" className="text-white font-medium">{images[activeIndex].caption}</Body>
-                    </div>
-                )}
+                <MediaUploadOverlay field={`images.${activeIndex}.image`} altText={images[activeIndex]?.caption || `Gallery image ${activeIndex + 1}`} valueShape="media" positionClass="absolute inset-0">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeIndex}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute inset-0"
+                        >
+                            {images[activeIndex]?.image?.url ? (
+                                <Image
+                                    src={images[activeIndex].image.url}
+                                    alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
+                                    data-image-index={activeIndex}
+                                    fill
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div
+                                    className="w-full h-full flex items-center justify-center"
+                                    style={{
+                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                    }}
+                                    aria-hidden="true"
+                                >
+                                    <span className="text-4xl opacity-20">📷</span>
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                    {images[activeIndex]?.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                            <Body size="small" className="text-white font-medium">{images[activeIndex].caption}</Body>
+                        </div>
+                    )}
+                </MediaUploadOverlay>
             </div>
 
             {/* Thumbnail strip — 80px buttons (>44px ✅) */}
@@ -633,37 +649,39 @@ function JustifiedGallery({ headline, sectionLabel, images, theme: _theme }: { h
                                 height: '220px',
                             }}
                         >
-                            {item.image?.url ? (
-                                <>
-                                    <Image
-                                        src={item.image.url}
-                                        alt={item.caption || item.image.alt || ''}
-                                        data-image-index={i}
-                                        fill
-                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
+                            <MediaUploadOverlay field={`images.${i}.image`} altText={item.caption || `Gallery image ${i + 1}`} valueShape="media" positionClass="absolute inset-0">
+                                {item.image?.url ? (
+                                    <>
+                                        <Image
+                                            src={item.image.url}
+                                            alt={item.caption || item.image.alt || ''}
+                                            data-image-index={i}
+                                            fill
+                                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                        />
+                                        <div
+                                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                            style={{ background: `rgba(var(--brand-primary-rgb), 0.15)` }}
+                                        />
+                                        {item.caption && (
+                                            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                <RichText text={item.caption} as="p" className="text-white text-xs font-medium" />
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
                                     <div
-                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                        style={{ background: `rgba(var(--brand-primary-rgb), 0.15)` }}
-                                    />
-                                    {item.caption && (
-                                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <RichText text={item.caption} as="p" className="text-white text-xs font-medium" />
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div
-                                    className="w-full h-full flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                    }}
-                                    aria-hidden="true"
-                                >
-                                    <span className="text-2xl opacity-20">📷</span>
-                                </div>
-                            )}
+                                        className="w-full h-full flex items-center justify-center"
+                                        style={{
+                                            background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                            border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
+                                        }}
+                                        aria-hidden="true"
+                                    >
+                                        <span className="text-2xl opacity-20">📷</span>
+                                    </div>
+                                )}
+                            </MediaUploadOverlay>
                         </StaggerItem>
                     )
                 })}

@@ -228,12 +228,12 @@ export function getDefaultContentFields(type: EmailTemplateType, locale: Locale)
         case 'staff-invitation':
             // Inline literal base. fieldMap: { subject, greeting, ctaLabel:'cta', closing:'footer' }.
             // subject embeds ${workspaceName} which has NO {var} token (vars.brandName is the literal
-            // 'PrimeWeb') → omitted to avoid a misleading "join PrimeWeb on PrimeWeb" that would also
+            // 'Web Store') → omitted to avoid a misleading "join Web Store on Web Store" that would also
             // persist on save. greeting/cta/closing are static/tokenized and round-trip cleanly.
             return {
                 greeting: 'Hello {inviteeName}',
                 ctaLabel: 'Log In to Accept',
-                closing: 'PrimeWeb © 2026. All rights reserved.',
+                closing: 'Web Store © 2026. All rights reserved.',
             }
 
         // ── Seller Communications ─────────────────────────────────────────

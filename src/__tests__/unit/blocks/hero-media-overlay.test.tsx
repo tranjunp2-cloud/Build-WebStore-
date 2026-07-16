@@ -15,12 +15,20 @@ vi.mock('@/components/site-renderer/OwnerContext', () => ({
     useIsOwner: vi.fn(() => false),
 }))
 
+vi.mock('@/components/site-renderer/BuilderPreviewContext', () => ({
+    useIsBuilderPreview: vi.fn(() => false),
+}))
+
 vi.mock('@/components/site-renderer/BlockEditCallbackContext', () => ({
     useBlockEditCallback: vi.fn(() => null),
 }))
 
 vi.mock('@/hooks/use-upload-progress', () => ({
     useUploadProgress: vi.fn(),
+}))
+
+vi.mock('@/hooks/use-direct-upload', () => ({
+    useDirectUpload: vi.fn(),
 }))
 
 vi.mock('@/lib/media/compress-image', () => ({
@@ -35,8 +43,10 @@ Object.defineProperty(window, 'parent', { value: { postMessage: postMessageSpy }
 // ── Imports (after mocks) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { HeroMediaOverlay } from '@/blocks/hero/hero-media-overlay'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
+import { useDirectUpload } from '@/hooks/use-direct-upload'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const mockOnFieldChange = vi.fn()
@@ -47,12 +57,23 @@ function makeFile(type: string, name = 'photo.jpg'): File {
 }
 
 let mockUpload: Mock
+let mockDirectUpload: Mock
 
 beforeEach(() => {
     vi.clearAllMocks()
+    // Default false so existing owner/callback-driven tests are unaffected;
+    // GH-1461 test below overrides this locally.
+    vi.mocked(useIsBuilderPreview).mockReturnValue(false)
     mockUpload = vi.fn()
     vi.mocked(useUploadProgress).mockReturnValue({
         upload: mockUpload,
+        progress: 0,
+        isUploading: false,
+        reset: vi.fn(),
+    })
+    mockDirectUpload = vi.fn()
+    vi.mocked(useDirectUpload).mockReturnValue({
+        upload: mockDirectUpload,
         progress: 0,
         isUploading: false,
         reset: vi.fn(),
@@ -168,10 +189,17 @@ describe('TC-F30-HMO-007: valid image upload triggers onFieldChange', () => {
         await waitFor(() => {
             expect(mockOnFieldChange).toHaveBeenCalledWith('image', { id: 101, url: 'https://cdn/img.jpg', alt: 'Hero image' })
         })
-        expect(postMessageSpy).toHaveBeenCalledWith(
-            { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
-            expect.any(String),
-        )
+        // GH-1381: success toast now waits for the parent's BLOCK_FIELD_CHANGE_RESULT ACK
+        window.dispatchEvent(new MessageEvent('message', {
+            origin: window.location.origin,
+            data: { type: 'BLOCK_FIELD_CHANGE_RESULT', blockIndex: 0, field: 'image', ok: true },
+        }))
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+                expect.any(String),
+            )
+        })
     })
 })
 
@@ -215,6 +243,22 @@ describe('TC-F30-HMO-010: showImageButton=false hides Change Image button', () =
         )
         expect(screen.queryByText('Change Image')).toBeNull()
         expect(screen.getByText('Change Video')).toBeTruthy()
+    })
+})
+
+describe('TC-F30-HMO-013: builder preview mode hides overlay (GH-1461)', () => {
+    it('renders children without overlay wrapper when isBuilderPreview=true, even with isOwner+callback', () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        vi.mocked(useIsBuilderPreview).mockReturnValue(true)
+        const { container } = render(
+            <HeroMediaOverlay field="image.url">
+                <img data-testid="child" src="/img.jpg" alt="test" />
+            </HeroMediaOverlay>
+        )
+        expect(screen.getByTestId('child')).toBeTruthy()
+        expect(container.querySelector('[class*="group/media-overlay"]')).toBeNull()
+        expect(screen.queryByText('Change Image')).toBeNull()
     })
 })
 

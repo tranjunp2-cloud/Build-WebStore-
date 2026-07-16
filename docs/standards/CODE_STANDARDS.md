@@ -98,6 +98,13 @@ See `docs/TEST_CONVENTION.md` for full conventions. Summary:
 - Use `next/image` for images (auto-optimize)
 - Lazy load large components (`dynamic()` with `ssr: false` for heavy client-only)
 
+## CSS / Tailwind
+
+- `tailwind.config.js` has `corePlugins.preflight: false` — Tailwind's `@tailwind base` is disabled
+- **Critical:** Bare border utilities (`border`, `border-r`, `divide-y`, etc.) render invisible without `border-style: solid`. Use the arbitrary-property shorthand: `[border:1px_solid_hsl(var(--color))]` instead of splitting `border` + `border-color` classes
+- **Button icon sizing:** shadcn's `<Button>` base class includes `[&_svg]:size-4` (class+element selector beats bare instance classes by CSS specificity). Resize icons with `!h-3 !w-3` (Tailwind `!` modifier) instead of bare `h-3 w-3`.
+- See `src/app/globals.css` (`.dash-col-divider`, `.dash-tab-trigger`, `.dash-table` examples), `src/components/ui/button.tsx` (base styles + `dashSecondary` variant), and `src/app/(dashboard)/products/page.tsx` for patterns
+
 ## Comments
 
 - Default: no comments. Well-named identifiers > comments.

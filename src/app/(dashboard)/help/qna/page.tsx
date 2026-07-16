@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
     title: 'Q&A | Help Center',
-    description: 'Find answers to frequently asked questions about PrimeWeb CMS.',
+    description: 'Find answers to frequently asked questions about Web Store CMS.',
 };
 
 export default function QnAPage() {

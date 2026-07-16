@@ -304,4 +304,56 @@ describe('hydrateUrlUploadsToMedia', () => {
     ).length;
     expect(numericCount).toBe(50);
   });
+
+  it('TC-F38-RAW-22: logo-cloud logos[].logo {url,alt} → hydrated to numeric Media id', async () => {
+    // GH-1185: hydrateUrlUploadsToMedia must process logo-cloud spec
+    // even though planImageNeeds skips it. Uploaded logo URLs → Media IDs.
+    vi.stubGlobal('fetch', mockFetchOk());
+    const payload = fakePayload(async () => ({ id: 888 }));
+
+    const blocks: Record<string, unknown>[] = [
+      {
+        blockType: 'logo-cloud',
+        headline: 'Our Partners',
+        logos: [
+          { name: 'Brand A', logo: { url: 'https://images.unsplash.com/logo-a.jpg', alt: 'Brand A Logo' } },
+          { name: 'Brand B', logo: { url: 'https://images.unsplash.com/logo-b.jpg', alt: 'Brand B Logo' } },
+        ],
+      },
+    ];
+
+    const result = await hydrateUrlUploadsToMedia(blocks, payload, CTX);
+
+    // Both logos should be hydrated
+    expect(result.hydrated).toBe(2);
+    expect(result.failed).toBe(0);
+
+    // Verify logo objects are now numeric Media IDs
+    const logos = (blocks[0]!.logos as any[]);
+    expect(typeof logos[0]!.logo).toBe('number');
+    expect(typeof logos[1]!.logo).toBe('number');
+  });
+
+  it('TC-F38-RAW-22: empty {url:""} logo stripped by cleanupNonNumericImageFields', async () => {
+    // Empty logo URL objects should be removed during cleanup phase
+    const blocks: Record<string, unknown>[] = [
+      {
+        blockType: 'logo-cloud',
+        logos: [
+          { name: 'Brand A', logo: { url: '', alt: 'Empty' } },
+          { name: 'Brand B', logo: 999 },
+        ],
+      },
+    ];
+
+    // Import cleanup function
+    const { cleanupNonNumericImageFields } = await import('@/lib/ai/media-injector');
+
+    cleanupNonNumericImageFields(blocks);
+
+    // Empty logo object should be stripped, numeric stays
+    const logos = (blocks[0]!.logos as any[]);
+    expect(logos[0]!.logo).toBeUndefined();
+    expect(logos[1]!.logo).toBe(999);
+  });
 });

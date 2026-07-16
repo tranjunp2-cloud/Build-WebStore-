@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tests for F37 US-01 LocalBusiness JSON-LD extension (Phase 04/06)
- * TC-IDs: TC-F37-01-05 to TC-F37-01-09, TC-F37-01-12 (provisional — docs/qa/F37*.md not yet formalized)
+ * TC-IDs: TC-F37-01-05 to TC-F37-01-09, TC-F37-01-12, TC-F37-02-21 (provisional — docs/qa/F37*.md not yet formalized)
  */
 import { describe, it, expect } from 'vitest'
 import { generateLocalBusinessSchema, generatePageSchemas, serializeJsonLd } from '@/lib/seo/json-ld'
@@ -44,6 +44,61 @@ describe('[TC-F37-01-05] generateLocalBusinessSchema — full structured output 
         expect(schema.geo).toEqual({ '@type': 'GeoCoordinates', latitude: 3.1201, longitude: 101.6231 })
         expect(schema.priceRange).toBe('$$')
         expect(schema.areaServed).toBe('Petaling Jaya, Shah Alam')
+    })
+})
+
+// ── TC-F37-01-22: geo-cascade output (plain strings) still maps to PostalAddress (Phase 04) ─
+
+describe('[TC-F37-01-22] generateLocalBusinessSchema — geo-cascade string output stays compatible (AC-1)', () => {
+    it('city/state/postcode resolved via the DB-backed cascade are plain strings and map unchanged to addressLocality/addressRegion/postalCode', () => {
+        // Arrange — shape identical to what GeoCascadeFields' onChange patch produces:
+        // plain string names resolved from `/api/geo/districts` and `/api/geo/states`
+        // (cascade ids never leave the component — see geo-cascade-fields.tsx).
+        const siteFromCascade = {
+            name: 'Kedai Kopi ABC',
+            domain: 'kedaikopiabc.com',
+            localBusiness: {
+                streetAddress: 'No. 12, Jalan SS2/24',
+                city: 'Petaling Jaya',
+                state: 'Selangor',
+                postcode: '47300',
+                country: 'MY',
+            },
+        }
+
+        // Act
+        const schema = generateLocalBusinessSchema(null, siteFromCascade)!
+
+        // Assert — json-ld.ts's contract is untouched: it still just reads plain strings.
+        expect(schema.address).toEqual({
+            '@type': 'PostalAddress',
+            streetAddress: 'No. 12, Jalan SS2/24',
+            addressLocality: 'Petaling Jaya',
+            addressRegion: 'Selangor',
+            postalCode: '47300',
+            addressCountry: 'MY',
+        })
+        expect(typeof (schema.address as { addressLocality: unknown }).addressLocality).toBe('string')
+        expect(typeof (schema.address as { addressRegion: unknown }).addressRegion).toBe('string')
+        expect(typeof (schema.address as { postalCode: unknown }).postalCode).toBe('string')
+    })
+})
+
+// ── TC-F37-02-12: hasMap derived from coordinates (US-F37-02 Additional Criteria) ─
+
+describe('[TC-F37-02-12] generateLocalBusinessSchema — hasMap fallback (US-F37-02)', () => {
+    it('emits a Google Maps URL built from lat/lng when coordinates are present', () => {
+        const schema = generateLocalBusinessSchema(null, siteWithLocalBusiness)!
+        expect(schema.hasMap).toBe('https://www.google.com/maps?q=3.1201,101.6231')
+    })
+
+    it('omits hasMap when coordinates are absent', () => {
+        const siteWithoutCoords = {
+            name: 'Kedai Kopi ABC',
+            localBusiness: { streetAddress: 'No. 12, Jalan SS2/24' },
+        }
+        const schema = generateLocalBusinessSchema(null, siteWithoutCoords)!
+        expect(schema.hasMap).toBeUndefined()
     })
 })
 
@@ -131,6 +186,29 @@ describe('[TC-F37-01-12] dayOfWeekToSchema — exact Schema.org day string (AC-2
     it('returns null for an unrecognized day code (not a fabricated string)', () => {
         expect(dayOfWeekToSchema('XX')).toBeNull()
         expect(dayOfWeekToSchema(undefined)).toBeNull()
+    })
+})
+
+// ── TC-F37-02-21: split-shift openingHours produces N separate spec entries (US-F37-02) ─
+
+describe('[TC-F37-02-21] generateLocalBusinessSchema — split-shift openingHours (US-F37-02)', () => {
+    it('emits 2 separate openingHoursSpecification entries for a day with 2 time ranges (split-shift)', () => {
+        const siteWithSplitShift = {
+            name: 'Kedai Kopi ABC',
+            domain: 'kedaikopiabc.com',
+            localBusiness: {
+                ...siteWithLocalBusiness.localBusiness,
+                openingHours: [
+                    { dayOfWeek: 'Mo', opens: '07:00', closes: '11:00', isClosed: false },
+                    { dayOfWeek: 'Mo', opens: '13:00', closes: '18:00', isClosed: false },
+                ],
+            },
+        }
+        const schema = generateLocalBusinessSchema(null, siteWithSplitShift)!
+        const spec = schema.openingHoursSpecification as Array<{ dayOfWeek: string; opens: string; closes: string }>
+        expect(spec).toHaveLength(2)
+        expect(spec.every(s => s.dayOfWeek === 'Monday')).toBe(true)
+        expect(spec.map(s => `${s.opens}-${s.closes}`)).toEqual(['07:00-11:00', '13:00-18:00'])
     })
 })
 

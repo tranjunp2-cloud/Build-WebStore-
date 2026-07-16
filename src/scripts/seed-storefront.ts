@@ -1,5 +1,5 @@
 /**
- * Seed script for PrimeWeb Storefront testing.
+ * Seed script for Web Store Storefront testing.
  * Creates: 1 admin user, 1 tenant, 1 site, 5 products.
  *
  * Usage: npx tsx src/scripts/seed-storefront.ts
@@ -33,7 +33,7 @@ async function seed() {
                 email: ADMIN_EMAIL,
                 password: ADMIN_PASSWORD,
                 firstName: 'Admin',
-                lastName: 'PrimeWeb',
+                lastName: 'Web Store',
                 roles: ['super-admin'],
             },
         })

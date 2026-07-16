@@ -1,4 +1,10 @@
-import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeChangeHook } from 'payload'
+import type {
+    CollectionConfig,
+    CollectionAfterChangeHook,
+    CollectionBeforeChangeHook,
+    CollectionBeforeOperationHook,
+} from 'payload'
+import { APIError } from 'payload'
 import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
@@ -13,6 +19,72 @@ import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+/**
+ * Single source of truth for the `roles` select options — reused by the field
+ * definition below and by the invalid-filter guard so the two can never drift.
+ */
+const USER_ROLE_OPTIONS = [
+    { label: 'Super Admin', value: 'super-admin' },
+    { label: 'Tenant Owner', value: 'tenant-owner' },
+    { label: 'Editor', value: 'editor' },
+    { label: 'Viewer', value: 'viewer' },
+]
+const VALID_ROLE_VALUES = new Set(USER_ROLE_OPTIONS.map((o) => o.value))
+// Operators that compare `roles` against an enum value — only these may carry a role
+// string. `exists` (boolean) is allowed but carries no enum value. Any OTHER operator
+// (like/contains/greater_than/…) on an enum column makes Postgres throw 42883 → 500,
+// so we reject them up front. (GH #1535 — Bug 1)
+const ROLE_VALUE_OPS = new Set(['equals', 'not_equals', 'in', 'not_in', 'all'])
+
+/**
+ * beforeOperation guard: reject any query that filters `roles` by a value outside the
+ * select enum (e.g. ?where[roles][in][]=buyer) or by an operator the enum column can't
+ * handle. Such queries otherwise reach Postgres and crash with "invalid input value for
+ * enum" / 42883 → Payload swallows it into a generic 500. Short-circuit with a clean 400
+ * so a bad filter never crashes /api/users. Valid role filters pass through untouched.
+ * (GH #1535 — Bug 1)
+ */
+const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
+    const where = (args as { where?: unknown }).where
+    const invalidValues = new Set<string>()
+    const badOperators = new Set<string>()
+
+    const scan = (node: unknown): void => {
+        if (!node || typeof node !== 'object') return
+        for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+            if ((key === 'and' || key === 'or') && Array.isArray(value)) {
+                value.forEach(scan)
+            } else if (key === 'roles' && value && typeof value === 'object') {
+                for (const [op, opVal] of Object.entries(value as Record<string, unknown>)) {
+                    if (op === 'exists') continue // boolean semantics — carries no enum value
+                    if (!ROLE_VALUE_OPS.has(op)) {
+                        badOperators.add(op)
+                        continue
+                    }
+                    const vals = Array.isArray(opVal) ? opVal : [opVal]
+                    for (const v of vals) {
+                        // For a value-comparison op, anything not an exact enum string is invalid
+                        // (catches 'buyer'/'staff' and non-string values like numbers).
+                        if (typeof v !== 'string' || !VALID_ROLE_VALUES.has(v)) invalidValues.add(String(v))
+                    }
+                }
+            }
+        }
+    }
+    scan(where)
+
+    if (invalidValues.size > 0 || badOperators.size > 0) {
+        const parts: string[] = []
+        if (invalidValues.size > 0) parts.push(`invalid value(s): ${[...invalidValues].join(', ')}`)
+        if (badOperators.size > 0) parts.push(`unsupported operator(s): ${[...badOperators].join(', ')}`)
+        throw new APIError(
+            `Invalid roles filter — ${parts.join('; ')}. Valid roles: ${[...VALID_ROLE_VALUES].join(', ')}; operators: ${[...ROLE_VALUE_OPS].join(', ')}, exists.`,
+            400,
+        )
+    }
+    return args
+}
 
 /**
  * beforeChange hook: auto-set createdBy (on create) and updatedBy (on create/update) from req.user.
@@ -137,7 +209,7 @@ export const Users: CollectionConfig = {
                 return html
             },
             generateEmailSubject: () => {
-                return 'Reset your PrimeWeb password \uD83D\uDD10'
+                return 'Reset your Web Store password \uD83D\uDD10'
             },
         },
     },
@@ -146,6 +218,7 @@ export const Users: CollectionConfig = {
         description: 'Platform users — can be super-admins or tenant members.',
     },
     hooks: {
+        beforeOperation: [rejectInvalidRoleFilter],
         beforeChange: [setAuditFields],
         afterChange: [sendWelcomeEmailHook],
     },
@@ -1099,12 +1172,7 @@ export const Users: CollectionConfig = {
             hasMany: true,
             defaultValue: ['tenant-owner'],
             saveToJWT: true, // edge middleware checks role via decoded JWT (no DB call in edge runtime)
-            options: [
-                { label: 'Super Admin', value: 'super-admin' },
-                { label: 'Tenant Owner', value: 'tenant-owner' },
-                { label: 'Editor', value: 'editor' },
-                { label: 'Viewer', value: 'viewer' },
-            ],
+            options: USER_ROLE_OPTIONS,
             access: {
                 update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
             },

@@ -136,8 +136,9 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
    "Tài khoản EasyParcel không đủ số dư."  [ Nạp tiền ngay ↗ ]  [ Thử lại ]
    → order KHÔNG đổi trạng thái
 
-🚫 COD East MY: nút "Ready to Ship" DISABLED ngay từ đầu + note:
-   "EasyParcel chỉ hỗ trợ COD tại khu vực West MY."
+🚫 COD_NOT_ELIGIBLE (per PD-021 R1–R5, live từ quotation — KHÔNG hardcode vùng):
+   alert + note "Courier không hỗ trợ COD cho đơn này (theo hạn mức/tuyến hiện tại)"
+   → panel recovery: Ship manually (self-delivery)
 ```
 
 **Thiếu dữ liệu parcel (weight/dims) — INLINE input, KHÔNG modal (Option A):** đơn chuẩn (product đủ số đo) vẫn **1-click**. Khi product thiếu số đo → bấm Ready to Ship sẽ **chặn lại + xổ box nhập ngay dưới nút** (tái dùng component Weight/Dimensions cũ):
@@ -157,7 +158,7 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
 
 **Dual-field:** `order.status` (lifecycle, merchant bấm tay — vd "Đánh dấu hoàn tất") **tách biệt** `shippingTrackingStatus` (13 status EasyParcel, cron poll). Delivered → KHÔNG auto-complete; merchant tự bấm.
 
-**Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** `[ Hoàn Tiền ]` + `[ Huỷ Đơn ]` có sẵn (`/refund` + `/cancel`, tự restock, idempotent); refund phân tier theo trạng thái label (chưa mua → full; chưa pickup → hủy trên dashboard EasyParcel; đã pickup → cước mất). **Reverse label cắt khỏi MVP.**
+**Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** `[ Hoàn Tiền ]` + `[ Huỷ Đơn ]` có sẵn (`/refund` + `/cancel`, tự restock, idempotent); cancel phân tier theo trạng thái label (chưa mua → full; pre-pickup → Primeweb hủy vận đơn EP trước rồi mới local cancel; picked-up trở đi → block Cancel, dùng Refund/Return, cước mất). **Reverse label cắt khỏi MVP.**
 
 **Non-EP tenant:** hiển thị ô nhập `trackingNumber` **thủ công ngay trên panel chính** (không có nút Ready to Ship EasyParcel, KHÔNG gộp vào modal/tab).
 
@@ -170,7 +171,8 @@ Actor: Merchant — tiền đề: order paid + confirmed, tenant EasyParcel ON
    System   → check product weight/dims:
               ├─ đủ    → chạy luôn (bước 2)
               └─ thiếu → xổ inline input weight/L×W×H → điền → [Tiếp tục tạo nhãn]
-   (COD + buyer East MY → nút DISABLED từ đầu + note "COD chỉ West MY")
+   (COD không đủ điều kiện R1–R5 tại thời điểm tạo nhãn → server trả COD_NOT_ELIGIBLE
+    → hiện panel recovery Ship manually; per PD-021, KHÔNG chặn tĩnh theo vùng)
 
 2. System   → POST /api/orders/[id]/create-label (2 bước, inline spinner):
    ① EPSubmitOrderBulk → "Đang giữ chỗ…"  (chưa trừ ví)
@@ -207,10 +209,10 @@ Actor: Merchant — KHÔNG có RMA UI mới, reuse nút có sẵn
 1. Buyer/Merchant → yêu cầu trả/hủy
 2. Merchant → bấm [Huỷ Đơn] hoặc [Hoàn Tiền] trên drawer (nút có sẵn)
    System   → /cancel hoặc /refund (idempotent, tự restock)
-3. System   → refund phân tier theo trạng thái label:
-   ├─ chưa mua label     → refund FULL (hàng + ship) + restock
-   ├─ đã mua, chưa pickup → refund tiền hàng; cước: hủy trên dashboard EasyParcel hoàn ví
-   └─ đã pickup          → refund tiền hàng; ⚠️ cước mất (ghi rõ)
+3. System   → cancel/refund phân tier theo trạng thái label:
+   ├─ chưa mua label     → refund FULL (hàng + ship) + restock + discount release/email
+   ├─ đã mua, chưa pickup → refresh tracking → EP cancel shipment → local cancel/refund/restock/email
+   └─ đã pickup          → block Cancel; dùng Refund/Return sau khi hàng quay về; ⚠️ cước mất
    (Reverse label: KHÔNG hỗ trợ ở MVP)
 ```
 

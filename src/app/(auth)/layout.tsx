@@ -46,12 +46,12 @@ export default async function AuthLayout({
                         />
 
                         <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[448px] flex flex-col items-start flex-1" style={{ gap: 28 }}>
-                            {/* Logo — Figma: 48×48 rounded-2xl with glow + "PrimeWeb" Inter Bold 24 */}
+                            {/* Logo — Figma: 48×48 rounded-2xl with glow + "Web Store" Inter Bold 24 */}
                             <div className="flex justify-center w-full">
                                 <Link href="/" className="group inline-flex items-center gap-3" style={{ textDecoration: 'none' }}>
                                     <Image
                                         src="/icons/auth/logo-primeweb.png"
-                                        alt="PrimeWeb Logo"
+                                        alt="Web Store Logo"
                                         width={48}
                                         height={48}
                                         className="transition-transform group-hover:scale-105"
@@ -61,7 +61,7 @@ export default async function AuthLayout({
                                         priority
                                     />
                                     <span style={{ color: 'var(--auth-text)', fontFamily: 'Inter, sans-serif', fontSize: 24, fontWeight: 700, lineHeight: '32px', textDecoration: 'none' }}>
-                                        Prime<span style={{ color: '#00B6CD' }}>Web</span>
+                                        Web <span style={{ color: '#00B6CD' }}>Store</span>
                                     </span>
                                 </Link>
                             </div>
@@ -80,7 +80,7 @@ export default async function AuthLayout({
 
                             {/* Footer — Figma: Inter 400 12px, #94A3B8, center */}
                             <p className="w-full m-0 text-center text-xs" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.33', color: 'var(--auth-footer-color)' }}>
-                                © 2026 PrimeWeb. AI-powered website builder for Malaysian SMEs.
+                                © 2026 Web Store. AI-powered website builder for Malaysian SMEs.
                             </p>
                         </div>
 

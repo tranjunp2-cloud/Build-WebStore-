@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import React from 'react';
 
 vi.mock('@/app/(dashboard)/settings/domains/actions', () => ({
@@ -356,5 +356,175 @@ describe('F19 Domain Management (DomainsClient)', () => {
                 expect.stringContaining('Domain connected!'),
             );
         });
+    });
+});
+
+// F23 #1459 — subdomain slug input: width + Vietnamese IME composition.
+// See docs/qa/F23-custom-subdomain-slug.md TC-F23-053..055.
+describe('F23 subdomain slug input (#1459)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        // Guard the debounced availability check (fires when slug !== current).
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ available: true }),
+        })) as unknown as typeof fetch);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    // Enter "Change subdomain" edit mode and return the slug input element.
+    function enterEditMode(): HTMLInputElement {
+        render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
+        fireEvent.click(screen.getByRole('button', { name: /Change subdomain/i }));
+        return screen.getByRole('textbox') as HTMLInputElement;
+    }
+
+    it('[TC-F23-053] keeps IME buffer while composing, sanitizes on compositionEnd', () => {
+        const input = enterEditMode();
+
+        // While composing (Vietnamese Telex), the raw buffer — incl. diacritics —
+        // must NOT be mutated mid-composition, otherwise chars get dropped.
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopđ' } });
+        expect(input.value).toBe('shopđ');
+
+        // On compositionEnd, filter to [a-z0-9-]: 'đ' is stripped, 'shop' preserved.
+        fireEvent.compositionEnd(input, { target: { value: 'shopđ' } });
+        expect(input.value).toBe('shop');
+    });
+
+    it('[TC-F23-054] EN keyboard onChange still lowercases and strips invalid chars', () => {
+        const input = enterEditMode();
+
+        // No composition in progress → sanitize synchronously as before.
+        fireEvent.change(input, { target: { value: 'My-Shop!@#' } });
+        expect(input.value).toBe('my-shop');
+    });
+
+    it('[TC-F23-055] input container is no longer hard-capped at 280px', () => {
+        const input = enterEditMode();
+        const container = input.parentElement as HTMLElement;
+
+        expect(container.className).not.toContain('max-w-[280px]');
+        expect(container.className).toContain('sm:max-w-[520px]');
+        // Input itself stays fluid so long slugs remain visible.
+        expect(input.className).toContain('flex-1');
+        expect(input.className).toContain('min-w-0');
+    });
+
+    it('[TC-F23-056] edit row wraps so validation message is not clipped on mobile (#1583)', async () => {
+        const input = enterEditMode();
+        const inputGroup = input.parentElement as HTMLElement;
+        const row = inputGroup.parentElement as HTMLElement;
+
+        // Row must wrap: input is w-full on mobile, so the status/message
+        // block drops below it instead of overflowing the viewport.
+        // Both halves of the pair are load-bearing — pin them together.
+        expect(row.className).toContain('flex-wrap');
+        expect(inputGroup.className).toContain('w-full');
+        // Idle renders no status div — an empty one would wrap into a phantom row.
+        expect(row.children).toHaveLength(1);
+
+        // <3 chars → invalid after the 400ms debounce (no fetch involved).
+        // timeout 2000: real 400ms debounce + CI scheduling jitter headroom.
+        fireEvent.change(input, { target: { value: 'ab' } });
+        const msg = await waitFor(() => screen.getByText('At least 3 characters'), { timeout: 2000 });
+
+        expect(msg.className).toContain('break-words');
+        const statusDiv = msg.parentElement as HTMLElement;
+        expect(statusDiv.className).toContain('min-w-0');
+        expect(statusDiv.className).not.toContain('ml-2');
+    });
+
+    it('[TC-F23-057] reverting to the current slug clears the stale validation message (#1583)', async () => {
+        const input = enterEditMode();
+
+        fireEvent.change(input, { target: { value: 'ab' } });
+        await waitFor(() => screen.getByText('At least 3 characters'), { timeout: 2000 });
+
+        // Back to the untouched slug: the debounce effect's early-return branch
+        // must reset status to idle instead of leaving the old error hanging.
+        fireEvent.change(input, { target: { value: 'mywebstore' } });
+        await waitFor(
+            () => expect(screen.queryByText('At least 3 characters')).not.toBeInTheDocument(),
+            { timeout: 2000 }
+        );
+    });
+
+    it('[TC-F23-058] stale in-flight check response is discarded after reverting input (#1583)', async () => {
+        let resolveFetch!: (v: unknown) => void;
+        const deferredFetch = vi.fn(() => new Promise((res) => { resolveFetch = res; }));
+        vi.stubGlobal('fetch', deferredFetch as unknown as typeof fetch);
+
+        const input = enterEditMode();
+        fireEvent.change(input, { target: { value: 'shop-race' } });
+        await waitFor(() => expect(deferredFetch).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+        // Revert to the current slug while the response is still in flight.
+        fireEvent.change(input, { target: { value: 'mywebstore' } });
+
+        // Late response lands — the seq guard must drop it instead of painting
+        // a verdict next to the untouched current slug (the #1583 race variant).
+        resolveFetch({ ok: false, status: 500, json: async () => ({ available: false }) });
+        await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+        expect(screen.queryByText('Already taken')).not.toBeInTheDocument();
+    });
+
+    it('[TC-F23-059] typing again after an available verdict disables Save immediately', async () => {
+        const input = enterEditMode(); // beforeEach stub resolves { available: true }
+        const save = screen.getByRole('button', { name: /^save$/i });
+
+        fireEvent.change(input, { target: { value: 'shop-a' } });
+        await waitFor(() => expect(save).not.toBeDisabled(), { timeout: 2000 });
+
+        // One more keystroke: the old 'available' no longer describes the input,
+        // so Save must drop back to disabled without waiting for the next debounce.
+        fireEvent.change(input, { target: { value: 'shop-ab' } });
+        expect(save).toBeDisabled();
+    });
+
+    it('[TC-F23-060] mid-composition pause never fires the check; it runs after compositionEnd', async () => {
+        const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ available: true }) }));
+        vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+        const input = enterEditMode();
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopd' } });
+
+        // Pause well past the 400ms debounce while still composing — no request may fire
+        // (the raw IME buffer is not a slug candidate).
+        await act(async () => { await new Promise((r) => setTimeout(r, 550)); });
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        // Committing the composition must still trigger the check, even though the
+        // sanitized buffer ('shopd') equals the pre-commit input state.
+        fireEvent.compositionEnd(input, { target: { value: 'shopd' } });
+        await waitFor(
+            () => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('slug=shopd')),
+            { timeout: 2000 }
+        );
+    });
+
+    it('[TC-F23-061] Cancel mid-composition does not wedge the checker on the next edit session', async () => {
+        const input = enterEditMode(); // beforeEach stub resolves { available: true }
+
+        // Cancel while composing: the input unmounts before compositionend can fire,
+        // so nothing on the (dead) element ever clears the composing flag.
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: 'shopcomposing' } });
+        fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+        // Re-enter edit mode — the flag must have been reset, or the debounce
+        // effect skips every check and Save can never enable again.
+        fireEvent.click(screen.getByRole('button', { name: /Change subdomain/i }));
+        const input2 = screen.getByRole('textbox') as HTMLInputElement;
+        fireEvent.change(input2, { target: { value: 'shop-fresh' } });
+
+        const save = screen.getByRole('button', { name: /^save$/i });
+        await waitFor(() => expect(save).not.toBeDisabled(), { timeout: 2000 });
     });
 });

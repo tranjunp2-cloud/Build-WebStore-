@@ -90,7 +90,7 @@ export default buildConfig({
   email: process.env.MAIL_HOST
     ? nodemailerAdapter({
         defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
-        defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+        defaultFromName: process.env.MAIL_FROM_NAME || 'Web Store',
         transportOptions: {
           host: process.env.MAIL_HOST,
           port: parseInt(process.env.MAIL_PORT || '587'),
@@ -103,7 +103,7 @@ export default buildConfig({
       })
     : nodemailerAdapter({
         defaultFromAddress: 'noreply@primeweb.app',
-        defaultFromName: 'PrimeWeb',
+        defaultFromName: 'Web Store',
         // No SMTP configured — use stream transport (logs to console, no crash)
         transportOptions: {
           streamTransport: true,

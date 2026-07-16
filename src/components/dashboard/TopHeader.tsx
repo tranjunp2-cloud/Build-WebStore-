@@ -60,16 +60,16 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                         <AppSwitcher />
                     </div>
 
-                    {/* Logo (icon + PrimeWeb wordmark) */}
+                    {/* Logo (icon + Web Store wordmark) */}
                     <Link href="/dashboard" className="flex items-center gap-2 no-underline outline-none">
                         <img
                             src="/images/logo-icon-3c4d76.png"
-                            alt="PrimeWeb Logo"
+                            alt="Web Store Logo"
                             className="w-[28px] h-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                         />
                         <div className="hidden lg:flex items-center text-[16px] font-bold leading-none tracking-tight">
-                            <span className="text-dash-text">Prime</span>
-                            <span className="text-[#06B6D4]">Web</span>
+                            <span className="text-dash-text">Web </span>
+                            <span className="text-[#06B6D4]">Store</span>
                         </div>
                     </Link>
                 </div>
@@ -79,12 +79,12 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                 {collapsed && (
                     <Link
                         href="/dashboard"
-                        aria-label="PrimeWeb dashboard"
+                        aria-label="Web Store dashboard"
                         className="hidden lg:flex items-center justify-center no-underline outline-none lg:mx-auto"
                     >
                         <img
                             src="/images/logo-icon-3c4d76.png"
-                            alt="PrimeWeb Logo"
+                            alt="Web Store Logo"
                             className="w-[28px] h-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                         />
                     </Link>

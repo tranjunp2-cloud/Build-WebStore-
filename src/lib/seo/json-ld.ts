@@ -208,9 +208,13 @@ export function generateLocalBusinessSchema(
 
     // geo — GeoCoordinates only when both lat+lng are present, finite numbers.
     const { latitude: lat, longitude: lng } = localBusiness || {}
-    const geo = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)
-        ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng }
-        : undefined
+    const hasValidCoords = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)
+    const geo = hasValidCoords ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng } : undefined
+
+    // hasMap (US-F37-02 Additional Criteria): GBP/Waze URL take priority once
+    // those connections exist (US-F37-05/US-F37-09); until then, fall back to
+    // a plain Google Maps link derived from the coordinates the seller already entered.
+    const hasMap = hasValidCoords ? `https://www.google.com/maps?q=${lat},${lng}` : undefined
 
     // openingHoursSpecification — drop closed days and incomplete rows (AC-2).
     const openingHoursSpecification = (localBusiness?.openingHours || [])
@@ -231,6 +235,7 @@ export function generateLocalBusinessSchema(
         ...(email && { email }),
         ...(sameAs.length > 0 && { sameAs }),
         ...(geo && { geo }),
+        ...(hasMap && { hasMap }),
         ...(openingHoursSpecification.length > 0 && { openingHoursSpecification }),
         ...(priceRange && { priceRange }),
         ...(areaServed && { areaServed }),

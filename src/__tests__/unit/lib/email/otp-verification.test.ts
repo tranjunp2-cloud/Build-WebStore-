@@ -27,7 +27,7 @@ describe('otpVerificationEmail — EN locale (TC-F02.21, TC-F02.23)', () => {
 
     it('subject contains EN verification text (TC-F02.21)', () => {
         const result = otpVerificationEmail({ ...base, locale: 'en' })
-        expect(result.subject).toBe('Your PrimeWeb verification code 🔐')
+        expect(result.subject).toBe('Your Web Store verification code 🔐')
     })
 
     it('includes userName in greeting (TC-F02.21)', () => {
@@ -62,7 +62,7 @@ describe('otpVerificationEmail — EN locale (TC-F02.21, TC-F02.23)', () => {
 
     it('includes EN footer text', () => {
         const result = otpVerificationEmail({ ...base, locale: 'en' })
-        expect(result.html).toContain('Powered by PrimeWeb')
+        expect(result.html).toContain('Powered by Web Store')
     })
 })
 
@@ -76,7 +76,7 @@ describe('otpVerificationEmail — MS locale (TC-F02.21, TC-F02.23)', () => {
 
     it('subject is Bahasa Melayu version (TC-F02.21)', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.subject).toBe('Kod pengesahan PrimeWeb anda 🔐')
+        expect(result.subject).toBe('Kod pengesahan Web Store anda 🔐')
     })
 
     it('includes MS heading "Pengesahan E-mel"', () => {
@@ -111,12 +111,12 @@ describe('otpVerificationEmail — MS locale (TC-F02.21, TC-F02.23)', () => {
 
     it('includes MS footer text', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.html).toContain('Dikuasakan oleh PrimeWeb')
+        expect(result.html).toContain('Dikuasakan oleh Web Store')
     })
 
     it('includes MS copyright with year', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.html).toContain('PrimeWeb')
+        expect(result.html).toContain('Web Store')
         expect(result.html).toContain('Kuala Lumpur')
     })
 
@@ -227,7 +227,7 @@ describe('otpVerificationEmail — locale fallback behavior (TC-F02.21)', () => 
         // Type assertion needed since EmailLocale is a union type
         const result = otpVerificationEmail({ userName: 'User', otpCode: '123456', locale: 'fr' as 'en' })
         // Should use EN content as fallback
-        expect(result.subject).toBe('Your PrimeWeb verification code 🔐')
+        expect(result.subject).toBe('Your Web Store verification code 🔐')
     })
 })
 
@@ -240,14 +240,14 @@ describe('otpVerificationEmail — copyright year', () => {
         // EN locale uses copyright from en.json (static string), not new Date()
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '123456', locale: 'en' })
         expect(result.html).toMatch(/\d{4}/)
-        expect(result.html).toContain('PrimeWeb')
+        expect(result.html).toContain('Web Store')
         expect(result.html).toContain('Kuala Lumpur')
     })
 
     it('MS locale copyright includes a 4-digit year', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '123456', locale: 'ms' })
         expect(result.html).toMatch(/\d{4}/)
-        expect(result.html).toContain('PrimeWeb')
+        expect(result.html).toContain('Web Store')
     })
 
     it('fallback copyright uses new Date().getFullYear() when locale has no otp key', () => {

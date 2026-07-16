@@ -344,27 +344,59 @@ export function DomainsClient({
     const [showSlugConfirm, setShowSlugConfirm] = useState(false);
     const [savingSlug, setSavingSlug] = useState(false);
     const slugDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // F23 #1459: track IME composition so we don't sanitize mid-composition (drops Vietnamese chars)
+    const isComposingRef = useRef(false);
+    // GH-1583 review: state mirror của isComposingRef cho effect debounce (ref không làm effect
+    // chạy lại) — đổi state ở compositionEnd đảm bảo effect re-run kể cả khi buffer sau sanitize
+    // không đổi giá trị (vd 'shopd'), không thì check cuối bị nuốt.
+    const [isComposingSlug, setIsComposingSlug] = useState(false);
+    // GH-1583 review: seq tăng mỗi lần input/mode đổi; response fetch về muộn mang seq cũ bị bỏ —
+    // chặn check đang bay đè status của input đã gõ khác / đã revert / đã Cancel.
+    const slugCheckSeqRef = useRef(0);
+    const sanitizeSlug = (v: string) => v.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63);
 
-    const checkSlugAvailability = useCallback(async (slug: string) => {
+    const checkSlugAvailability = useCallback(async (slug: string, seq: number) => {
         if (slug === currentSlug) { setSlugStatus('idle'); return; }
         if (slug.length < 3) { setSlugStatus('invalid'); setSlugMessage(t?.Domains?.slugMinChars || 'At least 3 characters'); return; }
         setSlugStatus('checking');
         try {
             const res = await fetch(`/api/slug/check?slug=${encodeURIComponent(slug)}`);
             const data = await res.json();
+            // Seq cũ = input đã đổi trong lúc chờ response → kết quả này mô tả slug khác, bỏ.
+            if (seq !== slugCheckSeqRef.current) return;
             if (res.ok && data.available) { setSlugStatus('available'); setSlugMessage(''); }
             else if (res.status === 422) { setSlugStatus('invalid'); setSlugMessage(data.message || 'Invalid format'); }
             else if (res.status === 409) { setSlugStatus('unavailable'); setSlugMessage(t?.Domains?.slugReserved || 'Reserved'); }
             else { setSlugStatus('unavailable'); setSlugMessage(t?.Domains?.slugTaken || 'Already taken'); }
-        } catch { setSlugStatus('invalid'); setSlugMessage(t?.Domains?.slugCheckFailed || 'Check failed'); }
-    }, [currentSlug]);
+        } catch {
+            if (seq !== slugCheckSeqRef.current) return;
+            setSlugStatus('invalid'); setSlugMessage(t?.Domains?.slugCheckFailed || 'Check failed');
+        }
+    }, [currentSlug, t]);
 
     useEffect(() => {
-        if (!isEditingSlug || slugInput === currentSlug) return;
+        // Mọi thay đổi input/mode vô hiệu hóa check đang bay (seq guard trong checkSlugAvailability).
+        slugCheckSeqRef.current += 1;
+        if (!isEditingSlug) return;
+        // Buffer IME chưa chốt không phải slug candidate — không check, không reset;
+        // isComposingSlug là state nên compositionEnd chắc chắn kéo effect chạy lại.
+        if (isComposingSlug) return;
+        if (slugInput === currentSlug) {
+            // GH-1583: gõ về đúng slug hiện tại thì reset về idle — nhánh này không
+            // schedule checkSlugAvailability nên message lỗi cũ sẽ treo nếu không reset.
+            setSlugStatus('idle');
+            setSlugMessage('');
+            return;
+        }
+        // Verdict cũ hết hiệu lực NGAY khi gõ tiếp — không reset thì Save vẫn sáng ~400ms
+        // với status 'available' của slug trước đó trong lúc chờ debounce.
+        setSlugStatus('idle');
+        setSlugMessage('');
         if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current);
-        slugDebounceRef.current = setTimeout(() => checkSlugAvailability(slugInput), 400);
+        const seq = slugCheckSeqRef.current;
+        slugDebounceRef.current = setTimeout(() => checkSlugAvailability(slugInput, seq), 400);
         return () => { if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current); };
-    }, [slugInput, isEditingSlug, checkSlugAvailability, currentSlug]);
+    }, [slugInput, isEditingSlug, isComposingSlug, checkSlugAvailability, currentSlug]);
 
     const handleSaveSlug = async () => {
         setSavingSlug(true);
@@ -603,33 +635,50 @@ export function DomainsClient({
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-0">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    {/* GH-1583: flex-wrap để cụm status/message rớt xuống dưới input trên mobile
+                                        (input w-full chiếm trọn hàng) thay vì tràn khỏi viewport; desktop không đổi
+                                        vì input max-w-[520px], gap-x-2 giữ đúng 8px như ml-2 cũ. */}
                                     {/* Input-group: viền + focus-ring nằm ở khung bao ngoài (focus-within)
                                         nên cả cụm input + hậu tố .domain sáng viền liền mạch khi focus.
                                         Input bên trong để trong suốt (cùng pattern ô tiền "RM" form discount). */}
                                     <div
-                                        className="flex h-9 w-full max-w-[280px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
+                                        className="flex h-9 w-full sm:max-w-[520px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
                                         style={{ background: 'var(--dash-surface)' }}
                                     >
                                         <input
                                             type="text"
                                             value={slugInput}
-                                            onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                // While IME is composing, keep the raw buffer so Vietnamese
+                                                // (Telex/VNI) chars aren't dropped; sanitize on compositionEnd.
+                                                setSlugInput(isComposingRef.current ? raw : sanitizeSlug(raw));
+                                            }}
+                                            onCompositionStart={() => { isComposingRef.current = true; setIsComposingSlug(true); }}
+                                            onCompositionEnd={(e) => {
+                                                isComposingRef.current = false;
+                                                setIsComposingSlug(false);
+                                                setSlugInput(sanitizeSlug(e.currentTarget.value));
+                                            }}
                                             className="h-full min-w-0 flex-1 border-0 bg-transparent pl-3 pr-1 text-[13px] font-mono outline-none"
                                             style={{ color: 'var(--dash-text)' }}
                                             autoFocus
                                         />
-                                        <span className="flex h-full items-center pr-3 text-[13px] text-slate-500 whitespace-nowrap">
+                                        <span className="flex h-full items-center pr-3 text-[13px] text-slate-500 whitespace-nowrap shrink-0">
                                             .{PLATFORM_DOMAIN}
                                         </span>
                                     </div>
-                                    <div className="ml-2">
-                                        {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
-                                        {slugStatus === 'available' && <Check className="h-4 w-4 text-[hsl(var(--success))]" />}
-                                        {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
-                                            <span className="text-[12px] text-[hsl(var(--destructive))]">{slugMessage}</span>
-                                        )}
-                                    </div>
+                                    {/* Idle không render — div rỗng sẽ wrap thành dòng thừa (gap-y) trên mobile. */}
+                                    {slugStatus !== 'idle' && (
+                                        <div className="min-w-0">
+                                            {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
+                                            {slugStatus === 'available' && <Check className="h-4 w-4 text-[hsl(var(--success))]" />}
+                                            {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
+                                                <span className="text-[12px] text-[hsl(var(--destructive))] break-words">{slugMessage}</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {/* "Connected" status badge — theme-aware via Badge success variant */}
@@ -641,7 +690,12 @@ export function DomainsClient({
                             {!isEditingSlug ? (
                                 <Button
                                     type="button"
-                                    onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                                    onClick={() => {
+                                        setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle');
+                                        // Cancel giữa IME composition unmount input trước khi compositionend kịp bắn
+                                        // → flag kẹt true và effect debounce bỏ qua mọi check ở session sau. Reset ở đây.
+                                        setIsComposingSlug(false); isComposingRef.current = false;
+                                    }}
                                     variant="dashSecondary"
                                     size="dash"
                                     className="w-full sm:w-auto justify-center"

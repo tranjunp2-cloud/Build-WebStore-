@@ -13,7 +13,6 @@ import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemp
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { discountReserveErrorResponse } from '@/lib/discounts/messages'
 import { computeOrderTotal, effectiveSubtotalSen } from '@/lib/orders/order-total'
-import { getShippingRate } from '@/lib/shipping'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
@@ -23,6 +22,9 @@ import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-u
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { getRates } from '@/lib/shipping/get-rates'
+import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -244,9 +246,45 @@ export async function POST(request: NextRequest) {
             }
         }
         const discountRM = discountSen / 100
+        // EP-aware shipping rate — supersedes staging's flat-rate calc (#962): getRates
+        // quotes EasyParcel when the tenant is connected and falls back to the same flat
+        // rate otherwise. Free-ship gates on the POST-discount subtotal (F33 phase-07).
+        // tenant is already fetched above as `tenant` / `tenantTyped`.
+        const epIntegration = (tenant as any)?.easyParcelIntegration ?? {}
+        let epToken: string | null = null
+        const defaultWarehouse = getDefaultWarehouse(epIntegration)
+        const warehouseState = defaultWarehouse.state ?? ''
+        if (epIntegration.enabled && isEpReady(epIntegration)) {
+            try {
+                epToken = await getValidToken(epIntegration, (tenant as any).id, payload)
+            } catch {
+                // token expired or not connected — silent fallback to flat rate
+            }
+        }
+
+        // Aggregate parcel weight; default 500g per item when product.weight is unset
+        const totalWeightGrams = orderItems.reduce((acc: number, item: any) => acc + ((item.weightGrams || 500) * item.quantity), 0)
+
         const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
-        const shippingFeeSen = getShippingRate(customer.address?.state, (site as any).shippingConfig, effSubtotalSen)
-        const shippingFee = shippingFeeSen / 100
+        const rateResult = await getRates(
+            {
+                weightGrams: totalWeightGrams,
+                destPostcode: customer.address?.postcode ?? '',
+                destState: customer.address?.state ?? '',
+                senderPostcode: defaultWarehouse.postcode ?? '47500',
+                senderState: warehouseState,
+                subtotalSen: effSubtotalSen,
+                codAmountSen: undefined,  // Stripe = no COD
+            },
+            epToken,
+            (site as any)?.shippingConfig ?? {},
+            customer.address?.state,
+        )
+        const bestRate = rateResult.rates[0]
+        const shippingFee = bestRate.priceSen / 100
+
+        // Shared gateway-agnostic total (F33) — identical formula as COD/QR so all gateways charge the same.
+        const shippingFeeSen = bestRate.priceSen
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
@@ -279,6 +317,10 @@ export async function POST(request: NextRequest) {
                         discountCode: discountRow.code,
                         discountAmount: discountSen,
                     } : {}),
+                    // EP shipping fields — only written when a real EP courier is selected
+                    ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
+                    ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                    parcelWeight: totalWeightGrams,
                 } as Record<string, unknown>,
             })
 
@@ -376,6 +418,10 @@ export async function POST(request: NextRequest) {
                     discountCode: discountRow.code,
                     discountAmount: discountSen,
                 } : {}),
+                // EP shipping fields — only written when a real EP courier is selected
+                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
+                ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                parcelWeight: totalWeightGrams,
             } as Record<string, unknown>,
         })
 

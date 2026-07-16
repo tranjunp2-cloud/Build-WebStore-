@@ -85,4 +85,5 @@ export interface SeoData {
     missingSeoItems: MissingSeoItem[]
     siteId: string | number | null
     autoMetaEnabled: boolean
+    aiCrawlersEnabled: boolean
 }

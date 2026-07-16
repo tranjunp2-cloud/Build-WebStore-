@@ -16,6 +16,7 @@ import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/produ
 interface VariantPayload {
     name: string
     price: number
+    compareAtPrice?: number
     sku: string
     stock: number
 }
@@ -189,16 +190,24 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             width: Number(prod.width) || 0,
             height: Number(prod.height) || 0
         },
-        variants: hasVariants ? safeVariants!.map(v => ({
-            name: sanitizeXSS(v.name || defaultVariantName),
-            price: Number(v.price || prod.price) || 0,
-            stock: coerceFiniteNumber(v.stock),
-            sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
-        })) : undefined,
+        variants: hasVariants ? safeVariants!.map(v => {
+            const variantPrice = Number(v.price || prod.price) || 0
+            // Fall back to the product-level compareAtPrice when the AI omits a per-variant
+            // one (the bulk-parse prompt only asks the AI for compareAtPrice at product level
+            // in some responses) — otherwise variants silently lose the "was" price entirely.
+            const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
+            return {
+                name: sanitizeXSS(v.name || defaultVariantName),
+                price: variantPrice,
+                compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+                stock: coerceFiniteNumber(v.stock),
+                sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
+            }
+        }) : undefined,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
         // (Products.ts beforeChange hook overrides whatever is sent) — computed here too so the
         // payload is internally consistent with what the review drawer displayed (Stock there
-        // edits every variant uniformly; base "inventory" = sum, matching VariantsInventorySection's
+        // edits every variant uniformly; base "inventory" = sum, matching VariantOptionsSection's
         // `setValue('baseInventory', total)` convention in the manual Add/Edit Product form).
         inventory: hasVariants ? safeVariants!.reduce((sum, v) => sum + coerceFiniteNumber(v.stock), 0) : coerceFiniteNumber(prod.stock),
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
@@ -239,7 +248,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             })
 
             const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'parseError')
+            if (!res.ok) throw new Error(JSON.stringify(data))
 
             if (data.products && Array.isArray(data.products)) {
                 const initProducts = data.products.map((p: ParsedProduct) => {
@@ -289,10 +298,30 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             }
         } catch (error) {
             const errBase = error as Error
+            // Non-ok fetch responses throw JSON.stringify(data) (see the isSkuConflictError /
+            // SKU-retry convention above) so 429's resetAt survives the throw — parse once here,
+            // falling back to the raw message as the code when it isn't JSON (e.g. a network error).
+            let parsed: { error?: string; resetAt?: number } | null = null
+            try {
+                parsed = JSON.parse(errBase.message)
+            } catch {
+                parsed = null
+            }
+            const code = parsed?.error ?? errBase.message
+
             let errMsg = t.dashboard?.products?.bulkCreate?.parseError || 'Failed to parse products summary'
-            if (errBase.message === 'aiQuotaExceeded') errMsg = t.dashboard?.products?.bulkCreate?.aiQuotaExceeded || 'AI system overloaded'
-            else if (errBase.message === 'aiTimeout') errMsg = t.dashboard?.products?.bulkCreate?.aiTimeout || 'AI timeout'
-            
+            if (code === 'rateLimitExceeded') {
+                // resetAt comes from an untrusted-in-principle JSON response — guard the same way
+                // coerceFiniteNumber already guards untrusted AI numeric output above, so a
+                // malformed/non-numeric resetAt degrades to "1 min" instead of showing "NaN min".
+                const resetAt = coerceFiniteNumber(parsed?.resetAt, Date.now())
+                const minutes = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000))
+                const tmpl = t.dashboard?.products?.bulkCreate?.rateLimitExceeded
+                    || "You've used all your AI generation attempts this hour. Try again in {minutes} min."
+                errMsg = tmpl.replace('{minutes}', String(minutes))
+            } else if (code === 'aiQuotaExceeded') errMsg = t.dashboard?.products?.bulkCreate?.aiQuotaExceeded || 'AI system overloaded'
+            else if (code === 'aiTimeout') errMsg = t.dashboard?.products?.bulkCreate?.aiTimeout || 'AI timeout'
+
             toast.error(errMsg)
         } finally {
             setIsParsing(false)
@@ -446,14 +475,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         // itself), silently falling back to Tailwind's flat bg-black/60 (0.6) in both themes.
         <div className="dash-shell">
         <div
-            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 backdrop-blur-sm antialiased"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
         >
             {/* Design-system tokens (not the design mockup's raw hex) — bg/border/text/focus all
                 resolve to the same --card/--border/--muted-foreground/--ring vars used by the
                 shared <Input> and every other dashboard form (ProductForm, discount-form). */}
-            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-t-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] border-b-0 overflow-hidden">
-                {/* Header — drawer style: title + subtitle (left), close button (right) */}
+            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] overflow-hidden">
+                {/* Header — title + subtitle (left), close button (right) */}
                 <div className="flex items-start justify-between gap-3 p-[18px_22px_14px] border-b border-solid border-[hsl(var(--border))]/30">
                     <div className="flex flex-col gap-[3px]">
                         <div className="flex items-center gap-[9px]">
@@ -480,7 +509,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     </button>
                 </div>
 
-                {/* Body — drawer-style scrollable draft list */}
+                {/* Body — scrollable draft list */}
                 <div className="flex-1 overflow-y-auto px-[24px] pt-[18px] pb-6 flex flex-col">
                     {isParsing ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -574,7 +603,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     )}
                 </div>
 
-                {/* Footer — drawer style: draft count (left), Discard/Approve All (right) */}
+                {/* Footer — draft count (left), Discard/Approve All (right) */}
                 <div className="flex w-full items-center justify-between gap-3 p-[18px_24px_18px] border-t border-solid border-[hsl(var(--border))]/30">
                     <span className="text-[13px] text-[hsl(var(--muted-foreground))]">
                         {draftCount === 1

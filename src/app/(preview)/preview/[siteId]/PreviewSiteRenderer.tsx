@@ -162,7 +162,13 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             isBuilderPreview={isBuilderPreview}
             isEditorIframe={isEditorIframe}
             isOwner={true}
-            onBlockFieldChange={handleBlockFieldChange}
+            // GH-1461: BLOCK_FIELD_CHANGED is only ever listened to by the real editor's
+            // PreviewFrame.tsx — everywhere else (builder preview AND the standalone
+            // preview opened from the editor toolbar, which has no parent frame at all)
+            // nothing reads this postMessage, but a non-null callback still made
+            // media-upload-overlay render its "Change Image" hover UI on those
+            // review-only surfaces. Wire it only for the real editor iframe.
+            onBlockFieldChange={isEditorIframe && !isBuilderPreview ? handleBlockFieldChange : undefined}
         />
     )
 }

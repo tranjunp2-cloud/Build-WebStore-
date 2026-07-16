@@ -2,7 +2,6 @@
 
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { RotateCcw, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useI18n, type Translations } from '@/i18n'
@@ -10,8 +9,8 @@ import { profilePatchSchema } from '@/lib/profile/schemas'
 import type { PlatformUser } from '@/types/user'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 import { PhoneInput } from './phone-input'
+import { ProfileSaveBar } from './profile-save-bar'
 import { SsoGuardBox } from './sso-guard-box'
 
 type FormValues = z.infer<typeof profilePatchSchema>
@@ -22,9 +21,6 @@ type Props = {
     ssoUrl: string
     onUserUpdate: (partial: Partial<PlatformUser>) => void
 }
-
-// Geometry only — colors/border/focus from shared <Input> primitive
-const inputCls = 'h-[48px] rounded-[8px] px-3 text-[14px] shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
 
 export function GeneralInfoTab({ user, role, ssoUrl, onUserUpdate }: Props) {
     const { t } = useI18n()
@@ -92,10 +88,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.firstName}
                     </Label>
-                    <Input
-                        {...register('firstName')}
-                        className={inputCls}
-                    />
+                    <Input {...register('firstName')} />
                     {formState.errors.firstName && (
                         <p className="text-xs text-destructive">{formState.errors.firstName.message}</p>
                     )}
@@ -104,10 +97,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.lastName}
                     </Label>
-                    <Input
-                        {...register('lastName')}
-                        className={inputCls}
-                    />
+                    <Input {...register('lastName')} />
                 </div>
             </div>
 
@@ -121,7 +111,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                         type="email"
                         value={user.email}
                         readOnly
-                        className="h-[48px] rounded-[8px] px-3 text-[14px] bg-[hsl(var(--secondary))] cursor-not-allowed shadow-[0px_1px_1px_rgba(0,0,0,0.1)]"
+                        className="bg-[hsl(var(--secondary))] cursor-not-allowed"
                     />
                     <p className="text-[10px] italic text-[hsl(var(--muted-foreground))] tracking-[1px]">
                         {t.profile.general.emailReadonly}
@@ -141,33 +131,14 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                 </div>
             </div>
 
-            {/* Action bar — only visible when dirty */}
+            {/* Floating save bar — only visible when dirty (same template as edit-discount) */}
             {formState.isDirty && (
-                <div className="flex items-center justify-end gap-3 h-[72px] bg-[hsl(var(--background)/0.5)] rounded-[12px] px-6 mt-2">
-                    <Button
-                        type="button"
-                        onClick={() => reset()}
-                        disabled={formState.isSubmitting}
-                        variant="dashSecondary"
-                        className="h-[48px] rounded-[10px] px-[10px] font-medium"
-                    >
-                        <RotateCcw className="h-4 w-4" />
-                        {t.profile.general.cancel}
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={formState.isSubmitting}
-                        variant="dashPrimary"
-                        className="h-[48px] min-w-[150px] rounded-[10px] px-[10px] font-medium"
-                    >
-                        {formState.isSubmitting ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        ) : (
-                            <Check className="h-4 w-4" />
-                        )}
-                        {formState.isSubmitting ? t.profile.general.saving : t.profile.general.save}
-                    </Button>
-                </div>
+                <ProfileSaveBar
+                    saving={formState.isSubmitting}
+                    saveLabel={t.profile.general.save}
+                    savingLabel={t.profile.general.saving}
+                    onCancel={() => reset()}
+                />
             )}
         </form>
     )

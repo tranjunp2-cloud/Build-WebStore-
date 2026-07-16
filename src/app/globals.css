@@ -60,7 +60,8 @@
   --dash-error: #FB2C36;
   --dash-warning: #B45309;
   --dash-overlay: rgba(0, 0, 0, 0.35);
-  --save-bar-bg: rgba(248, 250, 252, 0.92);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(25, 32, 56, 0.10);
 
   /* Editor semantic tokens — light mode */
   --editor-bg: #F1F5F9;
@@ -88,7 +89,8 @@
   --dash-divider: #232E3D;
   --dash-warning: #F5B945;
   --dash-overlay: rgba(0, 0, 0, 0.5);
-  --save-bar-bg: rgba(15, 23, 42, 0.88);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(0, 0, 0, 0.60);
 
   /* Editor semantic tokens — dark mode */
   --editor-bg: #0B1120;
@@ -217,12 +219,16 @@
                                   wide table fits without horizontal scroll)
    Column ratios stay per-page via each table's <colgroup>; element sizes that aren't
    text (thumbnails, action buttons) are tuned per-page. Higher specificity (class +
-   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px]. */
+   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px].
+   `:not([aria-hidden])` excludes decorative status dots (Badge's `dot` prop,
+   AiReviewIndicator's pulse dot) — those are tiny fixed-size spans with no text; the
+   8px cell padding this rule adds below xl was stretching them into ellipse/pill
+   shapes since padding eats into their `w-1.5` (6px) box under border-box sizing. */
 .dash-table-compact th { font-size: 10px; }
-.dash-table-compact td, .dash-table-compact td span { font-size: 12px; }
+.dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 12px; }
 @media (max-width: 1279.98px) {
   .dash-table-compact th { font-size: 8px; padding-left: 8px; padding-right: 8px; }
-  .dash-table-compact td, .dash-table-compact td span { font-size: 10px; padding-left: 8px; padding-right: 8px; }
+  .dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 10px; padding-left: 8px; padding-right: 8px; }
 }
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
@@ -321,6 +327,23 @@ html:not(.dark) {
   color: var(--dash-text);
 }
 
+/* --dash-content-pl: mép TRÁI của CỘT NỘI DUNG (sidebar + gutter trang md:p-8 = 2rem),
+   dùng cho các save bar `fixed ... lg:left-[var(--dash-content-pl)]` (settings/discounts/
+   customers/products). Trước đây var này set inline = 250px (mép sidebar, không cộng gutter,
+   không theo sidebar responsive 246/250) → bar nhô ~28-32px so với card nội dung (GH-1592).
+   Width sidebar phải khớp Sidebar.tsx (`w-[246px] 2xl:w-[250px]`, mini `w-[64px]`).
+   Scope vào `.dash-shell-root` (marker chỉ có trên layout root — CMSLayoutClient, nơi toggle
+   `.dash-sidebar-mini`), KHÔNG dùng `.dash-shell` trần: nhiều modal/popover tự gắn `dash-shell`
+   để ăn theme, nếu match sẽ re-declare var này mà không có gate mini → consumer lồng bên trong
+   đọc sai offset khi sidebar thu gọn; var định nghĩa ở root tự inherit xuống toàn cây. */
+@media (min-width: 1024px) {
+  .dash-shell-root { --dash-content-pl: calc(246px + 2rem); }
+  .dash-shell-root.dash-sidebar-mini { --dash-content-pl: calc(64px + 2rem); }
+}
+@media (min-width: 1536px) {
+  .dash-shell-root:not(.dash-sidebar-mini) { --dash-content-pl: calc(250px + 2rem); }
+}
+
 .dash-shell .bg-zinc-950,
 .dash-shell .bg-\[\#0B1120\],
 .dash-shell .bg-\[\#0f1729\],
@@ -379,6 +402,11 @@ html:not(.dark) {
 .dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
 /* AI Fix All Issues gradient btn — light=white, dark=black */
 .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #fff !important; }
+/* GH-1578: checkbox ticks on bg-[hsl(var(--primary))] / bg-[#10B981] bypass this remap via
+   inline style={{ color: '#fff' }} instead of an exception here — those bg values are dynamic
+   CSS-var/arbitrary classes that don't lend themselves to a static selector exception. See
+   StaffDrawer.tsx and AIFixModal.tsx. If you add a new text-white element on a colored/checked
+   background, it WILL get remapped unless you either add an exception above or use inline style. */
 .dark .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #0F172A !important; }
 /* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
 html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
@@ -749,6 +777,17 @@ html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0
 .editor-shell .bg-blue-500 .text-white,
 .editor-shell .bg-blue-600 .text-white { color: #fff !important; }
 
+/* solid teal primary accent giữ chữ trắng cả 2 theme (nút Next/Done coach marks) —
+   bg-[hsl(var(--primary))] là teal đặc cố định, không bị remap theo theme (GH-1584) */
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\].text-white,
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\] .text-white { color: #fff !important; }
+
+/* dark scrim overlays (bg-black/NN) keep white text/icons both themes — hover
+   preview overlay (TemplateCard), upload-progress overlay (BlockImageEditor) —
+   these always sit on a dark backdrop regardless of theme. */
+.editor-shell [class*="bg-black/"].text-white,
+.editor-shell [class*="bg-black/"] .text-white { color: #fff !important; }
+
 /* text-white opacity variants */
 .editor-shell .text-white\/80,
 .editor-shell .text-white\/70,
@@ -956,6 +995,8 @@ html:not(.dark) .editor-shell textarea::placeholder {
 .editor-portal [class*="from-"] .text-white,
 .editor-portal [class*="bg-gradient"].text-white,
 .editor-portal [class*="bg-gradient"] .text-white { color: #fff !important; }
+.editor-portal [class*="bg-black/"].text-white,
+.editor-portal [class*="bg-black/"] .text-white { color: #fff !important; }
 .editor-portal .text-white\/80,
 .editor-portal .text-white\/70 { color: var(--editor-text); }
 .editor-portal .text-white\/50,
@@ -1100,6 +1141,13 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
        browsers then fall back to the UA default `border-style: inset` (beveled:
        top/left darker than bottom/right). Force solid so borders render evenly. */
     border-style: solid;
+  }
+
+  /* Radix <Select> item hover/highlight (ui/select.tsx SelectItem) — written as plain CSS
+     instead of a Tailwind data-[highlighted]: class because the class doesn't reliably
+     paint on this portaled content (same issue as the SelectContent bg-popover fix). */
+  .select-item[data-highlighted] {
+    background-color: hsl(var(--muted));
   }
 
   textarea {

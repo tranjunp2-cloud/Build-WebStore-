@@ -51,10 +51,11 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
             <Select value={code} onValueChange={handleCodeChange} disabled={disabled}>
                 <SelectTrigger
                     aria-label="Country code"
-                    className="h-[48px] w-auto flex-shrink-0 rounded-[8px] gap-1.5 px-2 shadow-[0px_1px_1px_rgba(0,0,0,0.1)]"
+                    className="w-auto flex-shrink-0 gap-1.5"
                 >
-                    <span className="text-xl leading-none select-none">{selected.flag}</span>
-                    <SelectValue />
+                    <span className="text-base leading-none select-none">{selected.flag}</span>
+                    {/* Explicit children — default SelectValue mirrors SelectItem content, which already includes the flag (GH-1604) */}
+                    <SelectValue>{selected.code} {selected.label}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                     {COUNTRY_CODES.map(c => (
@@ -74,7 +75,7 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
                 disabled={disabled}
                 placeholder="123456789"
                 aria-label="Phone number"
-                className="h-[48px] rounded-[8px] text-[14px] flex-1 px-3 shadow-[0px_1px_1px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1"
             />
         </div>
     )

@@ -28,55 +28,13 @@ import { getPayload, type Payload } from 'payload'
 import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
 import { seedTenantProducts, seedTenantExtraPages } from './qc-seed-products'
-
-// Role values MUST match `src/collections/Users.ts` field `roles` options.
-// Values: super-admin | tenant-owner | editor | viewer.
-type UserRole = 'super-admin' | 'tenant-owner' | 'editor' | 'viewer'
-
-// Membership role MUST match Users.tenants[].role field values.
-// Values: owner | admin | editor | viewer | custom.
-type TenantRole = 'owner' | 'admin' | 'editor' | 'viewer'
-
-// Tenant status MUST match `src/collections/Tenants.ts` field `status`.
-type TenantStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'suspended'
-
-interface UserSpec {
-  email: string
-  firstName: string
-  lastName: string
-  roles: UserRole[]
-}
-
-interface TenantSpec {
-  name: string
-  slug: string
-  status: TenantStatus
-  ownerEmail: string
-  membershipRole: TenantRole
-}
-
-const USERS: UserSpec[] = [
-  { email: 'qc-admin-1@primeweb.local', firstName: 'QC', lastName: 'Admin1', roles: ['super-admin'] },
-  { email: 'qc-admin-2@primeweb.local', firstName: 'QC', lastName: 'Admin2', roles: ['super-admin'] },
-  { email: 'qc-owner-1@primeweb.local', firstName: 'QC', lastName: 'Owner1', roles: ['tenant-owner'] },
-  { email: 'qc-owner-2@primeweb.local', firstName: 'QC', lastName: 'Owner2', roles: ['tenant-owner'] },
-  { email: 'qc-owner-3@primeweb.local', firstName: 'QC', lastName: 'Owner3', roles: ['tenant-owner'] },
-  { email: 'qc-owner-4@primeweb.local', firstName: 'QC', lastName: 'Owner4', roles: ['tenant-owner'] },
-  { email: 'qc-owner-5@primeweb.local', firstName: 'QC', lastName: 'Owner5', roles: ['tenant-owner'] },
-  // "Staff" concept mapped to `editor` — closest existing role. There is
-  // no `tenant-staff` role in the current schema.
-  { email: 'qc-staff-1@primeweb.local', firstName: 'QC', lastName: 'Editor1', roles: ['editor'] },
-  { email: 'qc-staff-2@primeweb.local', firstName: 'QC', lastName: 'Editor2', roles: ['editor'] },
-  { email: 'qc-staff-3@primeweb.local', firstName: 'QC', lastName: 'Viewer1', roles: ['viewer'] },
-]
-
-const TENANTS: TenantSpec[] = [
-  { name: 'QC Tenant 1', slug: 'qc-shop-1', status: 'active', ownerEmail: 'qc-owner-1@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 2', slug: 'qc-shop-2', status: 'active', ownerEmail: 'qc-owner-2@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 3', slug: 'qc-shop-3', status: 'trialing', ownerEmail: 'qc-owner-3@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 4', slug: 'qc-shop-4', status: 'past_due', ownerEmail: 'qc-owner-4@primeweb.local', membershipRole: 'owner' },
-  { name: 'QC Tenant 5', slug: 'qc-shop-5', status: 'suspended', ownerEmail: 'qc-owner-5@primeweb.local', membershipRole: 'owner' },
-]
+import {
+  buildTenants,
+  buildUsers,
+  readMerchantCount,
+  type TenantSpec,
+  type UserSpec,
+} from './qc-fixtures'
 
 type IdMap = Record<string, string | number>
 
@@ -90,18 +48,28 @@ function readSeedPassword(): string {
   return pw
 }
 
-async function seedUsers(payload: Payload, password: string): Promise<IdMap> {
+async function seedUsers(payload: Payload, users: UserSpec[], password: string): Promise<IdMap> {
+  // Batch lookup ALL emails in a single query — sequential per-email
+  // pre-checks (300+ round-trips) exceeds Neon Free tier's idle timeout
+  // and drops the connection mid-loop. One `in` query keeps us alive.
+  const emails = users.map((u) => u.email)
+  const existingResult = await payload.find({
+    collection: 'users',
+    where: { email: { in: emails } },
+    limit: emails.length,
+    overrideAccess: true,
+  })
+  const existingByEmail = new Map<string, string | number>()
+  for (const doc of existingResult.docs) {
+    existingByEmail.set(doc.email as string, doc.id)
+  }
+  console.log(`  ~ ${existingByEmail.size}/${users.length} users already exist, creating ${users.length - existingByEmail.size} new`)
+
   const idsByEmail: IdMap = {}
-  for (const spec of USERS) {
-    const existing = await payload.find({
-      collection: 'users',
-      where: { email: { equals: spec.email } },
-      limit: 1,
-      overrideAccess: true,
-    })
-    if (existing.docs.length) {
-      idsByEmail[spec.email] = existing.docs[0].id
-      console.log(`  ~ user exists: ${spec.email}`)
+  for (const spec of users) {
+    const existingId = existingByEmail.get(spec.email)
+    if (existingId !== undefined) {
+      idsByEmail[spec.email] = existingId
       continue
     }
     const created = await payload.create({
@@ -121,18 +89,27 @@ async function seedUsers(payload: Payload, password: string): Promise<IdMap> {
   return idsByEmail
 }
 
-async function seedTenants(payload: Payload): Promise<IdMap> {
+async function seedTenants(payload: Payload, tenants: TenantSpec[]): Promise<IdMap> {
+  // Batch pre-check via single `in` query — avoids Neon idle timeout
+  // when scaling past ~150 tenants (same fix as seedUsers).
+  const names = tenants.map((t) => t.name)
+  const existingResult = await payload.find({
+    collection: 'tenants',
+    where: { name: { in: names } },
+    limit: names.length,
+    overrideAccess: true,
+  })
+  const existingByName = new Map<string, string | number>()
+  for (const doc of existingResult.docs) {
+    existingByName.set(doc.name as string, doc.id)
+  }
+  console.log(`  ~ ${existingByName.size}/${tenants.length} tenants already exist, creating ${tenants.length - existingByName.size} new`)
+
   const tenantIdsByName: IdMap = {}
-  for (const spec of TENANTS) {
-    const existing = await payload.find({
-      collection: 'tenants',
-      where: { name: { equals: spec.name } },
-      limit: 1,
-      overrideAccess: true,
-    })
-    if (existing.docs.length) {
-      tenantIdsByName[spec.name] = existing.docs[0].id
-      console.log(`  ~ tenant exists: ${spec.name}`)
+  for (const spec of tenants) {
+    const existingId = existingByName.get(spec.name)
+    if (existingId !== undefined) {
+      tenantIdsByName[spec.name] = existingId
       continue
     }
     const created = await payload.create({
@@ -152,31 +129,45 @@ async function seedTenants(payload: Payload): Promise<IdMap> {
 
 async function linkOwnerships(
   payload: Payload,
+  tenants: TenantSpec[],
   userIds: IdMap,
   tenantIds: IdMap,
 ): Promise<void> {
-  for (const spec of TENANTS) {
+  // Batch load all owner users once — avoids N sequential findByID
+  // round-trips that trigger Neon idle timeout at scale.
+  const ownerIds = tenants
+    .map((t) => userIds[t.ownerEmail])
+    .filter((id): id is string | number => id !== undefined)
+  const usersResult = await payload.find({
+    collection: 'users',
+    where: { id: { in: ownerIds } },
+    limit: ownerIds.length,
+    overrideAccess: true,
+  })
+  const userById = new Map<string | number, typeof usersResult.docs[0]>()
+  for (const doc of usersResult.docs) userById.set(doc.id, doc)
+
+  let linked = 0
+  let existing = 0
+  for (const spec of tenants) {
     const userId = userIds[spec.ownerEmail]
     const tenantId = tenantIds[spec.name]
     if (!userId || !tenantId) {
       console.warn(`  ! skip link ${spec.ownerEmail} → ${spec.name} (missing id)`)
       continue
     }
-    const user = await payload.findByID({
-      collection: 'users',
-      id: userId,
-      overrideAccess: true,
-    })
+    const user = userById.get(userId)
+    if (!user) {
+      console.warn(`  ! skip link ${spec.ownerEmail} (user not loaded)`)
+      continue
+    }
     const memberships = Array.isArray(user.tenants) ? user.tenants : []
     const alreadyLinked = memberships.some((m) => {
       const tRef = m?.tenant
       const tId = typeof tRef === 'object' && tRef ? (tRef as { id: string | number }).id : tRef
       return tId === tenantId
     })
-    if (alreadyLinked) {
-      console.log(`  ~ link exists: ${spec.ownerEmail} → ${spec.name}`)
-      continue
-    }
+    if (alreadyLinked) { existing++; continue }
     await payload.update({
       collection: 'users',
       id: userId,
@@ -188,8 +179,57 @@ async function linkOwnerships(
       },
       overrideAccess: true,
     })
-    console.log(`  + linked ${spec.ownerEmail} → ${spec.name} as ${spec.membershipRole}`)
+    linked++
   }
+  console.log(`  ~ ${existing} links already exist, +${linked} new links created`)
+}
+
+async function seedPlanSubscriptions(
+  payload: Payload,
+  tenants: TenantSpec[],
+  tenantIds: IdMap,
+): Promise<number> {
+  // Batch load all existing subs — same anti-idle-timeout pattern.
+  const allTenantIds = tenants.map((t) => tenantIds[t.name]).filter((x): x is string | number => !!x)
+  const existingResult = await payload.find({
+    collection: 'plan-subscriptions',
+    where: { tenant: { in: allTenantIds } },
+    limit: allTenantIds.length,
+    overrideAccess: true,
+  })
+  const existingTenantIds = new Set<string | number>()
+  for (const doc of existingResult.docs) {
+    const tRef = (doc as { tenant?: unknown }).tenant
+    const tId = typeof tRef === 'object' && tRef ? (tRef as { id: string | number }).id : tRef as string | number
+    existingTenantIds.add(tId)
+  }
+  let created = 0
+  const now = new Date()
+  const oneYearLater = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+  for (const spec of tenants) {
+    const tid = tenantIds[spec.name]
+    if (!tid) continue
+    if (existingTenantIds.has(tid)) continue
+    // packCode = first segment of plan value (STARTER / STANDARD /
+    // PROFESSIONAL). Mirrors what SSO webhook sends in the real flow so
+    // enforcement-layer lookups behave the same way against seeded data.
+    const packCode = spec.plan.split('_')[0]
+    await payload.create({
+      collection: 'plan-subscriptions',
+      data: {
+        tenant: tid as number,
+        name: 'main',
+        plan: spec.plan,
+        status: 'active',
+        startsAt: now.toISOString(),
+        endsAt: oneYearLater.toISOString(),
+        packCode,
+      },
+      overrideAccess: true,
+    })
+    created++
+  }
+  return created
 }
 
 async function seedTenantContent(
@@ -234,30 +274,58 @@ async function seedTenantContent(
 async function main(): Promise<void> {
   assertQcEnv()
   const password = readSeedPassword()
+  const merchantCount = readMerchantCount()
+  const users = buildUsers(merchantCount)
+  const tenants = buildTenants(merchantCount)
+
   const t0 = Date.now()
   const payload = await getPayload({ config })
 
-  console.log('🌱 Seeding QC test data...')
+  console.log(`🌱 Seeding QC test data (merchants=${merchantCount})...`)
   console.log('  Users:')
-  const userIds = await seedUsers(payload, password)
+  const userIds = await seedUsers(payload, users, password)
   console.log('  Tenants:')
-  const tenantIds = await seedTenants(payload)
+  const tenantIds = await seedTenants(payload, tenants)
   console.log('  Owner ↔ tenant memberships:')
-  await linkOwnerships(payload, userIds, tenantIds)
-  console.log('  Per-tenant content:')
+  await linkOwnerships(payload, tenants, userIds, tenantIds)
+  console.log('  Plan subscriptions (active):')
+  const subscriptionsCreated = await seedPlanSubscriptions(payload, tenants, tenantIds)
+  console.log(`    + ${subscriptionsCreated} active subscriptions created`)
+  // Content phase — batch-parallel to speed up 300-tenant runs. Sequential
+  // baseline was ~0.5 tenants/min (12 write ops/tenant × Neon latency).
+  // Concurrency=8 keeps well under Neon Free tier pool (~25 conn) and cuts
+  // 300-tenant runs from ~6h to ~45min. Per-tenant ops still sequential
+  // inside seedTenantContent — parallelism is BETWEEN tenants.
+  const rawConcurrency = Number(process.env.QC_SEED_CONCURRENCY ?? 1)
+  const contentConcurrency = Number.isFinite(rawConcurrency) && rawConcurrency >= 1
+    ? Math.min(Math.floor(rawConcurrency), 20)
+    : 1
+  console.log(`  Per-tenant content (concurrency=${contentConcurrency}):`)
   let totalProducts = 0
   let totalExtraPages = 0
-  for (const spec of TENANTS) {
-    const tid = tenantIds[spec.name]
-    if (!tid) continue
-    const { productsCreated, extraPagesCreated } = await seedTenantContent(payload, tid, spec.name)
-    totalProducts += productsCreated
-    totalExtraPages += extraPagesCreated
+  for (let batchStart = 0; batchStart < tenants.length; batchStart += contentConcurrency) {
+    const batch = tenants.slice(batchStart, batchStart + contentConcurrency)
+    const batchResults = await Promise.all(
+      batch.map((spec) => {
+        const tid = tenantIds[spec.name]
+        if (!tid) return Promise.resolve({ productsCreated: 0, extraPagesCreated: 0 })
+        return seedTenantContent(payload, tid, spec.name)
+      }),
+    )
+    for (const r of batchResults) {
+      totalProducts += r.productsCreated
+      totalExtraPages += r.extraPagesCreated
+    }
+    const done = batchStart + batch.length
+    if (done % 20 === 0 || done === tenants.length) {
+      const elapsedSec = ((Date.now() - t0) / 1000).toFixed(0)
+      console.log(`    [progress] ${done}/${tenants.length} tenants (${elapsedSec}s elapsed)`)
+    }
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
   console.log(
-    `✅ Seed done in ${elapsed}s. Summary: ${Object.keys(userIds).length} users, ${Object.keys(tenantIds).length} tenants, ${totalProducts} products, ${totalExtraPages} extra pages.`,
+    `✅ Seed done in ${elapsed}s. Summary: ${Object.keys(userIds).length} users, ${Object.keys(tenantIds).length} tenants, ${subscriptionsCreated} subscriptions, ${totalProducts} products, ${totalExtraPages} extra pages.`,
   )
   console.log('   Password sourced from QC_SEED_PASSWORD. Order seed deferred — schema complexity.')
   process.exit(0)

@@ -8,7 +8,7 @@ import {
     ArrowLeft, Save, Sparkles, Loader2, FileText,
     ImageIcon, Eye, EyeOff, ChevronDown, X,
     Settings2, User, Calendar, Globe, Link2, List, ListOrdered, Upload, Quote,
-    Tag, Wand2, Check, Briefcase, Smile, Target, RefreshCw
+    Tag, Wand2, Check, Briefcase, Smile, Target, RefreshCw, Lock
 } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarUI } from "@/components/ui/calendar"
@@ -663,9 +663,19 @@ export default function BlogEditorPage() {
                                 onChange={(e) => updateField('slug', formatSlugInput(e.target.value))}
                                 onBlur={(e) => updateField('slug', slugify(e.target.value))}
                                 placeholder="ksd-vdf"
+                                // GH-1538 follow-up: lock slug once the post is live — changing the
+                                // URL of an already-published (SEO-indexed) post breaks existing
+                                // links/rankings. Drafts (isNew, or not-yet-published) stay editable.
+                                disabled={!isNew && form.status === 'published'}
                                 className="flex-1 h-9"
                             />
                         </div>
+                        {!isNew && form.status === 'published' && (
+                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Lock className="h-3 w-3 shrink-0" />
+                                {t.dashboard.blog.editor.slugLockedHint}
+                            </p>
+                        )}
                         {error === 'slug_invalid' && (
                             <p className="text-xs text-destructive">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
                         )}
@@ -919,7 +929,10 @@ export default function BlogEditorPage() {
 
             {/* AI Generator Modal */}
             {showAIGenerator && typeof document !== 'undefined' && createPortal(
-                <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
+                <div
+                    className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center backdrop-blur-[3px] xl:p-4 animate-in fade-in duration-200"
+                    style={{ backgroundColor: 'var(--dash-overlay)' }}
+                >
                     <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[hsl(var(--secondary))] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[hsl(var(--border))] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
                         {/* Mobile drag handle */}
                         <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">

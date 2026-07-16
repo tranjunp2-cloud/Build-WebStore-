@@ -145,14 +145,16 @@ THEN  KHÔNG có `aggregateRating` trong LocalBusiness type (policy Google 2025�
 
 ### Additional Criteria
 
-- [ ] `generateLocalBusinessSchema()` là pure function, không async, < 5ms (NFR)
-- [ ] `hasMap` chứa GBP URL (nếu connected) và/hoặc Waze URL
-- [ ] Address ưu tiên `localBusiness.streetAddress`; fallback `contactInfo.address` nếu trống (BR-02)
+- [x] `generateLocalBusinessSchema()` là pure function, không async (verified: no async/await, no I/O in function body)
+- [x] `hasMap` — implemented as Google Maps URL fallback từ `localBusiness` lat/lng (`https://www.google.com/maps?q={lat},{lng}`), omit khi thiếu toạ độ. Nâng cấp lên GBP URL/Waze URL khi US-F37-05/US-F37-09 hoàn thành (chưa build, không đổi scope US-02).
+- [x] Address ưu tiên `localBusiness.streetAddress`; fallback `contactInfo.address` nếu trống (BR-02)
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
 - [ ] Output validated bằng Google Rich Results Test
+
+> **Update 2026-07-10 (issue #1310):** AC-1, AC-2, BR-02 và `hasMap` fallback đã code + test xong (`local-business-json-ld.test.ts`, TC-F37-02-12). Còn lại 2 mục Definition of Done cần review/QA thủ công (không tự-certify được từ code): 9-Point Checklist và chạy Google Rich Results Test thật trên 1 site có đủ local business data.
 
 ---
 

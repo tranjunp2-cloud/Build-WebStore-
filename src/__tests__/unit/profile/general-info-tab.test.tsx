@@ -22,6 +22,9 @@ const mockI18nValue = {
                 networkError: 'Network error',
                 invalidPhone: 'Invalid phone number',
             },
+            saveBar: {
+                unsavedChanges: 'Unsaved changes',
+            },
             sso: {
                 generalTitle: 'Information managed by SSO',
                 generalNotice: 'Personal information is synced from SSO.',
@@ -84,7 +87,8 @@ describe('GeneralInfoTab', () => {
         expect(screen.getByText('Information managed by SSO')).toBeInTheDocument()
     })
 
-    // TC-F23-02-01: Staff role renders editable inputs; action bar only shows when dirty
+    // TC-F23-02-01: Staff role renders editable inputs; save bar (with unsaved
+    // indicator) only shows when dirty
     it('renders enabled inputs for staff and shows Save only when dirty', () => {
         // Arrange
         render(
@@ -100,13 +104,15 @@ describe('GeneralInfoTab', () => {
         const firstNameInput = screen.getByDisplayValue('John') as HTMLInputElement
         expect(firstNameInput.disabled).toBe(false)
         expect(screen.queryByText('Save')).not.toBeInTheDocument()
+        expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
 
         // Trigger dirty state
         fireEvent.change(firstNameInput, { target: { value: 'Jane' } })
 
-        // Assert — action bar appears
+        // Assert — floating save bar appears with unsaved indicator
         expect(screen.getByText('Save')).toBeInTheDocument()
         expect(screen.getByText('Cancel')).toBeInTheDocument()
+        expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
     })
 
     // TC-F23-02-02: Email field is always readonly

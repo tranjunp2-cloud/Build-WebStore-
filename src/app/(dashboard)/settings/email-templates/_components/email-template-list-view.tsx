@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent, TabsCount } from '@/components/ui/tabs'
 import { EmailTemplateCardList } from './email-template-card-list'
 
 export const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
@@ -111,16 +111,12 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                         <TabsTrigger value="buyer" variant="underline">
                             <User className="h-4 w-4" />
                             {et.buyerEmails}
-                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                {allBuyer.length}
-                            </span>
+                            <TabsCount>{allBuyer.length}</TabsCount>
                         </TabsTrigger>
                         <TabsTrigger value="seller" variant="underline">
                             <Store className="h-4 w-4" />
                             {et.sellerEmails}
-                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                {allSeller.length}
-                            </span>
+                            <TabsCount>{allSeller.length}</TabsCount>
                         </TabsTrigger>
                     </TabsList>
                     {/* On phones the absolute count overlaps the tabs — show it

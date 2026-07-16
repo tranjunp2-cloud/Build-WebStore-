@@ -41,6 +41,7 @@ export async function getSeoData(): Promise<SeoData> {
     let contentQualityScore = 100
     let technicalSeoScore = 100
     let autoMetaEnabled = true
+    let aiCrawlersEnabled = true
     let siteId: string | number | null = null
     const missingSeoItems: MissingSeoItem[] = []
     let missingTitleCount = 0
@@ -57,6 +58,7 @@ export async function getSeoData(): Promise<SeoData> {
             if (site) {
                 siteId = site.id
                 autoMetaEnabled = site.seo?.autoMetaEnabled !== false
+                aiCrawlersEnabled = site.aiCrawlersEnabled !== false
 
                 const pageDbRows = await (payload.db.drizzle.execute(sql`
                     SELECT id, title, slug, seo_title, seo_description, seo_no_index
@@ -182,5 +184,6 @@ export async function getSeoData(): Promise<SeoData> {
         missingSeoItems,
         siteId,
         autoMetaEnabled,
+        aiCrawlersEnabled,
     }
 }

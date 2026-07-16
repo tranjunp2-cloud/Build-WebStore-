@@ -346,6 +346,105 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 
 ---
 
+### 3.16 EasyParcel Allowlist + Auto-Cheapest (F36, GH-1333 Phase 06)
+
+**[DEPRECATED 2026-07-01]** Merchant courier selection via allowlist (`selectedCouriers[]`) has been REMOVED. Checkout now auto-picks the cheapest courier that serves the route (no user selection). TC-F14.124–F14.144 below are OBSOLETE. See GH-1333 (F36) for new auto-cheapest behavior.
+
+---
+
+#### ~~Coalesce Helper Tests (getAllowedCouriers)~~ [DEPRECATED]
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.124** | Unit | High | `selectedCouriers:['jnt','flash']` array present → `['jnt','flash']` | Import `getAllowedCouriers(ep)`, ep={selectedCouriers:['jnt','flash']} | Return `['jnt','flash']` | F36, GH-1333 |
+| **TC-F14.125** | Unit | High | Legacy only `selectedCourier:'flash'`, no array → `['flash']` | ep={selectedCourier:'flash', warehouses:[]} (no selectedCouriers) | Return `['flash']` | F36, GH-1333 |
+| **TC-F14.126** | Unit | High | Neither array nor legacy set → `[]` | ep={warehouses:[], accessToken:'tok'} (no courier fields) | Return `[]` | F36, GH-1333 |
+| **TC-F14.127** | Unit | High | Array wins when BOTH present | ep={selectedCouriers:['jnt'], selectedCourier:'flash'} | Return `['jnt']` (array priority) | F36, GH-1333 |
+| **TC-F14.128** | Unit | Medium | Array with whitespace/empty entries → trimmed + deduped | ep={selectedCouriers:['  jnt  ', '', 'jnt', 'flash']} | Return `['jnt','flash']` (trim, filter empty, dedupe) | F36, GH-1333 |
+
+#### Readiness Gate (isEpReady)
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.129** | Unit | High | isEpReady true when token + warehouse + ≥1 courier (array) | isEpReady({accessToken:'tok', warehouses:[completeWh], selectedCouriers:['jnt','flash']}) | true | F36, GH-1333 |
+| **TC-F14.130** | Unit | High | isEpReady false when allowlist length=0 (empty array) | isEpReady({accessToken:'tok', warehouses:[completeWh], selectedCouriers:[]}) | false (no courier allowed) | F36, GH-1333 |
+
+#### getRates Cheapest + COD Logic
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.131** | Unit | High | Allowlist `['jnt','flash']`, route offers both → pick cheaper only, `degraded:false`, `rates.length===1` | Mock quotations→{jnt:RM50, flash:RM40}, allowedCouriers=['jnt','flash'], codAmountSen=0 | rates=[{courier:'flash', priceSen:4000}], degraded:false | F36, GH-1333 |
+| **TC-F14.132** | Unit | High | Allowlist `['dhl']`, route offers only `['jnt','flash']` → flat fallback, `degraded:true` | allowedCouriers=['dhl'], quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flat', degraded:true}], degraded:true | F36, GH-1333 |
+| **TC-F14.133** | Unit | High | Empty/absent allowlist → cheapest of ALL (not rates[0]), `degraded:false` | allowedCouriers=undefined, quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flash', priceSen:4000}], degraded:false (cheapest regardless order) | F36, GH-1333 |
+| **TC-F14.134** | Unit | High | COD order (`codAmountSen>0`), both allowed, only `flash.codAvailable` → returns `flash` even if `jnt` cheaper | codAmountSen=1000, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'flash', codAvailable:true}], degraded:false | F36, GH-1333 |
+| **TC-F14.135** | Unit | High | COD order, NO courier is COD-capable → GIỮ EP pick (không swap flat), `codIneligible:'no_cod_courier'` (PD-021) | codAmountSen=1000, allowedCouriers=['jnt','flash'], both codAvailable:false | rates=[{courier:'jnt' — cheapest EP}], degraded:false, codIneligible='no_cod_courier'; buyer thấy courier + giá thật, chỉ hiện error | F36, GH-1333, PD-021 |
+| **TC-F14.136** | Unit | High | Non-COD order (`codAmountSen=0`) ignores `codAvailable` flag (cheapest regardless) | codAmountSen=0, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'jnt', codAvailable:false}] (jnt cheaper) | F36, GH-1333 |
+| **TC-F14.137** | Unit | Medium | Allowlist `['flat']` (sentinel) filtered out → treated as no allowlist → cheapest of all | allowedCouriers=['flat'], quotations→{jnt:RM40, flash:RM50} | rates=[{courier:'jnt', degraded:false}] (after filtering 'flat', no restriction, pick cheapest) | F36, GH-1333 |
+
+#### Server Route Threading
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.138** | Func | High | POST /api/orders/calculate-shipping passes `getAllowedCouriers(ep)` to getRates | Call POST with epIntegration={selectedCouriers:['jnt'], ...}, quotations→jnt/flash available | Response includes chosen rate's codAvailable | F36, GH-1333 |
+| **TC-F14.139** | Func | High | Legacy single-courier tenant → identical output to pre-change (regression) | ep={selectedCourier:'flash'}, quotations→flash/jnt both available, jnt cheaper | rates=[{courier:'flash'}] because legacy coalesced to ['flash'] | F36, GH-1333 |
+
+#### Save Route Guard
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.140** | Sec | High | POST /api/tenant/[id]/easyparcel-save: `enabled:true` + empty `selectedCouriers` → 400 `EP_NOT_READY` | POST {enabled:true, warehouses:[completeWh], selectedCouriers:[]} | HTTP 400, error.code='EP_NOT_READY' | F36, GH-1333 |
+| **TC-F14.141** | Func | High | POST with `selectedCouriers:['jnt','flash']` + complete warehouse → 200, persists array + legacy scalar | POST {enabled:true, warehouses:[completeWh], selectedCouriers:['jnt','flash']} | HTTP 200, DB easyParcelIntegration.selectedCouriers=['jnt','flash'], selectedCourier='jnt' | F36, GH-1333 |
+
+#### UI Multi-Select
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.142** | UI | High | CourierPicker toggles membership (check adds, re-check removes), aria-checked reflects state | Render CourierPicker with ['jnt']. Click 'flash' checkbox (add). Click 'jnt' checkbox (remove). | After add: ['jnt','flash'], aria-checked='true' on flash. After remove: ['flash'], aria-checked='false' on jnt | F36, GH-1333 |
+| **TC-F14.143** | UI | High | Settings-tab seeds `selectedCouriers` from legacy config via coalesce, Activate disabled at 0 | Render SettingsTab for ep={selectedCourier:'flash'}. Check initial state. Try Activate with 0 selected. | Initial picked=['flash']. Activate button disabled when selected.length=0 | F36, GH-1333 |
+| **TC-F14.144** | UI | High | Stepper `courierDone` true only when ≥1 selected; activate body carries array | Render Stepper. Step 2 (courier) with 0 selected. Add 1. Click Next. | courierDone=false at 0 selected; activate POST includes selectedCouriers:['jnt'] | F36, GH-1333 |
+
+#### Auto-Cheapest — BYOC Guard (ACTIVE)
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.145** | Unit | High | BYOC couriers ("Bring Your Own Contract", e.g. `BYOC FedEx`) are excluded from auto-pick even when cheapest; picks cheapest non-BYOC. All-BYOC → flat fallback | Quotations: byoc_fedex RM30, flash RM40, jnt RM50 | rates=[{courier:'flash'}] (BYOC skipped); all-BYOC → rates=[{courier:'flat', degraded:true}] | F36, GH-1333 |
+
+#### COD Eligibility R1/R2/R3 — PD-021 Follow-EP Model (ACTIVE)
+
+> COD gating theo `min_cod_amount`/`max_cod_amount`/`cod.available` LIVE per-route (KHÔNG hardcode vùng). Unit rules: `src/__tests__/unit/shipping/cod-eligibility.test.ts` (TC-F36.U01–U11, supersede bộ isCodBlocked East-MY cũ). getRates integration bên dưới.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.146** | Unit | High | COD amount vượt max của MỌI courier COD-capable (R1) → GIỮ EP pick + `codIneligible:'over_max'` | codAmountSen=500000 (RM5000), quotation jnt COD min RM7.50/max RM1000 | rates=[{courier:'jnt'}], degraded:false, codIneligible='over_max' | F36, GH-1333, PD-021 |
+| **TC-F14.147** | Unit | High | COD amount dưới min của MỌI courier COD-capable (R2) → GIỮ EP pick + `codIneligible:'under_min'` | codAmountSen=50 (RM0.50), quotation jnt COD min RM7.50/max RM1000 | rates=[{courier:'jnt'}], degraded:false, codIneligible='under_min' | F36, GH-1333, PD-021 |
+| **TC-F14.148** | Unit | High | Auto-pick enforce min/max: courier rẻ hơn nhưng out-of-range bị skip, chọn courier in-range | codAmountSen=150000 (RM1500), jnt RM40 max RM1000, dhl RM50 max RM2000 | rates=[{courier:'dhl'}], degraded:false, codIneligible undefined | F36, GH-1333, PD-021 |
+| **TC-F14.149** | Unit | High | `codMinSen` extract từ quotation `min_cod_amount` (RM→sen) để enforce R2 | Quotation flash COD min RM7.50 → min_cod_amount:'7.5' | rates[0].codMinSen=750 | F36, GH-1333, PD-021 |
+| **TC-F14.150** | Unit | High | create-label live re-check: service còn COD-eligible (kể cả route East MY — R4 không có input vùng) → ok | Re-quote SVC-JNT, cod available min 7.5/max 1000, amount RM118, dest Sarawak | {ok:true} → submit tiếp tục | F36, GH-1333, PD-021 |
+| **TC-F14.151** | Unit | High | create-label live re-check: limits đổi làm amount out-of-range HOẶC courier tắt COD → 422 COD_NOT_ELIGIBLE | (a) max giảm còn RM100, amount RM118; (b) cod.available=false | (a) {ok:false, reason:'over_max'}; (b) {ok:false, reason:'no_cod_courier'} → route trả 422 | F36, GH-1333, PD-021 |
+| **TC-F14.152** | Unit | High | create-label live re-check fail-open: quotation lỗi / service vắng mặt / status error → KHÔNG chặn tạo label | (a) quotations throw; (b) service_id khác; (c) status:'error' | {ok:true} cả 3 case — submit_orders là authority cho lỗi quote | F36, GH-1333, PD-021 |
+| **TC-F14.153** | Unit | High | `codProbeSen`: verdict COD tính trên probe amount mà KHÔNG COD-filter pick — storefront pre-disable COD trước khi buyer chọn payment method | Non-COD pick + codProbeSen=500000, jnt COD max RM1000, citylink rẻ hơn không COD | rates=[citylink] (cheapest overall), codIneligible='over_max'; probe in-range → codIneligible undefined | F36, GH-1333, PD-021 |
+| **TC-F14.154** | Unit | High | NaN guard: EP trả `min_cod_amount`/`max_cod_amount` = ""/non-numeric → coi như KHÔNG có limit (không được fail so sánh vì NaN) | Quotation pos cod.available=true, min=""/max="" , codAmountSen=950 | rates=[pos], codMinSen/codMaxSen=undefined (không NaN), codIneligible=undefined — COD đặt được | F36, GH-1333, PD-021 |
+
+#### Pickup/Dropoff Collection Date — US-F36-07 (ACTIVE)
+
+> Chọn pickup/dropoff + `collection_date` NGAY tại bước Ready-to-Ship (trước khi mua label); server clamp AC-3b dùng CHUNG helper `pickup-schedule.ts` với date picker. Popover schedule-pickup sau-label + route `/api/orders/[id]/pickup` đã gỡ (TC-F36.P01–P20 retire). Unit: `src/__tests__/unit/shipping/pickup-schedule.test.ts`.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.155** | Unit | High | `earliestPickupDate` cut-off aware (MYT): trước cut-off → hôm nay; sau cut-off → ngày làm việc kế; T6 sau cut-off → T2; courier lạ (EP-CR*) fallback cut-off 12:00 | nowUtc cố định các mốc quanh cut-off J&T 13:50 / default 12:00 | same-day / next-business-day đúng từng mốc | F36, GH-1333, US-F36-07 AC-2 |
+| **TC-F14.156** | Unit | Medium | `isBusinessDateString` phân loại T2–T6/T7-CN theo MYT; `courierCutoffLabel` trả "13:50" (jnt) / "12:00" (default) | các ngày cố định 2026-07-06..12 | Mon–Fri true, Sat/Sun false; label đúng | F36, GH-1333, US-F36-07 AC-2 |
+| **TC-F14.157** | Unit | High | `clampCollectionDate` (AC-3b): không tin client — no date → earliest; past → clamp; mở picker trước cut-off nhưng submit sau → clamp lên ngày kế + shifted:true; weekend → bump ngày làm việc; future weekday hợp lệ → giữ nguyên | requested × nowUtc matrix | {date, shifted} đúng từng case; create-label trả `collectionDate`+`collectionDateShifted` để UI toast "đã dời sang DD/MM" | F36, GH-1333, US-F36-07 AC-3b |
+
+#### Parcel Weight Unit — GH-1458 KG Canonical (ACTIVE)
+
+> `Products.weight` đơn vị chuẩn = **KG** (chốt 2026-07-06). Pipeline shipping chạy gram integer nội bộ; `productWeightToGrams()` là điểm convert duy nhất, wire vào checkout + stripe-checkout (`build-order-items`) + calculate-shipping (server lookup theo productId khi client không gửi weightG). Trước fix này weight sản phẩm không hề được đọc — mọi đơn quote 500g/item default.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.158** | Unit | High | `productWeightToGrams`: kg→gram integer; unset/0/âm/NaN → 500g default; KHÔNG chia 1000 lần nữa (regression grams-era) | 0.5 / 1.5 / null / 0 / -1 / NaN | 500 / 1500 / 500 / 500 / 500 / 500; 0.5kg qua aggregateWeightKg ra đúng 0.5kg | F36, GH-1333, GH-1458 |
+
+---
+
 ## 4. End-to-End UAT Flows
 
 ### E2E #1: Seller setup → Buyer mua West MY (happy path)
@@ -795,6 +894,107 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 
 ---
 
+## 10. F36 Order Detail (GH-1333) — Fulfillment & Pickup Scheduling
+
+> **Scope:** Full-page order detail redesign (replaces drawer). Fulfillment state machine (7 states), EasyParcel create-label, pickup scheduling, COD recovery, tracking timeline.
+>
+> **Files:** `src/app/(dashboard)/orders/[id]/page.tsx` (RSC), `src/app/(dashboard)/orders/_components/detail/*` (12 components), `src/app/api/orders/[id]/{self-deliver,pickup}/route.ts` (2 endpoints), `src/lib/shipping/cod-block.ts` (helper).
+>
+> **TC-ID scheme:** `TC-F36.OD.NNN` (OD = Order Detail), e.g. TC-F36.OD.001, TC-F36.OD.002, ...
+
+### Fulfillment State Machine (7 states)
+
+| State | Trigger | Display | Components | TC-ID |
+|-------|---------|---------|------------|-------|
+| **pending→confirm** | Status=pending, EP ready, no label | Weight wizard → confirm | create-label-flow | TC-F36.OD.001–003 |
+| **ready→create-label** | Status=pending, EP ready, missing weight | Weight input form | missing-weight-form | TC-F36.OD.004–005 |
+| **success** | Status=pending, label created (labelUrl + awbNo) | Print modal + pickup popover + (if COD) recovery | print-label-modal, schedule-pickup-popover, cod-recovery | TC-F36.OD.006–010 |
+| **shipping/completed** | Status=shipped/completed, `shippingTrackingHistory` present | Tracking timeline (immutable) | tracking-timeline | TC-F36.OD.011–013 |
+| **cancelled** | Status=cancelled | Reason badge (immutable) | order-actions-card | TC-F36.OD.014 |
+| **cod-blocked** | codAmount>0 + state in {Sabah, Sarawak, Labuan} | Recovery only: "Ship manually" | cod-recovery, self-delivery-zone | TC-F36.OD.015–017 |
+| **missing-weight** | All routes but parcelWeight=null | Inline weight form | missing-weight-form | TC-F36.OD.018–019 |
+
+### Test Cases (TC-F36.OD.*)
+
+#### Routing & Navigation (TC-F36.OD.001–003)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.001** | Func | Blocker | Full-page route `/orders/[id]` renders 2-column layout | Click row in OrdersTable → navigate to `/orders/[id]` | Page load; left col = items/customer/payment; right col = fulfillment zone | GH-1333 Phase 02 |
+| **TC-F36.OD.002** | Func | Critical | Legacy `?order=123` query redirects to `/orders/[id]` | POST to `/orders?order=123` (old deep-link) | 301 redirect to `/orders/123` | GH-1333 Phase 02 |
+| **TC-F36.OD.003** | Func | High | Drawer removed from OrdersClientLayout | Open Orders page, check layout tree | No `.DrawerPanel` overlay; table click triggers `<Link href="/orders/[id]">` | GH-1333 Phase 02 |
+
+#### Create Label Flow (TC-F36.OD.004–007)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.004** | Func | Critical | Wizard: enter weight → confirm → POST /create-label | Order status=pending, EP ready, no label. Enter parcelWeight=5000 sen, click "Create Label" | POST /api/orders/[id]/create-label success; response: `{labelUrl, awbNo}`. UI updates to success state | GH-1333 Phase 03 |
+| **TC-F36.OD.005** | Func | High | Missing weight form: input parcelWeight, re-confirm | Order status=pending, parcelWeight=null. Input 5000, click "Confirm" | Form submits; state→pending→confirm (awaiting label creation); Create Label button enabled | GH-1333 Phase 03 |
+| **TC-F36.OD.006** | Func | High | Create-label single-step: no intermediate steps | EP createLabel API returns awbNo + labelUrl in one call | State jumps directly to success (print modal visible) | GH-1333 Phase 03 |
+| **TC-F36.OD.007** | Edge | Medium | Label creation error → toast + retry button | POST create-label fails (EP timeout/error) | Toast "Failed to create label. Retry?" appears; retry button re-submits | GH-1333 Phase 03 |
+
+#### Print Label Modal (TC-F36.OD.008–009)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.008** | Func | High | Print label modal: open/download/print buttons | State=success, labelUrl present. Click "Open PDF" | Browser opens PDF in new tab; "Download" button triggers file save; "Print" button opens system print dialog | GH-1333 Phase 03 |
+| **TC-F36.OD.009** | UI | Medium | A4/A6 toggle (informational, no re-fetch) | Modal rendered, toggle A4↔A6 | Button state toggles; PDF URL unchanged (API doesn't support dynamic size) | GH-1333 Phase 03 |
+
+#### Schedule Pickup (TC-F36.OD.010–011)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.010** | Func | High | Pickup popover: date picker + slot select → POST | Label created, popover open. Select date 2026-07-10, slot "08:00–12:00", click "Schedule" | POST /api/orders/[id]/pickup success; response: `{pickupScheduledAt, pickupSlot}`. Toast "Pickup scheduled" | GH-1333 Phase 03 |
+| **TC-F36.OD.011** | Edge | Medium | Slot list depends on carrier API (informational) | EP API returns 3 available slots for selected date | Slot dropdown renders all 3; no pre-filtering on server | GH-1333 Phase 03 |
+
+#### Tracking Timeline (TC-F36.OD.012–014)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.012** | Func | High | Tracking timeline renders milestones from `shippingTrackingHistory` array | Order status=shipped, tracking history has 3 entries (confirmed, picked-up, delivered) | Timeline shows 3 milestone cards with dates + status labels (i18n) | GH-1333 Phase 05 |
+| **TC-F36.OD.013** | UI | Medium | Milestone status labels localized (en/ms) | Dashboard language set to Malay; shippingTrackingHistory status = "picked-up" | Timeline label renders i18n key `dashboard.orders.tracking.pickedUp` → "Diambil" (Malay) | GH-1333 Phase 06 |
+| **TC-F36.OD.014** | Edge | Low | Empty shippingTrackingHistory → no timeline | Order status=shipped, tracking history=[] | Timeline section empty or hidden; no error | GH-1333 Phase 05 |
+
+#### COD Recovery (TC-F36.OD.015–017)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.015** | Func | Critical | COD-blocked detection: codAmount>0 + state={Sabah,Sarawak,Labuan} | Order: codAmount=500, state='Sabah', status=pending, EP ready | Fulfillment zone shows "COD Recovery" only; "Ship manually" button → self-delivery form | GH-1333 Phase 03 |
+| **TC-F36.OD.016** | Func | High | COD recovery non-East states → standard fulfill path | Order: codAmount=500, state='Selangor' | Fulfillment zone shows normal create-label flow (not COD recovery) | GH-1333 Phase 03 |
+| **TC-F36.OD.017** | Edge | Medium | COD-free order (codAmount=0 or null) → standard path even in East | Order: codAmount=0, state='Sabah' | Normal create-label flow; no COD recovery badge | GH-1333 Phase 03 |
+
+#### Self-Delivery (TC-F36.OD.018–020)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.018** | Func | High | Self-delivery form: enter courier + tracking → POST | COD recovery or manual fulfillment. Enter courier='J&T', tracking='JT123456', click "Ship" | POST /api/orders/[id]/self-deliver success; status→shipped, selfDeliveryCourier + trackingNumber saved. Toast "Order marked shipped" | GH-1333 Phase 03 |
+| **TC-F36.OD.019** | Edge | Medium | Free-text courier name (no validation) | Enter courier='Our-Custom-Handler-123-!@#' | Form accepts; DB stores raw string | GH-1333 Phase 03 |
+| **TC-F36.OD.020** | UI | Medium | Tracking number display in shipped email (plain text, no link) | Order shipped via self-deliver, email sent. Email contains tracking number | Email body: "Tracking: JT123456" (plain text, KHÔNG có `<a href>` link) | GH-1333 Phase 06 |
+
+#### Missing Weight Handling (TC-F36.OD.021–022)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.021** | Func | High | Missing weight form: parcelWeight input + confirm re-enables create-label | Order parcelWeight=null. Input 3000, click "Confirm Weight" | Form submits; parcelWeight persisted. Create Label button re-enabled | GH-1333 Phase 03 |
+| **TC-F36.OD.022** | Edge | Medium | Weight validation: sen range (must be ≥1) | Enter weight='0' or weight='-1' | Inline error "Weight must be positive"; submit blocked | GH-1333 Phase 03 |
+
+#### Order Item Card (TC-F36.OD.023–024)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.023** | UI | High | Items card: thumbnail/SKU/weight expandable | Order has 2 items. Click item row to expand | Expand shows: product image (or monogram fallback), name, SKU, variant weight, unit price, qty, line total | GH-1333 Phase 04 |
+| **TC-F36.OD.024** | Edge | Medium | Missing product image → monogram tile | Product no longer has image (or depth=null). Item card renders | Monogram tile (initials) displays instead of image; no broken image icon | GH-1333 Phase 04 |
+
+#### Page Rendering & i18n (TC-F36.OD.025–027)
+
+| ID | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F36.OD.025** | Func | High | Order detail page renders all 4 right-col cards + fulfillment zone | Navigate to `/orders/[id]` | Page loads with no 404. Left col has items/customer/payment. Right col has fulfillment zone + cards. | GH-1333 Phase 02 |
+| **TC-F36.OD.026** | UI | Critical | All button/field labels use i18n keys (no hardcoded English) | Dashboard language=Malay. View fulfillment buttons, form labels | All text in `dashboard.orders.*` scope; no English fallback visible | GH-1333 Phase 06 |
+| **TC-F36.OD.027** | Edge | Medium | i18n missing key → fallback to key name (no blank) | i18n key not found in ms.json (EN key exists). Dashboard language=Malay | Label shows key ID (e.g. "dashboard.orders.fulfillment") instead of blank | GH-1333 Phase 06 |
+
+---
+
 ## 11. Open Questions
 
 1. **Wave 6 release date** — F14 còn bao xa? Nếu sắp ship → cần dev sprint emergency vì chưa impl business logic
@@ -804,3 +1004,6 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 5. **Reset to Defaults** — có cần confirmation modal "Are you sure?" không, hay reset ngay khi click?
 6. **Empty tracking number** — seller có thể đổi status sang "Shipped" mà KHÔNG nhập tracking? Hay bắt buộc?
 7. **Tax (SST 6%)** ở TC-F14.07 — F09 đã impl SST chưa hay F14 phải tự handle?
+8. **F36 wallet balance display** — PW1 showed EP wallet balance on order detail. v2 API doesn't return it. Confirm: hidden in v1?
+9. **F36 pickup reschedule** — v1 persists locally. v2 feature (EP reschedule API call) deferred. Confirm: no sync back to EP?
+10. **F36 shipping label size** — A4 vs A6 toggle informational. Confirm: no API parameter → same PDF regardless?

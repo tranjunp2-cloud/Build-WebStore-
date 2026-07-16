@@ -45,7 +45,7 @@ export default function () {
 
   check(res, {
     'status 200': (r) => r.status === 200,
-    'body has PrimeWeb': (r) => (r.body || '').toString().includes('PrimeWeb'),
+    'body has Web Store': (r) => (r.body || '').toString().includes('Web Store'),
     'duration < 2s': (r) => r.timings.duration < 2000,
   })
 

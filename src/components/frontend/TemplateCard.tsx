@@ -54,7 +54,7 @@ export function TemplateCard({
     }, [])
 
     return (
-        <div ref={cardRef} className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all duration-500 hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-2xl hover:shadow-blue-500/[0.06] hover:-translate-y-1">
+        <div ref={cardRef} className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-500 hover:border-slate-300 dark:hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-2xl hover:shadow-blue-500/[0.06] hover:-translate-y-1">
             {/* Live preview thumbnail via iframe */}
             <div className="relative h-64 overflow-hidden bg-[#08080c]">
                 {/* Skeleton/Placeholder */}

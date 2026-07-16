@@ -13,7 +13,9 @@ import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementOrderStock, restockAll } from './decrement-stock'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
-import { getShippingRate } from '@/lib/shipping'
+import { getRates } from '@/lib/shipping/get-rates'
+import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 
 interface XenditTenantDoc {
     id: string | number
@@ -87,10 +89,40 @@ export async function POST(request: NextRequest) {
         }
 
         const subtotalSen = Math.round(subtotal * 100)
-        // Xendit has no discount support; effectiveSubtotalSen(subtotalSen, 0) === subtotalSen.
+        // EP-aware shipping rate (F36, TC-F36.29) — mirrors stripe-checkout: quote EasyParcel
+        // live when the tenant is connected, silent fallback to the site's flat rate otherwise.
+        // Xendit has no discount support, so the free-ship gate uses the raw subtotal.
         // If discounts are added to this route, switch to effectiveSubtotalSen(subtotalSen, discountSen).
-        const shippingFeeSen = getShippingRate(customer.address?.state, (site as any).shippingConfig, subtotalSen)
-        const shippingFee = shippingFeeSen / 100
+        const epIntegration = (tenant as any)?.easyParcelIntegration ?? {}
+        let epToken: string | null = null
+        const defaultWarehouse = getDefaultWarehouse(epIntegration)
+        if (epIntegration.enabled && isEpReady(epIntegration)) {
+            try {
+                epToken = await getValidToken(epIntegration, (tenant as any).id, payload)
+            } catch {
+                // token expired or not connected — silent fallback to flat rate
+            }
+        }
+
+        // Aggregate parcel weight; default 500g per item when product.weight is unset
+        const totalWeightGrams = orderItems.reduce((acc: number, item: any) => acc + ((item.weightGrams || 500) * item.quantity), 0)
+
+        const rateResult = await getRates(
+            {
+                weightGrams: totalWeightGrams,
+                destPostcode: customer.address?.postcode ?? '',
+                destState: customer.address?.state ?? '',
+                senderPostcode: defaultWarehouse.postcode ?? '47500',
+                senderState: defaultWarehouse.state ?? '',
+                subtotalSen,
+                codAmountSen: undefined,  // Xendit = prepaid, no COD
+            },
+            epToken,
+            (site as any)?.shippingConfig ?? {},
+            customer.address?.state,
+        )
+        const bestRate = rateResult.rates[0]
+        const shippingFee = bestRate.priceSen / 100
         const tax = 0
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
@@ -105,6 +137,14 @@ export async function POST(request: NextRequest) {
                     status: 'paid', paymentStatus: 'paid', paymentMethod: 'free', paymentProvider: 'xendit',
                     locale: siteTyped.locale ?? 'en',
                     customerEmail: customer.email, customerName: customer.name, customerPhone: customer.phone || '',
+                    // EP shipping fields — only written when a real EP courier is selected (TC-F36.29)
+                    ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
+                    ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                    parcelWeight: totalWeightGrams,
                 } as Record<string, unknown>,
             })
             return NextResponse.json({ success: true, data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', sessionUrl: null } })
@@ -127,6 +167,16 @@ export async function POST(request: NextRequest) {
                     city: customer.address.city || '', state: customer.address.state || '',
                     postcode: customer.address.postcode || '', country: customer.address.country || 'Malaysia',
                 } : undefined,
+                // EP shipping fields — only written when a real EP courier is selected (TC-F36.29).
+                // Without these the order detail derives 'self-delivery' and create-label 422s
+                // on MISSING_SERVICE_ID even though the buyer paid an EP-quoted rate.
+                ...(bestRate.courier !== 'flat' ? {
+                    shippingCourier: bestRate.courier,
+                    shippingCourierName: bestRate.courierName,
+                    ...(bestRate.courierLogo ? { shippingCourierLogo: bestRate.courierLogo } : {}),
+                } : {}),
+                ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                parcelWeight: totalWeightGrams,
             } as Record<string, unknown>,
         })
 

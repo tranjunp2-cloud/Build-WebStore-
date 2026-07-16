@@ -16,7 +16,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Ticket, History } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 
 const TABS = [
     { key: 'codes', href: '/discounts', icon: Ticket },
@@ -68,11 +68,7 @@ export function DiscountsTabNav() {
                         <TabsTrigger key={tab.key} variant="underline" value={tab.key}>
                             <Icon className="h-4 w-4" />
                             {tabLabels[tab.key]}
-                            {count != null && (
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {fmtCount(count)}
-                                </span>
-                            )}
+                            {count != null && <TabsCount>{fmtCount(count)}</TabsCount>}
                         </TabsTrigger>
                     )
                 })}

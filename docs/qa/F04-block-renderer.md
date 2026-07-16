@@ -143,7 +143,19 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 4. Hành Trình E2E UAT Flow
+## 4. Logo Cloud — Monogram Placeholder (GH-1185, plan `plans/260709-1404-GH-1185-image-business-context-logo-cloud/`)
+
+> Logo Cloud block uses placeholder monograms when brand logos are missing. Monogram rules: single-word names → first 2 letters ("Aeon" → "AE"); multi-word → first letter of ≤3 words ("Bank Negara Malaysia" → "BNM"); empty → "?". Both placeholder and real logo preserve `data-image-index` for editor replace.
+
+| TC-ID | Loại | Mô tả | Kỳ vọng | Status |
+|---|---|---|---|---|
+| **TC-F04.LC1** | `[Positive]` | `LogoPlaceholder` monogram: single-word "Aeon"→"AE", "Maxis"→"MA" | Render <LogoPlaceholder name="Aeon"> → monogram displays "AE"; name="Maxis" → "MA" | [ ] |
+| **TC-F04.LC2** | `[Positive]` | Multi-word "Bank Negara Malaysia"→"BNM" (≤3); empty→"?" | name="Bank Negara Malaysia" → "BNM"; name="" → "?"; name="   " (whitespace) → "?" | [ ] |
+| **TC-F04.LC3** | `[Positive]` | Real logo (`logo.url` present) → `LogoImage` renders; `data-image-index` preserved on both paths | {logo: {url: 'https://example.com/logo.png'}} → <LogoImage> renders with data-image-index; no logo → <LogoPlaceholder> with data-image-index | [ ] |
+
+---
+
+## 5. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |
 |:---:|:---|:---|
@@ -155,7 +167,7 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 5. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
+## 6. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
 
 | Nhóm Kiểm Thử | Trạng Thái | Ghi Chú |
 |---|---|---|
@@ -171,7 +183,7 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
-## 6. GH-1367 Editor Toolbar & Text Selection (TC-EDIT-01..09)
+## 7. GH-1367 Editor Toolbar & Text Selection (TC-EDIT-01..09)
 
 **Scope:** Editor UI regression tests for Bug 1 (text-hit detection guard) + Bug 2 (light/dark theme toolbar). Mapped to Block Renderer feature family (F04 blocks are edited via this toolbar).
 
@@ -195,3 +207,50 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 - TC-EDIT-01..05: Mock `caretRangeFromPoint` per test case to simulate text vs background hits. Assert postMessage type.
 - TC-EDIT-06..09: Render real `BlockActionBar` component; query className strings + simulate pointerDown on grip button.
 - All tests: No fake data, import real components, follow AAA pattern.
+
+---
+
+## 7. GH-1461 Builder-Preview Read-Only Enforcement (TC-GH1461-01..05, TC-GH1461-WA-01..02, TC-GH1461-CUR-01..02, TC-GH1461-LC-01)
+
+**Scope:** AI Builder read-only preview screens (`?builder=1`, non-editor) must disable all edit affordances (Change Image overlay, WhatsApp/cart click) while leaving the real editor and storefront untouched. Mapped to Block Renderer feature family (`SiteRenderer.tsx` provides the context both editor and preview consume).
+
+| TC-ID | Layer | Test File | Assertion |
+|:---|:---|:---|:---|
+| **TC-GH1461-01** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` returns `true` inside a block when `SiteRenderer` receives `isBuilderPreview={true}` |
+| **TC-GH1461-02** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` returns `false` when `isBuilderPreview={false}` (real editor) |
+| **TC-GH1461-03** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` defaults to `false` when the prop is omitted (storefront) |
+| **TC-GH1461-04** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useBlockEditCallback()` resolves to `null` when `isBuilderPreview={true}`, even with a real `onBlockFieldChange` provided — locks the single-source-of-truth invariant the fix depends on |
+| **TC-GH1461-05** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useBlockEditCallback()` resolves to a real callback when `isBuilderPreview={false}`, same `onBlockFieldChange` input |
+| **TC-GH1461-WA-01** | Unit (RTL) | `src/__tests__/unit/blocks/whatsapp-button.test.tsx` | callback=null (builder-preview/storefront) → anchor has no `onclick` handler, real navigation not suppressed |
+| **TC-GH1461-WA-02** | Unit (RTL) | `src/__tests__/unit/blocks/whatsapp-button.test.tsx` | callback present (real editor) → click is prevented so it doesn't navigate away from the editor canvas |
+| **TC-GH1461-CUR-01** | Unit (RTL) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | `BuilderLinkScripts` mount injects `html { cursor: default; }` style tag into `document.head` — arrow cursor forced on readonly preview surfaces |
+| **TC-GH1461-CUR-02** | Unit (RTL) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | `BuilderLinkScripts` unmount removes the injected style tag — no leak into subsequent surfaces |
+| **TC-GH1461-LC-01** | Unit (RTL) | `src/__tests__/unit/blocks/logo-cloud-per-tile-overlay.test.tsx` | each logo tile's `MediaUploadOverlay` sits in its own dedicated wrapper (overlay tracks hover on `parentElement` — a shared row parent would light every tile at once) |
+
+Also see **TC-F30-HMO-013** (`docs/qa/F30-hero-media-overlay.md`) — same GH-1461 invariant verified at the `HeroMediaOverlay` component level.
+
+**Root Cause & Fix:** `isOwner` is dual-purpose (also gates analytics-exclusion), so it can't be reused to hide edit UI in the AI Builder's read-only preview without breaking real-storefront-traffic analytics. Added a dedicated `BuilderPreviewContext` (`src/components/site-renderer/BuilderPreviewContext.tsx`) and made `SiteRenderer.tsx`'s callback resolution the single source of truth: `callbackValue = onBlockFieldChange && !isBuilderPreview ? {...} : null` — every consumer (hero/logo/gallery overlays, WhatsApp button, cart widget, CTA) reads `useBlockEditCallback()`/`useIsBuilderPreview()` and gets `null`/`true` automatically in builder-preview, instead of each caller needing its own `isBuilderPreview` check.
+
+**Test Coverage Strategy:**
+- TC-GH1461-01..03: probe-block pattern (`mockGetComponent.mockReturnValue(ProbeBlock)`) captures the raw context value seen inside a rendered block tree.
+- TC-GH1461-04..05: same probe pattern but asserts the *derived* callback, not just the raw flag — verified by temporarily reverting the `SiteRenderer.tsx` fix and confirming TC-GH1461-04 fails with the pre-fix behavior (not a tautological test).
+- TC-GH1461-WA-01/02: render the real `WhatsappButtonBlock` with `useBlockEditCallback` mocked directly (no SiteRenderer needed) to lock the block's own click-suppression contract independent of the context-propagation tests above.
+- TC-GH1461-CUR-01/02: render the real `BuilderLinkScripts` and inspect `document.head` for the injected style tag across mount/unmount.
+- TC-GH1461-LC-01: render the real `LogoCloudBlock` with `MediaUploadOverlay` mocked to a marker div; assert one overlay per tile, each with a distinct dedicated parent wrapper.
+
+## 8. GH-770 Builder Preview Parameter Handling (TC-F01-GH770-01..08 — PreviewPage suite)
+
+**Scope:** `/preview/[siteId]` reads `builder` / `editor` searchParams to decide which client scripts mount: `editor=1` → full `PreviewScripts` (editing listeners, only inside the editor iframe); anything else (builder preview `builder=1` AND standalone toolbar preview with no params) → lightweight readonly `BuilderLinkScripts` (GH-1461 rework flipped TC-04/05 semantics from "no scripts" to "readonly scripts" and added TC-08).
+
+| TC-ID | Layer | Test File | Assertion |
+|:---|:---|:---|:---|
+| **TC-F01-GH770-01** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `builder` searchParam is consumed without error |
+| **TC-F01-GH770-02** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `builder=1` → SiteRenderer receives `isBuilderPreview={true}` |
+| **TC-F01-GH770-03** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | no `builder` param → `isBuilderPreview={false}` |
+| **TC-F01-GH770-04** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `builder=1` → `PreviewScripts` absent, `BuilderLinkScripts` present (readonly surface) |
+| **TC-F01-GH770-05** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | no `builder`/`editor` param (standalone toolbar preview) → `BuilderLinkScripts`, not `PreviewScripts` (GH-1461: review-only) |
+| **TC-F01-GH770-06** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `builder` param does not bypass auth — unauthenticated → redirect to `/login` |
+| **TC-F01-GH770-07** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `builder` param does not bypass tenant isolation |
+| **TC-F01-GH770-08** | Unit (RTL) | `src/__tests__/unit/editor/preview-page.test.tsx` | `editor=1` (editor iframe) → full `PreviewScripts` present, `BuilderLinkScripts` absent |
+
+> Note: the `TC-F01-GH770` prefix is also reused by two sibling suites covering the same GH-770 feature at other layers — nav-URL rewriting in `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` (01..05) and `BuilderPreviewSurface` iframe mode in `src/__tests__/unit/builder/builder-preview-primitives.test.tsx` (01..09). Numbering restarts per suite.

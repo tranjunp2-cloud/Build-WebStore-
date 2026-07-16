@@ -69,11 +69,14 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            {/* --dash-content-pl: live sidebar width (250 / 64 collapsed) so fixed bottom save-bars
-                can align with the content area at lg+ (tablet uses left-0). */}
+            {/* .dash-shell-root scopes --dash-content-pl (globals.css) — left edge of the CONTENT
+                column (sidebar width + p-8 gutter) so fixed bottom save-bars align with the cards
+                at lg+ (GH-1592). Value lives in CSS (responsive 246/250/64px + 2rem), not inline,
+                because an inline style can't vary per breakpoint. Scoped to this root marker (not
+                bare .dash-shell): modals/popovers self-apply dash-shell for theming and would
+                re-declare the var without the .dash-sidebar-mini gate. */}
             <div
-                className="dash-shell min-h-screen bg-dash-bg flex flex-col"
-                style={{ '--dash-content-pl': collapsed ? '64px' : '250px' } as React.CSSProperties}
+                className={cn('dash-shell dash-shell-root min-h-screen bg-dash-bg flex flex-col', collapsed && 'dash-sidebar-mini')}
             >
                 <TenantAccessWatcher />
                 <TopHeader
@@ -117,7 +120,12 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                 </div>
                 <Toaster
                     position="top-right"
-                    style={{ '--width': '207px' } as React.CSSProperties}
+                    // GH-1538 #12: was 207px — way too narrow, wrapped normal-length messages
+                    // (e.g. "Sitemap submitted — N URLs sent to Google") onto 3 lines. This
+                    // Toaster's own style/toastOptions here fully override the shared defaults
+                    // in components/ui/sonner.tsx (props spread, not merged) so the width had
+                    // to be fixed at this call site, not just the shared wrapper.
+                    style={{ '--width': '300px' } as React.CSSProperties}
                     toastOptions={{
                         classNames: {
                             toast: "bg-dash-surface border border-dash-border shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[16px] px-[24px] flex items-center gap-[8px] min-h-[46px] w-full",

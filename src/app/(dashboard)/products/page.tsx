@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { format } from 'date-fns'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -20,16 +21,18 @@ import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
 import { AiReviewIndicator } from '@/components/dashboard/AiReviewIndicator'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TablePagination } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
@@ -37,6 +40,7 @@ import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
+import { computeStockDisplay, singleSeverity, type StockDisplay, type StockSeverity } from '@/lib/products/stock-display'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
@@ -85,6 +89,38 @@ function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
     if (currency === 'SGD') return `S$${price.toFixed(2)}`
     return `$${price.toFixed(2)}`
+}
+
+// Composes the Stock column's final display string. `computeStockDisplay` stays i18n-free
+// (mirrors getDisplayPrice's "From " prefix pattern — the pure helper returns raw numbers,
+// the caller adds words) — for a variant product this appends "1 variant" / "{N} variants".
+function formatStockLabel(stockDisplay: StockDisplay, t: ReturnType<typeof useI18n>['t']) {
+    if (!stockDisplay.showVariantCount) return stockDisplay.label
+    const suffix = stockDisplay.variantCount === 1
+        ? (t.dashboard.products.list.stockVariantCountOne || '1 variant')
+        : (t.dashboard.products.list.stockVariantCountMany || '{count} variants').replace('{count}', String(stockDisplay.variantCount))
+    return `${stockDisplay.label} / ${suffix}`
+}
+
+// Mobile Stock chip styling keyed by `computeStockDisplay` severity (GH-1525 #4).
+const STOCK_CHIP_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'bg-[hsl(var(--destructive)/0.1)] border-[hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))]',
+    warning: 'bg-[hsl(var(--warning)/0.1)] border-[hsl(var(--warning)/0.3)] text-[hsl(var(--warning))]',
+    success: 'bg-[hsl(var(--success))]/10 border-[#05DF72]/30 text-[hsl(var(--success))]',
+}
+
+// Per-variant breakdown row styling (Tooltip/Popover stock detail) — same severity
+// tokens as STOCK_CHIP_CLASSES, applied per row via `singleSeverity(v.stock)` so the
+// color reflects THAT variant's own stock, not the row's overall range severity.
+const STOCK_ROW_DOT_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'bg-[hsl(var(--destructive))]',
+    warning: 'bg-[hsl(var(--warning))]',
+    success: 'bg-[hsl(var(--success))]',
+}
+const STOCK_ROW_TEXT_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'text-[hsl(var(--destructive))]',
+    warning: 'text-[hsl(var(--warning))]',
+    success: 'text-[hsl(var(--success))]',
 }
 
 function getImageUrl(image: ProductImage | string | null): string | null {
@@ -251,9 +287,10 @@ export default function ProductsPage() {
 
     // Rows-per-page stateful so the DS TablePagination selector ([10,25,50,100]) works (GH-1290 Bug 4)
     const [itemsPerPage, setItemsPerPage] = useState(10)
-    const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage)
     const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     const handleLimitChange = (n: number) => { setItemsPerPage(n); setCurrentPage(1) }
+    // GH-1579: snap back when deletions strand currentPage past the last page
+    useTablePageClamp(currentPage, filteredAndSortedProducts.length, itemsPerPage, setCurrentPage)
 
     const statusCounts = {
         all: products.length,
@@ -381,8 +418,15 @@ export default function ProductsPage() {
 
     return (
         <div className="space-y-6 pb-20">
-            {/* AI Chat Banner (Figma Node 30882:5804) */}
-            <div className="rounded-[16px] border border-[hsl(var(--primary))]/20 bg-gradient-to-r from-blue-500/10 to-teal-400/10 p-[24px] overflow-hidden relative">
+            {/* AI Chat Banner (Figma Node 30882:5804) — flat card + corner-confined radial
+                teal glow (design ref: ai-bulk-create.html .ai-box), not a full-width color sweep */}
+            <div
+                className="rounded-[18px] [border:2px_solid_hsl(var(--border))] bg-[hsl(var(--card))] p-[24px] overflow-hidden relative"
+                style={{
+                    backgroundImage:
+                        'radial-gradient(120% 140% at 85% -10%, hsl(var(--primary) / 0.10), transparent 55%)',
+                }}
+            >
                 <div className="relative flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
@@ -391,30 +435,34 @@ export default function ProductsPage() {
                     <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
                     {/* Command shell — textarea + footer (hint + Generate button) share one bordered
                         box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
-                    <div className="w-full rounded-xl border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))] transition-colors">
+                    <div className="w-full rounded-xl [border:2px_solid_hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:[border-color:hsl(var(--ring))] focus-within:ring-[3px] focus-within:ring-[hsl(var(--primary))]/10 transition-colors">
                         <textarea
                             ref={aiTextareaRef}
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
                             onKeyDown={e => {
-                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && aiPrompt.trim()) {
+                                // Plain Enter generates; ⌘/Ctrl+Enter and Shift+Enter fall
+                                // through to the textarea's default behavior and insert a new
+                                // line (Shift+Enter must stay excluded — it's the conventional
+                                // newline shortcut in chat-style inputs and was never asked to change).
+                                if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && aiPrompt.trim()) {
                                     e.preventDefault()
                                     handleCreateAi()
                                 }
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
                             rows={1}
-                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[14px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
                         />
-                        <div className="flex items-center justify-between gap-3 border-t border-[hsl(var(--input-border))]/60 px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
-                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
-                                <span>·</span>
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
-                                <span>+</span>
-                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                        <div className="flex items-center justify-end md:justify-between gap-3 [border-top:1px_solid_hsl(var(--input-border))] px-3 py-1">
+                            <div className="hidden md:flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
                                 <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
+                                <span>·</span>
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <span>+</span>
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
                             </div>
                             {/* Generate Drafts — shared dashboard primary button (size="dash") */}
                             <Button
@@ -422,9 +470,9 @@ export default function ProductsPage() {
                                 size="dash"
                                 onClick={handleCreateAi}
                                 disabled={!aiPrompt.trim()}
-                                className="shrink-0 justify-center"
+                                className="shrink-0 justify-center !h-6 !px-2.5 !text-[11.5px]"
                             >
-                                <Sparkles className="h-4 w-4" />
+                                <Sparkles className="!h-3 !w-3" />
                                 {t.dashboard.products.list.aiChatBtn}
                             </Button>
                         </div>
@@ -443,7 +491,7 @@ export default function ProductsPage() {
                                     setAiPrompt(suggestion.fill)
                                     aiTextareaRef.current?.focus()
                                 }}
-                                className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
+                                className="rounded-full [border:1px_solid_hsl(var(--border))] bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:[border-color:hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10"
                             >
                                 {suggestion.label}
                             </button>
@@ -482,30 +530,22 @@ export default function ProductsPage() {
                         <TabsList variant="underline">
                             <TabsTrigger variant="underline" value="all">
                                 {t.dashboard.products.list.filterAll}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.all}
-                                </span>
+                                <TabsCount>{statusCounts.all}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="active">
 
                                 {t.dashboard.products.list.filterActive}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.active}
-                                </span>
+                                <TabsCount>{statusCounts.active}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="draft">
                                 <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
                                 {t.dashboard.products.list.filterDraft}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.draft}
-                                </span>
+                                <TabsCount>{statusCounts.draft}</TabsCount>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="archived">
                                 <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
                                 {t.dashboard.products.list.filterArchived}
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                                    {statusCounts.archived}
-                                </span>
+                                <TabsCount>{statusCounts.archived}</TabsCount>
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
@@ -548,8 +588,10 @@ export default function ProductsPage() {
                                 size="dash"
                                 onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
                                 style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                    ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                    : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
+                                    ? { background: 'hsl(var(--primary)/0.12)', border: '1px solid hsl(var(--primary)/0.4)', color: 'hsl(var(--primary))' }
+                                    : isAdvancedFiltersOpen
+                                        ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)', color: 'var(--dash-text-muted)' }
+                                        : { background: 'hsl(var(--card))', border: '1px solid hsl(var(--input-border))', color: 'var(--dash-text-muted)' }}
                                 className="shrink-0 rounded-[16px]"
                             >
                                 <Filter size={16} className="shrink-0" />
@@ -589,8 +631,8 @@ export default function ProductsPage() {
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
                             className="whitespace-nowrap"
                             style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                : { background: 'hsl(var(--card))' }}
+                                ? { background: 'hsl(var(--primary)/0.12)', border: '1px solid hsl(var(--primary)/0.4)', color: 'hsl(var(--primary))' }
+                                : { background: 'hsl(var(--card))', border: '1px solid hsl(var(--input-border))', color: 'var(--dash-text-muted)' }}
                         >
                             <Filter size={16} className="shrink-0" />
                             {t.dashboard.products.list.filterBtn}
@@ -632,7 +674,7 @@ export default function ProductsPage() {
                                             const cat = category.name;
                                             const isSelected = selectedCategories.includes(cat);
                                             return (
-                                                <label key={cat} className="flex items-center gap-[8px] cursor-pointer group min-h-[28px]"
+                                                <label key={category.id} className="flex items-center gap-[8px] cursor-pointer group min-h-[28px]"
                                                     onClick={(e) => { e.preventDefault(); setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]); }}>
                                                     {isSelected ? (
                                                         <div className="w-5 h-5 flex shrink-0 items-center justify-center rounded-[4px] bg-[hsl(var(--primary))] group-hover:opacity-80 transition-opacity">
@@ -756,7 +798,7 @@ export default function ProductsPage() {
                             <div className="hidden min-[820px]:block">
                                 <Table
                                     className="table-fixed w-full dash-table-compact"
-                                    footer={
+                                    footer={shouldShowTablePagination(filteredAndSortedProducts.length) ? (
                                         <TablePagination
                                             page={currentPage}
                                             total={filteredAndSortedProducts.length}
@@ -765,15 +807,16 @@ export default function ProductsPage() {
                                             onLimitChange={handleLimitChange}
                                             labels={{ unit: 'products' }}
                                         />
-                                    }
+                                    ) : undefined}
                                 >
                                     <colgroup>
                                         <col style={{ width: '60px' }} />
-                                        <col style={{ width: '30%' }} />
-                                        <col style={{ width: '16%' }} />
-                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '24%' }} />
+                                        <col style={{ width: '15%' }} />
                                         <col style={{ width: '12%' }} />
-                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '11%' }} />
+                                        <col style={{ width: '116px' }} />
+                                        <col style={{ width: '12%' }} />
                                         <col style={{ width: '86px' }} />
                                     </colgroup>
 
@@ -784,6 +827,22 @@ export default function ProductsPage() {
                                             <TableHead>{t.dashboard.products.list.colPrice}</TableHead>
                                             <TableHead>{t.dashboard.products.list.colStock}</TableHead>
                                             <TableHead>{t.dashboard.products.list.colWeight}</TableHead>
+                                            <TableHead
+                                                className="cursor-pointer select-none"
+                                                onClick={() => setSortBy(prev => (prev === 'Latest' ? 'Oldest' : 'Latest'))}
+                                                title={t.dashboard.products.list.colCreated}
+                                            >
+                                                <span className="inline-flex items-center gap-1">
+                                                    {t.dashboard.products.list.colCreated}
+                                                    {sortBy === 'Latest' ? (
+                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                    ) : sortBy === 'Oldest' ? (
+                                                        <ArrowUp className="w-3.5 h-3.5" />
+                                                    ) : (
+                                                        <ArrowUpDown className="w-3.5 h-3.5 opacity-50" />
+                                                    )}
+                                                </span>
+                                            </TableHead>
                                             <TableHead>{t.dashboard.products.list.colStatus}</TableHead>
                                             <TableHead className="text-right">{t.dashboard.products.list.colActions}</TableHead>
                                         </TableRow>
@@ -795,7 +854,10 @@ export default function ProductsPage() {
                                             const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
-                                            const inv = product.inventory || 0
+                                            const createdDate = product.createdAt ? new Date(product.createdAt) : null
+                                            const createdDisplay = createdDate && !isNaN(createdDate.getTime()) ? format(createdDate, 'dd MMM yyyy') : '—'
+                                            const stockDisplay = computeStockDisplay(product)
+                                            const stockLabel = formatStockLabel(stockDisplay, t)
                                             const missing = getMissingFields(product)
 
                                             return (
@@ -838,18 +900,58 @@ export default function ProductsPage() {
 
                                                     {/* Stock */}
                                                     <TableCell>
-                                                        {inv === 0 ? (
-                                                            <Badge variant="destructive" dot>{inv}</Badge>
-                                                        ) : inv <= 5 ? (
-                                                            <Badge variant="warning" dot>{inv}</Badge>
+                                                        {stockDisplay.breakdown && stockDisplay.breakdown.length > 1 ? (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        tabIndex={0}
+                                                                        role="button"
+                                                                        aria-label={`${t.dashboard.products.list.colStock}: ${stockLabel}`}
+                                                                        className="inline-flex cursor-help"
+                                                                    >
+                                                                        <Badge variant={stockDisplay.severity} dot>{stockLabel}</Badge>
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent align="start" onClick={(e) => e.stopPropagation()} className="w-52 p-0 overflow-hidden">
+                                                                    <p className="border-b border-[hsl(var(--border))] px-3 py-2 text-[12px] font-semibold text-foreground">
+                                                                        {t.dashboard.products.list.colStock}
+                                                                    </p>
+                                                                    <ul className="max-h-48 list-none space-y-0.5 overflow-y-auto p-1.5">
+                                                                        {stockDisplay.breakdown.map((v, i) => {
+                                                                            const rowSeverity = singleSeverity(v.stock)
+                                                                            return (
+                                                                                <li key={i} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1">
+                                                                                    <span className="flex min-w-0 items-center gap-1.5">
+                                                                                        <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STOCK_ROW_DOT_CLASSES[rowSeverity])} />
+                                                                                        <span className="truncate text-foreground/70">{v.name}</span>
+                                                                                    </span>
+                                                                                    <span className={cn("shrink-0 font-semibold tabular-nums", STOCK_ROW_TEXT_CLASSES[rowSeverity])}>{v.stock}</span>
+                                                                                </li>
+                                                                            )
+                                                                        })}
+                                                                    </ul>
+                                                                </TooltipContent>
+                                                            </Tooltip>
                                                         ) : (
-                                                            <Badge variant="success" dot>{inv}</Badge>
+                                                            <Badge variant={stockDisplay.severity} dot>{stockLabel}</Badge>
                                                         )}
                                                     </TableCell>
 
                                                     {/* Weight */}
                                                     <TableCell>
                                                         <span className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{weightDisplay}</span>
+                                                    </TableCell>
+
+                                                    {/* Created */}
+                                                    <TableCell>
+                                                        <span
+                                                            className="text-[14px] whitespace-nowrap"
+                                                            style={{ color: 'var(--dash-text-muted)' }}
+                                                            title={createdDate ? createdDate.toLocaleString() : undefined}
+                                                        >
+                                                            {createdDisplay}
+                                                        </span>
                                                     </TableCell>
 
                                                     {/* Status toggle */}
@@ -891,7 +993,8 @@ export default function ProductsPage() {
                         <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
-                                const inv = product.inventory || 0
+                                const stockDisplay = computeStockDisplay(product)
+                                const stockLabel = formatStockLabel(stockDisplay, t)
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                 const missing = getMissingFields(product)
@@ -948,21 +1051,53 @@ export default function ProductsPage() {
                                             {/* Stock (Left) */}
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                {inv === 0 ? (
-                                                        <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
-                                                        </div>
-                                                    ) : inv <= 5 ? (
-                                                        <div className="inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] px-2 bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.3)]">
+                                                {stockDisplay.breakdown && stockDisplay.breakdown.length > 1 ? (
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className={`inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] border px-2 ${STOCK_CHIP_CLASSES[stockDisplay.severity]}`}
+                                                            >
+                                                                {stockDisplay.severity === 'warning' && (
+                                                                    <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                                )}
+                                                                <span className="text-[13px] font-semibold">{stockLabel}</span>
+                                                            </button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent
+                                                            align="start"
+                                                            className="w-52 p-0 overflow-hidden"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <p className="border-b border-[hsl(var(--border))] px-3 py-2 text-[12px] font-semibold text-foreground">
+                                                                {t.dashboard.products.list.colStock}
+                                                            </p>
+                                                            <ul className="max-h-48 list-none space-y-0.5 overflow-y-auto p-1.5">
+                                                                {stockDisplay.breakdown.map((v, i) => {
+                                                                    const rowSeverity = singleSeverity(v.stock)
+                                                                    return (
+                                                                        <li key={i} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 text-[12px]">
+                                                                            <span className="flex min-w-0 items-center gap-1.5">
+                                                                                <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STOCK_ROW_DOT_CLASSES[rowSeverity])} />
+                                                                                <span className="truncate text-foreground/70">{v.name}</span>
+                                                                            </span>
+                                                                            <span className={cn("shrink-0 font-semibold tabular-nums", STOCK_ROW_TEXT_CLASSES[rowSeverity])}>{v.stock}</span>
+                                                                        </li>
+                                                                    )
+                                                                })}
+                                                            </ul>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                ) : (
+                                                    <div className={`inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] border px-2 ${STOCK_CHIP_CLASSES[stockDisplay.severity]}`}>
+                                                        {stockDisplay.severity === 'warning' && (
                                                             <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--warning))]">{inv}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--success))]/10 border border-[#05DF72]/30">
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--success))]">{inv}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        )}
+                                                        <span className="text-[13px] font-semibold">{stockLabel}</span>
+                                                    </div>
+                                                )}
+                                            </div>
 
                                                 {/* Status Toggle - Compacted */}
                                                 <div
@@ -1018,7 +1153,7 @@ export default function ProductsPage() {
 
                         {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
                             pager lives in its footer slot from iPad Air up. */}
-                        {totalPages > 1 && (
+                        {shouldShowTablePagination(filteredAndSortedProducts.length) && (
                             <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}

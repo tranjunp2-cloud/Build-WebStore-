@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef } from 'react'
-import { ImagePlus } from 'lucide-react'
+import { ImagePlus, Loader2 } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { useI18n } from '@/i18n'
 
@@ -43,13 +43,17 @@ export function ImageToolbar({ onImageSelect, isProcessing }: ImageToolbarProps)
                 onChange={handleFileChange}
             />
             
-            <button 
+            <button
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors disabled:opacity-50"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessing}
             >
-                <ImagePlus className="w-4 h-4" />
-                {it.changeImage}
+                {isProcessing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                    <ImagePlus className="w-4 h-4" />
+                )}
+                {isProcessing ? it.uploading : it.changeImage}
             </button>
 
         </div>

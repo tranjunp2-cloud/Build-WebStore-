@@ -846,6 +846,143 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-053: Subdomain input — IME tiếng Việt không rớt ký tự (composition)
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, đang ở chế độ "Change subdomain" (input slug hiển thị)
+- **Steps:**
+  1. `compositionStart` trên input (mô phỏng IME Telex/VNI/Unikey bắt đầu compose)
+  2. `change` với giá trị `"shopđ"` khi đang compose
+  3. `compositionEnd` với giá trị `"shopđ"`
+- **Expected:** Trong lúc compose, buffer giữ nguyên `"shopđ"` (KHÔNG bị sanitize giữa chừng → không rớt ký tự); sau `compositionEnd` giá trị được lọc còn `"shop"` (`[a-z0-9-]`)
+- **Test Data:** Chuỗi compose `"shopđ"` → kết quả `"shop"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-054: Subdomain input — EN keyboard vẫn lowercase + strip khi gõ
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", không có composition
+- **Steps:**
+  1. `change` với giá trị `"My-Shop!@#"`
+- **Expected:** Không regression — giá trị được lowercase + strip ký tự lạ ngay lập tức → `"my-shop"`
+- **Test Data:** `"My-Shop!@#"` → `"my-shop"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-055: Subdomain input — không còn bị chốt cứng 280px
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. Render input, đọc className của container + input
+- **Expected:** Container KHÔNG chứa `max-w-[280px]`, có `sm:max-w-[520px]`; input giữ `flex-1` + `min-w-0` để slug dài tới 63 ký tự luôn hiển thị
+- **Test Data:** —
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-056: Subdomain edit — message validation không bị cắt trên mobile
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. Đọc className của row bao ngoài (cha của input-group)
+  2. Idle: đếm số con của row
+  3. `change` với giá trị `"ab"` (< 3 ký tự), chờ debounce 400ms
+- **Expected:** Row có `flex-wrap` (mobile: input `w-full` → message rớt xuống dưới, không tràn viewport); idle KHÔNG render status div (tránh dòng wrap rỗng); message `"At least 3 characters"` có `break-words`, container có `min-w-0`, không còn `ml-2`
+- **Test Data:** `"ab"` → invalid
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-057: Subdomain edit — gõ về đúng slug hiện tại thì message lỗi cũ tự reset
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. `change` với giá trị `"ab"` → chờ debounce → message `"At least 3 characters"` xuất hiện
+  2. `change` về đúng slug hiện tại (`"mywebstore"`)
+- **Expected:** Status reset về `idle` — message lỗi cũ biến mất (trước đây effect early-return khi `slugInput === currentSlug` mà không reset status → message treo)
+- **Test Data:** `"ab"` → invalid → `"mywebstore"` → idle
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-058: Subdomain edit — response check về muộn (sau khi revert input) bị bỏ, không đè UI
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1583, review PR #1596)
+- **Scenario Reference:** — (race: fetch in-flight vs revert)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", fetch mock deferred (không resolve ngay)
+- **Steps:**
+  1. Gõ `"shop-race"` → chờ debounce → fetch được dispatch (chưa resolve)
+  2. Revert input về đúng slug hiện tại → status reset `idle`
+  3. Resolve fetch (kết quả `unavailable`)
+- **Expected:** Seq guard bỏ response cũ — KHÔNG hiện `"Already taken"` cạnh slug hiện tại (chống biến thể race của #1583); cơ chế này đồng thời chặn 2 fetch chồng nhau resolve ngược thứ tự
+- **Test Data:** deferred fetch, `"shop-race"` → revert `"mywebstore"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-059: Subdomain edit — gõ tiếp sau verdict `available` thì Save disable ngay lập tức
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596)
+- **Scenario Reference:** — (cửa sổ 400ms debounce: Save sáng với status của slug cũ)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", fetch mock trả `available: true`
+- **Steps:**
+  1. Gõ `"shop-a"` → chờ check → Save enabled
+  2. Gõ thêm 1 ký tự (`"shop-ab"`) → assert Save disabled NGAY (không chờ debounce)
+- **Expected:** Verdict cũ hết hiệu lực ngay khi input đổi — user không thể Save slug chưa được check
+- **Test Data:** `"shop-a"` (available) → `"shop-ab"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-060: Subdomain edit — dừng gõ giữa IME composition không bắn check; check chạy sau compositionEnd
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596, liên quan #1459 IME)
+- **Scenario Reference:** — (debounce fire với raw buffer IME)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", đang composition (IME tiếng Việt)
+- **Steps:**
+  1. `compositionStart` → `change` với buffer `"shopd"` → đợi > 400ms (vẫn đang composition)
+  2. Assert fetch KHÔNG được gọi
+  3. `compositionEnd` với `"shopd"` (sanitize xong không đổi giá trị)
+- **Expected:** Không có request nào cho buffer chưa chốt; sau compositionEnd check vẫn chạy cho giá trị đã chốt (state `isComposingSlug` đảm bảo effect re-run kể cả khi input không đổi)
+- **Test Data:** `"shopd"` (buffer ASCII — case khó: sanitize không đổi)
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-061: Subdomain edit — Cancel giữa IME composition không làm kẹt checker ở session sau
+- **Priority:** P2
+- **Type:** Unit (component)
+- **AC Reference:** — (review PR #1596 — comment levietducprime)
+- **Scenario Reference:** — (flag `isComposingSlug` kẹt true khi input unmount trước compositionend)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", đang composition
+- **Steps:**
+  1. `compositionStart` → `change` buffer → bấm **Cancel** (input unmount, compositionend không bao giờ bắn)
+  2. Bấm "Change subdomain" vào lại edit mode → gõ slug hợp lệ
+- **Expected:** Flag composition được reset khi vào edit mode → check chạy bình thường → Save enable; không fix thì effect debounce early-return vĩnh viễn, Save không bao giờ sáng
+- **Test Data:** `"shopcomposing"` (đang compose) → Cancel → `"shop-fresh"` → available
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1016,4 +1153,8 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 52 Test Cases — 10 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 61 Test Cases — 19 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
+*TC-F23-056..057 bổ sung cho BUG #1583 (message validation tràn khỏi màn hình mobile + message lỗi treo khi gõ về slug hiện tại).*
+*TC-F23-058..060 bổ sung từ adversarial review PR #1596 (seq guard chống response về muộn, Save disable ngay khi gõ tiếp, IME composition không bắn check).*
+*TC-F23-061 bổ sung từ review comment PR #1596 (reset flag composition khi vào edit mode — chống kẹt checker sau Cancel giữa composition).*

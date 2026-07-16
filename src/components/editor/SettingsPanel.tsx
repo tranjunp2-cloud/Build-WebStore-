@@ -43,9 +43,10 @@ import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
-import { StateSelect } from './local-business/state-select'
+import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
-import { OpeningHoursTable } from './local-business/opening-hours-table'
+import { OpeningHoursEditor } from './local-business/opening-hours-editor'
+import { sanitizeLegacyOpeningHours } from './local-business/opening-hours-utils'
 import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
@@ -447,7 +448,6 @@ function SettingsPanelInner({
     const footerSectionRef = React.useRef<HTMLDivElement>(null)
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
-    const [localBusinessPostcodeError, setLocalBusinessPostcodeError] = useState<string | null>(null)
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -489,6 +489,21 @@ function SettingsPanelInner({
     // the merge-then-track sequence lives in exactly one place (DRY).
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
         const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
+        // Every save re-sends the full openingHours array (full-object merge
+        // above). A row saved before AC-3's strict validation could have
+        // isClosed=false with missing opens/closes, or no dayOfWeek at all —
+        // re-sending it as-is now fails saveSiteSchema. This also has to run
+        // when patch.openingHours IS set: applyBatchSave only re-encodes the
+        // day(s) the user just edited and passes every OTHER day through
+        // unchanged, so a legacy-invalid row on an untouched day would still
+        // 400 the save. sanitizeLegacyOpeningHours is a no-op for well-formed
+        // rows (encodeDay's output always has dayOfWeek, and open rows always
+        // have both opens+closes), so this never weakens validation for a
+        // genuinely new bad submission — there isn't one, since the UI can't
+        // produce one.
+        if (merged.openingHours) {
+            merged.openingHours = sanitizeLegacyOpeningHours(merged.openingHours)
+        }
         const result = await onSiteSettingsChange?.({ localBusiness: merged })
         // Only track on a confirmed successful save — onSiteSettingsChange resolves
         // even on failure (errors are caught/toasted upstream), so `result === true`
@@ -722,48 +737,28 @@ function SettingsPanelInner({
                                 placeholder={s.streetAddressPlaceholder}
                             />
                         </div>
-                        <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
-                            <div>
-                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.city}</label>
-                                <Input
-                                    defaultValue={siteLocalBusiness.city || ''}
-                                    key={`lb-city-${siteLocalBusiness.city || ''}`}
-                                    onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ city: sanitizeInput(e.target.value) })}
-                                    variant="editor"
-                                    className={editorInputClassName}
-                                    placeholder={s.cityPlaceholder}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.postcode}</label>
-                                <Input
-                                    defaultValue={siteLocalBusiness.postcode || ''}
-                                    key={`lb-postcode-${siteLocalBusiness.postcode || ''}`}
-                                    onBlur={(e: FieldBlurEvent) => {
-                                        const v = e.target.value.trim()
-                                        if (!v || /^\d{5}$/.test(v)) {
-                                            setLocalBusinessPostcodeError(null)
-                                            void handleLocalBusinessChange({ postcode: v })
-                                        } else {
-                                            setLocalBusinessPostcodeError(t.editor.settingsValidation.invalidPostcode)
-                                            toast.error(t.editor.settingsValidation.invalidPostcode)
-                                        }
-                                    }}
-                                    variant="editor"
-                                    className={cn(editorInputClassName, localBusinessPostcodeError && 'border-red-500/50')}
-                                    placeholder={s.postcodePlaceholder}
-                                />
-                                {localBusinessPostcodeError ? <p className="mt-1 text-[11px] text-red-400">{localBusinessPostcodeError}</p> : null}
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.state}</label>
-                            <StateSelect
-                                value={siteLocalBusiness.state}
-                                onChange={value => void handleLocalBusinessChange({ state: value })}
-                                placeholder={s.selectState}
-                            />
-                        </div>
+                        {/* State drives the District/Postcode cascade, so it must be picked
+                            first — a deliberate reorder from the old street→city→postcode→state
+                            order (see plans/260710-1032-f37-local-business-geo-cascade). `key`
+                            forces a remount once `site` finishes loading (site starts `null` at
+                            first paint), so the reverse-resolve pre-fill effect re-runs against
+                            real saved data instead of permanently resolving against an empty value. */}
+                        <GeoCascadeFields
+                            key={site?.id ?? 'lb-geo-pending'}
+                            value={{ state: siteLocalBusiness.state, city: siteLocalBusiness.city, postcode: siteLocalBusiness.postcode }}
+                            onChange={patch => void handleLocalBusinessChange(patch)}
+                            fullWidth={fullWidth}
+                            labels={{
+                                state: s.state,
+                                city: s.city,
+                                postcode: s.postcode,
+                                selectState: s.selectState,
+                                selectCity: s.selectCity,
+                                selectPostcode: s.selectPostcode,
+                                loadingOption: s.loadingOption,
+                                legacyValueHint: s.legacyValueHint,
+                            }}
+                        />
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
                             <Input
@@ -858,7 +853,7 @@ function SettingsPanelInner({
 
                     <div className="space-y-3 border-t border-white/[0.06] pt-4">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.openingHoursGroupLabel}</p>
-                        <OpeningHoursTable
+                        <OpeningHoursEditor
                             rows={siteLocalBusiness.openingHours}
                             fullWidth={fullWidth}
                             onChange={rows => void handleLocalBusinessChange({ openingHours: rows })}
@@ -874,6 +869,17 @@ function SettingsPanelInner({
                             closedLabel={s.openingHoursClosed}
                             opensLabel={s.openingHoursOpens}
                             closesLabel={s.openingHoursCloses}
+                            editAllLabel={s.openingHoursEditAll}
+                            editWeekdaysLabel={s.openingHoursEditWeekdays}
+                            editWeekendLabel={s.openingHoursEditWeekend}
+                            editDayAriaTemplate={s.openingHoursEditDayAria}
+                            modalTitle={s.openingHoursModalTitle}
+                            open24hLabel={s.openingHoursOpen24}
+                            addRangeLabel={s.openingHoursAddRange}
+                            removeRangeLabel={s.openingHoursRemoveRange}
+                            invalidRangeLabel={s.openingHoursInvalidRange}
+                            saveLabel={s.openingHoursSave}
+                            cancelLabel={s.openingHoursCancel}
                         />
                     </div>
 

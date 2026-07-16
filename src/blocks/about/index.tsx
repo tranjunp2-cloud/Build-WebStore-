@@ -6,6 +6,7 @@ import type { AboutConfig, TimelineItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 import {
     SectionLabel,
     DiagonalStripe,
@@ -81,13 +82,15 @@ function AboutImage({
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.15 }}
         >
-            <img
-                src={imageUrl}
-                alt={alt}
-                className="w-full h-auto object-cover aspect-[4/3] max-h-[500px]"
-                style={{ borderRadius: 'var(--radius-lg)' }}
-                loading="lazy"
-            />
+            <MediaUploadOverlay field="image" altText={alt}>
+                <img
+                    src={imageUrl}
+                    alt={alt}
+                    className="w-full h-auto object-cover aspect-[4/3] max-h-[500px]"
+                    style={{ borderRadius: 'var(--radius-lg)' }}
+                    loading="lazy"
+                />
+            </MediaUploadOverlay>
         </motion.div>
     )
 }
@@ -404,12 +407,14 @@ function ImageOverlayVariant({ block, category, s3Map }: { block: AboutConfig; c
             className="relative overflow-hidden"
             style={{ color: '#ffffff', minHeight: 480 }}
         >
-            <img
-                src={imageUrl}
-                alt={block.image?.alt || `About ${headline || 'us'}`}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-            />
+            <MediaUploadOverlay field="image" altText={block.image?.alt || `About ${headline || 'us'}`} positionClass="absolute inset-0">
+                <img
+                    src={imageUrl}
+                    alt={block.image?.alt || `About ${headline || 'us'}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                />
+            </MediaUploadOverlay>
             <DuotoneOverlay color1="#0a0a0a" color2={CSS_VARS.primary} opacity={0.65} blendMode="multiply" />
             <SectionWrapper
                 as="div"
