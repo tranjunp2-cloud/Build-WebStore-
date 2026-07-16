@@ -10,7 +10,7 @@ import OpenAI from 'openai'
 import type { BasePayload } from 'payload'
 import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
-import { resolveComposerCategory } from './composer-category-resolver'
+import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
 import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
@@ -146,8 +146,12 @@ Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a ch
 
 /** Tier 2: deterministic curated products from library, keyed by category. */
 function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProduct & { _imageKeyword: string }> {
-    const category = resolveComposerCategory(
-        `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products}`,
+    // GH-1611: form key wins — otherwise a bakery whose name/products carry no
+    // 'fnb' keyword fell to 'business' and its product grid pulled corporate stock
+    // while the rest of the site showed cakes.
+    const category = resolveBusinessCategory(
+        businessInfo.industry,
+        `${businessInfo.businessName} ${businessInfo.products}`,
     )
     const pool = SAMPLE_PRODUCTS_BY_CATEGORY[category] ?? SAMPLE_PRODUCTS_BY_CATEGORY['business'] ?? []
     // businessName-only seed is intentional: curated fallback products are generic
@@ -355,8 +359,11 @@ export async function generateSampleProducts(
 
     // Fetch images sequentially with delay to stay within Unsplash rate limits (demo: 50/hr)
     const siteKey = siteId ? String(siteId) : Date.now().toString(36)
-    const category = resolveComposerCategory(
-        `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+    // GH-1611: form key wins (see getFallbackProducts) — this one drives the
+    // product IMAGE search, so a wrong category is a wrong-industry photo.
+    const category = resolveBusinessCategory(
+        businessInfo.industry,
+        `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
     )
     // Pre-fetch product URLs as Tier-C fallback (direct download, no search API needed)
     // Seed-shuffle the fixed industry pool (6 items) so each product gets a distinct URL

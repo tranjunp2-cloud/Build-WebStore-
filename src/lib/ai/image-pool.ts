@@ -13,7 +13,7 @@
  * Depends on: Phase 02 theme-moods (mood.photographyFilter + mood.imageryKeywords)
  */
 
-import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, PixabayError, type PixabayPhoto } from './pixabay-client'
+import { searchPhotos, detectQueryLang, photoMatchesTerms, PIXABAY_CATEGORY_BY_COMPOSER, PixabayError, type PixabayPhoto } from './pixabay-client'
 import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 
@@ -61,11 +61,34 @@ export interface BuildPoolCtx {
    * (e.g. "ramen" vs "noodles") still yield distinct pool queries.
    */
   products?: string[]
+  /**
+   * GH-1611: the subset of `products` the USER actually typed — what the relevance
+   * gate is allowed to trust. `products` also carries LLM-extracted visual keywords
+   * (route.ts mergeKeywords ← extractImageKeywords), and those may be adjectives
+   * ("artisan", "minimalist"). A 1-word term needs a single tag hit, so gating on an
+   * adjective re-opens the exact hole this issue is about: a photo tagged
+   * "jeans, flatlay, minimalist" would enter a bakery's pool.
+   *
+   * Absent → fall back to `products` (callers with no LLM keywords: tests, legacy).
+   */
+  gateProducts?: string[]
   /** Deterministic seed — same seed returns same query (query-level stability). */
   seed: number
   /** Optional sizes; defaults match typical block needs per home page. */
   landscapeSize?: number
   squareSize?: number
+  /**
+   * GH-1611: how many photos a bucket must hold before it counts as FILLED —
+   * i.e. the largest single-block need mapping to that bucket (gallery = 6).
+   *
+   * Previously a bucket declared itself full at half its size (4 of 9), so the
+   * fallback ladder stopped early, gallery came up 2 short, and media-injector
+   * patched the deficit with an off-pool legacy search whose photos were
+   * appended AFTER the pool ones — the "first 4 right, last 2 wrong" pattern in
+   * the bug report. Defaults to the legacy half-size heuristic when absent.
+   */
+  landscapeMin?: number
+  squareMin?: number
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -75,7 +98,25 @@ export const DEFAULT_SQUARE_SIZE = 6
 
 
 /**
- * Build the Pixabay search query from the context.
+ * GH-1611: a composer category is an internal KEY ('fnb', 'realestate'), not a
+ * word anyone tags a photo with — searching Pixabay for q="fnb" returns
+ * nothing. Only 'business' happens to also be a real word, which is exactly why
+ * the fnb→business drift produced retail/fashion photos instead of no photos.
+ * Always search with the category's natural-language phrase instead.
+ */
+function categoryPhrase(category: string): string {
+  return Object.hasOwn(CATEGORY_BASE_KEYWORDS, category)
+    ? CATEGORY_BASE_KEYWORDS[category]?.[0] ?? category
+    : category
+}
+
+/**
+ * Build the Pixabay search TERMS from the context.
+ *
+ * GH-1611: terms are kept as an array, not pre-joined. The relevance gate must
+ * know where one product term ends and the next begins — AND-matching the
+ * joined string would demand a single photo be both a cake and a baguette (see
+ * `photoMatchesTerms`). `buildPoolQuery` still joins them for Pixabay's `q`.
  *
  * Pixabay `q` is AND-matched on image tags (every word must match), so the
  * query must stay tight — mixing raw user-language product terms with English
@@ -83,12 +124,13 @@ export const DEFAULT_SQUARE_SIZE = 6
  *
  * Rules:
  *   - Raw keyword present (products/topProduct, user language, UNtranslated)
- *     → q = raw terms ONLY (max 3). No English scaffolding mixed in.
- *   - No raw keyword → scaffolding: resolved category + 1 mood adjective.
+ *     → terms = raw terms ONLY (max 3). No English scaffolding mixed in.
+ *   - No raw keyword → scaffolding: category phrase + 1 mood adjective.
  *   - relaxed=true → genuinely broaden: products[0] only; if already ≤1 term,
- *     fall to the category so the underfill retry produces a DIFFERENT query.
+ *     fall to the category phrase so the underfill retry produces a DIFFERENT
+ *     query.
  */
-export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): string {
+export function buildPoolTerms(ctx: BuildPoolCtx, relaxed: boolean = false): string[] {
   const terms: string[] = []
   const seen = new Set<string>()
   const push = (t: string | undefined) => {
@@ -122,12 +164,13 @@ export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): str
   if (hasRawKeyword) {
     if (relaxed) {
       // Broaden: single strongest term; if only one term existed anyway,
-      // fall to category so the retry query differs from the primary one.
+      // fall to the category PHRASE so the retry query differs from the primary
+      // one AND is actually searchable (GH-1611 — the composer key was not).
       const first = productTerms[0] ?? ctx.topProduct
       if (productTerms.length > 1) {
         push(first)
       } else {
-        push(ctx.category)
+        push(categoryPhrase(ctx.category))
         if (terms.length === 0) push(first)
       }
     } else {
@@ -140,13 +183,53 @@ export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): str
     }
   } else {
     // Scaffolding path — no user keyword to protect, English terms are fine.
-    push(ctx.category)
+    push(categoryPhrase(ctx.category))
     if (!relaxed && ctx.mood) {
       push(ctx.mood.imageryKeywords[0])
     }
   }
 
-  return terms.join(' ').trim()
+  return terms
+}
+
+/** The Pixabay `q` string — terms joined. See `buildPoolTerms` for the array. */
+export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): string {
+  return buildPoolTerms(ctx, relaxed).join(' ').trim()
+}
+
+/**
+ * The SUBJECT terms the relevance gate may judge a photo against: the user's
+ * products, and nothing else.
+ *
+ * Search terms ≠ gate terms. A search query may legitimately carry a mood
+ * adjective ("coffee shop minimalist") to bias Pixabay's ranking, but gating on
+ * an adjective is a hole: a 1-word term needs one hit, so "minimalist" would
+ * admit a photo tagged "jeans, flatlay, minimalist" into a bakery's pool — the
+ * exact cross-industry image GH-1611 is about.
+ *
+ * Empty when the user gave no products (scaffolding path). The gate is then
+ * skipped entirely: the query is already the curated category phrase and the
+ * Pixabay `category` filter keeps it on-domain, so gating that phrase against
+ * itself would only empty the bucket.
+ */
+export function buildGateTerms(ctx: BuildPoolCtx): string[] {
+  // User-typed products only — never the LLM-extracted keywords that also live in
+  // `products` (see BuildPoolCtx.gateProducts).
+  const source = ctx.gateProducts ?? ctx.products
+  const raw = source && source.length > 0 ? source
+    : ctx.gateProducts !== undefined ? []        // caller said: trust nothing
+    : [ctx.topProduct ?? '']
+  const seen = new Set<string>()
+  return raw
+    .map((t) => (t ?? '').trim())
+    .filter((t) => {
+      if (!t) return false
+      const lower = t.toLowerCase()
+      if (seen.has(lower)) return false
+      seen.add(lower)
+      return true
+    })
+    .slice(0, 3)
 }
 
 /**
@@ -201,12 +284,19 @@ export const VN_CATEGORY_QUERIES: Readonly<Record<string, string>> = {
 
 /**
  * Search one orientation bucket with the GH-1185 fallback ladder:
- *   1. primary query — Vietnamese queries are relevance-gated (every query
- *      word must appear in the photo tags; kills "cá cơm" false positives)
- *   2. relaxed query (broadened by buildPoolQuery) — same gate
+ *   1. primary query — relevance-gated against the query TERMS (GH-1611: every
+ *      language, not just Vietnamese; a photo must match at least one term)
+ *   2. relaxed query (broadened by buildPoolTerms) — same gate
  *   3. trusted category phrase, ungated — curated VN phrase
  *      (VN_CATEGORY_QUERIES) for VN queries, English category base keyword
  *      (CATEGORY_BASE_KEYWORDS[category][0]) otherwise
+ *
+ * GH-1611: tiers are merged with de-duplication by photo id. The tiers overlap by
+ * design (a broadened query re-returns the primary query's top hits), so a plain
+ * concat let the SAME photo count twice toward minCount — the bucket looked full
+ * while holding 4 distinct photos for a 6-slot gallery, and the gallery rendered
+ * the same cake twice. Only distinct photos count as progress.
+ *
  * Returns the photos plus whether any fallback tier fired (underfill signal).
  */
 async function searchBucket(
@@ -238,47 +328,91 @@ async function searchBucket(
     console.warn(`[image-pool] ${orientation} search failed:`, err)
     if (isRateLimited(err)) return { photos, usedFallback: true }
   }
-  if (isVietnamese) {
-    const gated = photos.filter((p) => photoMatchesQuery(p.alt, query))
-    if (gated.length < photos.length) {
+  // GH-1611: gate EVERY language, not just Vietnamese. The pool query is
+  // English by default (GEN_TRANSLATE_POOL_KEYWORDS), so a VN-only gate never
+  // ran in production and off-industry photos entered the pool unchecked.
+  // Gate on the SUBJECT terms (products), never on the joined query and never on
+  // mood adjectives — see buildGateTerms / photoMatchesTerms.
+  const gateTerms = buildGateTerms(ctx)
+  const gate = (candidates: PixabayPhoto[], terms: string[], label: string): PixabayPhoto[] => {
+    // No products → the query IS the curated category phrase; the Pixabay
+    // `category` filter is the domain guard and there is nothing to gate on.
+    if (terms.length === 0) return candidates
+    const kept = candidates.filter((p) => photoMatchesTerms(p.alt, terms))
+    if (kept.length < candidates.length) {
       console.info(
-        `[image-pool] ${orientation} relevance gate: ${gated.length}/${photos.length} photos match "${query}"`,
+        `[image-pool] ${orientation} relevance gate: ${kept.length}/${candidates.length} photos match "${label}"`,
       )
     }
-    photos = gated
+    return kept
   }
-  if (photos.length >= minCount) return { photos, usedFallback }
+  // GH-1611: tiers overlap (the broadened query re-returns the primary query's
+  // hits), so merging must dedupe by photo id — otherwise the same photo counts
+  // twice toward minCount and the gallery renders it twice.
+  const seenIds = new Set<string>()
+  const merge = (incoming: PixabayPhoto[]): void => {
+    for (const p of incoming) {
+      if (seenIds.has(p.id)) continue
+      seenIds.add(p.id)
+      photos.push(p)
+    }
+  }
+
+  const tier1 = gate(photos, gateTerms, query)
+  photos = []
+  merge(tier1)
+  if (photos.length >= minCount) return { photos: photos.slice(0, size), usedFallback }
+
+  // The curated category phrase is trusted (ungated) ONLY because Pixabay's
+  // `category` filter keeps its results on-domain. Four composer categories have no
+  // Pixabay equivalent (ecommerce, creative, events, blog → no filter), and there
+  // the curated tier is an open door: `ecommerce`'s phrase is "product photography",
+  // whose top hits are the very clothing flatlays this issue is about. So gate it on
+  // its own phrase when unfiltered, with no escape hatch.
+  //
+  // An empty bucket is a SAFE outcome — verified, not assumed:
+  // cleanupNonNumericImageFields (media-injector.ts:311-315) deletes any image field
+  // the pipeline could not fill, so GPT's hallucinated URL cannot survive, and the
+  // block renders a curated image keyed on siteType (api/preview/renderers/images.ts
+  // IMAGE_LIBRARY) — on-industry by construction. Off-industry stock beats nothing;
+  // it does NOT beat the curated on-industry library. So: never admit an ungated
+  // photo to avoid an empty bucket.
+  const curatedGateTerms = category ? [] : [categoryPhrase(ctx.category)]
 
   // Tier 2 — relaxed (broadened) query, still user-derived.
-  const relaxedQuery = buildPoolQuery(ctx, true)
+  const relaxedTerms = buildPoolTerms(ctx, true)
+  const relaxedQuery = relaxedTerms.join(' ').trim()
+  // Single-product input broadens straight to the category phrase — same trust
+  // rules as tier-3 then, not the product gate (which would reject everything the
+  // broader query was fetched to add).
+  const relaxedIsCurated = relaxedQuery === categoryPhrase(ctx.category)
+  let tier2Failed = false
   if (relaxedQuery !== query) {
     usedFallback = true
     try {
-      let extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
-      if (detectQueryLang(relaxedQuery) === 'vi') {
-        extra = extra.filter((p) => photoMatchesQuery(p.alt, relaxedQuery))
-      }
-      photos = photos.concat(extra)
+      const extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
+      merge(gate(extra, relaxedIsCurated ? curatedGateTerms : relaxedTerms, relaxedQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
       if (isRateLimited(err)) return { photos, usedFallback: true }
+      tier2Failed = true
     }
   }
-  if (photos.length >= minCount) return { photos, usedFallback }
+  if (photos.length >= minCount) return { photos: photos.slice(0, size), usedFallback }
 
-  // Tier 3 — trusted category phrase, ungated. VN inputs use the curated
-  // Vietnamese phrase (lang=vi). Non-VN inputs whose bucket is still under
-  // minCount (zero or thin hits — e.g. "pen dan pensel" has no Pixabay tag
-  // coverage) top up with the English category base keyword instead of
-  // returning an empty/thin bucket: an empty pool means media-injector
-  // replaces nothing, so GPT-hallucinated stock URLs (typically off-topic
-  // fashion shots for `ecommerce`) survive as-is.
+  // Tier 3 — curated category phrase. VN inputs use the curated Vietnamese phrase
+  // (lang=vi). Non-VN inputs whose bucket is still under minCount (zero or thin hits
+  // — e.g. "pen dan pensel" has no Pixabay tag coverage) top up with the English
+  // category base keyword. Trusted (ungated) only where Pixabay's `category` filter
+  // guards the domain; gated on the phrase itself otherwise — see curatedGateTerms.
   const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
   const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
   // `!== relaxedQuery` guard: on the scaffolding path the tier-2 query can
   // already equal the category base keyword — re-issuing the byte-identical
-  // just-failed search wastes a rate-limited Pixabay call.
-  if (catQuery && catQuery !== query && catQuery !== relaxedQuery) {
+  // just-failed search wastes a rate-limited Pixabay call. Unless tier-2 ERRORED
+  // (transient 5xx): then the query was never actually answered, and skipping it
+  // here would leave the bucket empty with no category fallback at all.
+  if (catQuery && catQuery !== query && (catQuery !== relaxedQuery || tier2Failed)) {
     usedFallback = true
     try {
       // lang:'vi' explicit for VN phrases — curated phrases like "quán cà phê"
@@ -291,12 +425,19 @@ async function searchBucket(
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
       }
-      photos = photos.concat(extra)
+      merge(gate(extra, curatedGateTerms, catQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
     }
   }
-  return { photos, usedFallback }
+  if (photos.length === 0) {
+    // Deliberate: the block falls back to the curated on-industry IMAGE_LIBRARY.
+    console.warn(`[image-pool] ${orientation} bucket empty after all tiers — category="${ctx.category}" query="${query}"`)
+  }
+  // Cap at the requested bucket size: the tiers stack, and every pool entry is
+  // downloaded + uploaded to Payload by preUploadPool. An uncapped bucket meant
+  // ~3× the media rows and S3 objects, serialized on the gen critical path.
+  return { photos: photos.slice(0, size), usedFallback }
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -322,8 +463,17 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   // call entirely (empty bucket is intentional here, NOT an underfill).
   let landscapePhotos: PixabayPhoto[] = []
   if (landscapeSize > 0) {
+    // GH-1611: "filled" = enough for the hungriest block that draws from this
+    // bucket (gallery needs 6), not half the bucket size. Never BELOW the legacy
+    // floor though — hero-only sizing has a base need of 1, and stopping the
+    // ladder at a single photo would hand hero and about the same image.
+    // Clamped to the bucket size so it can't demand more than we ever fetch.
+    const landscapeMin = Math.min(
+      landscapeSize,
+      Math.max(ctx.landscapeMin ?? 0, Math.max(3, Math.floor(landscapeSize / 2))),
+    )
     const landscape = await searchBucket(
-      ctx, query, 'landscape', landscapeSize, 1200, Math.max(3, Math.floor(landscapeSize / 2)),
+      ctx, query, 'landscape', landscapeSize, 1200, landscapeMin,
     )
     landscapePhotos = landscape.photos
     if (landscape.usedFallback || landscapePhotos.length === 0) underfill = true
@@ -332,8 +482,12 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   // ── Square bucket (team, product flatlay) ─────────────────────────
   let squarePhotos: PixabayPhoto[] = []
   if (squareSize > 0) {
+    const squareMin = Math.min(
+      squareSize,
+      Math.max(ctx.squareMin ?? 0, Math.max(2, Math.floor(squareSize / 2))),
+    )
     const square = await searchBucket(
-      ctx, query, 'squarish', squareSize, 1000, Math.max(2, Math.floor(squareSize / 2)),
+      ctx, query, 'squarish', squareSize, 1000, squareMin,
     )
     squarePhotos = square.photos
     if (square.usedFallback || squarePhotos.length === 0) underfill = true

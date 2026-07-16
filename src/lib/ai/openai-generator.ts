@@ -20,7 +20,7 @@ import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-
 import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
-import { resolveComposerCategory } from './composer-category-resolver'
+import { resolveBusinessCategory } from './composer-category-resolver'
 import { startCapture, finishCapture } from './capture-generation'
 import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
@@ -210,7 +210,10 @@ export async function generateSiteWithAI(
         // explicit RHYTHM section — hard-constrained block sequence drawn
         // from 3 curated recipes per category (story-first/menu-first/...).
         // Without this, GPT reverts to its prior and every site rhymes.
-        const presetCategory = resolveComposerCategory(promptText)
+        // GH-1611: the form's industry key is authoritative. Scoring promptText alone
+        // let a bakery named "Maison Dubois" score 0 and land on 'business', so the
+        // site theme/mood/recipe disagreed with the image pool (which resolves the key).
+        const presetCategory = resolveBusinessCategory(businessInfo.industry, promptText)
         const themeSeed = computeGenSeed(businessInfo)
         const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
         const layoutRecipe = pickRecipe(presetCategory, themeSeed)
@@ -2138,7 +2141,8 @@ async function generateTemplateFirst(
 ): Promise<{ result: GenerationResult; events: SSEEvent[] } | null> {
     events.push({ event: 'step', data: { step: 'composing', label: 'Building from templates...', progress: 15 } })
 
-    const presetCategory = resolveComposerCategory(promptText)
+    // GH-1611: same as above — form key wins over free-text scoring.
+    const presetCategory = resolveBusinessCategory(businessInfo.industry, promptText)
     const themeSeed = computeGenSeed(businessInfo)
     const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
     const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language

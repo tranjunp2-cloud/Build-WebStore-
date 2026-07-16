@@ -125,10 +125,16 @@ const POOL_MIN_EXTRA = 2
  * no enabled block resolves to 0 → buildImagePool skips that Pixabay call.
  *
  * Default config (hero-only) → { landscape: 3, square: 0 } instead of 12+6.
+ *
+ * GH-1611: also returns the un-buffered base (`landscapeMin`/`squareMin`) — the
+ * hungriest single block's need. buildImagePool uses it as the "bucket is
+ * filled" threshold, so the fallback ladder keeps going until gallery's 6 slots
+ * can actually be served from the pool instead of stopping at half the bucket
+ * and leaving media-injector to patch the deficit with off-pool photos.
  */
 export function computePoolBucketSizes(
     enabled: ReadonlySet<string> = getImageEnabledBlocks(),
-): { landscape: number; square: number } {
+): { landscape: number; square: number; landscapeMin: number; squareMin: number } {
     let landscapeBase = 0
     let squareBase = 0
     for (const blockType of enabled) {
@@ -149,6 +155,8 @@ export function computePoolBucketSizes(
     return {
         landscape: sized(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
         square: sized(squareBase, DEFAULT_SQUARE_SIZE),
+        landscapeMin: Math.min(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        squareMin: Math.min(squareBase, DEFAULT_SQUARE_SIZE),
     }
 }
 

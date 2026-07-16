@@ -14,7 +14,11 @@ import { composeFromBlueprint, type TemplateSeed } from './template-composer'
 import { TEMPLATE_PRESETS } from './template-definitions'
 import type { TemplatePreset } from './template-definitions'
 import { resolveFontPairing } from './font-pairings'
-import { resolveComposerCategory, type ComposerCategory } from './composer-category-resolver'
+import {
+    resolveBusinessCategory,
+    resolveComposerCategory,
+    type ComposerCategory,
+} from './composer-category-resolver'
 import { getCategoryContent } from './content'
 import type { BusinessSample } from './content/types'
 import type { GenerationResult, GeneratedBlock, GeneratedPage, BusinessIntent } from './generate-blocks'
@@ -72,6 +76,10 @@ function findFirstImage(blocks: GeneratedBlock[]): string | undefined {
  * Pick a deterministic preset for a category using the seed.
  * Throws if no presets exist for the category (should never happen — all 14 have 4 each).
  */
+function hasPresets(category: ComposerCategory): boolean {
+    return TEMPLATE_PRESETS.some((p) => p.category === category)
+}
+
 function pickPreset(category: ComposerCategory, seed: number): TemplatePreset {
     const candidates = TEMPLATE_PRESETS.filter((p) => p.category === category)
     if (candidates.length === 0) {
@@ -190,7 +198,18 @@ export function composeTemplateResult(
     // failure so the caller (openai-generator.generateWithFallback) can
     // cleanly try the legacy generateBlocks safety net instead of throwing
     // through the outer catch and surfacing as a 500 to the user.
-    const category = resolveComposerCategory(prompt)
+    // GH-1611: the Builder form sends `industry` as an ALREADY-RESOLVED composer key
+    // ('fnb'), which resolveComposerCategory scores at 0 and sinks to 'business' — so
+    // a bakery got built from the corporate blueprint (and its images with it). Trust
+    // the form key; score the free text only when there is no key.
+    //
+    // Guard: events/travel/blog have no TEMPLATE_PRESETS and pickPreset throws for
+    // them (caller catches → legacy generator). That hole is pre-existing on the
+    // free-text path; keep today's behaviour rather than let the form key newly
+    // trigger it — fixing the preset gap is a separate issue.
+    const industry = typeof info === 'string' ? undefined : info?.industry
+    const formCategory = resolveBusinessCategory(industry, prompt)
+    const category = hasPresets(formCategory) ? formCategory : resolveComposerCategory(prompt)
     const preset = pickPreset(category, seed)
 
     // Legacy string overload = extracted name only. New object overload = full wire info.

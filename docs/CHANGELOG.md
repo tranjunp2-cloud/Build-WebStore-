@@ -15,6 +15,17 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F01 — AI Gen: images matched the wrong industry (GH-1611)
+
+A bakery's generated Gallery mixed cake photos with clothing photos (jeans flatlay, shirt rack).
+
+- **Root cause — silent category drift.** The builder form posts `businessInfo.industry` as an already-resolved composer key (`'fnb'`), but five call sites fed it back through `resolveComposerCategory()`, a free-text classifier. `'fnb'` and `'realestate'` are absent from their own keyword lists, so both scored 0 and fell into the `'business'` safe sink. Pixabay was then filtered on `category=business` instead of `food` — retail/fashion stock became eligible. Fixed by using the existing `normalizeComposerCategory()` (`route.ts` ×4, `gen-page-split.ts`). Side effects also fixed: a bakery was stored with `siteType=business` instead of `restaurant`, and blog/nav seeding used the wrong category.
+- **Relevance gate now runs in production.** The gate (`photoMatchesQuery`, GH-1185) only applied to Vietnamese queries, but the pool query is translated to English by default (`GEN_TRANSLATE_POOL_KEYWORDS`) — so it never ran. New `photoMatchesTerms()` gates **every** language and matches per product TERM instead of AND-matching the joined query, which had demanded a single photo be both a cake and a baguette.
+- **Fallback tiers no longer search by internal key.** Broadened/scaffolding queries used the composer key verbatim (`q="fnb"` → 0 hits; `q="business"` → the retail photos in this bug). They now use `CATEGORY_BASE_KEYWORDS[category][0]` (`'coffee shop'`).
+- **Pool sizing:** a bucket now counts as filled only when it can serve the hungriest block that draws from it (gallery = 6), not at half the bucket size. Previously the ladder stopped at 4 of 9, and media-injector patched gallery's 2-slot deficit with an off-pool search whose photos were appended last — the exact "first 4 right, last 2 wrong" pattern reported.
+- **Observability:** `[image-pool] UNDERFILL` warn (category, query, per-bucket counts) when the pool cannot fill.
+- Tests: `composer-category-resolver.test.ts` pins idempotency across all 14 `TEMPLATE_CATEGORY_OPTIONS` values, so a newly added industry option cannot drift unnoticed.
+
 ### F36 — Order Detail Redesign (Full-Page 2-Column with EasyParcel Fulfillment, GH-1333)
 
 **Order fulfillment CMS screen moved from right-slide drawer to full-page route:**
