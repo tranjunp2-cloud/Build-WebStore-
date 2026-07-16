@@ -233,8 +233,14 @@ function LoginFormContent() {
                 }
 
                 setFormError('root', { message: errorCode })
-                resetField('password')
                 toast.error(localizedMsg)
+                setTimeout(() => {
+                    const pwdInput = document.getElementById('password') as HTMLInputElement | null
+                    if (pwdInput) {
+                        pwdInput.focus()
+                        pwdInput.select()
+                    }
+                }, 50)
                 return
             }
 
