@@ -104,15 +104,18 @@ vi.mock('@/lib/ai/coerce-video-variants', () => ({
 vi.mock('@/components/builder/BuilderCompletionView', () => ({
     default: ({
         onDashboard,
+        onMoveBlock,
         onOpenEditor,
         onPublish,
     }: {
         onDashboard: () => void
+        onMoveBlock: (blockId: string, direction: 'up' | 'down') => void
         onOpenEditor: () => void
         onPublish: () => void
     }) => (
         <div>
             <button type="button" onClick={onDashboard}>Dashboard</button>
+            <button type="button" onClick={() => onMoveBlock('block-1', 'down')}>Move Block</button>
             <button type="button" onClick={onOpenEditor}>Open Editor</button>
             <button type="button" onClick={onPublish}>Publish Website</button>
         </div>
@@ -149,8 +152,11 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
             userId: 'user-1',
             step: 'chat',
             status: 'done',
-            blocks: [],
-            theme: null,
+            blocks: [
+                { _id: 'block-1', blockType: 'hero' },
+                { _id: 'block-2', blockType: 'features' },
+            ],
+            theme: { name: 'test-theme' } as never,
             siteId: 'site-123',
             siteName: 'Chibi Studio',
             businessInfo: {
@@ -216,5 +222,47 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         expect(fetchMock).not.toHaveBeenCalled()
         expect(mockPush).toHaveBeenCalledWith('/dashboard')
+    })
+
+    it('calls /save with edited blocks before Publish Website when manual edits exist', async () => {
+        fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input)
+            if (url.includes('/save')) {
+                return {
+                    ok: true,
+                    json: async () => ({ ok: true }),
+                } as Response
+            }
+            if (url.includes('/publish')) {
+                return {
+                    ok: true,
+                    json: async () => ({ data: { id: 'site-123', url: 'http://localhost/site-123' } }),
+                } as Response
+            }
+            return {
+                ok: true,
+                json: async () => ({}),
+            } as Response
+        })
+
+        render(<AIBuilderPageClient userId="user-1" />)
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Move Block' })).toBeInTheDocument())
+        fireEvent.click(screen.getByRole('button', { name: 'Move Block' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Publish Website' }))
+
+        await waitFor(() => {
+            const saveCall = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/sites/site-123/save'))
+            expect(saveCall).toBeTruthy()
+
+            const [, init] = saveCall!
+            expect(init).toMatchObject({ method: 'PATCH' })
+
+            const body = JSON.parse(String(init?.body ?? '{}')) as { blocks?: Array<{ _id: string }>; theme?: unknown }
+            expect(body.blocks?.map((block) => block._id)).toEqual(['block-2', 'block-1'])
+            expect(body.theme).toEqual({ name: 'test-theme' })
+        })
+
+        expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/sites/site-123/publish'))).toBe(true)
     })
 })

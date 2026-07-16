@@ -54,31 +54,58 @@ const HERO_QUERIES: Record<string, string> = {
 
 interface SlotDef {
     slot: string
-    query: string
+    queryCandidates: string[]
     imgixW: number
     imgixH: number
     orientation: 'landscape' | 'portrait' | 'squarish'
+}
+
+function buildProductQueryCandidates(productTerms?: string | null): string[] {
+    if (!productTerms) return []
+
+    const tokens = productTerms
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+
+    const candidates = [
+        tokens.join(' '),
+        tokens.slice(0, 2).join(' '),
+        tokens.slice(0, 1).join(' '),
+    ].filter(Boolean)
+
+    return Array.from(new Set(candidates))
+}
+
+function buildSearchCandidates(baseQuery: string, productTerms?: string | null): string[] {
+    const productCandidates = buildProductQueryCandidates(productTerms)
+    return productCandidates.length > 0 ? productCandidates : [baseQuery]
+}
+
+function queryGroupKey(slot: SlotDef): string {
+    return `${slot.queryCandidates.join('||')}:${slot.orientation}`
 }
 
 function buildSlots(category: string, productTerms?: string | null): SlotDef[] {
     const baseGalleryQ = GALLERY_QUERIES[category] ?? GALLERY_QUERIES['business']!
     const baseHeroQ = HERO_QUERIES[category] ?? HERO_QUERIES['business']!
 
-    const galleryQ = productTerms ? `${productTerms} ${baseGalleryQ}`.trim() : baseGalleryQ
-    const heroQ = productTerms ? `${productTerms} ${baseHeroQ}`.trim() : baseHeroQ
+    const galleryQueries = buildSearchCandidates(baseGalleryQ, productTerms)
+    const heroQueries = buildSearchCandidates(baseHeroQ, productTerms)
     return [
         ...Array.from({ length: 6 }, (_, i) => ({
-            slot: `gallery[${i}]`, query: galleryQ, imgixW: 800, imgixH: 800, orientation: 'squarish' as const,
+            slot: `gallery[${i}]`, queryCandidates: galleryQueries, imgixW: 800, imgixH: 800, orientation: 'squarish' as const,
         })),
         ...Array.from({ length: 3 }, (_, i) => ({
-            slot: `hero[${i}]`, query: heroQ, imgixW: 1400, imgixH: 800, orientation: 'landscape' as const,
+            slot: `hero[${i}]`, queryCandidates: heroQueries, imgixW: 1400, imgixH: 800, orientation: 'landscape' as const,
         })),
-        { slot: 'about', query: galleryQ, imgixW: 1200, imgixH: 800, orientation: 'landscape' as const },
+        { slot: 'about', queryCandidates: galleryQueries, imgixW: 1200, imgixH: 800, orientation: 'landscape' as const },
         ...Array.from({ length: 4 }, (_, i) => ({
-            slot: `team[${i}]`, query: 'professional portrait person', imgixW: 400, imgixH: 400, orientation: 'squarish' as const,
+            slot: `team[${i}]`, queryCandidates: ['professional portrait person'], imgixW: 400, imgixH: 400, orientation: 'squarish' as const,
         })),
         ...Array.from({ length: 3 }, (_, i) => ({
-            slot: `features[${i}]`, query: galleryQ, imgixW: 600, imgixH: 400, orientation: 'landscape' as const,
+            slot: `features[${i}]`, queryCandidates: galleryQueries, imgixW: 600, imgixH: 400, orientation: 'landscape' as const,
         })),
     ]
 }
@@ -175,32 +202,37 @@ export async function seedImageLibraryForSite(
         let uploaded = 0
         let failed = 0
 
-        // Group slots by query+orientation — search separately per orientation so
+        // Group slots by query candidates + orientation — search separately per orientation so
         // landscape hero/about slots get properly oriented source images.
         const queryGroups = new Map<string, SlotDef[]>()
         for (const slot of slots) {
-            const key = `${slot.query}:${slot.orientation}`
+            const key = queryGroupKey(slot)
             const group = queryGroups.get(key) ?? []
             group.push(slot)
             queryGroups.set(key, group)
         }
 
-        // Search Pixabay once per unique query+orientation, then distribute photos to slots
+        // Search Pixabay once per unique query+orientation, retrying with progressively
+        // shorter product-focused queries when the more specific query returns zero hits.
         const photosByKey = new Map<string, Awaited<ReturnType<typeof searchPhotos>>>()
         for (const [key, groupSlots] of queryGroups) {
-            const { query, orientation } = groupSlots[0]!
+            const { queryCandidates, orientation } = groupSlots[0]!
             // Pixabay ships fixed sizes — request the largest size any slot in this
             // group needs; Payload regenerates per-variant sizes on upload anyway.
             const groupWidth = Math.max(...groupSlots.map((s) => s.imgixW))
-            try {
-                // GH-1185: Pixabay category filter keeps results on-domain.
-                const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
-                const photos = await searchPhotos(query, 10, { orientation, width: groupWidth, category: pixCategory })
-                photosByKey.set(key, photos)
-            } catch (err) {
-                console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)
-                photosByKey.set(key, [])
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+            let photos: Awaited<ReturnType<typeof searchPhotos>> = []
+
+            for (const query of queryCandidates) {
+                try {
+                    photos = await searchPhotos(query, 10, { orientation, width: groupWidth, category: pixCategory })
+                    if (photos.length > 0) break
+                } catch (err) {
+                    console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)
+                }
             }
+
+            photosByKey.set(key, photos)
         }
 
         // Assign a unique photo to each slot (rotate through results)
@@ -208,7 +240,7 @@ export async function seedImageLibraryForSite(
         const slotPhotoAssignments: Array<{ slotDef: SlotDef; photoUrl: string | null }> = []
 
         for (const slotDef of slots) {
-            const key = `${slotDef.query}:${slotDef.orientation}`
+            const key = queryGroupKey(slotDef)
             const photos = photosByKey.get(key) ?? []
             if (photos.length === 0) {
                 slotPhotoAssignments.push({ slotDef, photoUrl: null })
