@@ -88,7 +88,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.firstName}
                     </Label>
-                    <Input className="h-12" {...register('firstName')} />
+                    <Input {...register('firstName')} />
                     {formState.errors.firstName && (
                         <p className="text-xs text-destructive">{formState.errors.firstName.message}</p>
                     )}
@@ -97,7 +97,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.lastName}
                     </Label>
-                    <Input className="h-12" {...register('lastName')} />
+                    <Input {...register('lastName')} />
                 </div>
             </div>
 
@@ -111,7 +111,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
                         type="email"
                         value={user.email}
                         readOnly
-                        className="bg-[hsl(var(--secondary))] cursor-not-allowed h-12"
+                        className="bg-[hsl(var(--secondary))] cursor-not-allowed"
                     />
                     <p className="text-[10px] italic text-[hsl(var(--muted-foreground))] tracking-[1px]">
                         {t.profile.general.emailReadonly}
