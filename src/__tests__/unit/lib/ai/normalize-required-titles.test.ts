@@ -128,19 +128,23 @@ describe('[TC-F01.PGRID] normalizeChangesRequiredFields()', () => {
         expect(properties[1]!.title).toBe('Property 2')
     })
 
-    it('TC-F01.PGRID-22 — filters incomplete faq items instead of publishing invalid question/answer rows', () => {
+    it('TC-F01.PGRID-22 — faq keeps rows with unsafe-missing fields so publish can raise a friendly validation error, but still backfills safe alt fields', () => {
         const changes = {
             faqs: [
                 { question: 'What time do you open?', answer: '9am daily' },
                 { question: 'Incomplete question only' },
-                { answer: 'Incomplete answer only' },
+                { title: 'From title alt', answer: 'Resolved via alt field' },
             ],
         }
         normalizeChangesRequiredFields(changes, { blockType: 'faq' })
-        expect(changes.faqs).toEqual([{ question: 'What time do you open?', answer: '9am daily' }])
+        expect(changes.faqs).toEqual([
+            { question: 'What time do you open?', answer: '9am daily' },
+            { question: 'Incomplete question only' },
+            { title: 'From title alt', question: 'From title alt', answer: 'Resolved via alt field' },
+        ])
     })
 
-    it('TC-F01.PGRID-23 — filters incomplete pricing plans and nested feature rows with missing text', () => {
+    it('TC-F01.PGRID-23 — pricing keeps incomplete plans/features for publish-time validation instead of dropping user content', () => {
         const changes = {
             plans: [
                 { name: 'Starter', price: '29', features: [{ text: 'Feature A' }, { included: true }] },
@@ -149,27 +153,34 @@ describe('[TC-F01.PGRID] normalizeChangesRequiredFields()', () => {
             ],
         }
         normalizeChangesRequiredFields(changes, { blockType: 'pricing' })
-        expect(changes.plans).toEqual([{ name: 'Starter', price: '29', features: [{ text: 'Feature A' }] }])
+        expect(changes.plans).toEqual([
+            { name: 'Starter', price: '29', features: [{ text: 'Feature A' }, { included: true }] },
+            { name: 'Broken Plan' },
+            { price: '99' },
+        ])
     })
 
-    it('TC-F01.PGRID-24 — filters incomplete pricing-table plans before publish', () => {
+    it('TC-F01.PGRID-24 — pricing-table keeps incomplete plans for publish-time validation', () => {
         const changes = { plans: [{ name: 'Pro', price: '59' }, { name: 'Missing price' }] }
         normalizeChangesRequiredFields(changes, { blockType: 'pricing-table' })
-        expect(changes.plans).toEqual([{ name: 'Pro', price: '59' }])
+        expect(changes.plans).toEqual([{ name: 'Pro', price: '59' }, { name: 'Missing price' }])
     })
 
-    it('TC-F01.PGRID-25 — filters incomplete navigation links recursively', () => {
+    it('TC-F01.PGRID-25 — navigation keeps broken links for validation, but still normalizes safe label fallbacks recursively', () => {
         const changes = {
             links: [
                 { label: 'Home', url: '/' },
                 { label: 'About' },
+                { title: 'Alt label only', url: '/alt' },
                 { label: 'Services', url: '/services', children: [{ label: 'Child', url: '/services/child' }, { label: 'Broken child' }] },
             ],
         }
         normalizeChangesRequiredFields(changes, { blockType: 'navigation' })
         expect(changes.links).toEqual([
             { label: 'Home', url: '/' },
-            { label: 'Services', url: '/services', children: [{ label: 'Child', url: '/services/child' }] },
+            { label: 'About' },
+            { title: 'Alt label only', label: 'Alt label only', url: '/alt' },
+            { label: 'Services', url: '/services', children: [{ label: 'Child', url: '/services/child' }, { label: 'Broken child' }] },
         ])
     })
 })
@@ -252,20 +263,22 @@ describe('[TC-F01.PGRID] sanitizeBlocksRequiredFields()', () => {
         expect(sanitizeBlocksRequiredFields(blocks)).toEqual(blocks)
     })
 
-    it('TC-F01.PGRID-26 — filters incomplete features/stats rows instead of publishing invalid arrays', () => {
+    it('TC-F01.PGRID-26 — features/stats/about-cards keep invalid rows for validation while still applying safe backfills', () => {
         const result = sanitizeBlocksRequiredFields([
-            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }, { title: 'Broken' }] },
-            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }, { value: '99%' }] },
+            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }, { title: 'Broken' }, { name: 'Alt title', body: 'Alt description' }] },
+            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }, { value: '99%' }, { value: '12', name: 'Years' }] },
+            { blockType: 'about', layout: 'cards', stats: [{ value: '99%' }, { value: '12', title: 'Years' }] },
         ])
         expect(result).toEqual([
-            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }] },
-            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }] },
+            { blockType: 'features', features: [{ title: 'Fast', description: 'Ships in one day' }, { title: 'Broken' }, { name: 'Alt title', body: 'Alt description', title: 'Alt title', description: 'Alt description' }] },
+            { blockType: 'stats', stats: [{ value: '24/7', label: 'Support' }, { value: '99%' }, { value: '12', name: 'Years', label: 'Years' }] },
+            { blockType: 'about', layout: 'cards', stats: [{ value: '99%' }, { value: '12', title: 'Years', label: 'Years' }] },
         ])
     })
 })
 
 describe('[TC-F01.PGRID] sanitizeSingleBlockRequiredFields()', () => {
-    it('TC-F01.PGRID-27 — sanitizes footer columns + links for site-level publish blocks', () => {
+    it('TC-F01.PGRID-27 — footer keeps incomplete columns/links for validation instead of silently deleting them', () => {
         const result = sanitizeSingleBlockRequiredFields({
             blockType: 'footer',
             columns: [
@@ -276,8 +289,29 @@ describe('[TC-F01.PGRID] sanitizeSingleBlockRequiredFields()', () => {
         expect(result).toEqual({
             blockType: 'footer',
             columns: [
-                { title: 'Company', links: [{ label: 'About', url: '/about' }] },
+                { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken' }] },
+                { links: [{ label: 'No title', url: '/x' }] },
             ],
+        })
+    })
+
+    it('TC-F01.PGRID-28 — step-process and social-proof normalize safe alt fields without deleting invalid rows', () => {
+        const steps = sanitizeSingleBlockRequiredFields({
+            blockType: 'step-process',
+            steps: [{ heading: 'Step A', body: 'Do this' }, { title: 'Broken step' }],
+        })
+        expect(steps).toEqual({
+            blockType: 'step-process',
+            steps: [{ heading: 'Step A', body: 'Do this', title: 'Step A', description: 'Do this' }, { title: 'Broken step' }],
+        })
+
+        const reviews = sanitizeSingleBlockRequiredFields({
+            blockType: 'social-proof',
+            reviews: [{ name: 'Alice', quote: 'Amazing service' }, { author: 'Bob' }],
+        })
+        expect(reviews).toEqual({
+            blockType: 'social-proof',
+            reviews: [{ name: 'Alice', quote: 'Amazing service', author: 'Alice', content: 'Amazing service' }, { author: 'Bob' }],
         })
     })
 })

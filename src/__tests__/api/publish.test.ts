@@ -212,11 +212,14 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(siteUpdate).toBeTruthy()
         expect(siteUpdate![0].data.headerBlock).toEqual({
             blockType: 'navigation',
-            links: [{ label: 'Home', url: '/' }],
+            links: [{ label: 'Home', url: '/' }, { label: 'Broken' }],
         })
         expect(siteUpdate![0].data.footerBlock).toEqual({
             blockType: 'footer',
-            columns: [{ title: 'Company', links: [{ label: 'About', url: '/about' }] }],
+            columns: [
+                { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken link only' }] },
+                { links: [{ label: 'Missing title', url: '/x' }] },
+            ],
         })
     })
 
@@ -820,6 +823,60 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         const failure = body.error.failures[0]
         // Must NOT be "Menu → Category 2 → items" (wrong field) — field-name-only fallback.
         expect(failure.friendlyDetail).toBe('Menu → Food Menu → name: This field is required.')
+    })
+
+    it('TC-F01-pub-20: GH-1621 re-review — about cards stats get safe label backfill, but missing unsafe fields still raise a friendly validation error instead of being dropped', async () => {
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: layout.0.stats.0.label')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [{ path: 'layout.0.stats.0.label', message: 'This field is required.' }],
+                }
+            }
+        }
+
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'pages' && id === 'page-about') {
+                expect(data.layout).toEqual([
+                    {
+                        blockType: 'about',
+                        layout: 'cards',
+                        stats: [
+                            { value: '99%' },
+                            { value: '12', title: 'Years', label: 'Years' },
+                        ],
+                    },
+                ])
+                throw new FakeValidationError()
+            }
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({
+                docs: [{ id: 'page-about', title: 'About Us', _status: 'draft', site: 'site-123', layout: [{ blockType: 'about', layout: 'cards', stats: [{ value: '99%' }, { value: '12', title: 'Years' }] }] }],
+                hasNextPage: false,
+            }),
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        const failure = body.error.failures[0]
+        expect(failure.pageTitle).toBe('About Us')
+        expect(failure.friendlyDetail).toBe('About Us → About → Stat 1 → label: This field is required.')
     })
 
     it('TC-F01-pub-11: surfaces generic errors without .cause in failures[] (errName + errMsg always present)', async () => {

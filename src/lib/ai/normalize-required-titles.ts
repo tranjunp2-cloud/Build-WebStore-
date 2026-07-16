@@ -81,8 +81,8 @@ function backfillRequiredField(items: unknown[], rule: RequiredFieldRule): Recor
     })
 }
 
-function sanitizeRequiredShapeItems(items: unknown[], fields: RequiredShapeField[]): Record<string, unknown>[] {
-    return items.flatMap((it) => {
+function normalizeRequiredShapeItems(items: unknown[], fields: RequiredShapeField[]): Record<string, unknown>[] {
+    return items.map((it) => {
         const obj = typeof it === 'object' && it !== null ? { ...(it as Record<string, unknown>) } : {}
         for (const field of fields) {
             const currentValue = getNonBlankString(obj[field.name])
@@ -91,10 +91,9 @@ function sanitizeRequiredShapeItems(items: unknown[], fields: RequiredShapeField
                 continue
             }
             const altValue = field.altFields?.map((name) => getNonBlankString(obj[name])).find(Boolean)
-            if (!altValue) return []
-            obj[field.name] = altValue
+            if (altValue) obj[field.name] = altValue
         }
-        return [obj]
+        return obj
     })
 }
 
@@ -128,66 +127,82 @@ export function sanitizeTestimonialItems(items: unknown[]): Record<string, unkno
 }
 
 function sanitizeFeatureItems(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'title', altFields: ['name', 'heading'] },
         { name: 'description', altFields: ['text', 'body', 'content'] },
     ])
 }
 
 function sanitizeStatItems(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'value' },
         { name: 'label', altFields: ['name', 'title'] },
     ])
 }
 
 function sanitizeFaqItems(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'question', altFields: ['title', 'name'] },
         { name: 'answer', altFields: ['description', 'body', 'content', 'text'] },
     ])
 }
 
 function sanitizePricingPlans(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'name', altFields: ['title', 'heading'] },
         { name: 'price' },
-    ]).map((plan) => ({
-        ...plan,
-        features: Array.isArray(plan.features)
-            ? plan.features.flatMap((feature) => {
+    ]).map((plan) => {
+        if (!Array.isArray(plan.features)) return plan
+        return {
+            ...plan,
+            features: plan.features.map((feature) => {
                 if (typeof feature === 'string') {
                     const text = getNonBlankString(feature)
-                    return text ? [{ text }] : []
+                    return text ? { text } : {}
                 }
-                return sanitizeRequiredShapeItems([feature], [{ name: 'text' }])
-            })
-            : plan.features,
-    }))
+                return normalizeRequiredShapeItems([feature], [{ name: 'text' }])[0] ?? {}
+            }),
+        }
+    })
 }
 
 function sanitizePricingTablePlans(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'name', altFields: ['title', 'heading'] },
         { name: 'price' },
     ])
 }
 
 function sanitizeNavLinks(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [
+    return normalizeRequiredShapeItems(items, [
         { name: 'label', altFields: ['name', 'title'] },
         { name: 'url' },
-    ]).map((link) => ({
-        ...link,
-        children: Array.isArray(link.children) ? sanitizeNavLinks(link.children) : link.children,
-    }))
+    ]).map((link) =>
+        Array.isArray(link.children)
+            ? { ...link, children: sanitizeNavLinks(link.children) }
+            : link
+    )
 }
 
 function sanitizeFooterColumns(items: unknown[]): Record<string, unknown>[] {
-    return sanitizeRequiredShapeItems(items, [{ name: 'title', altFields: ['name', 'heading'] }]).map((column) => ({
+    return normalizeRequiredShapeItems(items, [{ name: 'title', altFields: ['name', 'heading'] }]).map((column) => ({
         ...column,
         links: Array.isArray(column.links) ? sanitizeNavLinks(column.links) : column.links,
     }))
+}
+
+function sanitizeStepItems(items: unknown[]): Record<string, unknown>[] {
+    return normalizeRequiredShapeItems(items, [
+        { name: 'title', altFields: ['name', 'heading'] },
+        { name: 'description', altFields: ['text', 'body', 'content'] },
+    ])
+}
+
+function sanitizeReviewItems(items: unknown[]): Record<string, unknown>[] {
+    return normalizeRequiredShapeItems(items, [
+        { name: 'author', altFields: ['name', 'title'] },
+        { name: 'content', altFields: ['quote', 'text', 'body', 'description'] },
+    ])
 }
 
 /** Applies the right required-field backfill to one block's own data (its actual
@@ -210,6 +225,10 @@ function sanitizeBlockRequiredFields(blockType: string, blockData: Record<string
         blockData.stats = sanitizeStatItems(blockData.stats)
         return
     }
+    if (blockType === 'about' && blockData.layout === 'cards' && Array.isArray(blockData.stats)) {
+        blockData.stats = sanitizeStatItems(blockData.stats)
+        return
+    }
     if (blockType === 'faq' && Array.isArray(blockData.faqs)) {
         blockData.faqs = sanitizeFaqItems(blockData.faqs)
         return
@@ -228,6 +247,14 @@ function sanitizeBlockRequiredFields(blockType: string, blockData: Record<string
     }
     if (blockType === 'footer' && Array.isArray(blockData.columns)) {
         blockData.columns = sanitizeFooterColumns(blockData.columns)
+        return
+    }
+    if (blockType === 'step-process' && Array.isArray(blockData.steps)) {
+        blockData.steps = sanitizeStepItems(blockData.steps)
+        return
+    }
+    if (blockType === 'social-proof' && Array.isArray(blockData.reviews)) {
+        blockData.reviews = sanitizeReviewItems(blockData.reviews)
         return
     }
     const rule = REQUIRED_ARRAY_FIELDS[blockType]
