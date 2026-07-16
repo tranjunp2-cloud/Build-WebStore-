@@ -225,5 +225,32 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         expect(result.mediaIds).toEqual([7])
         expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(2)
     })
+
+    it('gallery: unmapped category with empty products rejects all photos (returning empty)', async () => {
+        const offTopicPhoto = {
+            id: 'off-1',
+            url: 'https://pixabay.com/get/off-1_1280.jpg',
+            alt: 'product photography dress clothing flatlay',
+            photographer: 'Alice',
+            width: 1920,
+            height: 1080,
+        }
+        vi.mocked(searchPhotos)
+            .mockResolvedValueOnce([offTopicPhoto] as never)
+        
+        const msCtx = {
+            businessName: 'Unconfigured Shop',
+            tenantId: '1',
+            category: 'ecommerce',
+            language: 'en' as const,
+            englishKeywords: [],
+        }
+
+        const result = await getMediaForBlock(
+            'gallery', [], 1, msCtx as never, payloadStub,
+        )
+
+        expect(result.mediaIds).toEqual([])
+    })
 })
 

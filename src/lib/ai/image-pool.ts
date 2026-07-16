@@ -338,14 +338,7 @@ async function searchBucket(
   const gate = (candidates: PixabayPhoto[], terms: string[], label: string): PixabayPhoto[] => {
     if (terms.length === 0) {
       if (categoryMapped) return candidates
-      const fallbackTerms = [categoryPhrase(ctx.category)]
-      const kept = candidates.filter((p) => photoMatchesTerms(p.alt, fallbackTerms))
-      if (kept.length < candidates.length) {
-        console.info(
-          `[image-pool] ${orientation} relevance gate (unmapped fallback): ${kept.length}/${candidates.length} photos match "${categoryPhrase(ctx.category)}"`,
-        )
-      }
-      return kept
+      return []
     }
     const kept = candidates.filter((p) => photoMatchesTerms(p.alt, terms))
     if (kept.length < candidates.length) {

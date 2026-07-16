@@ -479,14 +479,7 @@ export async function getMediaForBlock(
     const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
         if (terms.length === 0) {
             if (categoryMapped) return photos
-            const fallbackTerms = [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory]
-            const kept = photos.filter((p) => photoMatchesTerms(p.alt, fallbackTerms))
-            if (kept.length < photos.length) {
-                console.info(
-                    `[Media Pipeline] ${blockType} relevance gate (unmapped fallback): ${kept.length}/${photos.length} match "${fallbackTerms.join(' | ')}"`,
-                )
-            }
-            return kept
+            return []
         }
         const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {

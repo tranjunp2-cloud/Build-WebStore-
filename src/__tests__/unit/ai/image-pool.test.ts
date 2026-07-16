@@ -926,12 +926,12 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
     expect(pool.landscape.map((p) => p.id)).toEqual(['h1'])
   })
 
-  it('[TC-GH1611-16] unmapped category with empty products gates primary/relaxed searches by category phrase (no ungated bypass)', async () => {
-    const genericFashion = fakePhoto('x1', 1920, 1080, 'model, dress, beauty')
+  it('[TC-GH1611-16] unmapped category with empty products rejects all photos (returning empty bucket to use curated fallback)', async () => {
+    const lookalikeClothing = fakePhoto('x1', 1920, 1080, 'dress, clothing, product photography')
     const productPhoto = fakePhoto('p1', 1920, 1080, 'product photography, watch, isolated')
 
     mockSearchPhotos
-      .mockResolvedValueOnce([genericFashion, productPhoto])
+      .mockResolvedValueOnce([lookalikeClothing, productPhoto])
 
     const pool = await buildImagePool({
       category: 'ecommerce',
@@ -941,7 +941,7 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
       squareSize: 0,
     })
 
-    expect(pool.landscape.map((p) => p.id)).toEqual(['p1'])
+    expect(pool.landscape).toEqual([])
   })
 })
 
