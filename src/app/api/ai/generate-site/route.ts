@@ -1579,10 +1579,13 @@ export async function POST(req: NextRequest) {
             const _imglibSeedTask = () => {
                 const t = Date.now()
                 console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
-                return import('@/lib/images/image-library-seeder')
-                    .then(({ seedImageLibraryForSite }) =>
-                        seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
-                    )
+                return imagePoolPromise.then(({ englishKeywords }) => {
+                    const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
+                    return import('@/lib/images/image-library-seeder')
+                        .then(({ seedImageLibraryForSite }) =>
+                            seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory, undefined, _productTerms),
+                        )
+                })
                     .catch(err =>
                         console.error('[generate-site] image-library seed failed',
                             err instanceof Error ? err.message : err),

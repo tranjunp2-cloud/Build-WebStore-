@@ -11,12 +11,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { seedImageLibraryForSite } from '@/lib/images/image-library-seeder'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 type TenantRef = string | number | { id: string | number } | null | undefined
 const resolveTenantId = (t: TenantRef): string | null =>
     t == null ? null : String(typeof t === 'object' ? t.id : t)
+
+type SiteWithGenerationMetadata = {
+    siteType?: unknown
+    aiGenerationMetadata?: { originalPrompt?: unknown } | null
+    seo?: { trackedKeywords?: Array<{ keyword?: unknown }> } | null
+}
+
+function deriveProductTerms(site: SiteWithGenerationMetadata): string | null {
+    const originalPrompt =
+        site.aiGenerationMetadata &&
+            typeof site.aiGenerationMetadata === 'object' &&
+            typeof site.aiGenerationMetadata.originalPrompt === 'string'
+            ? site.aiGenerationMetadata.originalPrompt
+            : ''
+
+    const promptProducts = originalPrompt.split('|').at(-1)?.trim() ?? ''
+    const parsedProducts = parseProductsString(promptProducts)
+    if (parsedProducts.length > 0) return parsedProducts.join(' ')
+
+    const trackedKeywords = Array.isArray(site.seo?.trackedKeywords)
+        ? site.seo.trackedKeywords
+            .map((entry) => (typeof entry?.keyword === 'string' ? entry.keyword.trim() : ''))
+            .filter(Boolean)
+        : []
+
+    return trackedKeywords.length > 0 ? trackedKeywords.join(' ') : null
+}
 
 export async function POST(
     _req: NextRequest,
@@ -38,11 +66,13 @@ export async function POST(
     }
 
     const category = (site.siteType as string) || 'business'
+    const productTerms = deriveProductTerms(site as SiteWithGenerationMetadata)
 
     // Await seed so we can return the S3 map immediately for postMessage live-update.
     // Only gallery slots (~6 images, ~5–10s). Never throws.
     await seedImageLibraryForSite(payload, siteTenantId, siteId, category,
         (slot) => slot.startsWith('gallery'),
+        productTerms,
     )
 
     const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
