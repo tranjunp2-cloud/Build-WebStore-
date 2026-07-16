@@ -5,10 +5,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as Sentry from '@sentry/nextjs'
-import { withSentrySpan } from '@/lib/ai/sentry-spans'
+import { captureSiteGenerationPerformance, withSentrySpan } from '@/lib/ai/sentry-spans'
 
 vi.mock('@sentry/nextjs', () => ({
     startSpan: vi.fn((_opts: unknown, fn: () => unknown) => fn()),
+    withScope: vi.fn((fn: (scope: { setLevel: ReturnType<typeof vi.fn>; setTag: ReturnType<typeof vi.fn>; setContext: ReturnType<typeof vi.fn> }) => void) =>
+        fn({ setLevel: vi.fn(), setTag: vi.fn(), setContext: vi.fn() }),
+    ),
+    captureMessage: vi.fn(),
 }))
 
 describe('withSentrySpan', () => {
@@ -56,5 +60,18 @@ describe('withSentrySpan', () => {
             expect.objectContaining({ name: 'ai.generateSite', op: 'ai' }),
             expect.any(Function),
         )
+    })
+
+    it('TC-MONITORING-04: captures a PII-safe site-generation completion event', () => {
+        // Arrange + Act
+        captureSiteGenerationPerformance({
+            requestId: 'request-1', totalMs: 31_000, pipelineMs: 30_900,
+            aiMs: 24_000, mediaMs: 3_000, dbMs: 500, productDataMs: 0,
+            productImageGraceMs: 0, blogGraceMs: 2_000, slugSyncMs: 100,
+            pages: 5, failures: 0, locale: 'en', mode: 'ai-first',
+        })
+
+        // Assert
+        expect(Sentry.captureMessage).toHaveBeenCalledWith('site_generation_completed', 'info')
     })
 })
