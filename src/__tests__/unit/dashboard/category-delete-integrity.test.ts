@@ -163,8 +163,33 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
         expect(sqlText).toContain('root.parent_id IS NULL')
+        expect(sqlText).toContain('root.id <> t.id')
         expect(sqlText).toContain('lower(trim(root.name)) = lower(trim(ch.name))')
         expect(sqlText).toContain('HAVING COUNT(*) > 1')
+    })
+
+    it('TC-F08-05-37: allows delete when a child shares the same name as the target root being deleted', async () => {
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Shoes', parent: null })
+        const deletedRecord = {
+            id: 'cat-123',
+            name: 'Shoes',
+            parent: null,
+            deletedAt: '2026-07-16T12:00:00.000Z',
+        }
+        mockExecute.mockResolvedValue({
+            rows: [{
+                direct_count: 0,
+                name_conflict_count: 0,
+                deleted: true,
+                deleted_doc: deletedRecord,
+            }],
+        })
+
+        await expect(deleteCategoryAction('cat-123')).resolves.toEqual(deletedRecord)
+
+        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
+        expect(sqlText).toContain('JOIN target t ON TRUE')
+        expect(sqlText).toContain('root.id <> t.id')
     })
 
     it('TC-F08-05-36: SQL locks the target category row before count/re-parent/delete to narrow the product-assignment race', async () => {

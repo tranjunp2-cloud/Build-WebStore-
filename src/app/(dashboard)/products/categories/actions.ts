@@ -264,11 +264,13 @@ export async function deleteCategoryAction(id: string | number) {
             root_conflicts AS (
                 SELECT COUNT(*)::int AS count
                 FROM children ch
+                JOIN target t ON TRUE
                 JOIN categories root
                   ON root.tenant_id = ch.tenant_id
                  AND root.parent_id IS NULL
                  AND root.deleted_at IS NULL
                  AND root.id <> ch.id
+                 AND root.id <> t.id
                  AND lower(trim(root.name)) = lower(trim(ch.name))
             ),
             sibling_conflicts AS (
