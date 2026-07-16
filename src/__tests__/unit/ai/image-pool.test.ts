@@ -21,6 +21,8 @@ import {
   type PoolPhoto,
   type BuildPoolCtx,
   buildPoolQuery,
+  buildPoolTerms,
+  buildGateTerms,
 } from '@/lib/ai/image-pool'
 import { deriveKeywords } from '@/lib/ai/image-keywords'
 import { THEME_MOODS } from '@/lib/ai/theme-moods'
@@ -40,11 +42,17 @@ vi.mock('@/lib/ai/pixabay-client', async () => {
   }
 })
 
-function fakePhoto(id: string, w: number, h: number): PixabayPhoto {
+// GH-1611: `alt` carries the Pixabay TAGS, and the relevance gate now runs for
+// every language (it used to run for Vietnamese only). A fixture tagged
+// "alt L0" is a photo Pixabay would never return for q="ramen" — the tags must
+// match the query under test or the gate correctly throws the photo away.
+const RAMEN_TAGS = 'ramen, noodle soup, japanese food'
+
+function fakePhoto(id: string, w: number, h: number, alt: string = RAMEN_TAGS): PixabayPhoto {
   return {
     id,
     url: `https://pixabay.com/get/${id}_1280.jpg`,
-    alt: `alt ${id}`,
+    alt,
     photographer: 'Alice Photographer',
     width: w,
     height: h,
@@ -147,13 +155,16 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     expect(/refined|candlelit|marble|timeless|soft natural/.test(q)).toBe(false)
   })
 
-  it('query uses category when no product + no mood', async () => {
+  it('query uses the category PHRASE when no product + no mood (GH-1611)', async () => {
     mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
     const pool = await buildImagePool({
       category: 'beauty',
       seed: 1,
     })
-    expect(pool.queryUsed.toLowerCase()).toContain('beauty')
+    // GH-1611: the composer key ('beauty', and worse: 'fnb', 'realestate') is an
+    // internal identifier, not a word photos are tagged with. Search with the
+    // category's natural-language phrase instead.
+    expect(pool.queryUsed).toBe('spa treatment')
   })
 
   it('makes 2 searchPhotos calls — 1 landscape + 1 square', async () => {
@@ -193,13 +204,14 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     expect(pool.queryUsed).not.toContain('tech')
   })
 
-  it('falls back to category name only when LLM fails (no products)', async () => {
+  it('falls back to the category phrase when LLM fails (no products) — GH-1611', async () => {
     mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
     const pool = await buildImagePool({
       category: 'tech',
       seed: 1,
     })
-    expect(pool.queryUsed).toBe('tech')
+    // Was 'tech' (the composer key). Pixabay tags photos "modern office", never "tech".
+    expect(pool.queryUsed).toBe('modern office')
   })
 })
 
@@ -283,10 +295,16 @@ describe('TC-F01-W.15 — pickFromPool', () => {
 
 describe('TC-F01-W.16 — underfill backoff', () => {
   it('retries with relaxed query when landscape underfills', async () => {
-    // First landscape call returns 1 photo (underfill), retry with relaxed returns 5
+    // First landscape call returns 1 photo (underfill), retry with relaxed returns 2.
+    // GH-1611: relaxed-tier photos are tagged for the RELAXED query ('restaurant
+    // interior') — that is what Pixabay would return for it, and what the gate checks.
+    const relaxedTags = 'restaurant interior, dining room, table'
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // initial landscape — underfill
-      .mockResolvedValueOnce([fakePhoto('RL1', 1920, 1080), fakePhoto('RL2', 1920, 1080)]) // relaxed retry
+      .mockResolvedValueOnce([
+        fakePhoto('RL1', 1920, 1080, relaxedTags),
+        fakePhoto('RL2', 1920, 1080, relaxedTags),
+      ]) // relaxed retry
       .mockResolvedValueOnce(squareFixture) // square OK first try
 
     const pool = await buildImagePool(baseCtx({ mood: THEME_MOODS.elegant }))
@@ -303,10 +321,10 @@ describe('TC-F01-W.16 — underfill backoff', () => {
     expect(pool.square).toEqual([])
   })
 
-  it('relaxed query broadens from product to category (raw keyword fallback)', async () => {
+  it('relaxed query broadens from product to the category PHRASE (GH-1611)', async () => {
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // underfill initial
-      .mockResolvedValueOnce([fakePhoto('RL1', 1920, 1080)]) // relaxed retry
+      .mockResolvedValueOnce([fakePhoto('RL1', 1920, 1080, 'restaurant interior, dining')]) // relaxed retry
       .mockResolvedValueOnce(squareFixture)
 
     await buildImagePool(baseCtx({ topProduct: 'ramen', mood: THEME_MOODS.elegant }))
@@ -314,9 +332,12 @@ describe('TC-F01-W.16 — underfill backoff', () => {
     const initialQuery = mockSearchPhotos.mock.calls[0]![0] as string
     const relaxedQuery = mockSearchPhotos.mock.calls[1]![0] as string
     // Initial: raw product only = "ramen"
-    // Relaxed with ≤1 term: falls back to category = "restaurant" (different query for retry)
+    // Relaxed with ≤1 term: broadens to the category PHRASE. Was the bare composer
+    // key ('restaurant'), which for 'fnb'/'realestate' is not a searchable word at
+    // all — q="fnb" returns nothing, and q="business" (the fnb→business drift)
+    // returned retail/fashion stock. Hence "restaurant interior", not "restaurant".
     expect(initialQuery).toBe('ramen')
-    expect(relaxedQuery).toBe('restaurant')
+    expect(relaxedQuery).toBe('restaurant interior')
   })
 
   it('no retry when initial query already has sufficient results', async () => {
@@ -542,10 +563,17 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
     // primary (all terms joined, AND-matched) and relaxed (first term) both
     // return 0. Pre-fix, non-VN queries had NO tier-3 → empty pool → GPT's
     // hallucinated stock URLs survived injection untouched.
+    // Tier-3 fixture carries the tags Pixabay actually returns for the curated
+    // ecommerce phrase. `ecommerce` has NO Pixabay category filter, so the curated
+    // tier is gated on its own phrase (GH-1611) — a fixture tagged with anything
+    // else would be (correctly) thrown away and would only be testing the gate.
+    const productPhotoFixture = Array.from({ length: 12 }, (_, i) =>
+      fakePhoto(`P${i}`, 1920, 1080, 'product photography, studio, packaging'),
+    )
     mockSearchPhotos
       .mockResolvedValueOnce([]) // primary landscape
       .mockResolvedValueOnce([]) // relaxed landscape
-      .mockResolvedValueOnce(landscapeFixture) // tier-3 landscape
+      .mockResolvedValueOnce(productPhotoFixture) // tier-3 landscape
 
     // Act — squareSize 0 keeps the mock queue landscape-only.
     const pool = await buildImagePool(baseCtx({
@@ -620,18 +648,263 @@ describe('TC-F38-RAW-25 — RATE_LIMITED short-circuits the pool fallback ladder
   })
 
   it('non-429 tier-1 error → ladder continues to tier-2 and tier-3', async () => {
-    // Arrange — transient server error must NOT abort the ladder
+    // Arrange — transient server error must NOT abort the ladder.
+    // GH-1611: two products keep the three tiers distinct — tier-2 broadens to
+    // products[0] ("ramen"), tier-3 is the category phrase ("restaurant
+    // interior"). With a single product tier-2 already IS the category phrase,
+    // so tier-3 is (correctly) skipped as a byte-identical repeat call.
     mockSearchPhotos
       .mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 500, true)) // tier-1
       .mockResolvedValueOnce([]) // tier-2: 0 hits
       .mockResolvedValueOnce(landscapeFixture) // tier-3
 
     // Act
-    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+    const pool = await buildImagePool(
+      baseCtx({ squareSize: 0, topProduct: undefined, products: ['ramen', 'gyoza'] }),
+    )
 
     // Assert — all 3 tiers fired, tier-3 filled the bucket
     expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
     expect(pool.landscape.length).toBeGreaterThan(0)
     expect(pool.underfill).toBe(true)
+  })
+})
+
+// ── GH-1611: cross-industry photos must never reach the pool ────────────────
+
+describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photos)', () => {
+  // The reported gen: F&B / bakery, product "bánh", translated to EN before the
+  // pool search (GEN_TRANSLATE_POOL_KEYWORDS is on by default).
+  const BAKERY_CTX = (over: Partial<BuildPoolCtx> = {}): BuildPoolCtx => ({
+    category: 'fnb',
+    products: ['chocolate birthday cake', 'frosted cupcake'],
+    seed: 7,
+    squareSize: 0,
+    ...over,
+  })
+  const CAKE = (id: string) => fakePhoto(id, 1920, 1080, 'cake, chocolate, dessert')
+  const CLOTHES = (id: string) => fakePhoto(id, 1920, 1080, 'jeans, knit hat, flatlay')
+
+  it('[TC-GH1611-01] gate drops off-industry photos from an ENGLISH query', async () => {
+    // Before: the gate only ran for Vietnamese queries, but the pool query is
+    // English by default → gate never ran → clothing photos entered the pool.
+    mockSearchPhotos.mockResolvedValueOnce([
+      CAKE('c1'), CLOTHES('x1'), CAKE('c2'), CLOTHES('x2'),
+    ])
+
+    const pool = await buildImagePool(BAKERY_CTX())
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('[TC-GH1611-02] keeps the product, drops the look-alike', async () => {
+    // Head noun + a modifier → the product. Modifiers alone (a balloon party that
+    // happens to be tagged "birthday, chocolate") → not the product.
+    mockSearchPhotos.mockResolvedValueOnce([
+      fakePhoto('c1', 1920, 1080, 'cake, chocolate, dessert'),
+      fakePhoto('x1', 1920, 1080, 'birthday, chocolate, balloons'),
+    ])
+
+    const pool = await buildImagePool(BAKERY_CTX({ landscapeSize: 1 }))
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['c1'])
+  })
+
+  it('[TC-GH1611-03] a multi-product query does not demand one photo satisfy every product', async () => {
+    // The query is "chocolate birthday cake frosted cupcake". AND-matching the
+    // joined string would require a single photo be both a cake AND a cupcake —
+    // no photo is, so every on-industry photo was dropped and the pool fell
+    // through to the off-industry fallback tiers.
+    mockSearchPhotos.mockResolvedValueOnce([
+      CAKE('c1'),
+      fakePhoto('c2', 1920, 1080, 'cupcake, frosted, bakery'),
+    ])
+
+    const pool = await buildImagePool(BAKERY_CTX())
+
+    expect(pool.landscape).toHaveLength(2)
+  })
+
+  it('[TC-GH1611-04] bucket is not "filled" until the hungriest block (gallery=6) can be served', async () => {
+    // landscapeMin=6 (gallery). Tier-1 returns 4 → the ladder MUST keep going.
+    // Before: minCount was half the bucket (4 of 9) → ladder stopped → gallery
+    // came up 2 short → media-injector patched the deficit off-pool and appended
+    // those photos last ⇒ "first 4 right, last 2 wrong".
+    mockSearchPhotos
+      .mockResolvedValueOnce([CAKE('c1'), CAKE('c2'), CAKE('c3'), CAKE('c4')]) // tier-1: 4 < 6
+      .mockResolvedValueOnce([CAKE('c5'), CAKE('c6')]) // tier-2
+
+    const pool = await buildImagePool(BAKERY_CTX({ landscapeSize: 9, landscapeMin: 6 }))
+
+    expect(mockSearchPhotos.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(pool.landscape).toHaveLength(6)
+  })
+
+  it('[TC-GH1611-05] tier-2 broadens to a searchable phrase, never the composer key', async () => {
+    // q="fnb" returns nothing on Pixabay — 'fnb' is an internal key, not a tag.
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // tier-1 empty → force tier-2
+      .mockResolvedValueOnce([])
+
+    await buildImagePool(BAKERY_CTX({ products: ['banh mi'] }))
+
+    const queries = mockSearchPhotos.mock.calls.map((c) => c[0] as string)
+    expect(queries).not.toContain('fnb')
+    expect(queries).toContain('coffee shop') // CATEGORY_BASE_KEYWORDS.fnb[0]
+  })
+
+  it('[TC-GH1611-07] tiers merge by photo id — a repeat hit never counts twice', async () => {
+    // The broadened tier re-returns the primary tier's top hits. Concatenating
+    // them let one photo count twice toward minCount: the bucket "reached" 6
+    // while holding 4 distinct photos, so the gallery rendered the same cake
+    // twice and still came up short.
+    mockSearchPhotos
+      .mockResolvedValueOnce([CAKE('c1'), CAKE('c2')]) // tier-1: 2 < min 6
+      .mockResolvedValueOnce([CAKE('c1'), CAKE('c2'), CAKE('c3')]) // tier-2 repeats c1,c2
+      .mockResolvedValueOnce([CAKE('c3'), CAKE('c4')]) // tier-3 repeats c3
+
+    const pool = await buildImagePool(BAKERY_CTX({ landscapeSize: 9, landscapeMin: 6 }))
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['c1', 'c2', 'c3', 'c4'])
+  })
+
+  it('[TC-GH1611-08] mood adjectives are search terms, never gate terms', async () => {
+    // buildPoolTerms may carry a mood adjective to bias Pixabay's ranking, but the
+    // gate must not judge on it: a 1-word term needs one hit, so "minimalist" would
+    // admit the clothing flatlay from the bug report into an F&B pool.
+    const ctx: BuildPoolCtx = {
+      category: 'fnb',
+      products: ['chocolate birthday cake'],
+      mood: THEME_MOODS.elegant,
+      seed: 3,
+      squareSize: 0,
+    }
+    expect(buildGateTerms(ctx)).toEqual(['chocolate birthday cake']) // no adjectives
+
+    mockSearchPhotos.mockResolvedValue([
+      fakePhoto('x1', 1920, 1080, 'jeans, flatlay, minimalist'),
+      CAKE('c1'),
+    ])
+    // landscapeSize 1 → tier-1 alone fills the bucket, so this asserts the PRODUCT
+    // gate in isolation (the curated tiers have their own trust rules).
+    const pool = await buildImagePool({ ...ctx, landscapeSize: 1 })
+    expect(pool.landscape.map((p) => p.id)).not.toContain('x1')
+  })
+
+  it('[TC-GH1611-09] no products → no gate (the query IS the curated category phrase)', async () => {
+    // Gating the curated phrase against itself empties the bucket and there is no
+    // lower tier to recover from: tier-2 and tier-3 are the same query, so they are
+    // skipped. The Pixabay `category` filter is the domain guard on this path.
+    mockSearchPhotos.mockResolvedValue([
+      fakePhoto('s1', 1920, 1080, 'wellness, massage, relax'), // real spa photo, no query word
+      fakePhoto('s2', 1920, 1080, 'sauna, towel, candle'),
+    ])
+
+    const pool = await buildImagePool({ category: 'beauty', seed: 1, squareSize: 0 })
+
+    expect(pool.queryUsed).toBe('spa treatment')
+    expect(pool.landscape.map((p) => p.id)).toEqual(['s1', 's2']) // not emptied
+  })
+
+  it('[TC-GH1611-10] single-product ladder survives a transient tier-2 error', async () => {
+    // With one product, tier-2 broadens straight to the category phrase, so tier-3
+    // is normally the same query and is skipped. But when tier-2 ERRORS the query was
+    // never answered — skipping it too would leave the bucket empty.
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // tier-1: 0 hits
+      .mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 500, true)) // tier-2 transient
+      .mockResolvedValueOnce([CAKE('c1'), CAKE('c2'), CAKE('c3')]) // tier-3 retries the phrase
+
+    const pool = await buildImagePool({
+      category: 'fnb',
+      products: ['chocolate birthday cake'],
+      seed: 5,
+      squareSize: 0,
+    })
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
+    expect(pool.landscape.length).toBeGreaterThan(0)
+  })
+
+  it('[TC-GH1611-11] bucket never exceeds its size (every pool photo is downloaded + uploaded)', async () => {
+    mockSearchPhotos.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => CAKE(`c${i}`)),
+    )
+    const pool = await buildImagePool(BAKERY_CTX({ landscapeSize: 5, landscapeMin: 5 }))
+    expect(pool.landscape).toHaveLength(5)
+  })
+
+  it('[TC-GH1611-12] curated tier is gated when the category has NO Pixabay filter', async () => {
+    // ecommerce/creative/events/blog have no Pixabay category equivalent (see
+    // PIXABAY_CATEGORY_BY_COMPOSER), so nothing constrains the curated fallback
+    // server-side. ecommerce's phrase is "product photography" — its top hits are
+    // exactly the clothing flatlays from this bug report.
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // tier-1: product query, 0 hits
+      .mockResolvedValue([
+        fakePhoto('x1', 1920, 1080, 'jeans, knit hat, flatlay'), // off-phrase
+        fakePhoto('p1', 1920, 1080, 'product photography, studio, light'),
+      ])
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: ['leather handbag'],
+      seed: 2,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['p1'])
+  })
+
+  it('[TC-GH1611-06] buildPoolTerms keeps term boundaries that buildPoolQuery flattens', () => {
+    const ctx = BAKERY_CTX()
+    expect(buildPoolTerms(ctx)).toEqual(['chocolate birthday cake', 'frosted cupcake'])
+    expect(buildPoolQuery(ctx)).toBe('chocolate birthday cake frosted cupcake')
+  })
+
+  it('[TC-GH1611-13] an empty bucket is preferred over an ungated off-domain photo', async () => {
+    // The gate must have NO escape hatch. `ecommerce` has no Pixabay category filter,
+    // so if every tier is gated out, re-admitting the rejects "to avoid an empty
+    // bucket" hands the pool the exact clothing flatlays of GH-1611. An empty bucket
+    // is safe: cleanupNonNumericImageFields drops the unfilled field and the block
+    // renders the curated on-industry IMAGE_LIBRARY image instead.
+    mockSearchPhotos
+      .mockResolvedValueOnce([fakePhoto('x1', 1920, 1080, 'jeans, flatlay, minimalist')]) // primary
+      .mockResolvedValueOnce([fakePhoto('x2', 1920, 1080, 'shirt, rack, store')]) // relaxed
+      .mockResolvedValueOnce([fakePhoto('x3', 1920, 1080, 'denim, hat, fashion')]) // curated tier
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: ['leather handbag'],
+      seed: 3,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape).toEqual([])
+    expect(pool.underfill).toBe(true)
+  })
+
+  it('[TC-GH1611-14] the gate trusts user products only, never LLM-extracted keywords', async () => {
+    // route.ts merges extractImageKeywords' output into `products` for the SEARCH
+    // query. Those terms are LLM-generated and may be adjectives — and a 1-word gate
+    // term needs a single tag hit, so gating on "minimalist" would admit a photo
+    // tagged "jeans, flatlay, minimalist" into a bakery's pool. `gateProducts` pins
+    // the gate to what the merchant actually typed.
+    mockSearchPhotos
+      .mockResolvedValueOnce([
+        fakePhoto('j1', 1920, 1080, 'jeans, flatlay, minimalist'),
+        fakePhoto('c1', 1920, 1080, 'cake, chocolate, dessert'),
+      ]) // primary — the only tier the product gate polices
+      .mockResolvedValue([]) // later tiers: nothing to add
+
+    const pool = await buildImagePool({
+      category: 'fnb',
+      products: ['chocolate cake', 'minimalist'], // 2nd term came from the LLM
+      gateProducts: ['chocolate cake'], // ...and is not trusted by the gate
+      seed: 4,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['c1'])
   })
 })

@@ -23,7 +23,7 @@ import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
-import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
+import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
 import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
 import { preUploadPool } from '@/lib/ai/pool-preupload'
@@ -385,7 +385,9 @@ export async function POST(req: NextRequest) {
                     businessInfo.shortDescription,
                     businessInfo.products,
                 ].join(' | ')
-                const resolvedCategory = resolveComposerCategory(promptCategoryText)
+                // GH-1611: the form's industry key is authoritative; free-text scoring
+                // is only the fallback (URL extraction / API clients).
+                const resolvedCategory = resolveBusinessCategory(businessInfo.industry, promptCategoryText)
                 const tmplResult = await payload.find({
                     collection: 'templates',
                     where: {
@@ -442,8 +444,15 @@ export async function POST(req: NextRequest) {
             // AI generation (GH-1190). await below costs ~0ms in the common case.
             const _parsedProductsForPool = !ENABLE_DALLE_HERO
                 ? parseProductsString(businessInfo.products) : []
+            // GH-1611: normalize, do NOT resolve. The builder form posts an already
+            // resolved composer key ('fnb', 'realestate', …) and
+            // resolveComposerCategory is not idempotent on those — neither key
+            // appears in its own keyword list, so both scored 0 and fell into the
+            // 'business' sink. A bakery then sent category=business to Pixabay
+            // instead of category=food, which let retail/fashion photos into the
+            // pool (clothing flatlays in a bakery gallery).
             const _presetCategoryForPool = !ENABLE_DALLE_HERO
-                ? resolveComposerCategory(businessInfo.industry) : ''
+                ? normalizeComposerCategory(businessInfo.industry) : ''
             const _themeSeedForPool = !ENABLE_DALLE_HERO ? computeGenSeed(businessInfo) : 0
             const _themeMoodForPool = !ENABLE_DALLE_HERO
                 ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
@@ -509,10 +518,37 @@ export async function POST(req: NextRequest) {
                             mood: _themeMoodForPool,
                             topProduct: poolKeywords[0],
                             products: poolKeywords,
+                            // GH-1611: the relevance gate may only trust terms the USER
+                            // typed. `poolKeywords` also carries extractImageKeywords'
+                            // LLM output, which can be an adjective ("artisan") — and a
+                            // 1-word gate term needs only one tag hit, so gating on one
+                            // would re-admit the off-industry photo. mergeKeywords keeps
+                            // products first and translation preserves order + count, so
+                            // the user's terms are the leading slice.
+                            gateProducts: poolKeywords.slice(0, mergeKeywords(_parsedProductsForPool, []).length),
                             seed: _themeSeedForPool,
                             landscapeSize: poolSizes.landscape,
                             squareSize: poolSizes.square,
+                            // GH-1611: a bucket is only "filled" once it can serve the
+                            // hungriest block that draws from it (gallery = 6). Without
+                            // this the ladder stopped at half the bucket and gallery's
+                            // last slots were patched from an off-pool search.
+                            landscapeMin: poolSizes.landscapeMin,
+                            squareMin: poolSizes.squareMin,
                         })
+                        // GH-1611: surface a REAL deficit — QC could not tell from
+                        // the Editor whether a weak gallery came from a thin pool.
+                        // Keyed on the actual shortfall, not `pool.underfill`: that
+                        // flag is set whenever any fallback tier fired, which is
+                        // most gens, and a warning that always fires is noise.
+                        const landscapeShort = pool.landscape.length < poolSizes.landscapeMin
+                        const squareShort = pool.square.length < poolSizes.squareMin
+                        if (landscapeShort || squareShort) {
+                            console.warn(
+                                `[image-pool] UNDERFILL category=${_presetCategoryForPool} query="${pool.queryUsed}" ` +
+                                `landscape=${pool.landscape.length}/${poolSizes.landscapeMin} square=${pool.square.length}/${poolSizes.squareMin}`,
+                            )
+                        }
                     } catch {
                         // pool stays null; rawKeywords still returned for legacy search
                     }
@@ -582,7 +618,7 @@ export async function POST(req: NextRequest) {
             const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
                 payload,
                 tenantId: resolvedTenantId,
-                category: resolveComposerCategory(businessInfo.industry),
+                category: normalizeComposerCategory(businessInfo.industry),
                 businessName: businessInfo.businessName,
                 products: parseProductsString(businessInfo.products),
                 industry: businessInfo.industry,
@@ -770,7 +806,7 @@ export async function POST(req: NextRequest) {
         const safeSiteType = (() => {
             const fromAI = resolveSiteType(result.siteType)
             if (fromAI !== 'business') return fromAI
-            return resolveSiteType(resolveComposerCategory(businessInfo.industry))
+            return resolveSiteType(normalizeComposerCategory(businessInfo.industry))
         })()
 
         // F26-01: Always show confirm dialog after AI generation so user can verify or correct detected locale.
@@ -1323,8 +1359,10 @@ export async function POST(req: NextRequest) {
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
             let sampleCategoryId: number | undefined
             try {
-                const composerCategory = resolveComposerCategory(
-                    `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+                // GH-1611: form key wins over free-text scoring (see resolveBusinessCategory).
+                const composerCategory = resolveBusinessCategory(
+                    businessInfo.industry,
+                    `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
                 )
                 const { docs: catDocs } = await payload.find({
                     collection: 'categories',
@@ -1548,7 +1586,7 @@ export async function POST(req: NextRequest) {
                                 payload,
                                 resolvedTenantId,
                                 site.id as string | number,
-                                resolveComposerCategory(businessInfo.industry),
+                                normalizeComposerCategory(businessInfo.industry),
                                 businessInfo.businessName,
                                 user.id,
                                 parseProductsString(businessInfo.products),

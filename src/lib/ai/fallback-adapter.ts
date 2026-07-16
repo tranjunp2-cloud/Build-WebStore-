@@ -14,11 +14,16 @@ import { composeFromBlueprint, type TemplateSeed } from './template-composer'
 import { TEMPLATE_PRESETS } from './template-definitions'
 import type { TemplatePreset } from './template-definitions'
 import { resolveFontPairing } from './font-pairings'
-import { resolveComposerCategory, type ComposerCategory } from './composer-category-resolver'
+import {
+    resolveBusinessCategory,
+    resolveComposerCategory,
+    type ComposerCategory,
+} from './composer-category-resolver'
 import { getCategoryContent } from './content'
 import type { BusinessSample } from './content/types'
 import type { GenerationResult, GeneratedBlock, GeneratedPage, BusinessIntent } from './generate-blocks'
 import { filterUnsupportedBlocks } from './unsupported-blocks'
+import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
@@ -72,6 +77,10 @@ function findFirstImage(blocks: GeneratedBlock[]): string | undefined {
  * Pick a deterministic preset for a category using the seed.
  * Throws if no presets exist for the category (should never happen — all 14 have 4 each).
  */
+function hasPresets(category: ComposerCategory): boolean {
+    return TEMPLATE_PRESETS.some((p) => p.category === category)
+}
+
 function pickPreset(category: ComposerCategory, seed: number): TemplatePreset {
     const candidates = TEMPLATE_PRESETS.filter((p) => p.category === category)
     if (candidates.length === 0) {
@@ -90,25 +99,46 @@ export function adaptTemplateSeedToGenerationResult(
     biz: BusinessSample,
     category: ComposerCategory,
     language: Language,
+    seed: number = 42,
 ): GenerationResult {
     const fontPair = resolveFontPairing(templateSeed.theme.fontPairingId)
+
+    const enforcerCtx = {
+        businessName: biz.name,
+        industry: category,
+        seed,
+        userBiz: biz,
+    }
 
     // Homepage blocks = first page's layout (composer always builds home first).
     // Filter out unsupported blocks (require media pipeline or missing from Payload schema) —
     // must match the drop list applied in AI happy path (openai-generator validateBlocks).
     const homePage = templateSeed.pages[0]
     const rawHomeBlocks = (homePage?.layout ?? []) as GeneratedBlock[]
-    const blocks = filterUnsupportedBlocks(rawHomeBlocks, 'fallback')
+    let blocks = filterUnsupportedBlocks(rawHomeBlocks, 'fallback')
+    blocks = enforceMinimumStructure(blocks as any[], category, enforcerCtx) as typeof blocks
+    blocks = enforceMinItems(blocks as any[], category, enforcerCtx) as typeof blocks
+    enforceGridAlignment(blocks as any[], category, enforcerCtx)
 
     // Phase 06: generate unique per-page SEO instead of reusing site tagline.
     // First materialize the filtered block list per page so the SEO generator
     // mines from blocks the user will actually see.
-    const filteredPages = templateSeed.pages.map((page, idx) => ({
-        title: page.title,
-        slug: page.slug,
-        isHomepage: idx === 0,
-        blocks: filterUnsupportedBlocks(page.layout as GeneratedBlock[], 'fallback'),
-    }))
+    const filteredPages = templateSeed.pages.map((page, idx) => {
+        let pageBlocks = filterUnsupportedBlocks(page.layout as GeneratedBlock[], 'fallback')
+        if (idx === 0) {
+            pageBlocks = blocks
+        } else {
+            pageBlocks = enforceSubpageStructure(pageBlocks as any[], category, enforcerCtx) as typeof pageBlocks
+            pageBlocks = enforceMinItems(pageBlocks as any[], category, enforcerCtx) as typeof pageBlocks
+            enforceGridAlignment(pageBlocks as any[], category, enforcerCtx)
+        }
+        return {
+            title: page.title,
+            slug: page.slug,
+            isHomepage: idx === 0,
+            blocks: pageBlocks,
+        }
+    })
 
     const pagesForSeo: PageForSeo[] = filteredPages.map((p) => ({
         title: p.title,
@@ -190,7 +220,18 @@ export function composeTemplateResult(
     // failure so the caller (openai-generator.generateWithFallback) can
     // cleanly try the legacy generateBlocks safety net instead of throwing
     // through the outer catch and surfacing as a 500 to the user.
-    const category = resolveComposerCategory(prompt)
+    // GH-1611: the Builder form sends `industry` as an ALREADY-RESOLVED composer key
+    // ('fnb'), which resolveComposerCategory scores at 0 and sinks to 'business' — so
+    // a bakery got built from the corporate blueprint (and its images with it). Trust
+    // the form key; score the free text only when there is no key.
+    //
+    // Guard: events/travel/blog have no TEMPLATE_PRESETS and pickPreset throws for
+    // them (caller catches → legacy generator). That hole is pre-existing on the
+    // free-text path; keep today's behaviour rather than let the form key newly
+    // trigger it — fixing the preset gap is a separate issue.
+    const industry = typeof info === 'string' ? undefined : info?.industry
+    const formCategory = resolveBusinessCategory(industry, prompt)
+    const category = hasPresets(formCategory) ? formCategory : resolveComposerCategory(prompt)
     const preset = pickPreset(category, seed)
 
     // Legacy string overload = extracted name only. New object overload = full wire info.
@@ -238,7 +279,7 @@ export function composeTemplateResult(
     // `generateWithFallback` (see openai-generator.ts) so it can push
     // `consistency_warning` SSE events into the gen event stream.
     // `composeTemplateResult` stays pure / side-effect-free for tests.
-    return adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
+    return adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language, seed)
 }
 
 /**

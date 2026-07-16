@@ -267,6 +267,88 @@ export function enforceMinimumStructure(
     return out
 }
 
+export function enforceSubpageStructure(
+    blocks: Block[],
+    category: string,
+    ctx: InjectionContext = {},
+): Block[] {
+    const out = [...blocks]
+    const navBlock = out.find((b) => b.blockType === 'navigation')
+    const footerBlock = out.find((b) => b.blockType === 'footer')
+    const contentBlocks = out.filter((b) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+
+    const req = getCategoryRequirement(category)
+    const recipe = pickSkeletonRecipe(category, ctx.seed ?? 0)
+    const usableBlocks = recipe ? recipeBlocksUsable(recipe) : []
+    const presentTypes = new Set(
+        contentBlocks.map((b) => (typeof b.blockType === 'string' ? b.blockType : '')).filter(Boolean),
+    )
+
+    const padCandidates = [
+        ...usableBlocks,
+        ...req.recommendedBlocks,
+    ].filter((b) => 
+        b !== 'navigation' && 
+        b !== 'footer' && 
+        b !== 'hero' &&
+        !presentTypes.has(b) && 
+        !isUnsupportedBlock(b)
+    )
+
+    const fallbackTypes = ['features', 'about', 'services', 'contact', 'testimonials', 'faq']
+    for (const type of fallbackTypes) {
+        if (!padCandidates.includes(type) && !presentTypes.has(type)) {
+            padCandidates.push(type)
+        }
+    }
+
+    let guard = 0
+    // Pad content blocks to at least 5 blocks (so total page blocks is at least 7 with nav + footer)
+    while (contentBlocks.length < 5 && guard < padCandidates.length + 10) {
+        guard++
+        const next = padCandidates.find((b) => !presentTypes.has(b))
+        if (!next) {
+            // Duplicate non-hero/non-nav/non-footer content blocks if candidates exhausted
+            const repeatCandidates = fallbackTypes.filter((b) => b !== 'hero' && b !== 'navigation' && b !== 'footer')
+            const repeat = repeatCandidates[guard % repeatCandidates.length]
+            const injected = buildBlockFromLibrary(repeat, category, ctx)
+            if (injected) {
+                contentBlocks.push(injected)
+            }
+            continue
+        }
+        const injected = buildBlockFromLibrary(next, category, ctx)
+        if (!injected) {
+            presentTypes.add(next)
+            continue
+        }
+        contentBlocks.push(injected)
+        presentTypes.add(next)
+        console.info(`[Structure Enforcer] padded subpage with "${next}" to reach content section floor (current count: ${contentBlocks.length})`)
+    }
+
+    const finalBlocks: Block[] = []
+    if (navBlock) {
+        finalBlocks.push(navBlock)
+    } else {
+        const injectedNav = buildBlockFromLibrary('navigation', category, ctx)
+        if (injectedNav) finalBlocks.push(injectedNav)
+    }
+
+    finalBlocks.push(...contentBlocks)
+
+    if (footerBlock) {
+        finalBlocks.push(footerBlock)
+    } else {
+        const injectedFooter = buildBlockFromLibrary('footer', category, ctx)
+        if (injectedFooter) finalBlocks.push(injectedFooter)
+    }
+
+    applyStructuralVariantRotation(finalBlocks, category, ctx.seed ?? 0)
+
+    return finalBlocks
+}
+
 /**
  * Plan 260415 — rotate contact + footer block variants against the curated
  * per-category pool using the same seeded-shuffle approach as nav rotation.
