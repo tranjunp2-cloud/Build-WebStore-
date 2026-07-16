@@ -181,4 +181,49 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         expect(result.mediaIds).toEqual([])
         expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(3)
     })
+
+    it('gallery: unmapped category fallback uses englishKeywords for gating when provided (rejecting lookalike clothing)', async () => {
+        const lookalikePhoto = {
+            id: 'look-1',
+            url: 'https://pixabay.com/get/look-1_1280.jpg',
+            alt: 'red dress clothing garment product photography',
+            photographer: 'Alice',
+            width: 1920,
+            height: 1080,
+        }
+        const matchingPhoto = {
+            id: 'match-1',
+            url: 'https://pixabay.com/get/match-1_1280.jpg',
+            alt: 'leather handbag product photography',
+            photographer: 'Bob',
+            width: 1920,
+            height: 1080,
+        }
+
+        vi.mocked(searchPhotos)
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([lookalikePhoto, matchingPhoto] as never)
+
+        createMock.mockResolvedValue({ id: 7 })
+        vi.mocked(downloadPhotoBuffer).mockResolvedValue({
+            buffer: Buffer.from('img'),
+            mimetype: 'image/jpeg',
+        } as never)
+
+        const msCtx = {
+            businessName: 'Leather Shop',
+            tenantId: '1',
+            category: 'ecommerce',
+            language: 'en' as const,
+            englishKeywords: ['handbag'],
+        }
+
+        const result = await getMediaForBlock(
+            'gallery', ['handbag'], 1, msCtx as never, payloadStub,
+        )
+
+        expect(result.mediaIds).toEqual([7])
+        expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(2)
+    })
 })
+

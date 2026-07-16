@@ -334,10 +334,19 @@ async function searchBucket(
   // Gate on the SUBJECT terms (products), never on the joined query and never on
   // mood adjectives — see buildGateTerms / photoMatchesTerms.
   const gateTerms = buildGateTerms(ctx)
+  const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[ctx.category])
   const gate = (candidates: PixabayPhoto[], terms: string[], label: string): PixabayPhoto[] => {
-    // No products → the query IS the curated category phrase; the Pixabay
-    // `category` filter is the domain guard and there is nothing to gate on.
-    if (terms.length === 0) return candidates
+    if (terms.length === 0) {
+      if (categoryMapped) return candidates
+      const fallbackTerms = [categoryPhrase(ctx.category)]
+      const kept = candidates.filter((p) => photoMatchesTerms(p.alt, fallbackTerms))
+      if (kept.length < candidates.length) {
+        console.info(
+          `[image-pool] ${orientation} relevance gate (unmapped fallback): ${kept.length}/${candidates.length} photos match "${categoryPhrase(ctx.category)}"`,
+        )
+      }
+      return kept
+    }
     const kept = candidates.filter((p) => photoMatchesTerms(p.alt, terms))
     if (kept.length < candidates.length) {
       console.info(
@@ -391,7 +400,10 @@ async function searchBucket(
     usedFallback = true
     try {
       const extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
-      merge(gate(extra, relaxedIsCurated ? curatedGateTerms : relaxedTerms, relaxedQuery))
+      const tier2Terms = categoryMapped
+        ? (relaxedIsCurated ? curatedGateTerms : relaxedTerms)
+        : (gateTerms.length > 0 ? gateTerms : (relaxedIsCurated ? curatedGateTerms : relaxedTerms))
+      merge(gate(extra, tier2Terms, relaxedQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
       if (isRateLimited(err)) return { photos, usedFallback: true }
@@ -425,7 +437,10 @@ async function searchBucket(
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
       }
-      merge(gate(extra, curatedGateTerms, catQuery))
+      const tier3Terms = categoryMapped
+        ? curatedGateTerms
+        : (gateTerms.length > 0 ? gateTerms : curatedGateTerms)
+      merge(gate(extra, tier3Terms, catQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
     }

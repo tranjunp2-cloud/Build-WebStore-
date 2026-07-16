@@ -568,7 +568,7 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
     // tier is gated on its own phrase (GH-1611) — a fixture tagged with anything
     // else would be (correctly) thrown away and would only be testing the gate.
     const productPhotoFixture = Array.from({ length: 12 }, (_, i) =>
-      fakePhoto(`P${i}`, 1920, 1080, 'product photography, studio, packaging'),
+      fakePhoto(`P${i}`, 1920, 1080, i === 0 ? 'pen, pensel, product photography, studio' : 'product photography, studio, packaging'),
     )
     mockSearchPhotos
       .mockResolvedValueOnce([]) // primary landscape
@@ -843,7 +843,7 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
       .mockResolvedValueOnce([]) // tier-1: product query, 0 hits
       .mockResolvedValue([
         fakePhoto('x1', 1920, 1080, 'jeans, knit hat, flatlay'), // off-phrase
-        fakePhoto('p1', 1920, 1080, 'product photography, studio, light'),
+        fakePhoto('p1', 1920, 1080, 'leather handbag, product photography, studio, light'),
       ])
 
     const pool = await buildImagePool({
@@ -907,4 +907,41 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
 
     expect(pool.landscape.map((p) => p.id)).toEqual(['c1'])
   })
+
+  it('[TC-GH1611-15] fallback is gated by product terms when products are provided (rejecting lookalike clothing)', async () => {
+    const clothingHit = fakePhoto('x1', 1920, 1080, 'dress, clothing, product photography')
+    const handbagHit = fakePhoto('h1', 1920, 1080, 'leather handbag, product photography')
+
+    mockSearchPhotos
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([clothingHit, handbagHit])
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: ['leather handbag'],
+      seed: 5,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['h1'])
+  })
+
+  it('[TC-GH1611-16] unmapped category with empty products gates primary/relaxed searches by category phrase (no ungated bypass)', async () => {
+    const genericFashion = fakePhoto('x1', 1920, 1080, 'model, dress, beauty')
+    const productPhoto = fakePhoto('p1', 1920, 1080, 'product photography, watch, isolated')
+
+    mockSearchPhotos
+      .mockResolvedValueOnce([genericFashion, productPhoto])
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: [],
+      gateProducts: [],
+      seed: 6,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['p1'])
+  })
 })
+

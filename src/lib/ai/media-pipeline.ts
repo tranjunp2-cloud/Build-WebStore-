@@ -475,8 +475,19 @@ export async function getMediaForBlock(
     // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
     // on-industry ones, leaving non-hero blocks with no image at all.
     const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[composerCategory])
     const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
-        if (terms.length === 0) return photos
+        if (terms.length === 0) {
+            if (categoryMapped) return photos
+            const fallbackTerms = [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory]
+            const kept = photos.filter((p) => photoMatchesTerms(p.alt, fallbackTerms))
+            if (kept.length < photos.length) {
+                console.info(
+                    `[Media Pipeline] ${blockType} relevance gate (unmapped fallback): ${kept.length}/${photos.length} match "${fallbackTerms.join(' | ')}"`,
+                )
+            }
+            return kept
+        }
         const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {
             console.info(
@@ -508,10 +519,10 @@ export async function getMediaForBlock(
                 category: pixCategory,
                 ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
-            const curatedGateTerms = pixCategory
-                ? []
-                : [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory]
-            const gatedPhotos = gateTerms(photos, curatedGateTerms)
+            const fallbackGateTerms = categoryMapped
+                ? (pixCategory ? [] : [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory])
+                : (subjectTerms.length > 0 ? subjectTerms : [CATEGORY_BASE_KEYWORDS[composerCategory]?.[0] ?? composerCategory])
+            const gatedPhotos = gateTerms(photos, fallbackGateTerms)
             if (gatedPhotos.length > 0) {
                 console.info(
                     `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
