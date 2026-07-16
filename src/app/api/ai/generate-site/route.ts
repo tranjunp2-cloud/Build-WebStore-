@@ -1495,15 +1495,14 @@ export async function POST(req: NextRequest) {
                     }
                     console.info(`[generate-site] deferred product images: attached=${enriched}/${products.length} rate_limited=${stats.rateLimited} upload_failed=${stats.uploadFailed} no_image=${stats.noImage}`)
                 }
-                const runProductImageTask = () => {
-                    void _productImageTask().catch((err) =>
+                const runProductImageTask = () =>
+                    _productImageTask().catch((err) =>
                         console.warn('[generate-site] deferred product image enrichment failed:', err instanceof Error ? err.message : err),
                     )
-                }
                 try {
                     after(runProductImageTask)
                 } catch {
-                    runProductImageTask()
+                    void runProductImageTask()
                 }
             }
         } catch (err) {

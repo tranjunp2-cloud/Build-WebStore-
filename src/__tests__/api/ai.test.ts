@@ -1150,13 +1150,22 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(mockPayload.create).mock.calls.some((call) => call[0].collection === 'products')).toBe(true)
             expect(vi.mocked(after).mock.calls.length).toBeGreaterThanOrEqual(3)
 
+            // Product enrichment is the first deferred task scheduled by the
+            // route. It must return its promise so Next/Vercel keeps the
+            // request lifecycle alive until image updates finish.
+            const deferredTasks = vi.mocked(after).mock.calls.map(([task]) => task as () => unknown)
+            const productImageTask = deferredTasks[0]!
+            const productImageTaskResult = productImageTask()
+            expect(productImageTaskResult).toBeInstanceOf(Promise)
+
             resolveImages({
                 products: [{
                     name: 'Sample Bread', sku: 'BREAD-001', imageId: 123,
                 }],
                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
             })
-            await runCapturedAfterTasks()
+            await productImageTaskResult
+            for (const task of deferredTasks.slice(1)) await task()
 
             // The deferred task must update the product created by this request.
             // Re-querying all products for the site by deterministic SKU would
