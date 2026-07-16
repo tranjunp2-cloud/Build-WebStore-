@@ -98,9 +98,20 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
-vi.mock('@/lib/ai/generate-sample-products', () => ({
-    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
-}))
+vi.mock('@/lib/ai/generate-sample-products', () => {
+    const generateSampleProducts = vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } })
+    return {
+        generateSampleProducts,
+        prepareSampleProducts: vi.fn().mockImplementation(async () => {
+            const generated = await generateSampleProducts()
+        return { products: generated.products, imageKeywords: [], category: 'business' }
+        }),
+        enrichSampleProductImages: vi.fn().mockImplementation(async (prepared) => ({
+            products: prepared.products,
+            stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+        })),
+    }
+})
 
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
 // prove seeding is DEFERRED (scheduled, not awaited in-request) and then
@@ -1107,6 +1118,46 @@ describe('AI Streaming APIs', () => {
                 delete process.env.GEN_BLOG_PREP_GRACE_MS
             }
         })
+
+        it('[TC-GENPERF-PI-01] slow product image enrichment does not block catalog creation or response', async () => {
+            // Arrange — copy is ready, but the external image provider remains pending.
+            const { prepareSampleProducts, enrichSampleProductImages } = await import('@/lib/ai/generate-sample-products')
+            const { after } = await import('next/server')
+            vi.mocked(prepareSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Bread',
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    status: 'active',
+                }],
+                imageKeywords: ['artisan bread'],
+                category: 'food',
+            })
+            let resolveImages: (value: { products: Array<Record<string, unknown>>; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
+            vi.mocked(enrichSampleProductImages).mockReturnValueOnce(new Promise((resolve) => {
+                resolveImages = resolve
+            }) as ReturnType<typeof enrichSampleProductImages>)
+            // Act — response must not wait for the unresolved image promise.
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — product data persisted and a third after() task was queued
+            // alongside the existing blog and image-library tasks.
+            expect(res.status).toBe(200)
+            const mockPayload = await vi.mocked(getPayload).mock.results.at(-1)?.value
+            expect(vi.mocked(mockPayload.create).mock.calls.some((call) => call[0].collection === 'products')).toBe(true)
+            expect(vi.mocked(after).mock.calls.length).toBeGreaterThanOrEqual(3)
+
+            resolveImages({
+                products: [{
+                    name: 'Sample Bread', sku: 'BREAD-001', imageId: 123,
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+            await runCapturedAfterTasks()
+        }, 10_000)
     })
 
     describe('canonicalizePageSlug — trust canonical slug over title/content [GH-820 + dental /contact fix]', () => {

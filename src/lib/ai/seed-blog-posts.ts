@@ -116,10 +116,6 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
-    /** Settles when the request's other Pixabay consumers (image pool,
-     *  sample products) finished searching — the thumbnail phase waits for
-     *  it so blog searches never compete for the rate limit (GH-1190). */
-    pixabayGate?: Promise<unknown>
 }): Promise<PreparedBlogPost[] | null> {
     const { payload, tenantId, category, businessName, products, industry, seed } = opts
     try {
@@ -170,9 +166,8 @@ export async function prepareBlogPosts(opts: {
         )
 
         // Thumbnails keep the legacy sequencing (one at a time, 500ms apart,
-        // rate-limit short-circuit) — gentle on Pixabay, and gated behind the
-        // request's other Pixabay consumers (GH-1190).
-        if (opts.pixabayGate) await opts.pixabayGate.catch(() => undefined)
+        // rate-limit short-circuit) so they stay gentle on Pixabay. Do not gate
+        // them on product images: that dependency was an avoidable latency tail.
 
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)

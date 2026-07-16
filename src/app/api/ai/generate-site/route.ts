@@ -22,7 +22,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
-import { withSentrySpan } from '@/lib/ai/sentry-spans'
+import { captureSiteGenerationPerformance, withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
@@ -42,7 +42,7 @@ import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
-import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { enrichSampleProductImages, prepareSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
@@ -111,6 +111,7 @@ interface AIBlock {
  */
 export async function POST(req: NextRequest) {
     const startTime = Date.now()
+    const requestId = crypto.randomUUID()
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
@@ -549,22 +550,23 @@ export async function POST(req: NextRequest) {
                     .catch((): Map<string, number> => new Map())
                 : Promise.resolve(new Map<string, number>())
 
-            // Start sample product generation AFTER imagePool completes to avoid competing
-            // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
-            // sample products (~7-12s) then run during AI (~30-77s) so await below still
-            // costs ~0ms in the common case. Both phases use separate Pixabay search calls.
+            // Product copy starts immediately. Image enrichment waits for the pool so
+            // Pixabay work remains ordered, but no longer determines when catalog data
+            // can be persisted or when the client receives `done`.
             // Note: siteId intentionally omitted — products run before site row is created so site.id
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = imagePoolPromise.then(() =>
-                generateSampleProducts(
-                    businessInfo,
-                    (language as 'en' | 'ms' | 'auto'),
+            const preparedSampleProductsPromise = prepareSampleProducts(
+                businessInfo,
+                language as 'en' | 'ms' | 'auto',
+            )
+            const sampleProductsPromise = Promise.all([preparedSampleProductsPromise, imagePoolPromise])
+                .then(([prepared]) => enrichSampleProductImages(
+                    prepared,
                     String(resolvedTenantId),
                     payload,
-                )
-            )
+                ))
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('ai', () =>
@@ -590,7 +592,6 @@ export async function POST(req: NextRequest) {
                 products: parseProductsString(businessInfo.products),
                 industry: businessInfo.industry,
                 seed: computeGenSeed(businessInfo),
-                pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
             }).catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -1296,15 +1297,25 @@ export async function POST(req: NextRequest) {
         let productsCreatedCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         try {
-            // GH-1190 profiling: this await is the untracked critical-path tail
-            // — sample-product gen (Pixabay image search ×N products) kicked at
-            // AI-start but often outlasts the ai+media+db window, so the remaining
-            // wait here was mislabeled "SSE overhead". Track it: it scales with
-            // product count (VN 20-product sites are the slowest), pinpointing
-            // the real long pole for the staging benchmark.
-            const { products: sampleProducts, stats: imgStats } =
-                await trackPhase('products', () => sampleProductsPromise)
-            productImageStats = imgStats
+            const preparedProducts = await trackPhase('product_data', () => preparedSampleProductsPromise)
+            // Keep this bounded but non-configurable: it protects the user-visible
+            // generation path from a slow external image provider without adding
+            // another deployment-time tuning knob.
+            const PRODUCT_IMAGE_GRACE_MS = 5_000
+            let productImageTimer: ReturnType<typeof setTimeout> | undefined
+            const enrichedOrPending = await trackPhase('product_image_grace', () => Promise.race([
+                sampleProductsPromise,
+                new Promise<'pending'>((resolve) => {
+                    productImageTimer = setTimeout(() => resolve('pending'), PRODUCT_IMAGE_GRACE_MS)
+                }),
+            ]))
+            if (productImageTimer) clearTimeout(productImageTimer)
+
+            const productImagesPending = enrichedOrPending === 'pending'
+            const sampleProducts = productImagesPending
+                ? preparedProducts.products
+                : enrichedOrPending.products
+            if (!productImagesPending) productImageStats = enrichedOrPending.stats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
             let sampleCategoryId: number | undefined
@@ -1455,6 +1466,51 @@ export async function POST(req: NextRequest) {
                     }
                 }
             }
+
+            if (productImagesPending) {
+                // `after()` is request-lifecycle aware on Vercel. The initial
+                // product rows are already present, so this only enriches image
+                // relationships and cannot reduce generated catalog data.
+                const _productImageTask = async () => {
+                    const { products, stats } = await sampleProductsPromise
+                    const persisted = await payload.find({
+                        collection: 'products',
+                        where: { site: { equals: site.id } },
+                        limit: 100,
+                        depth: 0,
+                    })
+                    const productIdsBySku = new Map(
+                        (persisted.docs as Array<Record<string, unknown>>)
+                            .filter((doc) => (typeof doc.id === 'string' || typeof doc.id === 'number') && typeof doc.sku === 'string')
+                            .map((doc) => [doc.sku as string, doc.id as string | number]),
+                    )
+                    let enriched = 0
+                    for (const product of products) {
+                        if (product.imageId == null) continue
+                        const productId = productIdsBySku.get(product.sku)
+                        if (productId == null) continue
+                        const alt = buildProductAlt(undefined, product.name, result.siteName).slice(0, 500)
+                        try {
+                            await payload.update({
+                                collection: 'products',
+                                id: productId,
+                                data: { images: [{ image: product.imageId, alt }] },
+                            })
+                            enriched++
+                        } catch (err) {
+                            console.warn(`[generate-site] deferred product image update failed sku=${product.sku}:`, err instanceof Error ? err.message : err)
+                        }
+                    }
+                    console.info(`[generate-site] deferred product images: attached=${enriched}/${products.length} rate_limited=${stats.rateLimited} upload_failed=${stats.uploadFailed} no_image=${stats.noImage}`)
+                }
+                try {
+                    after(_productImageTask)
+                } catch {
+                    void _productImageTask().catch((err) =>
+                        console.warn('[generate-site] deferred product image enrichment failed:', err instanceof Error ? err.message : err),
+                    )
+                }
+            }
         } catch (err) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
         }
@@ -1550,20 +1606,20 @@ export async function POST(req: NextRequest) {
             // Plan 260415 F01-gen-audit — single summary line per gen so ops can
             // scan Vercel logs for phase breakdown without correlating manually.
             // Use compact key=value so grep/jq can pull it out easily.
-            // GH-1190: `products` + `blog_grace` were previously folded into
-            // `other` (the "SSE overhead ~30s" in the F01 re-profile). Surface
-            // them and subtract from `other` so the residual is true glue time.
+            // GH-1190: surface bounded product/blog tails separately so `other`
+            // remains true glue time rather than hidden external I/O.
             const phaseOther = Math.max(
                 0,
                 timeMs
                     - (phaseTimings.ai ?? 0)
                     - (phaseTimings.media ?? 0)
                     - (phaseTimings.db ?? 0)
-                    - (phaseTimings.products ?? 0)
+                    - (phaseTimings.product_data ?? 0)
+                    - (phaseTimings.product_image_grace ?? 0)
                     - (phaseTimings.blog_grace ?? 0),
             )
             console.info(
-                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms products=${phaseTimings.products ?? 0}ms blog_grace=${phaseTimings.blog_grace ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
+                `[generate-site] DONE request_id=${requestId} total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms product_data=${phaseTimings.product_data ?? 0}ms product_image_grace=${phaseTimings.product_image_grace ?? 0}ms blog_grace=${phaseTimings.blog_grace ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
             )
 
             return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
@@ -1584,13 +1640,34 @@ export async function POST(req: NextRequest) {
                             site: _pipeSite,
                             homepagePage,
                             createdPages,
+                            pageFailures,
                             productsCreatedCount,
                             timeMs,
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
-                        // F23: sync tenant slug now that generation succeeded (GH-1371)
-                        await syncTenantSlug()
+                        // F23: sync tenant slug now that generation succeeded (GH-1371).
+                        // This happens after runGenPipeline's summary, so log it
+                        // separately and use the true client-visible duration below.
+                        await trackPhase('slug_sync', () => syncTenantSlug())
+                        const clientTimeMs = Date.now() - startTime
+                        console.info(`[generate-site] SSE_DONE request_id=${requestId} total=${clientTimeMs}ms slug_sync=${phaseTimings.slug_sync ?? 0}ms pipeline=${timeMs}ms`)
+                        captureSiteGenerationPerformance({
+                            requestId,
+                            totalMs: clientTimeMs,
+                            pipelineMs: timeMs,
+                            aiMs: phaseTimings.ai ?? 0,
+                            mediaMs: phaseTimings.media ?? 0,
+                            dbMs: phaseTimings.db ?? 0,
+                            productDataMs: phaseTimings.product_data ?? 0,
+                            productImageGraceMs: phaseTimings.product_image_grace ?? 0,
+                            blogGraceMs: phaseTimings.blog_grace ?? 0,
+                            slugSyncMs: phaseTimings.slug_sync ?? 0,
+                            pages: createdPages.length,
+                            failures: pageFailures.length,
+                            locale: result.language || language,
+                            mode: process.env.GEN_MODE?.trim() || 'template-first',
+                        })
 
                         // products_generated event
                         if (productsCreatedCount > 0) {
@@ -1610,7 +1687,7 @@ export async function POST(req: NextRequest) {
                                 siteLanguage: result.language || language,
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
-                                timeMs,
+                                timeMs: clientTimeMs,
                             })}\n\n`
                         controller.enqueue(_encoder.encode(doneData))
 
@@ -1667,12 +1744,30 @@ export async function POST(req: NextRequest) {
             site,
             homepagePage,
             createdPages,
+            pageFailures,
             productsCreatedCount: _productsCreatedCount,
             timeMs,
         } = await runGenPipeline()
 
         // F23: sync tenant slug now that generation succeeded (GH-1371)
-        await syncTenantSlug()
+        await trackPhase('slug_sync', () => syncTenantSlug())
+        const clientTimeMs = Date.now() - startTime
+        captureSiteGenerationPerformance({
+            requestId,
+            totalMs: clientTimeMs,
+            pipelineMs: timeMs,
+            aiMs: phaseTimings.ai ?? 0,
+            mediaMs: phaseTimings.media ?? 0,
+            dbMs: phaseTimings.db ?? 0,
+            productDataMs: phaseTimings.product_data ?? 0,
+            productImageGraceMs: phaseTimings.product_image_grace ?? 0,
+            blogGraceMs: phaseTimings.blog_grace ?? 0,
+            slugSyncMs: phaseTimings.slug_sync ?? 0,
+            pages: createdPages.length,
+            failures: pageFailures.length,
+            locale: result.language || language,
+            mode: process.env.GEN_MODE?.trim() || 'template-first',
+        })
 
         // Notify SSO Hub: user created their first site (step 1)
         // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
@@ -1696,7 +1791,7 @@ export async function POST(req: NextRequest) {
             blockCount: result.blocks.length,
             totalPages: createdPages.length,
             theme: result.theme,
-            timeMs,
+            timeMs: clientTimeMs,
         })
 
     } catch (error: unknown) {
