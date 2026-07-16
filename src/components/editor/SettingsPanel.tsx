@@ -812,7 +812,7 @@ function SettingsPanelInner({
                                 value={siteLocalBusiness.businessCategory || undefined}
                                 onValueChange={value => void handleLocalBusinessChange({ businessCategory: value })}
                             >
-                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
                                     <SelectValue placeholder={s.selectCategory} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
@@ -828,7 +828,7 @@ function SettingsPanelInner({
                                 value={siteLocalBusiness.priceRange || undefined}
                                 onValueChange={value => void handleLocalBusinessChange({ priceRange: value })}
                             >
-                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
                                     <SelectValue placeholder={s.selectPriceRange} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
