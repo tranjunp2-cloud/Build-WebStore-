@@ -220,59 +220,129 @@ export async function deleteCategoryAction(id: string | number) {
 
     const payload = await getPayload({ config: configPromise })
 
-    // Access check FIRST: the count query below is raw SQL with no tenant scoping, so we must
-    // confirm the caller can actually access this category (Payload's tenant-scoped access
-    // rules) before running it — otherwise directCount would leak another tenant's product
-    // count via the thrown error message. Throws if not found / not authorized for this tenant.
-    await payload.findByID({
+    // Access check FIRST: the delete SQL below runs with raw DB access, so we must confirm the
+    // caller can actually access this category (Payload's tenant-scoped access rules) before any
+    // lower-level operation happens. Throws if not found / not authorized for this tenant.
+    const authorizedCategory = await payload.findByID({
         collection: 'categories',
         id,
         user,
         overrideAccess: false,
     })
 
-    // Hard-block: count products assigned DIRECTLY to this category only (not descendants —
-    // direct children are re-parented to top-level below, so descendant products no longer
-    // sit under this node once the delete completes). [Decision: direct-only, confirmed 2026-07-10]
+    // Hard-block + re-parent + soft-delete run as one SQL statement, anchored by a FOR UPDATE
+    // lock on the target category row. This keeps the delete decision and the writes in one DB
+    // critical section without depending on Payload's transaction wrapper, scopes child moves to
+    // the authorized tenant only, and preflights root-level name conflicts before any re-parent.
     const { sql } = await import('drizzle-orm')
-    // Payload DB adapter types do not expose the drizzle instance directly
-    const countResult = await (payload.db as any).drizzle.execute(
-        sql`SELECT COUNT(DISTINCT r.parent_id)::int as count
-            FROM products_rels r
-            JOIN products p ON p.id = r.parent_id
-            WHERE r.path = 'category' AND r.categories_id = ${id} AND p.deleted_at IS NULL`
+    const deleteResult = await (payload.db as any).drizzle.execute(
+        sql`WITH target AS (
+                SELECT c.id, c.tenant_id
+                FROM categories c
+                WHERE c.id = ${id} AND c.deleted_at IS NULL
+                FOR UPDATE
+            ),
+            direct_products AS (
+                SELECT COUNT(DISTINCT p.id)::int AS count
+                FROM target t
+                LEFT JOIN products_rels r
+                    ON r.categories_id = t.id
+                   AND r.path = 'category'
+                LEFT JOIN products p
+                    ON p.id = r.parent_id
+                   AND p.deleted_at IS NULL
+            ),
+            children AS (
+                SELECT c.id, c.name, c.tenant_id
+                FROM categories c
+                JOIN target t
+                  ON c.parent_id = t.id
+                 AND c.deleted_at IS NULL
+                 AND c.tenant_id = t.tenant_id
+                FOR UPDATE
+            ),
+            root_conflicts AS (
+                SELECT COUNT(*)::int AS count
+                FROM children ch
+                JOIN categories root
+                  ON root.tenant_id = ch.tenant_id
+                 AND root.parent_id IS NULL
+                 AND root.deleted_at IS NULL
+                 AND root.id <> ch.id
+                 AND lower(trim(root.name)) = lower(trim(ch.name))
+            ),
+            sibling_conflicts AS (
+                SELECT COUNT(*)::int AS count
+                FROM (
+                    SELECT lower(trim(name)) AS normalized_name
+                    FROM children
+                    GROUP BY lower(trim(name))
+                    HAVING COUNT(*) > 1
+                ) dup
+            ),
+            conflicts AS (
+                SELECT COALESCE((SELECT count FROM root_conflicts), 0) +
+                       COALESCE((SELECT count FROM sibling_conflicts), 0) AS count
+            ),
+            reparent AS (
+                UPDATE categories c
+                SET parent_id = NULL,
+                    breadcrumbs = c.name,
+                    updated_at = NOW()
+                FROM target t, direct_products dp, conflicts cf
+                WHERE c.parent_id = t.id
+                  AND c.deleted_at IS NULL
+                  AND c.tenant_id = t.tenant_id
+                  AND dp.count = 0
+                  AND cf.count = 0
+                RETURNING c.id
+            ),
+            soft_delete AS (
+                UPDATE categories c
+                SET deleted_at = NOW(),
+                    updated_at = NOW()
+                FROM target t, direct_products dp, conflicts cf
+                WHERE c.id = t.id
+                  AND dp.count = 0
+                  AND cf.count = 0
+                RETURNING c.*
+            )
+            SELECT
+                COALESCE((SELECT count FROM direct_products), 0) AS direct_count,
+                COALESCE((SELECT count FROM conflicts), 0) AS name_conflict_count,
+                COALESCE((SELECT COUNT(*)::int FROM reparent), 0) AS reparented_count,
+                EXISTS(SELECT 1 FROM soft_delete) AS deleted,
+                (SELECT row_to_json(sd) FROM soft_delete sd) AS deleted_doc`
     )
-    const directCount = (countResult.rows[0] as { count?: number } | undefined)?.count || 0
+
+    const deleteRow = (deleteResult.rows[0] as {
+        direct_count?: number
+        name_conflict_count?: number
+        deleted?: boolean
+        deleted_doc?: Record<string, unknown> | null
+    } | undefined) ?? {}
+
+    const directCount = deleteRow.direct_count || 0
     if (directCount > 0) {
         throw new Error(`CATEGORY_HAS_PRODUCTS:${directCount}`)
     }
 
-    // Re-parent direct children to top-level before soft-deleting self. Uses payload.update
-    // (not raw SQL) so the beforeChange breadcrumb-regen hook fires for each child.
-    // Known limitation: this bypasses saveCategoryAction's name-dedup pre-check, so a re-parented
-    // child could end up sharing a name with an existing top-level category. Same risk class as
-    // the accepted "no DB backstop for name dedup" limitation already documented in Phase 04 —
-    // low blast radius (no crash, name isn't DB-unique), not fixed here to avoid scope creep
-    // beyond GH-1587's stated requirements.
-    await payload.update({
-        collection: 'categories',
-        where: { parent: { equals: id }, deletedAt: { exists: false } },
-        data: { parent: null },
-        user,
-        overrideAccess: true,
-    })
+    const nameConflictCount = deleteRow.name_conflict_count || 0
+    if (nameConflictCount > 0) {
+        throw new Error(`CATEGORY_REPARENT_NAME_CONFLICT:${nameConflictCount}`)
+    }
 
-    // overrideAccess:true — `deletedAt` now carries `access: { update: () => false }` (GH-1587
-    // H1), which would silently strip this write under overrideAccess:false. Access to this
-    // category was already verified by the findByID check at the top of this function.
-    const res = await payload.update({
-        collection: 'categories',
-        id,
-        data: {
-            deletedAt: new Date().toISOString(),
-        },
-        user,
-        overrideAccess: true,
-    })
-    return JSON.parse(JSON.stringify(res));
+    if (!deleteRow.deleted || !deleteRow.deleted_doc) {
+        throw new Error('Category delete failed. Please retry.')
+    }
+
+    const deletedDoc = deleteRow.deleted_doc as Record<string, unknown>
+    const deletedAt = typeof deletedDoc.deletedAt === 'string'
+        ? deletedDoc.deletedAt
+        : (typeof deletedDoc.deleted_at === 'string' ? deletedDoc.deleted_at : new Date().toISOString())
+
+    return JSON.parse(JSON.stringify({
+        ...(authorizedCategory as Record<string, unknown>),
+        deletedAt,
+    }));
 }

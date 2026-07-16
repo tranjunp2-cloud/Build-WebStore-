@@ -368,6 +368,10 @@ export default function CategoryManager() {
                 const count = message.split(':')[1]
                 toast.error(t.dashboard.products.categories.deleteModal.tooManyChildrenError.replace('{count}', count))
                 // Keep modal open — same rationale as CATEGORY_HAS_PRODUCTS above.
+            } else if (message.startsWith('CATEGORY_REPARENT_NAME_CONFLICT:')) {
+                const count = message.split(':')[1]
+                toast.error(t.dashboard.products.categories.deleteModal.reparentNameConflictError.replace('{count}', count))
+                // Keep modal open so the user can resolve the conflicting top-level names first.
             } else {
                 toast.error(t.dashboard.products.categories.toast.deleteError)
                 setIsDeleteOpen(false)

@@ -2042,6 +2042,7 @@
                     "productsWarning": "Produk dalam kategori ini tidak akan dipadamkan, tetapi akan kehilangan tag kategori ini.",
                     "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
                     "tooManyChildrenError": "Tidak dapat memadamkan kategori ini. Ia mempunyai {count} subkategori, lebih daripada yang boleh dipindahkan dengan selamat sekaligus. Sila pindahkan sebahagian subkategori terlebih dahulu.",
+                    "reparentNameConflictError": "Kategori ini belum boleh dipadamkan. Memindahkan subkategorinya ke tahap teratas akan mewujudkan {count} konflik nama kategori pendua. Sila namakan semula atau pindahkan subkategori yang bercanggah terlebih dahulu.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."

@@ -168,41 +168,42 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
 
     describe('TC-F08-05-06: Delete & Field Access (GH-1587 H1)', () => {
         it('TC-F08-05-06: deleteCategoryAction still sets deletedAt despite field-level access: false', async () => {
-            // Arrange: collection has `deletedAt` with `access: { update: () => false }`,
-            // but deleteCategoryAction uses overrideAccess: true for the internal write
+            // Arrange: the delete path now uses one raw SQL statement instead of 2 payload.update
+            // calls, so the regression proof is the returned deletedAt + the SQL soft-delete branch.
             mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
-            mockExecute.mockResolvedValue({ rows: [{ count: 0 }] })
-            mockFind.mockResolvedValue({ docs: [] })
-            mockUpdate.mockResolvedValue({ id: 'cat-123', deletedAt: expect.any(String) })
+            mockExecute.mockResolvedValue({
+                rows: [{
+                    direct_count: 0,
+                    name_conflict_count: 0,
+                    deleted: true,
+                    deleted_doc: { deleted_at: '2026-07-16T00:00:00.000Z' },
+                }],
+            })
 
-            // Act
             const result = await deleteCategoryAction('cat-123')
 
-            // Assert: deletedAt was successfully set despite field-level access rule
-            expect(mockUpdate).toHaveBeenCalled()
-            const updateCall = mockUpdate.mock.calls[1][0]
-            expect(updateCall.data.deletedAt).toBeDefined()
-            expect(updateCall.data.deletedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-            // Verify it was an internal write with overrideAccess:true
-            expect(updateCall.overrideAccess).toBe(true)
-            expect(result.deletedAt).toBeDefined()
+            expect(result.deletedAt).toBe('2026-07-16T00:00:00.000Z')
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(JSON.stringify(sqlCall)).toContain('deleted_at')
         })
 
-        it('TC-F08-05-06: Re-parent update sets parent despite field-level access rules', async () => {
-            // Arrange: verifies re-parent can set parent field during delete operation
+        it('TC-F08-05-06: deleteCategoryAction no longer relies on payload.update to re-parent children', async () => {
             mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
-            mockExecute.mockResolvedValue({ rows: [{ count: 0 }] })
-            mockFind.mockResolvedValue({ docs: [{ id: 'child-1', parent: 'cat-123' }] })
-            mockUpdate.mockResolvedValue({ id: expect.any(String) })
+            mockExecute.mockResolvedValue({
+                rows: [{
+                    direct_count: 0,
+                    name_conflict_count: 0,
+                    deleted: true,
+                    deleted_doc: { deleted_at: '2026-07-16T00:00:00.000Z' },
+                }],
+            })
 
-            // Act
             await deleteCategoryAction('cat-123')
 
-            // Assert: first update re-parents child with overrideAccess:true
-            expect(mockUpdate).toHaveBeenCalledTimes(2)
-            const reparentCall = mockUpdate.mock.calls[0][0]
-            expect(reparentCall.data.parent).toBeNull()
-            expect(reparentCall.overrideAccess).toBe(true)
+            expect(mockUpdate).not.toHaveBeenCalled()
+            const sqlCall = mockExecute.mock.calls[0][0]
+            expect(JSON.stringify(sqlCall)).toContain('parent_id')
+            expect(JSON.stringify(sqlCall)).toContain('breadcrumbs')
         })
     })
 
