@@ -203,7 +203,7 @@ export default function BlogCategoriesPage() {
                                                             if (e.key === 'Escape') setEditingId(null)
                                                         }}
                                                         autoFocus
-                                                        className="flex-1 min-w-0 h-[26px] text-[12px] rounded-[12px]"
+                                                        className="flex-1 min-w-0 h-10 text-[12px] rounded-[12px]"
                                                     />
                                                     <Button
                                                         type="button"

@@ -61,7 +61,7 @@ export function TableSearch({
                 onChange={e => setInput(e.target.value)}
                 placeholder={placeholder}
                 autoComplete="off"
-                className="h-9 pl-9 pr-3 text-[13px] bg-[hsl(var(--card))]"
+                className="h-10 pl-9 pr-3 text-[13px] bg-[hsl(var(--card))]"
             />
         </div>
     )

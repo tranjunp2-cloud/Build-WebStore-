@@ -844,7 +844,7 @@ export function PaymentsFormClient({
                                         onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
-                                        <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
+                                        <div className="px-[12px] h-12 grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                             <User className="w-[14px] h-[14px] text-dash-text-muted" />
                                         </div>
                                         <input
@@ -853,7 +853,7 @@ export function PaymentsFormClient({
                                             value={accountHolderName}
                                             onChange={e => handleAccountHolderNameChange(e.target.value)}
                                             placeholder={pt.accountHolderNamePlaceholder}
-                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
+                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                         />
                                     </div>
                                     {bankTransferErrors.accountHolderName ? (
@@ -881,7 +881,7 @@ export function PaymentsFormClient({
                                                 value={bankName}
                                                 onChange={e => handleBankNameChange(e.target.value)}
                                                 placeholder="e.g. Maybank Berhad"
-                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600"
                                             />
                                         </div>
                                         <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
@@ -900,7 +900,7 @@ export function PaymentsFormClient({
                                             onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
-                                            <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
+                                            <div className="px-[12px] h-12 grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                                 MYR
                                             </div>
                                             <input
@@ -908,7 +908,7 @@ export function PaymentsFormClient({
                                                 value={accountNumber}
                                                 onChange={e => handleAccountNumberChange(e.target.value)}
                                                 placeholder="5141 2287 ••••"
-                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                             />
                                         </div>
                                         {bankTransferErrors.accountNumber ? (

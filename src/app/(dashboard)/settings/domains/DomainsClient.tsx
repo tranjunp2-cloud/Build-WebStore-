@@ -643,7 +643,7 @@ export function DomainsClient({
                                         nên cả cụm input + hậu tố .domain sáng viền liền mạch khi focus.
                                         Input bên trong để trong suốt (cùng pattern ô tiền "RM" form discount). */}
                                     <div
-                                        className="flex h-9 w-full sm:max-w-[520px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
+                                        className="flex h-10 w-full sm:max-w-[520px] items-center rounded-lg border border-[hsl(var(--input-border))] transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]"
                                         style={{ background: 'var(--dash-surface)' }}
                                     >
                                         <input
@@ -808,7 +808,7 @@ export function DomainsClient({
                                                 {DNS_A_RECORD.split(',').map((ip, idx) => (
                                                     <div key={idx} className="flex items-center gap-2">
                                                         <div
-                                                            className="flex-1 h-[44px] flex items-center px-4 rounded-[12px]"
+                                                            className="flex-1 h-10 flex items-center px-4 rounded-[12px]"
                                                             style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                                                         >
                                                             <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{ip.trim()}</span>
@@ -833,7 +833,7 @@ export function DomainsClient({
                                             <span className="text-[12px] font-medium uppercase tracking-wider" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.cnameRecord || 'CNAME Record'}</span>
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="flex-1 h-[44px] flex items-center px-4 rounded-[12px]"
+                                                    className="flex-1 h-10 flex items-center px-4 rounded-[12px]"
                                                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                                                 >
                                                     <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{DNS_CNAME}</span>
