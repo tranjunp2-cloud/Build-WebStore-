@@ -279,7 +279,7 @@ export default function ForgotPasswordPage() {
                             id="email"
                             type="email"
                             placeholder={t.auth.forgot.emailPlaceholder}
-                            className={`h-10 pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`h-12 pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('email')}
                         />
                     </div>
@@ -288,7 +288,7 @@ export default function ForgotPasswordPage() {
                     )}
                 </div>
 
-                <Button type="submit" disabled={isSubmitting} className="mt-5 h-10 w-full">
+                <Button type="submit" disabled={isSubmitting} className="mt-5 h-12 w-full">
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

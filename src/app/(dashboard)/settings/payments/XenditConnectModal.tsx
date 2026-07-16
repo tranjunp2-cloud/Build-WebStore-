@@ -218,7 +218,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         </div>
                         <button
                             type="button" onClick={handleClose} disabled={isSaving}
-                            className="h-9 px-[16px] rounded-[8px] text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap hover:bg-[var(--dash-secondary-bg)]"
+                            className="h-12 px-[16px] rounded-[8px] text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap hover:bg-[var(--dash-secondary-bg)]"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                         >
                             {pt.cancel}
@@ -226,7 +226,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         <button
                             type="button" onClick={handleSubmit}
                             disabled={!secretKey || !callbackToken}
-                            className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                            className="inline-flex items-center gap-[6px] h-12 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                             style={{
                                 background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
                                 color: '#052e22',

@@ -76,7 +76,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                             href="https://dashboard.xendit.co"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
+                            className="inline-flex items-center gap-[6px] h-12 px-[14px] text-[13px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
                             style={{ border: '1px solid var(--dash-border)' }}
                         >
                             <ExternalLink className="w-3 h-3" />
@@ -85,7 +85,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                         {onDisconnect && (
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
+                                className="inline-flex items-center gap-[6px] h-12 px-[14px] text-[13px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
                                 style={{ border: '1px solid var(--dash-border)' }}
                             >
                                 <Unlink className="w-3 h-3" />
@@ -128,7 +128,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                         <div className="flex justify-end gap-2 p-[18px_22px_22px]">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.08] hover:bg-white/[0.04] transition-all"
+                                className="inline-flex items-center gap-2 h-12 px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.08] hover:bg-white/[0.04] transition-all"
                             >
                                 {pt.xenditDisconnectKeep}
                             </button>
@@ -139,7 +139,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                                     finally { setIsDisconnecting(false); setShowModal(false); }
                                 }}
                                 disabled={isDisconnecting}
-                                className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-wait"
+                                className="inline-flex items-center gap-2 h-12 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-wait"
                                 style={{ background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 0 0 1px rgba(239,68,68,0.45) inset, 0 6px 16px -4px rgba(239,68,68,0.45)' }}
                             >
                                 {pt.xenditDisconnect}

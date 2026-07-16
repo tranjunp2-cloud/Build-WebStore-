@@ -553,7 +553,7 @@ export default function ProductsPage() {
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
-                        <div className="relative w-full h-9">
+                        <div className="relative w-full h-10">
                             <Image src="/images/figma/search-icon.svg" width={16} height={16} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
                             <Input
@@ -570,7 +570,7 @@ export default function ProductsPage() {
                         <div className="flex flex-row items-center gap-2 w-full">
                             {/* Sort — shadcn Select (design system, themed) */}
                             <Select value={sortBy} onValueChange={setSortBy}>
-                                <SelectTrigger className="h-9 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
+                                <SelectTrigger className="h-10 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
                                     <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1122,7 +1122,7 @@ export default function ProductsPage() {
                                             <Link
                                                 href={`/products/${product.id}`}
                                                 onClick={e => e.stopPropagation()}
-                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 active:scale-[0.98] transition-all"
+                                                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 active:scale-[0.98] transition-all"
                                             >
                                                 <Pencil className="w-[18px] h-[18px]" />
                                                 {t.dashboard.products.list.edit}
@@ -1132,7 +1132,7 @@ export default function ProductsPage() {
                                             <button
                                                 type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
+                                                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
                                                 {t.dashboard.products.list.delete}
