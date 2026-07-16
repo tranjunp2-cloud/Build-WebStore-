@@ -1,20 +1,14 @@
 import { test, expect } from '@playwright/test'
 
-const TEST_EMAIL = process.env.TEST_USER_EMAIL || 'admin@primeweb.app'
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || 'Password123!'
-
 test.describe('GH-1573 EasyParcel OAuth Start Config Check', () => {
     test('returns 400 when EasyParcel is not configured', async ({ request }) => {
-        // 1. Log in to get session cookie & user info
-        const loginRes = await request.post('/api/users/login', {
-            data: { email: TEST_EMAIL, password: TEST_PASSWORD },
-        })
-        expect(loginRes.status()).toBe(200)
-        const loginBody = await loginRes.json()
-        const user = loginBody.user
+        // 1. Get logged-in user profile to extract tenant ID
+        const meRes = await request.get('/api/users/me')
+        expect(meRes.status()).toBe(200)
+        const user = await meRes.json()
         expect(user).toBeDefined()
 
-        // Extract tenant ID
+        // Extract tenant ID from authenticated session
         const tenant = user.tenants?.[0]?.tenant
         const tenantId = tenant && typeof tenant === 'object' ? tenant.id : tenant
         expect(tenantId).toBeDefined()
