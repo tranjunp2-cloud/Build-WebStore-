@@ -1,10 +1,5 @@
 export const dynamic = 'force-dynamic'
-// Override vercel.json's 60s default — AI site generation runs:
-//   OpenAI GPT-4.1-mini → Pixabay pipeline (5-10 images) → Payload create
-// Real-world timing sits around 60-120s, previous 60s cap produced 504
-// Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
-// Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
-export const maxDuration = 300
+export const maxDuration = 60
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -1296,6 +1291,14 @@ export async function POST(req: NextRequest) {
         }
         let productsCreatedCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
+        // Keep the ownership boundary for post-response image enrichment. Looking
+        // products up by site/SKU would let a slow generation mutate rows from a
+        // later regeneration of the same site.
+        const createdProductIdsBySku = new Map<string, string | number>()
+        const recordCreatedProduct = (sku: string, id: string | number) => {
+            createdProductIdsBySku.set(sku, id)
+            productsCreatedCount++
+        }
         try {
             const preparedProducts = await trackPhase('product_data', () => preparedSampleProductsPromise)
             // Keep this bounded but non-configurable: it protects the user-visible
@@ -1403,14 +1406,14 @@ export async function POST(req: NextRequest) {
                 // is unbounded AI output, unlike the form's client-validated 120-char product name.
                 const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
-                    await payload.create({
+                    const created = await payload.create({
                         collection: 'products',
                         data: {
                             ...baseData,
                             ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                         },
                     })
-                    productsCreatedCount++
+                    recordCreatedProduct(product.sku, created.id)
                 } catch (err) {
                     if (safeImageId != null && isStaleMediaFk(err)) {
                         // FK violation: media row deleted between pre-check and create.
@@ -1431,31 +1434,31 @@ export async function POST(req: NextRequest) {
                             }
                             if (retryImageId != null) {
                                 try {
-                                    await payload.create({
+                                    const created = await payload.create({
                                         collection: 'products',
                                         data: { ...baseData, images: [{ image: retryImageId, alt: fallbackAlt }] },
                                     })
-                                    productsCreatedCount++
+                                    recordCreatedProduct(product.sku, created.id)
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
                                 } catch {
                                     // retry with new id also failed — give up gracefully
                                     try {
-                                        await payload.create({ collection: 'products', data: baseData })
-                                        productsCreatedCount++
+                                        const created = await payload.create({ collection: 'products', data: baseData })
+                                        recordCreatedProduct(product.sku, created.id)
                                     } catch { /* non-fatal */ }
                                     console.warn(`[generate-site] STALE_MEDIA_FK_GIVE_UP product="${name}" oldId=${safeImageId} reason=retry_fk`)
                                 }
                             } else {
                                 try {
-                                    await payload.create({ collection: 'products', data: baseData })
-                                    productsCreatedCount++
+                                    const created = await payload.create({ collection: 'products', data: baseData })
+                                    recordCreatedProduct(product.sku, created.id)
                                 } catch { /* non-fatal */ }
                                 console.warn(`[generate-site] STALE_MEDIA_FK_RETRY_FAIL product="${name}" oldId=${safeImageId} reason=reupload_fail`)
                             }
                         } else {
                             try {
-                                await payload.create({ collection: 'products', data: baseData })
-                                productsCreatedCount++
+                                const created = await payload.create({ collection: 'products', data: baseData })
+                                recordCreatedProduct(product.sku, created.id)
                             } catch { /* non-fatal */ }
                             console.warn(`[generate-site] STALE_MEDIA_FK_NO_FALLBACK product="${name}" imageId=${safeImageId}`)
                         }
@@ -1473,21 +1476,10 @@ export async function POST(req: NextRequest) {
                 // relationships and cannot reduce generated catalog data.
                 const _productImageTask = async () => {
                     const { products, stats } = await sampleProductsPromise
-                    const persisted = await payload.find({
-                        collection: 'products',
-                        where: { site: { equals: site.id } },
-                        limit: 100,
-                        depth: 0,
-                    })
-                    const productIdsBySku = new Map(
-                        (persisted.docs as Array<Record<string, unknown>>)
-                            .filter((doc) => (typeof doc.id === 'string' || typeof doc.id === 'number') && typeof doc.sku === 'string')
-                            .map((doc) => [doc.sku as string, doc.id as string | number]),
-                    )
                     let enriched = 0
                     for (const product of products) {
                         if (product.imageId == null) continue
-                        const productId = productIdsBySku.get(product.sku)
+                        const productId = createdProductIdsBySku.get(product.sku)
                         if (productId == null) continue
                         const alt = buildProductAlt(undefined, product.name, result.siteName).slice(0, 500)
                         try {
@@ -1503,12 +1495,15 @@ export async function POST(req: NextRequest) {
                     }
                     console.info(`[generate-site] deferred product images: attached=${enriched}/${products.length} rate_limited=${stats.rateLimited} upload_failed=${stats.uploadFailed} no_image=${stats.noImage}`)
                 }
-                try {
-                    after(_productImageTask)
-                } catch {
+                const runProductImageTask = () => {
                     void _productImageTask().catch((err) =>
                         console.warn('[generate-site] deferred product image enrichment failed:', err instanceof Error ? err.message : err),
                     )
+                }
+                try {
+                    after(runProductImageTask)
+                } catch {
+                    runProductImageTask()
                 }
             }
         } catch (err) {

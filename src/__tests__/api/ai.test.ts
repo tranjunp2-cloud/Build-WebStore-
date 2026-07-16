@@ -1119,7 +1119,7 @@ describe('AI Streaming APIs', () => {
             }
         })
 
-        it('[TC-GENPERF-PI-01] slow product image enrichment does not block catalog creation or response', async () => {
+        it('[TC-GENPERF-PI-01] slow product image enrichment does not block catalog creation or mutate a regenerated product', async () => {
             // Arrange — copy is ready, but the external image provider remains pending.
             const { prepareSampleProducts, enrichSampleProductImages } = await import('@/lib/ai/generate-sample-products')
             const { after } = await import('next/server')
@@ -1157,6 +1157,18 @@ describe('AI Streaming APIs', () => {
                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
             })
             await runCapturedAfterTasks()
+
+            // The deferred task must update the product created by this request.
+            // Re-querying all products for the site by deterministic SKU would
+            // allow a prior generation to overwrite a regenerated product.
+            expect(vi.mocked(mockPayload.update)).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'products',
+                id: 'new-products-123',
+                data: expect.objectContaining({ images: [{ image: 123, alt: expect.any(String) }] }),
+            }))
+            expect(vi.mocked(mockPayload.find).mock.calls.some((call) =>
+                call[0].collection === 'products' && call[0].where?.site?.equals,
+            )).toBe(false)
         }, 10_000)
     })
 
