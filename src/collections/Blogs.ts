@@ -14,10 +14,15 @@ function getActorTenantId(user: unknown) {
 
 const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
     const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
+    const actorTenantId = getActorTenantId(req.user)
+    const originalTenantId = unwrapRelationId(originalDoc?.tenant)
+    const requestedTenantId = unwrapRelationId(data.tenant)
+    const effectiveTenantId = req.user && !isSuperAdmin
+        ? (operation === 'update' ? (originalTenantId ?? actorTenantId) : actorTenantId)
+        : (requestedTenantId ?? originalTenantId)
+
     if (req.user && !isSuperAdmin) {
-        const safeTenantId = operation === 'update'
-            ? (unwrapRelationId(originalDoc?.tenant) ?? getActorTenantId(req.user))
-            : getActorTenantId(req.user)
+        const safeTenantId = effectiveTenantId
         if (!safeTenantId) {
             throw new Error('Không thể xác định thương hiệu (tenant) của bài viết')
         }
@@ -37,9 +42,37 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         }
     }
 
+    const categoryWasProvided = Object.prototype.hasOwnProperty.call(data, 'category')
+    const finalCategoryId = categoryWasProvided
+        ? unwrapRelationId(data.category)
+        : unwrapRelationId(originalDoc?.category)
+    const tenantWasProvided = Object.prototype.hasOwnProperty.call(data, 'tenant')
+
+    if (categoryWasProvided && (finalCategoryId == null || finalCategoryId === '')) {
+        data.category = null
+    } else if (
+        finalCategoryId != null &&
+        finalCategoryId !== '' &&
+        (categoryWasProvided || tenantWasProvided || operation === 'create')
+    ) {
+        const categoryDoc = await req.payload.findByID({
+            collection: 'blog_categories',
+            id: finalCategoryId,
+            overrideAccess: true,
+            disableErrors: true,
+        })
+        const categoryTenantId = unwrapRelationId(categoryDoc?.tenant)
+        if (!categoryDoc || categoryDoc.status === 'deleted' || !effectiveTenantId || !categoryTenantId || String(categoryTenantId) !== String(effectiveTenantId)) {
+            throw new Error('BLOG_CATEGORY_TENANT_MISMATCH')
+        }
+        if (categoryWasProvided) {
+            data.category = finalCategoryId
+        }
+    }
+
     if (operation === 'create' && req.user) {
         if (!data.tenant) {
-            data.tenant = getActorTenantId(req.user)
+            data.tenant = actorTenantId
         }
         if (!data.site && data.tenant) {
             const siteRes = await req.payload.find({

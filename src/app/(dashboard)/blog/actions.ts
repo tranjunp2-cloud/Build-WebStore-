@@ -12,11 +12,42 @@ type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[]; rol
 
 /** Payload expects its internal User type — our auth user is compatible at runtime */
 type PayloadUser = PayloadRequest['user']
+type PayloadClient = Awaited<ReturnType<typeof getPayload>>
 
 function getTenantId(user: UserWithTenants): string | undefined {
     const entry = user.tenants?.[0]
     if (!entry?.tenant) return undefined
     return typeof entry.tenant === 'object' ? entry.tenant?.id : entry.tenant
+}
+
+function unwrapRelationId(value: string | number | { id: string | number } | null | undefined) {
+    if (value == null) return value
+    return typeof value === 'object' ? value.id : value
+}
+
+async function validateBlogCategoryForTenant(params: {
+    payload: PayloadClient
+    categoryId: string | number | null
+    tenantId: string | undefined
+    user: UserWithTenants
+}) {
+    const { payload, categoryId, tenantId, user } = params
+    if (categoryId == null) return { ok: true as const, categoryId: null }
+    if (isSuperAdmin(user)) return { ok: true as const, categoryId }
+
+    const categoryDoc = await payload.findByID({
+        collection: 'blog_categories',
+        id: categoryId,
+        overrideAccess: true,
+        disableErrors: true,
+    })
+    const categoryTenantId = unwrapRelationId(categoryDoc?.tenant)
+
+    if (!categoryDoc || categoryDoc.status === 'deleted' || !tenantId || !categoryTenantId || String(categoryTenantId) !== String(tenantId)) {
+        return { ok: false as const, error: 'Invalid category selection' }
+    }
+
+    return { ok: true as const, categoryId }
 }
 
 // GH-1587: `if (tenantId && ownerTenantId && mismatch)` fails OPEN when tenantId is falsy —
@@ -222,12 +253,19 @@ export async function deleteBlogCategoryAction(id: string) {
             }
         }
 
-        // Unset category from all posts referencing this category
+        // Unset category only on blogs that belong to the same tenant as the category being deleted.
         const affected = await payload.find({
             collection: 'blogs',
-            where: { category: { equals: id } },
+            where: {
+                and: [
+                    { category: { equals: id } },
+                    { tenant: { equals: catTenantId } },
+                ],
+            },
             limit: 500,
             depth: 0,
+            user: user as PayloadUser,
+            overrideAccess: false,
         })
 
         if (affected.docs.length > 0) {
@@ -237,6 +275,8 @@ export async function deleteBlogCategoryAction(id: string) {
                         collection: 'blogs',
                         id: blog.id,
                         data: { category: null },
+                        user: user as PayloadUser,
+                        overrideAccess: false,
                     })
                 )
             )
@@ -246,6 +286,8 @@ export async function deleteBlogCategoryAction(id: string) {
         await payload.delete({
             collection: 'blog_categories',
             id,
+            user: user as PayloadUser,
+            overrideAccess: false,
         })
         return { success: true }
     } catch (e: unknown) {
@@ -306,12 +348,23 @@ export async function saveBlogAction(data: {
         }
     }
 
+    const normalizedCategoryId = data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null
+    const categoryCheck = await validateBlogCategoryForTenant({
+        payload,
+        categoryId: normalizedCategoryId,
+        tenantId,
+        user: user as UserWithTenants,
+    })
+    if (!categoryCheck.ok) {
+        return { error: categoryCheck.error }
+    }
+
     const body: Record<string, unknown> = {
         title: data.title,
         slug: data.slug,
         content: data.content,
         status: data.status,
-        category: data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null,
+        category: categoryCheck.categoryId,
         thumbnail: data.thumbnail ? (isNaN(Number(data.thumbnail)) ? data.thumbnail : Number(data.thumbnail)) : null,
         publishedAt: data.publishedAt || null,
         scheduledPublishDate: data.scheduledPublishDate || null,

@@ -357,6 +357,35 @@ describe('saveBlogAction — cross-tenant update IDOR (TC-F17-SEC-03)', () => {
         expect(result).toEqual({ error: 'Failed to save blog' })
         expect(mockUpdate).not.toHaveBeenCalled()
     })
+
+    it('TC-F17-SEC-03e: Non-admin user cannot attach a cross-tenant blog category when saving a blog', async () => {
+        mockFind.mockReset()
+        mockFindByID.mockReset()
+        mockCreate.mockReset()
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+        mockFindByID.mockResolvedValueOnce({
+            id: 'cat-tenant-2',
+            tenant: 'tenant-2',
+            status: 'active',
+        })
+
+        const result = await saveBlogAction({
+            title: 'New blog',
+            slug: 'new-blog',
+            content: '<p>new</p>',
+            status: 'draft',
+            category: 'cat-tenant-2',
+        })
+
+        expect(result).toEqual({ error: 'Invalid category selection' })
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockFindByID).toHaveBeenCalledWith({
+            collection: 'blog_categories',
+            id: 'cat-tenant-2',
+            overrideAccess: true,
+            disableErrors: true,
+        })
+    })
 })
 
 // GH-1587 round-4 review: same fail-open pattern (if tenantId && ownerTenantId && mismatch)
@@ -397,6 +426,41 @@ describe('Sibling actions — fail-open regression fixes (TC-F17-SEC-04..09)', (
         const result = await deleteBlogCategoryAction('cat-1')
         expect(result).toEqual({ error: 'ERR_UNAUTHORIZED' })
         expect(mockDelete).not.toHaveBeenCalled()
+    })
+
+    it('TC-F17-SEC-07b: deleteBlogCategoryAction tenant-scopes cleanup and uses access-controlled Local API writes', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'cat-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'blog-1' }], totalDocs: 1 })
+        mockUpdate.mockResolvedValueOnce({ id: 'blog-1', category: null })
+        mockDelete.mockResolvedValueOnce({ id: 'cat-1' })
+
+        const result = await deleteBlogCategoryAction('cat-1')
+
+        expect(result).toEqual({ success: true })
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            where: {
+                and: [
+                    { category: { equals: 'cat-1' } },
+                    { tenant: { equals: 'tenant-1' } },
+                ],
+            },
+            user: mockUser,
+            overrideAccess: false,
+        }))
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            id: 'blog-1',
+            data: { category: null },
+            user: mockUser,
+            overrideAccess: false,
+        }))
+        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blog_categories',
+            id: 'cat-1',
+            user: mockUser,
+            overrideAccess: false,
+        }))
     })
 
     it('TC-F17-SEC-08: getBlogByIdAction rejects when actor has no resolvable tenant', async () => {
