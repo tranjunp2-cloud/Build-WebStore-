@@ -37,7 +37,7 @@ export function MissingInfoIndicator({ missing, t }: MissingInfoIndicatorProps) 
                     onPointerDown={onPointerDown}
                     onFocus={onFocus}
                     onClick={onClick}
-                    className="inline-flex shrink-0 cursor-help items-center justify-center"
+                    className="inline-flex shrink-0 items-center justify-center"
                 >
                     <AlertTriangle className="w-4 h-4 text-warning" aria-hidden="true" />
                 </button>

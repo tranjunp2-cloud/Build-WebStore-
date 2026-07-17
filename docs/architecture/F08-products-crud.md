@@ -286,18 +286,19 @@ falsy values are replaced) and persist on a live `status:'active'` product.
 #### Fallback Pattern
 
 ```
-"{Product Name} - {Store Name}"
+"{Product Name}"
 ```
 
-Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Air Force 1 - TradeHub Store"`.
+Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Air Force 1"`.
 
 #### Implementation
 
 **Build-time (save-side):**
-- Location: `src/lib/products/build-product-alt.ts` (pure function `buildProductAlt(product, siteName)`)
-- Called during `saveProductAction()` in `src/app/(dashboard)/products/actions.ts` to capture site context
-- Server fetches tenant's `Sites.name` once per save (single query, no per-image cost)
-- Fallback computed but not stored; always regenerated at render-time
+- Location: `src/lib/products/build-product-alt.ts` (pure function `buildProductAlt(alt, productName, storeName)`)
+- Called during `saveProductAction()` in `src/app/(dashboard)/products/actions.ts` and the AI website-generation flow
+- `saveProductAction()` intentionally persists the fallback from `productName` only for dashboard/manual saves (no `Sites.name` lookup on that path)
+- When `images[].alt` is blank, the fallback is computed and persisted into the saved product data
+- The AI website-generation flow also persists the same fallback into created product records
 
 **Render-time (display-side):**
 - All storefront components apply fallback via `buildProductAlt()`:
@@ -305,14 +306,17 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
   - `src/blocks/products-grid/index.tsx` — grid block across storefront pages
   - `src/blocks/products-featured/index.tsx` — featured products block
   - `src/blocks/product-quick-view/index.tsx` — quick-view overlay on listings
-- Logic: `alt={product.images[i].alt || buildProductAlt(product, site.name)}`
-- No database changes needed; fallback computed on-the-fly
+- Logic: `alt={buildProductAlt(product.images[i].alt, product.name, site.name)}` (or equivalent props)
+- No schema/database migration changes needed; render-time fallback still protects legacy or incomplete data
 
 #### Guard Order
 
-1. Check if product image has explicit alt text (`product.images[i].alt`)
-2. If missing/empty: use fallback `buildProductAlt(product, site.name)`
-3. Result: `<img alt="...">` never empty
+1. On save/create, if product image alt text is blank, persist `buildProductAlt(img.alt, productName, undefined)` for dashboard/manual saves, or the equivalent AI-site-generation fallback on the website-generation path
+2. On render, call `buildProductAlt(product.images[i].alt, product.name, site.name)` as a final safety net
+   - Falls back to `productName` if present.
+   - Falls back to `storeName` if `productName` is missing/empty.
+   - Falls back to `"Product image"` if both are missing/empty.
+3. Result: newly saved products carry persisted alt text, and storefront `<img alt="...">` is still never empty
 
 #### Non-breaking
 
@@ -327,7 +331,7 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 
 #### Advisory Hints (Non-blocking Warnings)
 
-- **Category advisory:** When product category is empty, form displays optional hint text in `GeneralInfoSection.tsx`. Note: this hint is advisory UI copy only — Category itself is still a hard Save requirement (see below), so the hint functions as an early nudge before the Zod block fires on submit.
+- **Category advisory (Removed):** The category advisory hint was removed from `GeneralInfoSection.tsx` (and the orphaned `categoryHint` i18n key cleaned up) per user request. Category is a hard validation requirement checked at Save time by Zod. The Category label is styled with `font-semibold` and has a required asterisk (`*`) to clearly indicate its mandatory status.
 - **Images alt-text advisory:** When product images lack alt text, hint text appears near image uploader, guiding merchants toward accessibility without enforcement. Alt text is genuinely optional at Save.
 - **Philosophy:** Advisory messages align with "soft validation" — inform without blocking, for Alt text. Publishing gate (Active transition) enforces only price/sku/inventory (per D1, Category is not part of that gate either).
 
@@ -364,12 +368,21 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 
 **Enhanced prompt input:**
 - Replaced single-line `<Input>` with multi-line auto-growing `<textarea>` (new hook: `src/hooks/use-auto-resize-textarea.ts` handles dynamic height on content change).
-- Submit behavior changed: plain **Enter** inserts newline; **Cmd/Ctrl+Enter** submits. Encourages multi-sentence descriptions without accidental submission.
+- Submit behavior: plain **Enter** generates (submits); **Shift+Enter** inserts a newline (the conventional newline shortcut in chat-style inputs).
 - Added 3 clickable **suggestion pills** below textarea (e.g. "Describe your product", "Add features", "Include materials"). Each pill pre-fills the textarea with a contextual prompt starter, reducing friction for first-time users.
 
 **Modal state & persistence:**
 - `buildSavePayload()` creates each product with `aiReviewPending: true`.
 - Removed `router.refresh()` call from `handleSave` — parent page's `onSuccess` callback now refetches via `loadProducts()` without full page reload, improving performance.
+
+**UI Design & Layout Polish:**
+- **Design System Integration:** Replaced custom styled HTML `<button>` components for "Discard" and "Approve All" in the footer actions with the unified `<Button>` component (`@/components/ui/button`) configured with `variant="dashSecondary"` and `variant="dashPrimary"`, and `size="dash"`.
+- **Variant Layout Improvement:** In the desktop preview table row, replaced the legacy truncation layout (`truncate self-center`) with a wrapping layout (`min-w-[110px] whitespace-normal break-words self-start pt-1.5`) to display the variant names list clearly and prevent UI breakages for products with extensive variant names.
+
+### Frontend Component: `ImageUploader.tsx`
+
+**Alt-Text Preview Typography Polish:**
+- **Font Weight Adjustment:** Updated the styling of the edit alt-text button (which acts as the alt-text preview trigger) in `src/components/dashboard/ImageUploader.tsx` to use the `font-medium` class instead of the default weight. This increases typography contrast and ensures alignment with standard design-system preview elements, while preserving theme-aware text colors (`text-[hsl(var(--muted-foreground))]`).
 
 ### Frontend Component: `AiReviewIndicator.tsx`
 
@@ -398,7 +411,7 @@ New and updated strings in `src/i18n/locales/en.json` and `ms.json`:
 ### State Lifecycle
 
 ```
-User types prompt → Clicks "Generate Drafts" (or Cmd+Enter)
+User types prompt → Clicks "Generate Drafts" (or Enter)
            ↓
 POST /api/ai/products-bulk-parse
            ↓

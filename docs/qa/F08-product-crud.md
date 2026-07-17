@@ -195,6 +195,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-05-10** | `US-05/Orph` | `UX` | Danh mục bị xóa vẫn gắn trên sản phẩm | 1. Xóa một danh mục đang được gắn vào sản phẩm.<br>2. Mở sản phẩm đó. | - Dropdown không hiển thị danh mục null/trống gây crash.<br>- Thông báo "Danh mục [X] không còn tồn tại". | Blocker | [ ] |
 | **TC-F08-05-11** | `US-05/AC2` | `Func` | Sản phẩm gắn đúng 1 danh mục (Single-select) | 1. Mở form Tạo/Sửa sản phẩm.<br>2. Thử chọn danh mục từ dropdown. | - Dropdown cho phép chọn đúng 1 danh mục (không thể chọn nhiều).<br>- Giao diện enforce single-select, bảo đảm mỗi SP chỉ có 1 Category. | Blocker | [x] |
 | **TC-F08-05-12** | `US-05/Sec` | `Sec` | XSS injection vào tên danh mục | 1. Nhập tên danh mục chứa `<iframe src="evil.com"></iframe>`.<br>2. Save và xem Dropdown. | - Tag bị escape thành ký tự an toàn.<br>- Không thực thi HTML trong dropdown. | Blocker | [ ] |
+| **TC-F08-05-13** | `US-05/UX` | `UX` | Modal tạo danh mục giữ focus ô tên và không submit khi nhấn Enter | 1. Mở `/products/categories`.<br>2. Click `Add Category` để mở modal.<br>3. Gõ nhiều ký tự vào ô `Category Name`.<br>4. Nhấn `Enter` khi đang focus trong ô tên. | - Ô `Category Name` vẫn giữ focus sau mỗi lần nhập.<br>- Giá trị đã gõ không bị mất.<br>- Modal vẫn mở.<br>- Không save category cho tới khi bấm nút `Save Category`. | High | [x] |
 
 ---
 

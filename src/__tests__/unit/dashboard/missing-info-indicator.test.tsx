@@ -265,7 +265,7 @@ describe('MissingInfoIndicator — Button properties', () => {
         expect(button).toHaveAttribute('type', 'button')
     })
 
-    it('button has cursor-help class (visual indicator)', () => {
+    it('button does not use cursor-help class', () => {
         // Arrange
         const missing: MissingField[] = ['category']
         const mockT = createMockT()
@@ -275,7 +275,7 @@ describe('MissingInfoIndicator — Button properties', () => {
 
         // Assert
         const button = screen.getByRole('button')
-        expect(button).toHaveClass('cursor-help')
+        expect(button).not.toHaveClass('cursor-help')
     })
 
     it('button has shrink-0 to prevent truncation', () => {

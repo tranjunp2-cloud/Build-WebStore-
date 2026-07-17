@@ -1,7 +1,7 @@
 /**
  * Unit tests for buildProductAlt (src/lib/products/build-product-alt.ts).
  *
- * TC-09.38 — alt-text fallback "{Product Name} - {Store Name}" (GH-1458). Mirrors the
+ * TC-09.38 — alt-text fallback "{Product Name}" (GH-1458, GH-1502). Mirrors the
  * priority-chain test style of safeAltText usage in hero blocks.
  */
 // @vitest-environment node
@@ -15,12 +15,12 @@ describe('buildProductAlt — TC-09.38: alt present', () => {
     })
 })
 
-describe('buildProductAlt — TC-09.38: alt blank -> "name - store"', () => {
-    it('builds "{name} - {store}" when alt is empty, whitespace, or missing', () => {
-        expect(buildProductAlt('', 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
-        expect(buildProductAlt('   ', 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
-        expect(buildProductAlt(undefined, 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
-        expect(buildProductAlt(null, 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
+describe('buildProductAlt — TC-09.38: alt blank -> name only', () => {
+    it('builds "{name}" when alt is empty, whitespace, or missing', () => {
+        expect(buildProductAlt('', 'Baju Pink', 'My Shop')).toBe('Baju Pink')
+        expect(buildProductAlt('   ', 'Baju Pink', 'My Shop')).toBe('Baju Pink')
+        expect(buildProductAlt(undefined, 'Baju Pink', 'My Shop')).toBe('Baju Pink')
+        expect(buildProductAlt(null, 'Baju Pink', 'My Shop')).toBe('Baju Pink')
     })
 })
 
@@ -60,6 +60,6 @@ describe('buildProductAlt — TC-09.38: both blank -> hard fallback', () => {
 describe('buildProductAlt — TC-09.38: non-string alt guarded', () => {
     it('ignores non-string alt values and falls through the chain', () => {
         // @ts-expect-error — verifying runtime guard against unexpected non-string input
-        expect(buildProductAlt(123, 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
+        expect(buildProductAlt(123, 'Baju Pink', 'My Shop')).toBe('Baju Pink')
     })
 })

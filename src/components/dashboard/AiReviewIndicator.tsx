@@ -32,7 +32,7 @@ export function AiReviewIndicator({ pending, t }: AiReviewIndicatorProps) {
                     onPointerDown={onPointerDown}
                     onFocus={onFocus}
                     onClick={onClick}
-                    className="inline-flex shrink-0 cursor-help items-center justify-center"
+                    className="inline-flex shrink-0 items-center justify-center"
                 >
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
                 </button>

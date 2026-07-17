@@ -2,7 +2,7 @@
  * Alt-text fallback for product images (GH-1458).
  *
  * Modeled on safeAltText() in src/blocks/hero/shared.tsx. Priority chain: merchant-entered alt →
- * "{productName} - {storeName}" → productName alone → storeName alone → hard fallback. NEVER
+ * productName alone → storeName alone → hard fallback. NEVER
  * returns an empty string, so the storefront `<img alt>` is never blank in the DOM.
  *
  * Pure function, no I/O — fully unit-testable.
@@ -18,7 +18,6 @@ export function buildProductAlt(
     const trimmedName = typeof productName === 'string' ? productName.trim() : ''
     const trimmedStore = typeof storeName === 'string' ? storeName.trim() : ''
 
-    if (trimmedName && trimmedStore) return `${trimmedName} - ${trimmedStore}`
     if (trimmedName) return trimmedName
     if (trimmedStore) return trimmedStore
     return 'Product image'

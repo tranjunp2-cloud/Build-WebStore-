@@ -224,7 +224,7 @@ export function ImageUploader({
                                             type="button"
                                             title={img.alt}
                                             aria-label={t.dashboard.imageUploader?.editAltText || 'Edit Alt text'}
-                                            className="mt-1 flex w-full items-center gap-1 rounded-[6px] px-0.5 py-[3px] text-left text-[11px] text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+                                            className="mt-1 flex w-full items-center gap-1 rounded-[6px] px-0.5 py-[3px] text-left text-[11px] font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                                         >
                                             <span className="min-w-0 flex-1 truncate">{img.alt}</span>
                                             <Pencil className="h-3 w-3 shrink-0 text-[hsl(var(--muted-foreground))]" />
