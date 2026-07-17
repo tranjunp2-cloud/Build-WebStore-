@@ -352,20 +352,18 @@ export async function saveBlogAction(data: {
             return { error: msg.includes('required') || msg.includes('invalid') ? msg : 'Failed to save blog' }
         }
     } else {
-        // GH-1587: verify the actor owns this blog before writing to it. Every other
-        // write path in this file does this check (updateBlogStatusAction, deleteBlogAction,
-        // updateBlogCategoryAction) — this was the one missing it, so any authenticated user
-        // could update any tenant's blog post by ID (Local API defaults overrideAccess:true).
-        // Fail-closed via isSuperAdmin() — see its definition for why (fail-open gap).
-        if (!isSuperAdmin(user as UserWithTenants)) {
-            const existing = await payload.findByID({ collection: 'blogs', id: data.id! })
-            const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
-            if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
-                return { error: 'Unauthorized update access' }
-            }
-        }
-
         try {
+            // GH-1587: verify the actor owns this blog before writing to it. Keep the pre-check
+            // inside the existing try/catch so a stale/deleted blog ID stays a controlled action
+            // error instead of bubbling a raw 500 from findByID().
+            if (!isSuperAdmin(user as UserWithTenants)) {
+                const existing = await payload.findByID({ collection: 'blogs', id: data.id! })
+                const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+                if (!tenantId || !blogTenantId || String(tenantId) !== String(blogTenantId)) {
+                    return { error: 'Unauthorized update access' }
+                }
+            }
+
             const result = await payload.update({
                 collection: 'blogs',
                 id: data.id!,

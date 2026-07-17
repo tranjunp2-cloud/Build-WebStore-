@@ -343,6 +343,20 @@ describe('saveBlogAction — cross-tenant update IDOR (TC-F17-SEC-03)', () => {
         expect(result.id).toBe('blog-owned-by-tenant-2')
         expect(mockUpdate).toHaveBeenCalled()
     })
+
+    it('TC-F17-SEC-03d: Stale or deleted blog ID returns a controlled error instead of bubbling a 500 from the ownership pre-check', async () => {
+        mockFindByID.mockReset()
+        mockUpdate.mockReset()
+        mockFindByID.mockRejectedValueOnce(new Error('Blog not found'))
+
+        const result = await saveBlogAction({
+            id: 'missing-blog',
+            title: 'Updated', slug: 'updated', content: '<p>updated</p>', status: 'draft'
+        })
+
+        expect(result).toEqual({ error: 'Failed to save blog' })
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
 })
 
 // GH-1587 round-4 review: same fail-open pattern (if tenantId && ownerTenantId && mismatch)
