@@ -17,9 +17,19 @@ created: 2026-07-13
 
 Branch built on top of `feat/f08-1587-category-integrity-fixes` (PR #1605) because `Categories.ts` + `actions.ts` are heavily modified there. At PR-open: either (a) wait for PR #1605 → merge to `staging`, then base this PR on `staging`; or (b) set this PR's base to `feat/f08-1587-category-integrity-fixes`. Pick whichever is un-merged least. Just a note — implementer does not resolve during phases.
 
+### ⚠️ IMPORTANT — discovered 2026-07-14 afternoon, NOT resolved, resolve at PR-open time
+
+`feat/f08-1587-category-integrity-fixes` (PR #1605) gained 3 NEW commits this same day (`aa6c8318`, `09dcf032`, `63af1949`, plan at `plans/260714-0943-GH-1587-category-field-access-fixes/`, completed, code-reviewed 9.5/10) that **independently fix Bug A (parent cross-tenant IDOR) and Bug C (tenant/site field-spoof) on `Categories.ts`** — via a DIFFERENT, arguably cleaner mechanism: absolute field-level locks (`access: { create: super-admin-only, update: () => false }`) on the `tenant`/`site`/`dna`/`deletedAt` fields, plus a similar `beforeValidate` parent-tenant guard, plus replacing `.passthrough()` with an explicit Zod allowlist in `categories/actions.ts` (their M1, closes the same smuggling vector our Bug D fix addresses differently for Products).
+
+**Impact:**
+- `Categories.ts` will have a SEVERE merge conflict on rebase — not just textual, two different architectures for the same problem.
+- Bug 0 fix (`getCategoriesAction` `overrideAccess:false`) is untouched by their diff — safe, no conflict there.
+- Bugs B/D/E/F remain unique to this branch (Products.ts, Blogs.ts, BlogCategories.ts, Users.ts untouched by their work) — these merge cleanly regardless.
+- **Recommendation for PR-open time:** likely DROP this branch's Bug A/C changes to `Categories.ts` (superseded by the cleaner field-lock approach already merged upstream) and rebase the Bug B/D/E/F work on top of the updated `Categories.ts`/`actions.ts`. Needs careful side-by-side reconciliation, not a blind rebase — user explicitly deferred this decision, do NOT attempt without asking first.
+
 ## Prerequisites (checklist — before implementation starts)
 
-- [ ] Open a GitHub issue for this work (none exists yet — user chose to plan first; per validation, issue is created AFTER implementation, not before). Title e.g. `security(F08): cross-tenant isolation — parent IDOR + anonymous REST leak`. Use `Relates to #N`, never `Closes`.
+- [x] Open a GitHub issue for this work — done: [#1626](https://github.com/primeproduction/ech-prime-web-v2/issues/1626), created after implementation per validation decision. PR should use `Relates to #1626` (and `#1587` for the original parent story), never `Closes`.
 - [ ] Confirm PR #1605 status to decide PR base (see above).
 
 ## Phases

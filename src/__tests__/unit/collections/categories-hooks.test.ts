@@ -402,3 +402,162 @@ describe('BlogCategories anonymous read access block [TC-F17-SEC-02]', () => {
         expect(access).toEqual({ tenant: { in: ['tenant-1'] } })
     })
 })
+
+describe('Blogs Collection Hooks — Tenant/Site Field Spoof (TC-F17-SEC-13)', () => {
+    describe('beforeChange hook — force tenant/site to actor-owned values', () => {
+        const hook = Blogs.hooks!.beforeChange![0] as any
+
+        it('TC-F17-SEC-13: Non-admin create with spoofed tenant/site gets forced to actor tenant and actor site', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn()
+                        .mockResolvedValueOnce({ docs: [] })
+                        .mockResolvedValueOnce({ docs: [{ id: 'site-A' }] })
+                }
+            }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B', site: 'victim-site', title: 'Blog' },
+                operation: 'create',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+            expect(result.site).toBe('site-A')
+            expect(req.payload.find).toHaveBeenNthCalledWith(
+                1,
+                expect.objectContaining({
+                    where: { id: { equals: 'victim-site' }, tenant: { equals: 'tenant-A' } }
+                })
+            )
+        })
+
+        it('TC-F17-SEC-13: Non-admin update with spoofed tenant/site reverts to original ownership', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [] })
+                }
+            }
+            const originalDoc = { id: 'blog-1', tenant: 'tenant-A', site: 'site-A', title: 'Original' }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B', site: 'victim-site' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+            expect(result.site).toBe('site-A')
+        })
+
+        it('TC-F17-SEC-13: Non-admin update with another site in same tenant preserves the requested site', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {
+                    find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 'site-A-2' }] })
+                }
+            }
+            const originalDoc = { id: 'blog-1', tenant: 'tenant-A', site: 'site-A', title: 'Original' }
+
+            const result = await hook({
+                data: { site: 'site-A-2' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+            expect(result.site).toBe('site-A-2')
+        })
+
+        it('TC-F17-SEC-13: Super-admin passthrough keeps caller-supplied tenant/site', async () => {
+            const req = {
+                user: { id: 'admin', roles: ['super-admin'], tenants: [] },
+                payload: {
+                    find: vi.fn()
+                }
+            }
+            const originalDoc = { id: 'blog-1', tenant: 'tenant-A', site: 'site-A', title: 'Original' }
+
+            const result = await hook({
+                data: { tenant: 'tenant-B', site: 'site-B' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-B')
+            expect(result.site).toBe('site-B')
+            expect(req.payload.find).not.toHaveBeenCalled()
+        })
+    })
+})
+
+describe('BlogCategories Collection Hooks — Tenant Field Spoof (TC-F17-SEC-14)', () => {
+    describe('beforeChange hook — force tenant to actor-owned value', () => {
+        const hook = BlogCategories.hooks!.beforeChange![0] as any
+
+        it('TC-F17-SEC-14: Non-admin create with spoofed tenant gets forced to actor tenant', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {}
+            }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B', name: 'News' },
+                operation: 'create',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+        })
+
+        it('TC-F17-SEC-14: Non-admin update with spoofed tenant reverts to original tenant', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] },
+                payload: {}
+            }
+            const originalDoc = { id: 'cat-1', tenant: 'tenant-A', name: 'News' }
+
+            const result = await hook({
+                data: { tenant: 'victim-tenant-B', name: 'Updated News' },
+                originalDoc,
+                operation: 'update',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-A')
+        })
+
+        it('TC-F17-SEC-14: Non-admin without resolvable tenant is rejected fail-closed', async () => {
+            const req = {
+                user: { id: 'user-1', tenants: [] },
+                payload: {}
+            }
+
+            await expect(hook({
+                data: { tenant: 'victim-tenant-B', name: 'News' },
+                operation: 'create',
+                req
+            } as any)).rejects.toThrow(/Không thể xác định thương hiệu/)
+        })
+
+        it('TC-F17-SEC-14: Super-admin passthrough keeps caller-supplied tenant', async () => {
+            const req = {
+                user: { id: 'admin', roles: ['super-admin'], tenants: [] },
+                payload: {}
+            }
+
+            const result = await hook({
+                data: { tenant: 'tenant-B', name: 'Global News' },
+                operation: 'create',
+                req
+            } as any)
+
+            expect(result.tenant).toBe('tenant-B')
+        })
+    })
+})

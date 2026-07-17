@@ -30,9 +30,10 @@ vi.mock('@/lib/subscriptions/plan-subscription', () => ({
 }))
 
 import {
-    createBlogCategoryAction, saveBlogAction, listBlogsAction,
-    deleteBlogAction, updateBlogStatusAction, updateBlogCategoryAction,
-    deleteBlogCategoryAction, getBlogByIdAction, bulkDeleteBlogsAction,
+    createBlogCategoryAction, getBlogCategoriesAction, getCategoryPublishedPostCountAction,
+    saveBlogAction, listBlogsAction, deleteBlogAction, updateBlogStatusAction,
+    updateBlogCategoryAction, deleteBlogCategoryAction, getBlogByIdAction,
+    bulkDeleteBlogsAction,
 } from '@/app/(dashboard)/blog/actions'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -87,6 +88,95 @@ describe('listBlogsAction — search trim [TC-F17.01]', () => {
         // Only tenant condition, no or/search condition
         const orCondition = call.where.and?.find((c: Record<string, unknown>) => 'or' in c)
         expect(orCondition).toBeUndefined()
+    })
+})
+
+
+// GH-1587 follow-up: read helpers had the same fail-open shape as the write paths —
+// they only added tenant filters when tenantId was truthy, so a still-authenticated actor
+// with tenants:[] could read unscoped categories/blogs/counts. These regressions must fail
+// without the fix and pass after it.
+describe('Read helpers — tenantless actor fail-closed (TC-F17-SEC-10..12)', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('TC-F17-SEC-10: getBlogCategoriesAction returns [] and does not query when actor has no resolvable tenant', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [] } as any)
+
+        const result = await getBlogCategoriesAction()
+
+        expect(result).toEqual([])
+        expect(mockFind).not.toHaveBeenCalled()
+    })
+
+    it('TC-F17-SEC-10b: getBlogCategoriesAction still works for super-admin with no tenant memberships', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [], roles: ['super-admin'] } as any)
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'cat-1', name: 'News' }] })
+
+        const result = await getBlogCategoriesAction()
+
+        expect(result).toEqual([{ id: 'cat-1', name: 'News' }])
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blog_categories',
+            where: { and: [{ status: { not_equals: 'deleted' } }] },
+        }))
+    })
+
+    it('TC-F17-SEC-11: getCategoryPublishedPostCountAction returns 0 and does not query when actor has no resolvable tenant', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [] } as any)
+
+        const result = await getCategoryPublishedPostCountAction('cat-1')
+
+        expect(result).toBe(0)
+        expect(mockFind).not.toHaveBeenCalled()
+    })
+
+    it('TC-F17-SEC-11b: getCategoryPublishedPostCountAction still works for super-admin with no tenant memberships', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [], roles: ['super-admin'] } as any)
+        mockFind.mockResolvedValueOnce({ docs: [], totalDocs: 7 })
+
+        const result = await getCategoryPublishedPostCountAction('cat-1')
+
+        expect(result).toBe(7)
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            where: { and: [
+                { category: { equals: 'cat-1' } },
+                { status: { equals: 'published' } },
+            ] },
+        }))
+    })
+
+    it('TC-F17-SEC-12: listBlogsAction returns empty payload and does not query when actor has no resolvable tenant', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [] } as any)
+
+        const result = await listBlogsAction({ search: 'hello' })
+
+        expect(result).toEqual({ data: [], meta: null })
+        expect(mockFind).not.toHaveBeenCalled()
+    })
+
+    it('TC-F17-SEC-12b: listBlogsAction still allows super-admin with no tenant memberships', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValueOnce({ id: 1, tenants: [], roles: ['super-admin'] } as any)
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 'blog-1', title: 'Global' }],
+            totalDocs: 1,
+            totalPages: 1,
+            page: 1,
+            limit: 10,
+            hasNextPage: false,
+            hasPrevPage: false,
+        })
+
+        const result = await listBlogsAction({ search: '  global  ' })
+
+        expect(result.data).toEqual([{ id: 'blog-1', title: 'Global' }])
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            where: { and: [{ or: [
+                { title: { contains: 'global' } },
+                { slug: { contains: 'global' } },
+            ] }] },
+        }))
     })
 })
 

@@ -1,8 +1,65 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+
+function unwrapRelationId(
+    value: string | number | { id: string | number } | null | undefined,
+): string | number | null | undefined {
+    if (value == null) return value
+    return typeof value === 'object' ? value.id : value
+}
+
+function getActorTenantId(user: unknown) {
+    const typedUser = user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> } | null | undefined
+    return unwrapRelationId(typedUser?.tenants?.[0]?.tenant)
+}
+
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+    const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
+    if (req.user && !isSuperAdmin) {
+        const safeTenantId = operation === 'update'
+            ? (unwrapRelationId(originalDoc?.tenant) ?? getActorTenantId(req.user))
+            : getActorTenantId(req.user)
+        if (!safeTenantId) {
+            throw new Error('Không thể xác định thương hiệu (tenant) của bài viết')
+        }
+        data.tenant = safeTenantId
+
+        const originalSiteId = operation === 'update' ? unwrapRelationId(originalDoc?.site) : undefined
+        const requestedSiteId = unwrapRelationId(data.site)
+        if (requestedSiteId != null && String(requestedSiteId) !== String(originalSiteId ?? '')) {
+            const siteCheck = await req.payload.find({
+                collection: 'sites',
+                where: { id: { equals: requestedSiteId }, tenant: { equals: safeTenantId } },
+                limit: 1,
+            })
+            data.site = siteCheck.docs.length > 0 ? requestedSiteId : originalSiteId
+        } else if (originalSiteId != null) {
+            data.site = originalSiteId
+        }
+    }
+
+    if (operation === 'create' && req.user) {
+        if (!data.tenant) {
+            data.tenant = getActorTenantId(req.user)
+        }
+        if (!data.site && data.tenant) {
+            const siteRes = await req.payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: data.tenant } },
+                limit: 1,
+            })
+            if (siteRes.docs.length > 0) {
+                data.site = siteRes.docs[0].id
+            }
+        }
+    }
+
+    return data
+}
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
     hooks: {
+        beforeChange: [beforeChangeHook],
         afterChange: [
             async ({ doc, previousDoc, req, context }) => {
                 const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
@@ -70,6 +127,10 @@ export const Blogs: CollectionConfig = {
             relationTo: 'tenants',
             required: true,
             index: true,
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'site',
@@ -77,6 +138,10 @@ export const Blogs: CollectionConfig = {
             relationTo: 'sites',
             required: true,
             index: true,
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'title',

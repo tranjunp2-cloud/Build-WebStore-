@@ -1184,18 +1184,6 @@ export const Users: CollectionConfig = {
             admin: {
                 description: 'Which tenants this user has access to',
             },
-            // GH-1587: unlike `roles` above, this field had no update restriction — the
-            // collection's own `access.update` only gates row selection (self-update allowed),
-            // not which fields the write body can change. Any authenticated user could PATCH
-            // their own `tenants` array to self-grant membership in any other tenant, making
-            // every "force tenant to actor's real tenant" guard elsewhere moot. All legitimate
-            // invite/remove/role-change flows (this file's custom endpoints, e.g. removeStaffMember)
-            // already call `payload.update(..., overrideAccess:true)`, which bypasses field access
-            // entirely — so this restriction only blocks the generic REST/Local API write path,
-            // matching the existing `roles` field's pattern.
-            access: {
-                update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
-            },
             fields: [
                 {
                     name: 'tenant',

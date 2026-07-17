@@ -1,7 +1,41 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+
+function unwrapRelationId(
+    value: string | number | { id: string | number } | null | undefined,
+): string | number | null | undefined {
+    if (value == null) return value
+    return typeof value === 'object' ? value.id : value
+}
+
+function getActorTenantId(user: unknown) {
+    const typedUser = user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> } | null | undefined
+    return unwrapRelationId(typedUser?.tenants?.[0]?.tenant)
+}
+
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+    const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
+    if (req.user && !isSuperAdmin) {
+        const safeTenantId = operation === 'update'
+            ? (unwrapRelationId(originalDoc?.tenant) ?? getActorTenantId(req.user))
+            : getActorTenantId(req.user)
+        if (!safeTenantId) {
+            throw new Error('Không thể xác định thương hiệu (tenant) của danh mục blog')
+        }
+        data.tenant = safeTenantId
+    }
+
+    if (operation === 'create' && req.user && !data.tenant) {
+        data.tenant = getActorTenantId(req.user)
+    }
+
+    return data
+}
 
 export const BlogCategories: CollectionConfig = {
     slug: 'blog_categories',
+    hooks: {
+        beforeChange: [beforeChangeHook],
+    },
     admin: {
         useAsTitle: 'name',
         description: 'Blog post categories, scoped per tenant.',
@@ -45,6 +79,10 @@ export const BlogCategories: CollectionConfig = {
             relationTo: 'tenants',
             required: true,
             index: true,
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'name',

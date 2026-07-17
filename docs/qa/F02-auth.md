@@ -160,16 +160,6 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02-RTOKEN-06** | `Unit` | Preserve mfa_verified:true từ token gốc | SignJWT được gọi với `mfa_verified: true` khi token gốc có claim này. | High |
 | **TC-F02-RTOKEN-07** | `Unit` | Mặc định mfa_verified=true khi claim vắng mặt | Token cũ (chưa có claim) → SignJWT vẫn nhận `mfa_verified: true`. | High |
 | **TC-F02-RTOKEN-08** | `Unit` | Happy path → 200, set httpOnly cookie | Trả `{ ok: true }`, cookie `payload-token` được set với `httpOnly: true`. | Blocker |
-
-### Tenant self-grant IDOR (Bug F, GH-1587 round-4 review)
-
-> Automated unit tests in `src/__tests__/unit/collections/all-collections-config.test.ts` (describe: "tenants field — update access")
-> Live reproduction via Payload Local API against real Postgres data before/after fix.
-
-| ID | Loại | Tiêu Đề | Kết Quả Mong Đợi | Ưu Tiên |
-|:---|:---|:---|:---|:---:|
-| **TC-F02-SEC-01** | `Sec` | Chặn tự-cấp quyền tenant — `Users.tenants` field bị spoof qua PATCH trực tiếp | User thường KHÔNG thể tự PATCH `user.tenants` để tự thêm tư cách thành viên (owner) của tenant khác — field `tenants` giờ có `access.update: super-admin only`, giống pattern của field `roles`. Super-admin vẫn full quyền (passthrough). Trước fix: user bất kỳ tự cấp quyền `owner` vào tenant nạn nhân qua `PATCH /api/users/<own-id>` — verified live, làm mọi tenant-isolation check khác (Bug C/D) trở nên vô nghĩa vì attacker tự thêm tenant nạn nhân vào danh sách của chính mình trước. | Blocker |
-
 ---
 
 ## 4. End-to-End User Flow (Acceptance Test)

@@ -86,22 +86,6 @@ describe('Users collection [TC-F02]', () => {
         { desc: 'allows super-admin', req: superAdmin, expected: true },
     ])
 
-    // GH-1587 round-4 review: `tenants` field previously had no field-level access — the
-    // collection's own `access.update` only gates row SELECTION (self-update allowed), not
-    // which fields the write body can change. Any authenticated user could self-grant
-    // membership in another tenant via a bare PATCH. Fixed to mirror the `roles` field pattern.
-    describe('tenants field — update access (TC-F02-SEC-01)', () => {
-        const tenantsField = (Users.fields as any[]).find((f) => f.name === 'tenants')
-
-        it('TC-F02-SEC-01: field has an update access restriction (not open like the array default)', () => {
-            expect(tenantsField?.access?.update).toBeDefined()
-        })
-
-        testAccess('tenants.update', tenantsField?.access?.update, [
-            { desc: 'denies normal user (would let them self-grant tenant membership)', req: normalUser, expected: false },
-            { desc: 'allows super-admin', req: superAdmin, expected: true },
-        ])
-    })
 })
 
 // ─── Pages ────────────────────────────────────────────────────────────

@@ -36,7 +36,9 @@ export async function getBlogCategoriesAction() {
     const payload = await getPayload({ config: configPromise })
 
     // Get the first tenant from user's tenants array
-    const tenantId = getTenantId(user as UserWithTenants)
+    const typedUser = user as UserWithTenants
+    const tenantId = getTenantId(typedUser)
+    if (!isSuperAdmin(typedUser) && !tenantId) return []
 
     // Apply tenant filtering + exclude soft-deleted
     const conditions: Where[] = [
@@ -175,7 +177,9 @@ export async function getCategoryPublishedPostCountAction(categoryId: string): P
     if (!user) return 0
 
     const payload = await getPayload({ config: configPromise })
-    const tenantId = getTenantId(user as UserWithTenants)
+    const typedUser = user as UserWithTenants
+    const tenantId = getTenantId(typedUser)
+    if (!isSuperAdmin(typedUser) && !tenantId) return 0
 
     const conditions: Where[] = [
         { category: { equals: categoryId } },
@@ -390,7 +394,9 @@ export async function listBlogsAction(params: {
     if (!user) return { data: [], meta: null }
 
     const payload = await getPayload({ config: configPromise })
-    const tenantId = getTenantId(user as UserWithTenants)
+    const typedUser = user as UserWithTenants
+    const tenantId = getTenantId(typedUser)
+    if (!isSuperAdmin(typedUser) && !tenantId) return { data: [], meta: null }
 
     const conditions: Where[] = []
     if (tenantId) conditions.push({ tenant: { equals: tenantId } })

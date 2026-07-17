@@ -1,10 +1,10 @@
 /**
  * GH-1587 cross-tenant isolation — manual verification script.
  *
- * Re-runs live attacks against real local Postgres data for every bug fixed
- * on branch fix/category-tenant-isolation-security (Bugs A-F). Each check
- * creates its own throwaway data, attacks it, asserts the attack is blocked,
- * then cleans up after itself. Safe to run repeatedly against a local DB.
+ * Re-runs live attacks against real local Postgres data for the tenant-
+ * isolation fixes in this branch. Each check creates its own throwaway data,
+ * attacks it, asserts the attack is blocked, then cleans up after itself.
+ * Safe to run repeatedly against a local DB.
  *
  * Usage: npx tsx --require ./scripts/seed-preload.cjs scripts/verify-gh1587-fixes.ts
  */
@@ -38,7 +38,6 @@ async function main() {
     const authorId = (await payload.find({ collection: 'users', limit: 1 })).docs[0]?.id
 
     const attackerUser = { id: 'attacker', roles: ['owner'], tenants: [{ tenant: tenantA.id }] }
-    const noTenantUser = { id: 'no-tenant-attacker', roles: ['owner'], tenants: [] }
 
     console.log('\n=== Bug B: anonymous REST read blocked (Categories/Products/Blogs/BlogCategories) ===')
     for (const collection of ['categories', 'products', 'blogs', 'blog_categories'] as const) {
@@ -116,27 +115,106 @@ async function main() {
         await payload.delete({ collection: 'blogs', id: victimBlog.id, overrideAccess: true })
     }
 
-    console.log('\n=== Bug F: Users.tenants self-grant ===')
+    console.log('\n=== Blog collections: tenant/site field spoof blocked on generic Payload API ===')
     {
-        const attacker = await payload.create({
-            collection: 'users', overrideAccess: true,
+        const mine = await payload.create({
+            collection: 'blogs',
+            overrideAccess: true,
             data: {
-                email: `verify-gh1587-${Date.now()}@example.com`,
-                password: 'ThrowawayPassw0rd!',
-                firstName: 'Verify', lastName: 'GH1587',
-                roles: ['tenant-owner'],
+                tenant: tenantA.id,
+                site: siteA.id,
+                title: `VERIFY-MY-BLOG-${Date.now()}`,
+                slug: `verify-my-blog-${Date.now()}`,
+                content: 'x',
+                status: 'draft',
+                author: authorId,
             },
         })
-        const selfUser = { id: attacker.id, roles: attacker.roles ?? ['tenant-owner'], tenants: [] }
-        const updated = await payload.update({
-            collection: 'users', id: attacker.id, user: selfUser as any, overrideAccess: false,
-            data: { tenants: [{ tenant: tenantB.id, role: 'owner', status: 'active' }] },
+        const spoofedCreate = await payload.create({
+            collection: 'blogs',
+            user: attackerUser as any,
+            overrideAccess: false,
+            data: {
+                tenant: tenantB.id,
+                site: siteB.id,
+                title: `VERIFY-SPOOF-CREATE-${Date.now()}`,
+                slug: `verify-spoof-create-${Date.now()}`,
+                content: 'x',
+                status: 'draft',
+                author: authorId,
+            },
         })
-        const gotTenantB = ((updated.tenants as any[]) ?? []).some(
-            (t) => String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === String(tenantB.id)
+        const spoofedCreateTenant = typeof spoofedCreate.tenant === 'object' ? spoofedCreate.tenant.id : spoofedCreate.tenant
+        const spoofedCreateSite = typeof spoofedCreate.site === 'object' ? spoofedCreate.site.id : spoofedCreate.site
+        report(
+            'Blogs create — spoofed tenant/site forced to actor ownership',
+            String(spoofedCreateTenant) === String(tenantA.id) && String(spoofedCreateSite) === String(siteA.id),
+            `create landed as tenant=${spoofedCreateTenant}, site=${spoofedCreateSite}`,
         )
-        report('Bug F — self-grant tenant membership', !gotTenantB, `tenants after attack: ${JSON.stringify(updated.tenants)}`)
-        await payload.delete({ collection: 'users', id: attacker.id, overrideAccess: true })
+
+        const updated = await payload.update({
+            collection: 'blogs',
+            id: mine.id,
+            user: attackerUser as any,
+            overrideAccess: false,
+            data: { tenant: tenantB.id, site: siteB.id },
+        })
+        const finalTenant = typeof updated.tenant === 'object' ? updated.tenant.id : updated.tenant
+        const finalSite = typeof updated.site === 'object' ? updated.site.id : updated.site
+        report(
+            'Blogs update — spoofed tenant/site stays in actor tenant',
+            String(finalTenant) === String(tenantA.id) && String(finalSite) === String(siteA.id),
+            `update landed as tenant=${finalTenant}, site=${finalSite}`,
+        )
+
+        const spoofedCategoryCreate = await payload.create({
+            collection: 'blog_categories',
+            user: attackerUser as any,
+            overrideAccess: false,
+            data: {
+                tenant: tenantB.id,
+                name: `VERIFY-SPOOF-CAT-${Date.now()}`,
+                slug: `verify-spoof-cat-${Date.now()}`,
+            },
+        })
+        const spoofedCategoryCreateTenant = typeof spoofedCategoryCreate.tenant === 'object'
+            ? spoofedCategoryCreate.tenant.id
+            : spoofedCategoryCreate.tenant
+        report(
+            'BlogCategories create — spoofed tenant forced to actor ownership',
+            String(spoofedCategoryCreateTenant) === String(tenantA.id),
+            `create landed as tenant=${spoofedCategoryCreateTenant}`,
+        )
+
+        const myCategory = await payload.create({
+            collection: 'blog_categories',
+            overrideAccess: true,
+            data: {
+                tenant: tenantA.id,
+                name: `VERIFY-MY-CAT-${Date.now()}`,
+                slug: `verify-my-cat-${Date.now()}`,
+            },
+        })
+        const updatedCategory = await payload.update({
+            collection: 'blog_categories',
+            id: myCategory.id,
+            user: attackerUser as any,
+            overrideAccess: false,
+            data: { tenant: tenantB.id },
+        })
+        const finalCategoryTenant = typeof updatedCategory.tenant === 'object'
+            ? updatedCategory.tenant.id
+            : updatedCategory.tenant
+        report(
+            'BlogCategories update — spoofed tenant stays in actor tenant',
+            String(finalCategoryTenant) === String(tenantA.id),
+            `update landed as tenant=${finalCategoryTenant}`,
+        )
+
+        await payload.delete({ collection: 'blogs', id: mine.id, overrideAccess: true })
+        await payload.delete({ collection: 'blogs', id: spoofedCreate.id, overrideAccess: true })
+        await payload.delete({ collection: 'blog_categories', id: spoofedCategoryCreate.id, overrideAccess: true })
+        await payload.delete({ collection: 'blog_categories', id: myCategory.id, overrideAccess: true })
     }
 
     console.log(`\n${'='.repeat(60)}\n${passed} passed, ${failed} failed\n`)

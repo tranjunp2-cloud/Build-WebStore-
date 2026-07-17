@@ -24,7 +24,6 @@ export async function getCategoriesAction() {
         where: { deletedAt: { exists: false } },
         depth: 1,
         limit: 1000,
-        overrideAccess: false,
     })
 
     const getDescendantIds = (parentId: string | number, allCats: Array<{ id: string | number; parent?: string | number | { id: string | number } | null }>, visited = new Set<string>()): (string | number)[] => {
