@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { slugify } from '@/lib/utils/slugify'
 
 interface SlugCheckResult {
     available: boolean
@@ -25,21 +26,6 @@ interface SlugPickerProps {
     skipInitialCheck?: boolean
 }
 
-/** Client-side slugify for instant preview (mirrors server-side logic) */
-function clientSlugify(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 63)
-    return slug.length >= 3 ? slug : ''
-}
-
 export default function SlugPicker({ businessName = '', onSlugChange, platformDomain, skipInitialCheck }: SlugPickerProps) {
     const { t } = useI18n()
     const f = t.onboarding.form
@@ -58,7 +44,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
     // Auto-generate slug from business name
     useEffect(() => {
         if (businessName) {
-            const generated = clientSlugify(businessName)
+            const generated = slugify(businessName)
             if (generated) {
                 setSlug(generated)
             }

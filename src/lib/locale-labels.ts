@@ -9,6 +9,7 @@ export const LOCALE_LABELS: Record<string, LocaleLabel> = {
     // Primary (skip modal)
     en: { short: 'EN', full: 'English', flag: '🇬🇧' },
     ms: { short: 'MY', full: 'Malay', flag: '🇲🇾' },
+    id: { short: 'ID', full: 'Indonesian', flag: '🇮🇩' },
 
     // Asian
     th: { short: 'TH', full: 'Thai', flag: '🇹🇭' },
