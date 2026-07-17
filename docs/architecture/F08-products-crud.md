@@ -295,8 +295,8 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 
 **Build-time (save-side):**
 - Location: `src/lib/products/build-product-alt.ts` (pure function `buildProductAlt(alt, productName, storeName)`)
-- Called during `saveProductAction()` in `src/app/(dashboard)/products/actions.ts` to capture site context
-- Server fetches tenant's `Sites.name` once per save (single query, no per-image cost)
+- Called during `saveProductAction()` in `src/app/(dashboard)/products/actions.ts` and the AI website-generation flow
+- `saveProductAction()` intentionally persists the fallback from `productName` only for dashboard/manual saves (no `Sites.name` lookup on that path)
 - When `images[].alt` is blank, the fallback is computed and persisted into the saved product data
 - The AI website-generation flow also persists the same fallback into created product records
 
@@ -311,7 +311,7 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 
 #### Guard Order
 
-1. On save/create, if product image alt text is blank, persist `buildProductAlt(img.alt, productName, storeName)` into `images[].alt`
+1. On save/create, if product image alt text is blank, persist `buildProductAlt(img.alt, productName, undefined)` for dashboard/manual saves, or the equivalent AI-site-generation fallback on the website-generation path
 2. On render, call `buildProductAlt(product.images[i].alt, product.name, site.name)` as a final safety net
    - Falls back to `productName` if present.
    - Falls back to `storeName` if `productName` is missing/empty.

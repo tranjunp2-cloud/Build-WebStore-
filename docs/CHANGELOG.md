@@ -304,7 +304,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 **Phase 3 wiring (complete; alt-text fallback on storefront):**
 - **Alt-text fallback:** Storefront product images now always have non-empty `<img alt>` text via fallback pattern `"{Product Name}"`. Satisfies WCAG requirement that images must have descriptive alt text. Fallback generated when product lacks explicit alt-text metadata.
-- **Server-side lookup:** `src/app/(dashboard)/products/actions.ts` `saveProductAction()` fetches tenant's Sites.name once per save and threads it into product save context (single DB lookup, no per-image overhead). `buildProductAlt()` utility (`src/lib/products/build-product-alt.ts`) constructs fallback from `product.name` + `site.name`.
+- **Server-side persistence:** `src/app/(dashboard)/products/actions.ts` `saveProductAction()` now persists blank image alt text from `product.name` only for dashboard/manual saves (no tenant `Sites.name` lookup on that path). `buildProductAlt()` utility (`src/lib/products/build-product-alt.ts`) still keeps the render-time fallback chain `product.name` → `site.name` → `"Product image"` for storefront safety.
 - **Render-time usage:** All storefront render paths apply `buildProductAlt()` fallback at display time: `src/components/storefront/ProductImageGallery.tsx`, `src/blocks/products-grid/index.tsx`, `src/blocks/products-featured/index.tsx`, `src/blocks/product-quick-view/index.tsx`. Instances without explicit alt preserve computed fallback via utility; no merchant action required.
 - **Non-breaking:** Existing products with explicit alt-text unchanged. Fallback only applies when alt is missing/empty. Draft/Archive transitions unaffected.
 
