@@ -125,10 +125,16 @@ const POOL_MIN_EXTRA = 2
  * no enabled block resolves to 0 → buildImagePool skips that Pixabay call.
  *
  * Default config (hero-only) → { landscape: 3, square: 0 } instead of 12+6.
+ *
+ * GH-1611: also returns the un-buffered base (`landscapeMin`/`squareMin`) — the
+ * hungriest single block's need. buildImagePool uses it as the "bucket is
+ * filled" threshold, so the fallback ladder keeps going until gallery's 6 slots
+ * can actually be served from the pool instead of stopping at half the bucket
+ * and leaving media-injector to patch the deficit with off-pool photos.
  */
 export function computePoolBucketSizes(
     enabled: ReadonlySet<string> = getImageEnabledBlocks(),
-): { landscape: number; square: number } {
+): { landscape: number; square: number; landscapeMin: number; squareMin: number } {
     let landscapeBase = 0
     let squareBase = 0
     for (const blockType of enabled) {
@@ -149,6 +155,8 @@ export function computePoolBucketSizes(
     return {
         landscape: sized(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
         square: sized(squareBase, DEFAULT_SQUARE_SIZE),
+        landscapeMin: Math.min(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        squareMin: Math.min(squareBase, DEFAULT_SQUARE_SIZE),
     }
 }
 
@@ -240,26 +248,28 @@ export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
             }
         }
 
-        // Nested array fields (gallery.images[].image, team.members[].avatar)
+        // Nested array fields (gallery.images[].image, team.members[].avatar).
+        // GH-1621: never pad with `{}` placeholders to reach `minCount` — a padded
+        // item only gets an `image` assigned below, so any other Payload-required
+        // field on that item (e.g. portfolio-grid.projects[].title) would stay empty.
+        // Only inject images for items the AI actually generated — `minCount` here
+        // is a pool-sizing hint for computePoolBucketSizes(), not a floor to pad to.
+        // NOTE: this function's sole caller (generate-site/route.ts) creates pages as
+        // `_status:'published'` (not draft), so it's fully Payload-validated at create
+        // time regardless — a title-less padded item would already fail loudly there,
+        // and generate-site also runs its own portfolio-grid title fallback afterward
+        // (sanitizeBlocksForPayload). Removing the padding is still correct hygiene
+        // (no reason to fabricate content-free array items) and protects any future
+        // caller of planImageNeeds that lacks that same downstream safety net — but it
+        // is not, by itself, a confirmed fix for the original GH-1621 Sentry incident.
+        // The confirmed live gap for that failure mode is normalize-required-titles.ts
+        // (edit-block's draft-editing path). See the GH-1621 journal entry.
         if (spec.nestedArray) {
-            for (const { arrayField, itemField, minCount } of spec.nestedArray) {
-                let arr = block[arrayField]
-                if (!Array.isArray(arr)) {
-                    // Create array if missing with minCount empty entries
-                    if (minCount && minCount > 0) {
-                        arr = Array.from({ length: minCount }, () => ({}))
-                        block[arrayField] = arr
-                    } else {
-                        continue
-                    }
-                }
+            for (const { arrayField, itemField } of spec.nestedArray) {
+                const arr = block[arrayField]
+                if (!Array.isArray(arr) || arr.length === 0) continue
                 const items = arr as AIBlock[]
-                // Pad array to minCount if below
-                if (minCount && items.length < minCount) {
-                    while (items.length < minCount) items.push({})
-                }
                 const count = items.length
-                if (count === 0) continue
                 needs.push({
                     blockType,
                     count,

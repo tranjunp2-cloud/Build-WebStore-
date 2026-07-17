@@ -52,7 +52,7 @@ export function FilterChip<T extends string>({
                 // Hover matches the dashSecondary Button pattern (see Discounts "Export CSV") —
                 // a subtle surface wash, not a border-color change.
                 className={cn(
-                    "chip-trigger flex items-center gap-1.5 h-9 px-3 rounded-lg border border-solid text-[13px] font-medium transition-colors cursor-pointer",
+                    "chip-trigger flex items-center gap-1.5 h-10 px-3 rounded-lg border border-solid text-[13px] font-medium transition-colors cursor-pointer",
                     active
                         ? "bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.4)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.18)]"
                         : "bg-[hsl(var(--card))] border-[hsl(var(--input-border))] text-[var(--dash-text-muted)] hover:bg-white/[0.05]"

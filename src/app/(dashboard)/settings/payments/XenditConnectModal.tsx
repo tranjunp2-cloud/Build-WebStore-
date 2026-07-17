@@ -46,13 +46,13 @@ function SecretField({ label, requiredLabel, value, onChange, placeholder, show,
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[13px] font-mono font-medium min-w-0 focus:outline-none placeholder:text-gray-400"
+                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[13px] font-mono font-medium min-w-0 focus:outline-none placeholder:text-gray-400"
                     style={{ color: 'var(--dash-text)' }}
                 />
                 <button
                     type="button"
                     onClick={onToggleShow}
-                    className="px-3 h-[40px] grid place-items-center transition-colors shrink-0"
+                    className="px-3 h-12 grid place-items-center transition-colors shrink-0"
                     style={{ borderLeft: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                 >
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -218,7 +218,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         </div>
                         <button
                             type="button" onClick={handleClose} disabled={isSaving}
-                            className="h-9 px-[16px] rounded-[8px] text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap hover:bg-[var(--dash-secondary-bg)]"
+                            className="h-12 px-[16px] rounded-[8px] text-[13px] font-semibold transition-colors disabled:opacity-50 whitespace-nowrap hover:bg-[var(--dash-secondary-bg)]"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                         >
                             {pt.cancel}
@@ -226,7 +226,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         <button
                             type="button" onClick={handleSubmit}
                             disabled={!secretKey || !callbackToken}
-                            className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                            className="inline-flex items-center gap-[6px] h-12 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                             style={{
                                 background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
                                 color: '#052e22',

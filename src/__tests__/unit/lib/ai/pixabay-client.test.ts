@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, photoMatchesTerms, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -412,5 +412,150 @@ describe('downloadPhotoBuffer', () => {
         await expect(
             downloadPhotoBuffer('https://pixabay.com/get/photo-1_1280.jpg'),
         ).rejects.toMatchObject({ code: 'TIMEOUT' })
+    })
+})
+
+// ── GH-1611: term-aware relevance gate ──────────────────────────────────────
+
+describe('TC-GH1611 — photoMatchesTerms (term-aware gate)', () => {
+    it('[TC-GH1611-20] keeps the GH-1185 invariant: a 2-word term needs both words', () => {
+        // The original bug: q="phở bò" matched Scottish cattle tagged "bò ghàidhealach".
+        expect(photoMatchesTerms('scottish cattle, bò ghàidhealach', ['phở bò'])).toBe(false)
+        expect(photoMatchesTerms('phở bò, món ăn việt nam', ['phở bò'])).toBe(true)
+    })
+
+    it('[TC-GH1611-21] a multi-term query does not demand one photo satisfy every term', () => {
+        // AND-matching the joined query would require a photo be both a cake and a
+        // baguette — no photo is, so every on-industry photo was thrown away and the
+        // pool fell through to off-industry fallbacks (clothing in a bakery gallery).
+        const terms = ['chocolate birthday cake', 'crusty baguette bread']
+        expect(photoMatchesTerms('cake, chocolate, dessert', terms)).toBe(true)
+        expect(photoMatchesTerms('bread, baguette, bakery', terms)).toBe(true)
+    })
+
+    it('[TC-GH1611-22] a 3+ word term needs the head noun AND a modifier', () => {
+        // Head noun ("cake") + a modifier ("chocolate") → it is the product.
+        expect(photoMatchesTerms('cake, chocolate, dessert', ['chocolate birthday cake'])).toBe(true)
+        // Modifiers without the head noun → a balloon party, not a cake.
+        expect(photoMatchesTerms('birthday, party, balloons, chocolate', ['chocolate birthday cake'])).toBe(false)
+        // Head noun alone is NOT enough — that rule let the shirt-rack photo from the
+        // GH-1611 report satisfy a leather-goods shop via the shared word "store".
+        expect(photoMatchesTerms('shirt rack, clothing store, retail', ['leather handbag store'])).toBe(false)
+        // Deliberate false negative: a real cake tagged only "cake, sweet, food" is
+        // dropped. The ladder backfills on-category; a wrong photo cannot be undone.
+        expect(photoMatchesTerms('cake, sweet, food', ['chocolate birthday cake'])).toBe(false)
+    })
+
+    it('[TC-GH1611-26] GH-1185 holds at longer arities, not just 2-word dishes', () => {
+        // The original GH-1185 example: q="cơm cá kho tộ" must NOT match dried anchovy
+        // ("cá cơm") photos, which share the words "cá" and "cơm". A "2 of N" rule would
+        // have let this back in — hence the head-noun requirement ("tộ" is absent).
+        expect(photoMatchesTerms('cá cơm, anchovy, dried fish', ['cơm cá kho tộ'])).toBe(false)
+        expect(photoMatchesTerms('cơm tấm, sườn nướng, món việt', ['cơm tấm sườn nướng'])).toBe(true)
+    })
+
+    it('[TC-GH1611-27] matches whole tag tokens, not substrings', () => {
+        // Substring matching made "tea" match "team", "art" match "cartoon", and
+        // "pho" match "photography" — a bubble-tea shop got office meeting photos.
+        expect(photoMatchesTerms('team, meeting, office', ['tea'])).toBe(false)
+        expect(photoMatchesTerms('cartoon, drawing, kids', ['art'])).toBe(false)
+        expect(photoMatchesTerms('photography, camera, lens', ['pho'])).toBe(false)
+        // Compounds still count from 4 chars up: a cupcake IS a cake.
+        expect(photoMatchesTerms('cupcake, frosting, sweet', ['cake'])).toBe(true)
+        // ...and so do inflections of the same stem (5+ chars): Pixabay tags the
+        // cupcake photo "frosting" while the merchant typed "frosted cupcake".
+        expect(photoMatchesTerms('cupcake, frosting, sweet', ['frosted cupcake'])).toBe(true)
+        // The stem rule must not resurrect the substring false positives:
+        expect(photoMatchesTerms('breadboard, circuit, arduino', ['artisan sourdough bread'])).toBe(false)
+        expect(photoMatchesTerms('punching bag, gym, boxing', ['handmade leather bag'])).toBe(false)
+    })
+
+    it('[TC-GH1611-29] a compound must END with the word — starting with it is a different thing', () => {
+        // These all passed under naive substring/prefix matching and are the whole
+        // reason the rule is suffix-anchored: a breadboard is not bread, a tablet is
+        // not a table, a plantation is not a plant.
+        expect(photoMatchesTerms('breadboard, circuit, arduino', ['bread'])).toBe(false)
+        expect(photoMatchesTerms('tablet, computer, screen', ['table'])).toBe(false)
+        expect(photoMatchesTerms('plantation, field, palm', ['plant'])).toBe(false)
+        expect(photoMatchesTerms('paperclip, office, desk', ['paper'])).toBe(false)
+        expect(photoMatchesTerms('cabinet, kitchen, wooden', ['rustic wooden cabin'])).toBe(false)
+        // The suffix must be attached to a real morpheme (>=3 chars), or the rule
+        // reads "price" as rice and "chair" as hair.
+        expect(photoMatchesTerms('price tag, sale, discount', ['rice'])).toBe(false)
+        expect(photoMatchesTerms('chair, furniture, wood', ['hair'])).toBe(false)
+        expect(photoMatchesTerms('coats, winter, fashion', ['oats'])).toBe(false)
+        // Real compounds (word at the END) still match — a cupcake IS a cake.
+        expect(photoMatchesTerms('cheesecake, berry, slice', ['cake'])).toBe(true)
+        // Inflections still match — "grilled" IS "grill".
+        expect(photoMatchesTerms('grilled pork, bbq, charcoal', ['grill'])).toBe(true)
+    })
+
+    it('[TC-GH1611-30] merchant plurals match Pixabay singulars (and vice versa)', () => {
+        // Merchants type their product list in the plural ("Cakes, Cupcakes, Pastries")
+        // while Pixabay tags the singular subject ("cake"). A stemmer applied
+        // asymmetrically ("cakes"→"cak" but "cake"→"cake") rejects every photo of the
+        // very product the gate exists to find — the bakery then fills its gallery from
+        // the ungated category tier, which is how GH-1611 looked in the first place.
+        expect(photoMatchesTerms('cake, chocolate, dessert', ['cakes'])).toBe(true)
+        expect(photoMatchesTerms('cupcake, frosting, sweet', ['cupcakes'])).toBe(true)
+        expect(photoMatchesTerms('pastry, croissant, bakery', ['pastries'])).toBe(true)
+        expect(photoMatchesTerms('cookie, biscuit, dessert', ['cookies'])).toBe(true)
+        expect(photoMatchesTerms('noodle, soup, asian', ['noodles'])).toBe(true)
+        expect(photoMatchesTerms('dress, fashion, model', ['dresses'])).toBe(true)
+        // Reverse direction — Pixabay tags the plural, merchant typed the singular.
+        expect(photoMatchesTerms('cakes, birthday, party', ['cake'])).toBe(true)
+        // Plural + compound head together: cheesecake IS a cake.
+        expect(photoMatchesTerms('cheesecake, dessert, slice', ['cakes'])).toBe(true)
+        // Still rejects the off-industry photo — matching plurals must not soften the gate.
+        expect(photoMatchesTerms('jeans, denim, fashion', ['cakes'])).toBe(false)
+    })
+
+    it('[TC-GH1611-28] never gate on mood adjectives — they admit anything', () => {
+        // A 1-word term needs 1 hit, so "minimalist"/"bright" as gate terms would let a
+        // clothing flatlay into a bakery pool. Callers pass SUBJECT terms only; this
+        // test documents WHY (the gate itself cannot tell an adjective from a noun).
+        expect(photoMatchesTerms('jeans, flatlay, minimalist', ['minimalist'])).toBe(true)
+        expect(photoMatchesTerms('jeans, flatlay, minimalist', ['chocolate birthday cake'])).toBe(false)
+    })
+
+    it('[TC-GH1611-23] rejects cross-industry photos — the reported symptom', () => {
+        expect(
+            photoMatchesTerms('jeans, knit hat, flatlay', ['chocolate birthday cake', 'frosted cupcake']),
+        ).toBe(false)
+        expect(
+            photoMatchesTerms('shirt rack, clothing store, retail', ['banh mi', 'vietnamese bread']),
+        ).toBe(false)
+    })
+
+    it('[TC-GH1611-24] single-word term must appear; empty tags/terms handled', () => {
+        expect(photoMatchesTerms('ramen, noodle soup', ['ramen'])).toBe(true)
+        expect(photoMatchesTerms('pizza, italian', ['ramen'])).toBe(false)
+        expect(photoMatchesTerms(null, ['ramen'])).toBe(false)
+        expect(photoMatchesTerms('anything', [])).toBe(true) // no terms → nothing to gate on
+    })
+
+    it('[TC-GH1611-25] NFC-normalizes both sides (decomposed VN input)', () => {
+        const decomposed = 'phở bò'.normalize('NFD')
+        expect(photoMatchesTerms('phở bò, món ăn việt nam', [decomposed])).toBe(true)
+    })
+
+    it('[TC-GH1611-M1] Vietnamese head-initial anchoring vs English head-final anchoring', () => {
+        // Vietnamese term: 4 words, head is words[0] = "bánh"
+        const viTerm = 'bánh mì thịt nướng'
+        
+        // Match: tags contain head "bánh" + modifier "mì" (2 hits total)
+        expect(photoMatchesTerms('bánh mì, sandwich, vietnam', [viTerm])).toBe(true)
+        
+        // Reject: tags contain modifiers "thịt", "nướng" (2 hits) but miss the head "bánh"
+        expect(photoMatchesTerms('thịt nướng, bbq, grill', [viTerm])).toBe(false)
+
+        // English term: 3 words, head is words[2] = "cake"
+        const enTerm = 'chocolate birthday cake'
+        
+        // Match: tags contain head "cake" + modifier "chocolate"
+        expect(photoMatchesTerms('cake, chocolate, dessert', [enTerm])).toBe(true)
+        
+        // Reject: tags contain modifiers "chocolate", "birthday" (2 hits) but miss the head "cake"
+        expect(photoMatchesTerms('chocolate, birthday, celebration', [enTerm])).toBe(false)
     })
 })

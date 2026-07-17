@@ -175,8 +175,8 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ${blockList}
 
 ## STRUCTURE RULES
-1. Generate 5 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-6 blocks), Blog (4-6 blocks with 3-5 seeded posts)
-2. Every page MUST have at least 4 blocks with non-empty body copy — no stub pages
+1. Generate 5 pages: Homepage (8-14 blocks), About (7-9 blocks), Services/Products (7-9 blocks), Contact (7-9 blocks), Blog (7-9 blocks with 3-5 seeded posts)
+2. Every page MUST have at least 7 blocks (including navigation and footer) with non-empty body copy — no stub pages
 3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
 4. Each block MUST have "blockType" and "variant" fields
 5. blockType MUST be one of the listed types — no custom types
@@ -231,6 +231,11 @@ ORDERING RULES:
 - Place a CTA block every 3-4 sections. First in hero, mid-page, and before footer.
 - NEVER place two text-heavy sections back-to-back. Alternate: text-heavy → visual-heavy → text-heavy
 - Features MUST come before stats (stats need context)
+- Subpages (About, Services, Contact, Blog, etc.) MUST have a logical flow of at least 5 content sections:
+  * About Page: navigation → hero → story (or about) → team → stats → cta → footer
+  * Services/Products Page: navigation → hero → service-cards → features → testimonials → cta → footer
+  * Contact Page: navigation → hero → contact → faq → socials → footer
+  * Blog Page: navigation → hero → blog-list → features → newsletter → footer
 
 ### Content Quality
 - Hero headline must mention the ACTUAL business name — never generic

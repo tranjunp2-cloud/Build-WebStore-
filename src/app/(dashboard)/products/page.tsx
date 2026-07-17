@@ -42,6 +42,7 @@ import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
 import { computeStockDisplay, singleSeverity, type StockDisplay, type StockSeverity } from '@/lib/products/stock-display'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
+import { getAiChatEnterBehavior } from '@/lib/products/ai-chat-enter-behavior'
 
 type ProductImage = {
     url?: string
@@ -177,6 +178,7 @@ export default function ProductsPage() {
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
     const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const aiPromptComposingRef = useRef(false)
     useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
     const [sortBy, setSortBy] = useState('Latest')
     const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
@@ -428,11 +430,13 @@ export default function ProductsPage() {
                 }}
             >
                 <div className="relative flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                        <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
-                        <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-start gap-3">
+                            <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
+                            <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
+                        </div>
+                        <p className="text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
                     </div>
-                    <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
                     {/* Command shell — textarea + footer (hint + Generate button) share one bordered
                         box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
                     <div className="w-full rounded-xl [border:2px_solid_hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:[border-color:hsl(var(--ring))] focus-within:ring-[3px] focus-within:ring-[hsl(var(--primary))]/10 transition-colors">
@@ -440,26 +444,38 @@ export default function ProductsPage() {
                             ref={aiTextareaRef}
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
+                            onCompositionStart={() => {
+                                aiPromptComposingRef.current = true
+                            }}
+                            onCompositionEnd={() => {
+                                aiPromptComposingRef.current = false
+                            }}
+                            onBlur={() => {
+                                aiPromptComposingRef.current = false
+                            }}
                             onKeyDown={e => {
-                                // Plain Enter generates; ⌘/Ctrl+Enter and Shift+Enter fall
-                                // through to the textarea's default behavior and insert a new
-                                // line (Shift+Enter must stay excluded — it's the conventional
-                                // newline shortcut in chat-style inputs and was never asked to change).
-                                if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && aiPrompt.trim()) {
-                                    e.preventDefault()
-                                    handleCreateAi()
-                                }
+                                const behavior = getAiChatEnterBehavior({
+                                    key: e.key,
+                                    prompt: aiPrompt,
+                                    shiftKey: e.shiftKey,
+                                    ctrlKey: e.ctrlKey,
+                                    metaKey: e.metaKey,
+                                    isComposing: aiPromptComposingRef.current || e.nativeEvent.isComposing,
+                                })
+                                if (behavior === 'ignore') return
+                                e.preventDefault()
+                                if (behavior === 'submit') handleCreateAi()
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
                             rows={1}
-                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[14px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[14px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] placeholder:text-[11px] md:placeholder:text-[13px] focus:outline-none focus-visible:outline-none"
                         />
                         <div className="flex items-center justify-end md:justify-between gap-3 [border-top:1px_solid_hsl(var(--input-border))] px-3 py-1">
                             <div className="hidden md:flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
                                 <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
                                 <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
                                 <span>·</span>
-                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Shift</kbd>
                                 <span>+</span>
                                 <kbd className="rounded [border:1px_solid_hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
                                 <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
@@ -553,7 +569,7 @@ export default function ProductsPage() {
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
-                        <div className="relative w-full h-9">
+                        <div className="relative w-full h-10">
                             <Image src="/images/figma/search-icon.svg" width={16} height={16} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
                             <Input
@@ -570,7 +586,7 @@ export default function ProductsPage() {
                         <div className="flex flex-row items-center gap-2 w-full">
                             {/* Sort — shadcn Select (design system, themed) */}
                             <Select value={sortBy} onValueChange={setSortBy}>
-                                <SelectTrigger className="h-9 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
+                                <SelectTrigger className="h-10 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
                                     <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -908,7 +924,7 @@ export default function ProductsPage() {
                                                                         tabIndex={0}
                                                                         role="button"
                                                                         aria-label={`${t.dashboard.products.list.colStock}: ${stockLabel}`}
-                                                                        className="inline-flex cursor-help"
+                                                                        className="inline-flex"
                                                                     >
                                                                         <Badge variant={stockDisplay.severity} dot>{stockLabel}</Badge>
                                                                     </span>
@@ -1122,7 +1138,7 @@ export default function ProductsPage() {
                                             <Link
                                                 href={`/products/${product.id}`}
                                                 onClick={e => e.stopPropagation()}
-                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 active:scale-[0.98] transition-all"
+                                                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 active:scale-[0.98] transition-all"
                                             >
                                                 <Pencil className="w-[18px] h-[18px]" />
                                                 {t.dashboard.products.list.edit}
@@ -1132,7 +1148,7 @@ export default function ProductsPage() {
                                             <button
                                                 type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
+                                                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
                                                 {t.dashboard.products.list.delete}

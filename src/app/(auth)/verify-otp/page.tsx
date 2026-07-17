@@ -376,7 +376,7 @@ function VerifyOTPContent() {
                                 flex: '1 1 0',
                                 maxWidth: '48px',
                                 minWidth: '36px',
-                                height: '56px',
+                                height: '48px',
                                 borderRadius: '16px',
                                 background: 'var(--auth-input-bg)',
                                 border: digit
@@ -400,7 +400,7 @@ function VerifyOTPContent() {
                     type="button"
                     onClick={() => handleVerify(otp.join(''))}
                     disabled={isVerifying || !isOtpComplete}
-                    className="h-9 w-full"
+                    className="h-12 w-full"
                 >
                     {isVerifying ? (
                         <>

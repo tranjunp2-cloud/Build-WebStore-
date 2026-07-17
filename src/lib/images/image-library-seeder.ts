@@ -17,65 +17,95 @@ import { buildSiteAltKey, siteAltKeyPrefix } from './image-library-keys'
 // ── Search query per category+slot type ─────────────────────────────────────
 
 const GALLERY_QUERIES: Record<string, string> = {
-    fnb:        'cafe coffee latte barista',
+    fnb: 'cafe coffee latte barista',
     restaurant: 'restaurant dining gourmet food',
-    ecommerce:  'fashion retail boutique products',
-    beauty:     'beauty salon skincare spa',
-    fitness:    'gym fitness workout exercise',
-    health:     'healthcare clinic medical wellness',
-    education:  'classroom education learning school',
+    ecommerce: 'fashion retail boutique products',
+    beauty: 'beauty salon skincare spa',
+    fitness: 'gym fitness workout exercise',
+    health: 'healthcare clinic medical wellness',
+    education: 'classroom education learning school',
     realestate: 'luxury home real estate interior',
-    events:     'wedding flowers event venue',
-    travel:     'travel destination hotel resort',
-    creative:   'creative studio art portfolio',
-    tech:       'technology startup modern office',
-    business:   'business corporate professional office',
-    blog:       'creative workspace writing desk',
+    events: 'wedding flowers event venue',
+    travel: 'travel destination hotel resort',
+    creative: 'creative studio art portfolio',
+    tech: 'technology startup modern office',
+    business: 'business corporate professional office',
+    blog: 'creative workspace writing desk',
 }
 
 const HERO_QUERIES: Record<string, string> = {
-    fnb:        'cafe interior coffee shop ambiance',
+    fnb: 'cafe interior coffee shop ambiance',
     restaurant: 'restaurant elegant interior dining',
-    ecommerce:  'fashion store boutique window display',
-    beauty:     'beauty spa interior luxurious',
-    fitness:    'gym interior fitness equipment',
-    health:     'clinic hospital bright modern',
-    education:  'school campus learning environment',
+    ecommerce: 'fashion store boutique window display',
+    beauty: 'beauty spa interior luxurious',
+    fitness: 'gym interior fitness equipment',
+    health: 'clinic hospital bright modern',
+    education: 'school campus learning environment',
     realestate: 'luxury home architecture modern',
-    events:     'wedding venue ballroom elegant',
-    travel:     'resort hotel luxury destination',
-    creative:   'creative studio artist workspace',
-    tech:       'modern tech office open space',
-    business:   'corporate office building professional',
-    blog:       'home office desk creative setup',
+    events: 'wedding venue ballroom elegant',
+    travel: 'resort hotel luxury destination',
+    creative: 'creative studio artist workspace',
+    tech: 'modern tech office open space',
+    business: 'corporate office building professional',
+    blog: 'home office desk creative setup',
 }
 
 // ── Slot definitions ─────────────────────────────────────────────────────────
 
 interface SlotDef {
     slot: string
-    query: string
+    queryCandidates: string[]
     imgixW: number
     imgixH: number
     orientation: 'landscape' | 'portrait' | 'squarish'
 }
 
-function buildSlots(category: string): SlotDef[] {
-    const galleryQ = GALLERY_QUERIES[category] ?? GALLERY_QUERIES['business']!
-    const heroQ = HERO_QUERIES[category] ?? HERO_QUERIES['business']!
+function buildProductQueryCandidates(productTerms?: string | null): string[] {
+    if (!productTerms) return []
+
+    const tokens = productTerms
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+
+    const candidates = [
+        tokens.join(' '),
+        tokens.slice(0, 2).join(' '),
+        tokens.slice(0, 1).join(' '),
+    ].filter(Boolean)
+
+    return Array.from(new Set(candidates))
+}
+
+function buildSearchCandidates(baseQuery: string, productTerms?: string | null): string[] {
+    const productCandidates = buildProductQueryCandidates(productTerms)
+    return productCandidates.length > 0 ? productCandidates : [baseQuery]
+}
+
+function queryGroupKey(slot: SlotDef): string {
+    return `${slot.queryCandidates.join('||')}:${slot.orientation}`
+}
+
+function buildSlots(category: string, productTerms?: string | null): SlotDef[] {
+    const baseGalleryQ = GALLERY_QUERIES[category] ?? GALLERY_QUERIES['business']!
+    const baseHeroQ = HERO_QUERIES[category] ?? HERO_QUERIES['business']!
+
+    const galleryQueries = buildSearchCandidates(baseGalleryQ, productTerms)
+    const heroQueries = buildSearchCandidates(baseHeroQ, productTerms)
     return [
         ...Array.from({ length: 6 }, (_, i) => ({
-            slot: `gallery[${i}]`, query: galleryQ, imgixW: 800, imgixH: 800, orientation: 'squarish' as const,
+            slot: `gallery[${i}]`, queryCandidates: galleryQueries, imgixW: 800, imgixH: 800, orientation: 'squarish' as const,
         })),
         ...Array.from({ length: 3 }, (_, i) => ({
-            slot: `hero[${i}]`, query: heroQ, imgixW: 1400, imgixH: 800, orientation: 'landscape' as const,
+            slot: `hero[${i}]`, queryCandidates: heroQueries, imgixW: 1400, imgixH: 800, orientation: 'landscape' as const,
         })),
-        { slot: 'about', query: galleryQ, imgixW: 1200, imgixH: 800, orientation: 'landscape' as const },
+        { slot: 'about', queryCandidates: galleryQueries, imgixW: 1200, imgixH: 800, orientation: 'landscape' as const },
         ...Array.from({ length: 4 }, (_, i) => ({
-            slot: `team[${i}]`, query: 'professional portrait person', imgixW: 400, imgixH: 400, orientation: 'squarish' as const,
+            slot: `team[${i}]`, queryCandidates: ['professional portrait person'], imgixW: 400, imgixH: 400, orientation: 'squarish' as const,
         })),
         ...Array.from({ length: 3 }, (_, i) => ({
-            slot: `features[${i}]`, query: galleryQ, imgixW: 600, imgixH: 400, orientation: 'landscape' as const,
+            slot: `features[${i}]`, queryCandidates: galleryQueries, imgixW: 600, imgixH: 400, orientation: 'landscape' as const,
         })),
     ]
 }
@@ -85,7 +115,7 @@ function buildSlots(category: string): SlotDef[] {
 class Semaphore {
     private queue: Array<() => void> = []
     private active = 0
-    constructor(private readonly max: number) {}
+    constructor(private readonly max: number) { }
 
     async run<T>(fn: () => Promise<T>): Promise<T> {
         if (this.active >= this.max) {
@@ -126,6 +156,7 @@ export async function seedImageLibraryForSite(
     siteId: number | string,
     category: string,
     slotFilter?: (slot: string) => boolean,
+    productTerms?: string | null,
 ): Promise<SeededImageMapping> {
     const start = Date.now()
     const mapping: SeededImageMapping = { hero: [], gallery: [], about: null, team: [], features: [] }
@@ -165,38 +196,43 @@ export async function seedImageLibraryForSite(
             }
         }
 
-        const allSlots = buildSlots(category)
+        const allSlots = buildSlots(category, productTerms)
         const slots = slotFilter ? allSlots.filter(s => slotFilter(s.slot)) : allSlots
         const sem = new Semaphore(CONCURRENCY)
         let uploaded = 0
         let failed = 0
 
-        // Group slots by query+orientation — search separately per orientation so
+        // Group slots by query candidates + orientation — search separately per orientation so
         // landscape hero/about slots get properly oriented source images.
         const queryGroups = new Map<string, SlotDef[]>()
         for (const slot of slots) {
-            const key = `${slot.query}:${slot.orientation}`
+            const key = queryGroupKey(slot)
             const group = queryGroups.get(key) ?? []
             group.push(slot)
             queryGroups.set(key, group)
         }
 
-        // Search Pixabay once per unique query+orientation, then distribute photos to slots
+        // Search Pixabay once per unique query+orientation, retrying with progressively
+        // shorter product-focused queries when the more specific query returns zero hits.
         const photosByKey = new Map<string, Awaited<ReturnType<typeof searchPhotos>>>()
         for (const [key, groupSlots] of queryGroups) {
-            const { query, orientation } = groupSlots[0]!
+            const { queryCandidates, orientation } = groupSlots[0]!
             // Pixabay ships fixed sizes — request the largest size any slot in this
             // group needs; Payload regenerates per-variant sizes on upload anyway.
             const groupWidth = Math.max(...groupSlots.map((s) => s.imgixW))
-            try {
-                // GH-1185: Pixabay category filter keeps results on-domain.
-                const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
-                const photos = await searchPhotos(query, 10, { orientation, width: groupWidth, category: pixCategory })
-                photosByKey.set(key, photos)
-            } catch (err) {
-                console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)
-                photosByKey.set(key, [])
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+            let photos: Awaited<ReturnType<typeof searchPhotos>> = []
+
+            for (const query of queryCandidates) {
+                try {
+                    photos = await searchPhotos(query, 10, { orientation, width: groupWidth, category: pixCategory })
+                    if (photos.length > 0) break
+                } catch (err) {
+                    console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)
+                }
             }
+
+            photosByKey.set(key, photos)
         }
 
         // Assign a unique photo to each slot (rotate through results)
@@ -204,7 +240,7 @@ export async function seedImageLibraryForSite(
         const slotPhotoAssignments: Array<{ slotDef: SlotDef; photoUrl: string | null }> = []
 
         for (const slotDef of slots) {
-            const key = `${slotDef.query}:${slotDef.orientation}`
+            const key = queryGroupKey(slotDef)
             const photos = photosByKey.get(key) ?? []
             if (photos.length === 0) {
                 slotPhotoAssignments.push({ slotDef, photoUrl: null })

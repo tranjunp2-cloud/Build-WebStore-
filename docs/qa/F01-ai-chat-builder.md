@@ -338,6 +338,51 @@ _Unit: `src/__tests__/unit/lib/ai/ensure-cart-global-block.test.ts` (`ensureCart
 
 ---
 
+### 3.x. AI Chat Edit — backfill title bắt buộc trước khi apply changes (GH-1621)
+
+_Unit: `src/__tests__/unit/lib/ai/normalize-required-titles.test.ts` (`normalizeChangesRequiredFields`, `coerceServiceItems`). **Adversarial review (260714) xác định đây mới là fix confirm đóng đúng gap sống của GH-1621** — không phải "bonus" như plan ban đầu nêu: `/api/ai/edit-block`'s `update_block`/`update_multiple_blocks` apply AI `changes` trực tiếp vào page ĐANG TỒN TẠI, không qua schema validation, rồi editor autosave thành draft (draft bỏ qua required-validation) → đúng cơ chế "im lặng tới lúc Publish". Media-injector padding fix (TC-F38-RAW-26) vẫn giữ vì là phòng vệ đúng đắn, nhưng route gọi nó (`generate-site`) tạo page `_status:'published'` (không phải draft) nên được Payload validate ngay lúc tạo — không phải fix đã confirm cho đúng triệu chứng Sentry gốc. Chi tiết: journal `260714-gh1621-portfolio-grid-empty-title-pad.md`._
+
+| TC ID | Nguồn | Loại | Mô tả | Bước thực hiện | Kết quả mong đợi | Ưu tiên | Trạng thái |
+|---|---|---|---|---|---|---|---|
+| TC-F01.PGRID-01 | GH-1621 | Unit | **[Unit]** Backfill title rỗng/thiếu trên `portfolio-grid.projects[]` | `normalizeChangesRequiredFields({projects:[{title:'Real'},{title:''},{}]}, {blockType:'portfolio-grid'})` | item 1 giữ nguyên; item 2 → `Project 2`; item 3 → `Project 3` | Critical | [x] |
+| TC-F01.PGRID-02 | GH-1621 | Unit | **[Unit]** Ưu tiên `name`/`heading` trước khi dùng fallback chung | project thiếu `title` nhưng có `name`/`heading` | Title lấy từ `name`/`heading`, không rơi vào `Project N` | High | [x] |
+| TC-F01.PGRID-03 | GH-1621 | Unit | **[Unit]** Không đụng block type khác (vd hero) | `blockType:'hero'` + `changes` bất kỳ | `changes` giữ nguyên 100%, không mutate | High | [x] |
+| TC-F01.PGRID-04 | GH-1621 | Unit | **[Unit]** No-op khi `changes` không có mảng cần backfill | `blockType:'portfolio-grid'`, `changes={headline:'...'}` | `changes` giữ nguyên | Medium | [x] |
+| TC-F01.PGRID-05 | GH-1621 | Unit | **[Unit]** Resolve blockType từ `changes.blockType` khi `existingBlock=null` (case `add_block`/block context rỗng) | `changes={blockType:'portfolio-grid', projects:[{}]}`, existingBlock=null | Vẫn backfill đúng title | High | [x] |
+| TC-F01.PGRID-06 | GH-1621 | Unit | **[Unit]** blockType không xác định được → cảnh báo + no-op (an toàn, không đoán bừa) | `changes={projects:[{}]}`, existingBlock=null, không có `changes.blockType` | `console.warn` được gọi; `changes` không bị sửa | Medium | [x] |
+| TC-F01.PGRID-07 | GH-1621 | Unit | **[Unit]** `booking-widget` bị loại trừ (required field là `name`, không phải `title`) | `blockType:'booking-widget'` + `services` | `changes` giữ nguyên, không áp nhầm rule title | High | [x] |
+| TC-F01.PGRID-08 | GH-1621 | Unit | **[Unit]** `service-cards` vẫn qua `coerceServiceItems` (title + description + icon) — regression guard cho pattern gốc | `blockType:'service-cards'` + `services` mix string/object | Mỗi item có đủ `title`/`icon`/`description`, hành vi y hệt trước refactor | Critical | [x] |
+| TC-F01.PGRID-09 | GH-1621 | Unit | **[Unit]** `coerceServiceItems` — string shorthand → object đầy đủ | `coerceServiceItems(['Haircut'])` | `{title:'Haircut', icon:'⭐', description:''}` | High | [x] |
+| TC-F01.PGRID-10 | GH-1621 | Unit | **[Unit]** `coerceServiceItems` — giữ nguyên description đã có, không ghi đè bằng rỗng | item có sẵn `description` hợp lệ | description giữ nguyên | Medium | [x] |
+| TC-F01.PGRID-11 | Review | Unit | **[Unit]** `portfolio-grid` — string shorthand giữ nguyên text AI làm title, không rơi vào fallback chung | `projects:['Downtown Loft Renovation', {title:'Real Project'}]` | Item 1 → `{title:'Downtown Loft Renovation'}` (giữ nguyên text AI, KHÔNG phải `Project 1`) | High | [x] |
+| TC-F01.PGRID-12 | Review | Unit | **[Unit]** `coerceServiceItems` — string rỗng backfill về title chung, không để trống | `coerceServiceItems([''])` | `title === 'Service 1'` (không giữ `''`) | High | [x] |
+
+**P1 mục 4 (issue #1621) — Audit toàn bộ block có `minCount` đối chiếu `required`, mở rộng bảo vệ:**
+
+| TC ID | Nguồn | Loại | Mô tả | Bước thực hiện | Kết quả mong đợi | Ưu tiên | Trạng thái |
+|---|---|---|---|---|---|---|---|
+| TC-F01.PGRID-13 | Audit | Unit | **[Unit]** `team.members[].name` backfill (required, khác `title`) | member thiếu `name` | Backfill `Team Member N`, member có `name` giữ nguyên | Critical | [x] |
+| TC-F01.PGRID-14 | Audit | Unit | **[Unit]** `doctor-profile.doctors[].name` backfill | doctor thiếu `name` | Backfill `Doctor N` | Critical | [x] |
+| TC-F01.PGRID-15 | Audit | Unit | **[Unit]** `testimonials` route qua `sanitizeTestimonialItems` (drop item không quote) | mix item có/không `quote` | Item không quote bị loại, không backfill quote giả | Critical | [x] |
+| TC-F01.PGRID-16 | Audit | Unit | **[Unit]** `sanitizeTestimonialItems` — drop item không quote, backfill name thiếu | 1 item đủ, 1 item quote rỗng, 1 item thiếu name | Item quote rỗng bị loại hoàn toàn (không bịa quote giả — khác nguyên tắc title/name); item thiếu name → `Customer N` | Critical | [x] |
+| TC-F01.PGRID-17 | Review | Unit | **[Unit]** `sanitizeTestimonialItems` — string shorthand giữ nguyên làm quote (KHÔNG bị hiểu nhầm thành object rỗng rồi loại) | `sanitizeTestimonialItems(['Fantastic team...', {quote:'Real'}])` | Cả 2 item giữ lại, quote 1 = text gốc AI trả về | High | [x] |
+| TC-F01.PGRID-17b | Review | Unit | **[Unit]** `sanitizeTestimonialItems` — item không phải object/string (null, number) bị loại | mix `null`, `42`, object hợp lệ | Chỉ object hợp lệ giữ lại | Medium | [x] |
+| TC-F01.PGRID-18 | Audit | Unit | **[Unit]** `sanitizeBlocksRequiredFields()` — quét cả layout, chỉ sửa block cần, giữ nguyên block an toàn | layout gồm hero + portfolio-grid + team + testimonials | hero giữ nguyên; 3 block kia đều được backfill/sanitize đúng rule riêng | Critical | [x] |
+| TC-F01.PGRID-19 | Audit | Unit | **[Unit]** `sanitizeBlocksRequiredFields()` không mutate input, trả về copy mới | so sánh input trước/sau + reference | Input gốc không đổi; output là object/array mới | High | [x] |
+| TC-F01.PGRID-20 | Audit | Unit | **[Unit]** Block thiếu `blockType` → bỏ qua an toàn, không crash | block chỉ có field khác, không có `blockType` | Trả về nguyên vẹn, không throw | Medium | [x] |
+| TC-F01.PGRID-21 | Review | Unit | **[Unit]** `property-card.properties[].title` backfill — Critical gap adversarial review bắt được (audit ban đầu bỏ sót dù đúng trong phạm vi `BLOCK_IMAGE_SPEC`) | property thiếu `title` | Backfill `Property N` | Critical | [x] |
+
+**⚠️ P0.2 đã đổi kiến trúc sau code review (260714, xem journal mục "Correction #2"):**
+
+Bản đầu wire `sanitizeBlocksRequiredFields()` vào **MỌI lần autosave** (`save/route.ts`) — adversarial review (2 reviewer độc lập) phát hiện đây là lỗi thật: chạy trên toàn bộ layout mỗi lần save, có thể âm thầm sửa/xóa field mà user không đụng tới (vd testimonial đang gõ dở bị mất do race điều kiện debounce ~3s, hoặc field blank tạm thời trong lúc gõ lại bị tự điền placeholder giả mà không có gì báo cho user biết). **Đã sửa:** chuyển sanitizer sang chạy **CHỈ 1 LẦN, ngay trước khi promote draft→published** (`publish/route.ts`, sau `normalizeBlocksForPersistence`, trước `payload.update(draft:false)`) — không đụng gì tới trong lúc user còn đang sửa, vẫn chặn được đường AI edit-block LẪN sửa tay qua UI (data trong draft lúc bấm Publish, bất kể tạo ra kiểu gì, đều được sanitize). `save/route.ts` đã revert về nguyên bản (không còn sanitize). Test: `src/__tests__/api/publish.test.ts` (`TC-F01-pub-18` verify wiring đúng chỗ mới), `src/__tests__/unit/api/save-draft-page.test.ts` (`TC-F01-pub-17`, giờ verify NGƯỢC LẠI — draft save KHÔNG mutate).
+
+**Known gap ngoài phạm vi audit (ghi nhận, chưa fix):** `pricing.plans[].name`+`.price` (2 field required, `price` giả có thể gây hiểu lầm nghiêm trọng trên trang live — cần quyết định thiết kế riêng, không đơn giản như backfill title) và `faq.faqs[].question`+`.answer` — cả 2 block này KHÔNG nằm trong `BLOCK_IMAGE_SPEC` nên nằm ngoài phạm vi audit gốc của issue #1621. Đề xuất tách issue riêng.
+
+**P1 (issue #1621 mục 3) — Toast Publish fail giờ nói rõ block/item/trang thay vì chỉ "title: required":**
+Backend (`src/app/api/sites/[siteId]/publish/route.ts`, hàm `friendlyValidationLocation()`) resolve `validationErrors[].path` (vd `layout.6.projects.4.title`) → tên block (qua `blockRegistry`) + item 1-indexed + tên trang, trả về field mới `failures[].friendlyDetail` (vd `"About Us → Portfolio → Project 5 → title: This field is required."`). Frontend (`editor/[siteId]/page.tsx`, cả `handlePublish` và `handleRepublish`/nút Update) ưu tiên field này, fallback về logic cũ nếu backend không trả (an toàn ngược). Test: `src/__tests__/api/publish.test.ts` (`TC-F01-pub-16`), `src/__tests__/unit/editor/publish-flow.test.tsx` (`TC-F05.64`) — theo đúng convention 2 series này (không có row riêng trong docs/qa, nhất quán với các TC-F01-pub-*/TC-F05.6* khác đã có từ trước).
+
+---
+
 ## 4. Hành Trình Trải Nghiệm End-to-End (E2E UAT Flow)
 
 _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của chủ cửa hàng SME._

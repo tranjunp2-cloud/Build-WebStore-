@@ -160,7 +160,7 @@ export function StripeConnectBlock({
                     type="button"
                     onClick={handleClick}
                     disabled={isLoading}
-                    className="h-[44px] gap-2 whitespace-nowrap"
+                    className="h-12 gap-2 whitespace-nowrap"
                     // Connect mode keeps the shared blue->teal gradient (white text from the
                     // variant). Onboard/Verify stay amber (distinct state) — bg overridden inline,
                     // text remains white.

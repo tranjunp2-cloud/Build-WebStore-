@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -132,6 +132,7 @@ const levelTextColors = {
 export default function CategoryManager() {
     const { t } = useI18n()
     const router = useRouter()
+    const nameInputRef = useRef<HTMLInputElement>(null)
 
     // State
     const [categories, setCategories] = useState<Category[]>([])
@@ -188,6 +189,12 @@ export default function CategoryManager() {
         }, 400)
         return () => { cancelled = true; clearTimeout(timer) }
     }, [formData.name, formData.parent, formData.id, isFormOpen])
+
+    useEffect(() => {
+        if (isFormOpen) {
+            nameInputRef.current?.focus()
+        }
+    }, [isFormOpen])
 
     // Delete Modal
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -262,6 +269,16 @@ export default function CategoryManager() {
         if (newSet.has(id)) newSet.delete(id)
         else newSet.add(id)
         setExpandedIds(newSet)
+    }
+
+    const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+
+        const target = e.target as HTMLElement
+        if (target instanceof HTMLTextAreaElement || target instanceof HTMLButtonElement) return
+        if (target instanceof HTMLInputElement && ['submit', 'button', 'checkbox', 'radio', 'file'].includes(target.type)) return
+
+        e.preventDefault()
     }
 
     const handleOpenForm = (cat?: Category, overrideParentId?: string | number) => {
@@ -608,8 +625,6 @@ export default function CategoryManager() {
                         role="dialog"
                         aria-modal="true"
                         onKeyDown={(e) => { if (e.key === 'Escape') setIsFormOpen(false) }}
-                        // Auto-focus the modal container when it mounts
-                        ref={(el) => { if (el) el.focus() }}
                         tabIndex={-1}
                         className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh] outline-none"
                         style={{ border: '1px solid var(--dash-border)' }}
@@ -628,12 +643,13 @@ export default function CategoryManager() {
                         </div>
 
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-                            <form id="cat-form" onSubmit={handleSave} className="flex flex-col gap-6">
+                            <form id="cat-form" onSubmit={handleSave} onKeyDown={handleFormKeyDown} className="flex flex-col gap-6">
                                 <div className="flex flex-col gap-2">
                                     <Label>
                                         {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[hsl(var(--destructive))]">*</span>
                                     </Label>
                                     <Input
+                                        ref={nameInputRef}
                                         type="text"
                                         required
                                         value={formData.name}

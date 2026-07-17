@@ -557,6 +557,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			usage: { prompt_tokens: 1, completion_tokens: 1 },
 			choices: [{ message: { content: JSON.stringify({ siteName: 'T', category: 'business', theme: {}, seo: {}, language: 'en', pages }) } }],
 		})
+		let lightAttempts = 0
 		const mockOpenai = {
 			chat: {
 				completions: {
@@ -564,8 +565,9 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 						const sys = String(opts.messages?.[0]?.content ?? '')
 						if (sys.includes('HOMEPAGE ONLY')) return scoped([{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }])
 						if (sys.includes('Contact, Blog')) {
-							// nano attempt fails; MAIN-model retry succeeds
-							if (opts.model === 'gpt-4.1-nano') throw new Error('nano flake')
+							// light batch attempt fails first, MAIN-model retry succeeds
+							lightAttempts++
+							if (lightAttempts === 1) throw new Error('light attempt flake')
 							return scoped([
 								{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] },
 								{ title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] },
@@ -635,10 +637,10 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		// Act
 		await runParallelPageSplit(input)
 
-		// Assert — light batch on nano (default of site-generation-subpages-light),
+		// Assert — light batch on mini (default of site-generation-subpages-light),
 		// home + About/Services batch on the caller's main model
 		const light = seenModels.find((m) => m.scope === 'light-batch')
-		expect(light?.model).toBe('gpt-4.1-nano')
+		expect(light?.model).toBe('gpt-4.1-mini')
 		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-4.1-mini')
 		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-4.1-mini')
 	})

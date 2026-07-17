@@ -9,13 +9,12 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockResolveComposerCategory, mockOpenAICreate } = vi.hoisted(() => ({
+const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockOpenAICreate } = vi.hoisted(() => ({
     mockSearchPhotos: vi.fn(),
     mockUploadImageUrl: vi.fn(),
     mockFindOrCreateCartonMedia: vi.fn(),
     mockFindByID: vi.fn(),
     mockGetProductImages: vi.fn(),
-    mockResolveComposerCategory: vi.fn(),
     mockOpenAICreate: vi.fn(),
 }))
 
@@ -60,9 +59,11 @@ vi.mock('@/lib/images/industry-images', () => ({
     getProductImages: mockGetProductImages,
 }))
 
-vi.mock('@/lib/ai/composer-category-resolver', () => ({
-    resolveComposerCategory: mockResolveComposerCategory,
-}))
+// GH-1611: the category resolver is NOT mocked. Faking resolveBusinessCategory as
+// "score the concatenated string" would re-implement the exact bug it fixes (a form
+// key like 'fnb' scores 0 and sinks to 'business'), so the fix would look tested
+// while never running. businessInfo.industry = 'business' below, and the real
+// resolver returns 'business' for it — same category the spy used to force.
 
 vi.mock('@/lib/ai/config', () => ({
     selectModel: vi.fn().mockReturnValue('gpt-4.1-nano'),
@@ -100,7 +101,6 @@ const PRODUCT_URLS = [
 beforeEach(() => {
     vi.clearAllMocks()
     mockGetProductImages.mockReturnValue(PRODUCT_URLS)
-    mockResolveComposerCategory.mockReturnValue('business')
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
     delete process.env.PIXABAY_FALLBACK_ONLY
