@@ -14,6 +14,12 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
     return { countryCode: '60', number: digits }
 }
 
+/** Normalize a Malaysian phone number to the canonical digits-only `60...` format. */
+export function normalizeMyPhone(raw: string | null | undefined): string {
+    const { countryCode, number } = splitPhone(raw ?? '')
+    return number ? `${countryCode}${number}` : ''
+}
+
 /**
  * Whether a raw phone is usable as an EP shipment contact number. EP accepts a
  * placeholder at submit time but the courier's AWB issuance rejects it later,
@@ -30,6 +36,11 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
  * The cap catches multi-number pastes ("0123... / 0198...") in legacy data.
  */
 export function hasUsablePhone(raw: string | null | undefined): boolean {
-    const { number } = splitPhone(raw ?? '')
-    return number.length >= 8 && number.length <= 11 && !number.startsWith('0')
+    const value = raw?.trim() ?? ''
+    if (!value || !/^\+?[\d\s()-]+$/.test(value)) return false
+    const { number } = splitPhone(value)
+    return number.length >= 8
+        && number.length <= 11
+        && !number.startsWith('0')
+        && !number.startsWith('60')
 }

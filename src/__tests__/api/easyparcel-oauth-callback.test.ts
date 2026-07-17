@@ -43,6 +43,7 @@ vi.mock('@/lib/shipping/easyparcel/normalize', () => ({
 import { GET } from '@/app/api/easyparcel/oauth-callback/route'
 import { exchangeCodeForToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getAccountInfo } from '@/lib/shipping/easyparcel/client'
+import { NextRequest } from 'next/server'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -338,19 +339,45 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // TC-F36.24: Missing code parameter → error redirect
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.24] Missing code parameter → error redirect to /settings/shipping?ep=error', async () => {
-        // Arrange: Request without code
+    it('[TC-F36.201] Missing code parameter returns to the EasyParcel shipping tab', async () => {
+        // Arrange
         const url = new URL('http://localhost/api/easyparcel/oauth-callback')
         url.searchParams.set('state', state)
-        // code missing
+        const request = new NextRequest(url)
 
-        // Act: Call GET with malformed request
-        // Note: In real test, would use NextRequest mock
-        // For contract: verify expected redirect logic
+        // Act
+        const response = await GET(request)
 
-        // Expected: redirect to /settings/shipping?ep=error
-        const expectedRedirectUrl = '/settings/shipping?ep=error'
-        expect(expectedRedirectUrl).toContain('ep=error')
+        // Assert
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=error')
+    })
+
+    it('[TC-F36.201] Successful callback returns to the EasyParcel shipping tab', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: tenantId, easyParcelIntegration: {} })
+        mockUpdate.mockResolvedValue({ id: tenantId })
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
+            access_token: 'token-1',
+            refresh_token: 'refresh-1',
+            expires_in: 3600,
+            refresh_token_expires_in: 86400,
+        })
+        vi.mocked(getAccountInfo).mockResolvedValue({
+            data: { account: { name: 'Merchant' }, address: { pickup_address: null } },
+        })
+        const url = new URL('http://localhost/api/easyparcel/oauth-callback')
+        url.searchParams.set('code', code)
+        url.searchParams.set('state', state)
+        const request = new NextRequest(url, {
+            headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+        })
+
+        // Act
+        const response = await GET(request)
+
+        // Assert
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=connected')
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
     })
 
     // ──────────────────────────────────────────────────────────────────

@@ -23,15 +23,23 @@ vi.mock('sonner', () => ({
     },
 }))
 
+vi.mock('@/i18n', async () => {
+    const locale = await import('@/i18n/locales/en.json')
+    return { useI18n: () => ({ t: locale.default }) }
+})
+
 vi.mock('@/app/(dashboard)/settings/shipping/pickup-addresses', () => ({
-    PickupAddresses: ({ value, onChange }: { value: any[]; onChange: (v: any[]) => void }) => (
+    PickupAddresses: ({ value, onChange, onEditingChange }: { value: any[]; onChange: (v: any[]) => void; onEditingChange?: (editing: boolean) => void }) => (
         <div data-testid="pickup-addresses">
             <button
                 data-testid="add-warehouse"
-                onClick={() => onChange([
-                    ...value,
-                    { id: 'w-' + Date.now(), label: 'New Warehouse', phone: '0123456789', address1: 'St', state: 'Selangor', postcode: '47810' },
-                ])}
+                onClick={() => {
+                    onChange([
+                        ...value,
+                        { id: 'w-' + Date.now(), label: 'New Warehouse', phone: '0123456789', address1: 'St', city: 'Petaling Jaya', state: 'Selangor', postcode: '47810' },
+                    ])
+                    onEditingChange?.(false)
+                }}
             >
                 Add Warehouse
             </button>
@@ -252,10 +260,10 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert: POST body should have warehouses ONLY, NO selectedCourier
@@ -268,7 +276,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
                     credentials: 'include',
                     body: JSON.stringify({
                         enabled: true,
-                        warehouses: [completeWarehouse],
+                        warehouses: [{ ...completeWarehouse, phone: '60123456789' }],
                     }),
                 }),
             )
@@ -309,10 +317,10 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert
@@ -326,7 +334,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
     // TC-F36.40: Save & Activate error shows error toast + doesn't reload
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.40] Save & Activate error shows error toast and does NOT reload', async () => {
+    it('[TC-F36.40] Save & Activate uses localized fallback and does NOT reload', async () => {
         // Arrange
         const { toast } = await import('sonner')
         const mockFetch = vi.fn().mockResolvedValue({
@@ -356,15 +364,15 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert
         await waitFor(() => {
-            expect(vi.mocked(toast).error).toHaveBeenCalledWith('Failed to activate')
+            expect(vi.mocked(toast).error).toHaveBeenCalledWith('Failed to save EasyParcel settings')
             expect(mockReload).not.toHaveBeenCalled()
         })
     })
@@ -484,7 +492,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Assert: Activate button should exist and be enabled (canActivate=true)
         await waitFor(() => {
-            const activateBtn = screen.getByRole('button', { name: /save & activate/i })
+            const activateBtn = screen.getByRole('button', { name: /save (?:&|and) activate/i })
             expect(activateBtn).not.toBeDisabled()
         })
     })

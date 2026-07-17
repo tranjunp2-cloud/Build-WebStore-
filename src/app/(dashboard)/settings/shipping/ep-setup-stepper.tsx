@@ -3,19 +3,19 @@
 import { useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PickupAddresses } from './pickup-addresses'
 import { EpWalletBanner } from './ep-wallet-banner'
-import { getDefaultWarehouse, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isWarehouseComplete, normalizeWarehouses, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
 import type { EasyParcelIntegrationConfig } from './easyparcel-settings-tab'
+import { getEasyParcelErrorMessage } from './easyparcel-error-message'
 
 interface Props {
     tenantId: string
     initialEpConfig: EasyParcelIntegrationConfig | null
 }
-
-// Courier step removed — checkout auto-picks the cheapest courier that serves the route.
-const STEPS = ['Connect', 'Pickup', 'Review'] as const
 
 /**
  * Guided setup shown after OAuth but before activation. The merchant configures a pickup address,
@@ -23,29 +23,39 @@ const STEPS = ['Connect', 'Pickup', 'Review'] as const
  * checkout uses flat rate. Reuses PickupAddresses from the management view.
  */
 export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
-    // Step index within STEPS: 0=Connect (done), 1=Pickup, 2=Review. Starts at Pickup;
+    const { t } = useI18n()
+    const copy = t.dashboard.settings.shipping.easyParcel
+    const steps = [copy.stepConnect, copy.stepPickup, copy.stepReview]
+    // Step index: 0=Connect (done), 1=Pickup, 2=Review. Starts at Pickup;
     // the merchant can Back to Connect to switch account / disconnect.
     const [step, setStep] = useState(1)
-    const [warehouses, setWarehouses] = useState<Warehouse[]>(initialEpConfig?.warehouses ?? [])
+    const [warehouses, setWarehouses] = useState<Warehouse[]>(normalizeWarehouses(initialEpConfig?.warehouses ?? []))
     const [isSaving, setIsSaving] = useState(false)
     const [isDisconnecting, setIsDisconnecting] = useState(false)
+    const [isEditingWarehouse, setIsEditingWarehouse] = useState(warehouses.length === 0)
+    const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
-    const pickupDone = warehouses.length > 0
-    const canNext = step === 0 || (step === 1 && pickupDone)
-    const canActivate = pickupDone
+    const defaultWh = getDefaultWarehouse({ warehouses })
+    const pickupDone = isWarehouseComplete(defaultWh)
+    const canNext = !isEditingWarehouse && (step === 0 || (step === 1 && pickupDone))
+    const canActivate = pickupDone && !isEditingWarehouse
 
     async function handleDisconnect() {
         setIsDisconnecting(true)
         try {
             const res = await fetch(`/api/tenant/${tenantId}/easyparcel-disconnect`, { method: 'DELETE', credentials: 'include' })
             const json = await res.json()
-            if (!res.ok || !json.success) { toast.error(json?.error?.message ?? 'Disconnect failed'); return }
-            toast.success('EasyParcel disconnected')
+            if (!res.ok || !json.success) {
+                toast.error(getEasyParcelErrorMessage(json?.error?.code, copy, copy.disconnectFailed))
+                return
+            }
+            toast.success(copy.disconnected)
             window.location.reload()
         } catch {
-            toast.error('Network error. Please try again.')
+            toast.error(copy.networkError)
         } finally {
             setIsDisconnecting(false)
+            setConfirmDisconnect(false)
         }
     }
 
@@ -60,116 +70,128 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
                 body: JSON.stringify({ enabled: true, warehouses }),
             })
             const json = await res.json()
-            if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to activate')
-            toast.success('EasyParcel activated')
+            if (!res.ok || !json.success) {
+                toast.error(getEasyParcelErrorMessage(json?.error?.code, copy, copy.saveFailed))
+                return
+            }
+            toast.success(copy.activated)
             window.location.reload()
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to activate')
+        } catch {
+            toast.error(copy.networkError)
         } finally {
             setIsSaving(false)
         }
     }
 
-    const defaultWh = getDefaultWarehouse({ warehouses })
-
     return (
-        <div className="mt-5 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
+        <div className="mt-5 min-w-0 overflow-hidden rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)]">
             {/* Step indicator */}
-            <div className="flex items-center gap-2 p-6 pb-4">
-                {STEPS.map((label, i) => {
+            <div className="grid grid-cols-3 gap-2 p-4 sm:flex sm:items-center sm:p-6 sm:pb-4">
+                {steps.map((label, i) => {
                     const done = i < step
                     const current = i === step
                     return (
-                        <div key={label} className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
+                        <div key={label} className="flex min-w-0 items-center gap-2 sm:flex-1">
+                            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center sm:flex-row sm:text-left">
                                 <span className={[
                                     'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold',
                                     done ? 'bg-[hsl(var(--primary))] text-white'
                                         : current ? 'border-2 border-[hsl(var(--primary))] text-[hsl(var(--primary))]'
-                                            : 'border-2 border-white/[0.15] text-[var(--dash-text-muted)]',
+                                            : 'border-2 border-[var(--dash-border)] text-[var(--dash-text-muted)]',
                                 ].join(' ')}>
                                     {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                                 </span>
-                                <span className={['text-[13px] font-medium', current || done ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'].join(' ')}>{label}</span>
+                                <span className={['min-w-0 break-words text-[12px] font-medium sm:text-[13px]', current || done ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'].join(' ')}>{label}</span>
                             </div>
-                            {i < STEPS.length - 1 && <span className="w-6 h-px bg-white/[0.12]" />}
+                            {i < steps.length - 1 && <span className="hidden h-px flex-1 bg-[var(--dash-border)] sm:block" />}
                         </div>
                     )
                 })}
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+            <div className="border-t border-[var(--dash-border)]" />
 
             {/* Step body */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
                 {step === 0 && (
                     <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                        <div className="flex flex-col gap-4 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                             <div className="flex items-center gap-3 min-w-0">
                                 <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
                                 <div className="min-w-0">
-                                    <p className="text-[13px] font-medium text-[var(--dash-text)] truncate">{initialEpConfig?.accountName || 'OAuth session active'}</p>
+                                    <p className="truncate text-[13px] font-medium text-[var(--dash-text)]">{initialEpConfig?.accountName || copy.oauthActive}</p>
                                     {initialEpConfig?.accountEmail && <p className="text-[12px] text-[var(--dash-text-muted)] truncate">{initialEpConfig.accountEmail}</p>}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <Button variant="outline" size="sm" onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }} className="flex items-center gap-1.5">
-                                    <PlugZap className="h-3.5 w-3.5" /> Reconnect
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                                <Button variant="outline" size="sm" onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }} className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto">
+                                    <PlugZap className="h-3.5 w-3.5" /> {copy.reconnect}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={isDisconnecting}
-                                    className="flex items-center gap-1.5 border-[hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)]">
-                                    {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />} Disconnect
+                                <Button variant="outline" size="sm" onClick={() => setConfirmDisconnect(true)} disabled={isDisconnecting}
+                                    className="h-11 w-full gap-1.5 border-[hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)] sm:h-9 sm:w-auto">
+                                    {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />} {copy.disconnect}
                                 </Button>
                             </div>
                         </div>
                         <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Reconnect to switch EasyParcel account, or disconnect to cancel setup.
+                            {copy.switchAccountDescription}
                         </p>
                     </div>
                 )}
-                {step === 1 && <PickupAddresses value={warehouses} onChange={setWarehouses} />}
+                {step === 1 && <PickupAddresses value={warehouses} onChange={setWarehouses} onEditingChange={setIsEditingWarehouse} />}
                 {step === 2 && (
                     <div className="flex flex-col gap-4">
-                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">Review &amp; activate</p>
-                        <div className="rounded-[12px] border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col gap-3">
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">{copy.reviewActivate}</p>
+                        <div className="flex flex-col gap-3 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4">
                             <div className="flex items-start gap-2">
                                 <MapPin className="h-4 w-4 text-[var(--dash-text-muted)] mt-0.5 shrink-0" />
                                 <div>
-                                    <p className="text-[13px] font-medium text-[var(--dash-text)]">{defaultWh.label || defaultWh.name || 'Pickup address'}</p>
+                                    <p className="text-[13px] font-medium text-[var(--dash-text)]">{defaultWh.label || defaultWh.name || copy.pickupFallback}</p>
                                     <p className="text-[12px] text-[var(--dash-text-muted)]">
                                         {[defaultWh.address1, defaultWh.city, defaultWh.postcode, defaultWh.state].filter(Boolean).join(', ')}
                                     </p>
                                 </div>
                             </div>
-                            <div className="text-[13px] text-[var(--dash-text-muted)]">
-                                Courier selection is <span className="text-[var(--dash-text)] font-medium">automatic</span> — checkout always quotes the cheapest courier that serves the route.
-                            </div>
+                            <div className="text-[13px] text-[var(--dash-text-muted)]">{copy.automaticCourier}</div>
                         </div>
                         <EpWalletBanner tenantId={tenantId} active />
                         <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Activating turns on live EasyParcel rates at checkout. Until you activate, checkout uses your flat rate.
+                            {copy.activationDescription}
                         </p>
                     </div>
                 )}
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+            <div className="border-t border-[var(--dash-border)]" />
 
             {/* Footer nav */}
-            <div className="flex items-center justify-between gap-4 px-6 py-5">
-                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving} className="flex items-center gap-1.5">
-                    <ChevronLeft className="h-4 w-4" /> Back
+            <div className="flex flex-col-reverse gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving || isEditingWarehouse} className="h-11 w-full gap-1.5 sm:w-auto">
+                    <ChevronLeft className="h-4 w-4" /> {copy.back}
                 </Button>
-                {step < STEPS.length - 1 ? (
-                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext} className="flex items-center gap-1.5">
-                        Next <ChevronRight className="h-4 w-4" />
+                {step < steps.length - 1 ? (
+                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext} className="h-11 w-full gap-1.5 sm:w-auto">
+                        {copy.next} <ChevronRight className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving} className="flex items-center gap-2">
-                        {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Activating…</> : <><Check className="h-4 w-4" />Save &amp; Activate</>}
+                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving} className="h-11 w-full gap-2 sm:w-auto">
+                        {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />{copy.activating}</> : <><Check className="h-4 w-4" />{copy.saveAndActivate}</>}
                     </Button>
                 )}
             </div>
+
+            <ConfirmModal
+                open={confirmDisconnect}
+                variant="danger"
+                loading={isDisconnecting}
+                icon={<Unlink className="h-7 w-7 text-[hsl(var(--destructive))]" />}
+                title={copy.disconnectTitle}
+                description={copy.disconnectDescription}
+                confirmLabel={copy.disconnect}
+                cancelLabel={copy.cancel}
+                onCancel={() => setConfirmDisconnect(false)}
+                onConfirm={handleDisconnect}
+            />
         </div>
     )
 }

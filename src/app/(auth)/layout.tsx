@@ -13,7 +13,7 @@ export default async function AuthLayout({
 }) {
     const cookieStore = await cookies()
     const cookieValue = cookieStore.get('prefer_lang')?.value
-    const localeCookie = (cookieValue === 'en' || cookieValue === 'ms') ? (cookieValue as Locale) : 'en'
+    const localeCookie = (cookieValue === 'en' || cookieValue === 'ms' || cookieValue === 'vi') ? (cookieValue as Locale) : 'en'
     // Auth follows the user's stored CMS theme (e.g. logging out of a light-mode
     // dashboard keeps login light); defaults to dark when nothing is stored yet
     // (first-ever visit). Root layout's pre-paint script already applies this

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const nonce = colonIdx > 0 ? rawState.slice(colonIdx + 1) : ''
 
     const makeErrorRedirect = () => {
-        const r = NextResponse.redirect(new URL('/settings/shipping?ep=error', request.nextUrl.origin))
+        const r = NextResponse.redirect(new URL('/settings/shipping?tab=easyparcel&ep=error', request.nextUrl.origin))
         if (tenantId) r.cookies.delete(`ep_state_${tenantId}`)
         return r
     }
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
             overrideAccess: true,
         })
 
-        const successRedirect = NextResponse.redirect(new URL('/settings/shipping?ep=connected', request.nextUrl.origin))
+        const successRedirect = NextResponse.redirect(new URL('/settings/shipping?tab=easyparcel&ep=connected', request.nextUrl.origin))
         successRedirect.cookies.delete(`ep_state_${tenantId}`)
         return successRedirect
     } catch {

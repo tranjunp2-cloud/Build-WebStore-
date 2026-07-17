@@ -423,6 +423,7 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
             label: 'Branch 1',
             phone: '0123456789',
             address1: 'Branch 1 St',
+            city: 'Johor Bahru',
             state: 'Johor',
             postcode: '80000',
         }
@@ -432,6 +433,7 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
             label: 'HQ Default',
             phone: '0111111111',
             address1: 'HQ St',
+            city: 'Petaling Jaya',
             state: 'Selangor',
             postcode: '47810',
             isDefault: true, // This one
@@ -442,6 +444,7 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
             label: 'Branch 3',
             phone: '0222222222',
             address1: 'Branch 3 St',
+            city: 'George Town',
             state: 'Penang',
             postcode: '10000',
         }
@@ -498,6 +501,7 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
             name: 'Legacy Warehouse', // Old schema uses 'name' instead of 'label'
             phone: '0123456789',
             address1: 'Legacy St',
+            city: 'Petaling Jaya',
             state: 'Selangor',
             postcode: '47810',
         }

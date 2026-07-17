@@ -1,13 +1,5 @@
 import 'server-only'
 
-/** Normalize a MY phone number to "60XXXXXXXXX" format. */
-export function normalizePhone(raw: string): string {
-    const digits = raw.replace(/\D/g, '')
-    if (digits.startsWith('60')) return digits
-    if (digits.startsWith('0')) return '60' + digits.slice(1)
-    return '60' + digits
-}
-
 /**
  * Aggregate item weight (in grams) to kg.
  * Min floor: 0.1 kg (EP minimum). Rounds up to 1 decimal place.
@@ -76,5 +68,4 @@ export function mapSubdivisionName(code: string): string {
 // Phone helpers moved to ./phone (pure, client-safe — warehouse.ts is imported by
 // the client Settings → Shipping tab and needs hasUsablePhone). Re-exported here
 // for server callers, same as the pickup-schedule re-export above.
-export { splitPhone, hasUsablePhone } from './phone'
-
+export { splitPhone, hasUsablePhone, normalizeMyPhone, normalizeMyPhone as normalizePhone } from './phone'

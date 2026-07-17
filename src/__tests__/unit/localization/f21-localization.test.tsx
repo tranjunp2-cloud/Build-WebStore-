@@ -231,13 +231,18 @@ describe('[TC-F21.02] No full-page reload on language switch (FR-03)', () => {
         expect(reloadSpy).not.toHaveBeenCalled()
     })
 
-    it('toggleLocale switches between en and ms', async () => {
+    it('toggleLocale cycles through en, ms, and vi', async () => {
         renderWithI18n('en')
         expect(screen.getByTestId('locale').textContent).toBe('en')
 
         fireEvent.click(screen.getByTestId('toggle'))
         await waitFor(() => {
             expect(screen.getByTestId('locale').textContent).toBe('ms')
+        })
+
+        fireEvent.click(screen.getByTestId('toggle'))
+        await waitFor(() => {
+            expect(screen.getByTestId('locale').textContent).toBe('vi')
         })
 
         fireEvent.click(screen.getByTestId('toggle'))
@@ -264,6 +269,7 @@ describe('[TC-F21.01] LanguageSwitcher renders inside Auth Form Card', () => {
         )
         expect(screen.getByText('MY')).toBeInTheDocument()
         expect(screen.getByText('EN')).toBeInTheDocument()
+        expect(screen.getByText('VI')).toBeInTheDocument()
     })
 
     it('renders globe variant with current locale label', () => {

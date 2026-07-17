@@ -7,8 +7,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { hasUsablePhone, splitPhone } from '@/lib/shipping/easyparcel/phone'
-import { isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
+import { hasUsablePhone, normalizeMyPhone, splitPhone } from '@/lib/shipping/easyparcel/phone'
+import { isWarehouseComplete, normalizeWarehouses } from '@/lib/shipping/easyparcel/warehouse'
 import { buildSubmitParams } from '@/app/api/orders/[id]/create-label/build-submit-params'
 
 const baseInput = {
@@ -40,6 +40,12 @@ describe('hasUsablePhone [TC-F36.186a]', () => {
         expect(hasUsablePhone('---')).toBe(false)             // no digits at all
     })
 
+    it('rejects letters and unsupported separators before stripping formatting', () => {
+        expect(hasUsablePhone('abc0123456789')).toBe(false)
+        expect(hasUsablePhone('0123456789 ext 2')).toBe(false)
+        expect(hasUsablePhone('0123/456789')).toBe(false)
+    })
+
     it('validates the POST-splitPhone number, not raw digits (review #1595)', () => {
         // 9 raw digits pass a raw-length check, but splitPhone strips '60' and
         // emits '0000000' — the exact placeholder that stranded the live shipment.
@@ -54,6 +60,7 @@ describe('hasUsablePhone [TC-F36.186a]', () => {
         // Length cap: multi-number paste in legacy data emits a >11-digit blob
         // the courier cannot dial (review #1595 round 3).
         expect(hasUsablePhone('0123456789 / 0198765432')).toBe(false)
+        expect(hasUsablePhone('606012345678')).toBe(false)   // double country prefix
     })
 })
 
@@ -110,7 +117,7 @@ describe('buildSubmitParams — no placeholder phone [TC-F36.186c]', () => {
 })
 
 describe('isWarehouseComplete — shared phone rule [TC-F36.186a]', () => {
-    const wh = { label: 'WH', phone: '01116127971', address1: 'A1', state: 'Kuala Lumpur', postcode: '55100' }
+    const wh = { label: 'WH', phone: '01116127971', address1: 'A1', city: 'KL', state: 'Kuala Lumpur', postcode: '55100' }
 
     it('accepts a warehouse with a usable phone', () => {
         expect(isWarehouseComplete(wh)).toBe(true)
@@ -122,5 +129,31 @@ describe('isWarehouseComplete — shared phone rule [TC-F36.186a]', () => {
 
     it('rejects a short warehouse phone', () => {
         expect(isWarehouseComplete({ ...wh, phone: '0123' })).toBe(false)
+    })
+
+    it('rejects a warehouse without a city', () => {
+        expect(isWarehouseComplete({ ...wh, city: '' })).toBe(false)
+    })
+})
+
+describe('warehouse canonicalization [TC-F36.202]', () => {
+    it('normalizes common MY phone formats into a digits-only 60 prefix', () => {
+        expect(normalizeMyPhone('012-345 6789')).toBe('60123456789')
+        expect(normalizeMyPhone('+60 12 345 6789')).toBe('60123456789')
+    })
+
+    it('keeps exactly one default warehouse and moves it first without mutating input', () => {
+        const input = [
+            { id: 'a', label: 'A', phone: '0123456789', isDefault: false },
+            { id: 'b', label: 'B', phone: '+60 13 456 7890', isDefault: true },
+            { id: 'c', label: 'C', phone: '0145678901', isDefault: true },
+        ]
+
+        const result = normalizeWarehouses(input)
+
+        expect(result.map((warehouse) => warehouse.id)).toEqual(['b', 'a', 'c'])
+        expect(result.map((warehouse) => warehouse.isDefault)).toEqual([true, false, false])
+        expect(result[0].phone).toBe('60134567890')
+        expect(input[0].phone).toBe('0123456789')
     })
 })

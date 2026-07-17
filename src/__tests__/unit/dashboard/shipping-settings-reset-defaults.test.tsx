@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import React from 'react'
 import { ShippingSettingsClient } from '@/app/(dashboard)/settings/shipping/shipping-settings-client'
+import { resolveShippingTab } from '@/app/(dashboard)/settings/shipping/shipping-tab'
 
 // ── Top-level mocks ────────────────────────────────────────────────────────
 
@@ -48,6 +49,17 @@ vi.mock('@/i18n', () => ({
                         saving: 'Saving…',
                         allSaved: 'All changes saved',
                         liveBuyerPays: 'Buyer pays',
+                        easyParcel: {
+                            tabFlatRate: 'Flat Rate',
+                            tabEasyParcel: 'EasyParcel',
+                            statusLive: 'LIVE',
+                            statusFallback: 'FALLBACK',
+                            statusConnected: 'Connected',
+                            statusNotConnected: 'Not connected',
+                            statusOff: 'OFF',
+                            fallbackTitle: 'Fallback Mode Active',
+                            fallbackDescription: 'EasyParcel live rates are active.',
+                        },
                     },
                 },
             },
@@ -132,5 +144,21 @@ describe('ShippingSettingsClient — Reset [TC-F14.40..F14.42]', () => {
 
         expect(westInput).toHaveValue('8.00')
         expect(eastInput).toHaveValue('15.00')
+    })
+})
+
+describe('ShippingSettingsClient — tab persistence [TC-F36.201]', () => {
+    it('recognizes both persisted tab values and falls back to EasyParcel for OAuth results', () => {
+        expect(resolveShippingTab('flat-rate')).toBe('flat-rate')
+        expect(resolveShippingTab('easyparcel')).toBe('easyparcel')
+        expect(resolveShippingTab(undefined, 'connected')).toBe('easyparcel')
+        expect(resolveShippingTab('unknown')).toBeUndefined()
+    })
+
+    it('keeps forced EasyParcel content mounted but hidden while Flat Rate is active', () => {
+        const { container } = renderClient()
+        const inactivePanel = container.querySelector('[role="tabpanel"][data-state="inactive"]')
+
+        expect(inactivePanel?.className).toContain('data-[state=inactive]:hidden')
     })
 })

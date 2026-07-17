@@ -62,7 +62,7 @@ type SidebarProps = {
 
 export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false, onToggleCollapsed }: SidebarProps) {
     const pathname = usePathname()
-    const { locale, toggleLocale } = useI18n()
+    const { locale, toggleLocale, setLocale } = useI18n()
 
     // Filter sections per role + custom permissions (shared 5-tier gate — same rules for both sidebars)
     const visibleSections = useMemo(
@@ -220,7 +220,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 <div className="dash-sidebar-footer flex flex-col items-center gap-3 px-3 py-[17px]">
                     <button
                         onClick={toggleLocale}
-                        aria-label={locale === 'ms' ? 'Switch to English' : 'Switch to Malay'}
+                        aria-label={`Switch language from ${locale.toUpperCase()}`}
                         className="flex h-[38px] w-[38px] items-center justify-center rounded-[12px] border border-dash-border bg-transparent outline-none text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
                     >
                         <Globe className="h-4 w-4 shrink-0" />
@@ -228,7 +228,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 </div>
             ) : (
             <div className="dash-sidebar-footer flex flex-col gap-3 px-3 py-[17px]">
-                <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
+                <LanguageToggle locale={locale} setLocale={setLocale} />
             </div>
             )}
         </>

@@ -1246,6 +1246,7 @@ export const Users: CollectionConfig = {
             options: [
                 { label: 'English', value: 'en' },
                 { label: 'Bahasa Melayu', value: 'ms' },
+                { label: 'Tiếng Việt', value: 'vi' },
             ],
         },
         {
