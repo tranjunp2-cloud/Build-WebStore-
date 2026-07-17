@@ -580,7 +580,7 @@ describe('AI Streaming APIs', () => {
             )
             expect(productCreateCall).toBeDefined()
             // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
-            expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread - AI Bakery')
+            expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread')
         })
 
         it('[TC-09.49] persisted alt-text fallback is capped at 500 chars, matching saveProductAction (code-review fix)', async () => {

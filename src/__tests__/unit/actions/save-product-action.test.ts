@@ -405,7 +405,7 @@ describe('saveProductAction', () => {
     // ── TC-09.38: alt-text fallback threading (GH-1458) ─────────────────────────
 
     describe('alt-text fallback (GH-1458)', () => {
-        it('[TC-09.38] blank alt + tenant has a site name → "{name} - {store}"', async () => {
+        it('[TC-09.38] blank alt + tenant has a site name → "{name}"', async () => {
             vi.mocked(tenantIdForQuery).mockReturnValue(83)
             mockFind.mockImplementation((args: { collection: string }) =>
                 args.collection === 'sites'
@@ -414,8 +414,9 @@ describe('saveProductAction', () => {
 
             await saveProductAction({ name: 'Baju Pink', images: [{ image: 10, alt: '' }] })
 
+            expect(mockFind).not.toHaveBeenCalled()
             expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink - My Shop' }] }),
+                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink' }] }),
             }))
         })
 
@@ -455,7 +456,7 @@ describe('saveProductAction', () => {
             await saveProductAction({ name: 'Baju Pink' })
 
             expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-                data: expect.objectContaining({ images: [{ image: 99, alt: 'Baju Pink - My Shop' }] }),
+                data: expect.objectContaining({ images: [{ image: 99, alt: 'Baju Pink' }] }),
             }))
         })
     })
