@@ -5,8 +5,7 @@
  * (Contact+Blog). Wall-clock drops to ~max of the three. Started as a 2-call
  * split, escalated per plan after measurement showed the 4-subpage call was
  * both the long pole AND truncating at max_tokens. Behind env flag
- * GEN_PARALLEL_PAGES — default ON (opt out with GEN_PARALLEL_PAGES=false to
- * fall back to the single-call path; see openai-generator.ts useParallelSplit).
+ * GEN_PARALLEL_PAGES — flag OFF (default) leaves the single-call path untouched.
  *
  * Brand consistency (palette/tone/CTA labels) is already shared automatically
  * because both calls reuse the SAME base systemPrompt + userPromptText. Only
