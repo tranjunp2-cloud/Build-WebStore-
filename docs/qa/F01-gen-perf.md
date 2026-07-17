@@ -96,6 +96,26 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 
 ---
 
+## Wave 3 Test Matrix (GH-1190 Critical Path)
+
+| TC-ID | Level | Scenario | Status | Mapped To | Notes |
+|---|---|---|---|---|---|
+| TC-GENPERF-W3-01 | unit | named phase timings aggregate repeated phases | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | compact request-correlated timing snapshot |
+| TC-GENPERF-W3-02 | unit | generation request ID validation/correlation | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | unsafe IDs replaced with UUID |
+| TC-GENPERF-W3-03 | unit | browser retries only before any SSE event | ✅ PASS | src/__tests__/unit/builder/generation-sse-retry.test.ts | accepted/dispatched work is never automatically re-POSTed |
+| TC-GENPERF-W3-04 | route | site remains `generating` until product barrier settles | ✅ PASS | src/__tests__/api/ai.test.ts | completion status moves after required product persistence |
+| TC-GENPERF-W3-05 | unit | percentile uses nearest-rank semantics | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | shared by staging benchmark report |
+| TC-GENPERF-W3-06 | unit | partial product AI result uses curated fill without second model call | ✅ PASS | src/__tests__/unit/lib/ai/sample-products-image-fallback.test.ts | removes serial top-up latency |
+| TC-GENPERF-W3-07 | unit | product image search is bounded to two 6s attempts per product | ✅ PASS | src/__tests__/unit/lib/ai/sample-products-image-fallback.test.ts | gallery/carton fallbacks remain mandatory |
+| TC-GENPERF-W3-08 | unit | article AI failure returns structured full HTML fallback | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | contains headings, body sections, and list |
+| TC-GENPERF-W3-09 | route | accepted event is first and `done` payload remains compatible | ✅ PASS | src/__tests__/api/ai.test.ts | request ID returned in event/header |
+| TC-GENPERF-W3-E2E | Playwright | real generation renders five complete pages, products/blogs/media, stable refresh | ⏳ PENDING | tests/ai-builder-generation.spec.ts | requires valid generation environment and cleanup ownership |
+| TC-GENPERF-W3-STAGING | benchmark | EN/MS/VN/JP first-event p95 <=5s and done p95 <=60s | ⏳ PENDING | scripts/measure-generation-latency.ts | run >=20 successes/language across five industries |
+
+**Wave 3 verdict:** automated critical-path contracts pass in focused suites. Latency DoD remains open until the staging distribution and real-browser completeness gate pass.
+
+---
+
 ## Test Run Results (2026-07-03 15:51 — Wave 1 + Wave 2)
 
 ```

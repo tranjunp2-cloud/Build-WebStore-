@@ -1,10 +1,8 @@
 export const dynamic = 'force-dynamic'
-// Override vercel.json's 60s default — AI site generation runs:
-//   OpenAI GPT-4.1-mini → Pixabay pipeline (5-10 images) → Payload create
-// Real-world timing sits around 60-120s, previous 60s cap produced 504
-// Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
-// Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
-export const maxDuration = 300
+// All model calls and retries are explicitly bounded below this route budget.
+// Vercel after() work also shares this duration, so optional seeders must remain
+// best-effort and may not hold the SSE completion barrier.
+export const maxDuration = 60
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -50,6 +48,7 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
+import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -111,6 +110,8 @@ interface AIBlock {
  */
 export async function POST(req: NextRequest) {
     const startTime = Date.now()
+    const generationRequestId = normalizeGenerationRequestId(req.headers.get('x-generation-request-id'))
+    const generationTimings = new GenerationTimings(startTime)
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
@@ -165,17 +166,17 @@ export async function POST(req: NextRequest) {
         // Runs after auth + rate-limit — prevents unauthenticated callers from
         // triggering OpenAI API calls.
         const targetInputLocale = requestedGenerationLocale || language || 'en'
-        const businessInfo = {
-            ...normalizedBusinessInfo,
-            ...(await translateUserInputsIfNeeded(
+        const businessInfo = { ...normalizedBusinessInfo }
+        const translatedBusinessInfoPromise = translateUserInputsIfNeeded(
                 {
                     businessName: normalizedBusinessInfo.businessName,
                     shortDescription: normalizedBusinessInfo.shortDescription,
                     products: normalizedBusinessInfo.products,
                 },
                 targetInputLocale,
-            ))
-        }
+            )
+            .then((translated) => Object.assign(businessInfo, translated))
+            .catch(() => businessInfo)
 
         // Get tenant ID — auto-create if missing (legacy accounts)
         let tenantId = (user as { tenants?: Array<{ tenant: unknown }> }).tenants?.[0]?.tenant
@@ -362,12 +363,22 @@ export async function POST(req: NextRequest) {
         // we only had total `timeMs` and couldn't tell if a 3-minute gen was
         // OpenAI-bound (normal, ~60-100s) or media-bound (problem, 30-60s that
         // should be parallelized) or DB-bound (FK-retry thrashing).
-        const phaseTimings: Record<string, number> = {}
-        const trackPhase = <T>(name: string, fn: () => Promise<T>): Promise<T> => {
-            const t = Date.now()
-            return fn().finally(() => {
-                phaseTimings[name] = (phaseTimings[name] ?? 0) + (Date.now() - t)
-            })
+        generationTimings.record('preflight', Date.now() - startTime)
+        const trackPhase = <T>(name: string, fn: () => Promise<T>): Promise<T> =>
+            generationTimings.track(name, fn)
+
+        const logGenerationDone = (input: {
+            pages: number
+            failures: number
+            productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+        }) => {
+            console.info(
+                `[generate-site] DONE request_id=${generationRequestId} total=${generationTimings.totalMs()}ms ` +
+                `${generationTimings.compact()} pages=${input.pages} failures=${input.failures} ` +
+                `gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} ` +
+                `pixabay_rl=${input.productImageStats.rateLimited} images_failed=${input.productImageStats.uploadFailed} ` +
+                `products_no_image=${input.productImageStats.noImage}`,
+            )
         }
 
         // Fetch block prompt overrides from the admin template matching this category.
@@ -441,6 +452,7 @@ export async function POST(req: NextRequest) {
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
+            await trackPhase('translation', () => translatedBusinessInfoPromise)
             // GH-1185: keywords are sent to Pixabay RAW (user input language, no
             // GPT/dict translation). Pixabay q is AND-matched on tags with default
             // lang=en; translation was producing off-industry generic terms.
@@ -464,7 +476,7 @@ export async function POST(req: NextRequest) {
             // NOTE: field keeps the historical name `englishKeywords` — it now carries
             // the RAW user-language keywords (see plan 260702-1607-GH-1185).
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
-            const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
+            const imagePoolPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
                     // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
                     // LLM for 2-4 business-specific visual terms (SAME language as
@@ -558,7 +570,7 @@ export async function POST(req: NextRequest) {
                     }
                     return { pool, englishKeywords: rawKeywords }
                 })().catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
-                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
+                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] }))
 
             // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
             // photos to Payload `media` DURING the GPT window instead of after
@@ -570,7 +582,7 @@ export async function POST(req: NextRequest) {
             // rollback). When off, resolves an empty Map immediately so the
             // downstream pool path is byte-identical to pre-Phase-06 behavior.
             const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
-            const preUploadedPoolPromise: Promise<Map<string, number>> = GEN_POOL_PREUPLOAD
+            const preUploadedPoolPromise: Promise<Map<string, number>> = trackPhase('pool_preupload', () => GEN_POOL_PREUPLOAD
                 ? imagePoolPromise
                     .then(({ pool }) =>
                         pool
@@ -583,7 +595,7 @@ export async function POST(req: NextRequest) {
                             : new Map<string, number>(),
                     )
                     .catch((): Map<string, number> => new Map())
-                : Promise.resolve(new Map<string, number>())
+                : Promise.resolve(new Map<string, number>()))
 
             // Start sample product generation AFTER imagePool completes to avoid competing
             // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
@@ -594,16 +606,18 @@ export async function POST(req: NextRequest) {
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
             const sampleProductsPromise = imagePoolPromise.then(() =>
-                generateSampleProducts(
-                    businessInfo,
-                    (language as 'en' | 'ms' | 'auto'),
-                    String(resolvedTenantId),
-                    payload,
-                )
+                trackPhase('products_prepare', () =>
+                    generateSampleProducts(
+                        businessInfo,
+                        (language as 'en' | 'ms' | 'auto'),
+                        String(resolvedTenantId),
+                        payload,
+                    ),
+                ),
             )
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
-            const { result, events } = await trackPhase('ai', () =>
+            const { result, events } = await trackPhase('site_ai', () =>
                 withSentrySpan('ai.generateSite', () =>
                     generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
                 ),
@@ -617,6 +631,8 @@ export async function POST(req: NextRequest) {
             // remaining media + db + persist-grace window (~25s), still landing
             // the 3 posts before `done` in the common case; if it drags past the
             // grace race below it falls back to post-response after() seeding.
+            // Thumbnail search is intentionally independent from sample-product
+            // completion so a slow product upload cannot hold the blog tail.
             // Never rejects: null = prep failed → legacy seeding at the persist site.
             const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
                 payload,
@@ -626,7 +642,6 @@ export async function POST(req: NextRequest) {
                 products: parseProductsString(businessInfo.products),
                 industry: businessInfo.industry,
                 seed: computeGenSeed(businessInfo),
-                pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
             }).catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -717,7 +732,7 @@ export async function POST(req: NextRequest) {
                     // an absent one (legacy inline download+upload path).
                     const preUploadedPool = await preUploadedPoolPromise
 
-                    await trackPhase('media', () =>
+                    await trackPhase('media_fulfill', () =>
                         fulfillImageNeeds(
                             needs,
                             {
@@ -1285,7 +1300,7 @@ export async function POST(req: NextRequest) {
         // was killed on Vercel function freeze and its ~15 media creates
         // contended with critical-path uploads before `done`.
 
-        phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
+        generationTimings.record('pages_write', Date.now() - dbPhaseStart)
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
@@ -1308,16 +1323,6 @@ export async function POST(req: NextRequest) {
             createdPages as Array<{ layout?: unknown[] }>,
             generatedHeaderBlock,
         )
-        await payload.update({
-            collection: 'sites',
-            id: site.id as string | number,
-            data: {
-                generationStatus: 'completed',
-                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
-                ...cartPatch,
-            },
-        })
-
         // Write sample products to DB (non-fatal — awaits the parallel promise started above)
         // Matches constraint name from Drizzle: <table>_<col>_<reftable>_<refcol>_fk
         // Combines constraint-name regex with PG code for cases where Payload wraps the
@@ -1331,6 +1336,7 @@ export async function POST(req: NextRequest) {
         }
         let productsCreatedCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
+        const productsWriteStarted = Date.now()
         try {
             const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             productImageStats = imgStats
@@ -1488,6 +1494,8 @@ export async function POST(req: NextRequest) {
             }
         } catch (err) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
+        } finally {
+            generationTimings.record('products_write', Date.now() - productsWriteStarted)
         }
 
         // gen-perf blog-inline: blog prep overlapped the GPT window (kicked
@@ -1497,19 +1505,22 @@ export async function POST(req: NextRequest) {
         // to post-response seeding via after() exactly like the old path.
         // Internal tuning knob (tests use a tiny value to exercise the
         // pending branch deterministically) — not required in production env.
-        // `|| 15_000` (not `?? `) so an empty-string env (the .env.*.example ship
+        // `|| 8_000` (not `?? `) so an empty-string env (the .env.*.example ship
         // `GEN_BLOG_PREP_GRACE_MS=`) or a non-numeric value → default, not 0ms
         // (grace 0 disables inline-persist entirely, always falling to after()).
-        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 15_000
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 8_000
         let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
+        const blogGraceStarted = Date.now()
         const preparedBlogs = await Promise.race([
             blogPrepPromise,
             new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
         ])
+        generationTimings.record('blog_grace', Date.now() - blogGraceStarted)
         if (blogGraceTimer) clearTimeout(blogGraceTimer)
         if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
-            const blogsCreated = await persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id)
-                .catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
+            const blogsCreated = await trackPhase('blog_write', () =>
+                persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id),
+            ).catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
             console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
         } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
             // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
@@ -1544,6 +1555,18 @@ export async function POST(req: NextRequest) {
         }
         // preparedBlogs === [] → tenant already has posts (regenerate) — nothing to seed.
 
+        // Completion barrier: required pages, products, and inline-ready blogs
+        // have settled before the site becomes observable as completed.
+        await trackPhase('site_complete', () => payload.update({
+            collection: 'sites',
+            id: site.id as string | number,
+            data: {
+                generationStatus: 'completed',
+                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+                ...cartPatch,
+            },
+        }))
+
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
         // fire-and-forget) so it runs reliably post-response on Vercel and
@@ -1575,19 +1598,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-            const timeMs = Date.now() - startTime
-
-            // Plan 260415 F01-gen-audit — single summary line per gen so ops can
-            // scan Vercel logs for phase breakdown without correlating manually.
-            // Use compact key=value so grep/jq can pull it out easily.
-            const phaseOther = Math.max(
-                0,
-                timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
-            )
-            console.info(
-                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
-            )
-
+            const timeMs = generationTimings.totalMs()
             return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
@@ -1596,31 +1607,46 @@ export async function POST(req: NextRequest) {
             const _encoder = new TextEncoder()
             return new Response(new ReadableStream<Uint8Array>({
                 async start(controller) {
-                    const onEvent = (e: SSEEvent) =>
-                        controller.enqueue(
-                            _encoder.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`),
-                        )
+                    let streamOpen = true
+                    const enqueueEvent = (event: string, data: Record<string, unknown>) => {
+                        if (!streamOpen) return
+                        try {
+                            controller.enqueue(
+                                _encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+                            )
+                        } catch {
+                            // The backend owns completion after acceptance. A closed
+                            // browser stream must not cancel DB/media generation.
+                            streamOpen = false
+                        }
+                    }
+                    enqueueEvent('generation_accepted', { generationRequestId })
+                    generationTimings.record('first_sse_event', generationTimings.totalMs())
+                    const onEvent = (e: SSEEvent) => enqueueEvent(e.event, e.data)
                     try {
                         const {
                             result,
                             site: _pipeSite,
                             homepagePage,
                             createdPages,
+                            pageFailures,
                             productsCreatedCount,
-                            timeMs,
+                            productImageStats,
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
                         // F23: sync tenant slug now that generation succeeded (GH-1371)
-                        await syncTenantSlug()
+                        await trackPhase('slug_sync', syncTenantSlug)
+                        const timeMs = generationTimings.totalMs()
+                        logGenerationDone({
+                            pages: createdPages.length,
+                            failures: pageFailures.length,
+                            productImageStats,
+                        })
 
                         // products_generated event
                         if (productsCreatedCount > 0) {
-                            controller.enqueue(
-                                _encoder.encode(
-                                    `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`,
-                                ),
-                            )
+                            enqueueEvent('products_generated', { count: productsCreatedCount })
                         }
 
                         // done event
@@ -1634,7 +1660,10 @@ export async function POST(req: NextRequest) {
                                 totalPages: createdPages.length,
                                 timeMs,
                             })}\n\n`
-                        controller.enqueue(_encoder.encode(doneData))
+                        generationTimings.record('done_sent', 0)
+                        if (streamOpen) {
+                            try { controller.enqueue(_encoder.encode(doneData)) } catch { streamOpen = false }
+                        }
 
                         // Notify SSO Hub: user created their first site (step 1)
                         // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
@@ -1679,6 +1708,7 @@ export async function POST(req: NextRequest) {
                     'Content-Type': 'text/event-stream',
                     'Cache-Control': 'no-cache',
                     'Connection': 'keep-alive',
+                    'X-Generation-Request-Id': generationRequestId,
                 },
             })
         }
@@ -1689,12 +1719,19 @@ export async function POST(req: NextRequest) {
             site,
             homepagePage,
             createdPages,
+            pageFailures,
             productsCreatedCount: _productsCreatedCount,
-            timeMs,
+            productImageStats,
         } = await runGenPipeline()
 
         // F23: sync tenant slug now that generation succeeded (GH-1371)
-        await syncTenantSlug()
+        await trackPhase('slug_sync', syncTenantSlug)
+        const timeMs = generationTimings.totalMs()
+        logGenerationDone({
+            pages: createdPages.length,
+            failures: pageFailures.length,
+            productImageStats,
+        })
 
         // Notify SSO Hub: user created their first site (step 1)
         // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).

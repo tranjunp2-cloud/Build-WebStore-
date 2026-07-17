@@ -42,7 +42,12 @@ async function fetchBlogThumbnail(
             // GH-1185: site-domain filter — blog topics follow the site's
             // industry, so a loose keyword match still lands on-domain.
             const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
-            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200, category: pixCategory })
+            const photos = await searchPhotos(keyword, 1, {
+                orientation: 'landscape',
+                width: 1200,
+                category: pixCategory,
+                timeoutMs: 6_000,
+            })
             if (photos.length > 0) {
                 const photo = photos[0]!
                 // photo.url is already sized by the client (Pixabay fixed sizes).
@@ -91,6 +96,22 @@ function disambiguateSlugs(seeds: AnyBlogSeed[]): AnyBlogSeed[] {
     })
 }
 
+function escapeHtml(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+}
+
+export function buildFallbackBlogContent(seed: Pick<AnyBlogSeed, 'title' | 'excerpt'>, businessName: string): string {
+    const title = escapeHtml(seed.title)
+    const excerpt = escapeHtml(seed.excerpt)
+    const name = escapeHtml(businessName)
+    return `<h2>${title}</h2><p>${excerpt}</p><h3>Why it matters</h3><p>${name} focuses on practical choices, clear expectations, and dependable results. Use this guide as a starting point, then choose the option that best matches your needs.</p><h3>What to consider</h3><ul><li>Define the outcome you need before comparing options.</li><li>Ask questions about quality, timing, and ongoing support.</li><li>Choose a solution that remains useful as your needs change.</li></ul><h3>Next steps</h3><p>Contact ${name} for advice tailored to your situation and a clear path forward.</p>`
+}
+
 export type PreparedBlogPost = {
     title: string
     slug: string
@@ -100,7 +121,7 @@ export type PreparedBlogPost = {
 
 /**
  * Phase 1 — no site dependency: AI seed topics + full article bodies (3
- * parallel GPT calls, 30s-bounded each) + thumbnails. gen-perf blog-inline:
+ * parallel GPT calls, 12s-bounded each) + thumbnails. gen-perf blog-inline:
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
  * insert all 3 posts BEFORE the `done` event; also reused by the legacy
  * post-response `seedBlogPosts` path.
@@ -176,23 +197,25 @@ export async function prepareBlogPosts(opts: {
 
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)
-        const thumbnailIds: (number | undefined)[] = []
-        let searchRateLimited = false
-        for (let i = 0; i < seeds.length; i++) {
-            if (i > 0) await new Promise(r => setTimeout(r, 500))
-            const { thumbnailId, wasRateLimited } = await fetchBlogThumbnail(
-                seeds[i]!, i, blogThumbnails, tenantId, category, searchRateLimited, payload,
+        const firstThumbnail = await fetchBlogThumbnail(
+            seeds[0]!, 0, blogThumbnails, tenantId, category, false, payload,
+        )
+        console.log(`[seed-blog-posts] blog 1/${seeds.length} "${seeds[0]!.slug}" → thumbnailId=${firstThumbnail.thumbnailId ?? 'none'}`)
+        const remainingThumbnails = await Promise.all(seeds.slice(1).map(async (seed, offset) => {
+            const i = offset + 1
+            const { thumbnailId } = await fetchBlogThumbnail(
+                seed, i, blogThumbnails, tenantId, category, firstThumbnail.wasRateLimited, payload,
             )
-            if (wasRateLimited) searchRateLimited = true
-            thumbnailIds.push(thumbnailId)
-            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seeds[i]!.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
-        }
+            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seed.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
+            return thumbnailId
+        }))
+        const thumbnailIds = [firstThumbnail.thumbnailId, ...remainingThumbnails]
 
         const contents = await Promise.all(contentPromises)
         return seeds.map((s, i) => ({
             title: s.title,
             slug: s.slug,
-            content: contents[i] ?? `<p>${s.excerpt}</p>`,
+            content: contents[i] ?? buildFallbackBlogContent(s, businessName),
             ...(thumbnailIds[i] !== undefined ? { thumbnailId: thumbnailIds[i] } : {}),
         }))
     } catch (err) {

@@ -549,8 +549,8 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(pages[0].slug).toBe('/')
 	})
 
-	it('[TC-GENPERF-W2-13] failed batch is retried once on the MAIN model before composer fallback', async () => {
-		// Arrange — light batch (Contact, Blog) fails on nano, succeeds on retry
+	it('[TC-GENPERF-W2-13] structurally incomplete batch is retried once on the MAIN model before composer fallback', async () => {
+		// Arrange — light batch returns incomplete JSON on nano, succeeds on retry
 		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
 		const scoped = (pages: Array<Record<string, unknown>>) => ({
 			model: 'gpt-4o',
@@ -565,9 +565,11 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 						const sys = String(opts.messages?.[0]?.content ?? '')
 						if (sys.includes('HOMEPAGE ONLY')) return scoped([{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }])
 						if (sys.includes('Contact, Blog')) {
-							// light batch attempt fails first, MAIN-model retry succeeds
+							// Light batch is valid JSON but misses Blog; MAIN-model retry succeeds.
 							lightAttempts++
-							if (lightAttempts === 1) throw new Error('light attempt flake')
+							if (lightAttempts === 1) {
+								return scoped([{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] }])
+							}
 							return scoped([
 								{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] },
 								{ title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] },

@@ -282,6 +282,7 @@ describe('AI Streaming APIs', () => {
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                  method: 'POST',
+                 headers: { 'X-Generation-Request-Id': 'test_generation_1190' },
                  body: JSON.stringify({ 
                      businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
                  })
@@ -296,16 +297,21 @@ describe('AI Streaming APIs', () => {
              const reader = res.body?.getReader()
              expect(reader).toBeDefined()
              
-             // Read the first chunk of stream (which should be "theme_generated" event we mocked)
+             // The acceptance boundary is always the first event. Generation
+             // events follow while the backend continues its pipeline.
              const { value } = await reader!.read()
              const text = new TextDecoder().decode(value)
-             expect(text).toContain('event: theme_generated')
+             expect(text).toContain('event: generation_accepted')
+             expect(text).toContain('"generationRequestId":"test_generation_1190"')
              
-             // Wait for stream to finish reading to prevent controller close error
+             let rest = ''
              while (true) {
-                 const { done } = await reader!.read()
+                 const { done, value: nextValue } = await reader!.read()
                  if (done) break
+                 rest += new TextDecoder().decode(nextValue)
              }
+             expect(rest).toContain('event: theme_generated')
+             expect(rest).toContain('event: done')
         })
 
         it('[TC-F34-06] returns 403 when website_builder feature is locked on current plan', async () => {
@@ -374,6 +380,29 @@ describe('AI Streaming APIs', () => {
                      c[0].collection === 'sites' && c[0].data?.generationStatus === 'completed'
              )
              expect(completedCall).toBeDefined()
+        })
+
+        it('[TC-GENPERF-W3-04] does not mark the site completed before required product work settles', async () => {
+             // Arrange
+             let resolveProducts: (value: { products: []; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
+             vi.mocked(generateSampleProducts).mockReturnValueOnce(new Promise((resolve) => { resolveProducts = resolve }))
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+
+             // Act — let page/site creation reach the product completion barrier.
+             const responsePromise = GenerateSitePOST(req)
+             await vi.waitFor(() => expect(mockSiteDB.length).toBeGreaterThan(0))
+
+             // Assert — externally observable status remains generating.
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('generating')
+             resolveProducts({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } })
+             const response = await responsePromise
+             expect(response.status).toBe(200)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
         it('sets generationStatus to generating before creating pages', async () => {

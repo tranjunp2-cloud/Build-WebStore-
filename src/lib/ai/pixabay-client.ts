@@ -37,6 +37,8 @@ export interface PixabaySearchOptions {
     orientation?: PixabayOrientation
     /** Target render width — client picks largeImageURL (≥900) or webformatURL. */
     width?: number
+    /** Per-request deadline for latency-sensitive callers. */
+    timeoutMs?: number
     page?: number
     /**
      * GH-1185: Pixabay category slug (uploader-assigned, fixed vocabulary:
@@ -490,7 +492,7 @@ export async function searchPhotos(
 
     const url = `${BASE}?${params.toString()}`
     const res = await fetchWithRetry(url, {
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     })
     logRateLimit(res.headers)
     const json = (await res.json()) as PixabaySearchResponse

@@ -5,7 +5,7 @@
  * (Contact+Blog). Wall-clock drops to ~max of the three. Started as a 2-call
  * split, escalated per plan after measurement showed the 4-subpage call was
  * both the long pole AND truncating at max_tokens. Behind env flag
- * GEN_PARALLEL_PAGES — flag OFF (default) leaves the single-call path untouched.
+ * GEN_PARALLEL_PAGES — default ON; setting it to false restores the single-call path.
  *
  * Brand consistency (palette/tone/CTA labels) is already shared automatically
  * because both calls reuse the SAME base systemPrompt + userPromptText. Only
@@ -127,6 +127,7 @@ async function runSplitCall(
     systemPrompt: string,
     userPrompt: string,
     maxTokens: number,
+    timeoutMs = 38_000,
 ): Promise<SplitCallOutcome> {
     const start = Date.now()
     try {
@@ -139,7 +140,7 @@ async function runSplitCall(
             temperature: 0.7,
             max_tokens: maxTokens,
             response_format: { type: 'json_object' },
-        })
+        }, { timeout: timeoutMs })
         const choice = completion.choices[0]
         const content = choice?.message?.content
         if (!content) throw new Error('Empty AI response')
@@ -354,7 +355,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // contact page". One retry on the MAIN model rescues nearly all
     // intermittent nano/parse failures; composer stays as the last resort.
     const failedIdx = batchOutcomes
-        .map((o, i) => (o.parsed !== null && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length ? -1 : i))
+        // Retry only a valid JSON response with the wrong page shape. Network,
+        // timeout, and parse failures already consumed their budget and go
+        // directly to deterministic composer fallback.
+        .map((o, i) => (o.parsed !== null && batchPages[i]!.length !== SUBPAGE_BATCHES[i]!.pages.length ? i : -1))
         .filter((i) => i >= 0)
     if (failedIdx.length > 0) {
         console.warn(`[AI][GEN_PARALLEL_PAGES] retrying ${failedIdx.length} failed batch(es) with main model`)
@@ -366,6 +370,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     SUBPAGE_BATCH_MAX_TOKENS,
+                    10_000,
                 )
             }),
         )

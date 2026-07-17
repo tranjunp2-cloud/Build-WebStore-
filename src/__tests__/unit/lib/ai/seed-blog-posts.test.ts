@@ -235,9 +235,9 @@ describe('TC-F08-BS.08 — Tier A: searchPhotos called with AI imageKeyword; gal
 
         // searchPhotos called once per post (3 posts) with AI imageKeyword
         expect(searchPhotos).toHaveBeenCalledTimes(3)
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
 
         // uploadImageUrl called with photo.url directly (no Imgix transformation on Pixabay)
         expect(uploadImageUrl).toHaveBeenCalledWith(
@@ -411,9 +411,9 @@ describe('TC-F08-BS.16 — AI imageKeyword passed to searchPhotos (not category)
         const payload = makePayload(0)
         await seedBlogPosts(payload, 1, 2, 'restaurant', 'BakeryBiz', 3)
 
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
     })
 })
 
@@ -451,8 +451,8 @@ describe('TC-F08-BS.18 — AI returns 3 items with same slug → suffix disambig
     })
 })
 
-describe('TC-F08-BS.19 — generateBlogPostContent failure → fallback to excerpt', () => {
-    it('creates post with <p>excerpt</p> when content generation throws', async () => {
+describe('TC-F08-BS.19 / TC-GENPERF-W3-08 — generateBlogPostContent failure → complete deterministic fallback', () => {
+    it('[TC-GENPERF-W3-08] creates structured HTML content when content generation throws', async () => {
         const generateBlogPostContent = await getGenerateBlogPostContent()
         vi.mocked(generateBlogPostContent).mockRejectedValue(new Error('content gen failed'))
 
@@ -462,7 +462,9 @@ describe('TC-F08-BS.19 — generateBlogPostContent failure → fallback to excer
         expect(result).toBe(3)
         const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
         for (const [arg] of calls) {
-            expect(arg.data.content).toMatch(/^<p>.*<\/p>$/)
+            expect(arg.data.content).toContain('<h2>')
+            expect(arg.data.content).toContain('<h3>Next steps</h3>')
+            expect(arg.data.content).toContain('<ul>')
         }
     })
 })
