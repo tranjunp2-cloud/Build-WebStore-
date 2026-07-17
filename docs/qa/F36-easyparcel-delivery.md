@@ -1,6 +1,6 @@
 # QA Test Plan — F36 EasyParcel Delivery Integration (Malaysia)
 
-> **Version:** 1.2 | **Updated:** 2026-07-09 | **Owner:** QA Team
+> **Version:** 1.3 | **Updated:** 2026-07-17 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md) v2.0 (overview & index)
 > **Host PRDs:** [`F14-shipping.md`](../prd/F14-shipping.md) §20 · [`F10-orders-management.md`](../prd/F10-orders-management.md) §20 · [`F19-store-configuration.md`](../prd/F19-store-configuration.md)
 > **Stories ref:** [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md) (US-F36-01..12 + 08b)
@@ -8,6 +8,7 @@
 > **Spec:** EasyParcel OpenAPI v2026-03 (GitHub official)
 
 ### Changelog
+- **v1.3 (2026-07-17)** — Thêm §3.18m (TC-F36.201..208) cho GH-1652: callback/tab state, canonical warehouse API, explicit-save workflow, pickup form/confirmations, VI/EN/MS, responsive visual verification, và connected-sandbox persistence UAT.
 - **v1.2 (2026-07-09)** — QA gap-review vòng 2 (2 agent đọc song song stories + PRD/design field-map). Thêm §3.21 (TC-F36.179..185, 7 TC): `parcel_value` transform (RM/100), `feature.*` tracking booleans, `item[]` per-line build, Aramex cut-off missing, buyer label vocab-collapse (Exception/Admin Cancel/Expired), token encrypt-at-rest (nâng từ note TC-10), cron batch chunk≤100. **Flag 3 doc contradiction** (§9 #9 wallet-balance Design vs NFR-7 + nội bộ TC-01 vs TC-19/57, #10 courier_logo CSP, #12 COURIER_CUTOFF roster Aramex/Pos). Tổng **185 TCs**. (Vòng review xác nhận 178 TC gốc đã cover ~95% requirement — đa số "gap" agent nêu là false-positive.)
 - **v1.1 (2026-07-09)** — QA gap-review (qa-full:check) sau khi đọc **host PRD FR chi tiết** (F14 §20, F10 §20, F19 COD) + ck:scenario. Thêm §3.20 (TC-F36.161..178, 18 TC): address/phone transform B-8 (mapState/normalizePhone/buildAddress), 2-step submit+pay, Case A pre-alert, email trackingUrl, per-courier COD, currency 8.505 rounding, webhook replay. **Sửa 3 lỗi correctness:** parcelWeight **kg** (KHÔNG gram — GH-1458) ở TC-28/120/UAT; COD limit **per-courier** (KHÔNG hardcode RM7000) ở TC-79/83. **Flag BLOCKER spec conflict** OAuth vs API-key (2 thế hệ API mâu thuẫn trong docs). Tổng **178 TCs**.
 - **v1.0 (2026-07-09)** — Bộ TC khởi tạo. 160 manual/automated TCs phủ 13 stories (US-F36-01..12 + 08b), 6 phase (A Connect / B Rate / C Fulfillment / C-COD / D Returns) + 4 section cross-cutting (Currency NFR-1, Idempotency NFR-2, Security NFR-3/NFR-10, DB migration NFR-9). COD (US-F36-08/08b) marked **DEFERRED** — blocked on sandbox verify param `cod_enabled`/`cod_amount` (PRD §8/§9 item #1).
@@ -507,6 +508,19 @@ Không có gì xoá `shippingTrackingHistory` — cả nhánh cancel (`apply-tra
 |---|---|---|---|---|---|---|
 | **TC-F36.200** | Func | High | Timeline ghi nhận shipment mới sau re-ship | (a) `shipmentCreatedEntry('RMC002322989MY')`; và ca AWB `null` (courier cấp AWB bất đồng bộ). (b) Append vào history của shipment đã cancel. (c) Assert `mapShipmentStatusCode(2).internal` = status mà create-label seed. | (a) `status='pending_pickup'`, description **chứa AWB**; AWB null → `'Shipment created'`. (b) 3 entry, 2 entry cũ **còn nguyên**, entry mới **đứng cuối** (= `latest` trên UI). (c) Trùng `pending_pickup` — **đây chính là lý do** entry phải tồn tại; nếu EP đổi map code 2 thì test đỏ để review lại thay vì lặng lẽ nhân đôi event thật. | §3.18l |
 
+#### §3.18m — GH-1652 EasyParcel settings QA audit
+
+| ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
+|---|---|---|---|---|---|---|
+| **TC-F36.201** | E2E | High | OAuth quay lại đúng tab EasyParcel | Mở `/settings/shipping?tab=easyparcel`; kiểm redirect success/error có cả `tab=easyparcel` và `ep`. | Tab EasyParcel active; toast OAuth được xử lý một lần rồi xoá `ep` nhưng giữ `tab`. | GH-1652 |
+| **TC-F36.202** | API/Func | High | Warehouse contract canonical và được validate server-side | Gửi phone nhiều format, postcode sai, payload không phải array, nhiều default, warehouse thiếu city. | Phone persist dạng `60...`; postcode 5 số; đúng một default đứng đầu; malformed input bị 400; activation thiếu field bị `EP_NOT_READY`. | GH-1652 |
+| **TC-F36.203** | UI | High | Chỉnh local và explicit save | Sửa warehouse, mô phỏng save fail rồi save success. | Không gọi API khi chỉ sửa draft; fail giữ dirty state; success dùng response canonical làm snapshot mới. | GH-1652 |
+| **TC-F36.204** | UI | High | Form pickup đầy đủ và bảo vệ thao tác phá huỷ | Add/edit address2, submit thiếu field, đổi default, xoá warehouse cuối khi active. | Address2 được giữ; lỗi inline; chỉ một default; có confirm; xoá warehouse cuối đồng thời tắt EasyParcel trong draft. | GH-1652 |
+| **TC-F36.205** | Func/UI | Medium | VI/EN/MS và confirmation copy đồng bộ | So key tree EasyParcel của VI/EN/MS; đổi ngôn ngữ và mở disconnect/sync/delete confirmation. | Không thiếu key; copy Việt/Malay/English hiển thị đúng; destructive action không chạy trước confirm. | GH-1652 |
+| **TC-F36.206** | E2E | High | Responsive 375/390 không overflow | Mở tab EasyParcel ở viewport 375 và 390. | `scrollWidth <= clientWidth`; tab, stepper, form và action không chồng/lệch. | GH-1652 |
+| **TC-F36.207** | Manual/UI | High | Visual regression light/dark ở mọi trạng thái | Với viewport 390px và desktop, lần lượt mở disconnected, setup và management state trong light/dark theme. | Semantic colors, border, contrast và action hierarchy đúng; không text clipping, overlap hoặc control dưới 44px. | GH-1652 |
+| **TC-F36.208** | UAT/Integration | Blocker | Connected sandbox save/reload round-trip | Tenant sandbox đã OAuth: add → Save → reload; edit/default → Save → reload; delete → Save → reload; xóa warehouse cuối khi active. | Canonical phone/address/default persist đúng qua DB reload; OAuth identity/token fields không mất; xóa cuối đồng thời deactivate và checkout quay về Flat Rate. | GH-1652 |
+
 **Logo courier (2026-07-14):** trang buyer không có EP token, và route logo của merchant (`/api/tenant/[id]/easyparcel-couriers`) **trả kèm số dư ví EP** → tuyệt đối không được làm nguồn cho một trang công khai. Nên logo phải **persist trên order**: cột `orders.shipping_courier_logo`.
 
 Bắt logo **tại checkout, từ chính quotation** — probe live 2026-07-14 xác nhận `courier_logo` có ở **23/23 courier** trong response quotation (type `EpQuotationItem` trước đó **bỏ sót field này**, khiến ta tưởng phải gọi `GET /courier/list`). Không tốn thêm request nào, và không nhét thêm dependency EP vào đường tạo label đã trừ tiền ví. Áp dụng cho cả `checkout` lẫn `xendit-checkout`. EP không trả logo → lưu `null` → UI fallback icon (đơn cũ cũng vậy).
@@ -673,6 +687,7 @@ Quyết định 2026-07-14: **giữ stepper theo vòng đời đơn** (Order Pla
 | **Edge & Integration** | TC-F36.151..160 | 10/10 | 160 |
 | **Gap-Fill (transform/spec/pre-alert)** | TC-F36.161..178 | 18/18 | **161, 163, 166, 171, 177** |
 | **Gap-Fill v1.2 (payload/vocab/at-rest)** | TC-F36.179..185 | 7/7 | **179, 183** |
+| **GH-1652 Settings QA Audit** | TC-F36.201..208 | 8/8 | **201, 202, 203, 204, 206, 207, 208** |
 | **E2E UAT** | 5 flow | 5/5 | Tất cả |
 
 **Cổng release:** 100% TCs Blocker/Critical **non-deferred** pass + **money-critical suite (currency + idempotency + wallet + projection) 100%** + 0 Blocker bug open. COD suite (US-08) **DEFERRED** — không block go-live phase A–D nếu COD disabled toàn feature; unblock sau sandbox verify §9 #1.
@@ -728,6 +743,7 @@ Quyết định 2026-07-14: **giữ stepper theo vòng đời đơn** (Order Pla
 | **A-2/A-3** connect error codes + COD hint (spec-dep) | TC-F36.168, 175, 176 |
 | **Spec conflict** OAuth vs API-key | TC-F36.166, 167, 168 + §9 Q7 |
 | **Design §9.1/§9.2** payload field-map (parcel_value/feature/item[]) | TC-F36.179, 180, 181 |
+| **GH-1652** EasyParcel settings QA audit | TC-F36.201..208 |
 | **COURIER_CUTOFF** Aramex roster (§9 #12) | TC-F36.182, 65 |
 | **NFR-10** buyer label vocab-collapse | TC-F36.183, 126..132 |
 | **US-01 DoD** token encrypt-at-rest | TC-F36.184, 10, 136 |
