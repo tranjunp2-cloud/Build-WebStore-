@@ -87,6 +87,13 @@ describe('[TC-F08-04-41] AiReviewIndicator — pending', () => {
         expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'AI-created draft pending review')
     })
 
+    it('button does not use cursor-help class', () => {
+        const mockT = createMockT()
+        render(<AiReviewIndicator pending={true} t={mockT} />)
+        expect(screen.getByRole('button')).not.toHaveClass('cursor-help')
+
+    })
+
     it('shows the AI-review tooltip text', () => {
         const mockT = createMockT()
         render(<AiReviewIndicator pending={true} t={mockT} />)
