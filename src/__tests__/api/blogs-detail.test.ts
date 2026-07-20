@@ -73,6 +73,12 @@ describe('PATCH /api/blogs/[id] [TC-F17]', () => {
         const body = await res.json()
         expect(res.status).toBe(200)
         expect(body.data.title).toBe('Updated')
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            id: 'blog-1',
+            user: mockUser,
+            overrideAccess: false,
+        }))
     })
 
     it('returns 403 for wrong tenant', async () => {
@@ -80,6 +86,19 @@ describe('PATCH /api/blogs/[id] [TC-F17]', () => {
         const req = { json: () => Promise.resolve({ title: 'X' }) } as unknown as Request
         const res = await PATCH(req, ctx as any)
         expect(res.status).toBe(403)
+    })
+
+    it('returns 400 VALIDATION_ERROR when category belongs to a different tenant', async () => {
+        mockFindByID.mockResolvedValue({ id: 'blog-1', tenant: 'tenant-1' })
+        mockUpdate.mockRejectedValueOnce(new Error('BLOG_CATEGORY_TENANT_MISMATCH'))
+
+        const req = { json: () => Promise.resolve({ category: '999' }) } as unknown as Request
+        const res = await PATCH(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error.code).toBe('VALIDATION_ERROR')
+        expect(body.error.details).toBe('Invalid category selection')
     })
 })
 
@@ -93,7 +112,12 @@ describe('DELETE /api/blogs/[id] [TC-F17]', () => {
         const body = await res.json()
         expect(res.status).toBe(200)
         expect(body.data.deleted).toBe('blog-1')
-        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-1' }))
+        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            id: 'blog-1',
+            user: mockUser,
+            overrideAccess: false,
+        }))
     })
 
     it('returns 403 for wrong tenant', async () => {

@@ -85,6 +85,7 @@ describe('Users collection [TC-F02]', () => {
         { desc: 'denies normal user', req: normalUser, expected: false },
         { desc: 'allows super-admin', req: superAdmin, expected: true },
     ])
+
 })
 
 // ─── Pages ────────────────────────────────────────────────────────────

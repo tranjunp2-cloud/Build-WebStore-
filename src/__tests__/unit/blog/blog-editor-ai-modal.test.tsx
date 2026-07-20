@@ -220,7 +220,7 @@ vi.mock('@/i18n', () => ({
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
-import BlogEditorPage from '@/app/(dashboard)/blog/[id]/page'
+import BlogEditorPage from '@/app/(dashboard)/blog/[id]/BlogEditorPageClient'
 import * as actions from '@/app/(dashboard)/blog/actions'
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
