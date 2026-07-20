@@ -11,7 +11,7 @@ import BuilderFullPreview from '@/components/builder/BuilderFullPreview'
 import BuilderGenerationView from '@/components/builder/BuilderGenerationView'
 import { CongratsModal } from '@/components/builder/CongratsModal'
 import { LanguageConfirmBanner, type LanguageConfirmAction } from '@/components/editor/LanguageConfirmBanner'
-import { detectLocaleFromText } from '@/lib/detect-locale'
+import { buildLanguageDetectionText, resolveGenerationLanguageDecision } from '@/lib/language-detection'
 import { DraftRecoveryDialog } from '@/components/builder/DraftRecoveryDialog'
 import { PaywallCard } from '@/components/builder/PaywallCard'
 import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
@@ -198,7 +198,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [showPaywall, setShowPaywall] = useState(false)
     // F26: pre-generation locale confirm modal state
     const [preGenModal, setPreGenModal] = useState<{ detectedLocale: string } | null>(null)
-    const pendingGenRef = useRef<{ info: BusinessInfo; briefSnapshot: unknown } | null>(null)
+    const pendingGenRef = useRef<{ info: BusinessInfo; briefSnapshot: Record<string, unknown> | null } | null>(null)
 
     const {
         step,
@@ -702,22 +702,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         sseRetryCountRef.current = 0
         if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
 
-        // F26: detect input language — only intercept when it's not EN or BM
-        const text = [info.businessName, info.shortDescription, info.products].filter(Boolean).join(' ')
-        const detectedLocale = (info.language && info.language !== 'auto')
-            ? info.language
-            : detectLocaleFromText(text)
+        const decision = resolveGenerationLanguageDecision(
+            info.language,
+            buildLanguageDetectionText(info),
+        )
 
-        if (detectedLocale === 'en' || detectedLocale === 'ms') {
-            // Primary locale — generate immediately, no modal needed
+        if (!decision.requiresConfirmation) {
             prepareGenerationSession(info)
-            void startSSEGeneration(info, undefined, briefSnapshot)
+            void startSSEGeneration(info, undefined, briefSnapshot, decision.locale)
             return
         }
 
-        // Non-primary locale — show recommendation modal before generating
         pendingGenRef.current = { info, briefSnapshot }
-        setPreGenModal({ detectedLocale })
+        setPreGenModal({ detectedLocale: decision.locale })
     }, [prepareGenerationSession, startSSEGeneration])
 
     const handlePreGenConfirm = useCallback((action: LanguageConfirmAction, locale: string) => {
@@ -736,7 +733,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const apiLang = (['en', 'ms', 'vi'] as const).includes(locale as 'en' | 'ms' | 'vi') ? locale : 'auto'
         const updatedInfo: BusinessInfo = { ...info, language: apiLang }
         prepareGenerationSession(updatedInfo)
-        void startSSEGeneration(updatedInfo, undefined, briefSnapshot as any, locale)
+        void startSSEGeneration(updatedInfo, undefined, briefSnapshot, locale)
     }, [prepareGenerationSession, startSSEGeneration])
 
     const handleRetryGeneration = useCallback((info: BusinessInfo) => {

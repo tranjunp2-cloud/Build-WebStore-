@@ -25,6 +25,11 @@ import { blockRegistry } from '@/blocks/registry'
 import { withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
+import {
+    buildLanguageDetectionText,
+    detectLanguageFromText,
+    normalizeSupportedLocale,
+} from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
@@ -129,6 +134,10 @@ export async function POST(req: NextRequest) {
             shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
+        const effectiveGenerationLocale = normalizeSupportedLocale(requestedGenerationLocale)
+            ?? (language !== 'auto'
+                ? language
+                : detectLanguageFromText(buildLanguageDetectionText(normalizedBusinessInfo)).locale)
 
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
@@ -596,7 +605,7 @@ export async function POST(req: NextRequest) {
             const sampleProductsPromise = imagePoolPromise.then(() =>
                 generateSampleProducts(
                     businessInfo,
-                    (language as 'en' | 'ms' | 'auto'),
+                    effectiveGenerationLocale,
                     String(resolvedTenantId),
                     payload,
                 )
@@ -605,7 +614,15 @@ export async function POST(req: NextRequest) {
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('ai', () =>
                 withSentrySpan('ai.generateSite', () =>
-                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
+                    generateSiteWithAI(
+                        businessInfo,
+                        extraInstructions,
+                        language,
+                        referencePrompt,
+                        blockPromptOverrides,
+                        onEvent,
+                        { targetLocale: effectiveGenerationLocale },
+                    ),
                 ),
             )
 
@@ -813,14 +830,14 @@ export async function POST(req: NextRequest) {
             return resolveSiteType(normalizeComposerCategory(businessInfo.industry))
         })()
 
-        // F26-01: Always show confirm dialog after AI generation so user can verify or correct detected locale.
+        // The builder resolves/accepts the generation locale before starting this request.
         // generationLocale = actual language the AI generated in (any locale, e.g. 'el', 'th').
         // detectedLocale = EN/MS only — used for Sites.locale (translation system, Phase 1 EN+MS only).
         // The user-confirmed locale (requestedGenerationLocale) wins: `language` collapses non
         // en/ms/vi to 'auto' and GPT's result.language often falls back to 'en', losing the real code.
-        const generationLocale = requestedGenerationLocale || result.language || language || 'en'
+        const generationLocale = effectiveGenerationLocale || result.language || language || 'en'
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
-        const pendingLocaleConfirm = true
+        const pendingLocaleConfirm = false
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
