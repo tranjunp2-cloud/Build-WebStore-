@@ -8,6 +8,7 @@ export const ProductsGridConfigSchema = BaseBlockSchema.extend({
     subheadline: z.string().optional(),
     limit: z.number().int().min(1).max(20).default(6),
     category: z.string().optional(),
+    showCategoryFilter: z.boolean().default(false),
 })
 
 export type ProductsGridConfig = z.infer<typeof ProductsGridConfigSchema>
@@ -19,7 +20,7 @@ export const productsGridMeta: BlockMeta = {
     icon: '🛍️',
     variants: ['grid-3', 'grid-4', 'list'],
     defaultVariant: 'grid-3',
-    editableFields: ['headline', 'subheadline', 'limit', 'category'],
+    editableFields: ['headline', 'subheadline', 'limit', 'category', 'showCategoryFilter'],
     quickActions: ['change-limit'],
     category: 'commerce' as const,
 }

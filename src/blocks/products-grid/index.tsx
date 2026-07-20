@@ -1,198 +1,370 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import type { BlockProps, ThemeConfig } from '../types'
+import type React from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import type { BlockProps } from '../types'
 import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
-import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
+import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
-import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
-import { buildProductAlt } from '@/lib/products/build-product-alt'
+import { useI18n } from '@/i18n'
+import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { ProductCard } from './ProductCard'
+import { ProductFilterSidebar } from './ProductFilterSidebar'
+import { MobileFilterDrawer } from './MobileFilterDrawer'
+import { ProductsPagination } from './ProductsPagination'
+import { hasActiveProductFilters } from './filter-utils'
+import { useProductsGridData } from './use-products-grid-data'
 
-const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+const MOBILE_PRODUCTS_GRID_BREAKPOINT = 1024
+const FILTER_SCROLL_KEYS = new Set(['categoryId', 'minPrice', 'maxPrice', 'search'])
 
-interface ProductItem {
-    id: string
-    slug: string
-    name: string
-    price: string
-    priceRaw: number
-    currency: string
-    inventory: number
-    compareAtPrice?: number
-    image: string | null
-    imageAlt?: string
+function buildFilterScrollSignature(searchParams: { forEach: (callbackfn: (value: string, key: string) => void) => void }) {
+    const entries: string[] = []
+
+    searchParams.forEach((value, key) => {
+        if (FILTER_SCROLL_KEYS.has(key) || key.startsWith('attr_')) entries.push(`${key}=${value}`)
+    })
+
+    entries.sort()
+    return entries.join('&')
 }
 
-function ProductCard({ product, variant, theme, siteBasePath, siteName }: {
-    product: ProductItem
-    variant: 'grid-3' | 'grid-4' | 'list'
-    theme: ThemeConfig
-    siteBasePath: string
-    siteName?: string
-}) {
-    // Prefetched soft-nav to the PDP. <Link> prefetches the (force-dynamic) detail
-    // route as the card enters the viewport, so the click feels instant instead of
-    // waiting on a cold server render. Editor preview still intercepts navigation.
-    const pdpHref = product.slug ? `${siteBasePath}/products/${product.slug}` : '#'
-
-    return (
-        <HoverCard
-            className={`group overflow-hidden rounded-2xl h-full flex ${variant === 'list' ? 'flex-row items-center gap-6 p-4' : 'flex-col'}`}
-            style={{
-                border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
-                background: `linear-gradient(135deg, ${theme.colorMode === 'dark' ? '#ffffff03' : '#00000003'}, transparent)`,
-            }}
-        >
-            <div className={`relative overflow-hidden bg-black/5 dark:bg-white/5 ${variant === 'list' ? 'w-32 h-32 rounded-xl flex-shrink-0' : 'aspect-square'}`}>
-                {product.image ? (
-                    <img
-                        src={product.image}
-                        alt={buildProductAlt(product.imageAlt, product.name, siteName)}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🛍️</div>
-                )}
-            </div>
-
-            <div className={variant === 'list' ? 'flex-1 py-2' : `${CARD_PADDING.md} flex flex-col flex-1`}>
-                <Heading level={4} className="font-body mb-2">{product.name}</Heading>
-                <RichText text={product.price} as="p" className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }} />
-
-                {variant !== 'list' && <div className="mt-auto" />}
-
-                {/* Design decision (GH-1084): always navigate to PDP — add-to-cart is handled on
-                    PDP via ProductAddToCartSection (ensures variant selection before cart). */}
-                <Link
-                    href={pdpHref}
-                    className={`inline-flex items-center justify-center px-4 py-2 font-medium no-underline transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
-                    style={{
-                        backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
-                        color: 'var(--brand-primary)',
-                        border: variant === 'list' ? 'none' : `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
-                    }}
-                    onMouseEnter={(e) => {
-                        if (variant === 'list') return
-                        e.currentTarget.style.backgroundColor = CSS_VARS.primary
-                        e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff'
-                    }}
-                    onMouseLeave={(e) => {
-                        if (variant === 'list') return
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                        e.currentTarget.style.color = CSS_VARS.primary
-                    }}
-                    onClick={(e) => {
-                        // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
-                        // Both editor and builder gate PDP nav — product preview routes are not
-                        // rewritten to /preview, so navigating would leak to a live storefront PDP
-                        // that 404s for a draft site. (Builder product nav needs a productPreviewPath
-                        // rewrite first — out of scope for the menu-tab navigation fix.)
-                        if (isInEditorPreview()) { handleCartClick(e); return }
-                        // No slug → nothing to navigate to.
-                        if (!product.slug) e.preventDefault()
-                    }}
-                >
-                    View Detail
-                </Link>
-            </div>
-        </HoverCard>
-    )
+function formatPriceChipLabel(minPrice: string | null, maxPrice: string | null, fallbackMin: number, fallbackMax: number, heading: string) {
+    const resolvedMin = minPrice ?? String(Math.floor(fallbackMin))
+    const resolvedMax = maxPrice ?? String(Math.max(Math.ceil(fallbackMax), Math.floor(fallbackMin) + 1))
+    return `${heading}: $${resolvedMin} - $${resolvedMax}`
 }
 
 export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGridConfig>) {
-    const { headline = 'Featured Products', subheadline, limit = 6, variant = 'grid-3' } = block
-    const [products, setProducts] = useState<ProductItem[]>([])
-    const [loading, setLoading] = useState(true)
+    const { headline = 'Featured Products', subheadline } = block
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const { t } = useI18n()
+    const previewMode = isInEditorPreview()
+    const productText = t.storefront.products as Record<string, string | undefined>
+    const filtersEnabled = block.showCategoryFilter === true
+    const [isMobileViewport, setIsMobileViewport] = useState(() => (
+        typeof window !== 'undefined' ? window.innerWidth < MOBILE_PRODUCTS_GRID_BREAKPOINT : false
+    ))
+    const productsPerPage = filtersEnabled ? (isMobileViewport ? 10 : 9) : 6
+    const siteId = site?.id ? String(site.id) : null
+    const blockTopRef = useRef<HTMLDivElement>(null)
+    const previousFilterScrollSignatureRef = useRef<string | null>(null)
 
     useEffect(() => {
-        const siteId = site?.id ? String(site.id) : null
-        if (!siteId) {
-            setLoading(false)
-            return
+        if (typeof window === 'undefined') return
+
+        const syncViewport = () => {
+            setIsMobileViewport(window.innerWidth < MOBILE_PRODUCTS_GRID_BREAKPOINT)
         }
 
-        const controller = new AbortController()
+        syncViewport()
+        window.addEventListener('resize', syncViewport)
+        return () => window.removeEventListener('resize', syncViewport)
+    }, [])
 
-        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
-            .then(res => res.ok ? res.json() : Promise.reject(res))
-            .then(json => {
-                const docs = json.docs || []
-                const mapped: ProductItem[] = docs.map((doc: Record<string, unknown>) => {
-                    const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
-                    const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
-                    const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
-                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
-                    return {
-                        id: String(doc.id),
-                        slug: String(doc.slug || ''),
-                        name: String(doc.name || ''),
-                        price: `${currency} ${price.toFixed(2)}`,
-                        priceRaw: price,
-                        currency: currencyCode,
-                        inventory: Number(doc.inventory) || 0,
-                        compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
-                        image: images?.[0]?.image?.url ?? null,
-                        imageAlt: images?.[0]?.alt,
-                    }
-                })
-                setProducts(mapped)
-            })
-            .catch(err => {
-                if (err.name !== 'AbortError') console.error('[ProductsGridBlock] Failed to fetch products:', err)
-            })
-            .finally(() => setLoading(false))
+    const { bounds, categories, currentPage, displayFilters, filtersLoading, loading, refreshing, products, totalPages } = useProductsGridData({
+        filtersEnabled,
+        limit: productsPerPage,
+        siteId,
+    })
+    const filterScrollSignature = useMemo(() => buildFilterScrollSignature(searchParams), [searchParams])
+    const requestedView = searchParams.get('view')
+    const viewMode: ProductsGridConfig['variant'] = requestedView === 'list' ? 'list' : 'grid-3'
+    const cardVariant = viewMode
+    const hasActiveFilters = hasActiveProductFilters(displayFilters)
 
-        return () => controller.abort()
-    }, [limit, site?.id])
+    const showSidebar = filtersEnabled
+    const showViewToggle = !loading && products.length > 0
+    const showMobileFilterButton = showSidebar && !filtersLoading
+
+    useEffect(() => {
+        const previousSignature = previousFilterScrollSignatureRef.current
+        previousFilterScrollSignatureRef.current = filterScrollSignature
+
+        if (previousSignature === null || previousSignature === filterScrollSignature) return
+
+        blockTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    }, [filterScrollSignature])
 
     const gridCols = {
-        'grid-3': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-        'grid-4': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
-        'list': 'grid-cols-1 max-w-3xl mx-auto',
-    }[variant] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-
-    if (loading) {
-        return (
-            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent">
-                <div className="text-center">
-                    <div className="animate-pulse flex flex-col items-center gap-4">
-                        <div className="h-8 w-64 bg-white/10 rounded" />
-                        <div className="h-4 w-48 bg-white/5 rounded" />
-                    </div>
-                </div>
-            </SectionWrapper>
-        )
-    }
-
-    if (products.length === 0) {
-        return (
-            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent">
-                <div className="text-center">
-                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    <p className="opacity-60 text-lg">No products yet. Check back soon!</p>
-                </div>
-            </SectionWrapper>
-        )
-    }
+        'grid-3': 'grid-cols-2 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3 lg:gap-8',
+        'grid-4': 'grid-cols-2 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-6',
+        'list': 'grid-cols-1 max-w-5xl mx-auto gap-4 lg:gap-8',
+    }[cardVariant] || 'grid-cols-2 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3 lg:gap-8'
 
     const siteRec = site as Record<string, unknown>
     const siteBasePath = typeof siteRec?.siteBasePath === 'string'
         ? (siteRec.siteBasePath as string)
-        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+        : (siteRec?.tenantSlug ? `/sites/${String(siteRec.tenantSlug)}` : '')
+    const categoryLookup = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
+    const pricePrefix = useMemo(() => {
+        const currency = products[0]?.currency
+        if (currency === 'MYR') return 'RM '
+        if (currency === 'SGD') return 'S$ '
+        if (currency === 'USD') return '$ '
+        return '$ '
+    }, [products])
+    const gridAnimationSeed = useMemo(() => (
+        products.map((product) => `${product.id}:${product.slug}`).join('|') || `empty-${currentPage}-${viewMode}`
+    ), [currentPage, products, viewMode])
+
+    const navigateParams = (
+        mutate: (params: URLSearchParams) => void,
+        event?: React.SyntheticEvent<HTMLElement>,
+        historyMode: 'push' | 'replace' = 'replace',
+    ) => {
+        if (previewMode && event) {
+            handleCartClick(event as unknown as React.MouseEvent<HTMLElement>)
+            return
+        }
+
+        const params = new URLSearchParams(searchParams.toString())
+        mutate(params)
+        const nextHref = `${pathname}?${params.toString()}`
+        if (historyMode === 'replace') router.replace(nextHref, { scroll: false })
+        else router.push(nextHref, { scroll: false })
+    }
+
+    const clearFilters = (event: React.MouseEvent<HTMLButtonElement>) => {
+        navigateParams((params) => {
+            params.delete('categoryId')
+            params.delete('minPrice')
+            params.delete('maxPrice')
+            params.delete('search')
+            params.delete('page')
+            const keys = Array.from(params.keys()).filter((key) => key.startsWith('attr_'))
+            keys.forEach((key) => params.delete(key))
+        }, event, 'replace')
+    }
+
+    const removeCategoryFilter = (categoryId: string, event: React.MouseEvent<HTMLButtonElement>) => {
+        navigateParams((params) => {
+            const nextIds = params.getAll('categoryId').filter((id) => id !== categoryId)
+            params.delete('categoryId')
+            nextIds.forEach((id) => params.append('categoryId', id))
+            params.delete('page')
+        }, event, 'replace')
+    }
+
+    const removePriceFilter = (event: React.MouseEvent<HTMLButtonElement>) => {
+        navigateParams((params) => {
+            params.delete('minPrice')
+            params.delete('maxPrice')
+            params.delete('page')
+        }, event, 'replace')
+    }
+
+    const activeFilterChips = [
+        ...displayFilters.categoryIds.map((categoryId) => ({
+            key: `category-${categoryId}`,
+            label: categoryLookup.get(categoryId)?.name || categoryId,
+            onRemove: (event: React.MouseEvent<HTMLButtonElement>) => removeCategoryFilter(categoryId, event),
+        })),
+        ...((displayFilters.minPrice || displayFilters.maxPrice) ? [{
+            key: 'price',
+            label: formatPriceChipLabel(displayFilters.minPrice, displayFilters.maxPrice, bounds.minPrice, bounds.maxPrice, t.storefront.products.priceHeading),
+            onRemove: (event: React.MouseEvent<HTMLButtonElement>) => removePriceFilter(event),
+        }] : []),
+    ]
+
+    const viewToggle = showViewToggle ? (
+        <div className="inline-flex items-center gap-2">
+            <button
+                type="button"
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid-3'}
+                className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[rgba(var(--brand-primary-rgb),0.08)]"
+                style={{
+                    background: viewMode === 'grid-3' ? 'rgba(var(--brand-primary-rgb), 0.14)' : 'transparent',
+                    color: viewMode === 'grid-3' ? 'var(--brand-primary)' : 'var(--text-secondary)',
+                }}
+                onClick={(event) => navigateParams((params) => params.set('view', 'grid-3'), event, 'push')}
+            >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" />
+                    <rect x="10" y="1" width="5" height="5" rx="1" fill="currentColor" />
+                    <rect x="1" y="10" width="5" height="5" rx="1" fill="currentColor" />
+                    <rect x="10" y="10" width="5" height="5" rx="1" fill="currentColor" />
+                </svg>
+            </button>
+            <button
+                type="button"
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+                className="flex size-8 items-center justify-center rounded-[6px] transition-colors hover:bg-[rgba(var(--brand-primary-rgb),0.08)]"
+                style={{
+                    background: viewMode === 'list' ? 'rgba(var(--brand-primary-rgb), 0.14)' : 'transparent',
+                    color: viewMode === 'list' ? 'var(--brand-primary)' : 'var(--text-secondary)',
+                }}
+                onClick={(event) => navigateParams((params) => params.set('view', 'list'), event, 'push')}
+            >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="1" y="2" width="2" height="2" rx="0.5" fill="currentColor" />
+                    <rect x="1" y="7" width="2" height="2" rx="0.5" fill="currentColor" />
+                    <rect x="1" y="12" width="2" height="2" rx="0.5" fill="currentColor" />
+                    <rect x="5" y="2" width="10" height="2" rx="0.75" fill="currentColor" />
+                    <rect x="5" y="7" width="10" height="2" rx="0.75" fill="currentColor" />
+                    <rect x="5" y="12" width="10" height="2" rx="0.75" fill="currentColor" />
+                </svg>
+            </button>
+        </div>
+    ) : null
+
+    const filtersToolbar = (activeFilterChips.length > 0 || showViewToggle || showMobileFilterButton) ? (
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
+            {(showViewToggle || showMobileFilterButton) ? (
+                <div className={`order-1 flex w-full items-center ${showSidebar ? 'justify-between border-b pb-2 lg:order-2 lg:ml-auto lg:w-auto lg:justify-end lg:border-0 lg:pb-0' : 'justify-end lg:order-2 lg:ml-auto lg:w-auto'}`}>
+                    {showViewToggle ? viewToggle : <div />}
+                    {showMobileFilterButton ? (
+                        <div className="lg:hidden">
+                            <MobileFilterDrawer
+                                activeFilters={displayFilters}
+                                bounds={bounds}
+                                categories={categories}
+                                filterButtonLabel={productText.filterHeading || 'Filter'}
+                                onApplyFilters={(mutate, event) => navigateParams(mutate, event, 'replace')}
+                                pricePrefix={pricePrefix}
+                                primaryColor={CSS_VARS.primary}
+                                saveButtonLabel={productText.saveFilters || 'Save Filters'}
+                                sections={{
+                                    title: productText.filterHeading || 'Filter',
+                                    search: productText.searchHeading || 'Search Products',
+                                    categories: t.storefront.products.categoriesHeading,
+                                    price: t.storefront.products.priceHeading,
+                                }}
+                                searchPlaceholder={productText.searchPlaceholder || 'Search your keyword...'}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
+            {activeFilterChips.length > 0 ? (
+                <div className="order-2 hidden flex-wrap gap-3 lg:order-1 lg:flex lg:flex-1">
+                    {activeFilterChips.map((chip) => (
+                        <div
+                            key={chip.key}
+                            className="flex min-h-11 items-center gap-3 rounded-md px-3.5 py-2.5 lg:min-h-12 lg:px-4 lg:py-3"
+                            style={{ border: '1.5px solid rgba(var(--brand-primary-rgb), 0.28)' }}
+                        >
+                            <span className="min-w-0 whitespace-normal break-words text-sm font-semibold leading-5 text-[var(--text-primary)]">{chip.label}</span>
+                            <button
+                                type="button"
+                                aria-label={`Remove ${chip.label}`}
+                                className="shrink-0 text-base leading-none text-[var(--text-secondary)] transition-colors hover:text-[var(--brand-primary)]"
+                                onClick={chip.onRemove}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        className="flex min-h-11 items-center rounded-md px-3.5 py-2.5 text-sm font-semibold leading-5 transition-colors hover:bg-[rgba(var(--brand-primary-rgb),0.08)] lg:min-h-12 lg:px-4 lg:py-3"
+                        style={{ border: '1.5px solid rgba(var(--brand-primary-rgb), 0.28)', color: 'var(--brand-primary)' }}
+                        onClick={clearFilters}
+                    >
+                        {t.storefront.products.clearFilters}
+                    </button>
+                </div>
+            ) : null}
+        </div>
+    ) : null
+
+    const handlePageChange = (page: number, event: React.MouseEvent<HTMLButtonElement>) => {
+        navigateParams((params) => {
+            if (page <= 1) params.delete('page')
+            else params.set('page', String(page))
+        }, event, 'push')
+    }
+
+    const gridContent = loading ? (
+        <div className="text-center">
+            <div className="animate-pulse flex flex-col items-center gap-4">
+                <div className="h-8 w-64 rounded bg-[rgba(var(--brand-primary-rgb),0.12)]" />
+                <div className="h-4 w-48 rounded bg-[rgba(var(--brand-primary-rgb),0.06)]" />
+            </div>
+        </div>
+    ) : products.length === 0 ? (
+        <div className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-secondary)] px-6 py-14 text-center">
+            <p className="mb-4 text-5xl opacity-20">🛍️</p>
+            <p className="text-lg opacity-75">
+                {hasActiveFilters ? t.storefront.products.noMatch : (productText.noProductsYet || 'No products yet. Check back soon!')}
+            </p>
+            {hasActiveFilters && (
+                <button
+                    type="button"
+                    className="mt-5 text-sm font-semibold underline decoration-transparent underline-offset-4 transition hover:decoration-current"
+                    style={{ color: 'var(--brand-primary)' }}
+                    onClick={clearFilters}
+                >
+                    {t.storefront.products.clearFilters}
+                </button>
+            )}
+        </div>
+    ) : (
+        <>
+            <StaggerGrid key={gridAnimationSeed} data-grid-seed={gridAnimationSeed} className={`grid ${gridCols}`}>
+                {products.map((product) => (
+                    <StaggerItem key={product.id}>
+                        <ProductCard
+                            product={product}
+                            variant={cardVariant}
+                            theme={theme}
+                            siteBasePath={siteBasePath}
+                            siteName={site?.name ?? undefined}
+                        />
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+
+            {filtersEnabled ? (
+                <ProductsPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    primaryColor={CSS_VARS.primary}
+                    onPageChange={handlePageChange}
+                />
+            ) : null}
+        </>
+    )
+
+    const gridPanel = (
+        <div className="relative">
+            {refreshing && !loading ? (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        className="rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
+                        style={{
+                            backgroundColor: 'rgba(var(--brand-primary-rgb), 0.12)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid rgba(var(--brand-primary-rgb), 0.18)',
+                        }}
+                    >
+                        {productText.updatingProducts || 'Updating products...'}
+                    </div>
+                </div>
+            ) : null}
+            <div className={refreshing && !loading ? 'opacity-80 transition-opacity duration-200' : undefined}>
+                {gridContent}
+            </div>
+        </div>
+    )
 
     return (
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
+            <div ref={blockTopRef} className="scroll-mt-24" aria-hidden="true" />
             <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
 
-            {/* Header */}
             <div className="text-center max-w-2xl mx-auto mb-16">
                 {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                 <Heading level={2} className="mb-4">
@@ -205,20 +377,27 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                 )}
             </div>
 
-            {/* Grid */}
-            <StaggerGrid className={`grid gap-8 ${gridCols}`}>
-                {products.map((product) => (
-                    <StaggerItem key={product.id}>
-                        <ProductCard
-                            product={product}
-                            variant={variant}
-                            theme={theme}
-                            siteBasePath={siteBasePath}
-                            siteName={site?.name ?? undefined}
+            {showSidebar ? (
+                <div className="grid items-start gap-8 lg:grid-cols-[260px_1fr]">
+                    <div className="hidden lg:block">
+                        <ProductFilterSidebar
+                            categories={categories}
+                            bounds={bounds}
+                            activeFilters={displayFilters}
+                            primaryColor={CSS_VARS.primary}
                         />
-                    </StaggerItem>
-                ))}
-            </StaggerGrid>
+                    </div>
+                    <div>
+                        {filtersToolbar}
+                        {gridPanel}
+                    </div>
+                </div>
+            ) : (
+                <div>
+                    {filtersToolbar}
+                    {gridPanel}
+                </div>
+            )}
         </SectionWrapper>
     )
 }
