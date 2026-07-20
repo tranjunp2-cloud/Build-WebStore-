@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test'
+import { expectNoServerError } from './helpers/assertions'
+import { navigateTo } from './helpers/navigation'
 
 /**
  * Products CRUD Deep Tests — Interactions beyond page loads.
@@ -105,5 +107,44 @@ test.describe('Products CRUD Flows', () => {
                 }
             }
         }
+    })
+
+    test('[TC-09.53] AI chat Enter behavior blocks blank newline and keeps Shift+Enter multiline', async ({ page }) => {
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+
+        const aiChatTextarea = page.locator('textarea').first()
+        await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
+
+        await aiChatTextarea.click()
+        await aiChatTextarea.press('Enter')
+        await expect(aiChatTextarea).toHaveValue('')
+
+        await aiChatTextarea.fill('Line 1')
+        await aiChatTextarea.press('Shift+Enter')
+        await aiChatTextarea.type('Line 2')
+        await expect(aiChatTextarea).toHaveValue('Line 1\nLine 2')
+    })
+
+    test('[TC-F08-05-13] category modal keeps input focus and does not submit on Enter', async ({ page }) => {
+        await navigateTo(page, '/products/categories')
+        await expectNoServerError(page)
+
+        const addCategoryButton = page.getByRole('button', { name: /add category/i })
+        await expect(addCategoryButton).toBeVisible({ timeout: 10_000 })
+        await addCategoryButton.click()
+
+        const nameInput = page.getByPlaceholder(/type a category name/i)
+        await expect(nameInput).toBeVisible()
+        await expect(nameInput).toBeFocused()
+
+        await nameInput.type('Fas')
+        await expect(nameInput).toHaveValue('Fas')
+        await expect(nameInput).toBeFocused()
+
+        await nameInput.press('Enter')
+        await expect(nameInput).toHaveValue('Fas')
+        await expect(nameInput).toBeFocused()
+        await expect(page.getByRole('dialog')).toBeVisible()
     })
 })

@@ -9,6 +9,7 @@ import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
 import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
@@ -582,7 +583,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                         title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
                                                         className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
                                                     />
-                                                    <div className="hidden md:block w-[110px] shrink-0 self-center text-[12px] text-[hsl(var(--muted-foreground))] truncate">
+                                                    <div className="hidden md:block min-w-[110px] w-[110px] shrink-0 self-start pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))] whitespace-normal break-words">
                                                         {hasVariants ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
                                                     </div>
                                                 </div>
@@ -611,21 +612,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                             : (t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`)}
                     </span>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleClose}
-                            disabled={isSaving}
-                            className="h-[42px] px-5 rounded-2xl bg-transparent border border-solid border-[hsl(var(--border))] text-[14px] font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
+                        <Button variant="dashSecondary" size="dash" onClick={handleClose} disabled={isSaving}>
                             {t.dashboard?.products?.bulkCreate?.discard || 'Discard'}
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || isParsing || draftCount === 0}
-                            className="h-[42px] px-5 rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-[14px] font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
+                        </Button>
+                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={isSaving || isParsing || draftCount === 0}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             {t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

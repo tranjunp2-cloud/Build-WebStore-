@@ -36,6 +36,8 @@ export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContex
             collection: 'blog_categories',
             id,
             data: data!,
+            user,
+            overrideAccess: false,
         })
 
         return NextResponse.json({ success: true, data: updated })
@@ -75,12 +77,19 @@ export const DELETE = withFeatureGuard('content_management')(withAuth<RouteConte
             )
         }
 
-        // Unset category from all posts referencing this category
+        // Unset category only on blogs that belong to the same tenant as the category.
         const affected = await payload.find({
             collection: 'blogs',
-            where: { category: { equals: id } },
+            where: {
+                and: [
+                    { category: { equals: id } },
+                    { tenant: { equals: existingTenantId } },
+                ],
+            },
             limit: 500,
             depth: 0,
+            user,
+            overrideAccess: false,
         })
 
         if (affected.docs.length > 0) {
@@ -90,13 +99,15 @@ export const DELETE = withFeatureGuard('content_management')(withAuth<RouteConte
                         collection: 'blogs',
                         id: blog.id,
                         data: { category: null },
+                        user,
+                        overrideAccess: false,
                     })
                 )
             )
         }
 
         // Hard delete the category
-        await payload.delete({ collection: 'blog_categories', id })
+        await payload.delete({ collection: 'blog_categories', id, user, overrideAccess: false })
 
         return NextResponse.json({ success: true, data: { deleted: id, affectedPosts: affected.docs.length } })
     } catch (error: unknown) {

@@ -73,6 +73,14 @@ function toSnakeCase(str) {
   return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
 }
 
+function getArrayNestedFieldNames(source) {
+  const nested = new Set()
+  for (const role of getFieldRoles(source)) {
+    if (role.nested) nested.add(role.name)
+  }
+  return nested
+}
+
 /**
  * Walk `source` once and return an array of `{ name, nested, isContainer }`
  * — one entry per `name:` field declaration found ANYWHERE in the file
@@ -835,4 +843,9 @@ if (require.main === module) {
   main()
 }
 
-module.exports = { getFieldRoles, isPathMissingAtRef, diffNewTopLevelFieldNames }
+module.exports = {
+  getArrayNestedFieldNames,
+  getFieldRoles,
+  isPathMissingAtRef,
+  diffNewTopLevelFieldNames,
+}
