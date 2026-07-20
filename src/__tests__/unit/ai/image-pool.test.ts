@@ -296,14 +296,13 @@ describe('TC-F01-W.15 — pickFromPool', () => {
 describe('TC-F01-W.16 — underfill backoff', () => {
   it('retries with relaxed query when landscape underfills', async () => {
     // First landscape call returns 1 photo (underfill), retry with relaxed returns 2.
-    // GH-1611: relaxed-tier photos are tagged for the RELAXED query ('restaurant
-    // interior') — that is what Pixabay would return for it, and what the gate checks.
-    const relaxedTags = 'restaurant interior, dining room, table'
+    // GH-1611: even though the SEARCH broadens to the category phrase, accepted
+    // photos must still match the merchant's product term.
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // initial landscape — underfill
       .mockResolvedValueOnce([
-        fakePhoto('RL1', 1920, 1080, relaxedTags),
-        fakePhoto('RL2', 1920, 1080, relaxedTags),
+        fakePhoto('RL1', 1920, 1080, RAMEN_TAGS),
+        fakePhoto('RL2', 1920, 1080, RAMEN_TAGS),
       ]) // relaxed retry
       .mockResolvedValueOnce(squareFixture) // square OK first try
 
@@ -941,5 +940,26 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
     })
 
     expect(pool.landscape).toEqual([])
+  })
+
+  it('[TC-GH1611-17] mapped F&B fallback still rejects food from the wrong product', async () => {
+    // Arrange
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary product query underfills
+      .mockResolvedValueOnce([
+        fakePhoto('s1', 1920, 1080, 'sushi, salmon, japanese food'),
+        fakePhoto('c1', 1920, 1080, 'chocolate cake, bakery, dessert'),
+      ]) // relaxed category query returns mixed food products
+
+    // Act
+    const pool = await buildImagePool({
+      category: 'fnb',
+      products: ['chocolate cake'],
+      seed: 7,
+      squareSize: 0,
+    })
+
+    // Assert
+    expect(pool.landscape.map((photo) => photo.id)).toEqual(['c1'])
   })
 })

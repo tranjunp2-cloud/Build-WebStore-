@@ -365,12 +365,9 @@ async function searchBucket(
   merge(tier1)
   if (photos.length >= minCount) return { photos: photos.slice(0, size), usedFallback }
 
-  // The curated category phrase is trusted (ungated) ONLY because Pixabay's
-  // `category` filter keeps its results on-domain. Four composer categories have no
-  // Pixabay equivalent (ecommerce, creative, events, blog → no filter), and there
-  // the curated tier is an open door: `ecommerce`'s phrase is "product photography",
-  // whose top hits are the very clothing flatlays this issue is about. So gate it on
-  // its own phrase when unfiltered, with no escape hatch.
+  // The category phrase broadens SEARCH coverage only. It never replaces trusted
+  // product terms as the relevance gate: a category filter can keep food separate
+  // from fashion, but cannot keep sushi out of a bakery gallery.
   //
   // An empty bucket is a SAFE outcome — verified, not assumed:
   // cleanupNonNumericImageFields (media-injector.ts:311-315) deletes any image field
@@ -379,24 +376,19 @@ async function searchBucket(
   // IMAGE_LIBRARY) — on-industry by construction. Off-industry stock beats nothing;
   // it does NOT beat the curated on-industry library. So: never admit an ungated
   // photo to avoid an empty bucket.
-  const curatedGateTerms = category ? [] : [categoryPhrase(ctx.category)]
-
   // Tier 2 — relaxed (broadened) query, still user-derived.
   const relaxedTerms = buildPoolTerms(ctx, true)
   const relaxedQuery = relaxedTerms.join(' ').trim()
-  // Single-product input broadens straight to the category phrase — same trust
-  // rules as tier-3 then, not the product gate (which would reject everything the
-  // broader query was fetched to add).
-  const relaxedIsCurated = relaxedQuery === categoryPhrase(ctx.category)
   let tier2Failed = false
   if (relaxedQuery !== query) {
     usedFallback = true
     try {
       const extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
-      const tier2Terms = categoryMapped
-        ? (relaxedIsCurated ? curatedGateTerms : relaxedTerms)
-        : (gateTerms.length > 0 ? gateTerms : (relaxedIsCurated ? curatedGateTerms : relaxedTerms))
-      merge(gate(extra, tier2Terms, relaxedQuery))
+      // Product terms remain the relevance contract even after broadening. The
+      // Pixabay category filter only protects the industry (food vs fashion),
+      // not the merchant's product (cake vs sushi). With no trusted product,
+      // gate() deliberately accepts mapped categories and rejects unmapped ones.
+      merge(gate(extra, gateTerms, relaxedQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
       if (isRateLimited(err)) return { photos, usedFallback: true }
@@ -408,8 +400,7 @@ async function searchBucket(
   // Tier 3 — curated category phrase. VN inputs use the curated Vietnamese phrase
   // (lang=vi). Non-VN inputs whose bucket is still under minCount (zero or thin hits
   // — e.g. "pen dan pensel" has no Pixabay tag coverage) top up with the English
-  // category base keyword. Trusted (ungated) only where Pixabay's `category` filter
-  // guards the domain; gated on the phrase itself otherwise — see curatedGateTerms.
+  // category base keyword. Results still pass the product relevance gate.
   const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
   const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
   // `!== relaxedQuery` guard: on the scaffolding path the tier-2 query can
@@ -430,10 +421,7 @@ async function searchBucket(
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
       }
-      const tier3Terms = categoryMapped
-        ? curatedGateTerms
-        : (gateTerms.length > 0 ? gateTerms : curatedGateTerms)
-      merge(gate(extra, tier3Terms, catQuery))
+      merge(gate(extra, gateTerms, catQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
     }

@@ -89,7 +89,7 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         const tier3Photo = {
             id: 'cat-1',
             url: 'https://pixabay.com/get/cat-1_1280.jpg',
-            alt: 'stationery flatlay product photography',
+            alt: 'pen dan pensel stationery product photography',
             photographer: 'Bob',
             width: 1920,
             height: 1080,
@@ -110,6 +110,7 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
             tenantId: '1',
             category: 'ecommerce',
             language: 'ms' as const,
+            englishKeywords: ['pen dan pensel', 'buku nota'],
         }
 
         // Act
@@ -237,7 +238,7 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         }
         vi.mocked(searchPhotos)
             .mockResolvedValueOnce([offTopicPhoto] as never)
-        
+
         const msCtx = {
             businessName: 'Unconfigured Shop',
             tenantId: '1',
@@ -252,5 +253,83 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
 
         expect(result.mediaIds).toEqual([])
     })
-})
 
+    it('[TC-GH1611-18] mapped F&B category fallback rejects a different food product', async () => {
+        // Arrange
+        const sushiPhoto = {
+            id: 'sushi-1',
+            url: 'https://pixabay.com/get/sushi-1_1280.jpg',
+            alt: 'sushi salmon japanese food',
+            photographer: 'Alice',
+            width: 1920,
+            height: 1080,
+        }
+        const cakePhoto = {
+            id: 'cake-1',
+            url: 'https://pixabay.com/get/cake-1_1280.jpg',
+            alt: 'chocolate cake bakery dessert',
+            photographer: 'Bob',
+            width: 1920,
+            height: 1080,
+        }
+        vi.mocked(searchPhotos)
+            .mockResolvedValueOnce([]) // primary
+            .mockResolvedValueOnce([]) // broadened
+            .mockResolvedValueOnce([sushiPhoto, cakePhoto] as never) // category fallback
+        vi.mocked(downloadPhotoBuffer).mockResolvedValue({
+            buffer: Buffer.from('img'),
+            mimetype: 'image/jpeg',
+        } as never)
+        createMock.mockResolvedValue({ id: 7 })
+        const bakeryCtx = {
+            businessName: 'Bun & Baguette',
+            tenantId: '1',
+            category: 'fnb',
+            language: 'en' as const,
+            englishKeywords: ['chocolate cake'],
+        }
+
+        // Act
+        const result = await getMediaForBlock(
+            'gallery', ['chocolate cake', 'frosted cupcake'], 1, bakeryCtx as never, payloadStub,
+        )
+
+        // Assert
+        expect(result.mediaIds).toEqual([7])
+        expect(vi.mocked(downloadPhotoBuffer)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(downloadPhotoBuffer)).toHaveBeenCalledWith(cakePhoto.url)
+    })
+
+    it('[TC-GH1611-19] mapped F&B broadened tier keeps the full product gate', async () => {
+        // Arrange
+        const sushiPhoto = {
+            id: 'sushi-tier2',
+            url: 'https://pixabay.com/get/sushi-tier2_1280.jpg',
+            alt: 'sushi salmon japanese food',
+            photographer: 'Alice',
+            width: 1920,
+            height: 1080,
+        }
+        vi.mocked(searchPhotos)
+            .mockResolvedValueOnce([]) // primary multi-term query
+            .mockResolvedValueOnce([sushiPhoto] as never) // broadened tier
+            .mockResolvedValueOnce([]) // category fallback
+        const bakeryCtx = {
+            businessName: 'Bun & Baguette',
+            tenantId: '1',
+            category: 'fnb',
+            language: 'en' as const,
+            englishKeywords: ['chocolate cake', 'frosted cupcake'],
+        }
+
+        // Act
+        const result = await getMediaForBlock(
+            'gallery', ['food', 'bakery'], 1, bakeryCtx as never, payloadStub,
+        )
+
+        // Assert
+        expect(result.mediaIds).toEqual([])
+        expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(3)
+        expect(vi.mocked(downloadPhotoBuffer)).not.toHaveBeenCalled()
+    })
+})
