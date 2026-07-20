@@ -146,12 +146,12 @@ describe('[TC-F26-11-07] reviewed per-locale accuracy corpus', () => {
         const samples = GH1442_ACCURACY_CORPUS[locale]
 
         // Act
-        const correct = samples.filter(({ expectedLocale, text }) =>
-            detectLanguageFromText(text).locale === expectedLocale).length
+        const correct = samples.filter(({ expectedLocale, input }) =>
+            detectLanguageFromText(buildLanguageDetectionText(input)).locale === expectedLocale).length
 
         // Assert
         expect(samples).toHaveLength(100)
-        expect(new Set(samples.map(({ text }) => text)).size).toBe(100)
+        expect(new Set(samples.map(({ input }) => JSON.stringify(input))).size).toBe(100)
         expect(correct).toBeGreaterThanOrEqual(95)
     })
 
@@ -161,10 +161,43 @@ describe('[TC-F26-11-07] reviewed per-locale accuracy corpus', () => {
 
         // Act / Assert
         expect(samples).toHaveLength(800)
-        for (const { text } of samples) {
+        for (const { input } of samples) {
+            const text = buildLanguageDetectionText(input)
             const sharedLocale = detectLanguageFromText(text).locale
             expect(detectLocaleFromText(text)).toBe(sharedLocale)
             expect(detectLanguage(text).blockLang).toBe(sharedLocale)
         }
+    })
+
+    it.each([
+        [{ businessName: 'Maison', industry: 'retail', products: 'chaussures', shortDescription: 'produits locales' }, 'fr'],
+        [{ businessName: 'Schuh Haus', industry: 'retail', products: 'Schuhe', shortDescription: 'freundliche Beratung' }, 'de'],
+        [{ businessName: 'Casa Sol', industry: 'retail', products: 'tapas', shortDescription: 'sabores locales para amigos' }, 'es'],
+        [{ businessName: 'Casa Dolce', industry: 'retail', products: 'gelato artigianale', shortDescription: 'sapori per tutti' }, 'it'],
+        [{ businessName: 'Maju Jaya', industry: 'retail', products: 'produk berkualitas', shortDescription: 'layanan pelanggan terpercaya' }, 'id'],
+    ])('detects held-out full-form input as %s', (input, expectedLocale) => {
+        // Arrange
+        const text = buildLanguageDetectionText(input)
+
+        // Act / Assert
+        expect(detectLanguageFromText(text).locale).toBe(expectedLocale)
+        expect(resolveGenerationLanguageDecision('auto', text)).toEqual({
+            locale: expectedLocale,
+            requiresConfirmation: true,
+        })
+    })
+
+    it.each([
+        ['Български ресторант София', 'bg'],
+        ['Српски ресторан Београд', 'sr'],
+        ['Македонска куќа Скопје', 'mk'],
+        ['Беларуская пякарня Мінск', 'be'],
+        ['Кوردی رێستوران', 'ku'],
+        ['ئۇيغۇر ئاشخانىسى', 'ug'],
+        ['Cà phê ngon', 'vi'],
+        ['Toi ban banh ngon moi ngay', 'vi'],
+    ])('keeps distinct language evidence for %s', (text, expectedLocale) => {
+        // Act / Assert
+        expect(detectLanguageFromText(text).locale).toBe(expectedLocale)
     })
 })

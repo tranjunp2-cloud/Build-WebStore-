@@ -51,6 +51,16 @@ const MALAY_CONTEXT_MARKERS = new Set([
     'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
 ])
 
+const MALAY_EXCLUSIVE_MARKERS = new Set([
+    'kedai', 'syarikat', 'perniagaan', 'berkualiti', 'perkhidmatan', 'keperluan',
+    'pergigian', 'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
+])
+
+const INDONESIAN_EXCLUSIVE_MARKERS = new Set([
+    'toko', 'layanan', 'pelayanan', 'kebutuhan', 'kualitas', 'berkualitas',
+    'terpercaya', 'waralaba', 'pelaku',
+])
+
 const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
     en: new Set([
         'yoga', 'studio', 'pizza', 'place', 'nail', 'salon', 'coffee', 'shop', 'auto', 'repair',
@@ -60,25 +70,32 @@ const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
         'colorful', 'beautiful', 'outdoor', 'spaces', 'landscaping', 'toys', 'daily', 'best',
     ]),
     ms: MALAY_HIGH_PRECISION,
-    id: new Set(['toko', 'keluarga', 'usaha', 'layanan', 'pelayanan', 'kebutuhan', 'kualitas']),
+    id: new Set([
+        'toko', 'keluarga', 'usaha', 'layanan', 'pelayanan', 'kebutuhan', 'kualitas',
+        'berkualitas', 'terpercaya', 'waralaba', 'pelaku',
+    ]),
     it: new Set([
         'ottimi', 'dolci', 'birra', 'ristorante', 'italiano', 'italiana', 'cucina',
         'tradizionale', 'qualita', 'autenticita', 'pane', 'fresco', 'negozio', 'azienda',
         'prodotti', 'artigianale', 'servizi', 'migliore', 'benvenuti', 'specialita', 'gelateria',
+        'gelato', 'sapori', 'tutti', 'ciao', 'mondo', 'scarpe', 'famiglia',
     ]),
     fr: new Set([
         'francais', 'francaise', 'delicieux', 'delicieuse', 'cuisine', 'traditionnelle',
         'terroir', 'boulangerie', 'croissant', 'quotidien', 'entreprise', 'meilleur', 'plats',
-        'bonjour', 'artisanale', 'patisserie', 'bienvenue', 'produits', 'services',
+        'bonjour', 'artisanale', 'patisserie', 'bienvenue', 'produits', 'services', 'maison',
+        'chaussures', 'vendons', 'vente', 'conseils', 'femmes', 'locales',
     ]),
     de: new Set([
         'frisches', 'frisch', 'brot', 'taglich', 'backerei', 'unternehmen', 'dienstleistungen',
         'geschaft', 'qualitat', 'produkte', 'beste', 'traditionell', 'traditionelle', 'tradition',
-        'deutsch', 'deutsche', 'deutsches', 'kuche', 'geback', 'hochwertig',
+        'deutsch', 'deutsche', 'deutsches', 'kuche', 'geback', 'hochwertig', 'schuh',
+        'schuhe', 'beratung', 'verkaufen', 'freundliche',
     ]),
     es: new Set([
         'delicioso', 'deliciosa', 'panaderia', 'comida', 'tradicional', 'negocio', 'empresa',
-        'productos', 'servicios', 'mejor', 'fresco', 'tienda',
+        'productos', 'servicios', 'mejor', 'fresco', 'tienda', 'buenos', 'dias', 'amigos',
+        'tapas', 'sabores', 'locales', 'cada',
     ]),
     pt: new Set([
         'delicioso', 'padaria', 'comida', 'tradicional', 'negocio', 'empresa', 'produtos',
@@ -88,7 +105,16 @@ const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
     tr: new Set(['taze', 'ekmek', 'firini', 'magaza', 'isletme', 'urunler', 'hizmetler', 'geleneksel']),
     pl: new Set(['polska', 'piekarnia', 'swiezy', 'chleb', 'sklep', 'firma', 'produkty', 'uslugi']),
     sv: new Set(['svenskt', 'bageri', 'farskt', 'brod', 'butik', 'foretag', 'produkter', 'tjanster']),
-    ru: new Set(['русская', 'русский', 'пекарня', 'магазин', 'москва', 'свежий', 'хлеб', 'услуги']),
+    ru: new Set(['русская', 'русский', 'пекарня', 'магазин', 'москва', 'свежий', 'хлеб', 'услуги', 'кафе']),
+    uk: new Set(['українська', 'український', 'київ', 'крамниця', 'послуги', 'хліб']),
+    be: new Set(['беларуская', 'беларускі', 'пякарня', 'мінск', 'крама', 'паслугі']),
+    bg: new Set(['български', 'българска', 'софия', 'хляб', 'услуги', 'ресторант']),
+    sr: new Set(['српски', 'српска', 'београд', 'продавница', 'услуге', 'хлеб', 'ресторан']),
+    ar: new Set(['شركة', 'مطعم', 'مخبز', 'خبز', 'متجر', 'خدمات', 'عربي', 'عربية']),
+    fa: new Set(['ایرانی', 'رستوران', 'فروشگاه', 'خدمات', 'نان', 'فارسی']),
+    ur: new Set(['اردو', 'بیکری', 'لاہور', 'دکان', 'خدمات']),
+    ku: new Set(['کوردی', 'رێستوران', 'فرۆشگا', 'خزمەتگوزاری']),
+    ug: new Set(['ئۇيغۇر', 'ئاشخانىسى', 'دۇكان', 'مۇلازىمەت']),
 }
 
 const LATIN_FUNCTION_WORDS: Record<string, ReadonlySet<string>> = {
@@ -105,7 +131,7 @@ const VIETNAMESE_EXCLUSIVE_RE = /[ăđơưắằẳẵặẹẻẽếềểễ�
 const VIETNAMESE_LEXICON = new Set([
     'tiem', 'banh', 'ngon', 'cua', 'dep', 'quan', 'pho', 'viet',
     'dich', 'vu', 'san', 'pham', 'khach', 'tot', 'nhat', 'tuoi', 'moi', 'nha',
-    'thuoc', 'bun', 'hue', 'hoa',
+    'thuoc', 'bun', 'hue', 'hoa', 'ca', 'phe', 'toi', 'ban', 'ngay',
 ])
 
 export function normalizeLanguageDetectionText(text: string): string {
@@ -181,14 +207,18 @@ function detectScript(text: string): string | null {
 
     const arabicCount = countMatches(text, /[\u0600-\u06FF]/gu)
     if (isDominantScript(arabicCount, latinLetters)) {
+        if (/[ڭۇۆۈۋې]/u.test(text)) return 'ug'
+        if (/[ڕڵێە]/u.test(text)) return 'ku'
         if (/[ٹڈڑںھہے]/u.test(text)) return 'ur'
         if (/[پچژگکی]/u.test(text)) return 'fa'
-        return 'ar'
     }
 
     const cyrillicCount = countMatches(text, /\p{Script=Cyrillic}/gu)
     if (isDominantScript(cyrillicCount, latinLetters)) {
-        return /[іїєґ]/iu.test(text) ? 'uk' : 'ru'
+        if (/[ѓќѕ]/iu.test(text)) return 'mk'
+        if (/[ђљњћџ]/iu.test(text)) return 'sr'
+        if (/ў/iu.test(text)) return 'be'
+        if (/[їєґ]/iu.test(text)) return 'uk'
     }
     return null
 }
@@ -201,6 +231,16 @@ function tokenizeLatin(text: string): string[] {
 
 function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null {
     const uniqueTokens = new Set(tokens)
+    if (tokens.length === 1 && uniqueTokens.has('кафе')) {
+        return { locale: 'ru', confidence: 0.75, source: 'lexical' }
+    }
+    const malayExclusiveMatches = [...uniqueTokens].filter((token) => MALAY_EXCLUSIVE_MARKERS.has(token)).length
+    const indonesianExclusiveMatches = [...uniqueTokens].filter((token) => INDONESIAN_EXCLUSIVE_MARKERS.has(token)).length
+    if (malayExclusiveMatches || indonesianExclusiveMatches) {
+        const locale = indonesianExclusiveMatches > malayExclusiveMatches ? 'id' : 'ms'
+        return { locale, confidence: 0.98, source: 'lexical' }
+    }
+
     const indonesianMatches = [...uniqueTokens].filter((token) => LATIN_LEXICONS.id?.has(token)).length
     const hasMalayContext = [...uniqueTokens].some((token) => MALAY_CONTEXT_MARKERS.has(token))
     const hasIndonesianAnchor = uniqueTokens.has('toko')
@@ -220,7 +260,7 @@ function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null 
     }
 
     if (!best) return null
-    if (best.locale === 'ms' && (best.contentMatches >= 1 || best.functionMatches >= 2)) {
+    if (best.locale === 'ms' && (best.contentMatches >= 2 || best.functionMatches >= 2)) {
         return { locale: 'ms', confidence: 0.96, source: 'lexical' }
     }
     if (best.contentMatches >= 2 || (best.contentMatches >= 1 && best.score >= 4)) {
@@ -235,7 +275,6 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
 
     const scriptLocale = detectScript(normalized)
     if (scriptLocale) return { locale: scriptLocale, confidence: 1, source: 'script' }
-    if (normalized.length < 5) return { locale: 'en', confidence: 0, source: 'empty' }
 
     const vietnameseMatches = normalized.match(VIETNAMESE_EXCLUSIVE_RE)?.length ?? 0
     if (vietnameseMatches >= 2) return { locale: 'vi', confidence: 0.99, source: 'vietnamese' }
@@ -244,6 +283,9 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
     const vietnameseLexicalMatches = new Set(tokens.filter((token) => VIETNAMESE_LEXICON.has(token))).size
     if (vietnameseLexicalMatches >= 2 && vietnameseMatches >= 1) {
         return { locale: 'vi', confidence: 0.96, source: 'vietnamese' }
+    }
+    if (vietnameseLexicalMatches >= 4 || (vietnameseLexicalMatches >= 3 && /[^\u0000-\u007F]/.test(normalized))) {
+        return { locale: 'vi', confidence: 0.9, source: 'lexical' }
     }
 
     const lexical = detectLatinByLexicon(tokens)
@@ -254,12 +296,6 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
 
     const hasNonAscii = /[^\u0000-\u007F]/.test(normalized)
     if (!hasNonAscii && tokens.length < 2) return { locale: 'en', confidence: 0.7, source: 'fallback' }
-
-    // franc-min is unreliable for short ASCII business copy. Short non-English target
-    // languages are handled by the reviewed lexicons above; unknown short ASCII stays EN.
-    if (!hasNonAscii && (tokens.length < 8 || normalized.length < 60)) {
-        return { locale: 'en', confidence: 0.72, source: 'fallback' }
-    }
 
     const candidates = francAll(normalized, { minLength: 10, only: FRANC_CANDIDATES })
     const scoresByLocale = new Map<string, number>()
@@ -272,7 +308,9 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
 
     const [locale, score] = winner
     const margin = score - (runnerUp?.[1] ?? 0)
-    if (margin < 0.12) return { locale: 'en', confidence: 0.5, source: 'fallback' }
+    const isShortAscii = !hasNonAscii && (tokens.length < 8 || normalized.length < 60)
+    const minimumMargin = isShortAscii ? 0.25 : 0.12
+    if (margin < minimumMargin) return { locale: 'en', confidence: 0.5, source: 'fallback' }
 
     return { locale, confidence: score, source: 'statistical' }
 }

@@ -51,4 +51,15 @@ describe('[TC-F26-11-06] SlugPicker international auto-generation', () => {
             })
         },
     )
+
+    it('keeps the latest website address when the business name changes quickly', async () => {
+        // Arrange
+        const { rerender } = render(<SlugPicker businessName="北京传统餐厅" skipInitialCheck />)
+
+        // Act
+        rerender(<SlugPicker businessName="さくらラーメン" skipInitialCheck />)
+
+        // Assert
+        await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('sakura-ramen'))
+    })
 })

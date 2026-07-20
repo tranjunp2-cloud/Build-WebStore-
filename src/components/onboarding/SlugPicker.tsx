@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { slugify } from '@/lib/utils/slugify'
 
 interface SlugCheckResult {
     available: boolean
@@ -43,11 +42,23 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
 
     // Auto-generate slug from business name
     useEffect(() => {
-        if (businessName) {
-            const generated = slugify(businessName)
-            if (generated) {
-                setSlug(generated)
+        let active = true
+
+        const generateSlug = async () => {
+            if (!businessName) return
+
+            try {
+                const { slugify } = await import('@/lib/utils/slugify')
+                const generated = slugify(businessName)
+                if (active && generated) setSlug(generated)
+            } catch (error) {
+                console.error('[SlugPicker] Failed to load slug transliteration', error)
             }
+        }
+
+        void generateSlug()
+        return () => {
+            active = false
         }
     }, [businessName])
 
