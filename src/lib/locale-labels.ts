@@ -38,6 +38,7 @@ export const LOCALE_LABELS: Record<string, LocaleLabel> = {
 
     // Middle East / Central Asia
     ar: { short: 'AR', full: 'Arabic', flag: '🇸🇦' },
+    fa: { short: 'FA', full: 'Persian', flag: '🇮🇷' },
     he: { short: 'HE', full: 'Hebrew', flag: '🇮🇱' },
     ku: { short: 'KU', full: 'Kurdish', flag: '🇮🇶' },
     ug: { short: 'UG', full: 'Uyghur', flag: '🌐' },

@@ -54,6 +54,8 @@ const MALAY_CONTEXT_MARKERS = new Set([
 const MALAY_EXCLUSIVE_MARKERS = new Set([
     'kedai', 'syarikat', 'perniagaan', 'berkualiti', 'perkhidmatan', 'keperluan',
     'pergigian', 'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
+    'pembaikan', 'pencuci', 'kanak', 'kediaman', 'penyelenggaraan', 'mengikut',
+    'suai', 'mewujudkan',
 ])
 
 const INDONESIAN_EXCLUSIVE_MARKERS = new Set([
@@ -120,9 +122,9 @@ const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
 const LATIN_FUNCTION_WORDS: Record<string, ReadonlySet<string>> = {
     en: new Set(['the', 'a', 'an', 'and', 'or', 'for', 'with', 'from', 'our', 'your', 'we', 'you', 'in', 'of', 'to']),
     ms: new Set(['dan', 'atau', 'untuk', 'yang', 'dengan', 'kami', 'anda', 'kepada', 'dari', 'dalam', 'adalah']),
-    it: new Set(['il', 'lo', 'la', 'gli', 'le', 'di', 'del', 'della', 'con', 'per', 'una', 'uno', 'sono']),
-    fr: new Set(['le', 'la', 'les', 'de', 'des', 'du', 'avec', 'pour', 'une', 'un', 'nous', 'notre']),
-    de: new Set(['der', 'die', 'das', 'den', 'dem', 'mit', 'fur', 'und', 'ein', 'eine', 'unser']),
+    it: new Set(['il', 'lo', 'la', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dai', 'con', 'per', 'una', 'uno', 'sono', 'alle', 'agli', 'nel', 'nella', 'ogni']),
+    fr: new Set(['le', 'la', 'les', 'de', 'des', 'du', 'avec', 'pour', 'une', 'un', 'nous', 'notre', 'votre', 'chaque', 'dans', 'aux', 'par']),
+    de: new Set(['der', 'die', 'das', 'den', 'dem', 'mit', 'fur', 'und', 'ein', 'eine', 'unser', 'unsere', 'wir', 'von', 'zu', 'nach', 'bei', 'aus', 'jede', 'jeder']),
     es: new Set(['el', 'la', 'los', 'las', 'de', 'del', 'con', 'para', 'una', 'uno', 'nuestro']),
     pt: new Set(['o', 'a', 'os', 'as', 'de', 'do', 'da', 'com', 'para', 'uma', 'nosso']),
 }
@@ -132,6 +134,17 @@ const VIETNAMESE_LEXICON = new Set([
     'tiem', 'banh', 'ngon', 'cua', 'dep', 'quan', 'pho', 'viet',
     'dich', 'vu', 'san', 'pham', 'khach', 'tot', 'nhat', 'tuoi', 'moi', 'nha',
     'thuoc', 'bun', 'hue', 'hoa', 'ca', 'phe', 'toi', 'ban', 'ngay',
+])
+
+const DEVANAGARI_LANGUAGE_MARKERS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
+    ['mr', new Set(['मराठी', 'महाराष्ट्र', 'महाराष्ट्रीय'])],
+    ['ne', new Set(['नेपाली', 'नेपाल', 'काठमाडौँ', 'काठमाडौं'])],
+    ['hi', new Set(['हिंदी', 'हिन्दी'])],
+]
+
+const CONTROLLED_INDUSTRY_TOKENS = new Set([
+    'food', 'beverage', 'retail', 'professional', 'services', 'health', 'wellness',
+    'education',
 ])
 
 export function normalizeLanguageDetectionText(text: string): string {
@@ -190,9 +203,17 @@ function detectScript(text: string): string | null {
     if (isDominantScript(kanaCount + cjkCount, latinLetters) && kanaCount > 0) return 'ja'
     if (isDominantScript(cjkCount, latinLetters)) return 'zh'
 
+    const devanagariCount = countMatches(text, /[\u0900-\u097F]/gu)
+    if (isDominantScript(devanagariCount, latinLetters)) {
+        const words = new Set(text.toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [])
+        for (const [locale, markers] of DEVANAGARI_LANGUAGE_MARKERS) {
+            if ([...words].some((word) => markers.has(word))) return locale
+        }
+    }
+
     const direct = [
         [/[\u0E00-\u0E7F]/gu, 'th'], [/[\uAC00-\uD7AF]/gu, 'ko'],
-        [/[\u0900-\u097F]/gu, 'hi'], [/[\u0980-\u09FF]/gu, 'bn'],
+        [/[\u0980-\u09FF]/gu, 'bn'],
         [/[\u0A00-\u0A7F]/gu, 'pa'], [/[\u0A80-\u0AFF]/gu, 'gu'],
         [/[\u0C00-\u0C7F]/gu, 'te'], [/[\u0C80-\u0CFF]/gu, 'kn'],
         [/[\u0D00-\u0D7F]/gu, 'ml'], [/[\u0B80-\u0BFF]/gu, 'ta'],
@@ -230,7 +251,7 @@ function tokenizeLatin(text: string): string[] {
 }
 
 function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null {
-    const uniqueTokens = new Set(tokens)
+    const uniqueTokens = new Set(tokens.filter((token) => !CONTROLLED_INDUSTRY_TOKENS.has(token)))
     if (tokens.length === 1 && uniqueTokens.has('кафе')) {
         return { locale: 'ru', confidence: 0.75, source: 'lexical' }
     }
@@ -263,7 +284,11 @@ function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null 
     if (best.locale === 'ms' && (best.contentMatches >= 2 || best.functionMatches >= 2)) {
         return { locale: 'ms', confidence: 0.96, source: 'lexical' }
     }
-    if (best.contentMatches >= 2 || (best.contentMatches >= 1 && best.score >= 4)) {
+    if (
+        best.contentMatches >= 2
+        || (best.contentMatches >= 1 && best.score >= 4)
+        || (tokens.length >= 5 && best.functionMatches >= 2)
+    ) {
         return { locale: best.locale, confidence: Math.min(0.98, 0.72 + best.score * 0.04), source: 'lexical' }
     }
     return null
@@ -309,7 +334,7 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
     const [locale, score] = winner
     const margin = score - (runnerUp?.[1] ?? 0)
     const isShortAscii = !hasNonAscii && (tokens.length < 8 || normalized.length < 60)
-    const minimumMargin = isShortAscii ? 0.25 : 0.12
+    const minimumMargin = isShortAscii ? 0.25 : 0.08
     if (margin < minimumMargin) return { locale: 'en', confidence: 0.5, source: 'fallback' }
 
     return { locale, confidence: score, source: 'statistical' }

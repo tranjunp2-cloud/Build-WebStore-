@@ -7,8 +7,10 @@ import {
 } from '@/lib/language-detection'
 import { detectLocaleFromText } from '@/lib/detect-locale'
 import { detectLanguage } from '@/lib/ai/lang-detect'
+import { getLocaleLabel } from '@/lib/locale-labels'
 import {
     GH1442_ACCURACY_CORPUS,
+    GH1442_HELD_OUT_FULL_FORM_CASES,
     GH1442_TARGET_LOCALES,
 } from '@/__tests__/fixtures/language-detection-gh1442'
 
@@ -34,6 +36,9 @@ describe('[TC-F26-11-01] shared language detection', () => {
         ['Українська пекарня Київ', 'uk'],
         ['Русская пекарня Москва', 'ru'],
         ['اردو بیکری لاہور', 'ur'],
+        ['मराठी बेकरी पुणे', 'mr'],
+        ['नेपाली रेस्टुरेन्ट काठमाडौं', 'ne'],
+        ['हिंदी बेकरी दिल्ली', 'hi'],
         ['Taze ekmek firini Istanbul', 'tr'],
         ['Polska piekarnia swiezy chleb', 'pl'],
         ['Svenskt bageri farskt brod', 'sv'],
@@ -140,8 +145,8 @@ describe('[TC-F26-11-02][TC-F26-11-03][TC-F26-11-05] pre-generation decision', (
     })
 })
 
-describe('[TC-F26-11-07] reviewed per-locale accuracy corpus', () => {
-    it.each(GH1442_TARGET_LOCALES)('keeps %s accuracy at or above 95/100', (locale) => {
+describe('[TC-F26-11-07] per-locale robustness and held-out accuracy', () => {
+    it.each(GH1442_TARGET_LOCALES)('keeps %s parameterized robustness at or above 95/100', (locale) => {
         // Arrange
         const samples = GH1442_ACCURACY_CORPUS[locale]
 
@@ -169,22 +174,17 @@ describe('[TC-F26-11-07] reviewed per-locale accuracy corpus', () => {
         }
     })
 
-    it.each([
-        [{ businessName: 'Maison', industry: 'retail', products: 'chaussures', shortDescription: 'produits locales' }, 'fr'],
-        [{ businessName: 'Schuh Haus', industry: 'retail', products: 'Schuhe', shortDescription: 'freundliche Beratung' }, 'de'],
-        [{ businessName: 'Casa Sol', industry: 'retail', products: 'tapas', shortDescription: 'sabores locales para amigos' }, 'es'],
-        [{ businessName: 'Casa Dolce', industry: 'retail', products: 'gelato artigianale', shortDescription: 'sapori per tutti' }, 'it'],
-        [{ businessName: 'Maju Jaya', industry: 'retail', products: 'produk berkualitas', shortDescription: 'layanan pelanggan terpercaya' }, 'id'],
-    ])('detects held-out full-form input as %s', (input, expectedLocale) => {
+    it.each(GH1442_TARGET_LOCALES)('generalizes to independent held-out %s profiles', (locale) => {
         // Arrange
-        const text = buildLanguageDetectionText(input)
+        const samples = GH1442_HELD_OUT_FULL_FORM_CASES[locale]
 
-        // Act / Assert
-        expect(detectLanguageFromText(text).locale).toBe(expectedLocale)
-        expect(resolveGenerationLanguageDecision('auto', text)).toEqual({
-            locale: expectedLocale,
-            requiresConfirmation: true,
-        })
+        // Act
+        const detected = samples.map(({ input }) =>
+            detectLanguageFromText(buildLanguageDetectionText(input)).locale)
+
+        // Assert
+        expect(samples).toHaveLength(5)
+        expect(detected).toEqual(Array(5).fill(locale))
     })
 
     it.each([
@@ -199,5 +199,14 @@ describe('[TC-F26-11-07] reviewed per-locale accuracy corpus', () => {
     ])('keeps distinct language evidence for %s', (text, expectedLocale) => {
         // Act / Assert
         expect(detectLanguageFromText(text).locale).toBe(expectedLocale)
+    })
+
+    it('uses a human-readable Persian label throughout the AI pipeline', () => {
+        // Arrange / Act
+        const result = detectLanguage('رستوران ایرانی تهران')
+
+        // Assert
+        expect(result).toMatchObject({ blockLang: 'fa', gpLang: 'Persian' })
+        expect(getLocaleLabel('fa')).toMatchObject({ short: 'FA', full: 'Persian' })
     })
 })
