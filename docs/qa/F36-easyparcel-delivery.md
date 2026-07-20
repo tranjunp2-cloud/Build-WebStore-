@@ -97,6 +97,7 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 | **TC-F36.11** | Func | High | Disconnect → clear tokens, có thể re-authorize | Bấm Disconnect. | Tokens bị xóa khỏi `easyParcelIntegration`. Page về trạng thái chưa connect. Có thể Connect lại. | AC additional |
 | **TC-F36.12** | Func | Medium | Warehouse form dùng geo cascade có sẵn (State→City→Postcode) | Mở warehouse form. | 3 dropdown gọi `/api/geo/{states,districts,postcodes}`; line1 required, line2 optional, city required, postcode 5 digits, country hardcoded MY. KHÔNG dựng endpoint geo mới. | AC additional |
 | **TC-F36.13** | Sec | High | Network error khi connect → generic error, details chỉ ở log | Mock `oauth/token` timeout. | UI hiện "Failed to connect, retry". Chi tiết lỗi chỉ trong server log (không lộ ra client). | AC additional |
+| **TC-F36.201** | Func | High | **[x] AUTO — GH-1573:** OAuth chưa cấu hình không trả 5xx | Xoá `EASYPARCEL_CLIENT_ID` và `EASYPARCEL_REDIRECT_URI`, gọi authenticated GET `/api/tenant/[id]/easyparcel-oauth-start`. Chạy thêm Playwright smoke trên staging có hoặc không có OAuth config. | Thiếu config → HTTP 400 với `CONFIG_ERROR`; môi trường đã config → redirect 307. Không trường hợp hợp lệ nào trả 5xx. | GH-1573 |
 
 ---
 
