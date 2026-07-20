@@ -513,6 +513,14 @@ export async function fulfillImageNeeds(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
             if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
+            // Images only need to be distinct within one block. Reuse the same
+            // category-cohesive set across pages instead of searching/uploading
+            // every slot (a six-page site previously requested 84 unique images).
+            const uniqueCount = Math.max(...groupNeeds.map((need) => need.count))
+            const reuseAcrossNeeds = (ids: number[]): number[] => {
+                if (ids.length < uniqueCount) return ids
+                return Array.from({ length: totalCount }, (_, index) => ids[index % ids.length]!)
+            }
 
             // GH-1185: people slots (testimonial avatars, team members,
             // doctor profiles) are PEOPLE — never pool photos (pool is built
@@ -521,13 +529,13 @@ export async function fulfillImageNeeds(
             // placeholder beats a food avatar), so no pool/legacy fallback.
             if (PEOPLE_BLOCKS.has(blockType)) {
                 try {
-                    const result = await getAvatarMedia(totalCount, ctx.language, ctx, payload, blockType)
+                    const result = await getAvatarMedia(uniqueCount, ctx.language, ctx, payload, blockType)
                     if (result.failures.length > 0) {
                         console.warn(
                             `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
                         )
                     }
-                    return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: Math.max(0, totalCount - result.mediaIds.length) }
+                    return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: Math.max(0, uniqueCount - result.mediaIds.length) }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err)
                     console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
@@ -540,7 +548,7 @@ export async function fulfillImageNeeds(
             if (ctx.pool) {
                 const role = roleForBlock(blockType)
                 const poolSeed = hashBlockSeed(blockType, ctx.businessName)
-                const picks = pickManyFromPool(ctx.pool, role, poolSeed, totalCount)
+                const picks = pickManyFromPool(ctx.pool, role, poolSeed, uniqueCount)
                 if (picks.length > 0) {
                     try {
                         const result = await batchFetchFromPool(picks, blockType, ctx, payload)
@@ -552,14 +560,14 @@ export async function fulfillImageNeeds(
                         // Pool may be smaller than totalCount (multi-page templates exhaust
                         // the bucket). Fall through to legacy search to fill the deficit
                         // instead of leaving later pages without images.
-                        if (result.mediaIds.length >= totalCount) {
-                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        if (result.mediaIds.length >= uniqueCount) {
+                            return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: 0 }
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — supplementing with legacy search`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${uniqueCount}) — supplementing with legacy search`,
                         )
                         // Supplement pool result with legacy search for the deficit.
-                        const deficit = totalCount - result.mediaIds.length
+                        const deficit = uniqueCount - result.mediaIds.length
                         const keywords = deriveKeywords(category, blockType, {
                             businessName: ctx.businessName,
                             industry: ctx.category,
@@ -573,7 +581,7 @@ export async function fulfillImageNeeds(
                             return {
                                 blockType,
                                 groupNeeds,
-                                ids: [...result.mediaIds, ...legacyResult.mediaIds],
+                                ids: reuseAcrossNeeds([...result.mediaIds, ...legacyResult.mediaIds]),
                                 succeeded: 0,
                                 failed: 0,
                             }
@@ -602,13 +610,13 @@ export async function fulfillImageNeeds(
             })
 
             try {
-                const result = await getMediaForBlock(blockType, keywords, totalCount, ctx, payload)
+                const result = await getMediaForBlock(blockType, keywords, uniqueCount, ctx, payload)
                 if (result.failures.length > 0) {
                     console.warn(
                         `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
                     )
                 }
-                return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: Math.max(0, uniqueCount - result.mediaIds.length) }
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
                 console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
@@ -633,7 +641,6 @@ export async function fulfillImageNeeds(
                 failed += need.count
             }
         }
-        failed += r.failed
     }
 
     console.info(

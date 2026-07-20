@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, photoMatchesTerms, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, photoMatchesTerms, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER, __resetPixabayCircuitForTests } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -62,6 +62,7 @@ function makeDownloadResponse(data: Uint8Array, mimeType = 'image/jpeg') {
 
 beforeEach(() => {
     process.env.PIXABAY_API_KEY = DUMMY_KEY
+    __resetPixabayCircuitForTests()
     vi.mocked(fetch).mockReset()
 })
 
@@ -308,28 +309,30 @@ describe('searchPhotos', () => {
         expect(Number(url.searchParams.get('per_page'))).toBe(6)
     })
 
-    it('[TC-F38-PIXABAY-06] 429 response (twice) → throws PixabayError RATE_LIMITED', async () => {
-        // Arrange — fake timers so the retry jitter (2-2.5s) resolves instantly
-        vi.useFakeTimers()
+    it('[TC-F38-PIXABAY-06] 429 opens the circuit without retrying', async () => {
+        // Arrange
         vi.mocked(fetch).mockResolvedValue({
             ok: false,
             status: 429,
             headers: new Headers(),
         } as unknown as Response)
 
-        // Attach .catch synchronously BEFORE advancing timers to suppress unhandled-rejection warning.
-        // searchPhotos will reject after the jitter timer fires; we collect the error via `caught`.
-        const caught = searchPhotos('nature', 5).catch((e: unknown) => e)
+        // Act + Assert
+        await expect(searchPhotos('nature', 5)).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+        await expect(searchPhotos('city', 5)).rejects.toMatchObject({ code: 'RATE_LIMITED', retryable: false })
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    })
 
-        // Act — advance past the retry jitter (2-2.5s); stays below the 15s abort timeout
-        await vi.advanceTimersByTimeAsync(5_000)
+    it('[TC-GENPERF-W3-09] 503 opens the circuit for later search branches', async () => {
+        vi.mocked(fetch).mockResolvedValue({
+            ok: false,
+            status: 503,
+            headers: new Headers(),
+        } as unknown as Response)
 
-        // Assert
-        const err = await caught
-        expect(err).toBeInstanceOf(PixabayError)
-        expect((err as PixabayError).code).toBe('RATE_LIMITED')
-        // initial attempt + 1 retry = 2 total fetch calls
-        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+        await expect(searchPhotos('spa', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', status: 503 })
+        await expect(searchPhotos('beauty', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', retryable: false })
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
 
     it('[TC-F38-PIXABAY-10] 401 response → throws PixabayError UNAUTHORIZED without retry', async () => {

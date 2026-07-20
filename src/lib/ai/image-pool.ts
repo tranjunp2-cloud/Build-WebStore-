@@ -315,18 +315,18 @@ async function searchBucket(
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
-  // 429 short-circuit: once Pixabay rate-limits, every further tier is a
-  // guaranteed-fail request that deepens the storm (each searchPhotos already
-  // retries 429 once internally with ~2s sleep). Return thin/empty — the
-  // caller marks underfill and downstream paths have their own guards.
-  const isRateLimited = (err: unknown): boolean =>
-    err instanceof PixabayError && err.code === 'RATE_LIMITED'
+  // Provider-outage short-circuit: every further tier is a guaranteed-fail
+  // request that deepens the storm. Return thin/empty and let the caller use
+  // its deterministic industry fallback.
+  const isProviderUnavailable = (err: unknown): boolean =>
+    err instanceof PixabayError
+    && (err.code === 'RATE_LIMITED' || err.code === 'SERVER_ERROR' || err.code === 'TIMEOUT')
 
   try {
     photos = (await searchPhotos(query, size, { orientation, width, category })) ?? []
   } catch (err) {
     console.warn(`[image-pool] ${orientation} search failed:`, err)
-    if (isRateLimited(err)) return { photos, usedFallback: true }
+    if (isProviderUnavailable(err)) return { photos, usedFallback: true }
   }
   // GH-1611: gate EVERY language, not just Vietnamese. The pool query is
   // English by default (GEN_TRANSLATE_POOL_KEYWORDS), so a VN-only gate never
@@ -394,7 +394,7 @@ async function searchBucket(
       merge(gate(extra, relaxedIsCurated ? curatedGateTerms : relaxedTerms, relaxedQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
-      if (isRateLimited(err)) return { photos, usedFallback: true }
+      if (isProviderUnavailable(err)) return { photos, usedFallback: true }
       tier2Failed = true
     }
   }

@@ -12,6 +12,7 @@ vi.mock('@/lib/ai/media-pipeline', async (importOriginal) => ({
 }))
 
 beforeEach(() => {
+    vi.clearAllMocks()
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.PIXABAY_BLOCKS = 'all'
@@ -315,6 +316,35 @@ describe('media-injector [plan-260414-unsplash]', () => {
     })
 
     describe('fulfillImageNeeds — testimonials avatar routing [TC-F38-RAW-13]', () => {
+        it('[TC-GENPERF-W3-10] reuses one gallery image set across pages', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const needs = planImageNeeds(blocks)
+            const mediaIds = [101, 102, 103, 104, 105, 106]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'spa',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            const result = await fulfillImageNeeds(needs, {
+                businessName: 'Lumi Skin Studio', tenantId: '1', category: 'beauty',
+                pool: { queryUsed: 'spa', landscape: poolPhotos, square: [], portrait: [], underfill: false },
+            }, {} as never)
+
+            expect(vi.mocked(batchFetchFromPool)).toHaveBeenCalledWith(
+                expect.any(Array), 'gallery', expect.anything(), expect.anything(),
+            )
+            expect((vi.mocked(batchFetchFromPool).mock.calls[0]![0] as unknown[])).toHaveLength(6)
+            for (const block of blocks) {
+                expect(block.images.map((item) => item.image)).toEqual(mediaIds)
+            }
+            expect(result).toEqual({ succeeded: 12, failed: 0 })
+        })
+
         it('routes testimonials to getAvatarMedia (people portraits), never the pool', async () => {
             // Arrange — 3 testimonial items without avatars
             const blocks = [

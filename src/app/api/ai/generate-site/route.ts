@@ -371,13 +371,15 @@ export async function POST(req: NextRequest) {
             pages: number
             failures: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+            blockImageStats: { succeeded: number; failed: number }
         }) => {
             console.info(
                 `[generate-site] DONE request_id=${generationRequestId} total=${generationTimings.totalMs()}ms ` +
                 `${generationTimings.compact()} pages=${input.pages} failures=${input.failures} ` +
                 `gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} ` +
                 `pixabay_rl=${input.productImageStats.rateLimited} images_failed=${input.productImageStats.uploadFailed} ` +
-                `products_no_image=${input.productImageStats.noImage}`,
+                `products_no_image=${input.productImageStats.noImage} ` +
+                `block_images_ok=${input.blockImageStats.succeeded} block_images_failed=${input.blockImageStats.failed}`,
             )
         }
 
@@ -450,6 +452,7 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: number
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+            blockImageStats: { succeeded: number; failed: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
             await trackPhase('translation', () => translatedBusinessInfoPromise)
@@ -605,7 +608,10 @@ export async function POST(req: NextRequest) {
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = imagePoolPromise.then(() =>
+            const sampleProductsPromise = Promise.race([
+                imagePoolPromise.then(() => undefined),
+                new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+            ]).then(() =>
                 trackPhase('products_prepare', () =>
                     generateSampleProducts(
                         businessInfo,
@@ -707,6 +713,7 @@ export async function POST(req: NextRequest) {
             return buckets
         }
 
+        let blockImageStats = { succeeded: 0, failed: 0 }
         if (!ENABLE_DALLE_HERO) {
             try {
                 const allBuckets = collectAllBlockBuckets()
@@ -732,7 +739,7 @@ export async function POST(req: NextRequest) {
                     // an absent one (legacy inline download+upload path).
                     const preUploadedPool = await preUploadedPoolPromise
 
-                    await trackPhase('media_fulfill', () =>
+                    blockImageStats = await trackPhase('media_fulfill', () =>
                         fulfillImageNeeds(
                             needs,
                             {
@@ -774,6 +781,10 @@ export async function POST(req: NextRequest) {
                             payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
                         )
                         if (stripped > 0) {
+                            blockImageStats = {
+                                succeeded: Math.max(0, blockImageStats.succeeded - stripped),
+                                failed: blockImageStats.failed + stripped,
+                            }
                             console.warn(
                                 `[generate-site] Stripped ${stripped}/${checked} orphan media refs from bucket`,
                             )
@@ -823,6 +834,8 @@ export async function POST(req: NextRequest) {
         // composer category (which has broader VN keyword matching) as backup
         // so the seeder seeds industry-correct images (e.g. fitness vs business).
         const safeSiteType = (() => {
+            const fromInput = resolveSiteType(normalizeComposerCategory(businessInfo.industry))
+            if (fromInput !== 'business') return fromInput
             const fromAI = resolveSiteType(result.siteType)
             if (fromAI !== 'business') return fromAI
             return resolveSiteType(normalizeComposerCategory(businessInfo.industry))
@@ -1599,7 +1612,7 @@ export async function POST(req: NextRequest) {
         }
 
             const timeMs = generationTimings.totalMs()
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1632,6 +1645,7 @@ export async function POST(req: NextRequest) {
                             pageFailures,
                             productsCreatedCount,
                             productImageStats,
+                            blockImageStats,
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
@@ -1642,6 +1656,7 @@ export async function POST(req: NextRequest) {
                             pages: createdPages.length,
                             failures: pageFailures.length,
                             productImageStats,
+                            blockImageStats,
                         })
 
                         // products_generated event
@@ -1722,6 +1737,7 @@ export async function POST(req: NextRequest) {
             pageFailures,
             productsCreatedCount: _productsCreatedCount,
             productImageStats,
+            blockImageStats,
         } = await runGenPipeline()
 
         // F23: sync tenant slug now that generation succeeded (GH-1371)
@@ -1731,6 +1747,7 @@ export async function POST(req: NextRequest) {
             pages: createdPages.length,
             failures: pageFailures.length,
             productImageStats,
+            blockImageStats,
         })
 
         // Notify SSO Hub: user created their first site (step 1)
