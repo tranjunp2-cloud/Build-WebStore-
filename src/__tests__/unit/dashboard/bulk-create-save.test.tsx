@@ -31,8 +31,13 @@ vi.mock('@/app/(dashboard)/products/actions', () => ({
     deleteProductAction: vi.fn(),
 }))
 
+const mockI18nState: { locale: string; t: Record<string, unknown> } = {
+    locale: 'en',
+    t: {},
+}
+
 vi.mock('@/i18n', () => ({
-    useI18n: () => ({ t: {}, locale: 'en' }),
+    useI18n: () => mockI18nState,
 }))
 
 vi.mock('@/app/(dashboard)/actions/media', () => ({
@@ -67,7 +72,12 @@ function mockParseApi(products = [BASE_PRODUCT]) {
     }) as unknown as typeof fetch
 }
 
-async function renderAndWaitForProducts(productList = [BASE_PRODUCT]) {
+async function renderAndWaitForProducts(
+    productList = [BASE_PRODUCT],
+    i18nOverride: { locale?: string; t?: Record<string, unknown> } = {},
+) {
+    mockI18nState.locale = i18nOverride.locale || 'en'
+    mockI18nState.t = i18nOverride.t || {}
     mockParseApi(productList)
     const onClose = vi.fn()
     const onSuccess = vi.fn()
@@ -90,6 +100,8 @@ async function renderAndWaitForProducts(productList = [BASE_PRODUCT]) {
 describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockI18nState.locale = 'en'
+        mockI18nState.t = {}
     })
 
     it('TC-F08-04-27: success 1 product — id returned → singular toast, onSuccess + onClose called', async () => {
@@ -246,6 +258,48 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
                 expect.stringContaining('Product management'),
             )
         })
+    })
+
+    it('TC-F08-04-70: localizes regenerated variant tier labels during save for Malay drafts', async () => {
+        const productWithVariants = {
+            name: 'Baju',
+            price: 50,
+            category: '',
+            sku: 'SHIRT-001',
+            variants: [
+                { name: 'Putih - S', price: 50, sku: 'SHIRT-WH-S', stock: 5 },
+                { name: 'Putih - M', price: 50, sku: 'SHIRT-WH-M', stock: 7 },
+            ],
+        }
+        mockSaveProduct.mockResolvedValue({ id: 321 })
+        await renderAndWaitForProducts([productWithVariants], {
+            locale: 'ms',
+            t: {
+                dashboard: {
+                    products: {
+                        form: {
+                            sections: {
+                                color: 'Warna',
+                                size: 'Saiz',
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+
+        expect(mockSaveProduct.mock.calls[0][0].variantConfigs).toEqual([
+            { name: 'Warna', options: [{ value: 'Putih' }] },
+            { name: 'Saiz', options: [{ value: 'S' }, { value: 'M' }] },
+        ])
     })
 
     it('TC-F08-04-33 [GH-1491]: mounting locks body scroll; unmounting restores it', async () => {

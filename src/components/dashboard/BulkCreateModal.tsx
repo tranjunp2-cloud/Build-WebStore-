@@ -69,6 +69,19 @@ export function generateFallbackSku(name: string) {
     return `${base}-${suffix}`
 }
 
+function generateUniqueSku(name: string, usedSkus: Set<string>) {
+    let sku = generateFallbackSku(name)
+    for (let attempt = 0; usedSkus.has(sku.toLowerCase()); attempt++) {
+        // Random suffixes make collisions extremely unlikely; this deterministic escape hatch
+        // still guarantees progress if Math.random is mocked or an unlikely collision repeats.
+        sku = attempt < 9
+            ? generateFallbackSku(name)
+            : `${slugify(name).slice(0, 16).toUpperCase() || 'PRD'}-${attempt + 1}`
+    }
+    usedSkus.add(sku.toLowerCase())
+    return sku
+}
+
 const textToLexical = (text: string) => {
     if (!text) return undefined;
     return {
@@ -118,7 +131,23 @@ function coerceFiniteNumber(value: unknown, fallback = 0): number {
     return Number.isFinite(n) ? n : fallback
 }
 
-export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | number | null, categoryId: string | number | null, defaultVariantName: string = 'Default') {
+type VariantTierLabels = {
+    first: string
+    second: string
+}
+
+const DEFAULT_VARIANT_TIER_LABELS: VariantTierLabels = {
+    first: 'Color',
+    second: 'Size',
+}
+
+export function buildSavePayload(
+    prod: ParsedProduct,
+    cartonMediaId: string | number | null,
+    categoryId: string | number | null,
+    defaultVariantName: string = 'Default',
+    tierLabels: VariantTierLabels = DEFAULT_VARIANT_TIER_LABELS,
+) {
     const hasVariants = Boolean(prod.variants?.length)
     const baseSlug = prod.slug || slugify(prod.name)
     const finalSlug = baseSlug + '-' + Math.random().toString(36).substring(2, 7)
@@ -134,7 +163,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         
         if (validNumTiers > 0) {
             variantConfigs = Array.from({ length: validNumTiers }).map((_, i) => ({
-                name: i === 0 ? 'Color' : 'Size',
+                name: i === 0 ? tierLabels.first : tierLabels.second,
                 options: Array.from(
                     new Set(splitVariants.map(v => {
                         // Drop excess splits if AI provided too many
@@ -169,10 +198,37 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         safeName = safeName + ' (Bulk)';
     }
 
+    // AI can repeat a SKU across variant rows (and Payload rejects them as a generic
+    // "Variants" validation error). Reserve the base SKU first, then keep only unique
+    // AI SKUs case-insensitively; regenerate missing or colliding variant values.
+    const usedSkus = new Set<string>()
+    const requestedBaseSku = sanitizeXSS(prod.sku || '').trim()
+    const baseSku = requestedBaseSku && !usedSkus.has(requestedBaseSku.toLowerCase())
+        ? requestedBaseSku
+        : generateUniqueSku(safeName, usedSkus)
+    usedSkus.add(baseSku.toLowerCase())
+
+    const variants = hasVariants ? safeVariants!.map(v => {
+        const variantPrice = Number(v.price || prod.price) || 0
+        const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
+        const requestedSku = sanitizeXSS(v.sku || '').trim()
+        const sku = requestedSku && !usedSkus.has(requestedSku.toLowerCase())
+            ? requestedSku
+            : generateUniqueSku(`${safeName}-${v.name || defaultVariantName}`, usedSkus)
+        usedSkus.add(sku.toLowerCase())
+        return {
+            name: sanitizeXSS(v.name || defaultVariantName),
+            price: variantPrice,
+            compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+            stock: coerceFiniteNumber(v.stock),
+            sku,
+        }
+    }) : undefined
+
     return {
         name: safeName,
         slug: finalSlug,
-        sku: sanitizeXSS(prod.sku || '').trim() || generateFallbackSku(safeName),
+        sku: baseSku,
         price: Number(prod.price) || 0,
         compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
         description: prod.description ? textToLexical(sanitizeXSS(prod.description)) : undefined,
@@ -191,20 +247,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             width: Number(prod.width) || 0,
             height: Number(prod.height) || 0
         },
-        variants: hasVariants ? safeVariants!.map(v => {
-            const variantPrice = Number(v.price || prod.price) || 0
-            // Fall back to the product-level compareAtPrice when the AI omits a per-variant
-            // one (the bulk-parse prompt only asks the AI for compareAtPrice at product level
-            // in some responses) — otherwise variants silently lose the "was" price entirely.
-            const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
-            return {
-                name: sanitizeXSS(v.name || defaultVariantName),
-                price: variantPrice,
-                compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
-                stock: coerceFiniteNumber(v.stock),
-                sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
-            }
-        }) : undefined,
+        variants,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
         // (Products.ts beforeChange hook overrides whatever is sent) — computed here too so the
         // payload is internally consistent with what the review drawer displayed (Stock there
@@ -379,7 +422,11 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 }
 
                 const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
-                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName)
+                const tierLabels = {
+                    first: t.dashboard?.products?.form?.sections?.color || DEFAULT_VARIANT_TIER_LABELS.first,
+                    second: t.dashboard?.products?.form?.sections?.size || DEFAULT_VARIANT_TIER_LABELS.second,
+                }
+                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName, tierLabels)
 
                 // Retry with freshly regenerated SKUs on a uniqueness conflict — the AI/fallback
                 // generator can't see the merchant's existing catalog, so an occasional collision
@@ -398,10 +445,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         break
                     } catch (err) {
                         if (isSkuConflictError(err) && attempt < MAX_SKU_ATTEMPTS) {
+                            const retrySkus = new Set<string>()
                             payload = {
                                 ...payload,
-                                sku: generateFallbackSku(payload.name),
-                                variants: payload.variants?.map(v => ({ ...v, sku: generateFallbackSku(`${payload.name}-${v.name}`) })),
+                                sku: generateUniqueSku(payload.name, retrySkus),
+                                variants: payload.variants?.map(v => ({
+                                    ...v,
+                                    sku: generateUniqueSku(`${payload.name}-${v.name}`, retrySkus),
+                                })),
                             }
                             continue
                         }
