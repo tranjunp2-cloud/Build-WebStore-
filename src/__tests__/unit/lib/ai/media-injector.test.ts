@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
-import { getAvatarMedia, batchFetchFromPool } from '@/lib/ai/media-pipeline'
+import { getAvatarMedia, batchFetchFromPool, getMediaForBlock } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
 // portrait search — mock the pipeline layer to observe routing.
@@ -343,6 +343,32 @@ describe('media-injector [plan-260414-unsplash]', () => {
                 expect(block.images.map((item) => item.image)).toEqual(mediaIds)
             }
             expect(result).toEqual({ succeeded: 12, failed: 0 })
+        })
+
+        it('[TC-GENPERF-W3-12] partial pool does not legacy-search duplicate photos', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const mediaIds = [101, 102, 103, 104, 105]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'seafood',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Hai San Bien Dong', tenantId: '1', category: 'restaurant',
+                pool: { queryUsed: 'seafood', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            expect(vi.mocked(getMediaForBlock)).not.toHaveBeenCalled()
+            for (const block of blocks) {
+                expect(block.images.slice(0, 5).map((item) => item.image)).toEqual(mediaIds)
+                expect(block.images[5]!.image).toBeUndefined()
+            }
+            expect(result).toEqual({ succeeded: 10, failed: 2 })
         })
 
         it('routes testimonials to getAvatarMedia (people portraits), never the pool', async () => {

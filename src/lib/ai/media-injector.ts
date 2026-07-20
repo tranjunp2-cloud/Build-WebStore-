@@ -512,15 +512,11 @@ export async function fulfillImageNeeds(
     const perBlockResults = await Promise.all(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
-            if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
+            if (totalCount === 0) return { blockType, groupNeeds, ids: [] as number[], reusable: true }
             // Images only need to be distinct within one block. Reuse the same
             // category-cohesive set across pages instead of searching/uploading
             // every slot (a six-page site previously requested 84 unique images).
             const uniqueCount = Math.max(...groupNeeds.map((need) => need.count))
-            const reuseAcrossNeeds = (ids: number[]): number[] => {
-                if (ids.length < uniqueCount) return ids
-                return Array.from({ length: totalCount }, (_, index) => ids[index % ids.length]!)
-            }
 
             // GH-1185: people slots (testimonial avatars, team members,
             // doctor profiles) are PEOPLE — never pool photos (pool is built
@@ -535,11 +531,11 @@ export async function fulfillImageNeeds(
                             `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
                         )
                     }
-                    return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: Math.max(0, uniqueCount - result.mediaIds.length) }
+                    return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err)
                     console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
-                    return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                    return { blockType, groupNeeds, ids: [] as number[], reusable: true }
                 }
             }
 
@@ -557,37 +553,16 @@ export async function fulfillImageNeeds(
                                 `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
                             )
                         }
-                        // Pool may be smaller than totalCount (multi-page templates exhaust
-                        // the bucket). Fall through to legacy search to fill the deficit
-                        // instead of leaving later pages without images.
                         if (result.mediaIds.length >= uniqueCount) {
-                            return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: 0 }
+                            return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${uniqueCount}) — supplementing with legacy search`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${uniqueCount}) — leaving missing slots to industry fallback`,
                         )
-                        // Supplement pool result with legacy search for the deficit.
-                        const deficit = uniqueCount - result.mediaIds.length
-                        const keywords = deriveKeywords(category, blockType, {
-                            businessName: ctx.businessName,
-                            industry: ctx.category,
-                            language: ctx.language,
-                            products: ctx.products,
-                            mood: ctx.mood,
-                            englishKeywords: ctx.englishKeywords,
-                        })
-                        try {
-                            const legacyResult = await getMediaForBlock(blockType, keywords, deficit, ctx, payload)
-                            return {
-                                blockType,
-                                groupNeeds,
-                                ids: reuseAcrossNeeds([...result.mediaIds, ...legacyResult.mediaIds]),
-                                succeeded: 0,
-                                failed: 0,
-                            }
-                        } catch {
-                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
-                        }
+                        // A separate search can return a photo already present in
+                        // the pool under a new Media ID. Keep the partial unique set;
+                        // the renderer fills only the missing slots with curated images.
+                        return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
                         console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
@@ -616,11 +591,11 @@ export async function fulfillImageNeeds(
                         `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
                     )
                 }
-                return { blockType, groupNeeds, ids: reuseAcrossNeeds(result.mediaIds), succeeded: 0, failed: Math.max(0, uniqueCount - result.mediaIds.length) }
+                return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
                 console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
-                return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                return { blockType, groupNeeds, ids: [] as number[], reusable: true }
             }
         }),
     )
@@ -630,9 +605,8 @@ export async function fulfillImageNeeds(
     let succeeded = 0
     let failed = 0
     for (const r of perBlockResults) {
-        const ids = [...r.ids]
         for (const need of r.groupNeeds) {
-            const slice = ids.splice(0, need.count)
+            const slice = r.reusable ? r.ids.slice(0, need.count) : []
             if (slice.length > 0) {
                 need.assign(slice)
                 succeeded += slice.length
