@@ -54,10 +54,10 @@ const FOOD_STOCK = [
     photo('cake1', 'cake, chocolate, dessert'),
     photo('cake2', 'cupcake, frosting, sweet'),
     photo('cake3', 'birthday cake, candles, celebration'),
-    photo('cake4', 'bread, baguette, bakery'),
-    photo('cake5', 'cake, sweet, food'),
-    photo('cake6', 'pastry, croissant, bakery'),
-    photo('cake7', 'cookies, biscuit, dessert'),
+    photo('cake4', 'chocolate cake, bread, bakery'),
+    photo('cake5', 'frosted cupcake, sweet, food'),
+    photo('cake6', 'chocolate birthday cake, pastry, bakery'),
+    photo('cake7', 'frosted cupcake, cookies, dessert'),
 ]
 /** On-domain but off-product — what a loose `category=food` search also ships back. */
 const LOOSE_FOOD_STOCK = [
@@ -115,7 +115,7 @@ async function galleryPhotosFor(category: string) {
 }
 
 describe('TC-GH1611-30 — bakery gallery must not contain clothing', () => {
-    it('reproduces the reported failure with the OLD category resolution', async () => {
+    it('product gate blocks clothing even if an old caller supplies the drifted category', async () => {
         // resolveComposerCategory('fnb') → 'business' (the key is absent from its own
         // keyword list) → Pixabay filtered on business → retail stock eligible.
         const drifted = resolveComposerCategory(FORM_INDUSTRY)
@@ -130,13 +130,12 @@ describe('TC-GH1611-30 — bakery gallery must not contain clothing', () => {
             squareSize: 0,
         })
 
-        // Same gate, same mock — only the category is wrong, and that alone puts
-        // clothing in a bakery's pool. The curated fallback tier is trusted precisely
-        // BECAUSE Pixabay's category filter guards it, so a wrong category poisons the
-        // one tier the gate does not police. Category correctness is load-bearing.
+        // Defense in depth: category normalization is still load-bearing for search
+        // quality, but every tier now keeps the merchant product gate. A stale caller
+        // therefore cannot reintroduce the original clothing leak.
         const searchOpts = mockSearchPhotos.mock.calls[0]![2] as { category?: string }
         expect(searchOpts.category).toBe('business') // ← not 'food'
-        expect(pool.landscape.some((p) => isClothing(p.id))).toBe(true) // bug, reproduced
+        expect(pool.landscape.some((p) => isClothing(p.id))).toBe(false)
     })
 
     it('[TC-GH1611-31] fixed path: all 6 gallery images are on-industry', async () => {
