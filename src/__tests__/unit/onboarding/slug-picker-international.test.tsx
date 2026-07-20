@@ -28,6 +28,7 @@ describe('[TC-F26-11-06] SlugPicker international auto-generation', () => {
         ['Русская Пекарня Москва', 'russkaya-pekarnya-moskva'],
         ['Українська Пекарня Київ', 'ukrayinska-pekarnya-kiyiv'],
         ['さくらラーメン', 'sakura-ramen'],
+        ['東京ラーメン', 'dong-jing-ramen'],
         ['北京传统餐厅', 'bei-jing-chuan-tong-can-ting'],
     ])('fills the website address for %s', async (businessName, expected) => {
         // Arrange

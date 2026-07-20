@@ -9,6 +9,8 @@ describe('[TC-F26-11-06] international website address generation', () => {
         ['اردو بیکری لاہور', 'ardw-bykry-lawr'],
         ['Tiệm Bánh Hoa Mai', 'tiem-banh-hoa-mai'],
         ['さくらラーメン', 'sakura-ramen'],
+        ['東京ラーメン', 'dong-jing-ramen'],
+        ['大阪すし店', 'da-ban-sushi-dian'],
         ['北京传统餐厅', 'bei-jing-chuan-tong-can-ting'],
     ])('transliterates %s to %s', (businessName, expected) => {
         // Act

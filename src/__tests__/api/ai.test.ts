@@ -423,6 +423,38 @@ describe('AI Streaming APIs', () => {
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
 
+        it('[TC-F26-11-04] resolves a missing Auto override once for AI, products, and persistence', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Dolci Firenze',
+                         industry: 'ristorante italiano',
+                         products: 'ottimi dolci e birra',
+                         shortDescription: 'cucina tradizionale italiana',
+                     },
+                     language: 'auto',
+                 }),
+             })
+
+             // Act
+             await GenerateSitePOST(req)
+
+             // Assert
+             const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
+             expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
+             expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
+
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const siteCreateCall = vi.mocked(resolvedPayload.create).mock.calls.find(
+                 (call: [{ collection: string; data?: { generationLocale?: string } }]) =>
+                     call[0].collection === 'sites',
+             )
+             expect(siteCreateCall?.[0].data?.generationLocale).toBe('it')
+        })
+
         // GH-1458 — generate-site creates products directly via payload.create(), bypassing the
         // publish-guard/alt-fallback logic in saveProductAction. These verify the parity fix.
         // Phase 2 correction: generateSampleProducts' AI tier estimates weight/dimensions PER

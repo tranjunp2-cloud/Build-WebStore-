@@ -4,19 +4,12 @@ import transliterateSlug from 'slugify'
 import { toRomaji } from 'wanakana'
 
 function romanizeCjk(value: string): string {
-    const hasKana = /[\u3040-\u30FF]/u.test(value)
-    if (hasKana) {
-        const separatedScripts = value
-            .replace(/([\u3040-\u309F])([\u30A0-\u30FF])/gu, '$1 $2')
-            .replace(/([\u30A0-\u30FF])([\u3040-\u309F])/gu, '$1 $2')
-        return toRomaji(separatedScripts).replace(/([aeiou])\1+/gi, '$1')
-    }
-
-    if (/[\u3400-\u4DBF\u4E00-\u9FFF]/u.test(value)) {
-        return pinyin(value, { toneType: 'none', type: 'array' }).join(' ')
-    }
-
-    return value
+    return value.replace(
+        /[\u3040-\u309F]+|[\u30A0-\u30FF]+|[\u3400-\u4DBF\u4E00-\u9FFF]+/gu,
+        (run) => ` ${/[\u3040-\u30FF]/u.test(run)
+            ? toRomaji(run).replace(/([aeiou])\1+/gi, '$1')
+            : pinyin(run, { toneType: 'none', type: 'array' }).join(' ')} `,
+    )
 }
 
 function stableSlugSuffix(value: string): string {

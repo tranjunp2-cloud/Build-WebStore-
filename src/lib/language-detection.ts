@@ -38,17 +38,26 @@ const FRANC_CANDIDATES = [...new Set(Object.keys(FRANC_ISO_TO_LOCALE))]
 const SUPPORTED_LOCALES = new Set(Object.values(FRANC_ISO_TO_LOCALE))
 
 const MALAY_HIGH_PRECISION = new Set([
-    'kedai', 'warung', 'syarikat', 'perniagaan', 'jenama',
-    'jualan', 'pelanggan', 'tempatan', 'berkualiti', 'perkhidmatan', 'menyediakan',
+    'kedai', 'warung', 'restoran', 'klinik', 'butik', 'syarikat', 'perniagaan', 'jenama',
+    'jualan', 'pelanggan', 'tempatan', 'berkualiti', 'terbaik', 'segar', 'makanan',
+    'murah', 'harga', 'perkhidmatan', 'menyediakan', 'produk',
     'menggunakan', 'keperluan', 'kecantikan',
     'pergigian', 'pakaian', 'perabot', 'runcit', 'borong', 'khidmat', 'pemborong', 'hartanah',
+])
+
+const MALAY_CONTEXT_MARKERS = new Set([
+    'kedai', 'warung', 'syarikat', 'perniagaan', 'jenama', 'jualan', 'pelanggan',
+    'tempatan', 'berkualiti', 'perkhidmatan', 'menyediakan', 'pergigian', 'pakaian',
+    'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
 ])
 
 const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
     en: new Set([
         'yoga', 'studio', 'pizza', 'place', 'nail', 'salon', 'coffee', 'shop', 'auto', 'repair',
         'fitness', 'gym', 'dental', 'clinic', 'bakery', 'restaurant', 'store', 'business',
-        'services', 'professional', 'wellness', 'classes', 'bread', 'fresh',
+        'services', 'professional', 'wellness', 'classes', 'bread', 'fresh', 'flowers', 'garden',
+        'beauty', 'education', 'learning', 'children', 'kids', 'hair', 'styling', 'creative',
+        'colorful', 'beautiful', 'outdoor', 'spaces', 'landscaping', 'toys', 'daily', 'best',
     ]),
     ms: MALAY_HIGH_PRECISION,
     id: new Set(['toko', 'keluarga', 'usaha', 'layanan', 'pelayanan', 'kebutuhan', 'kualitas']),
@@ -64,7 +73,8 @@ const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
     ]),
     de: new Set([
         'frisches', 'frisch', 'brot', 'taglich', 'backerei', 'unternehmen', 'dienstleistungen',
-        'geschaft', 'qualitat', 'produkte', 'beste', 'traditionell',
+        'geschaft', 'qualitat', 'produkte', 'beste', 'traditionell', 'traditionelle', 'tradition',
+        'deutsch', 'deutsche', 'deutsches', 'kuche', 'geback', 'hochwertig',
     ]),
     es: new Set([
         'delicioso', 'deliciosa', 'panaderia', 'comida', 'tradicional', 'negocio', 'empresa',
@@ -82,6 +92,7 @@ const LATIN_LEXICONS: Record<string, ReadonlySet<string>> = {
 }
 
 const LATIN_FUNCTION_WORDS: Record<string, ReadonlySet<string>> = {
+    en: new Set(['the', 'a', 'an', 'and', 'or', 'for', 'with', 'from', 'our', 'your', 'we', 'you', 'in', 'of', 'to']),
     ms: new Set(['dan', 'atau', 'untuk', 'yang', 'dengan', 'kami', 'anda', 'kepada', 'dari', 'dalam', 'adalah']),
     it: new Set(['il', 'lo', 'la', 'gli', 'le', 'di', 'del', 'della', 'con', 'per', 'una', 'uno', 'sono']),
     fr: new Set(['le', 'la', 'les', 'de', 'des', 'du', 'avec', 'pour', 'une', 'un', 'nous', 'notre']),
@@ -92,9 +103,9 @@ const LATIN_FUNCTION_WORDS: Record<string, ReadonlySet<string>> = {
 
 const VIETNAMESE_EXCLUSIVE_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/giu
 const VIETNAMESE_LEXICON = new Set([
-    'tiem', 'banh', 'ngon', 'cua', 'hang', 'dep', 'quan', 'pho', 'com', 'viet', 'nam',
-    'dich', 'vu', 'san', 'pham', 'khach', 'hang', 'tot', 'nhat', 'tuoi', 'moi', 'nha',
-    'thuoc', 'bun', 'bo', 'hue', 'hoa',
+    'tiem', 'banh', 'ngon', 'cua', 'dep', 'quan', 'pho', 'viet',
+    'dich', 'vu', 'san', 'pham', 'khach', 'tot', 'nhat', 'tuoi', 'moi', 'nha',
+    'thuoc', 'bun', 'hue', 'hoa',
 ])
 
 export function normalizeLanguageDetectionText(text: string): string {
@@ -133,26 +144,52 @@ export function normalizeSupportedLocale(locale: string | undefined): string | n
     return SUPPORTED_LOCALES.has(normalized) ? normalized : null
 }
 
+function countMatches(text: string, pattern: RegExp): number {
+    return text.match(pattern)?.length ?? 0
+}
+
+function isDominantScript(scriptLetters: number, latinLetters: number): boolean {
+    if (scriptLetters === 0) return false
+    if (latinLetters === 0) return true
+    return scriptLetters >= 2 && scriptLetters / (scriptLetters + latinLetters) >= 0.3
+}
+
 function detectScript(text: string): string | null {
-    if (/[\u0E00-\u0E7F]/.test(text)) return 'th'
-    if (/[\u3040-\u30FF]/.test(text)) return 'ja'
-    if (/[\uAC00-\uD7AF]/.test(text)) return 'ko'
-    if (/[\u3400-\u4DBF\u4E00-\u9FFF]/.test(text)) return 'zh'
-    if (/[іїєґ]/iu.test(text)) return 'uk'
-    if (/[ٹڈڑںھہے]/u.test(text)) return 'ur'
-    if (/[\u0900-\u097F]/.test(text)) return 'hi'
-    if (/[\u0980-\u09FF]/.test(text)) return 'bn'
-    if (/[\u0A00-\u0A7F]/.test(text)) return 'pa'
-    if (/[\u0A80-\u0AFF]/.test(text)) return 'gu'
-    if (/[\u0C00-\u0C7F]/.test(text)) return 'te'
-    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn'
-    if (/[\u0D00-\u0D7F]/.test(text)) return 'ml'
-    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta'
-    if (/[\u1200-\u137F]/.test(text)) return 'am'
-    if (/[\u1000-\u109F]/.test(text)) return 'my'
-    if (/[\u1780-\u17FF]/.test(text)) return 'km'
-    if (/[\u0530-\u058F]/.test(text)) return 'hy'
-    if (/[\u10A0-\u10FF]/.test(text)) return 'ka'
+    const latinLetters = countMatches(text, /\p{Script=Latin}/gu)
+    const scriptLocale = (pattern: RegExp, locale: string): string | null =>
+        isDominantScript(countMatches(text, pattern), latinLetters) ? locale : null
+
+    const kanaCount = countMatches(text, /[\u3040-\u30FF]/gu)
+    const cjkCount = countMatches(text, /[\u3400-\u4DBF\u4E00-\u9FFF]/gu)
+    if (isDominantScript(kanaCount + cjkCount, latinLetters) && kanaCount > 0) return 'ja'
+    if (isDominantScript(cjkCount, latinLetters)) return 'zh'
+
+    const direct = [
+        [/[\u0E00-\u0E7F]/gu, 'th'], [/[\uAC00-\uD7AF]/gu, 'ko'],
+        [/[\u0900-\u097F]/gu, 'hi'], [/[\u0980-\u09FF]/gu, 'bn'],
+        [/[\u0A00-\u0A7F]/gu, 'pa'], [/[\u0A80-\u0AFF]/gu, 'gu'],
+        [/[\u0C00-\u0C7F]/gu, 'te'], [/[\u0C80-\u0CFF]/gu, 'kn'],
+        [/[\u0D00-\u0D7F]/gu, 'ml'], [/[\u0B80-\u0BFF]/gu, 'ta'],
+        [/[\u1200-\u137F]/gu, 'am'], [/[\u1000-\u109F]/gu, 'my'],
+        [/[\u1780-\u17FF]/gu, 'km'], [/[\u0530-\u058F]/gu, 'hy'],
+        [/[\u10A0-\u10FF]/gu, 'ka'], [/[\u0590-\u05FF]/gu, 'he'],
+    ] as const
+    for (const [pattern, locale] of direct) {
+        const detected = scriptLocale(pattern, locale)
+        if (detected) return detected
+    }
+
+    const arabicCount = countMatches(text, /[\u0600-\u06FF]/gu)
+    if (isDominantScript(arabicCount, latinLetters)) {
+        if (/[ٹڈڑںھہے]/u.test(text)) return 'ur'
+        if (/[پچژگکی]/u.test(text)) return 'fa'
+        return 'ar'
+    }
+
+    const cyrillicCount = countMatches(text, /\p{Script=Cyrillic}/gu)
+    if (isDominantScript(cyrillicCount, latinLetters)) {
+        return /[іїєґ]/iu.test(text) ? 'uk' : 'ru'
+    }
     return null
 }
 
@@ -164,6 +201,15 @@ function tokenizeLatin(text: string): string[] {
 
 function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null {
     const uniqueTokens = new Set(tokens)
+    const indonesianMatches = [...uniqueTokens].filter((token) => LATIN_LEXICONS.id?.has(token)).length
+    const hasMalayContext = [...uniqueTokens].some((token) => MALAY_CONTEXT_MARKERS.has(token))
+    const hasIndonesianAnchor = uniqueTokens.has('toko')
+        || (uniqueTokens.has('keluarga') && !hasMalayContext)
+        || indonesianMatches >= 2
+    if (hasIndonesianAnchor) {
+        return { locale: 'id', confidence: 0.96, source: 'lexical' }
+    }
+
     let best: { locale: string; score: number; contentMatches: number; functionMatches: number } | null = null
 
     for (const [locale, lexicon] of Object.entries(LATIN_LEXICONS)) {
@@ -177,9 +223,6 @@ function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null 
     if (best.locale === 'ms' && (best.contentMatches >= 1 || best.functionMatches >= 2)) {
         return { locale: 'ms', confidence: 0.96, source: 'lexical' }
     }
-    if (best.locale === 'id' && best.contentMatches >= 1) {
-        return { locale: 'id', confidence: 0.96, source: 'lexical' }
-    }
     if (best.contentMatches >= 2 || (best.contentMatches >= 1 && best.score >= 4)) {
         return { locale: best.locale, confidence: Math.min(0.98, 0.72 + best.score * 0.04), source: 'lexical' }
     }
@@ -188,17 +231,18 @@ function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null 
 
 export function detectLanguageFromText(text: string): LanguageDetectionResult {
     const normalized = normalizeLanguageDetectionText(text).slice(0, 4000)
-    if (normalized.length < 5) return { locale: 'en', confidence: 0, source: 'empty' }
+    if (!normalized) return { locale: 'en', confidence: 0, source: 'empty' }
 
     const scriptLocale = detectScript(normalized)
     if (scriptLocale) return { locale: scriptLocale, confidence: 1, source: 'script' }
+    if (normalized.length < 5) return { locale: 'en', confidence: 0, source: 'empty' }
 
     const vietnameseMatches = normalized.match(VIETNAMESE_EXCLUSIVE_RE)?.length ?? 0
     if (vietnameseMatches >= 2) return { locale: 'vi', confidence: 0.99, source: 'vietnamese' }
 
     const tokens = tokenizeLatin(normalized)
     const vietnameseLexicalMatches = new Set(tokens.filter((token) => VIETNAMESE_LEXICON.has(token))).size
-    if (vietnameseLexicalMatches >= 1 && vietnameseMatches >= 1) {
+    if (vietnameseLexicalMatches >= 2 && vietnameseMatches >= 1) {
         return { locale: 'vi', confidence: 0.96, source: 'vietnamese' }
     }
 
@@ -210,6 +254,12 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
 
     const hasNonAscii = /[^\u0000-\u007F]/.test(normalized)
     if (!hasNonAscii && tokens.length < 2) return { locale: 'en', confidence: 0.7, source: 'fallback' }
+
+    // franc-min is unreliable for short ASCII business copy. Short non-English target
+    // languages are handled by the reviewed lexicons above; unknown short ASCII stays EN.
+    if (!hasNonAscii && (tokens.length < 8 || normalized.length < 60)) {
+        return { locale: 'en', confidence: 0.72, source: 'fallback' }
+    }
 
     const candidates = francAll(normalized, { minLength: 10, only: FRANC_CANDIDATES })
     const scoresByLocale = new Map<string, number>()

@@ -3,7 +3,7 @@
 > **Phiên bản:** 1.0 | **Cập nhật:** 2026-05-28 | **Thực hiện:** QA Team
 > **Nguồn tham chiếu:** `docs/prd/F26-project-content-localization.md`, `docs/stories/F26-project-content-localization-stories.md`
 > **Kỹ thuật:** BVA, State Transition (locale_content JSONB), Error Guessing, Security (XSS/CSRF/Auth), Concurrency, Business-Data Guard
-> **Tổng TCs:** 73 (TC-F26-01-01 → TC-F26-11-06)
+> **Tổng TCs:** 75 (TC-F26-01-01 → TC-F26-11-08)
 
 ---
 
@@ -197,7 +197,7 @@ Bộ testcase này kiểm thử đầy đủ F26 — làm cho nội dung dự á
 | **TC-F26-10-03** | `editorStore.clearLocaleOverrideField` | `[State]` | Xoá 1 field khỏi mọi locale slot của block, giữ content khác | 1. Set override vi+en đều có {variant, headline}.<br>2. Gọi clearLocaleOverrideField(blockId,'variant'). | - Cả 2 slot chỉ còn {headline}.<br>- Block không có override → no-op, không throw. | High | [x] |
 | **TC-F26-10-04** | `routeBlockChanges` (nguồn routing của `handleBlockUpdate`) | `[Regression]` | Ma trận routing: vi-native ghi flat đủ; non-base chỉ structural vào flat; id-less ghi flat toàn bộ (echo raw, không qua template fallback) | 1. Gọi `routeBlockChanges` với các ctx: vi/vi/en (native), en/vi/en (non-base), hasBlockId=false, generationLocale rỗng.<br>2. Integration: áp routing vi-native vào store có override bẩn → đọc flat + getDisplayBlock. | - vi-native: flatChanges = toàn bộ patch; contentOverride = content; purgeKeys = structural.<br>- non-base: flatChanges CHỈ structural (không leak content vào flat vi).<br>- id-less: tất cả flat, không override/purge.<br>- Gate so với `generationLocale`, KHÔNG phải `Sites.locale`.<br>- Integration: display = 'video', không revert. | Blocker | [x] |
 
-### NHÓM 11 — GH-1442 Language Detection and Pre-generation Routing (5 TCs)
+### NHÓM 11 — GH-1442 Language Detection and Pre-generation Routing (8 TCs)
 
 | TC ID | Module | Loại | Mô tả | Bước | Kỳ vọng | Ưu tiên | AUTO |
 |---|---|---|---|---|---|---|---|
@@ -207,6 +207,8 @@ Bộ testcase này kiểm thử đầy đủ F26 — làm cho nội dung dự á
 | **TC-F26-11-04** | AI generator locale override | `[Contract]` | Locale đã confirm không bị detect lại | Resolve confirmed `it` và truyền qua generate route. | GPT language là Italian, `blockLang='it'`, persistence dùng `generationLocale='it'`. | Blocker | [x] |
 | **TC-F26-11-05** | Input normalization | `[Edge]` | Paste artifacts và một dấu Việt không làm sai locale | Test zero-width/NBSP và English có đúng một Vietnamese-exclusive mark. | Text được normalize; một dấu đơn lẻ vẫn EN; từ hai dấu có bằng chứng đủ mới là VI. | High | [x] |
 | **TC-F26-11-06** | `SlugPicker`, `slugify` | `[Regression]` | Business Name non-Latin tự tạo website address | Nhập Russian, Ukrainian, Urdu, Japanese và Chinese vào Business Name. | Cyrillic/Urdu/Japanese/Chinese được romanize; script chưa hỗ trợ nhận fallback `site-<hash>` ổn định; mọi giá trị hợp lệ DNS và field không rỗng. | High | [x] |
+| **TC-F26-11-07** | Shared language detector | `[Accuracy]` | Accuracy gate cho 8 locale mục tiêu | Chạy 100 mẫu đã review cho mỗi locale EN, MS, VI, IT, FR, DE, ZH và JA; so sánh cả UI/API wrappers. | Mỗi locale đạt ít nhất 95/100; cả 800 mẫu trả cùng kết quả qua shared detector và wrappers. | Blocker | [x] |
+| **TC-F26-11-08** | Builder browser flow | `[E2E]` | Auto locale routing từ đủ 4 business fields | Điền Business Name, Industry, Products/Services và Short Description bằng EN, MS, VI và IT rồi submit. | EN/MS gửi generate request ngay với locale tương ứng; VI/IT hiện popup và chỉ gửi sau khi confirm detected locale. | Blocker | [x] |
 
 ---
 

@@ -25,7 +25,11 @@ import { blockRegistry } from '@/blocks/registry'
 import { withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
-import { normalizeSupportedLocale } from '@/lib/language-detection'
+import {
+    buildLanguageDetectionText,
+    detectLanguageFromText,
+    normalizeSupportedLocale,
+} from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
@@ -122,8 +126,6 @@ export async function POST(req: NextRequest) {
         if (errorResponse) return errorResponse
 
         const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', generationLocale: requestedGenerationLocale, contentBrief: rawContentBrief } = data!
-        const effectiveGenerationLocale = normalizeSupportedLocale(requestedGenerationLocale)
-            ?? (language !== 'auto' ? language : undefined)
 
         // Normalize text inputs before sending to AI
         const normalizedBusinessInfo = {
@@ -132,6 +134,10 @@ export async function POST(req: NextRequest) {
             shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
+        const effectiveGenerationLocale = normalizeSupportedLocale(requestedGenerationLocale)
+            ?? (language !== 'auto'
+                ? language
+                : detectLanguageFromText(buildLanguageDetectionText(normalizedBusinessInfo)).locale)
 
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
@@ -599,7 +605,7 @@ export async function POST(req: NextRequest) {
             const sampleProductsPromise = imagePoolPromise.then(() =>
                 generateSampleProducts(
                     businessInfo,
-                    effectiveGenerationLocale ?? language,
+                    effectiveGenerationLocale,
                     String(resolvedTenantId),
                     payload,
                 )
