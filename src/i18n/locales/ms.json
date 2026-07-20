@@ -2506,7 +2506,7 @@
                     "saving": "Menyimpan...",
                     "completePickupFirst": "Tambah sekurang-kurangnya satu alamat kutipan yang lengkap.",
                     "disconnectTitle": "Putuskan sambungan EasyParcel?",
-                    "disconnectDescription": "Kadar langsung dan pembelian label akan dihentikan. Alamat kutipan anda disimpan untuk sambungan semula.",
+                    "disconnectDescription": "Kadar langsung dan pembelian label akan dihentikan. Semua alamat kutipan yang disimpan akan dipadamkan.",
                     "syncTitle": "Segerak daripada EasyParcel?",
                     "syncDescription": "Gantikan alamat kutipan tersimpan dengan alamat daripada EasyParcel? Perubahan tempatan yang belum disimpan akan hilang.",
                     "sync": "Segerak",

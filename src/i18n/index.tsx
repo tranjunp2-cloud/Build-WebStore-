@@ -3,10 +3,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import en from './locales/en.json'
 import ms from './locales/ms.json'
-import vi from './locales/vi'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-export type Locale = 'en' | 'ms' | 'vi'
+export type Locale = 'en' | 'ms'
 type Translations = typeof en
 
 interface PluralKeys {
@@ -35,7 +34,7 @@ interface I18nContextType {
 const LOCALE_KEY = 'prefer_lang' // QA doc: prefer_lang (was: primeweb-locale)
 
 // ─── Context ────────────────────────────────────────────────────────────
-const locales: Record<Locale, Translations> = { en, ms, vi }
+const locales: Record<Locale, Translations> = { en, ms }
 const I18nContext = createContext<I18nContextType | null>(null)
 
 // ─── Provider ───────────────────────────────────────────────────────────
@@ -68,7 +67,7 @@ export function I18nProvider({ children, defaultLocale = 'en' }: { children: Rea
     }, [])
 
     const toggleLocale = useCallback(() => {
-        setLocale(locale === 'en' ? 'ms' : locale === 'ms' ? 'vi' : 'en')
+        setLocale(locale === 'en' ? 'ms' : 'en')
     }, [locale, setLocale])
 
     // FR-08: Pluralization — EN: "1 issue" / "2 issues", BM: "1 isu" / "2 isu" (same form)

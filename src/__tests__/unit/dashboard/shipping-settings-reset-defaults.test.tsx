@@ -148,6 +148,14 @@ describe('ShippingSettingsClient — Reset [TC-F14.40..F14.42]', () => {
 })
 
 describe('ShippingSettingsClient — tab persistence [TC-F36.201]', () => {
+    it('uses the shared dashboard underline tab style', () => {
+        renderClient()
+
+        expect(screen.getByRole('tab', { name: /Flat Rate/i })).toHaveClass('dash-tab-trigger')
+        expect(screen.getByRole('tab', { name: /EasyParcel/i })).toHaveClass('dash-tab-trigger')
+        expect(screen.getByRole('tablist').className).toContain('border-bottom')
+    })
+
     it('recognizes both persisted tab values and falls back to EasyParcel for OAuth results', () => {
         expect(resolveShippingTab('flat-rate')).toBe('flat-rate')
         expect(resolveShippingTab('easyparcel')).toBe('easyparcel')

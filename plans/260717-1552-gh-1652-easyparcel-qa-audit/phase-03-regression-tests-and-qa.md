@@ -23,20 +23,20 @@
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/__tests__/unit/dashboard/ep-setup-stepper.test.tsx` - editor navigation guard, localized copy, disconnect confirmation.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/__tests__/api/easyparcel-oauth-callback.test.ts` - tab-aware success/error redirects.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/__tests__/api/tenant-easyparcel-save.test.ts` - sanitization, normalization, default ordering, malformed/oversized input, IDOR.
-- Create `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/__tests__/unit/localization/f36-easyparcel-settings-i18n.test.ts` - VI/EN/MS key parity and representative copy checks.
+- Create `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/__tests__/unit/localization/f36-easyparcel-settings-i18n.test.ts` - EN/MS key parity and representative copy checks.
 - Create `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/e2e/f36-easyparcel-settings.spec.ts` - authenticated tab and responsive browser checks.
 
 ## Test Matrix
 
 | Layer | Required scenarios |
 |---|---|
-| Pure | Phone inputs normalize to `60...`; invalid/all-zero/double-prefix rejected; canonical warehouse is non-mutating, one-default, default-first. |
+| Pure | Phone inputs normalize to `60...`; invalid/all-zero/double-prefix rejected; canonical persisted warehouse is non-mutating, one-default, default-first; UI draft can preserve order. |
 | API | Wrong tenant 403; malformed/oversized warehouses 400; enabled+incomplete default 400; valid add/edit/delete payload returns canonical settings; no courier or token fields accepted/returned. |
 | OAuth | Success and every error path include `tab=easyparcel`; state cookie still cleared. |
 | Pickup component | Default first; optional address2 blank is valid; existing address2 survives edit; invalid required fields show errors; phone characters blocked/normalized; delete waits for confirmation; editing callback toggles. |
 | Settings component | No request on local mutation; clean Save inactive; dirty Save sends once; editor hides Save; failure stays dirty; success resets snapshot; deleting final active warehouse drafts deactivation. |
 | Stepper | Disconnect waits for confirmation; uncommitted editor blocks navigation; activation body remains compatible. |
-| i18n | VI/EN/MS EasyParcel shape parity; representative disconnected/setup/management copy switches with locale; no missing-key crash. |
+| i18n | EN/MS EasyParcel shape parity; representative disconnected/setup/management copy switches with locale; no missing-key crash. |
 | Playwright | `?tab=easyparcel` opens correct tab; 375/390px disconnected state has `scrollWidth <= clientWidth`; mobile controls visible/tappable; desktop still renders both tabs. |
 | Manual sandbox | Connected tenant: add -> Save -> reload; edit/default -> Save -> reload; delete -> Save -> reload; last delete deactivates; OAuth callback lands on tab; light/dark at 390px. |
 

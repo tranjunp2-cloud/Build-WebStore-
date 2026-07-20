@@ -2,7 +2,7 @@
  * EasyParcel OAuth Callback Tests — F36 Phase 04 [GH-1333]
  * Tests that oauth-callback correctly:
  * 1. Does NOT set enabled=true (only stores token + testedAt + warehouses + accountName/email)
- * 2. Saves seeded warehouse from EP account info (one-time, non-overwriting)
+ * 2. Syncs the current EP pickup address after a clean reconnect without overwriting local edits
  * 3. Handles errors gracefully (non-critical account info fetch)
  * 4. Validates CSRF nonce and state parameter
  *
@@ -26,18 +26,6 @@ vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
 }))
 vi.mock('@/lib/shipping/easyparcel/client', () => ({
     getAccountInfo: vi.fn(),
-}))
-vi.mock('@/lib/shipping/easyparcel/normalize', () => ({
-    mapSubdivisionName: vi.fn((code) => {
-        // Simple mock mapping
-        const mapping: Record<string, string> = {
-            'KL': 'W.P. Kuala Lumpur',
-            'SG': 'Selangor',
-            'PJ': 'Selangor',
-            'JHR': 'Johor',
-        }
-        return mapping[code] || 'Unknown'
-    }),
 }))
 
 import { GET } from '@/app/api/easyparcel/oauth-callback/route'
@@ -160,70 +148,71 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     })
 
     // ──────────────────────────────────────────────────────────────────
-    // TC-F36.21: Callback with account info — seeds warehouse only if none exists
+    // TC-F36.11: Reconnect syncs the current pickup address from account info
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.21] Seeds warehouse from EP account if tenant has no warehouses yet', async () => {
-        // Arrange: Tenant has no existing warehouses
+    it('[TC-F36.11] Syncs the current EP pickup address after reconnect', async () => {
+        // Arrange
         mockFindByID.mockResolvedValue({
             id: tenantId,
             easyParcelIntegration: {
-                warehouses: [], // Empty
-                // No legacy warehouse
+                warehouse: null,
+                warehouses: [],
             },
         })
-
-        const tokenResponse = {
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
             access_token: 'token-1',
             refresh_token: 'refresh-1',
             expires_in: 3600,
             refresh_token_expires_in: 86400,
-        }
-
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
-        // Mock account info with pickup address
-        const epPickupAddress = {
-            name: 'EP Default Pickup',
-            phone_number: '0123456789',
-            address1: 'EP Warehouse St',
-            address2: 'Suite 100',
-            city: 'Kuala Lumpur',
-            province_code: 'SG',
-            postcode: '47810',
-            email: 'warehouse@ep.com',
-        }
-
+        })
         vi.mocked(getAccountInfo).mockResolvedValue({
             data: {
                 account: { name: 'Merchant' },
-                address: { pickup_address: epPickupAddress },
+                address: {
+                    pickup_address: {
+                        name: 'Current EP Pickup',
+                        phone_number: '0123456789',
+                        address1: 'EP Warehouse St',
+                        address2: 'Suite 100',
+                        city: 'Kuala Lumpur',
+                        province_code: 'MY-10',
+                        postcode: '47810',
+                        email: 'warehouse@ep.com',
+                    },
+                },
             },
         })
-
         mockUpdate.mockResolvedValue({ id: tenantId })
+        const url = new URL('http://localhost/api/easyparcel/oauth-callback')
+        url.searchParams.set('code', code)
+        url.searchParams.set('state', state)
+        const request = new NextRequest(url, {
+            headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+        })
 
-        // Assert: Verify seeded warehouse structure
-        const expectedSeededWarehouse = {
-            id: expect.any(String), // crypto.randomUUID()
-            label: 'EP Default Pickup',
-            phone: '0123456789',
-            address1: 'EP Warehouse St',
-            address2: 'Suite 100',
-            city: 'Kuala Lumpur',
-            state: 'Selangor', // Mapped from province_code 'SG'
-            postcode: '47810',
-            country: 'MY',
-            isDefault: true,
-        }
+        // Act
+        await GET(request)
 
-        // Expected payload should include seededWarehouses
-        // In contract test: verify structure
-        expect(expectedSeededWarehouse).toMatchObject({
-            label: 'EP Default Pickup',
-            phone: '0123456789',
-            postcode: '47810',
-            isDefault: true,
+        // Assert
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('warehouse')
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accountName: 'Merchant',
+            accountEmail: 'warehouse@ep.com',
+            warehouses: [{
+                id: expect.any(String),
+                label: 'Current EP Pickup',
+                phone: '0123456789',
+                address1: 'EP Warehouse St',
+                address2: 'Suite 100',
+                city: 'Kuala Lumpur',
+                state: 'Selangor',
+                postcode: '47810',
+                country: 'MY',
+                isDefault: true,
+            }],
         })
     })
 

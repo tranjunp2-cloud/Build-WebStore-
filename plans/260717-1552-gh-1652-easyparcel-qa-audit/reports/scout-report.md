@@ -20,8 +20,8 @@ No database schema change, new route, or new dependency is required.
 |---|---|---|---|
 | 1 | Open | OAuth callback returns `/settings/shipping?ep=connected`; tabs default to Flat Rate when `enabled=false`. | Redirect with `tab=easyparcel`; make tab selection query-aware and preserve the tab while clearing the one-shot toast param. |
 | 2 | Open | EasyParcel cards use `border-white/*`, `bg-white/*`, fixed RGBA dividers, and inconsistent radii. | Replace with dashboard semantic tokens and established component styles in both themes. |
-| 3 | Open | EasyParcel settings, pickup form, stepper, wallet, badges, toasts, and confirmations are hardcoded English. | Add `dashboard.settings.shipping.easyParcel` keys and consume through `useI18n`; GH-1652 explicitly requires VI/EN/MS, so extend the locale preference flow for VI. |
-| 4 | Open | `PickupAddresses` renders the stored array directly. | Stable non-mutating default-first sort for display and persisted canonical order. |
+| 3 | Open | EasyParcel settings, pickup form, stepper, wallet, badges, toasts, and confirmations are hardcoded English. | Add `dashboard.settings.shipping.easyParcel` keys and consume through `useI18n` for the ECH-supported EN/MS locales. |
+| 4 | Open | `PickupAddresses` renders the stored array directly. | Preserve draft order while editing; apply and animate canonical default-first order after Save succeeds. |
 | 5 | Partial | Shared `splitPhone`/`hasUsablePhone` exists, but the form accepts arbitrary characters and stores raw text; save API does not canonicalize. | Move MY canonicalization to the client-safe phone module, normalize to `60...`, validate client and server. |
 | 6 | Partial | `address2` is omitted from the form; invalid required fields only disable the CTA with no field feedback. Editing also drops an existing `address2`. | Restore optional address line 2, keep it outside validity, add explicit field errors, and require city/postcode rules from TC-F36.12. |
 | 7 | Open | Default checkbox is a hand-built inline-style span. | Use the shared shadcn Checkbox with semantic checked/focus tokens. |
@@ -53,7 +53,7 @@ No database schema change, new route, or new dependency is required.
 
 ## Scope Decisions
 
-- Support VI/EN/MS for the EasyParcel surface. Adding VI requires updating the global `Locale` type, provider, user preference validation/options, and locale switchers; untranslated areas can use the existing English tree as fallback.
+- Support EN/MS for the EasyParcel surface using the existing global locale flow.
 - Reuse `ConfirmModal`; this repo has no shared `AlertDialog` implementation.
 - Remove warehouse auto-persistence and keep one explicit Save transaction.
 - Deleting the final warehouse while active also drafts `enabled=false`; confirmation copy must state that checkout will return to Flat Rate.

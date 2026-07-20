@@ -84,7 +84,10 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
     }
 
     return (
-        <div className="mt-5 min-w-0 overflow-hidden rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)]">
+        <div
+            className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
+            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+        >
             {/* Step indicator */}
             <div className="grid grid-cols-3 gap-2 p-4 sm:flex sm:items-center sm:p-6 sm:pb-4">
                 {steps.map((label, i) => {

@@ -8,8 +8,8 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 /**
  * DELETE /api/tenant/[id]/easyparcel-disconnect
- * Clears the tenant's EasyParcel OAuth session + identity and disables the integration.
- * Warehouse / selectedCourier are kept so a future reconnect doesn't lose local config.
+ * Clears the tenant's EasyParcel OAuth session, identity, and pickup addresses,
+ * then disables the integration so a reconnect starts with the new account's data.
  */
 export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
     const { id: tenantId } = await ctx.params
@@ -43,6 +43,8 @@ export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
                 accountEmail: null,
                 enabled: false,
                 testedAt: null,
+                warehouse: null,
+                warehouses: [],
             },
         } as any,
         overrideAccess: true,

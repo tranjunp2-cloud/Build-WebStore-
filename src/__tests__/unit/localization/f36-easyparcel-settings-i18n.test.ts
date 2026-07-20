@@ -3,7 +3,6 @@
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
-import vi from '@/i18n/locales/vi'
 import { getEasyParcelErrorMessage } from '@/app/(dashboard)/settings/shipping/easyparcel-error-message'
 
 function flattenKeys(value: Record<string, unknown>, prefix = ''): string[] {
@@ -17,13 +16,11 @@ function flattenKeys(value: Record<string, unknown>, prefix = ''): string[] {
 }
 
 describe('EasyParcel settings locale tree [TC-F36.205]', () => {
-    it('keeps English, Malay, and Vietnamese key shapes identical', () => {
+    it('keeps English and Malay key shapes identical', () => {
         const enKeys = flattenKeys(en.dashboard.settings.shipping.easyParcel).sort()
         const msKeys = flattenKeys(ms.dashboard.settings.shipping.easyParcel).sort()
-        const viKeys = flattenKeys(vi.dashboard.settings.shipping.easyParcel).sort()
 
         expect(msKeys).toEqual(enKeys)
-        expect(viKeys).toEqual(enKeys)
         expect(enKeys.length).toBeGreaterThan(70)
     })
 
@@ -34,11 +31,13 @@ describe('EasyParcel settings locale tree [TC-F36.205]', () => {
         expect(copy.deleteLastDescription).toContain('{label}')
         expect(copy.toggleLabel).toBeTruthy()
         expect(copy.disconnectTitle).toBeTruthy()
-        expect(vi.dashboard.settings.shipping.easyParcel.saveSettings).toBe('Lưu cài đặt')
+        expect(copy.disconnectDescription).toContain('dipadamkan')
+        expect(en.dashboard.settings.shipping.easyParcel.disconnectDescription).toContain('deleted')
+        expect(en.dashboard.settings.shipping.easyParcel.saveSettings).toBeTruthy()
     })
 
     it('maps API codes to localized copy without exposing server messages', () => {
-        const copy = vi.dashboard.settings.shipping.easyParcel
+        const copy = ms.dashboard.settings.shipping.easyParcel
 
         expect(getEasyParcelErrorMessage('RATE_LIMITED', copy, copy.syncFailed)).toBe(copy.rateLimited)
         expect(getEasyParcelErrorMessage('FORBIDDEN', copy, copy.disconnectFailed)).toBe(copy.forbidden)

@@ -47,26 +47,25 @@ export async function GET(request: NextRequest) {
         const tokens = await exchangeCodeForToken(code)
         const now = Date.now()
 
-        // Best-effort: fetch the connected account's identity + default pickup address. Non-critical —
-        // never block the connection if this call fails or returns empty.
+        // Best-effort: fetch the connected account's identity and initial pickup address.
+        // Never block the connection if EasyParcel returns incomplete account information.
         let accountName: string | undefined
         let accountEmail: string | undefined
-        let seededWarehouses: Record<string, unknown>[] | undefined
+        let connectedWarehouses: Record<string, unknown>[] | undefined
         try {
             const info = await getAccountInfo(tokens.access_token)
             accountName = info.data?.account?.name?.trim() || undefined
             accountEmail = info.data?.address?.pickup_address?.email?.trim() || undefined
 
-            // Seed a pickup address from EP's default pickup_address — ONLY if the tenant has no pickup
-            // address yet, so we never clobber local edits. EP address is read-only on their side, so
-            // this is a one-time prefill the merchant can then manage locally.
+            // A normal reconnect follows disconnect, which clears local pickup addresses. Import
+            // EasyParcel's current default then; preserve local edits if this callback is replayed.
             const ep = (tenant as any)?.easyParcelIntegration ?? {}
             const existing = Array.isArray(ep.warehouses) ? ep.warehouses : []
             const legacy = ep.warehouse ?? {}
             const hasLocalWarehouse = existing.length > 0 || !!(legacy.name || legacy.address1 || legacy.postcode)
             const pa = info.data?.address?.pickup_address
             if (!hasLocalWarehouse && pa && (pa.name || pa.address1 || pa.postcode)) {
-                seededWarehouses = [{
+                connectedWarehouses = [{
                     id: crypto.randomUUID(),
                     label: pa.name?.trim() || 'Pickup address',
                     phone: pa.phone_number?.trim() || '',
@@ -79,7 +78,7 @@ export async function GET(request: NextRequest) {
                     isDefault: true,
                 }]
             }
-        } catch { /* non-critical — proceed without account identity / warehouse seed */ }
+        } catch { /* non-critical — proceed without account identity / pickup address */ }
 
         await payload.update({
             collection: 'tenants',
@@ -95,7 +94,7 @@ export async function GET(request: NextRequest) {
                     testedAt: new Date().toISOString(),
                     accountName: accountName ?? null,
                     accountEmail: accountEmail ?? null,
-                    ...(seededWarehouses ? { warehouses: seededWarehouses } : {}),
+                    ...(connectedWarehouses ? { warehouses: connectedWarehouses } : {}),
                 },
             } as any,
             overrideAccess: true,

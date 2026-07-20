@@ -2506,7 +2506,7 @@
                     "saving": "Saving...",
                     "completePickupFirst": "Add at least one complete pickup address first.",
                     "disconnectTitle": "Disconnect EasyParcel?",
-                    "disconnectDescription": "Live rates and label purchases will stop. Your pickup addresses will be kept for a future reconnect.",
+                    "disconnectDescription": "Live rates and label purchases will stop. All saved pickup addresses will be deleted.",
                     "syncTitle": "Sync from EasyParcel?",
                     "syncDescription": "Replace your saved pickup address with the one configured in EasyParcel? Unsaved local changes will be lost.",
                     "sync": "Sync",

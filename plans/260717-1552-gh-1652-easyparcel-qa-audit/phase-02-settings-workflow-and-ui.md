@@ -15,7 +15,7 @@
 - Save is dirty-aware, unavailable during nested editing, and resets snapshot from the canonical server response.
 - All required form errors are visible; `address2` is optional and preserved.
 - Delete and disconnect are confirmed in management and setup flows.
-- Complete EasyParcel settings copy is localized in VI/EN/MS.
+- Complete EasyParcel settings copy is localized in EN/MS.
 - Every connection/setup/management state works from 375px upward in light and dark themes.
 
 ## Related Code Files
@@ -23,12 +23,11 @@
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/api/easyparcel/oauth-callback/route.ts` - include `tab=easyparcel` in success/error redirects.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/shipping-settings-client.tsx` - query-aware controlled tab and mobile tab sizing.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/easyparcel-settings-tab.tsx` - local draft/snapshot, dirty save, form state, translated copy, responsive states.
-- Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/pickup-addresses.tsx` - default-first list, form validation, optional address2, shared controls, delete confirmation, mobile layout.
+- Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/pickup-addresses.tsx` - stable draft order, default styling, form validation, optional address2, shared controls, delete confirmation, mobile layout.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/ep-setup-stepper.tsx` - editing guard, disconnect confirmation, translations, mobile layout.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/app/(dashboard)/settings/shipping/ep-wallet-banner.tsx` - translations and mobile wrapping.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/i18n/locales/en.json` - canonical EasyParcel strings.
 - Modify `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/i18n/locales/ms.json` - matching Malay strings.
-- Create `/Users/levietducprime/Work/ech-prime-web-v2/.claude/worktrees/ech-prime-web-v2-workspace-2/src/i18n/locales/vi.ts` - Vietnamese EasyParcel strings with English fallback outside this feature.
 
 ## Implementation Steps
 
@@ -43,9 +42,9 @@
    - label, phone, address1, state, city, and 5-digit postcode errors shown per field;
    - shared shadcn Select for geo controls and Checkbox for default;
    - preserve geo cascade behavior and existing saved address2.
-7. Render a stable, default-first clone. Confirm delete before draft mutation. If deleting the final active warehouse, confirmation states that EasyParcel will be disabled and the parent drafts `enabled=false`.
+7. Keep draft order stable when default changes; after Save succeeds, animate the canonical default-first response into place (respect reduced-motion). Confirm delete before draft mutation. If deleting the final active warehouse, confirmation states that EasyParcel will be disabled and the parent drafts `enabled=false`.
 8. Reuse `ConfirmModal` for setup-stepper disconnect; keep the management confirmation.
-9. Add a nested `easyParcel` locale object under dashboard shipping in VI/EN/MS. Migrate strings from settings tab, pickup form, setup stepper, wallet banner, status badges, toasts, validation, and confirmations; register VI in the locale preference and switcher flow.
+9. Add a nested `easyParcel` locale object under dashboard shipping in EN/MS. Migrate strings from settings tab, pickup form, setup stepper, wallet banner, status badges, toasts, validation, and confirmations.
 10. Replace hardcoded white/RGBA borders/backgrounds with dashboard semantic tokens and shared controls. Preserve established page hierarchy; avoid a broad dashboard redesign.
 11. Apply responsive behavior:
     - tabs fill width and do not resize/overflow at 375px;
@@ -70,7 +69,7 @@ Save failure -> draft remains dirty; no false success/rollback illusion
 
 ## Risks
 
-- Large translation objects can drift between VI/EN/MS. Phase 03 adds key-parity and render checks.
+- Large translation objects can drift between EN/MS. Phase 03 adds key-parity and render checks.
 - Native Select-to-Radix migration must preserve async state/city/postcode value reconciliation.
 - Last-warehouse deletion changes two fields (`warehouses=[]`, `enabled=false`) and must be described before confirmation.
 - Query-controlled tabs must not cause hydration mismatch; derive initial state entirely client-side from `useSearchParams`.
@@ -81,7 +80,7 @@ Save failure -> draft remains dirty; no false success/rollback illusion
 - [x] Replace auto-save with draft/snapshot/dirty workflow.
 - [x] Add nested-editor guard and explicit field validation.
 - [x] Add delete/setup-disconnect confirmations.
-- [x] Localize full EasyParcel settings surface in VI/EN/MS.
+- [x] Localize full EasyParcel settings surface in EN/MS.
 - [x] Apply semantic light/dark tokens and 375px layouts.
 
 ## Success Criteria

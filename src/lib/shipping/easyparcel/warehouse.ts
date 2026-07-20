@@ -62,8 +62,15 @@ export function normalizeWarehouse(value: unknown): Warehouse | null {
     }
 }
 
-/** Canonicalize a list without mutating it, enforce one default, and put that default first. */
-export function normalizeWarehouses(value: unknown): Warehouse[] {
+interface NormalizeWarehousesOptions {
+    defaultFirst?: boolean
+}
+
+/** Canonicalize a list without mutating it, enforce one default, and optionally move it first. */
+export function normalizeWarehouses(
+    value: unknown,
+    { defaultFirst = true }: NormalizeWarehousesOptions = {},
+): Warehouse[] {
     if (!Array.isArray(value)) return []
     const warehouses = value
         .map(normalizeWarehouse)
@@ -76,7 +83,7 @@ export function normalizeWarehouses(value: unknown): Warehouse[] {
         isDefault: index === defaultIndex,
     }))
 
-    if (defaultIndex === 0) return normalized
+    if (!defaultFirst || defaultIndex === 0) return normalized
     return [normalized[defaultIndex], ...normalized.filter((_, index) => index !== defaultIndex)]
 }
 

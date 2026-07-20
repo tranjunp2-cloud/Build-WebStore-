@@ -12,7 +12,7 @@
 
 - One client-safe implementation canonicalizes a MY phone to digits-only `60...` and validates the post-prefix local number.
 - Warehouse input is bounded and sanitized server-side; arbitrary client keys are not persisted.
-- Canonical warehouses have stable IDs, trimmed fields, exactly one default when non-empty, and default-first order.
+- Canonical warehouses have stable IDs, trimmed fields, exactly one default when non-empty, and default-first persisted order.
 - Disabled EasyParcel may retain an incomplete draft warehouse; activation still requires a complete default warehouse.
 - Save returns the canonical persisted settings used to reset the client snapshot.
 - Existing tenant ownership/IDOR guard remains unchanged.
@@ -31,7 +31,7 @@
 3. Add pure warehouse helpers:
    - trim/whitelist `id`, `label`, `name`, `phone`, `address1`, `address2`, `city`, `state`, `postcode`, `country`, `isDefault`;
    - normalize non-empty phones;
-   - enforce deterministic default-first order without in-place sort;
+   - enforce deterministic default-first persisted order without in-place sort;
    - assign the first warehouse as default only when none is marked;
    - clear extra defaults.
 4. Bound warehouse count and string lengths in the route. Return `400 INVALID_WAREHOUSE` for bad shape/format and keep `EP_NOT_READY` for activation without a complete default.
@@ -55,7 +55,7 @@
 ## Todo
 
 - [x] Add shared MY phone canonicalization.
-- [x] Add non-mutating warehouse canonicalization/default-first ordering.
+- [x] Add non-mutating warehouse canonicalization/default-first persisted ordering.
 - [x] Harden save request parsing and response contract.
 - [x] Preserve activation and tenant-isolation guards.
 

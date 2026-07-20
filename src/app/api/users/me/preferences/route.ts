@@ -17,9 +17,9 @@ export async function PATCH(req: NextRequest) {
         const body = await req.json()
         const { prefer_lang } = body
 
-        if (!prefer_lang || !['en', 'ms', 'vi'].includes(prefer_lang)) {
+        if (!prefer_lang || !['en', 'ms'].includes(prefer_lang)) {
             return NextResponse.json(
-                { error: 'Invalid prefer_lang value. Must be "en", "ms", or "vi".' },
+                { error: 'Invalid prefer_lang value. Must be "en" or "ms".' },
                 { status: 400 }
             )
         }

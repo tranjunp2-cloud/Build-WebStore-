@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Switch } from '@/components/ui/switch'
 import { PickupAddresses } from './pickup-addresses'
 import { EpWalletBanner } from './ep-wallet-banner'
 import { EpSetupStepper } from './ep-setup-stepper'
@@ -61,7 +62,7 @@ function initialWarehouses(config: EasyParcelIntegrationConfig | null): Warehous
 }
 
 function settingsSnapshot(enabled: boolean, warehouses: Warehouse[]): string {
-    return JSON.stringify({ enabled, warehouses: normalizeWarehouses(warehouses) })
+    return JSON.stringify({ enabled, warehouses: normalizeWarehouses(warehouses, { defaultFirst: false }) })
 }
 
 export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
@@ -102,7 +103,10 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const canonicalWarehouses = useMemo(() => normalizeWarehouses(warehouses), [warehouses])
+    const canonicalWarehouses = useMemo(
+        () => normalizeWarehouses(warehouses, { defaultFirst: false }),
+        [warehouses],
+    )
     const warehouseComplete = isWarehouseComplete(getDefaultWarehouse({ warehouses: canonicalWarehouses }))
     const localReady = warehouseComplete
     const isDirty = settingsSnapshot(enabled, canonicalWarehouses) !== savedSnapshot
@@ -198,7 +202,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     function handleWarehousesChange(next: Warehouse[]) {
-        const normalized = normalizeWarehouses(next)
+        const normalized = normalizeWarehouses(next, { defaultFirst: false })
         setWarehouses(normalized)
         if (normalized.length === 0) setEnabled(false)
     }
@@ -220,6 +224,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             }
 
             const savedEnabled = json.data?.enabled === true
+            // Draft order stays stable until Save succeeds. The API response is canonical
+            // default-first; applying it here triggers PickupAddresses' layout animation.
             const savedWarehouses = normalizeWarehouses(json.data?.warehouses ?? canonicalWarehouses)
             setEnabled(savedEnabled)
             setWarehouses(savedWarehouses)
@@ -242,7 +248,10 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     if (!connected) {
         return (
-            <div className="mt-5 min-w-0 overflow-hidden rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)]">
+            <div
+                className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
+                style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+            >
                 <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
                     <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))] sm:h-[52px] sm:w-[52px]">
@@ -291,7 +300,10 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     return (
-        <div className="mt-5 min-w-0 overflow-hidden rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)]">
+        <div
+            className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
+            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+        >
             <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                 <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))] sm:h-[52px] sm:w-[52px]">
@@ -302,14 +314,12 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         <p className="mt-1 break-words text-[13px] leading-relaxed text-[var(--dash-text-muted)]">{copy.connectDescription}</p>
                     </div>
                 </div>
-                <button type="button" role="switch" aria-checked={enabled} aria-label={copy.toggleLabel}
-                    onClick={handleToggleEnabled} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]">
-                    <span className={`relative h-6 w-11 rounded-full border transition-colors ${enabled
-                        ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]'
-                        : 'border-[var(--dash-border)] bg-[var(--dash-surface)]'}`}>
-                        <span className={`absolute left-[3px] top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full bg-[hsl(var(--primary-foreground))] shadow-sm transition-transform ${enabled ? 'translate-x-5' : ''}`} />
-                    </span>
-                </button>
+                <Switch
+                    checked={enabled}
+                    onCheckedChange={handleToggleEnabled}
+                    aria-label={copy.toggleLabel}
+                    className="mt-1"
+                />
             </div>
 
             <div className="border-t border-[var(--dash-border)]" />

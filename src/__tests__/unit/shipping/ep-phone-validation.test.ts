@@ -156,4 +156,16 @@ describe('warehouse canonicalization [TC-F36.202]', () => {
         expect(result[0].phone).toBe('60134567890')
         expect(input[0].phone).toBe('0123456789')
     })
+
+    it('can preserve draft order while changing the default flag', () => {
+        const input = [
+            { id: 'a', label: 'A', isDefault: false },
+            { id: 'b', label: 'B', isDefault: true },
+        ]
+
+        const result = normalizeWarehouses(input, { defaultFirst: false })
+
+        expect(result.map((warehouse) => warehouse.id)).toEqual(['a', 'b'])
+        expect(result.map((warehouse) => warehouse.isDefault)).toEqual([false, true])
+    })
 })

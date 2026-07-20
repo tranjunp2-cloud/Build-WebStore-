@@ -55,7 +55,7 @@ export function rmStringToSen(value: string | null | undefined): number | undefi
     return Number.isFinite(rm) ? Math.round(rm * 100) : undefined
 }
 
-// Reverse of SUBDIVISION_CODE_MAP — built once for seeding warehouse.state from EP province_code.
+// Reverse of SUBDIVISION_CODE_MAP — built once for syncing warehouse.state from EP province_code.
 const SUBDIVISION_NAME_MAP: Record<string, string> = Object.fromEntries(
     Object.entries(SUBDIVISION_CODE_MAP).map(([name, code]) => [code, name]),
 )

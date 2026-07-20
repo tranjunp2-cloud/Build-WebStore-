@@ -57,7 +57,10 @@ export function ShippingRatesCard({
     const [westExpanded, setWestExpanded] = useState(false)
     const westStates = westExpanded ? WEST_MY_STATES : WEST_STATES_PREVIEW
     return (
-        <div className="flex flex-col p-6 rounded-[16px] border border-solid border-dash-border bg-[hsl(var(--card))] gap-5">
+        <div
+            className="flex flex-col gap-5 rounded-[16px] p-4 sm:p-[25px]"
+            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+        >
             {/* Card header */}
             <div className="flex items-start gap-4">
                 <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">

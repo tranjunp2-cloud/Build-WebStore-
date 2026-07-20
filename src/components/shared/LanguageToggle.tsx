@@ -6,12 +6,12 @@ import { cn } from '@/lib/utils'
 interface LanguageToggleProps {
     /** Current CMS locale; kept as string so this presentation stays i18n-agnostic. */
     locale: string
-    setLocale: (locale: 'en' | 'ms' | 'vi') => void
+    setLocale: (locale: 'en' | 'ms') => void
     className?: string
 }
 
 /**
- * Presentation-only MY/EN/VI language control (extracted from the dashboard sidebar footer).
+ * Presentation-only MY/EN language control (extracted from the dashboard sidebar footer).
  * No i18n import — the caller passes `locale` + `setLocale`, so it stays pure/testable and
  * is reusable by both the dashboard sidebar and the editor drawer. Styling uses the same
  * `--dash-*` tokens + `#2DD4BF` accent as the original so the dashboard looks unchanged.
@@ -28,7 +28,7 @@ export function LanguageToggle({ locale, setLocale, className }: LanguageToggleP
         >
             <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
             <div className="flex flex-1 items-center gap-1">
-                {(['ms', 'en', 'vi'] as const).map((lang) => (
+                {(['ms', 'en'] as const).map((lang) => (
                     <button
                         key={lang}
                         type="button"

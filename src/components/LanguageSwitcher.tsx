@@ -5,13 +5,13 @@ import { Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LocaleFlag } from '@/components/locale-flag'
 
-const LABEL: Record<Locale, string> = { en: 'EN', ms: 'MY', vi: 'VI' }
-const LANGUAGE_NAME: Record<Locale, string> = { en: 'English', ms: 'Bahasa Melayu', vi: 'Tiếng Việt' }
-const LOCALES: Locale[] = ['en', 'ms', 'vi']
+const LABEL: Record<Locale, string> = { en: 'EN', ms: 'MY' }
+const LANGUAGE_NAME: Record<Locale, string> = { en: 'English', ms: 'Bahasa Melayu' }
+const LOCALES: Locale[] = ['en', 'ms']
 
 export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'minimal' | 'globe' | 'segmented' }) {
     const { locale, toggleLocale, setLocale } = useI18n()
-    const nextLocale = locale === 'en' ? 'ms' : locale === 'ms' ? 'vi' : 'en'
+    const nextLocale = locale === 'en' ? 'ms' : 'en'
 
     if (variant === 'globe') {
         return (

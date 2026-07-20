@@ -41,6 +41,10 @@ describe('PickupAddresses [TC-F36.204]', () => {
         const onChange = vi.fn()
         render(<PickupAddresses value={[warehouse]} onChange={onChange} />)
 
+        expect(screen.getByText('HQ').closest('[data-selected="true"]')).toHaveStyle({
+            border: '1px solid hsl(var(--primary))',
+            background: 'hsl(var(--primary)/0.06)',
+        })
         fireEvent.click(screen.getByRole('button', { name: 'Edit pickup address' }))
         expect(screen.getByLabelText(/Address line 2/i)).toHaveValue('Level 2')
         fireEvent.click(screen.getByRole('button', { name: 'Update address' }))
@@ -50,14 +54,46 @@ describe('PickupAddresses [TC-F36.204]', () => {
         ])
     })
 
+    it('renders the edit form directly below the address being edited', () => {
+        const branch = { ...warehouse, id: 'w-2', label: 'Branch', address2: undefined, isDefault: false }
+        const { container } = render(<PickupAddresses value={[warehouse, branch]} onChange={vi.fn()} />)
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Edit pickup address' })[0])
+
+        const rows = container.querySelectorAll('[data-warehouse-key]')
+        const formPanel = container.querySelector('[data-pickup-address-form]')
+        expect(rows[0].nextElementSibling).toBe(formPanel)
+        expect(formPanel?.nextElementSibling).toBe(rows[1])
+    })
+
     it('shows field errors instead of silently disabling the form action', () => {
         render(<PickupAddresses value={[]} onChange={vi.fn()} />)
 
+        const defaultCheckbox = screen.getByRole('checkbox', { name: /Set as default pickup address/i })
+        expect(defaultCheckbox).toBeChecked()
+        expect(defaultCheckbox).toBeDisabled()
+        fireEvent.click(defaultCheckbox)
+        expect(defaultCheckbox).toBeChecked()
         fireEvent.click(screen.getByRole('button', { name: 'Add address' }))
 
         expect(screen.getAllByText('Required')).toHaveLength(4)
         expect(screen.getByText('Enter a valid Malaysian phone number.')).toBeInTheDocument()
         expect(screen.getByText('Enter a 5-digit postcode.')).toBeInTheDocument()
+    })
+
+    it('allows the new address default checkbox to toggle when a default already exists', () => {
+        render(<PickupAddresses value={[warehouse]} onChange={vi.fn()} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add address' }))
+        const defaultControls = screen.getAllByRole('checkbox', { name: /Set as default pickup address/i })
+        const formDefaultCheckbox = defaultControls[defaultControls.length - 1]
+
+        expect(formDefaultCheckbox).toBeEnabled()
+        expect(formDefaultCheckbox).not.toBeChecked()
+        fireEvent.click(formDefaultCheckbox)
+        expect(formDefaultCheckbox).toBeChecked()
+        fireEvent.click(formDefaultCheckbox)
+        expect(formDefaultCheckbox).not.toBeChecked()
     })
 
     it('does not mutate the draft until deletion is confirmed', async () => {
@@ -72,7 +108,7 @@ describe('PickupAddresses [TC-F36.204]', () => {
         await waitFor(() => expect(onChange).toHaveBeenCalledWith([]))
     })
 
-    it('promotes a newly selected default instead of keeping the old default', () => {
+    it('changes the default styling without reordering pickup addresses', () => {
         const onChange = vi.fn()
         const branch = { ...warehouse, id: 'w-2', label: 'Branch', address2: undefined, isDefault: false }
         render(<PickupAddresses value={[warehouse, branch]} onChange={onChange} />)
@@ -83,7 +119,7 @@ describe('PickupAddresses [TC-F36.204]', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Update address' }))
 
         const next = onChange.mock.calls[0][0]
-        expect(next.map((item: typeof warehouse) => item.id)).toEqual(['w-2', 'w-1'])
-        expect(next.map((item: typeof warehouse) => item.isDefault)).toEqual([true, false])
+        expect(next.map((item: typeof warehouse) => item.id)).toEqual(['w-1', 'w-2'])
+        expect(next.map((item: typeof warehouse) => item.isDefault)).toEqual([false, true])
     })
 })

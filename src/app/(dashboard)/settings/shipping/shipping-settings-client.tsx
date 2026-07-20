@@ -247,24 +247,18 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
                 defaultValue={initialTab ?? (epConfig?.enabled ? 'easyparcel' : 'flat-rate')}
                 onValueChange={persistTab}
             >
-                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1 sm:inline-grid sm:w-auto">
-                    <TabsTrigger
-                        value="flat-rate"
-                        className="flex min-h-11 min-w-0 flex-col items-center gap-1 rounded-md px-2 py-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm sm:flex-row sm:gap-2 sm:px-3"
-                    >
-                        <Calculator size={15} />
-                        <span className="min-w-0 text-center text-[13px] font-semibold sm:text-[14px]">{ep.tabFlatRate}</span>
+                <TabsList variant="underline">
+                    <TabsTrigger value="flat-rate" variant="underline">
+                        <Calculator className="h-4 w-4" />
+                        <span>{ep.tabFlatRate}</span>
                         <StatusBadge
                             variant={epLive ? 'fallback' : (flatRateLive ? 'live' : 'off')}
                             label={epLive ? ep.statusFallback : (flatRateLive ? ep.statusLive : ep.statusOff)}
                         />
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="easyparcel"
-                        className="flex min-h-11 min-w-0 flex-col items-center gap-1 rounded-md px-2 py-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm sm:flex-row sm:gap-2 sm:px-3"
-                    >
-                        <Truck size={15} />
-                        <span className="min-w-0 text-center text-[13px] font-semibold sm:text-[14px]">{ep.tabEasyParcel}</span>
+                    <TabsTrigger value="easyparcel" variant="underline">
+                        <Truck className="h-4 w-4" />
+                        <span>{ep.tabEasyParcel}</span>
                         <StatusBadge
                             variant={epLive ? (epConnected ? 'connected' : 'not-connected') : 'off'}
                             label={epLive ? (epConnected ? ep.statusConnected : ep.statusNotConnected) : ep.statusOff}

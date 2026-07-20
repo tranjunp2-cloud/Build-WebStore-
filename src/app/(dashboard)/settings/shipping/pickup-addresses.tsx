@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, MapPin, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,7 @@ interface PickupAddressesProps {
 export function PickupAddresses({ value, onChange, onEditingChange, active = false }: PickupAddressesProps) {
     const { t, ti } = useI18n()
     const copy = t.dashboard.settings.shipping.easyParcel
-    const warehouses = useMemo(() => normalizeWarehouses(value), [value])
+    const warehouses = useMemo(() => normalizeWarehouses(value, { defaultFirst: false }), [value])
     const [formOpen, setFormOpen] = useState(warehouses.length === 0)
     const [editingKey, setEditingKey] = useState<string | null>(null)
     const [form, setForm] = useState<FormState>(
@@ -72,6 +73,8 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
     const [selectedDistrictId, setSelectedDistrictId] = useState('')
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
+    const prefersReducedMotion = useReducedMotion()
+    const mustBeDefault = editingKey === null && !warehouses.some((warehouse) => warehouse.isDefault)
 
     useEffect(() => {
         onEditingChange?.(formOpen)
@@ -152,7 +155,7 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
     }
 
     function openAdd() {
-        setForm({ ...emptyForm, isDefault: warehouses.length === 0 })
+        setForm({ ...emptyForm, isDefault: !warehouses.some((warehouse) => warehouse.isDefault) })
         setEditingKey(null)
         setShowErrors(false)
         setSelectedStateId('')
@@ -210,7 +213,7 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
             state: form.state.trim(),
             postcode: form.postcode.trim(),
             country: 'MY',
-            isDefault: form.isDefault,
+            isDefault: mustBeDefault || form.isDefault,
         }
         let next = editingKey
             ? warehouses.map((warehouse, index) => (whKey(warehouse, index) === editingKey ? entry : warehouse))
@@ -221,14 +224,14 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                 isDefault: warehouse === entry,
             }))
         }
-        onChange(normalizeWarehouses(next))
+        onChange(normalizeWarehouses(next, { defaultFirst: false }))
         resetForm()
     }
 
     function removePending() {
         if (!pendingDelete) return
         const next = warehouses.filter((warehouse, index) => whKey(warehouse, index) !== pendingDelete.key)
-        onChange(normalizeWarehouses(next))
+        onChange(normalizeWarehouses(next, { defaultFirst: false }))
         setPendingDelete(null)
     }
 
@@ -236,12 +239,112 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
         onChange(normalizeWarehouses(warehouses.map((warehouse, index) => ({
             ...warehouse,
             isDefault: whKey(warehouse, index) === key,
-        }))))
+        })), { defaultFirst: false }))
     }
 
     const defaultWarehouse = warehouses.find((warehouse) => warehouse.isDefault) ?? warehouses[0]
     const showEastMalaysiaWarning = defaultWarehouse && EAST_MY_STATES.has(defaultWarehouse.state?.trim() || '')
     const deletingLastActive = active && warehouses.length === 1
+    const formPanel = formOpen ? (
+        <div data-pickup-address-form className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4 sm:p-5">
+            <div className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-[var(--dash-text-muted)]" />
+                <span className="text-[11px] font-bold uppercase text-[var(--dash-text-muted)]">
+                    {editingKey ? copy.editAddress : copy.addPickupAddress}
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="pa-label" className="text-[12px] text-[var(--dash-text)]">{copy.fieldLabel}</Label>
+                    <input id="pa-label" value={form.label} onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                        placeholder={copy.labelPlaceholder} className={EP_INPUT} aria-invalid={showErrors && !!errors.label}
+                        aria-describedby={showErrors && errors.label ? 'pa-label-error' : undefined} />
+                    {fieldError('label')}
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="pa-phone" className="text-[12px] text-[var(--dash-text)]">{copy.senderPhone}</Label>
+                    <input id="pa-phone" value={form.phone} onChange={(event) => setForm((current) => ({
+                        ...current,
+                        phone: event.target.value.replace(/\D/g, '').slice(0, 15),
+                    }))} inputMode="numeric" autoComplete="tel" placeholder={copy.phonePlaceholder} className={EP_INPUT}
+                        aria-invalid={showErrors && !!errors.phone} aria-describedby={showErrors && errors.phone ? 'pa-phone-error' : undefined} />
+                    {fieldError('phone')}
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pa-address1" className="text-[12px] text-[var(--dash-text)]">{copy.addressLine1}</Label>
+                <input id="pa-address1" value={form.address1} onChange={(event) => setForm((current) => ({ ...current, address1: event.target.value }))}
+                    placeholder={copy.addressLine1} className={EP_INPUT} aria-invalid={showErrors && !!errors.address1}
+                    aria-describedby={showErrors && errors.address1 ? 'pa-address1-error' : undefined} />
+                {fieldError('address1')}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pa-address2" className="text-[12px] text-[var(--dash-text)]">
+                    {copy.addressLine2} <span className="font-normal text-[var(--dash-text-muted)]">({copy.optional})</span>
+                </Label>
+                <input id="pa-address2" value={form.address2} onChange={(event) => setForm((current) => ({ ...current, address2: event.target.value }))}
+                    placeholder={copy.addressLine2} className={EP_INPUT} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="pa-state" className="text-[12px] text-[var(--dash-text)]">{copy.state}</Label>
+                    <Select value={selectedStateId || undefined} onValueChange={handleStateChange} disabled={statesLoading}>
+                        <SelectTrigger id="pa-state" className={EP_SELECT} aria-invalid={showErrors && !!errors.state}>
+                            <SelectValue placeholder={statesLoading ? copy.loading : copy.selectState} />
+                        </SelectTrigger>
+                        <SelectContent>{states.map((state) => <SelectItem key={state.id} value={String(state.id)}>{state.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {fieldError('state')}
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="pa-city" className="text-[12px] text-[var(--dash-text)]">{copy.city}</Label>
+                    <Select value={selectedDistrictId || undefined} onValueChange={handleDistrictChange} disabled={!selectedStateId || districtsLoading}>
+                        <SelectTrigger id="pa-city" className={EP_SELECT} aria-invalid={showErrors && !!errors.city}>
+                            <SelectValue placeholder={districtsLoading ? copy.loading : copy.selectCity} />
+                        </SelectTrigger>
+                        <SelectContent>{districts.map((district) => <SelectItem key={district.id} value={String(district.id)}>{district.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {fieldError('city')}
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="pa-postcode" className="text-[12px] text-[var(--dash-text)]">{copy.postcode}</Label>
+                    <Select value={form.postcode || undefined} onValueChange={(postcode) => setForm((current) => ({ ...current, postcode }))}
+                        disabled={!selectedDistrictId || postcodesLoading}>
+                        <SelectTrigger id="pa-postcode" className={EP_SELECT} aria-invalid={showErrors && !!errors.postcode}>
+                            <SelectValue placeholder={postcodesLoading ? copy.loading : copy.selectPostcode} />
+                        </SelectTrigger>
+                        <SelectContent>{postcodeOpts.map((postcode) => <SelectItem key={postcode} value={postcode}>{postcode}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {fieldError('postcode')}
+                </div>
+            </div>
+
+            <label className={`flex min-h-11 select-none items-center gap-2 ${mustBeDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <Checkbox
+                    checked={mustBeDefault || form.isDefault}
+                    disabled={mustBeDefault}
+                    onCheckedChange={(checked) => setForm((current) => ({ ...current, isDefault: checked === true }))}
+                    className="h-5 w-5"
+                    style={{
+                        border: `1px solid ${mustBeDefault || form.isDefault ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}`,
+                        background: mustBeDefault || form.isDefault ? 'hsl(var(--primary))' : 'transparent',
+                    }}
+                />
+                <span className="text-[12px] text-[var(--dash-text-muted)]">{copy.setAsDefault}</span>
+            </label>
+
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <Button variant="dashSecondary" size="dash" onClick={resetForm} className="h-11 w-full sm:w-auto">{copy.cancel}</Button>
+                <Button variant="dashPrimary" size="dash" onClick={commit} className="h-11 w-full sm:w-auto">
+                    {editingKey ? copy.updateAddress : copy.addAddress}
+                </Button>
+            </div>
+        </div>
+    ) : null
 
     return (
         <div className="flex min-w-0 flex-col gap-4">
@@ -270,139 +373,62 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                 const key = whKey(warehouse, index)
                 const selected = !!warehouse.isDefault
                 return (
-                    <div
-                        key={key}
-                        className={`flex min-w-0 items-start gap-3 rounded-lg border p-3 sm:p-4 ${selected
-                            ? 'border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.05)]'
-                            : 'border-[var(--dash-border)] bg-[var(--dash-surface)]'}`}
-                    >
-                        <Checkbox
-                            checked={selected}
-                            onCheckedChange={() => setDefault(key)}
-                            disabled={formOpen}
-                            aria-label={copy.setDefaultAria}
-                            className="mt-3 h-5 w-5"
-                        />
-                        <div className="min-w-0 flex-1 py-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="break-words text-[13px] font-semibold text-[var(--dash-text)]">{whLabel(warehouse, copy.pickupFallback)}</span>
-                                {selected && (
-                                    <span className="flex items-center gap-1 text-[11px] font-medium text-[hsl(var(--primary))]">
-                                        <Star className="h-3 w-3" /> {copy.defaultLabel}
-                                    </span>
+                    <Fragment key={key}>
+                        <motion.div
+                            layout="position"
+                            transition={prefersReducedMotion
+                                ? { duration: 0 }
+                                : { type: 'spring', stiffness: 420, damping: 36 }}
+                            data-warehouse-key={key}
+                            data-selected={selected}
+                            className="flex min-w-0 items-start gap-3 rounded-lg p-3 sm:p-4"
+                            style={selected
+                                ? { border: '1px solid hsl(var(--primary))', background: 'hsl(var(--primary)/0.06)' }
+                                : { border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }}
+                        >
+                            <Checkbox
+                                checked={selected}
+                                onCheckedChange={() => setDefault(key)}
+                                disabled={formOpen}
+                                aria-label={copy.setDefaultAria}
+                                className="mt-3 h-5 w-5"
+                                style={{
+                                    border: `1px solid ${selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}`,
+                                    background: selected ? 'hsl(var(--primary))' : 'transparent',
+                                }}
+                            />
+                            <div className="min-w-0 flex-1 py-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="break-words text-[13px] font-semibold text-[var(--dash-text)]">{whLabel(warehouse, copy.pickupFallback)}</span>
+                                    {selected && (
+                                        <span className="flex items-center gap-1 text-[11px] font-medium text-[hsl(var(--primary))]">
+                                            <Star className="h-3 w-3" /> {copy.defaultLabel}
+                                        </span>
+                                    )}
+                                </div>
+                                {whAddressLine(warehouse) && (
+                                    <p className="mt-0.5 break-words text-[12px] leading-relaxed text-[var(--dash-text-muted)]">
+                                        {whAddressLine(warehouse)}
+                                    </p>
                                 )}
                             </div>
-                            {whAddressLine(warehouse) && (
-                                <p className="mt-0.5 break-words text-[12px] leading-relaxed text-[var(--dash-text-muted)]">
-                                    {whAddressLine(warehouse)}
-                                </p>
-                            )}
-                        </div>
-                        {!formOpen && <div className="flex shrink-0 items-center gap-1">
-                            <button type="button" onClick={() => openEdit(warehouse, index)} aria-label={copy.editAddressAria}
-                                className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--dash-text-muted)] hover:bg-[var(--dash-surface-hover)] hover:text-[var(--dash-text)]">
-                                <Pencil className="h-4 w-4" />
-                            </button>
-                            <button type="button" onClick={() => setPendingDelete({ warehouse, key })} aria-label={copy.deleteAddressAria}
-                                className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--dash-text-muted)] hover:bg-[hsl(var(--destructive)/0.08)] hover:text-[hsl(var(--destructive))]">
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                        </div>}
-                    </div>
+                            {!formOpen && <div className="flex shrink-0 items-center gap-1">
+                                <button type="button" onClick={() => openEdit(warehouse, index)} aria-label={copy.editAddressAria}
+                                    className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--dash-text-muted)] hover:bg-[var(--dash-surface-hover)] hover:text-[var(--dash-text)]">
+                                    <Pencil className="h-4 w-4" />
+                                </button>
+                                <button type="button" onClick={() => setPendingDelete({ warehouse, key })} aria-label={copy.deleteAddressAria}
+                                    className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--dash-text-muted)] hover:bg-[hsl(var(--destructive)/0.08)] hover:text-[hsl(var(--destructive))]">
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>}
+                        </motion.div>
+                        {editingKey === key && formPanel}
+                    </Fragment>
                 )
             })}
 
-            {formOpen && (
-                <div className="flex min-w-0 flex-col gap-4 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-surface)] p-4 sm:p-5">
-                    <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 text-[var(--dash-text-muted)]" />
-                        <span className="text-[11px] font-bold uppercase text-[var(--dash-text-muted)]">
-                            {editingKey ? copy.editAddress : copy.addPickupAddress}
-                        </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                            <Label htmlFor="pa-label" className="text-[12px] text-[var(--dash-text)]">{copy.fieldLabel}</Label>
-                            <input id="pa-label" value={form.label} onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
-                                placeholder={copy.labelPlaceholder} className={EP_INPUT} aria-invalid={showErrors && !!errors.label}
-                                aria-describedby={showErrors && errors.label ? 'pa-label-error' : undefined} />
-                            {fieldError('label')}
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                            <Label htmlFor="pa-phone" className="text-[12px] text-[var(--dash-text)]">{copy.senderPhone}</Label>
-                            <input id="pa-phone" value={form.phone} onChange={(event) => setForm((current) => ({
-                                ...current,
-                                phone: event.target.value.replace(/\D/g, '').slice(0, 15),
-                            }))} inputMode="numeric" autoComplete="tel" placeholder={copy.phonePlaceholder} className={EP_INPUT}
-                                aria-invalid={showErrors && !!errors.phone} aria-describedby={showErrors && errors.phone ? 'pa-phone-error' : undefined} />
-                            {fieldError('phone')}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="pa-address1" className="text-[12px] text-[var(--dash-text)]">{copy.addressLine1}</Label>
-                        <input id="pa-address1" value={form.address1} onChange={(event) => setForm((current) => ({ ...current, address1: event.target.value }))}
-                            placeholder={copy.addressLine1} className={EP_INPUT} aria-invalid={showErrors && !!errors.address1}
-                            aria-describedby={showErrors && errors.address1 ? 'pa-address1-error' : undefined} />
-                        {fieldError('address1')}
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="pa-address2" className="text-[12px] text-[var(--dash-text)]">
-                            {copy.addressLine2} <span className="font-normal text-[var(--dash-text-muted)]">({copy.optional})</span>
-                        </Label>
-                        <input id="pa-address2" value={form.address2} onChange={(event) => setForm((current) => ({ ...current, address2: event.target.value }))}
-                            placeholder={copy.addressLine2} className={EP_INPUT} />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                            <Label htmlFor="pa-state" className="text-[12px] text-[var(--dash-text)]">{copy.state}</Label>
-                            <Select value={selectedStateId || undefined} onValueChange={handleStateChange} disabled={statesLoading}>
-                                <SelectTrigger id="pa-state" className={EP_SELECT} aria-invalid={showErrors && !!errors.state}>
-                                    <SelectValue placeholder={statesLoading ? copy.loading : copy.selectState} />
-                                </SelectTrigger>
-                                <SelectContent>{states.map((state) => <SelectItem key={state.id} value={String(state.id)}>{state.name}</SelectItem>)}</SelectContent>
-                            </Select>
-                            {fieldError('state')}
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                            <Label htmlFor="pa-city" className="text-[12px] text-[var(--dash-text)]">{copy.city}</Label>
-                            <Select value={selectedDistrictId || undefined} onValueChange={handleDistrictChange} disabled={!selectedStateId || districtsLoading}>
-                                <SelectTrigger id="pa-city" className={EP_SELECT} aria-invalid={showErrors && !!errors.city}>
-                                    <SelectValue placeholder={districtsLoading ? copy.loading : copy.selectCity} />
-                                </SelectTrigger>
-                                <SelectContent>{districts.map((district) => <SelectItem key={district.id} value={String(district.id)}>{district.name}</SelectItem>)}</SelectContent>
-                            </Select>
-                            {fieldError('city')}
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                            <Label htmlFor="pa-postcode" className="text-[12px] text-[var(--dash-text)]">{copy.postcode}</Label>
-                            <Select value={form.postcode || undefined} onValueChange={(postcode) => setForm((current) => ({ ...current, postcode }))}
-                                disabled={!selectedDistrictId || postcodesLoading}>
-                                <SelectTrigger id="pa-postcode" className={EP_SELECT} aria-invalid={showErrors && !!errors.postcode}>
-                                    <SelectValue placeholder={postcodesLoading ? copy.loading : copy.selectPostcode} />
-                                </SelectTrigger>
-                                <SelectContent>{postcodeOpts.map((postcode) => <SelectItem key={postcode} value={postcode}>{postcode}</SelectItem>)}</SelectContent>
-                            </Select>
-                            {fieldError('postcode')}
-                        </div>
-                    </div>
-
-                    <label className="flex min-h-11 cursor-pointer select-none items-center gap-2">
-                        <Checkbox checked={form.isDefault} onCheckedChange={(checked) => setForm((current) => ({ ...current, isDefault: checked === true }))} />
-                        <span className="text-[12px] text-[var(--dash-text-muted)]">{copy.setAsDefault}</span>
-                    </label>
-
-                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                        <Button variant="dashSecondary" size="dash" onClick={resetForm} className="h-11 w-full sm:w-auto">{copy.cancel}</Button>
-                        <Button variant="dashPrimary" size="dash" onClick={commit} className="h-11 w-full sm:w-auto">
-                            {editingKey ? copy.updateAddress : copy.addAddress}
-                        </Button>
-                    </div>
-                </div>
-            )}
+            {editingKey === null && formPanel}
 
             <ConfirmModal
                 open={pendingDelete !== null}

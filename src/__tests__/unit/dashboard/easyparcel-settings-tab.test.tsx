@@ -22,12 +22,26 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/(dashboard)/settings/shipping/pickup-addresses', () => ({
     PickupAddresses: ({ value, onChange }: { value: Array<Record<string, unknown>>; onChange: (next: Array<Record<string, unknown>>) => void }) => (
-        <button
-            type="button"
-            onClick={() => onChange([{ ...value[0], phone: '013-456 7890' }])}
-        >
-            Edit pickup draft
-        </button>
+        <div>
+            <div data-testid="warehouse-order">{value.map((warehouse) => warehouse.id).join(',')}</div>
+            <button
+                type="button"
+                onClick={() => onChange([{ ...value[0], phone: '013-456 7890' }])}
+            >
+                Edit pickup draft
+            </button>
+            {value.length > 1 && (
+                <button
+                    type="button"
+                    onClick={() => onChange(value.map((warehouse, index) => ({
+                        ...warehouse,
+                        isDefault: index === 1,
+                    })))}
+                >
+                    Select second default
+                </button>
+            )}
+        </div>
     ),
 }))
 
@@ -118,5 +132,40 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
         await waitFor(() => {
             expect(screen.queryByRole('button', { name: 'Save Settings' })).not.toBeInTheDocument()
         })
+    })
+
+    it('keeps draft order until Save succeeds, then applies the API default-first order', async () => {
+        const branch = {
+            ...initialEpConfig.warehouses[0],
+            id: 'w-2',
+            label: 'Branch',
+            isDefault: false,
+        }
+        const config = {
+            ...initialEpConfig,
+            warehouses: [initialEpConfig.warehouses[0], branch],
+        }
+        vi.mocked(global.fetch).mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                success: true,
+                data: {
+                    enabled: true,
+                    warehouses: [
+                        { ...branch, isDefault: true },
+                        { ...initialEpConfig.warehouses[0], isDefault: false },
+                    ],
+                },
+            }),
+        } as Response)
+        render(<EasyParcelSettingsTab tenantId="tenant-1" initialEpConfig={config} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select second default' }))
+        expect(screen.getByTestId('warehouse-order')).toHaveTextContent('w-1,w-2')
+        fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }))
+
+        await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Save Settings' })).not.toBeInTheDocument())
+        expect(screen.getByTestId('warehouse-order')).toHaveTextContent('w-2,w-1')
     })
 })
