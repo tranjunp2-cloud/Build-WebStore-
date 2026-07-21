@@ -136,7 +136,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Action CTAs (pricing)', () => 
     })
 
     // ── TC-F01.CTA-DRAG-06: Pricing with empty pages → fallback /contact ─
-    it('TC-F01.CTA-DRAG-06: pricing with pages=[] → ctaUrl becomes /contact (fallback)', () => {
+    it('TC-F01.CTA-DRAG-06: pricing with pages=[] → ctaUrl falls back to homepage', () => {
         const block = {
             blockType: 'pricing',
             title: 'Plans',
@@ -148,7 +148,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Action CTAs (pricing)', () => 
         const result = patchBlockCtaUrls(block, pagesEmpty)
 
         expect(result.plans).toHaveLength(1)
-        expect(result.plans[0].ctaUrl).toBe('/contact')
+        expect(result.plans[0].ctaUrl).toBe('/')
     })
 
     it('pricing with resolved CTA URL → preserve resolved URL (no fallback)', () => {
@@ -424,7 +424,7 @@ describe('[TC-F01.CTA-DRAG] patchLocaleInitCtaUrls — en/ms locale slots', () =
         expect(result.ms.ctaButtons[0].url).toBe('/about')
     })
 
-    it('patchLocaleInitCtaUrls: pricing in locale slots → fallback /contact preserved', () => {
+    it('patchLocaleInitCtaUrls: pricing in locale slots → fallback points to homepage', () => {
         const localeInit = {
             en: {
                 plans: [
@@ -440,8 +440,8 @@ describe('[TC-F01.CTA-DRAG] patchLocaleInitCtaUrls — en/ms locale slots', () =
 
         const result = patchLocaleInitCtaUrls(localeInit, pagesEmpty)
 
-        expect(result.en.plans[0].ctaUrl).toBe('/contact')
-        expect(result.ms.plans[0].ctaUrl).toBe('/contact')
+        expect(result.en.plans[0].ctaUrl).toBe('/')
+        expect(result.ms.plans[0].ctaUrl).toBe('/')
     })
 
     it('patchLocaleInitCtaUrls: non-CTA content → unchanged', () => {

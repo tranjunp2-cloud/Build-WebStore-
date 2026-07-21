@@ -123,11 +123,11 @@ export type PreparedBlogPost = {
  * Phase 1 — no site dependency: AI seed topics + full article bodies (3
  * parallel GPT calls, 12s-bounded each) + thumbnails. gen-perf blog-inline:
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
- * insert all 3 posts BEFORE the `done` event; also reused by the legacy
- * post-response `seedBlogPosts` path.
+ * insert all 3 posts BEFORE the `done` event; also reused by the fallback
+ * `seedBlogPosts` path.
  * Returns [] when the tenant already has posts (regenerate — nothing to
- * seed), null when preparation failed entirely (caller falls back to legacy
- * post-response seeding). Never throws.
+ * seed), null when preparation failed entirely (caller falls back to the
+ * synchronous static seeding path). Never throws.
  */
 export async function prepareBlogPosts(opts: {
     payload: BasePayload
@@ -148,7 +148,7 @@ export async function prepareBlogPosts(opts: {
             collection: 'blogs',
             where: { tenant: { equals: tenantId } },
         })
-        if (existing.totalDocs > 0) return []
+        if (existing.totalDocs >= 3) return []
 
         let seeds: AnyBlogSeed[] = []
         try {
@@ -273,7 +273,7 @@ export async function persistBlogPosts(
     return count
 }
 
-/** Legacy single-shot path (post-response fallback): prepare + persist. */
+/** Single-shot fallback: prepare + persist inside the completion barrier. */
 export async function seedBlogPosts(
     payload: BasePayload,
     tenantId: number | string,

@@ -3,7 +3,7 @@
  *
  * POST /api/e2e/ensure-test-user
  *   headers: Authorization: Bearer {E2E_SETUP_SECRET}
- *   body: { email: string, password: string }
+ *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string }
  *
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse body
-    let body: { email?: string; password?: string }
+    let body: { email?: string; password?: string; tenantSlug?: string; tenantName?: string }
     try {
         body = await req.json()
     } catch {
@@ -69,13 +69,23 @@ export async function POST(req: NextRequest) {
         )
     }
 
+    const requestedTenantSlug = body.tenantSlug?.trim().toLowerCase()
+    if (requestedTenantSlug && !/^e2e-[a-z0-9-]{3,58}$/.test(requestedTenantSlug)) {
+        return NextResponse.json(
+            { error: 'tenantSlug must start with e2e- and contain only lowercase letters, numbers, or hyphens' },
+            { status: 400 },
+        )
+    }
+    const tenantSlug = requestedTenantSlug || E2E_TENANT_SLUG
+    const tenantName = body.tenantName?.trim().slice(0, 100) || E2E_TENANT_NAME
+
     try {
         const payload = await getPayload({ config })
 
         // Step 1: find or create E2E tenant
         const tenantsResult = await payload.find({
             collection: 'tenants',
-            where: { slug: { equals: E2E_TENANT_SLUG } },
+            where: { slug: { equals: tenantSlug } },
             limit: 1,
             overrideAccess: true,
         })
@@ -88,8 +98,8 @@ export async function POST(req: NextRequest) {
                 collection: 'tenants',
                 overrideAccess: true,
                 data: {
-                    name: E2E_TENANT_NAME,
-                    slug: E2E_TENANT_SLUG,
+                    name: tenantName,
+                    slug: tenantSlug,
                     plan: 'free',
                     onboardingCompleted: true,
                 },

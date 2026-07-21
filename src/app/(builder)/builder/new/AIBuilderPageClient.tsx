@@ -193,8 +193,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
-    const sseRetryCountRef = useRef(0)
-    const sseRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
     const [showDraftDialog, setShowDraftDialog] = useState(false)
     const [showPaywall, setShowPaywall] = useState(false)
     // F26: pre-generation locale confirm modal state
@@ -542,7 +540,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         return () => {
             abortControllerRef.current?.abort()
             clearGenerationTimers()
-            if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
         }
     }, [clearGenerationTimers])
 
@@ -672,51 +669,20 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 // User cancelled or hard timeout — already handled
                 return
             }
-            // SSE disconnect or network error — show banner, auto-retry up to 3x
+            // The POST may already be running server-side even when no SSE
+            // frame reached the browser. Never auto-submit a second generation.
             const genError = getGenerationError(0, 'SSE_DISCONNECT')
-            const retryIntervals = genError.retryIntervals || [2000, 5000, 10000]
-            const maxRetries = genError.maxRetries || 3
-            const currentRetry = sseRetryCountRef.current
-
-            if (shouldRetryGenerationStream({ receivedAnyEvent, retryCount: currentRetry, maxRetries })) {
-                const delay = retryIntervals[currentRetry] || retryIntervals[retryIntervals.length - 1]
-                sseRetryCountRef.current += 1
-                toast.warning('Lost connection. Retrying...', { duration: delay })
-                // Store timer ref to prevent duplicate streams on new generation start
-                if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
-                sseRetryTimerRef.current = setTimeout(() => {
-                    sseRetryTimerRef.current = null
-                    void startSSEGeneration(info, extraInstructions, briefSnapshot, generationLocale, generationRequestId)
-                }, delay)
-                return
-            }
-
-            if (receivedAnyEvent) {
-                sseRetryCountRef.current = 0
-                const message = 'Connection lost after generation started. Check the dashboard for its latest status.'
-                setError({ code: genError.code, message, retryable: false })
-                setStep('info')
-                toast.warning(message, {
-                    duration: 10000,
-                    action: {
-                        label: 'Go to Dashboard',
-                        onClick: () => router.push('/dashboard?ai_status=generating'),
-                    },
-                })
-                return
-            }
-
-            // All retries exhausted — show fatal error, redirect to dashboard
-            sseRetryCountRef.current = 0
-            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
-            setError({ code: genError.code, message, retryable: genError.retryable })
+            const mayRetry = shouldRetryGenerationStream({ requestSubmitted: true })
+            const message = receivedAnyEvent
+                ? 'Connection lost after generation started. Check the dashboard for its latest status.'
+                : 'Connection lost while the request may still be processing. Check the dashboard before trying again.'
+            setError({ code: genError.code, message, retryable: mayRetry })
             setStep('info')
-            toast.error('Cannot create website', {
-                description: 'Connection failed after multiple retries.',
+            toast.warning(message, {
                 duration: 10000,
                 action: {
                     label: 'Go to Dashboard',
-                    onClick: () => router.push('/dashboard?ai_status=failed'),
+                    onClick: () => router.push('/dashboard?ai_status=generating'),
                 },
             })
         } finally {
@@ -727,9 +693,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         const briefSnapshot = useBuilderStore.getState().contentBrief
-        sseRetryCountRef.current = 0
-        if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
-
         // F26: detect input language — only intercept when it's not EN or BM
         const text = [info.businessName, info.shortDescription, info.products].filter(Boolean).join(' ')
         const detectedLocale = (info.language && info.language !== 'auto')

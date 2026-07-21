@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
-// All model calls and retries are explicitly bounded below this route budget.
-// Vercel after() work also shares this duration, so optional seeders must remain
-// best-effort and may not hold the SSE completion barrier.
+// Finish or fail explicitly before Vercel's 60-second hard limit so the client
+// always receives a terminal SSE event and partial sites stay non-completed.
 export const maxDuration = 60
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
@@ -111,11 +110,38 @@ interface AIBlock {
  */
 export async function POST(req: NextRequest) {
     const startTime = Date.now()
+    const routeDeadlineAt = startTime + 55_000
+    let routeDeadlineExceeded = false
     const generationRequestId = normalizeGenerationRequestId(req.headers.get('x-generation-request-id'))
     const generationTimings = new GenerationTimings(startTime)
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
+
+    const assertRouteDeadline = () => {
+        if (routeDeadlineExceeded || Date.now() >= routeDeadlineAt) {
+            routeDeadlineExceeded = true
+            throw new Error('GENERATION_DEADLINE_EXCEEDED')
+        }
+    }
+
+    const withRouteDeadline = async <T>(fn: () => Promise<T>): Promise<T> => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        try {
+            return await Promise.race([
+                fn(),
+                new Promise<T>((_resolve, reject) => {
+                    const remaining = Math.max(0, routeDeadlineAt - Date.now())
+                    timer = setTimeout(() => {
+                        routeDeadlineExceeded = true
+                        reject(new Error('GENERATION_DEADLINE_EXCEEDED'))
+                    }, remaining)
+                }),
+            ])
+        } finally {
+            if (timer) clearTimeout(timer)
+        }
+    }
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -451,6 +477,7 @@ export async function POST(req: NextRequest) {
             createdPages: Record<string, unknown>[]
             pageFailures: Array<{ slug: string; title: string; error: string }>
             productsCreatedCount: number
+            blogsReadyCount: number
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             blockImageStats: { succeeded: number; failed: number }
@@ -637,12 +664,11 @@ export async function POST(req: NextRequest) {
             // NOT during it — the site's parallel split calls own the OpenAI
             // budget in that window; blog's ~4 GPT calls competing there
             // inflated the `ai` phase (measured 2026-07-08). It now overlaps the
-            // remaining media + db + persist-grace window (~25s), still landing
-            // the 3 posts before `done` in the common case; if it drags past the
-            // grace race below it falls back to post-response after() seeding.
+            // remaining media + DB work. The completion barrier below waits for
+            // these rows; required blog content is never deferred past `done`.
             // Thumbnail search is intentionally independent from sample-product
             // completion so a slow product upload cannot hold the blog tail.
-            // Never rejects: null = prep failed → legacy seeding at the persist site.
+            // Never rejects: null = prep failed → synchronous fallback seeding.
             const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
                 payload,
                 tenantId: resolvedTenantId,
@@ -726,14 +752,14 @@ export async function POST(req: NextRequest) {
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 const aiPagesForMedia = (result as { pages?: unknown[] }).pages
                 if (!Array.isArray(aiPagesForMedia) || aiPagesForMedia.length === 0) {
-                    // Single-page AI responses are expanded into Home + three
+                    // Single-page AI responses are expanded into Home + four
                     // subpages later by buildGeneratedPages. Reserve their hero
                     // photos in this same batch so cloning the base hero does not
                     // clone its Media ID onto every page as well.
                     const hasFallbackHero = Array.isArray(result.blocks)
                         && result.blocks.some(block => block?.blockType === 'hero')
                     if (hasFallbackHero) {
-                        for (let index = 0; index < 3; index++) {
+                        for (let index = 0; index < 4; index++) {
                             needs.push({
                                 blockType: 'hero',
                                 count: 1,
@@ -1111,6 +1137,10 @@ export async function POST(req: NextRequest) {
             ),
         )
 
+        if (pageDefinitions.length !== 5) {
+            throw new Error(`COMPLETION_INCOMPLETE_PAGES expected=5 actual=${pageDefinitions.length}`)
+        }
+
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
@@ -1365,12 +1395,18 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
-        // GH-727 imglib seeding moved to after() — scheduled next to the blog
-        // seed below (gen-perf plan 260703 phase-02). Raw fire-and-forget here
+        // GH-727 imglib seeding moved to after() (gen-perf plan 260703 phase-02).
+        // Raw fire-and-forget here
         // was killed on Vercel function freeze and its ~15 media creates
         // contended with critical-path uploads before `done`.
 
         generationTimings.record('pages_write', Date.now() - dbPhaseStart)
+
+        if (createdPages.length !== 5 || pageFailures.length > 0) {
+            throw new Error(
+                `COMPLETION_INCOMPLETE_PAGE_WRITES expected=5 actual=${createdPages.length} failures=${pageFailures.length}`,
+            )
+        }
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
@@ -1568,62 +1604,64 @@ export async function POST(req: NextRequest) {
             generationTimings.record('products_write', Date.now() - productsWriteStarted)
         }
 
-        // gen-perf blog-inline: blog prep overlapped the GPT window (kicked
-        // pre-AI above) — persist the 3 prepared posts BEFORE `done` so the
-        // blog page ships complete. The grace race bounds the worst case: if
-        // prep is still running (Pixabay/GPT drag) or failed (null), fall back
-        // to post-response seeding via after() exactly like the old path.
-        // Internal tuning knob (tests use a tiny value to exercise the
-        // pending branch deterministically) — not required in production env.
-        // `|| 8_000` (not `?? `) so an empty-string env (the .env.*.example ship
-        // `GEN_BLOG_PREP_GRACE_MS=`) or a non-numeric value → default, not 0ms
-        // (grace 0 disables inline-persist entirely, always falling to after()).
-        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 8_000
-        let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
-        const blogGraceStarted = Date.now()
-        const preparedBlogs = await Promise.race([
-            blogPrepPromise,
-            new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
-        ])
-        generationTimings.record('blog_grace', Date.now() - blogGraceStarted)
-        if (blogGraceTimer) clearTimeout(blogGraceTimer)
-        if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
-            const blogsCreated = await trackPhase('blog_write', () =>
-                persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id),
-            ).catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
-            console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
-        } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
-            // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
-            const _blogSeedTask = () =>
-                blogPrepPromise
-                    .then((prepared) => {
-                        if (Array.isArray(prepared) && prepared.length > 0) {
-                            return persistBlogPosts(payload, prepared, resolvedTenantId, site.id as string | number, user.id)
-                        }
-                        if (prepared === null) {
-                            // Prep failed entirely — legacy full seeding (skips on regenerate).
-                            return seedBlogPosts(
-                                payload,
-                                resolvedTenantId,
-                                site.id as string | number,
-                                normalizeComposerCategory(businessInfo.industry),
-                                businessInfo.businessName,
-                                user.id,
-                                parseProductsString(businessInfo.products),
-                                businessInfo.industry,
-                                computeGenSeed(businessInfo),
-                            )
-                        }
-                        return 0
-                    })
-                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
-            try {
-                after(_blogSeedTask)
-            } catch {
-                void _blogSeedTask()
-            }
+        if (productsCreatedCount !== 6) {
+            throw new Error(`COMPLETION_INCOMPLETE_PRODUCTS expected=6 actual=${productsCreatedCount}`)
         }
-        // preparedBlogs === [] → tenant already has posts (regenerate) — nothing to seed.
+        if (productImageStats.noImage > 0) {
+            throw new Error(`COMPLETION_INCOMPLETE_PRODUCT_MEDIA missing=${productImageStats.noImage}`)
+        }
+        if (blockImageStats.failed > 0) {
+            throw new Error(`COMPLETION_INCOMPLETE_BLOCK_MEDIA missing=${blockImageStats.failed}`)
+        }
+
+        // Blogs are part of the completion contract. Better-match thumbnail
+        // enrichment may be deferred, but the three visible rows and content
+        // must exist before the site becomes completed or `done` is emitted.
+        const preparedBlogs = await trackPhase('blog_prepare_wait', () => blogPrepPromise)
+        let blogsReadyCount = 0
+        if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
+            if (preparedBlogs.length < 3 || preparedBlogs.some((post) => post.thumbnailId === undefined)) {
+                throw new Error(
+                    `COMPLETION_INCOMPLETE_BLOG_MEDIA expected=3 actual=${preparedBlogs.filter((post) => post.thumbnailId !== undefined).length}`,
+                )
+            }
+            blogsReadyCount = await trackPhase('blog_write', () =>
+                persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id),
+            )
+            console.info(`[generate-site] blog posts inline: ${blogsReadyCount}/${preparedBlogs.length}`)
+        } else if (preparedBlogs === null) {
+            blogsReadyCount = await trackPhase('blog_write_fallback', () => seedBlogPosts(
+                payload,
+                resolvedTenantId,
+                site.id as string | number,
+                normalizeComposerCategory(businessInfo.industry),
+                businessInfo.businessName,
+                user.id,
+                parseProductsString(businessInfo.products),
+                businessInfo.industry,
+                computeGenSeed(businessInfo),
+            ))
+        }
+
+        // Verify complete persisted rows rather than treating a settled promise
+        // as proof. This also covers regeneration where prep returns [].
+        const completeBlogs = await trackPhase('blog_count', () => payload.count({
+            collection: 'blogs',
+            where: {
+                and: [
+                    { tenant: { equals: resolvedTenantId } },
+                    { site: { equals: site.id } },
+                    { content: { exists: true } },
+                    { thumbnail: { exists: true } },
+                ],
+            },
+        }))
+        blogsReadyCount = completeBlogs.totalDocs
+        if (blogsReadyCount < 3) {
+            throw new Error(`COMPLETION_INCOMPLETE_BLOGS expected=3 actual=${blogsReadyCount}`)
+        }
+
+        assertRouteDeadline()
 
         // Completion barrier: required pages, products, and inline-ready blogs
         // have settled before the site becomes observable as completed.
@@ -1636,6 +1674,14 @@ export async function POST(req: NextRequest) {
                 ...cartPatch,
             },
         }))
+        if (routeDeadlineExceeded || Date.now() >= routeDeadlineAt) {
+            await payload.update({
+                collection: 'sites',
+                id: site.id as string | number,
+                data: { generationStatus: 'failed' },
+            }).catch(() => {})
+            assertRouteDeadline()
+        }
 
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
@@ -1669,7 +1715,7 @@ export async function POST(req: NextRequest) {
         }
 
             const timeMs = generationTimings.totalMs()
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, blogsReadyCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1701,13 +1747,17 @@ export async function POST(req: NextRequest) {
                             createdPages,
                             pageFailures,
                             productsCreatedCount,
+                            blogsReadyCount,
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
-                        } = await runGenPipeline(onEvent)
-
-                        // F23: sync tenant slug now that generation succeeded (GH-1371)
-                        await trackPhase('slug_sync', syncTenantSlug)
+                        } = await withRouteDeadline(async () => {
+                            const output = await runGenPipeline(onEvent)
+                            // F23: sync tenant slug now that generation succeeded (GH-1371)
+                            await trackPhase('slug_sync', syncTenantSlug)
+                            assertRouteDeadline()
+                            return output
+                        })
                         const timeMs = generationTimings.totalMs()
                         logGenerationDone({
                             pages: createdPages.length,
@@ -1730,6 +1780,9 @@ export async function POST(req: NextRequest) {
                                 siteLanguage: result.language || language,
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
+                                productsCount: productsCreatedCount,
+                                blogsCount: blogsReadyCount,
+                                imagesFailed: blockImageStats.failed,
                                 timeMs,
                             })}\n\n`
                         generationTimings.record('done_sent', 0)
@@ -1762,12 +1815,11 @@ export async function POST(req: NextRequest) {
                         } catch { /* stream already canceled — skip SSE write, still recover DB */ }
                         // Error recovery: update site status if site was created before failure
                         if (_site?.id && _payload) {
-                            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
                             await _payload
                                 .update({
                                     collection: 'sites',
                                     id: _site.id as string | number,
-                                    data: { generationStatus: status },
+                                    data: { generationStatus: 'failed' },
                                 })
                                 .catch(() => {})
                         }
@@ -1795,10 +1847,13 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             productImageStats,
             blockImageStats,
-        } = await runGenPipeline()
-
-        // F23: sync tenant slug now that generation succeeded (GH-1371)
-        await trackPhase('slug_sync', syncTenantSlug)
+        } = await withRouteDeadline(async () => {
+            const output = await runGenPipeline()
+            // F23: sync tenant slug now that generation succeeded (GH-1371)
+            await trackPhase('slug_sync', syncTenantSlug)
+            assertRouteDeadline()
+            return output
+        })
         const timeMs = generationTimings.totalMs()
         logGenerationDone({
             pages: createdPages.length,
@@ -1833,14 +1888,14 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
+        // A partial site must never be observable as completed. The client can
+        // retry explicitly after inspecting the failed generation.
         const _siteForCatch = _site as Record<string, unknown> | null
         if (_siteForCatch?.id && _payload) {
-            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
             await _payload.update({
                 collection: 'sites',
                 id: _siteForCatch.id as string | number,
-                data: { generationStatus: status },
+                data: { generationStatus: 'failed' },
             }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
         }
 
@@ -2118,6 +2173,13 @@ export function buildGeneratedPages({
     const features = blocks.find((block) => block.blockType === 'features') || null
     const testimonials = blocks.find((block) => block.blockType === 'testimonials') || null
     const contact = blocks.find((block) => block.blockType === 'contact') || null
+    const blogList = blocks.find((block) => block.blockType === 'blog-list') || {
+        blockType: 'blog-list',
+        variant: 'grid',
+        headline: 'Latest Insights',
+        subheadline: `News and practical advice from ${businessInfo.businessName}.`,
+        limit: 6,
+    }
     const footer = blocks.find((block) => block.blockType === 'footer') || null
 
     const compact = (pageBlocks: Array<AIBlock | null>) =>
@@ -2185,6 +2247,30 @@ export function buildGeneratedPages({
             },
         },
         {
+            title: 'Blog',
+            slug: '/blog',
+            isHomepage: false,
+            layout: compact([
+                navigation,
+                createPageHero(hero, {
+                    headline: `${businessInfo.businessName} Insights`,
+                    subheadline: 'Helpful ideas, updates, and practical guides.',
+                    primaryLabel: 'Contact us',
+                    primaryUrl: '/contact',
+                    secondaryLabel: 'Back to home',
+                    secondaryUrl: '/',
+                    badgeText: 'Blog',
+                    mediaId: fallbackHeroMediaIds?.[2],
+                }),
+                blogList,
+                footer,
+            ]),
+            seo: {
+                title: `${businessInfo.businessName} Blog`,
+                description: `Latest insights and updates from ${businessInfo.businessName}.`,
+            },
+        },
+        {
             title: 'Contact',
             slug: '/contact',
             isHomepage: false,
@@ -2198,7 +2284,7 @@ export function buildGeneratedPages({
                     secondaryLabel: 'View services',
                     secondaryUrl: '/products',
                     badgeText: 'Contact Us',
-                    mediaId: fallbackHeroMediaIds?.[2],
+                    mediaId: fallbackHeroMediaIds?.[3],
                 }),
                 contact,
                 footer,

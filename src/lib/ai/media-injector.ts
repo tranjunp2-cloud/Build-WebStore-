@@ -632,7 +632,25 @@ export async function fulfillImageNeeds(
     let failed = 0
     for (const r of perBlockResults) {
         let offset = 0
-        let exactWraps = 0
+        let wrapped = false
+        const greatestCommonDivisor = (a: number, b: number): number => {
+            let left = Math.abs(a)
+            let right = Math.abs(b)
+            while (right !== 0) {
+                const next = left % right
+                left = right
+                right = next
+            }
+            return left
+        }
+        const allocationStride = (poolSize: number, take: number): number => {
+            if (poolSize <= 1) return 0
+            let stride = Math.max(1, take % poolSize)
+            while (greatestCommonDivisor(stride, poolSize) !== 1) {
+                stride += 1
+            }
+            return stride % poolSize
+        }
         for (const need of r.groupNeeds) {
             const take = Math.min(need.count, r.ids.length)
             const slice = r.reusable && take > 0
@@ -644,13 +662,17 @@ export async function fulfillImageNeeds(
                 failed += need.count - slice.length
 
                 const rawNextOffset = offset + take
-                offset = rawNextOffset % r.ids.length
-                // When a full pass ends exactly on the boundary, shift the next
-                // multi-image window so a later gallery does not receive the
-                // exact same set again. Single-image blocks naturally cycle.
-                if (rawNextOffset >= r.ids.length && offset === 0 && take > 1 && r.ids.length > take) {
-                    exactWraps += 1
-                    offset = exactWraps % r.ids.length
+                if (!wrapped && rawNextOffset < r.ids.length) {
+                    // Consume disjoint windows first while the pool can satisfy
+                    // them without overlap.
+                    offset = rawNextOffset
+                } else if (!wrapped) {
+                    wrapped = true
+                    offset = take < r.ids.length ? 1 : 0
+                } else {
+                    // Once the first pass wraps, a stride coprime with the pool
+                    // size visits every cyclic window before repeating.
+                    offset = (offset + allocationStride(r.ids.length, take)) % r.ids.length
                 }
             } else {
                 failed += need.count

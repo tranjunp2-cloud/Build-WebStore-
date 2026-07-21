@@ -45,6 +45,10 @@ vi.mock('@/lib/ai/fallback-adapter', () => ({
 		pages: [
 			{ title: 'Homepage', slug: '/', isHomepage: true, blocks: [] },
 			{ title: 'About', slug: '/about', isHomepage: false, blocks: [] },
+			{ title: 'Menu', slug: '/menu', isHomepage: false, blocks: [] },
+			{ title: 'Gallery', slug: '/gallery', isHomepage: false, blocks: [] },
+			{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] },
+			{ title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] },
 		],
 	})),
 }))
@@ -438,6 +442,8 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(result.siteName).toBe('Test')
 		const pages = result.pages as Array<{ slug?: string; isHomepage?: boolean }>
 		expect(Array.isArray(pages)).toBe(true)
+		expect(pages).toHaveLength(5)
+		expect(pages.map((p) => p.slug)).toEqual(['/', '/about', '/services', '/contact', '/blog'])
 		expect(pages[0]?.isHomepage).toBe(true)
 		const slugs = pages.map((p) => p.slug)
 		expect(new Set(slugs).size).toBe(slugs.length)

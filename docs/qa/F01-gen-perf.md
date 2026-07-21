@@ -2,7 +2,7 @@
 
 **Plan Reference:** [plans/260703-1341-gen-perf-async-parallel](../../plans/260703-1341-gen-perf-async-parallel/plan.md)
 
-**Feature:** F01 AI Site Generator — performance optimization via async parallel seeding (blog + imglib post-response)
+**Feature:** F01 AI Site Generator — bounded completion path (required blogs inline, image-library seeding post-response)
 
 **Baseline (2026-07-03 local timing, pre-optimization):**
 | Language | Time-to-`done` | Notes |
@@ -88,7 +88,7 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 | TC-GENPERF-W2-15 | unit | chrome share-nothing (review fix A2) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | nav/footer structuredClone per page — mutate nested links/columns của home không leak sang page khác; syncFooterAcrossPages cũng share-nothing |
 | TC-GENPERF-BI-01 | route | blog-inline: persist TRƯỚC done | ✅ PASS | src/__tests__/api/ai.test.ts | prep xong trong cửa sổ GPT → persistBlogPosts chạy in-request (trước mọi after() task), seedBlogPosts legacy KHÔNG được gọi |
 | TC-GENPERF-BI-02 | route | blog-inline: regenerate skip | ✅ PASS | src/__tests__/api/ai.test.ts | prepare trả [] (tenant đã có posts) → không persist, không legacy seeding |
-| TC-GENPERF-BI-03 | route | blog-inline: grace fallback | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong tại persist site (grace GEN_BLOG_PREP_GRACE_MS) → done không bị chặn; prep xong sau response → after() task persist đủ 3 bài |
+| TC-GENPERF-BI-03 | route | blog completion barrier | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong → response vẫn pending; chỉ emit `done` sau khi persist đủ 3 bài |
 | TC-F08-BS.24 | unit | blog prep chờ pixabayGate | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepareBlogPosts không gọi searchPhotos khi gate chưa settle (GH-1190 serialization); gate mở → thumbnail phase chạy, trả đủ 3 prepared posts |
 | TC-F08-BS.25 | unit | prepare/persist contract | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepare trả null khi hard-fail (count throw) để caller fallback legacy; trả [] khi tenant có posts; persistBlogPosts insert đúng prepared rows (slug prefix, thumbnail optional) |
 | TC-F01-W.18 | unit | pool size động theo block | ✅ PASS | src/__tests__/unit/ai/image-pool.test.ts | buildImagePool tôn trọng landscapeSize/squareSize; size 0 → skip Pixabay call bucket đó (không tính underfill); cả 2 = 0 → 0 call, pool rỗng |

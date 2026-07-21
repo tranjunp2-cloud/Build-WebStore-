@@ -394,6 +394,28 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(second).toEqual([307, 308, 309, 301, 302, 303])
         })
 
+        it('[TC-GENPERF-W3-19] does not repeat a gallery window before exhausting pool rotations', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = Array.from({ length: 5 }, makeGallery)
+            const mediaIds = Array.from({ length: 12 }, (_, index) => 401 + index)
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'bakery',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Butter & Bloom', tenantId: '1', category: 'fnb',
+                pool: { queryUsed: 'bakery', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            const windows = blocks.map((block) => block.images.map((item) => item.image).join(','))
+            expect(new Set(windows).size).toBe(windows.length)
+        })
+
         it('[TC-GENPERF-W3-12] partial pool does not legacy-search duplicate photos', async () => {
             const makeGallery = () => ({
                 blockType: 'gallery',

@@ -8,8 +8,8 @@ import type { CTAConfig } from '@/blocks/cta/config'
  *
  * - Navigation CTAs (hero `ctaButtons`): resolve to a matching page slug; drop
  *   the button when no page matches (per-button hide, never per-block).
- * - Action CTAs (pricing `plans[].ctaUrl`): fall back to `/contact` on no-match
- *   so the buy button is never lost (every seed template ships `/contact`).
+ * - Action CTAs (pricing `plans[].ctaUrl`): fall back to an existing canonical
+ *   page so the buy button remains usable without creating a ghost link.
  *
  * Pure & React-free. Returns a new object; non-CTA blocks pass through.
  */
@@ -65,8 +65,7 @@ export function patchBlockCtaUrlsFromLinks<T extends Record<string, unknown>>(
         }
     }
 
-    // Pricing: action CTAs — keep the button, default to /contact, sync action
-    // type. Shared with AI-gen via resolvePricingPlanCta (DRY).
+    // Pricing: action CTAs — keep the button, use a real page, sync action type.
     if (Array.isArray(b.plans)) {
         return {
             ...block,

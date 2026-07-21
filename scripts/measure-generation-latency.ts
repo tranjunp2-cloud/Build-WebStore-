@@ -11,6 +11,7 @@ import { percentile } from '../src/lib/ai/generation-timings'
 
 const BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
 const BEARER = process.env.E2E_SETUP_SECRET ?? ''
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? ''
 const REPORT_DIR = 'plans/260717-1600-gh-1190-generation-critical-path/reports'
 const REQUEST_TIMEOUT_MS = 75_000
 
@@ -22,6 +23,10 @@ type RunResult = {
     firstEventMs?: number
     doneMs?: number
     serverTimeMs?: number
+    totalPages?: number
+    productsCount?: number
+    blogsCount?: number
+    imagesFailed?: number
     status: 'success' | 'failed'
     error?: string
 }
@@ -46,15 +51,35 @@ function parseArgs() {
     }
 }
 
-async function ensureTestUser(): Promise<string> {
+function cookieHeader(headers: Headers): string {
+    const values = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.()
+        ?? [headers.get('set-cookie') ?? '']
+    return values.filter(Boolean).map((value) => value.split(';', 1)[0]).join('; ')
+}
+
+async function createBenchmarkSession(runIndex: number, label: string): Promise<string> {
     if (!BEARER) throw new Error('E2E_SETUP_SECRET is required')
+    if (!TEST_PASSWORD) throw new Error('TEST_PASSWORD is required')
+    const suffix = `${label}-${runIndex}-${crypto.randomUUID().slice(0, 8)}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+    const tenantSlug = `e2e-gen-${suffix}`.slice(0, 62).replace(/-+$/g, '')
+    const email = `measure-gen+${crypto.randomUUID()}@primeweb.app`
     const response = await fetch(`${BASE}/api/e2e/ensure-test-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BEARER}` },
-        body: JSON.stringify({ email: 'measure-gen-latency@primeweb.app', password: 'TestPass123!' }),
+        body: JSON.stringify({ email, password: TEST_PASSWORD, tenantSlug, tenantName: `Generation Benchmark ${runIndex + 1}` }),
     })
     if (!response.ok) throw new Error(`ensure-test-user failed: ${response.status} ${await response.text()}`)
-    return response.headers.get('set-cookie') ?? ''
+    const login = await fetch(`${BASE}/api/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: TEST_PASSWORD }),
+    })
+    if (!login.ok) throw new Error(`login failed: ${login.status} ${await login.text()}`)
+    const cookie = cookieHeader(login.headers)
+    if (!cookie) throw new Error('login succeeded without a session cookie')
+    return cookie
 }
 
 async function runGeneration(cookie: string, fixture: typeof FIXTURES[number], language: string): Promise<RunResult> {
@@ -78,7 +103,7 @@ async function runGeneration(cookie: string, fixture: typeof FIXTURES[number], l
                     shortDescription: `${fixture.name} serves customers in Malaysia.`,
                     products: fixture.products,
                 },
-                language,
+                language: ['en', 'ms', 'vi'].includes(language) ? language : 'auto',
                 generationLocale: language,
             }),
             signal: controller.signal,
@@ -105,6 +130,21 @@ async function runGeneration(cookie: string, fixture: typeof FIXTURES[number], l
                     if (event === 'done') {
                         result.doneMs = Math.round(performance.now() - startedAt)
                         result.serverTimeMs = typeof data.timeMs === 'number' ? data.timeMs : undefined
+                        result.totalPages = typeof data.totalPages === 'number' ? data.totalPages : undefined
+                        result.productsCount = typeof data.productsCount === 'number' ? data.productsCount : undefined
+                        result.blogsCount = typeof data.blogsCount === 'number' ? data.blogsCount : undefined
+                        result.imagesFailed = typeof data.imagesFailed === 'number' ? data.imagesFailed : undefined
+                        if (
+                            result.totalPages !== 5 ||
+                            result.productsCount !== 6 ||
+                            result.blogsCount === undefined || result.blogsCount < 3 ||
+                            result.imagesFailed !== 0
+                        ) {
+                            throw new Error(
+                                `incomplete done payload pages=${result.totalPages ?? '-'} products=${result.productsCount ?? '-'} ` +
+                                `blogs=${result.blogsCount ?? '-'} imagesFailed=${result.imagesFailed ?? '-'}`,
+                            )
+                        }
                         result.status = 'success'
                     }
                     if (event === 'error') throw new Error(String(data.message ?? 'SSE error'))
@@ -137,10 +177,10 @@ function summarize(results: RunResult[]) {
 
 async function main() {
     const args = parseArgs()
-    const cookie = await ensureTestUser()
     const results: RunResult[] = []
     for (let index = 0; index < args.runs; index++) {
         const fixture = FIXTURES[index % FIXTURES.length]!
+        const cookie = await createBenchmarkSession(index, args.label)
         const result = await runGeneration(cookie, fixture, args.language)
         results.push(result)
         console.info(`[measure-generation] ${index + 1}/${args.runs} ${fixture.industry} ${result.status} done=${result.doneMs ?? '-'}ms`)

@@ -65,6 +65,7 @@ vi.mock('payload', () => {
                 if (collection === 'pages') return { docs: mockPageDB }
                 return { docs: [] }
             }),
+            count: vi.fn().mockResolvedValue({ totalDocs: 3 }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
                 const doc = { id: `new-${collection}-123`, ...data }
                 if (collection === 'sites') mockSiteDB.push(doc)
@@ -99,7 +100,18 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
-    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
+    generateSampleProducts: vi.fn().mockResolvedValue({
+        products: Array.from({ length: 6 }, (_, index) => ({
+            name: `Sample Product ${index + 1}`,
+            shortDescription: 'Sample product',
+            description: 'A complete sample product.',
+            price: 10 + index,
+            sku: `SAMPLE-${index + 1}`,
+            inventory: 0,
+            status: 'active',
+        })),
+        stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+    }),
 }))
 
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
@@ -114,11 +126,9 @@ vi.mock('next/server', async (importOriginal) => ({
 // Seeder boundaries — the route schedules these via after(); mocked so tests
 // observe scheduling without running GPT/Pixabay work.
 vi.mock('@/lib/ai/seed-blog-posts', () => ({
-    seedBlogPosts: vi.fn().mockResolvedValue(0),
-    // Default: prep "failed" (null) → route takes the legacy after() seeding
-    // path, which keeps the W1 blog tests meaningful. Inline-path tests
-    // (TC-GENPERF-BI-*) override per-case.
-    prepareBlogPosts: vi.fn().mockResolvedValue(null),
+    seedBlogPosts: vi.fn().mockResolvedValue(3),
+    // Default regeneration path: three persisted rows already exist.
+    prepareBlogPosts: vi.fn().mockResolvedValue([]),
     persistBlogPosts: vi.fn().mockResolvedValue(3),
 }))
 vi.mock('@/lib/images/image-library-seeder', () => ({
@@ -209,9 +219,9 @@ describe('AI Streaming APIs', () => {
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
-             expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
-             expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
+             expect(mockPageDB.length).toBe(6) // Five generated pages + system 404
+             expect(result.totalPages).toBe(5)
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/blog', '/contact', '404'])
         })
 
         it('removes generated CTA links whose target pages do not exist', async () => {
@@ -243,12 +253,30 @@ describe('AI Streaming APIs', () => {
                              seo: { title: 'Home', description: 'Bakery homepage' },
                          },
                          {
+                             title: 'About',
+                             slug: '/about',
+                             blocks: [{ blockType: 'about', headline: 'About us', body: 'Our bakery story' }],
+                             seo: { title: 'About', description: 'About the bakery' },
+                         },
+                         {
+                             title: 'Services',
+                             slug: '/services',
+                             blocks: [{ blockType: 'features', headline: 'Our services', items: [] }],
+                             seo: { title: 'Services', description: 'Bakery services' },
+                         },
+                         {
                              title: 'Contact',
                              slug: '/contact',
                              blocks: [
                                  { blockType: 'contact', variant: 'split', headline: 'Contact us', email: 'hello@butterandbloom.test' },
                              ],
                              seo: { title: 'Contact', description: 'Contact the bakery' },
+                         },
+                         {
+                             title: 'Blog',
+                             slug: '/blog',
+                             blocks: [{ blockType: 'blog-list', variant: 'grid', headline: 'Latest posts', limit: 3 }],
+                             seo: { title: 'Blog', description: 'Bakery articles' },
                          },
                      ],
                  },
@@ -450,7 +478,7 @@ describe('AI Streaming APIs', () => {
 
         it('[TC-GENPERF-W3-04] does not mark the site completed before required product work settles', async () => {
              // Arrange
-             let resolveProducts: (value: { products: []; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
+             let resolveProducts: (value: { products: Array<Record<string, unknown>>; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
              vi.mocked(generateSampleProducts).mockReturnValueOnce(new Promise((resolve) => { resolveProducts = resolve }))
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
@@ -465,10 +493,59 @@ describe('AI Streaming APIs', () => {
 
              // Assert — externally observable status remains generating.
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('generating')
-             resolveProducts({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } })
+             resolveProducts({
+                 products: Array.from({ length: 6 }, (_, index) => ({
+                     name: `Pending Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `PENDING-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
              const response = await responsePromise
              expect(response.status).toBe(200)
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
+        })
+
+        it('[TC-GENPERF-W3-20] fails completion when fewer than six products persist', async () => {
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 5 }, (_, index) => ({
+                     name: `Short Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `SHORT-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+        })
+
+        it('[TC-GENPERF-W3-21] fails completion when fewer than three complete blogs exist', async () => {
+             const payload = await getPayload({ config: {} as never })
+             vi.mocked(payload.count).mockResolvedValueOnce({ totalDocs: 2 } as never)
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
         })
 
         it('sets generationStatus to generating before creating pages', async () => {
@@ -1061,44 +1138,36 @@ describe('AI Streaming APIs', () => {
             )
         })
 
-        it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {
+        it('[TC-GENPERF-W1-02] fallback blog seeding completes in-request', async () => {
             // Arrange
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            const { prepareBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce(null)
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
             // Assert
             expect(res.status).toBe(200)
-            await drainEventLoop()
-            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
-            await runCapturedAfterTasks()
             expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
         })
 
-        it('[TC-GENPERF-W1-05] seeder rejection is non-fatal — no captured task ever rejects', async () => {
-            // Arrange — both seeders blow up
+        it('[TC-GENPERF-W1-05] optional image-library seeder rejection is non-fatal', async () => {
+            // Arrange
             const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(seedImageLibraryForSite).mockRejectedValueOnce(new Error('imglib boom'))
-            vi.mocked(seedBlogPosts).mockRejectedValueOnce(new Error('blog boom'))
             const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
-            // Assert — response unaffected; invoking tasks resolves (route wraps
-            // each in .catch), errors logged not propagated
+            // Assert — optional post-response work cannot invalidate completion.
             expect(res.status).toBe(200)
             await expect(runCapturedAfterTasks()).resolves.toBeUndefined()
             expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
-            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
             errorSpy.mockRestore()
-            warnSpy.mockRestore()
         })
 
-        it('[TC-GENPERF-W1-06] SSE done payload keys unchanged', async () => {
+        it('[TC-GENPERF-W1-06] SSE done payload includes completion evidence', async () => {
             // Arrange
             const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                 method: 'POST',
@@ -1121,7 +1190,7 @@ describe('AI Streaming APIs', () => {
             const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
             expect(m).toBeTruthy()
             expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
-                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+                ['blogsCount', 'imagesFailed', 'pageId', 'productsCount', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
             )
         })
 
@@ -1129,18 +1198,16 @@ describe('AI Streaming APIs', () => {
             // Arrange — simulate no-request-scope (after throws, e.g. Vitest/local)
             const { after } = await import('next/server')
             const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(after).mockImplementation(() => { throw new Error('after called outside request scope') })
 
             try {
                 // Act
                 const res = await GenerateSitePOST(genPerfReq())
 
-                // Assert — route falls back to `void task()`: seeders still invoked
+                // Assert — route falls back to `void task()` for optional work.
                 expect(res.status).toBe(200)
                 await vi.waitFor(() => {
                     expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
-                    expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
                 })
             } finally {
                 vi.mocked(after).mockImplementation(() => undefined)
@@ -1152,8 +1219,8 @@ describe('AI Streaming APIs', () => {
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
                 { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
-                { title: 'B', slug: 'b', content: '<p>b</p>' },
-                { title: 'C', slug: 'c', content: '<p>c</p>' },
+                { title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 2 },
+                { title: 'C', slug: 'c', content: '<p>c</p>', thumbnailId: 3 },
             ])
 
             // Act
@@ -1182,34 +1249,31 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 
-        it('[TC-GENPERF-BI-03] prep still running at persist site → done not blocked; posts persist post-response', async () => {
-            // Arrange — prep unresolved when the route reaches the grace race;
-            // tiny grace so the pending branch fires deterministically
+        it('[TC-GENPERF-BI-03] done waits until pending blog preparation is persisted', async () => {
+            // Arrange
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             let resolvePrep: (v: Array<{ title: string; slug: string; content: string }>) => void = () => {}
             vi.mocked(prepareBlogPosts).mockReturnValueOnce(new Promise((r) => { resolvePrep = r }))
-            process.env.GEN_BLOG_PREP_GRACE_MS = '50'
 
-            try {
-                // Act — response returns without waiting for prep
-                const res = await GenerateSitePOST(genPerfReq())
+            // Act — response must remain pending until blog prep settles.
+            let responseSettled = false
+            const responsePromise = GenerateSitePOST(genPerfReq()).then((response) => {
+                responseSettled = true
+                return response
+            })
+            await drainEventLoop()
+            expect(responseSettled).toBe(false)
+            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
 
-                // Assert — nothing persisted in-request
-                expect(res.status).toBe(200)
-                expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
-
-                // Prep finishes after the response → captured after() task persists
-                resolvePrep([
-                    { title: 'A', slug: 'a', content: '<p>a</p>' },
-                    { title: 'B', slug: 'b', content: '<p>b</p>' },
-                    { title: 'C', slug: 'c', content: '<p>c</p>' },
-                ])
-                await runCapturedAfterTasks()
-                expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
-                expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
-            } finally {
-                delete process.env.GEN_BLOG_PREP_GRACE_MS
-            }
+            resolvePrep([
+                { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
+                { title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 2 },
+                { title: 'C', slug: 'c', content: '<p>c</p>', thumbnailId: 3 },
+            ])
+            const res = await responsePromise
+            expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
     })
 
@@ -1256,7 +1320,7 @@ describe('AI Streaming APIs', () => {
                 result: {
                     seo: { title: 'Butter & Bloom', description: 'Fresh bakes' },
                 },
-                fallbackHeroMediaIds: [101, 102, 103],
+                fallbackHeroMediaIds: [101, 102, 103, 104],
             })
 
             const heroMediaIds = pages.map(page => {
@@ -1268,6 +1332,7 @@ describe('AI Streaming APIs', () => {
                 [101, 101],
                 [102, 102],
                 [103, 103],
+                [104, 104],
             ])
         })
     })

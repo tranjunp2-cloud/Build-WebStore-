@@ -270,7 +270,33 @@ function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Rec
     if (scope === 'home') {
         return { siteName: gr.siteName, category: gr.siteType, theme: gr.theme, seo: gr.seo, language: gr.language, pages: [gr.pages[0]] }
     }
-    return gr.pages.length > 1 ? { pages: gr.pages.slice(1) } : null
+    const candidates = gr.pages.slice(1)
+    if (candidates.length === 0) return null
+
+    const unused = new Set(candidates.map((_page, index) => index))
+    const slots = [
+        { title: 'About', slug: '/about', matches: /about|story|company/i },
+        { title: 'Services', slug: '/services', matches: /service|product|menu|program|class|treatment/i },
+        { title: 'Contact', slug: '/contact', matches: /contact|book|visit|location|get-in-touch/i },
+        { title: 'Blog', slug: '/blog', matches: /blog|news|article|insight/i },
+    ] as const
+
+    const pages = slots.map((slot) => {
+        const matchedIndex = candidates.findIndex((page, index) => {
+            if (!unused.has(index)) return false
+            return slot.matches.test(`${String(page.slug ?? '')} ${String(page.title ?? '')}`)
+        })
+        const fallbackIndex = matchedIndex >= 0 ? matchedIndex : [...unused][0]
+        const source = fallbackIndex === undefined ? candidates[0]! : candidates[fallbackIndex]!
+        if (fallbackIndex !== undefined) unused.delete(fallbackIndex)
+        return {
+            ...structuredClone(source),
+            title: slot.title,
+            slug: slot.slug,
+            isHomepage: false,
+        }
+    })
+    return { pages }
 }
 
 export type ParallelSplitInput = {

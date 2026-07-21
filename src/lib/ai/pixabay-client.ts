@@ -140,28 +140,43 @@ const DOWNLOAD_HOST_ALLOWLIST = [
     'images.unsplash.com',
     'plus.unsplash.com',
 ]
-const DEFAULT_TIMEOUT_MS = 5_000
+const SEARCH_TIMEOUT_MS = 5_000
+const DOWNLOAD_TIMEOUT_MS = 15_000
 const DEFAULT_MAX_BYTES = 10_000_000 // 10 MB
 const RATE_LIMIT_WARN_THRESHOLD = 20
 const LARGE_SIZE_MIN_WIDTH = 700 // ≥ this → largeImageURL (1280px), else webformatURL (640px)
 const CIRCUIT_OPEN_MS = 60_000
+const SERVER_ERROR_CIRCUIT_THRESHOLD = 3
 
 let circuitOpenUntil = 0
 let circuitError: PixabayError | null = null
-
-function isProviderOutage(error: PixabayError): boolean {
-    return error.code === 'RATE_LIMITED' || error.code === 'SERVER_ERROR' || error.code === 'TIMEOUT'
-}
+let consecutiveServerErrors = 0
 
 function openCircuit(error: PixabayError): void {
-    if (!isProviderOutage(error)) return
+    // A timeout may be query-specific and must not suppress unrelated users on
+    // the same warm instance. Rate limits are provider-wide; repeated 5xxs are
+    // treated as an outage only after a small failure threshold.
+    if (error.code === 'TIMEOUT') return
+    if (error.code === 'SERVER_ERROR') {
+        consecutiveServerErrors += 1
+        if (consecutiveServerErrors < SERVER_ERROR_CIRCUIT_THRESHOLD) return
+    } else if (error.code !== 'RATE_LIMITED') {
+        return
+    }
     circuitOpenUntil = Date.now() + CIRCUIT_OPEN_MS
     circuitError = error
 }
 
+function recordProviderSuccess(): void {
+    consecutiveServerErrors = 0
+}
+
 function assertCircuitClosed(): void {
+    if (circuitOpenUntil === 0) return
     if (Date.now() >= circuitOpenUntil) {
+        circuitOpenUntil = 0
         circuitError = null
+        consecutiveServerErrors = 0
         return
     }
     const source = circuitError
@@ -177,6 +192,7 @@ function assertCircuitClosed(): void {
 export function __resetPixabayCircuitForTests(): void {
     circuitOpenUntil = 0
     circuitError = null
+    consecutiveServerErrors = 0
 }
 
 /** Recommended orientation per block type — used by media-pipeline callers. */
@@ -235,7 +251,10 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
     while (attempt <= 1) {
         try {
             const res = await fetch(url, init)
-            if (res.ok) return res
+            if (res.ok) {
+                recordProviderSuccess()
+                return res
+            }
             if (res.status === 401 || res.status === 403) {
                 throw new PixabayError('UNAUTHORIZED', res.status, false)
             }
@@ -531,7 +550,7 @@ export async function searchPhotos(
 
     const url = `${BASE}?${params.toString()}`
     const res = await fetchWithRetry(url, {
-        signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? SEARCH_TIMEOUT_MS),
     })
     logRateLimit(res.headers)
     const json = (await res.json()) as PixabaySearchResponse
@@ -578,7 +597,7 @@ export async function downloadPhotoBuffer(
     let res: Response
     try {
         res = await fetch(url, {
-            signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+            signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
             headers: { 'User-Agent': 'ech-prime-web-v2/1.0' },
         })
     } catch (err) {

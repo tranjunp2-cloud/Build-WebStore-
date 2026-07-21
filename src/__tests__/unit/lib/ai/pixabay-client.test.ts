@@ -323,7 +323,7 @@ describe('searchPhotos', () => {
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
 
-    it('[TC-GENPERF-W3-09] 503 opens the circuit for later search branches', async () => {
+    it('[TC-GENPERF-W3-09] opens the circuit only after repeated 503 responses', async () => {
         vi.mocked(fetch).mockResolvedValue({
             ok: false,
             status: 503,
@@ -331,8 +331,10 @@ describe('searchPhotos', () => {
         } as unknown as Response)
 
         await expect(searchPhotos('spa', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', status: 503 })
-        await expect(searchPhotos('beauty', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', retryable: false })
-        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+        await expect(searchPhotos('beauty', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', status: 503 })
+        await expect(searchPhotos('wellness', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', status: 503 })
+        await expect(searchPhotos('massage', 6)).rejects.toMatchObject({ code: 'SERVER_ERROR', retryable: false })
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3)
     })
 
     it('[TC-F38-PIXABAY-10] 401 response → throws PixabayError UNAUTHORIZED without retry', async () => {
@@ -360,6 +362,18 @@ describe('searchPhotos', () => {
         // Act + Assert — fail-fast: single attempt, classified TIMEOUT
         await expect(searchPhotos('nature', 5)).rejects.toMatchObject({ code: 'TIMEOUT' })
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    })
+
+    it('[TC-GENPERF-W3-18] one timeout does not open the process-wide circuit', async () => {
+        const timeoutErr = new Error('slow query')
+        timeoutErr.name = 'TimeoutError'
+        vi.mocked(fetch)
+            .mockRejectedValueOnce(timeoutErr)
+            .mockResolvedValueOnce(makeApiResponse([makeHit(9)]))
+
+        await expect(searchPhotos('slow spa', 1)).rejects.toMatchObject({ code: 'TIMEOUT' })
+        await expect(searchPhotos('fast bakery', 1)).resolves.toHaveLength(1)
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
     })
 })
 

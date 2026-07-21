@@ -325,8 +325,8 @@ export function resolveCtaSlugFromLinks(
 
 /**
  * Resolve a pricing plan's action CTA. Returns a new plan with:
- *  - `ctaUrl` → canonical internal slug, defaulting to `/contact` (every site
- *    ships a contact page) when the placeholder `#`/empty or no page matches.
+ *  - `ctaUrl` → canonical internal slug, preferring `/contact` and otherwise
+ *    falling back to a page that actually exists.
  *  - `ctaActionType` → `'internal'` for an internal path so the editor shows
  *    the page picker; external (http) URLs keep their existing type.
  * Shared by AI-gen (`patchPageCtaUrls`) and manual-drag (`patchBlockCtaUrls`).
@@ -337,7 +337,10 @@ export function resolvePricingPlanCta(
 ): Record<string, unknown> {
     const raw = typeof plan.ctaUrl === 'string' ? plan.ctaUrl.trim() : ''
     const resolved = raw && raw !== '#' ? resolveCtaSlugFromLinks(plan.ctaUrl, canonicalLinks) : ''
-    const ctaUrl = resolved || '/contact'
+    const fallback = canonicalLinks.some(link => link.url === '/contact')
+        ? '/contact'
+        : canonicalLinks.find(link => link.url !== '/')?.url ?? '/'
+    const ctaUrl = resolved || fallback
     const ctaActionType = ctaUrl.startsWith('/') ? 'internal' : plan.ctaActionType
     return { ...plan, ctaUrl, ctaActionType }
 }
