@@ -3,6 +3,8 @@
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 export async function getCategoriesAction() {
     const user = await getCurrentUser()
@@ -273,13 +275,25 @@ export async function deleteCategoryAction(id: string | number) {
         overrideAccess: false,
     })
 
+    const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
+    if (!isSuperAdmin) {
+        const tenantId = tenantIdForQuery(user)
+        if (tenantId == null) {
+            throw new Error('Product management is not available on your current plan.')
+        }
+        const subscription = await getActivePlanSubscription(payload, tenantId)
+        if (!subscription || !(await canUse(payload, subscription.plan as PlanCode, 'product_management'))) {
+            throw new Error('Product management is not available on your current plan.')
+        }
+    }
+
     // Hard-block + re-parent + soft-delete run as one SQL statement, anchored by a FOR UPDATE
     // lock on the target category row. This keeps the delete decision and the writes in one DB
     // critical section without depending on Payload's transaction wrapper, scopes child moves to
     // the authorized tenant only, and preflights root-level name conflicts before any re-parent.
     const { sql } = await import('drizzle-orm')
     const deleteResult = await (payload.db as any).drizzle.execute(
-        sql`WITH target AS (
+        sql`WITH RECURSIVE target AS (
                 SELECT c.id, c.tenant_id
                 FROM categories c
                 WHERE c.id = ${id} AND c.deleted_at IS NULL
@@ -303,6 +317,22 @@ export async function deleteCategoryAction(id: string | number) {
                  AND c.deleted_at IS NULL
                  AND c.tenant_id = t.tenant_id
                 FOR UPDATE
+            ),
+            subtree AS (
+                SELECT c.id, c.parent_id, c.name, c.tenant_id,
+                       c.name::text AS new_breadcrumbs
+                FROM categories c
+                JOIN target t
+                  ON c.parent_id = t.id
+                 AND c.deleted_at IS NULL
+                 AND c.tenant_id = t.tenant_id
+                UNION ALL
+                SELECT c.id, c.parent_id, c.name, c.tenant_id,
+                       (s.new_breadcrumbs || ' > ' || c.name)::text
+                FROM categories c
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE c.deleted_at IS NULL
+                  AND c.tenant_id = s.tenant_id
             ),
             root_conflicts AS (
                 SELECT COUNT(*)::int AS count
@@ -331,13 +361,11 @@ export async function deleteCategoryAction(id: string | number) {
             ),
             reparent AS (
                 UPDATE categories c
-                SET parent_id = NULL,
-                    breadcrumbs = c.name,
+                SET parent_id = CASE WHEN c.parent_id = t.id THEN NULL ELSE c.parent_id END,
+                    breadcrumbs = s.new_breadcrumbs,
                     updated_at = NOW()
-                FROM target t, direct_products dp, conflicts cf
-                WHERE c.parent_id = t.id
-                  AND c.deleted_at IS NULL
-                  AND c.tenant_id = t.tenant_id
+                FROM target t, subtree s, direct_products dp, conflicts cf
+                WHERE s.id = c.id
                   AND dp.count = 0
                   AND cf.count = 0
                 RETURNING c.id
