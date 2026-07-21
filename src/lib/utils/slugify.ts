@@ -1,4 +1,25 @@
 import type { Payload } from 'payload'
+import { pinyin } from 'pinyin-pro'
+import transliterateSlug from 'slugify'
+import { toRomaji } from 'wanakana'
+
+function romanizeCjk(value: string): string {
+    return value.replace(
+        /[\u3040-\u309F]+|[\u30A0-\u30FF]+|[\u3400-\u4DBF\u4E00-\u9FFF]+/gu,
+        (run) => ` ${/[\u3040-\u30FF]/u.test(run)
+            ? toRomaji(run).replace(/([aeiou])\1+/gi, '$1')
+            : pinyin(run, { toneType: 'none', type: 'array' }).join(' ')} `,
+    )
+}
+
+function stableSlugSuffix(value: string): string {
+    let hash = 2166136261
+    for (const char of value.normalize('NFKC')) {
+        hash ^= char.codePointAt(0) ?? 0
+        hash = Math.imul(hash, 16777619)
+    }
+    return (hash >>> 0).toString(36).padStart(7, '0').slice(0, 7)
+}
 
 /**
  * Convert business name to DNS-safe slug.
@@ -7,19 +28,17 @@ import type { Payload } from 'payload'
  * - Enforces 3-63 chars (DNS label spec)
  */
 export function slugify(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // strip diacritics
-        .replace(/[^a-z0-9\s-]/g, '')    // remove special chars
-        .trim()
-        .replace(/\s+/g, '-')            // spaces → hyphens
-        .replace(/-+/g, '-')             // collapse multiple hyphens
-        .replace(/^-|-$/g, '')           // trim leading/trailing hyphens
-        .slice(0, 63)                    // DNS label max
+    const normalizedName = name.normalize('NFKC').trim()
+    const transliterated = transliterateSlug(romanizeCjk(normalizedName), {
+        lower: true,
+        strict: true,
+        trim: true,
+    }).slice(0, 63).replace(/-+$/g, '')
 
-    // Fallback if empty (emoji-only, pure symbols, etc.)
-    return slug.length >= 3 ? slug : 'my-store'
+    if (transliterated.length >= 3) return transliterated
+
+    const suffix = stableSlugSuffix(normalizedName || 'store')
+    return transliterated ? `${transliterated}-${suffix}`.slice(0, 63) : `site-${suffix}`
 }
 
 /**

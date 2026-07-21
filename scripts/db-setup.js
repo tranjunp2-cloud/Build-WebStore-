@@ -3618,6 +3618,8 @@ const MIGRATIONS = [
   { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter)
+  { name: 'pages_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "pages_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
@@ -3663,6 +3665,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter) — draft/versioned table
+  { name: '_pages_v_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "_pages_v_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean;` },
   { name: '_pages_v_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },

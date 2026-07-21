@@ -98,6 +98,19 @@ describe('generateSiteWithAI — fallback path (no API key) [TC-F01.08]', () => 
         const { result } = await generateSiteWithAI(businessInfo)
         expect(result.language).toBe('en')
     })
+
+    it('[TC-F26-11-04] fails instead of creating English fallback content for confirmed Italian', async () => {
+        // Act / Assert
+        await expect(generateSiteWithAI(
+            businessInfo,
+            undefined,
+            'auto',
+            undefined,
+            undefined,
+            undefined,
+            { targetLocale: 'it' },
+        )).rejects.toThrow('OpenAI is required to generate content in Italian')
+    })
 })
 
 describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {

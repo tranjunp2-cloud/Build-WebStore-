@@ -475,8 +475,12 @@ export async function getMediaForBlock(
     // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
     // on-industry ones, leaving non-hero blocks with no image at all.
     const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[composerCategory])
     const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
-        if (terms.length === 0) return photos
+        if (terms.length === 0) {
+            if (categoryMapped) return photos
+            return []
+        }
         const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {
             console.info(
@@ -485,9 +489,8 @@ export async function getMediaForBlock(
         }
         return kept
     }
-    // Tier 3: trusted category phrase, ungated — mirrors image-pool
-    // searchBucket so the legacy path degrades to on-category photos instead
-    // of off-topic AND-match noise. VN queries use the curated Vietnamese
+    // Tier 3 broadens the search with a category phrase, then applies the same
+    // trusted product gate as earlier tiers. VN queries use the curated Vietnamese
     // phrase (lang=vi); non-VN queries (Malay/English zero-hit) fall to the
     // English category base keyword — an empty result here means the block
     // keeps whatever URL GPT hallucinated into it (GH-1185 QC retest).
@@ -508,11 +511,17 @@ export async function getMediaForBlock(
                 category: pixCategory,
                 ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
-            if (photos.length > 0) {
+            // Keep the merchant's product terms as the relevance contract on
+            // every tier. A Pixabay category only constrains the broad industry;
+            // it cannot distinguish a bakery photo from another food product.
+            // gateTerms handles the no-product case: mapped categories may rely
+            // on the server-side filter, while unmapped categories reject all.
+            const gatedPhotos = gateTerms(photos, subjectTerms)
+            if (gatedPhotos.length > 0) {
                 console.info(
-                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${photos.length} photo(s)`,
+                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
                 )
-                return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+                return batchFetch(pickRandomN(gatedPhotos, count), blockType, ctx, payload)
             }
         }
         return blockType === 'hero'
@@ -541,10 +550,10 @@ export async function getMediaForBlock(
                         width: targetWidth,
                         category: pixCategory,
                     }),
-                    // Broadening keeps the product subject only on the raw path;
-                    // on the scaffolding path broadQuery is a category keyword and
-                    // must not be used as a gate term (see subjectTerms).
-                    subjectTerms.length > 0 ? [broadQuery] : [],
+                    // Broadening changes only the SEARCH query. Relevance remains
+                    // anchored to all trusted merchant product terms, otherwise an
+                    // ambiguous first keyword can admit the wrong product at tier 2.
+                    subjectTerms,
                 )
                 if (broader.length === 0) {
                     // `await` is load-bearing: categoryFallback can throw
