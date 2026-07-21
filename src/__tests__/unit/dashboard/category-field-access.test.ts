@@ -32,7 +32,22 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockFindByID = vi.fn()
-        mockFind = vi.fn()
+        mockFind = vi.fn().mockImplementation(async (args: { collection: string }) => {
+            if (args.collection === 'plan-subscriptions') {
+                return {
+                    docs: [{
+                        id: 'sub-123',
+                        plan: 'PROFESSIONAL_TM_USER',
+                        status: 'active',
+                        endsAt: '2099-01-01T00:00:00.000Z',
+                    }],
+                }
+            }
+            if (args.collection === 'plan-features') {
+                return { docs: [{ value: 'YES' }] }
+            }
+            return { docs: [] }
+        })
         mockCreate = vi.fn()
         mockUpdate = vi.fn()
         mockExecute = vi.fn()
