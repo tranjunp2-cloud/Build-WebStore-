@@ -1,20 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { Payload } from 'payload'
 import { productWeightToGrams } from '@/lib/shipping/product-weight'
-
-/** Minimal shape of a product document used in build-order-items flow. */
-interface ProductDoc {
-    id: string | number
-    name: string
-    price: number
-    currency?: string
-    inventory?: number | null
-    hasVariants?: boolean
-    variants?: Array<{ name: string; price: number; stock?: number | null }>
-    tenant?: string | number | { id: string | number }
-    images?: Array<{ url?: string }>
-    weight?: number | null // kg (GH-1458 canonical unit)
-}
+import { resolveProductLine, type ProductLineProduct } from '@/lib/products/resolve-product-line'
 
 export interface OrderItemRow {
     product: number | string
@@ -88,7 +75,7 @@ export async function buildOrderItems(
         }
 
         // Cross-tenant IDOR guard: reject if product has no tenant or belongs to a different tenant
-        const p = product as unknown as ProductDoc
+        const p = product as unknown as ProductLineProduct
         if (tenantId !== undefined) {
             const productTenantId = typeof p.tenant === 'object' ? p.tenant?.id : p.tenant
             if (!productTenantId || String(productTenantId) !== String(tenantId)) {
@@ -102,69 +89,69 @@ export async function buildOrderItems(
             }
         }
 
-        // Guard: hasVariants products require an explicit variant selection
-        if (p.hasVariants && !item.variant) {
-            return {
-                orderItems: [], checkoutItems: [], subtotal: 0, currency,
-                errorResponse: NextResponse.json(
-                    { success: false, error: { code: 'VARIANT_REQUIRED', message: `A variant must be selected for "${p.name}"` } },
-                    { status: 422 },
-                ),
+        const resolved = resolveProductLine(p, item, { stockPolicy: skipStockCheck ? 'ignore' : 'reject' })
+        if (!resolved.ok) {
+            if (resolved.code === 'VARIANT_REQUIRED') {
+                return {
+                    orderItems: [], checkoutItems: [], subtotal: 0, currency,
+                    errorResponse: NextResponse.json(
+                        { success: false, error: { code: 'VARIANT_REQUIRED', message: `A variant must be selected for "${p.name}"` } },
+                        { status: 422 },
+                    ),
+                }
             }
-        }
-
-        // Variant resolution — depth:0 is safe: variants is an array field, present on the doc
-        const variant = (p.hasVariants && item.variant && Array.isArray(p.variants))
-            ? p.variants!.find(v => v.name === item.variant) ?? null
-            : null
-
-        // Stale or unknown variant → reject; prevents silent base-price fallback exploit
-        if (p.hasVariants && item.variant && !variant) {
-            return {
-                orderItems: [], checkoutItems: [], subtotal: 0, currency,
-                errorResponse: NextResponse.json(
-                    { success: false, error: { code: 'VARIANT_NOT_FOUND', message: `Variant "${item.variant}" not found for "${p.name}"` } },
-                    { status: 422 },
-                ),
+            if (resolved.code === 'VARIANT_NOT_FOUND') {
+                return {
+                    orderItems: [], checkoutItems: [], subtotal: 0, currency,
+                    errorResponse: NextResponse.json(
+                        { success: false, error: { code: 'VARIANT_NOT_FOUND', message: `Variant "${item.variant}" not found for "${p.name}"` } },
+                        { status: 422 },
+                    ),
+                }
             }
-        }
-
-        const unitPrice = variant ? variant.price : p.price
-        // Variant-aware availability: per-variant stock for variant products, aggregate otherwise.
-        // Mirrors COD flow (checkout/route.ts). variant.stock is accurate since decrementVariantStock
-        // now keeps products_variants.stock in sync after every payment method.
-        // NULL stock = tracking disabled (unlimited). Mirror non-variant ?? Infinity pattern.
-        const stockAvail = (p.hasVariants && variant)
-            ? (variant.stock != null ? variant.stock : Infinity)
-            : (p.inventory ?? Infinity)
-
-        if (!skipStockCheck && stockAvail < item.quantity) {
-            return {
-                orderItems: [], checkoutItems: [], subtotal: 0, currency,
-                errorResponse: NextResponse.json(
-                    {
-                        success: false,
-                        error: {
-                            code: 'OUT_OF_STOCK',
-                            message: p.hasVariants
-                                ? `"${p.name}" (${item.variant}) has only ${stockAvail} left`
-                                : `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
-                            ...(p.hasVariants ? { variant: item.variant } : {}),
-                            available: stockAvail,
-                            requested: item.quantity,
+            if (!skipStockCheck) {
+                const stockAvail = resolved.available ?? 0
+                return {
+                    orderItems: [], checkoutItems: [], subtotal: 0, currency,
+                    errorResponse: NextResponse.json(
+                        {
+                            success: false,
+                            error: {
+                                code: 'OUT_OF_STOCK',
+                                message: p.hasVariants
+                                    ? `"${p.name}" (${item.variant}) has only ${stockAvail} left`
+                                    : `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
+                                ...(p.hasVariants ? { variant: item.variant } : {}),
+                                available: stockAvail,
+                                requested: item.quantity,
+                            },
                         },
-                    },
+                        { status: 422 },
+                    ),
+                }
+            }
+        }
+
+        // The `ignore` policy above guarantees a canonical variant price for legacy retry paths.
+        // Normal checkout always uses the reject policy and returns on any non-success result.
+        if (!resolved.ok) {
+            return {
+                orderItems: [], checkoutItems: [], subtotal: 0, currency,
+                errorResponse: NextResponse.json(
+                    { success: false, error: { code: 'OUT_OF_STOCK', message: `Product ${item.productId} is unavailable` } },
                     { status: 422 },
                 ),
             }
         }
+        const variant = resolved.variant
+        const unitPrice = resolved.unitPrice
 
         currency = p.currency || 'MYR'
         subtotal += unitPrice * item.quantity
         orderItems.push({ product: productId, productName: p.name, variant: item.variant || '', quantity: item.quantity, unitPrice, weightGrams: productWeightToGrams(p.weight) })
         // Stripe expects smallest unit: 100 sen = RM 1; include variant name so customer sees "Shirt (Red)" on Stripe page
         const displayName = variant ? `${p.name} (${variant.name})` : p.name
-        checkoutItems.push({ name: displayName, price: Math.round(unitPrice * 100), quantity: item.quantity, images: p.images?.[0]?.url ? [p.images[0].url] : [] })
+        checkoutItems.push({ name: displayName, price: Math.round(unitPrice * 100), quantity: item.quantity, images: resolved.ok && resolved.imageUrl ? [resolved.imageUrl] : [] })
     }
 
     return { orderItems, checkoutItems, subtotal, currency }

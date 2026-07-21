@@ -28,7 +28,7 @@ type AddToCartButtonProps = {
 }
 
 export function AddToCartButton({ product, variantName, requireVariant, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
-    const { addItem, setSiteSlug, items } = useCartStore()
+    const { addItem, activateSiteCart, items } = useCartStore()
     const isOwner = useIsOwner()
     const { t, ti } = useI18n()
 
@@ -52,7 +52,8 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
             )
             return
         }
-        setSiteSlug(siteSlug)
+        if (!siteId) return
+        activateSiteCart(String(siteId), siteSlug)
         addItem({
             productId: product.id,
             productSlug: product.slug,

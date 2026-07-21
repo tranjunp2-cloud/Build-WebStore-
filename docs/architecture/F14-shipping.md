@@ -133,11 +133,11 @@ sequenceDiagram
 
     Buyer->>Checkout: Select state "Selangor"
     Checkout->>Checkout: Debounce 300ms
-    Checkout->>Calc: { siteId, state, subtotal }
+    Checkout->>Calc: { siteId, state, subtotalSen }
     Calc->>Lib: classifyRegion("Selangor") → "west"
-    Calc->>Lib: calculateShippingFee(config, "west", subtotal)
-    Lib-->>Calc: { fee: 800, isFree: false, hint: "Add RM 50 more..." }
-    Calc-->>Checkout: 200 { fee, isFree, hint }
+    Calc->>Lib: getShippingRate(config, "west", subtotalSen)
+    Lib-->>Calc: 800 sen
+    Calc-->>Checkout: 200 { rates: [{ priceSen: 800 }], isFree: false, hint }
     Checkout->>Summary: Update shipping row + hint
     Summary-->>Buyer: Display "RM 8.00" + neutral hint
 ```
@@ -236,7 +236,7 @@ sequenceDiagram
 
 **Auth:** Public (checkout guest)
 **Idempotent:** Yes (pure calc).
-**Rate limit:** 60 req/min per IP (sane default; checkout debounce 300ms makes this generous).
+**Rate limit:** 20 req/min per `siteId`.
 **Body validation:** Handler guards against null or array body → returns 400.
 
 ```typescript
@@ -244,14 +244,15 @@ sequenceDiagram
 {
   siteId: string,    // required
   state: string,     // required, one of MY_STATES
-  subtotal: number   // required, sen, ≥0
+  subtotalSen: number // required, sen, ≥0
 }
 
 // Response 200
 {
   success: true,
   data: {
-    fee: number,           // sen, after free-shipping rule applied
+    fee: number,           // deprecated legacy field: flat=sen; EasyParcel=RM
+    rates: Array<{ priceSen: number }>, // canonical quoted amount in sen
     isFree: boolean,       // true if subtotal >= freeAbove
     region: 'west' | 'east',
     hint?: {
@@ -263,11 +264,16 @@ sequenceDiagram
 }
 
 // Response 400 — validation error (invalid state, null/array body)
-{ success: false, error: { code: 'INVALID_STATE', message: 'Unknown Malaysian state' } }
+{ success: false, error: { code: 'INVALID_STATE', message: 'Invalid Malaysia state' } }
 
 // Response 404 — site not found
-{ success: false, error: { code: 'SITE_NOT_FOUND', message: 'Site not found' } }
+{ success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } }
 ```
+
+`data.fee` is deprecated and intentionally preserves branch-specific legacy units:
+flat-rate responses return sen, while EasyParcel responses return RM. New clients
+MUST ignore it and derive the displayed RM amount from the canonical
+`rates[0].priceSen / 100` for both quote paths.
 
 ---
 
@@ -315,7 +321,7 @@ export const HINT_HIGHLIGHT_THRESHOLD = 5000  // RM 50 — gap ≤ this → high
 | `westRate`, `eastRate` | integer ∈ [0, 100000] | `VALIDATION_ERROR.out_of_range` |
 | `freeAbove` | `null` or integer ≥ 0 | `VALIDATION_ERROR.invalid_threshold` |
 | `state` (POST calc) | must ∈ `MY_STATES` enum | `INVALID_STATE` |
-| `subtotal` (POST calc) | integer ≥ 0 | `VALIDATION_ERROR.invalid_subtotal` |
+| `subtotalSen` (POST calc) | integer ≥ 0 | `VALIDATION_ERROR.invalid_subtotal` |
 | `postcode` (form) | regex `^\d{5}$` client-side only | (UI inline error, no API check) |
 
 Zod schemas in `src/lib/shipping/schemas.ts`.
@@ -326,7 +332,7 @@ Zod schemas in `src/lib/shipping/schemas.ts`.
 
 | Error | HTTP | User-facing UI | Recovery |
 |-------|------|----------------|----------|
-| `SITE_NOT_FOUND` | 404 | "Unable to load store. Please refresh." | Reload page |
+| `NOT_FOUND` | 404 | "Unable to load store. Please refresh." | Reload page |
 | `INVALID_STATE` | 400 | "Please select a valid state." | Re-select state |
 | `VALIDATION_ERROR` (rate range) | 400 | Inline input: "Rate must be 0 – RM 1,000" | Fix value |
 | `FORBIDDEN` (PATCH) | 403 | Toast: "You don't have permission" | Re-login |
@@ -357,7 +363,7 @@ Zod schemas in `src/lib/shipping/schemas.ts`.
 
 - **Auth:** PATCH gated by tenant membership check. Re-use existing `lib/auth/check-tenant-member.ts` (pattern from F19 settings).
 - **Input sanitization:** All numeric inputs → `parseInt`, reject NaN. Currency strings rejected — UI converts RM → sen before send.
-- **Rate limiting:** `/calculate-shipping` is public. Use `upstash/ratelimit` (60 req/min/IP) — re-use from `lib/rate-limit.ts` if exists; otherwise implement minimal in-memory.
+- **Rate limiting:** `/calculate-shipping` is public and uses `checkRateLimit` at 20 requests/minute per `siteId`.
 - **CSRF:** Next.js App Router POST + same-origin policy sufficient. No additional CSRF token needed.
 - **Tenant isolation:** Path param `siteId` — verify in handler `site.tenant === session.user.tenantId`. NEVER trust client-supplied tenant.
 

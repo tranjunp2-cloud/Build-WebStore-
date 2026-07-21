@@ -1,5 +1,55 @@
 import { describe, it, expect } from 'vitest'
-import { getShippingRate } from '@/lib/shipping'
+import { getShippingRate, shippingRateToRM } from '@/lib/shipping'
+
+describe('shippingRateToRM [TC-F14.159]', () => {
+    it('converts an exact sen RateOption price to RM for checkout display', () => {
+        // Arrange
+        const rate = { priceSen: 801 }
+
+        // Act
+        const feeRM = shippingRateToRM(rate, 8)
+
+        // Assert
+        expect(feeRM).toBe(8.01)
+    })
+
+    it('falls back safely when the response price is malformed', () => {
+        // Arrange
+        const rate = { priceSen: Number.NaN }
+
+        // Act
+        const feeRM = shippingRateToRM(rate, 8.01)
+
+        // Assert
+        expect(feeRM).toBe(8.01)
+    })
+
+    it('preserves an explicit zero-sen free-shipping quote', () => {
+        // Arrange
+        const rate = { priceSen: 0 }
+
+        // Act
+        const feeRM = shippingRateToRM(rate, 8.01)
+
+        // Assert
+        expect(feeRM).toBe(0)
+    })
+
+    it.each([
+        ['missing rate', undefined],
+        ['negative sen', { priceSen: -1 }],
+        ['fractional sen', { priceSen: 801.5 }],
+    ])('uses the RM fallback for %s', (_caseName, rate) => {
+        // Arrange
+        const fallbackRM = 5
+
+        // Act
+        const feeRM = shippingRateToRM(rate, fallbackRM)
+
+        // Assert
+        expect(feeRM).toBe(fallbackRM)
+    })
+})
 
 describe('getShippingRate [TC-F14]', () => {
     it('[TC-F14.01] charges west rate (800 sen) for Selangor with default config', () => {

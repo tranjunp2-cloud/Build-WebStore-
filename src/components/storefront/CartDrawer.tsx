@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
-import { X, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react'
+import { X, Minus, Plus, Trash2, ShoppingCart, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
@@ -17,12 +17,13 @@ function formatPrice(price: number, currency: string) {
 }
 
 export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: string }) {
-    const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
+    const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount, siteId: activeSiteId, siteSlug: activeSiteSlug, refreshStatus, refreshCart, changes } = useCartStore()
     const isOwner = useIsOwner()
     const { t } = useI18n()
     const pathname = usePathname()
     const shopBase = pathname.startsWith('/sites/') ? `/sites/${siteSlug}` : ''
     const hasCheckoutRoute = Boolean(siteSlug)
+    const checkoutBlocked = refreshStatus !== 'idle' || items.some(item => item.unavailable)
 
     useEffect(() => {
         if (isOpen) {
@@ -30,6 +31,10 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
         }
         return () => { document.body.style.overflow = '' }
     }, [isOpen])
+
+    useEffect(() => {
+        if (isOpen && activeSiteId && activeSiteSlug) void refreshCart()
+    }, [activeSiteId, activeSiteSlug, isOpen, refreshCart])
 
     if (!isOpen) return null
 
@@ -72,6 +77,12 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                     </button>
                 </div>
 
+                <div aria-live="polite" style={{ minHeight: refreshStatus === 'idle' && changes.length === 0 ? 0 : '28px', marginBottom: '12px' }}>
+                    {refreshStatus === 'refreshing' && <p role="status" style={{ margin: 0, fontSize: '13px', color: '#71717a', display: 'flex', gap: '6px', alignItems: 'center' }}><Loader2 size={14} className="spin" />{t.storefront.cart.updating}</p>}
+                    {refreshStatus === 'error' && <div role="alert" style={{ fontSize: '13px', color: '#b42318' }}>{t.storefront.cart.refreshFailed} <button type="button" onClick={() => void refreshCart()} style={{ border: 0, background: 'none', color: CSS_VARS.primary, fontWeight: 700, cursor: 'pointer' }}>{t.storefront.cart.retry}</button></div>}
+                    {refreshStatus === 'idle' && changes.length > 0 && <div role="status" style={{ fontSize: '13px', color: '#166534' }}><p style={{ margin: 0 }}>{t.storefront.cart.changesUpdated}</p>{changes.map(change => change.fields.includes('price') && change.previous && change.current ? <p key={`${change.productId}:${change.variantName ?? ''}:price`} style={{ margin: '4px 0 0' }}>{t.storefront.cart.priceChanged.replace('{from}', formatPrice(change.previous.price, currency)).replace('{to}', formatPrice(change.current.price, currency))}</p> : change.fields.includes('quantity') ? <p key={`${change.productId}:${change.variantName ?? ''}:quantity`} style={{ margin: '4px 0 0' }}>{t.storefront.cart.quantityAdjusted}</p> : null)}</div>}
+                </div>
+
                 {/* Items */}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
                     {items.length === 0 ? (
@@ -104,6 +115,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 {item.variantName && (
                                                     <p style={{ fontSize: '12px', color: '#71717a', margin: '2px 0 0' }}>{item.variantName}</p>
                                                 )}
+                                                {item.unavailable && <p role="alert" style={{ fontSize: '12px', color: '#b42318', margin: '4px 0 0' }}>{t.storefront.cart.itemUnavailable}</p>}
                                             </div>
                                             <button onClick={() => removeItem(item.productId, item.variantName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: '8px' }}>
                                                 <Trash2 size={11} color={'#71717a'} />
@@ -119,7 +131,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                             }}>
                                                 <button
                                                     onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantName)}
-                                                    disabled={item.quantity <= 1}
+                                                    disabled={item.unavailable || item.quantity <= 1}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.quantity <= 1 ? 0.3 : 1 }}>
                                                     <Minus size={7} />
                                                 </button>
@@ -128,7 +140,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 </span>
                                                 <button
                                                     onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantName)}
-                                                    disabled={item.inventory !== undefined && item.quantity >= item.inventory}
+                                                    disabled={item.unavailable || (item.inventory !== undefined && item.quantity >= item.inventory)}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: (item.inventory !== undefined && item.quantity >= item.inventory) ? 0.3 : 1 }}>
                                                     <Plus size={7} />
                                                 </button>
@@ -158,7 +170,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                 </p>
                             </>
                         )}
-                        {hasCheckoutRoute && items.length > 0 ? (
+                        {hasCheckoutRoute && items.length > 0 && !checkoutBlocked ? (
                             <a href={`${shopBase}/checkout`}
                                 onClick={() => {
                                     if (siteId) trackEvent({ siteId, event: 'checkout', metadata: { itemCount: items.length, subtotal: subtotal() }, isOwner })
@@ -169,9 +181,9 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                         ) : (
                             <button
                                 type="button"
-                                disabled={items.length === 0}
-                                onClick={items.length > 0 ? () => toast.info(t.storefront.cart.checkoutUnavailable) : undefined}
-                                style={{ ...ctaBtnStyle, background: items.length === 0 ? '#d1d5db' : CSS_VARS.accent, color: items.length === 0 ? '#9ca3af' : '#fff', cursor: items.length === 0 ? 'not-allowed' : 'pointer', boxShadow: 'none' }}
+                                disabled={items.length === 0 || checkoutBlocked}
+                                onClick={items.length > 0 && !checkoutBlocked ? () => toast.info(t.storefront.cart.checkoutUnavailable) : undefined}
+                                style={{ ...ctaBtnStyle, background: items.length === 0 || checkoutBlocked ? '#d1d5db' : CSS_VARS.accent, color: items.length === 0 || checkoutBlocked ? '#9ca3af' : '#fff', cursor: items.length === 0 || checkoutBlocked ? 'not-allowed' : 'pointer', boxShadow: 'none' }}
                             >
                                 {t.storefront.cart.proceedToCheckout.toUpperCase()}
                             </button>
