@@ -150,7 +150,7 @@ test.describe('Products Management', () => {
             name: 'Color',
             options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
         })
-        await expect(page.locator('[role="dialog"] input[type="text"]').first()).toHaveValue('T-Shirt')
+        await expect(page.locator('.fixed.inset-0 input[type="text"]').first()).toHaveValue('T-Shirt')
         await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
     })
 
