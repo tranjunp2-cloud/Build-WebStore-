@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -48,6 +49,15 @@ vi.mock('@/lib/rateLimit', () => ({
 let mockSiteDB: any[] = []
 let mockPageDB: any[] = []
 let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
+let mockPageCreateFailure: { slug: string; error: Error } | null = null
+let mockMediaDB: Array<Record<string, unknown>> = []
+let mockFailedPageCreateData: Record<string, unknown> | null = null
+
+type PersistedBlock = Record<string, unknown> & { blockType?: string }
+type PersistedPage = Record<string, unknown> & {
+    slug?: string
+    layout?: PersistedBlock[]
+}
 
 vi.mock('payload', () => {
     return {
@@ -63,9 +73,16 @@ vi.mock('payload', () => {
             find: vi.fn().mockImplementation(async ({ collection }) => {
                 if (collection === 'sites') return { docs: mockSiteDB }
                 if (collection === 'pages') return { docs: mockPageDB }
+                if (collection === 'media') return { docs: mockMediaDB }
                 return { docs: [] }
             }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
+                if (collection === 'pages' && mockPageCreateFailure && data.slug === mockPageCreateFailure.slug) {
+                    mockFailedPageCreateData = structuredClone(data)
+                    const { error } = mockPageCreateFailure
+                    mockPageCreateFailure = null
+                    throw error
+                }
                 const doc = { id: `new-${collection}-123`, ...data }
                 if (collection === 'sites') mockSiteDB.push(doc)
                 if (collection === 'pages') mockPageDB.push(doc)
@@ -191,6 +208,9 @@ describe('AI Streaming APIs', () => {
         mockPageDB = []
         mockTenant = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
         mockRateLimitAllowed = true
+        mockPageCreateFailure = null
+        mockMediaDB = []
+        mockFailedPageCreateData = null
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -288,6 +308,219 @@ describe('AI Streaming APIs', () => {
              expect(footerUrls).not.toContain('our-story')
              expect(footerUrls).toContain('/contact')
              expect(footerUrls).not.toContain('free-trial')
+        })
+
+        it('[TC-TF-025] normalizes generated products-grid defaults by page slug before persistence (GH-1588)', async () => {
+             // Arrange
+             const expectedProductsCopy = resolveBlockContent('products', 'en', 'Grid Shop').content as {
+                 headline?: string
+                 subheadline?: string
+             }
+
+             const generatedSite = {
+                 result: {
+                     siteName: 'Grid Shop',
+                     siteType: 'ecommerce',
+                     theme: {
+                         primaryColor: '#000000',
+                         secondaryColor: '#ffffff',
+                         fontHeading: 'DM Sans',
+                         fontBody: 'Inter',
+                         colorMode: 'light',
+                     },
+                     seo: { title: 'Grid Shop', description: 'Desc' },
+                     language: 'en',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 { blockType: 'hero', variant: 'centered', headline: 'Homepage Hero', subheadline: 'Welcome', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' },
+                                 {
+                                     blockType: 'products-grid',
+                                     variant: 'grid-3',
+                                     count: 24,
+                                     items: [
+                                         { name: 'Home Item 1', price: 'RM 10.00' },
+                                         { name: 'Home Item 2', price: 'RM 20.00' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Home', description: 'Home page' },
+                         },
+                         {
+                             title: 'Products',
+                             slug: '/products',
+                             isHomepage: false,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 { blockType: 'hero', variant: 'centered', headline: 'Products Hero', subheadline: 'Browse', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' },
+                                 {
+                                     blockType: 'products-grid',
+                                     variant: 'grid-3',
+                                     limit: 7.9,
+                                     count: 8,
+                                     items: [
+                                         { name: 'Product Item 1', price: 'RM 30.00' },
+                                         { name: 'Product Item 2', price: 'RM 40.00' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Products', description: 'Products page' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } satisfies Awaited<ReturnType<typeof generateSiteWithAI>>
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce(generatedSite)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Grid Shop', industry: 'Retail', products: 'Curated goods', shortDescription: 'A modern shop' }
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+
+             const persistedPages = mockPageDB as PersistedPage[]
+             const homepageSaved = persistedPages.find((page) => page.slug === '/')
+             const productsSaved = persistedPages.find((page) => page.slug === '/products')
+             expect(homepageSaved).toBeDefined()
+             expect(productsSaved).toBeDefined()
+
+             const homepageGrid = homepageSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             const productsGrid = productsSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(homepageGrid).toBeDefined()
+             expect(productsGrid).toBeDefined()
+
+             expect(homepageGrid.showCategoryFilter).toBe(false)
+             expect(productsGrid.showCategoryFilter).toBe(true)
+             expect(homepageGrid.headline).toBe(expectedProductsCopy.headline)
+             expect(homepageGrid.subheadline).toBe(expectedProductsCopy.subheadline)
+             expect(productsGrid.headline).toBe(expectedProductsCopy.headline)
+             expect(productsGrid.subheadline).toBe(expectedProductsCopy.subheadline)
+             expect(homepageGrid.limit).toBe(20)
+             expect(productsGrid.limit).toBe(7)
+             expect(homepageGrid.count).toBeUndefined()
+             expect(productsGrid.count).toBeUndefined()
+
+             const homepageHero = homepageSaved?.layout?.find((block) => block.blockType === 'hero')
+             expect(homepageHero?.headline).toBe('Homepage Hero')
+        })
+
+        it('[TC-TF-026] keeps fallback /products page unchanged when no products-grid is generated (GH-1588)', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Fallback Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             const productsSaved = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/products')
+             expect(productsSaved).toBeDefined()
+             expect(productsSaved?.layout?.some((block) => block.blockType === 'products-grid')).toBe(false)
+        })
+
+        it('[TC-TF-027] preserves Malay products-grid defaults when page creation retries without image refs (GH-1588)', async () => {
+             // Arrange
+             const expectedProductsCopy = resolveBlockContent('products', 'ms', 'Retry Shop').content as {
+                 headline?: string
+                 subheadline?: string
+             }
+             const generatedSite = {
+                 result: {
+                     siteName: 'Retry Shop',
+                     siteType: 'ecommerce',
+                     theme: {
+                         primaryColor: '#000000',
+                         secondaryColor: '#ffffff',
+                         fontHeading: 'DM Sans',
+                         fontBody: 'Inter',
+                         colorMode: 'light',
+                     },
+                     seo: { title: 'Retry Shop', description: 'Desc' },
+                     language: 'ms',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [{ blockType: 'hero', variant: 'centered', headline: 'Home' }],
+                             seo: { title: 'Home', description: 'Home page' },
+                         },
+                         {
+                             title: 'Products',
+                             slug: '/products',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'products-grid',
+                                 variant: 'grid-3',
+                                 count: 9,
+                                 image: 123,
+                                 items: [{ name: 'Retry Item', price: 'RM 10.00' }],
+                             }],
+                             seo: { title: 'Products', description: 'Products page' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } satisfies Awaited<ReturnType<typeof generateSiteWithAI>>
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce(generatedSite)
+             mockMediaDB = [{
+                 id: 123,
+                 filename: 'retry-product.jpg',
+                 mimeType: 'image/jpeg',
+                 filesize: 1024,
+             }]
+             mockPageCreateFailure = {
+                 slug: '/products',
+                 error: new Error('upload foreign key failed'),
+             }
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Retry Shop', industry: 'Retail', products: 'Goods', shortDescription: 'A retry shop' },
+                     language: 'ms',
+                     generationLocale: 'ms',
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             expect(mockPageCreateFailure).toBeNull()
+             const failedProductsPage = mockFailedPageCreateData as PersistedPage | null
+             const failedProductsGrid = failedProductsPage?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(failedProductsGrid?.image).toBe(123)
+             const productsSaved = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/products')
+             const productsGrid = productsSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(productsGrid).toMatchObject({
+                 showCategoryFilter: true,
+                 headline: expectedProductsCopy.headline,
+                 subheadline: expectedProductsCopy.subheadline,
+                 limit: 9,
+             })
+             expect(productsGrid?.count).toBeUndefined()
+             expect(productsGrid?.image).toBeUndefined()
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {

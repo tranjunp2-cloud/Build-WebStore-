@@ -4,7 +4,7 @@ plan: plans/260416-1450-template-first-gen/plan.md
 prd: docs/prd/F01-ai-builder.md
 created: 2026-04-16
 scenarios: 32
-test-cases: 18
+test-cases: 27
 ---
 
 # QA Test Plan — F01 Template-First Gen
@@ -269,6 +269,31 @@ test-cases: 18
   2. Check `categories` field on the result
 - **Expected:** `categories.length > 0` — the GH-1219 drop condition is false; block is kept.
 
+### TC-TF-025: Generated products-grid defaults follow page slug (GH-1588)
+- **Priority:** P1
+- **Type:** API integration (Vitest + mocked Payload)
+- **Steps:**
+  1. Generate a homepage and `/products` page that both contain a template-first `products-grid` block.
+  2. Inspect the layouts persisted through the generate-site route.
+- **Expected:** Only `/products` enables `showCategoryFilter`; both blocks restore headline/subheadline, normalize `limit` or legacy `count` to an integer from 1–20, and remove legacy `count` without changing unrelated blocks.
+
+### TC-TF-026: Fallback products page without products-grid remains unchanged (GH-1588)
+- **Priority:** P1
+- **Type:** API integration (Vitest + mocked Payload)
+- **Steps:**
+  1. Generate a fallback site whose `/products` page does not contain `products-grid`.
+  2. Inspect the persisted `/products` layout.
+- **Expected:** Generation succeeds and normalization does not inject a new `products-grid` block.
+
+### TC-TF-027: Malay image-reference retry preserves products-grid defaults (GH-1588)
+- **Priority:** P1
+- **Type:** API integration (Vitest + mocked Payload)
+- **Steps:**
+  1. Generate a Malay `/products` page containing a legacy `products-grid` shape and a numeric image reference that passes the media precheck.
+  2. Make the first Payload page create fail with an upload foreign-key error.
+  3. Inspect the page persisted by the image-free retry.
+- **Expected:** The first create receives the numeric image reference; the retry removes it while preserving Malay headline/subheadline, `showCategoryFilter`, normalized `limit`, and removal of legacy `count`.
+
 ## 5. Traceability Matrix
 
 | AC / FR | Test Cases | Coverage |
@@ -284,6 +309,7 @@ test-cases: 18
 | BR-03 (Rate limit before API) | TC-TF-014 | ✅ Full |
 | BR-06 (Content safety) | TC-TF-016 | ✅ Full |
 | BR-07 (Quota protection on fail) | TC-TF-003 | ✅ Full |
+| GH-1588 (products-grid generation defaults) | TC-TF-025, TC-TF-026, TC-TF-027 | ✅ Full |
 
 ## 6. Self-Check
 
@@ -291,7 +317,7 @@ test-cases: 18
 📋 QA Test Plan Self-Check:
 ├── Gọi Skill tool ck:scenario? ✅
 ├── Số scenarios: 32 (>= 30) ✅
-├── Số test cases: 18
+├── Số test cases: 27
 ├── Map 100% ACs? ✅ — AC-1,5,6 + FR-02,15,16,17,18 + BR-03,06,07
 ├── Có Traceability Matrix? ✅
 ├── Có Risk Assessment? ✅
