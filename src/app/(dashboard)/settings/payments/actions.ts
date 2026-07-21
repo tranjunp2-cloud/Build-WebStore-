@@ -20,6 +20,60 @@ export type PaymentUpdates = {
     account_number?: string | null;
 };
 
+type PaymentMedia = {
+    id: string | number;
+    url?: string | null;
+    thumbnailURL?: string | null;
+    filename?: string | null;
+};
+
+export type SavedPaymentSettings = Omit<PaymentUpdates, 'qr_image'> & {
+    payment_cod: boolean;
+    payment_qr: boolean;
+    payment_card: boolean;
+    payment_fpx: boolean;
+    qr_image: string | number | PaymentMedia | null;
+    account_holder_name: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+};
+
+export type UpdatePaymentSettingsResult =
+    | { success: true; payments: SavedPaymentSettings }
+    | { success: false; error: string };
+
+function editablePaymentSettings(value: unknown): SavedPaymentSettings {
+    const payments = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+    const rawQrImage = payments.qr_image;
+    let qrImage: SavedPaymentSettings['qr_image'] = null;
+    if (typeof rawQrImage === 'string' || typeof rawQrImage === 'number') {
+        qrImage = rawQrImage;
+    } else if (rawQrImage && typeof rawQrImage === 'object' && !Array.isArray(rawQrImage)) {
+        const media = rawQrImage as Record<string, unknown>;
+        if (typeof media.id === 'string' || typeof media.id === 'number') {
+            qrImage = {
+                id: media.id,
+                ...(typeof media.url === 'string' ? { url: media.url } : {}),
+                ...(typeof media.thumbnailURL === 'string' ? { thumbnailURL: media.thumbnailURL } : {}),
+                ...(typeof media.filename === 'string' ? { filename: media.filename } : {}),
+            };
+        }
+    }
+
+    return {
+        payment_cod: payments.payment_cod === true,
+        payment_qr: payments.payment_qr === true,
+        payment_card: payments.payment_card === true,
+        payment_fpx: payments.payment_fpx === true,
+        qr_image: qrImage,
+        account_holder_name: typeof payments.account_holder_name === 'string' ? payments.account_holder_name : null,
+        bank_name: typeof payments.bank_name === 'string' ? payments.bank_name : null,
+        account_number: typeof payments.account_number === 'string' ? payments.account_number : null,
+    };
+}
+
 export async function getPaymentSettings() {
     try {
         const payload = await getPayload({ config });
@@ -41,7 +95,7 @@ export async function getPaymentSettings() {
     }
 }
 
-export async function updatePaymentSettings(updates: PaymentUpdates) {
+export async function updatePaymentSettings(updates: PaymentUpdates): Promise<UpdatePaymentSettingsResult> {
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
@@ -150,13 +204,16 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             return { success: false, error: 'At least one payment method must remain active.' };
         }
 
-        await payload.update({
+        const updatedTenant = await payload.update({
             collection: 'tenants',
             id: tenantId,
             data: { payments: paymentsData } as any,
         });
 
-        return { success: true };
+        return {
+            success: true,
+            payments: editablePaymentSettings((updatedTenant as { payments?: unknown }).payments),
+        };
     } catch (error: unknown) {
         console.error("Failed to update payment settings via action:", error);
         return { success: false, error: 'Internal server error' };
@@ -341,4 +398,3 @@ export async function disconnectStripe() {
         return { success: false, error: 'Internal server error' };
     }
 }
-

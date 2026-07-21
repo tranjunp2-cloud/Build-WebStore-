@@ -106,18 +106,74 @@ describe('Payment Actions', () => {
             vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             // Backend guard fetches current tenant to merge effective payment state
             mockPayloadContext.findByID.mockResolvedValue({ payments: {} });
-            mockPayloadContext.update.mockResolvedValue({});
+            mockPayloadContext.update.mockResolvedValue({
+                payments: {
+                    payment_cod: true,
+                    payment_qr: false,
+                    payment_card: false,
+                    payment_fpx: false,
+                    qr_image: null,
+                    account_holder_name: null,
+                    bank_name: null,
+                    account_number: null,
+                },
+            });
 
             // Act
             const result = await updatePaymentSettings({ payment_cod: true });
 
             // Assert
             expect(result.success).toBe(true);
+            expect(result.payments).toEqual({
+                payment_cod: true,
+                payment_qr: false,
+                payment_card: false,
+                payment_fpx: false,
+                qr_image: null,
+                account_holder_name: null,
+                bank_name: null,
+                account_number: null,
+            });
             expect(mockPayloadContext.update).toHaveBeenCalledWith({
                 collection: 'tenants',
                 id: 'tenant-123',
                 data: { payments: { payment_cod: true } },
             });
+        });
+
+        it('should preserve unrelated payment methods by only writing submitted fields', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            mockPayloadContext.findByID.mockResolvedValue({
+                payments: {
+                    payment_cod: false,
+                    payment_qr: true,
+                    payment_card: true,
+                    payment_fpx: false,
+                },
+            });
+            mockPayloadContext.update.mockResolvedValue({
+                payments: {
+                    payment_cod: true,
+                    payment_qr: true,
+                    payment_card: true,
+                    payment_fpx: false,
+                },
+            });
+
+            // Act
+            const result = await updatePaymentSettings({ payment_cod: true });
+
+            // Assert
+            expect(mockPayloadContext.update).toHaveBeenCalledWith(expect.objectContaining({
+                data: { payments: { payment_cod: true } },
+            }));
+            expect(result.success && result.payments).toEqual(expect.objectContaining({
+                payment_cod: true,
+                payment_qr: true,
+                payment_card: true,
+                payment_fpx: false,
+            }));
         });
 
         it('should return error if payment_cod is not a boolean', async () => {

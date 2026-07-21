@@ -17,7 +17,19 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/(dashboard)/settings/payments/actions', () => ({
     getPaymentSettings: vi.fn().mockResolvedValue({ success: true, payments: { payment_cod: false, payment_qr: false, qr_image: null } }),
-    updatePaymentSettings: vi.fn().mockResolvedValue({ success: true }),
+    updatePaymentSettings: vi.fn().mockResolvedValue({
+        success: true,
+        payments: {
+            payment_cod: true,
+            payment_qr: false,
+            payment_card: false,
+            payment_fpx: false,
+            qr_image: null,
+            account_holder_name: null,
+            bank_name: null,
+            account_number: null,
+        },
+    }),
     uploadQrMedia: vi.fn().mockResolvedValue({ success: true, doc: { id: 'img-123', url: 'https://example.com/qr.png' } }),
 }));
 
@@ -67,6 +79,32 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith('Changes saved! ✅');
         });
+        expect(updatePaymentSettings).toHaveBeenCalledWith({ payment_cod: true });
+    });
+
+    it('[TC-F19.12] Hydrates the UI from the persisted payment response', async () => {
+        vi.mocked(updatePaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: {
+                payment_cod: false,
+                payment_qr: false,
+                payment_card: false,
+                payment_fpx: false,
+                qr_image: null,
+                account_holder_name: null,
+                bank_name: null,
+                account_number: null,
+            },
+        });
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+
+        await waitFor(() => expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument());
+        const codSwitch = screen.getAllByRole('switch')[0];
+        fireEvent.click(codSwitch);
+        fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => expect(codSwitch.getAttribute('aria-checked')).toBe('false'));
+        expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument();
     });
 
     it('[TC-F19.13] Expands QR Widget if toggling QR Banking without an image (Gatekeeping Rule)', async () => {
