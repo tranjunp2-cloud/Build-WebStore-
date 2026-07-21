@@ -120,6 +120,10 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         )
 
         fireEvent.click(screen.getByRole('button', { name: /sync from easyparcel/i }))
+        expect(onSyncFromEp).not.toHaveBeenCalled()
+
+        const dialog = await screen.findByRole('dialog')
+        fireEvent.click(within(dialog).getByRole('button', { name: /^sync$/i }))
 
         await waitFor(() => expect(onSyncFromEp).toHaveBeenCalledTimes(1))
     })
@@ -233,9 +237,8 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
     // TC-F36.37: Save & Activate button enabled when warehouse selected (no courier check)
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.37] Save & Activate button only enabled when warehouse selected', () => {
-        // Arrange: No warehouse initially
-        const { rerender } = render(
+    it('[TC-F36.37] Save & Activate button only enabled when warehouse selected', async () => {
+        render(
             <EpSetupStepper
                 tenantId="tenant-1"
                 initialEpConfig={{
@@ -250,13 +253,12 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         const addButton = screen.getByTestId('add-warehouse')
         fireEvent.click(addButton)
 
-        waitFor(() => {
-            const nextButton = screen.getByRole('button', { name: /next/i })
-            fireEvent.click(nextButton)
-        })
+        const nextButton = screen.getByRole('button', { name: /next/i })
+        await waitFor(() => expect(nextButton).toBeEnabled())
+        fireEvent.click(nextButton)
 
-        // Assert: On Step 2 with warehouse, Save & Activate should eventually appear
-        // (detailed check in next test)
+        const activateButton = await screen.findByRole('button', { name: /save (?:&|and) activate/i })
+        expect(activateButton).toBeEnabled()
     })
 
     // ──────────────────────────────────────────────────────────────────

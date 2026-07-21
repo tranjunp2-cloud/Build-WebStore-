@@ -35,7 +35,7 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
     const [isSaving, setIsSaving] = useState(false)
     const [isDisconnecting, setIsDisconnecting] = useState(false)
     const [isEditingWarehouse, setIsEditingWarehouse] = useState(warehouses.length === 0)
-    const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+    const [confirmAction, setConfirmAction] = useState<null | 'disconnect' | 'sync'>(null)
 
     const defaultWh = getDefaultWarehouse({ warehouses })
     const pickupDone = isWarehouseComplete(defaultWh)
@@ -57,7 +57,15 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
             toast.error(copy.networkError)
         } finally {
             setIsDisconnecting(false)
-            setConfirmDisconnect(false)
+            setConfirmAction(null)
+        }
+    }
+
+    async function handleSyncFromEp() {
+        try {
+            await onSyncFromEp?.()
+        } finally {
+            setConfirmAction(null)
         }
     }
 
@@ -147,7 +155,7 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
                                 <Button variant="outline" size="sm" onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }} className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto">
                                     <PlugZap className="h-3.5 w-3.5" /> {copy.reconnect}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => setConfirmDisconnect(true)} disabled={isDisconnecting}
+                                <Button variant="outline" size="sm" onClick={() => setConfirmAction('disconnect')} disabled={isDisconnecting}
                                     className="h-11 w-full gap-1.5 border-[hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)] sm:h-9 sm:w-auto">
                                     {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />} {copy.disconnect}
                                 </Button>
@@ -165,7 +173,10 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={onSyncFromEp}
+                                    onClick={() => {
+                                        if (isEditingWarehouse || warehouses.length > 0) setConfirmAction('sync')
+                                        else void handleSyncFromEp()
+                                    }}
                                     disabled={isSaving || isDisconnecting || isSyncing}
                                     className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto"
                                 >
@@ -221,16 +232,21 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
             </div>
 
             <ConfirmModal
-                open={confirmDisconnect}
-                variant="danger"
-                loading={isDisconnecting}
-                icon={<Unlink className="h-7 w-7 text-[hsl(var(--destructive))]" />}
-                title={copy.disconnectTitle}
-                description={copy.disconnectDescription}
-                confirmLabel={copy.disconnect}
+                open={confirmAction !== null}
+                variant={confirmAction === 'disconnect' ? 'danger' : 'default'}
+                loading={confirmAction === 'disconnect' ? isDisconnecting : isSyncing}
+                icon={confirmAction === 'disconnect'
+                    ? <Unlink className="h-7 w-7 text-[hsl(var(--destructive))]" />
+                    : <RefreshCw className="h-7 w-7 text-[hsl(var(--primary))]" />}
+                title={confirmAction === 'disconnect' ? copy.disconnectTitle : copy.syncTitle}
+                description={confirmAction === 'disconnect' ? copy.disconnectDescription : copy.syncDescription}
+                confirmLabel={confirmAction === 'disconnect' ? copy.disconnect : copy.sync}
                 cancelLabel={copy.cancel}
-                onCancel={() => setConfirmDisconnect(false)}
-                onConfirm={handleDisconnect}
+                onCancel={() => setConfirmAction(null)}
+                onConfirm={() => {
+                    if (confirmAction === 'disconnect') void handleDisconnect()
+                    else void handleSyncFromEp()
+                }}
             />
         </div>
     )

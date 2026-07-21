@@ -115,6 +115,7 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
     })
 
     it('sends canonical data and clears dirty state after a successful save', async () => {
+        const onEnabledSaved = vi.fn()
         vi.mocked(global.fetch).mockResolvedValue({
             ok: true,
             json: async () => ({
@@ -125,7 +126,13 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
                 },
             }),
         } as Response)
-        render(<EasyParcelSettingsTab tenantId="tenant-1" initialEpConfig={initialEpConfig} />)
+        render(
+            <EasyParcelSettingsTab
+                tenantId="tenant-1"
+                initialEpConfig={initialEpConfig}
+                onEnabledSaved={onEnabledSaved}
+            />,
+        )
 
         fireEvent.click(screen.getByRole('button', { name: 'Edit pickup draft' }))
         fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }))
@@ -142,6 +149,7 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
         await waitFor(() => {
             expect(screen.queryByRole('button', { name: 'Save Settings' })).not.toBeInTheDocument()
         })
+        expect(onEnabledSaved).toHaveBeenCalledWith(true)
     })
 
     it('keeps draft order until Save succeeds, then applies the API default-first order', async () => {

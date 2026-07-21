@@ -6,6 +6,7 @@ import { walletBalance, getAccountInfo } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { mapSubdivisionName } from '@/lib/shipping/easyparcel/normalize'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -141,19 +142,45 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 isDefault: true,
             }]
             : undefined
-        await payload.update({
-            collection: 'tenants',
-            id: tenantId,
-            data: {
-                easyParcelIntegration: {
-                    testedAt: new Date().toISOString(),
-                    ...(accountName !== undefined ? { accountName } : {}),
-                    ...(accountEmail !== undefined ? { accountEmail } : {}),
-                    ...(syncedWarehouses ? { warehouses: syncedWarehouses } : {}),
-                },
-            } as any,
-            overrideAccess: true,
+        const persisted = await withTenantRowLock(payload, tenantId, async (req) => {
+            const currentTenant = await payload.findByID({
+                collection: 'tenants',
+                id: tenantId,
+                depth: 0,
+                overrideAccess: true,
+                showHiddenFields: true,
+                req,
+            })
+            const currentIntegration = (currentTenant as { easyParcelIntegration?: Record<string, unknown> })
+                .easyParcelIntegration ?? {}
+
+            // The EP network calls happen outside the transaction. Only persist their result if
+            // this is still the same connection; Disconnect or reconnect invalidates the request.
+            if (currentIntegration.accessToken !== token) return false
+
+            await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                data: {
+                    easyParcelIntegration: {
+                        testedAt: new Date().toISOString(),
+                        ...(accountName !== undefined ? { accountName } : {}),
+                        ...(accountEmail !== undefined ? { accountEmail } : {}),
+                        ...(syncedWarehouses ? { warehouses: syncedWarehouses } : {}),
+                    },
+                } as any,
+                overrideAccess: true,
+                req,
+            })
+            return true
         })
+
+        if (!persisted) {
+            return NextResponse.json(
+                { success: false, error: { code: 'EP_CONNECTION_CHANGED', message: 'EasyParcel connection changed. Please retry.' } },
+                { status: 409 },
+            )
+        }
 
         return NextResponse.json({
             success: true,

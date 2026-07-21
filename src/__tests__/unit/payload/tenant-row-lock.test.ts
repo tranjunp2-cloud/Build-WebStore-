@@ -4,44 +4,53 @@ import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 function createPayload() {
     const execute = vi.fn().mockResolvedValue({ rows: [{ id: 'tenant-1' }] })
-    const commitTransaction = vi.fn().mockResolvedValue(undefined)
-    const rollbackTransaction = vi.fn().mockResolvedValue(undefined)
+    const transactionDb = { execute }
+    const transaction = vi.fn(async (
+        operation: (db: typeof transactionDb) => Promise<unknown>,
+    ) => operation(transactionDb))
     const payload = {
         db: {
-            beginTransaction: vi.fn().mockResolvedValue('tx-1'),
-            commitTransaction,
-            rollbackTransaction,
-            sessions: {
-                'tx-1': { db: { execute } },
-            },
+            drizzle: { transaction },
+            sessions: {},
         },
     } as unknown as Payload
 
-    return { payload, execute, commitTransaction, rollbackTransaction }
+    return { payload, execute, transaction, transactionDb }
 }
 
 describe('withTenantRowLock', () => {
     it('locks the tenant row and commits after the operation succeeds', async () => {
-        const { payload, execute, commitTransaction, rollbackTransaction } = createPayload()
+        const { payload, execute, transaction } = createPayload()
         const operation = vi.fn().mockResolvedValue('saved')
 
         await expect(withTenantRowLock(payload, 'tenant-1', operation)).resolves.toBe('saved')
 
         expect(execute).toHaveBeenCalledTimes(1)
-        expect(operation).toHaveBeenCalledWith({ transactionID: 'tx-1' })
-        expect(commitTransaction).toHaveBeenCalledWith('tx-1')
-        expect(rollbackTransaction).not.toHaveBeenCalled()
+        expect(operation).toHaveBeenCalledWith({ transactionID: expect.any(String) })
+        expect(transaction).toHaveBeenCalledTimes(1)
+        expect((payload.db as unknown as { sessions: Record<string, unknown> }).sessions).toEqual({})
     })
 
     it('rolls the transaction back when the operation fails', async () => {
-        const { payload, commitTransaction, rollbackTransaction } = createPayload()
+        const { payload } = createPayload()
         const failure = new Error('update failed')
 
         await expect(withTenantRowLock(payload, 'tenant-1', async () => {
             throw failure
         })).rejects.toBe(failure)
 
-        expect(rollbackTransaction).toHaveBeenCalledWith('tx-1')
-        expect(commitTransaction).not.toHaveBeenCalled()
+        expect((payload.db as unknown as { sessions: Record<string, unknown> }).sessions).toEqual({})
+    })
+
+    it('propagates a database commit failure after the operation returns', async () => {
+        const { payload, transaction, transactionDb } = createPayload()
+        const commitFailure = new Error('commit failed')
+        transaction.mockImplementationOnce(async (operation) => {
+            await operation(transactionDb)
+            throw commitFailure
+        })
+
+        await expect(withTenantRowLock(payload, 'tenant-1', async () => 'saved'))
+            .rejects.toBe(commitFailure)
     })
 })

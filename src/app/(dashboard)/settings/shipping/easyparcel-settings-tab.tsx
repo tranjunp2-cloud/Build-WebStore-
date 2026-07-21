@@ -61,6 +61,7 @@ function EasyParcelBrandMark() {
 interface Props {
     tenantId: string
     initialEpConfig: EasyParcelIntegrationConfig | null
+    onEnabledSaved?: (enabled: boolean) => void
 }
 
 function initialWarehouses(config: EasyParcelIntegrationConfig | null): Warehouse[] {
@@ -80,7 +81,7 @@ function settingsSnapshot(enabled: boolean, warehouses: Warehouse[]): string {
     return JSON.stringify({ enabled, warehouses: normalizeWarehouses(warehouses, { defaultFirst: false }) })
 }
 
-export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
+export function EasyParcelSettingsTab({ tenantId, initialEpConfig, onEnabledSaved }: Props) {
     const { t } = useI18n()
     const copy = t.dashboard.settings.shipping.easyParcel
     const connected = !!initialEpConfig?.testedAt
@@ -247,6 +248,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             setEnabled(savedEnabled)
             setWarehouses(savedWarehouses)
             setSavedSnapshot(settingsSnapshot(savedEnabled, savedWarehouses))
+            onEnabledSaved?.(savedEnabled)
             toast.success(copy.settingsSaved)
         } catch {
             toast.error(copy.networkError)

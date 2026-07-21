@@ -2,10 +2,18 @@ import { sql } from 'drizzle-orm'
 import type { Payload, PayloadRequest } from 'payload'
 
 type TransactionRequest = Pick<PayloadRequest, 'transactionID'>
-type TransactionCapableDb = Payload['db'] & {
-    sessions: Record<string, {
-        db: { execute: (query: unknown) => Promise<unknown> }
-    }>
+type TransactionSessionDb = {
+    execute: (query: unknown) => Promise<unknown>
+}
+type TransactionCapableDb = {
+    drizzle: {
+        transaction: <T>(
+            operation: (transaction: TransactionSessionDb) => Promise<T>,
+            options?: unknown,
+        ) => Promise<T>
+    }
+    sessions: Record<string, { db: TransactionSessionDb }>
+    transactionOptions?: unknown
 }
 
 /** Serialize mutations that must read and update the same tenant consistently. */
@@ -14,23 +22,21 @@ export async function withTenantRowLock<T>(
     tenantId: string | number,
     operation: (req: TransactionRequest) => Promise<T>,
 ): Promise<T> {
-    const db = payload.db as TransactionCapableDb
-    const transactionID = await db.beginTransaction()
-    if (transactionID == null) throw new Error('Database transactions are unavailable')
+    const db = payload.db as unknown as TransactionCapableDb
+    if (!db.drizzle?.transaction) throw new Error('Database transactions are unavailable')
 
-    const session = db.sessions[String(transactionID)]
-    if (!session) {
-        await db.rollbackTransaction(transactionID)
-        throw new Error('Database transaction session was not created')
-    }
+    // Payload's begin/commit adapter swallows PostgreSQL COMMIT errors. Using Drizzle's
+    // callback transaction directly preserves commit failures while the temporary session
+    // lets Payload Local API operations participate through req.transactionID.
+    return db.drizzle.transaction(async (transaction) => {
+        const transactionID = crypto.randomUUID()
+        db.sessions[transactionID] = { db: transaction }
 
-    try {
-        await session.db.execute(sql`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`)
-        const result = await operation({ transactionID })
-        await db.commitTransaction(transactionID)
-        return result
-    } catch (error) {
-        await db.rollbackTransaction(transactionID)
-        throw error
-    }
+        try {
+            await transaction.execute(sql`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`)
+            return await operation({ transactionID })
+        } finally {
+            delete db.sessions[transactionID]
+        }
+    }, db.transactionOptions)
 }

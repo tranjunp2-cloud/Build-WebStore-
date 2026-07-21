@@ -100,6 +100,7 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
     const [eastRateWarning, setEastRateWarning] = useState('')
     const [freeAboveWarning, setFreeAboveWarning] = useState('')
     const [isSaving, setIsSaving] = useState(false)
+    const [epLive, setEpLive] = useState(epConfig?.enabled === true)
     const savingRef = useRef(false)
 
     const snapshotRef = useRef<Snapshot>(snap(
@@ -235,7 +236,6 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
     }
 
     const flatRateLive = initial?.enabled !== false
-    const epLive = epConfig?.enabled === true
     const epConnected = Boolean(epConfig?.testedAt)
 
     function persistTab(value: string) {
@@ -331,7 +331,11 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
                     />
                 </TabsContent>
                 <TabsContent value="easyparcel" forceMount className="data-[state=inactive]:hidden">
-                    <EasyParcelSettingsTab tenantId={tenantId} initialEpConfig={epConfig} />
+                    <EasyParcelSettingsTab
+                        tenantId={tenantId}
+                        initialEpConfig={epConfig}
+                        onEnabledSaved={setEpLive}
+                    />
                 </TabsContent>
             </Tabs>
         </div>
