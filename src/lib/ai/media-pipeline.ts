@@ -38,6 +38,7 @@ interface SizePreset {
 
 import { normalizeComposerCategory } from './composer-category-resolver'
 import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
+import { getIndustryImages } from '@/lib/images/industry-images'
 import type { ThemeMood } from './theme-moods'
 import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
 
@@ -57,8 +58,8 @@ export interface MediaPipelineContext {
     // (warm/candlelit/minimalist/...) to every Unsplash query for cohesion.
     mood?: ThemeMood
     // Plan 260414-2249 phase-03: per-site image pool (1-2 Unsplash calls total
-    // before fulfillment runs). When present, block needs pick from pool
-    // instead of calling searchPhotos per block → visual cohesion by design.
+    // before fulfillment runs). When present, block needs pick from the verified
+    // pool; deficits use only the checked-in same-category image library.
     pool?: ImagePool
     // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
     englishKeywords?: string[]
@@ -304,6 +305,41 @@ export async function batchFetchFromPool(
         ),
     )
     return { mediaIds, photos: [], failures }
+}
+
+/**
+ * Upload trusted, category-curated images for a pool deficit.
+ *
+ * GH-1611: this is deliberately not a search. Every URL comes from the checked-in
+ * IMAGE_LIBRARY for the normalized composer category, so filling the final gallery
+ * slots cannot cross into another industry when the dynamic pool is thin.
+ */
+export async function getCuratedMediaForBlock(
+    blockType: string,
+    count: number,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+): Promise<BatchFetchResult> {
+    if (count <= 0) return { mediaIds: [], photos: [], failures: [] }
+
+    const category = normalizeComposerCategory(ctx.category)
+    const library = getIndustryImages(category)
+    const candidates = blockType === 'gallery' || blockType === 'portfolio-grid'
+        ? library.gallery
+        : blockType === 'hero'
+            ? library.hero
+            : blockType === 'about'
+                ? [library.about]
+                : library.products
+    const urls = Array.from({ length: count }, (_, index) => candidates[index % candidates.length])
+        .filter((url): url is string => Boolean(url))
+    const photos = urls.map((url, index) => ({
+        id: `curated-${category}-${blockType}-${index}`,
+        url,
+        alt: `${ctx.businessName} ${category} ${blockType}`,
+    }))
+
+    return batchFetchFromPool(photos, blockType, ctx, payload)
 }
 
 /**

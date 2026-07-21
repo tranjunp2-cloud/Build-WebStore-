@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { batchFetchFromPool, type MediaPipelineContext } from '@/lib/ai/media-pipeline'
+import { batchFetchFromPool, getCuratedMediaForBlock, type MediaPipelineContext } from '@/lib/ai/media-pipeline'
 
 vi.mock('@/lib/ai/pixabay-client', () => ({
     searchPhotos: vi.fn(),
@@ -87,5 +87,33 @@ describe('batchFetchFromPool × preUploadedPool', () => {
         expect(result.mediaIds).toHaveLength(2)
         expect(vi.mocked(downloadPhotoBuffer)).toHaveBeenCalledTimes(2)
         expect(payload.create).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe('curated category fallback [TC-GH1611-19]', () => {
+    it('uploads exactly the requested number of F&B gallery images from the curated library', async () => {
+        // Arrange
+        const { downloadPhotoBuffer } = await import('@/lib/ai/pixabay-client')
+        const payload = makePayload()
+        const ctx: MediaPipelineContext = {
+            businessName: 'Tiệm Bánh QA',
+            tenantId: '1',
+            category: 'fnb',
+        }
+
+        // Act
+        const result = await getCuratedMediaForBlock('gallery', 2, ctx, payload as never)
+
+        // Assert — the first two checked-in F&B gallery assets are coffee/bread,
+        // never ecommerce's clothing IDs.
+        const requestedUrls = vi.mocked(downloadPhotoBuffer).mock.calls.map(([url]) => url)
+        expect(requestedUrls).toHaveLength(2)
+        expect(requestedUrls).toEqual(expect.arrayContaining([
+            expect.stringContaining('photo-1495474472287-4d71bcdd2085'),
+            expect.stringContaining('photo-1509440159596-0249088772ff'),
+        ]))
+        expect(requestedUrls.join(' ')).not.toContain('photo-1523381210434-271e8be1f52b')
+        expect(result.mediaIds).toHaveLength(2)
+        expect(result.failures).toHaveLength(0)
     })
 })
