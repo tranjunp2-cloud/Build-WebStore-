@@ -4669,7 +4669,14 @@
             "shippingNote": "Yuran penghantaran tidak termasuk. Jumlah akhir dikira semasa pembayaran.",
             "proceedToCheckout": "Teruskan ke Pembayaran",
             "checkoutUnavailable": "Ciri pembayaran akan datang tidak lama lagi",
-            "qty": "Kuantiti:"
+            "qty": "Kuantiti:",
+            "updating": "Mengemas kini troli…",
+            "changesUpdated": "Troli anda telah dikemas kini dengan maklumat produk terkini.",
+            "priceChanged": "Harga dikemas kini daripada {from} kepada {to}.",
+            "quantityAdjusted": "Kuantiti dilaraskan kepada stok tersedia.",
+            "itemUnavailable": "Item ini tidak lagi tersedia.",
+            "refreshFailed": "Kami tidak dapat mengesahkan troli anda. Sila cuba lagi.",
+            "retry": "Cuba lagi"
         },
         "checkout": {
             "title": "Pembayaran",

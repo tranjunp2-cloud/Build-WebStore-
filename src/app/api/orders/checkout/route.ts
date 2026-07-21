@@ -27,6 +27,7 @@ import { decrementVariantStock, restockItem } from '../lib/stock-utils'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { resolveProductLine, type ProductLineProduct } from '@/lib/products/resolve-product-line'
 
 export const maxDuration = 60
 
@@ -134,39 +135,25 @@ export async function POST(request: Request) {
                 )
             }
 
-            const p = product as any
+            const p = product as ProductLineProduct
+            const resolved = resolveProductLine(p, item)
 
-            // Guard: hasVariants products require an explicit variant selection
-            if (p.hasVariants && !item.variant) {
-                return NextResponse.json(
-                    { success: false, error: { code: 'VARIANT_REQUIRED', message: `A variant must be selected for "${p.name}"` } },
-                    { status: 422 }
-                )
-            }
+            if (!resolved.ok) {
+                if (resolved.code === 'VARIANT_REQUIRED') {
+                    return NextResponse.json(
+                        { success: false, error: { code: 'VARIANT_REQUIRED', message: `A variant must be selected for "${p.name}"` } },
+                        { status: 422 }
+                    )
+                }
 
-            // Variant resolution — depth:0 is safe: variants is an array field, present on the doc
-            const variant = (p.hasVariants && item.variant && Array.isArray(p.variants))
-                ? (p.variants as Array<{ name: string; price: number; stock?: number }>).find(v => v.name === item.variant) ?? null
-                : null
+                if (resolved.code === 'VARIANT_NOT_FOUND') {
+                    return NextResponse.json(
+                        { success: false, error: { code: 'VARIANT_NOT_FOUND', message: `Variant "${item.variant}" not found for "${p.name}"` } },
+                        { status: 422 }
+                    )
+                }
 
-            // Stale or unknown variant → reject; prevents silent base-price fallback exploit
-            if (p.hasVariants && item.variant && !variant) {
-                return NextResponse.json(
-                    { success: false, error: { code: 'VARIANT_NOT_FOUND', message: `Variant "${item.variant}" not found for "${p.name}"` } },
-                    { status: 422 }
-                )
-            }
-
-            const unitPrice = variant ? variant.price : p.price
-            hasVariantsMap.set(String(productLookupId), !!p.hasVariants)
-
-            // Variant-aware availability: per-variant stock for variant products, aggregate otherwise.
-            // NULL stock = tracking disabled (unlimited). Mirror non-variant ?? Infinity pattern.
-            const stockAvail = (p.hasVariants && variant)
-                ? (variant.stock != null ? variant.stock : Infinity)
-                : (p.inventory ?? Infinity)
-
-            if (stockAvail < item.quantity) {
+                const stockAvail = resolved.available ?? 0
                 return NextResponse.json(
                     {
                         success: false,
@@ -184,6 +171,9 @@ export async function POST(request: Request) {
                     { status: 422 }
                 )
             }
+
+            hasVariantsMap.set(String(productLookupId), !!p.hasVariants)
+            const unitPrice = resolved.unitPrice
 
             currency = p.currency || 'MYR'
             subtotal += unitPrice * item.quantity

@@ -15,25 +15,28 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
     void _theme
     const storeCount = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
+    const activeSiteId = useCartStore(state => state.siteId)
     const callback = useBlockEditCallback()
     const inContainer = useInFloatingContainer()
-    const setSiteSlug = useCartStore(state => state.setSiteSlug)
+    const activateSiteCart = useCartStore(state => state.activateSiteCart)
     // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
     // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
     const siteSlug = String((site as Record<string, unknown>)?.tenantSlug || '')
 
     // Defer cart count to client-only to prevent SSR/hydration mismatch.
     // Server always has count=0 (no localStorage), client reads from localStorage.
+    const configuredSiteId = site?.id ? String(site.id) : ''
+    const isActiveSite = Boolean(configuredSiteId) && activeSiteId === configuredSiteId
     const [count, setCount] = useState(0)
     useEffect(() => {
-        setCount(storeCount)
-    }, [storeCount])
+        setCount(isActiveSite ? storeCount : 0)
+    }, [isActiveSite, storeCount])
 
     useEffect(() => {
-        if (siteSlug) {
-            setSiteSlug(siteSlug)
+        if (siteSlug && site?.id) {
+            activateSiteCart(String(site.id), siteSlug)
         }
-    }, [setSiteSlug, siteSlug])
+    }, [activateSiteCart, site?.id, siteSlug])
 
     return (
         <>
@@ -50,11 +53,11 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
                     <ShoppingCart className="h-5 w-5" />
                     {block.showLabel ? <span>{block.label || 'Cart'}</span> : null}
                     <span className="absolute -right-2 -top-2 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-slate-900">
-                        {count}
+                        {isActiveSite ? count : 0}
                     </span>
                 </button>
             </section>
-            <CartDrawer siteSlug={siteSlug} siteId={site?.id ? String(site.id) : undefined} />
+            {isActiveSite && <CartDrawer siteSlug={siteSlug} siteId={site?.id ? String(site.id) : undefined} />}
         </>
     )
 }

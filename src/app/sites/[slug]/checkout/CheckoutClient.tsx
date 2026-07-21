@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useCartStore } from '@/store/cartStore'
+import { cartSignature, useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
@@ -65,7 +65,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const ck = t.storefront.checkout
     const [siteId, setSiteId] = useState(initialSiteData?.siteId ?? '')
     const [isOwner, setIsOwner] = useState(false)
-    const { items, subtotal, clearCart } = useCartStore()
+    const { items: storedItems, subtotal, clearCart, activateSiteCart, refreshCart, refreshStatus, resolvedSignature, cartRevision, changes, acknowledgeChanges, siteId: activeCartSiteId } = useCartStore()
 
     const [enableCod, setEnableCod] = useState(initialSiteData?.enableCod ?? true)
     const [enableQrBanking, setEnableQrBanking] = useState(initialSiteData?.enableQrBanking ?? true)
@@ -148,6 +148,21 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [fontBody, setFontBody] = useState(initialFontBody)
 
     useEffect(() => { setMounted(true) }, [])
+
+    // Site-scoped cart storage must be activated before checkout reads persisted lines.
+    useEffect(() => {
+        if (siteId) activateSiteCart(String(siteId), slug)
+    }, [activateSiteCart, siteId, slug])
+
+    const isCartSiteActive = Boolean(siteId) && activeCartSiteId === String(siteId)
+    // Never render another storefront's in-memory cart while this site's storage is activating.
+    const items = isCartSiteActive ? storedItems : []
+    const currentCartSignature = cartSignature(items)
+    const cartResolved = isCartSiteActive && (items.length === 0 || (refreshStatus === 'idle' && resolvedSignature === currentCartSignature && !items.some(item => item.unavailable)))
+
+    useEffect(() => {
+        if (siteId && items.length > 0 && resolvedSignature !== cartSignature(items) && refreshStatus === 'idle') void refreshCart()
+    }, [items, refreshCart, refreshStatus, resolvedSignature, siteId])
 
     // Browser Back from Stripe Checkout lands back on this page. We set 'pw_stripe_pending' right
     // before redirecting to Stripe, so if checkout is shown again WITH that flag, the buyer backed
@@ -260,7 +275,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     }, [slug, initialSiteData])
 
     const currency = items[0]?.currency || 'MYR'
-    const sub = subtotal()
+    const sub = isCartSiteActive ? subtotal() : 0
     const selectedState = states.find(s => s.id === Number(selectedStateId))
     const baseShipping = sub > 0 ? (selectedState?.zone === 'east' ? shippingEastRM : shippingWestRM) : 0
     // SST removed at checkout (F33 phase-06) — no tax line
@@ -271,9 +286,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // EasyParcel live rate: resolve server-side once the destination (state + postcode) is chosen —
     // wait for the full address so we don't quote on a half-filled form. Mirrors the backend getRates
     // (EP courier when ready, flat fallback) so the shown total matches what's charged.
-    const addressReady = !!selectedState && !!form.postcode && sub > 0
+    const addressReady = isCartSiteActive && !!selectedState && !!form.postcode && sub > 0
     useEffect(() => {
-        if (!addressReady || !siteId || items.length === 0) { setShipCalc(null); return }
+        if (!addressReady || !siteId || items.length === 0 || !cartResolved) { setShipCalc(null); return }
         let cancelled = false
         setShipLoading(true)
         fetch('/api/orders/calculate-shipping', {
@@ -308,7 +323,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             .finally(() => { if (!cancelled) setShipLoading(false) })
         return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedStateId, form.postcode, siteId, items.length, paymentMethod, effectiveSub])
+    }, [selectedStateId, form.postcode, siteId, items.length, paymentMethod, effectiveSub, cartRevision, cartResolved])
 
     const shippingSettled = addressReady && !shipLoading && shipCalc != null
 
@@ -434,7 +449,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.line1.trim() && form.city && form.postcode && items.length > 0 &&
-        shippingSettled &&
+        shippingSettled && cartResolved &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit') &&
         // PD-021: COD not orderable on this route/amount (server would 422 COD_NOT_ELIGIBLE anyway)
         !(paymentMethod === 'cod' && codBlockReason)
@@ -449,6 +464,18 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
+        const beforeRefresh = useCartStore.getState()
+        const pendingChangesBeforeRefresh = JSON.stringify(beforeRefresh.changes)
+        await refreshCart()
+        const latestCart = useCartStore.getState()
+        if (latestCart.refreshStatus !== 'idle' || latestCart.resolvedSignature !== cartSignature(latestCart.items) || latestCart.items.some(item => item.unavailable)) return
+        if (latestCart.requiresConfirmation) {
+            const pendingChangesChanged = JSON.stringify(latestCart.changes) !== pendingChangesBeforeRefresh
+            // A newly discovered change must paint before the customer can confirm it.
+            if (!beforeRefresh.requiresConfirmation || pendingChangesChanged) return
+            // This click confirms the already-visible, still-current values.
+            acknowledgeChanges()
+        }
         // Clear any prior discount-exhausted warning so re-submitting the SAME exhausted code re-triggers
         // the inline warning (the field effect keys on a value change, so null→message must transition).
         setDiscountRejection(null)
@@ -1011,6 +1038,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 value); the buyer's payment selection is never changed automatically.
                                 Gated on shippingSettled: while a rate fetch is in flight the (stale)
                                 verdict stays hidden and only re-appears once the fresh result lands. */}
+                            {!cartResolved && <div className="sum-cod-err" role="alert"><AlertCircle size={14} /><span>{items.some(item => item.unavailable) ? t.storefront.cart.itemUnavailable : refreshStatus === 'error' ? t.storefront.cart.refreshFailed : t.storefront.cart.updating}</span>{refreshStatus === 'error' && <button type="button" onClick={() => void refreshCart()}>{t.storefront.cart.retry}</button>}</div>}
+                            {cartResolved && changes.length > 0 && <div className="sum-cod-err" role="status" aria-live="polite" style={{ color: '#166534', background: '#f0fdf4', borderColor: '#bbf7d0' }}><AlertCircle size={14} /><span><strong>{t.storefront.cart.changesUpdated}</strong>{changes.map(change => change.fields.includes('price') && change.previous && change.current ? <span key={`${change.productId}:${change.variantName ?? ''}:price`} style={{ display: 'block', marginTop: 4 }}>{t.storefront.cart.priceChanged.replace('{from}', formatPrice(change.previous.price, currency)).replace('{to}', formatPrice(change.current.price, currency))}</span> : change.fields.includes('quantity') ? <span key={`${change.productId}:${change.variantName ?? ''}:quantity`} style={{ display: 'block', marginTop: 4 }}>{t.storefront.cart.quantityAdjusted}</span> : change.fields.includes('unavailable') ? <span key={`${change.productId}:${change.variantName ?? ''}:unavailable`} style={{ display: 'block', marginTop: 4 }}>{t.storefront.cart.itemUnavailable}</span> : null)}</span></div>}
                             {paymentMethod === 'cod' && codBlockReason && shippingSettled && (
                                 <div className="sum-cod-err" role="alert">
                                     <AlertCircle size={14} />

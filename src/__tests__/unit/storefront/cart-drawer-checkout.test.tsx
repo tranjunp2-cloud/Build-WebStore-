@@ -1,10 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 
 // ── Mutable state driving useCartStore mock ───────────────────────────────
 let mockItems: import('@/store/cartStore').CartItem[] = []
 let mockIsOpen = false
+let mockSiteId = ''
+let mockSiteSlug = ''
+let mockRefreshStatus: 'idle' | 'refreshing' | 'error' = 'idle'
+let mockChanges: import('@/store/cartStore').CartChange[] = []
+let mockRequiresConfirmation = false
+const mockRefreshCart = vi.fn()
+const mockAcknowledgeChanges = vi.fn()
 
 // ── Mutable state driving usePathname mock ────────────────────────────────
 let mockPathname = '/sites/test-site'
@@ -23,6 +30,13 @@ vi.mock('@/store/cartStore', () => ({
         updateQuantity: vi.fn(),
         subtotal: vi.fn(() => mockItems.reduce((s, i) => s + i.price * i.quantity, 0)),
         itemCount: vi.fn(() => mockItems.reduce((s, i) => s + i.quantity, 0)),
+        siteId: mockSiteId,
+        siteSlug: mockSiteSlug,
+        refreshStatus: mockRefreshStatus,
+        refreshCart: mockRefreshCart,
+        changes: mockChanges,
+        requiresConfirmation: mockRequiresConfirmation,
+        acknowledgeChanges: mockAcknowledgeChanges,
     })),
 }))
 
@@ -47,6 +61,13 @@ vi.mock('@/i18n', () => ({
                     proceedToCheckout: 'Proceed to Checkout',
                     empty: 'Your cart is empty',
                     checkoutUnavailable: 'Checkout not available',
+                    updating: 'Updating cart',
+                    refreshFailed: 'Could not refresh cart.',
+                    retry: 'Retry',
+                    changesUpdated: 'Cart updated',
+                    priceChanged: 'Price changed from {from} to {to}',
+                    quantityAdjusted: 'Quantity adjusted to current stock',
+                    itemUnavailable: 'This item is no longer available',
                 },
             },
         },
@@ -72,6 +93,11 @@ describe('CartDrawer — checkout routing', () => {
     beforeEach(() => {
         mockItems = []
         mockIsOpen = false
+        mockSiteId = ''
+        mockSiteSlug = ''
+        mockRefreshStatus = 'idle'
+        mockChanges = []
+        mockRequiresConfirmation = false
         mockPathname = '/sites/test-site'
         vi.clearAllMocks()
     })
@@ -79,6 +105,11 @@ describe('CartDrawer — checkout routing', () => {
     afterEach(() => {
         mockItems = []
         mockIsOpen = false
+        mockSiteId = ''
+        mockSiteSlug = ''
+        mockRefreshStatus = 'idle'
+        mockChanges = []
+        mockRequiresConfirmation = false
         mockPathname = '/sites/test-site'
     })
 
@@ -204,6 +235,68 @@ describe('CartDrawer — checkout routing', () => {
             // Assert — no checkout link; fallback button rendered
             expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
             expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F09.57: Cart reconciliation feedback ───────────────────────────
+    describe('TC-F09.57: Cart refresh feedback', () => {
+        it('refreshes the active site cart when the drawer opens', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            mockSiteId = 'site-1'
+            mockSiteSlug = 'test-site'
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(mockRefreshCart).toHaveBeenCalledTimes(1)
+        })
+
+        it('shows a live updating status while cart refresh is in progress', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            mockRefreshStatus = 'refreshing'
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('status')).toHaveTextContent('Updating cart')
+        })
+
+        it('retries cart refresh after a refresh error', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            mockRefreshStatus = 'error'
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+            fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+            // Assert
+            expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh cart.')
+            expect(mockRefreshCart).toHaveBeenCalledTimes(1)
+            expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeDisabled()
+        })
+
+        it('alerts and locks quantity controls for an unavailable line', () => {
+            // Arrange
+            mockItems = [{ ...ITEM_ONE, unavailable: true }]
+            mockIsOpen = true
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('alert')).toHaveTextContent('This item is no longer available')
+            expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeDisabled()
+            expect(screen.getAllByRole('button').filter(button => button.hasAttribute('disabled'))).toHaveLength(3)
         })
     })
 })
