@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockUpdate = vi.fn()
+const mockFindByID = vi.fn()
 let mockUser = { id: 1, roles: ['super-admin'], tenants: [] }
 
 vi.mock('@/lib/auth', () => ({
@@ -17,8 +18,17 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
+        findByID: mockFindByID,
         update: mockUpdate,
     })),
+}))
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: string,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'tx-1' })),
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -60,6 +70,13 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockUser = { id: 1, roles: ['super-admin'], tenants: [] }
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            easyParcelIntegration: {
+                accessToken: 'connected-token',
+                refreshToken: 'connected-refresh-token',
+            },
+        })
     })
 
     // TC-F14.140: enabled=true + incomplete warehouse → 400 EP_NOT_READY
@@ -130,6 +147,7 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
             expect.objectContaining(canonicalWarehouse),
         ])
         expect(updateCall.data.easyParcelIntegration.enabled).toBe(true)
+        expect(updateCall.data.easyParcelIntegration.warehouse).toBeNull()
         expect(await res.json()).toEqual({
             success: true,
             data: {
@@ -172,6 +190,23 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         expect(res.status).toBe(200)
         const updateCall = mockUpdate.mock.calls[0][0]
         expect(updateCall.data.easyParcelIntegration.enabled).toBe(false)
+        expect(updateCall.data.easyParcelIntegration.warehouse).toBeNull()
+    })
+
+    it('rejects a stale save after EasyParcel has been disconnected', async () => {
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            easyParcelIntegration: { accessToken: null, refreshToken: null },
+        })
+
+        const res = await callPost('tenant-1', {
+            enabled: true,
+            warehouses: [completeWarehouse],
+        })
+
+        expect(res.status).toBe(409)
+        expect((await res.json()).error?.code).toBe('EP_NOT_CONNECTED')
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // Ownership check: non-admin, non-owned tenant → 403

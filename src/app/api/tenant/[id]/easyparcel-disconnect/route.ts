@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -30,24 +31,27 @@ export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
     }
 
     const payload = await getPayload({ config })
-    await payload.update({
-        collection: 'tenants',
-        id: tenantId,
-        data: {
-            easyParcelIntegration: {
-                accessToken: null,
-                refreshToken: null,
-                tokenExpiresAt: null,
-                tokenRefreshExpiresAt: null,
-                accountName: null,
-                accountEmail: null,
-                enabled: false,
-                testedAt: null,
-                warehouse: null,
-                warehouses: [],
-            },
-        } as any,
-        overrideAccess: true,
+    await withTenantRowLock(payload, tenantId, async (req) => {
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                easyParcelIntegration: {
+                    accessToken: null,
+                    refreshToken: null,
+                    tokenExpiresAt: null,
+                    tokenRefreshExpiresAt: null,
+                    accountName: null,
+                    accountEmail: null,
+                    enabled: false,
+                    testedAt: null,
+                    warehouse: null,
+                    warehouses: [],
+                },
+            } as any,
+            overrideAccess: true,
+            req,
+        })
     })
 
     return NextResponse.json({ success: true })

@@ -109,6 +109,21 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         expect(nextButton).toBeDisabled() // Can't proceed without warehouse
     })
 
+    it('offers manual EasyParcel sync when connected without a warehouse', async () => {
+        const onSyncFromEp = vi.fn().mockResolvedValue(undefined)
+        render(
+            <EpSetupStepper
+                tenantId="tenant-1"
+                initialEpConfig={{ accessToken: 'token', warehouses: [], enabled: false }}
+                onSyncFromEp={onSyncFromEp}
+            />,
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /sync from easyparcel/i }))
+
+        await waitFor(() => expect(onSyncFromEp).toHaveBeenCalledTimes(1))
+    })
+
     it('renders continuous mobile connectors and flexible desktop connectors between every step', () => {
         const { container } = render(
             <EpSetupStepper

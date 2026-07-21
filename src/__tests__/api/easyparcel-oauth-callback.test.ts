@@ -35,34 +35,13 @@ import { NextRequest } from 'next/server'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
-function makeRequest(code: string, state: string, cookies: Record<string, string> = {}) {
+function makeCallbackRequest(code: string, state: string, tenantId: string, nonce: string) {
     const url = new URL('http://localhost/api/easyparcel/oauth-callback')
     url.searchParams.set('code', code)
     url.searchParams.set('state', state)
-
-    const req = new Request(url.toString())
-
-    // Inject cookies (simplified — NextRequest handles this differently)
-    // For testing, we'll mock via a wrapper since NextRequest cookie handling is complex
-    return req
-}
-
-// Helper to mock request with cookies
-function makeRequestWithCookies(
-    code: string,
-    state: string,
-    nonceCookie: string | null,
-) {
-    const url = new URL('http://localhost/api/easyparcel/oauth-callback')
-    url.searchParams.set('code', code)
-    url.searchParams.set('state', state)
-
-    // Create a basic request; in real test we'd use NextRequest but for Vitest
-    // we need to mock the cookies behavior
-    const req = new Request(url.toString(), { method: 'GET' })
-
-    // Return both request and a mock of NextRequest behavior
-    return { req, nonceCookie }
+    return new NextRequest(url, {
+        headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+    })
 }
 
 const tenantId = 'tenant-1'
@@ -110,41 +89,22 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
         // Mock update to capture what's being saved
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // For this test, we'll simulate the request manually since NextRequest
-        // cookie handling is complex in Vitest. We focus on verifying the update payload.
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        // Act: Simulate callback with valid code + state + nonce
-        // (In real test, would use actual NextRequest)
-        const now = Date.now()
-        const expectedExpiresAt = new Date(now + tokenResponse.expires_in * 1000).toISOString()
-
-        // Assert: Verify what update() should be called with
-        // We'll verify the mock is called correctly by testing the route behavior
-
-        // For now, test the core logic: if oauth-callback were called successfully,
-        // the update payload should NOT include enabled=true
-
-        const updatePayload = {
-            collection: 'tenants',
-            id: tenantId,
-            data: {
-                easyParcelIntegration: {
-                    accessToken: 'new-access-token',
-                    refreshToken: 'new-refresh-token',
-                    tokenExpiresAt: expect.any(String),
-                    tokenRefreshExpiresAt: expect.any(String),
-                    testedAt: expect.any(String),
-                    accountName: 'Test Merchant',
-                    accountEmail: null,
-                    // Note: enabled is NOT in this object
-                },
-            },
-            overrideAccess: true,
-        }
-
-        // Expected: update NOT called with enabled field
-        // (we're verifying the contract, not executing the route which requires NextRequest)
-        expect(updatePayload.data.easyParcelIntegration).not.toHaveProperty('enabled')
+        // Assert
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accessToken: 'new-access-token',
+            refreshToken: 'new-refresh-token',
+            tokenExpiresAt: expect.any(String),
+            tokenRefreshExpiresAt: expect.any(String),
+            testedAt: expect.any(String),
+            accountName: 'Test Merchant',
+            accountEmail: null,
+        })
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('enabled')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -266,23 +226,20 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
 
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: Update should NOT include seededWarehouses field
-        // (existing warehouses should remain untouched)
-        const expectedPayload = {
-            easyParcelIntegration: {
-                accessToken: 'token-1',
-                refreshToken: 'refresh-1',
-                tokenExpiresAt: expect.any(String),
-                tokenRefreshExpiresAt: expect.any(String),
-                testedAt: expect.any(String),
-                accountName: 'Merchant',
-                accountEmail: null,
-                // warehouses field is NOT set — preserving existing
-            },
-        }
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        // Verify: seededWarehouses should not be in update if existing warehouses present
-        expect(expectedPayload.easyParcelIntegration).not.toHaveProperty('warehouses')
+        // Assert: existing warehouses stay untouched.
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accessToken: 'token-1',
+            refreshToken: 'refresh-1',
+            testedAt: expect.any(String),
+            accountName: 'Merchant',
+            accountEmail: null,
+        })
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('warehouses')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -310,18 +267,18 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
 
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: update should still be called with token fields
-        // (accountName/accountEmail may be undefined, but token is saved)
-        const expectedEssentials = {
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
+
+        // Assert: account-info failure remains non-critical and tokens are persisted.
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockUpdate.mock.calls[0][0].data.easyParcelIntegration).toMatchObject({
             accessToken: 'token-1',
             refreshToken: 'refresh-1',
             testedAt: expect.any(String),
-        }
-
-        expect(expectedEssentials.accessToken).toBe('token-1')
-        expect(expectedEssentials.testedAt).toBeDefined()
-
-        // In actual route: mockUpdate() should have been called despite getAccountInfo failure
+            accountName: null,
+            accountEmail: null,
+        })
     })
 
     // ──────────────────────────────────────────────────────────────────

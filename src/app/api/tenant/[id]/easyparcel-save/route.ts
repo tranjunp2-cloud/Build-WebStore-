@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { hasUsablePhone } from '@/lib/shipping/easyparcel/phone'
 import { getDefaultWarehouse, isWarehouseComplete, normalizeWarehouses } from '@/lib/shipping/easyparcel/warehouse'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -111,17 +112,42 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         }
 
         const payload = await getPayload({ config })
-        await payload.update({
-            collection: 'tenants',
-            id: tenantId,
-            data: {
-                easyParcelIntegration: {
-                    enabled,
-                    warehouses,
-                },
-            } as any,
-            overrideAccess: true,
+        const saveResult = await withTenantRowLock(payload, tenantId, async (req) => {
+            const currentTenant = await payload.findByID({
+                collection: 'tenants',
+                id: tenantId,
+                depth: 0,
+                overrideAccess: true,
+                showHiddenFields: true,
+                req,
+            })
+            const currentIntegration = (currentTenant as { easyParcelIntegration?: Record<string, unknown> })
+                .easyParcelIntegration
+            const connected = Boolean(currentIntegration?.accessToken && currentIntegration?.refreshToken)
+            if (!connected) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'EP_NOT_CONNECTED', message: 'Reconnect EasyParcel before saving settings.' } },
+                    { status: 409 },
+                )
+            }
+
+            await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                data: {
+                    easyParcelIntegration: {
+                        enabled,
+                        warehouse: null,
+                        warehouses,
+                    },
+                } as any,
+                overrideAccess: true,
+                req,
+            })
+
+            return null
         })
+        if (saveResult) return saveResult
 
         return NextResponse.json({ success: true, data: { enabled, warehouses } })
     } catch (error: unknown) {

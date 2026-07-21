@@ -128,6 +128,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const canSave = connected
         && isDirty
         && !isSaving
+        && !isSyncing
+        && !isDisconnecting
         && !isEditingWarehouse
         && (!enabled || warehouseComplete)
     const hasWarehouse = canonicalWarehouses.length > 0
@@ -264,6 +266,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     if (!connected) {
         return (
             <div
+                data-easyparcel-state="disconnected"
                 className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
                 style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
             >
@@ -309,11 +312,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     if (!persistedSetup) {
-        return <EpSetupStepper tenantId={tenantId} initialEpConfig={initialEpConfig} />
+        return (
+            <EpSetupStepper
+                tenantId={tenantId}
+                initialEpConfig={initialEpConfig}
+                isSyncing={isSyncing}
+                onSyncFromEp={handleSyncFromEp}
+            />
+        )
     }
 
     return (
         <div
+            data-easyparcel-state="management"
             className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
             style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
         >
@@ -331,6 +342,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 <Switch
                     checked={enabled}
                     onCheckedChange={handleToggleEnabled}
+                    disabled={isSaving || isSyncing || isDisconnecting}
                     aria-label={copy.toggleLabel}
                     className="mt-1 shrink-0"
                 />
@@ -364,11 +376,11 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </Button>
                         )}
                         <Button variant="outline" size="sm" onClick={() => (hasWarehouse ? setConfirm('sync') : handleSyncFromEp())}
-                            disabled={isSyncing} title={copy.syncTooltip} className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto">
+                            disabled={isSaving || isSyncing || isDisconnecting} title={copy.syncTooltip} className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto">
                             {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                             {copy.syncFromEasyParcel}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setConfirm('disconnect')} disabled={isDisconnecting}
+                        <Button variant="outline" size="sm" onClick={() => setConfirm('disconnect')} disabled={isSaving || isSyncing || isDisconnecting}
                             className="h-11 w-full gap-1.5 border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive)/0.06)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.12)] sm:h-9 sm:w-auto">
                             {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />}
                             {copy.disconnect}

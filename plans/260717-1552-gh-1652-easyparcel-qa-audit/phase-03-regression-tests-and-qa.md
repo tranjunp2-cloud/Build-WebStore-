@@ -74,6 +74,13 @@ git diff --check
 - Authenticated Playwright execution: blocked in setup because the configured local test account returned HTTP 401.
 - Connected EasyParcel sandbox persistence/OAuth UAT: pending a sandbox tenant and valid session.
 
+## Review Follow-up (2026-07-21)
+
+- Fixed review regressions around partial Payment hooks, serialized tenant mutations, stale EasyParcel saves, legacy warehouse cleanup, setup-flow sync, and OAuth route tests.
+- Focused Shipping/Payment regression: 16 files passed, 169 tests passed.
+- Playwright discovery: 5 tests found (auth setup + 4 F36 tests). Execution remains blocked because `TEST_EMAIL` and `TEST_PASSWORD` are not available in this worktree.
+- Connected EasyParcel sandbox persistence/OAuth UAT remains pending; do not mark TC-F36.208 complete until the sandbox round-trip is recorded.
+
 ## Success Criteria
 
 - Focused tests and typecheck pass with no skipped new regression.

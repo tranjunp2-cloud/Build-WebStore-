@@ -8,6 +8,14 @@ vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: vi.fn(),
 }));
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: string,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'tx-1' })),
+}));
+
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
         id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
@@ -138,6 +146,7 @@ describe('Payment Actions', () => {
                 collection: 'tenants',
                 id: 'tenant-123',
                 data: { payments: { payment_cod: true } },
+                req: { transactionID: 'tx-1' },
             });
         });
 
@@ -174,6 +183,27 @@ describe('Payment Actions', () => {
                 payment_card: true,
                 payment_fpx: false,
             }));
+        });
+
+        it('blocks removing the QR image when QR is the only active method', async () => {
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            mockPayloadContext.findByID.mockResolvedValue({
+                payments: {
+                    payment_cod: false,
+                    payment_qr: true,
+                    payment_card: false,
+                    payment_fpx: false,
+                    qr_image: 42,
+                },
+            });
+
+            const result = await updatePaymentSettings({ qr_image: null });
+
+            expect(result).toEqual({
+                success: false,
+                error: 'At least one payment method must remain active.',
+            });
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
         });
 
         it('should return error if payment_cod is not a boolean', async () => {

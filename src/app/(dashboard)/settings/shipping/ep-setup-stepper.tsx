@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, Unlink } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, RefreshCw, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,8 @@ import { getEasyParcelErrorMessage } from './easyparcel-error-message'
 interface Props {
     tenantId: string
     initialEpConfig: EasyParcelIntegrationConfig | null
+    isSyncing?: boolean
+    onSyncFromEp?: () => Promise<void>
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * then "Save & Activate" persists the config with enabled=true. Until then EP stays off and
  * checkout uses flat rate. Reuses PickupAddresses from the management view.
  */
-export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
+export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, onSyncFromEp }: Props) {
     const { t } = useI18n()
     const copy = t.dashboard.settings.shipping.easyParcel
     const steps = [copy.stepConnect, copy.stepPickup, copy.stepReview]
@@ -85,6 +87,7 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
 
     return (
         <div
+            data-easyparcel-state="setup"
             className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
             style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
         >
@@ -155,7 +158,27 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
                         </p>
                     </div>
                 )}
-                {step === 1 && <PickupAddresses value={warehouses} onChange={setWarehouses} onEditingChange={setIsEditingWarehouse} />}
+                {step === 1 && (
+                    <div className="flex flex-col gap-4">
+                        {onSyncFromEp && (
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onSyncFromEp}
+                                    disabled={isSaving || isDisconnecting || isSyncing}
+                                    className="h-11 w-full gap-1.5 sm:h-9 sm:w-auto"
+                                >
+                                    {isSyncing
+                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        : <RefreshCw className="h-3.5 w-3.5" />}
+                                    {copy.syncFromEasyParcel}
+                                </Button>
+                            </div>
+                        )}
+                        <PickupAddresses value={warehouses} onChange={setWarehouses} onEditingChange={setIsEditingWarehouse} />
+                    </div>
+                )}
                 {step === 2 && (
                     <div className="flex flex-col gap-4">
                         <p className="text-[14px] font-semibold text-[var(--dash-text)]">{copy.reviewActivate}</p>
@@ -183,15 +206,15 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
 
             {/* Footer nav */}
             <div className="flex flex-col-reverse gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving || isEditingWarehouse} className="h-11 w-full gap-1.5 sm:w-auto">
+                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving || isSyncing || isEditingWarehouse} className="h-11 w-full gap-1.5 sm:w-auto">
                     <ChevronLeft className="h-4 w-4" /> {copy.back}
                 </Button>
                 {step < steps.length - 1 ? (
-                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext} className="h-11 w-full gap-1.5 sm:w-auto">
+                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext || isSyncing} className="h-11 w-full gap-1.5 sm:w-auto">
                         {copy.next} <ChevronRight className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving} className="h-11 w-full gap-2 sm:w-auto">
+                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving || isSyncing} className="h-11 w-full gap-2 sm:w-auto">
                         {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />{copy.activating}</> : <><Check className="h-4 w-4" />{copy.saveAndActivate}</>}
                     </Button>
                 )}

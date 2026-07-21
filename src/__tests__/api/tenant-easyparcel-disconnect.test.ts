@@ -13,6 +13,14 @@ vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({ update: mockUpdate })),
 }))
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: string,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'tx-1' })),
+}))
+
 vi.mock('@payload-config', () => ({ default: {} }))
 
 import { DELETE } from '@/app/api/tenant/[id]/easyparcel-disconnect/route'
@@ -58,6 +66,7 @@ describe('[TC-F36.11] DELETE /api/tenant/[id]/easyparcel-disconnect', () => {
                 },
             },
             overrideAccess: true,
+            req: { transactionID: 'tx-1' },
         }))
         expect(await response.json()).toEqual({ success: true })
     })
