@@ -94,6 +94,30 @@ const CategoryServerSchema = z.object({
     description: z.string().optional(),
 });
 
+const POSTGRES_INT4_MAX = 2_147_483_647
+
+function normalizeCategoryParentId(
+    parent: string | number | { id: string | number } | null | undefined,
+): number | null | undefined {
+    if (parent == null) return parent
+
+    const rawId = typeof parent === 'object' ? parent.id : parent
+    if (typeof rawId === 'string' && !/^[1-9]\d*$/.test(rawId)) {
+        throw new Error('CATEGORY_PARENT_ID_INVALID')
+    }
+
+    const parentId = typeof rawId === 'string' ? Number(rawId) : rawId
+    if (
+        !Number.isSafeInteger(parentId) ||
+        parentId <= 0 ||
+        parentId > POSTGRES_INT4_MAX
+    ) {
+        throw new Error('CATEGORY_PARENT_ID_INVALID')
+    }
+
+    return parentId
+}
+
 // Name dedup pre-check: case-insensitive + trimmed, scoped to (parent, tenant). Backend source
 // of truth for CATEGORY_NAME_DUPLICATE — the client's debounced check is UX-only and races are
 // expected/acceptable since this same query runs again here on submit.
@@ -122,8 +146,16 @@ export async function checkCategoryNameAvailable(name: string, parentId: string 
     const tenantId = tenantIdForQuery(user)
     if (!tenantId || !name.trim()) return true
 
+    let normalizedParentId: number | null = null
+    let normalizedExcludeId: number | undefined
+    try {
+        normalizedParentId = normalizeCategoryParentId(parentId) ?? null
+        normalizedExcludeId = excludeId == null ? undefined : (normalizeCategoryParentId(excludeId) ?? undefined)
+    } catch {
+        return false
+    }
     const payload = await getPayload({ config: configPromise })
-    const isDuplicate = await findDuplicateCategoryName(payload, { name, parentId, tenantId, excludeId })
+    const isDuplicate = await findDuplicateCategoryName(payload, { name, parentId: normalizedParentId, tenantId, excludeId: normalizedExcludeId })
     return !isDuplicate
 }
 
@@ -155,6 +187,12 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
 
     const data = CategoryServerSchema.parse(rawData);
     data.name = data.name.trim();
+    try {
+        data.parent = normalizeCategoryParentId(data.parent)
+    } catch (error) {
+        if (error instanceof Error && error.message === 'CATEGORY_PARENT_ID_INVALID') return { success: false, error: 'CATEGORY_PARENT_ID_INVALID' }
+        throw error
+    }
 
     const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
@@ -174,18 +212,14 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
     }
 
     if (tenantId) {
-        const rawParent = data.parent
-        const parentId: string | number | null = rawParent && typeof rawParent === 'object'
-            ? (rawParent as { id: string | number }).id
-            : (rawParent as string | number | null | undefined) ?? null
         const isDuplicate = await findDuplicateCategoryName(payload, {
             name: data.name,
-            parentId,
+            parentId: data.parent ?? null,
             tenantId,
             excludeId: id,
         })
         if (isDuplicate) {
-            throw new Error('CATEGORY_NAME_DUPLICATE')
+            return { success: false, error: 'CATEGORY_NAME_DUPLICATE' }
         }
     }
 
@@ -200,7 +234,9 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             })
             return JSON.parse(JSON.stringify(res));
         } catch (updateErr) {
-            throw translateDbCategorySlugConflict(updateErr)
+            const translated = translateDbCategorySlugConflict(updateErr)
+            if (translated.message === 'CATEGORY_SLUG_DUPLICATE') return { success: false, error: 'CATEGORY_SLUG_DUPLICATE' }
+            throw translated
         }
     } else {
         try {
@@ -212,7 +248,9 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             })
             return JSON.parse(JSON.stringify(res));
         } catch (createErr) {
-            throw translateDbCategorySlugConflict(createErr)
+            const translated = translateDbCategorySlugConflict(createErr)
+            if (translated.message === 'CATEGORY_SLUG_DUPLICATE') return { success: false, error: 'CATEGORY_SLUG_DUPLICATE' }
+            throw translated
         }
     }
 }
@@ -331,12 +369,12 @@ export async function deleteCategoryAction(id: string | number) {
 
     const directCount = deleteRow.direct_count || 0
     if (directCount > 0) {
-        throw new Error(`CATEGORY_HAS_PRODUCTS:${directCount}`)
+        return { success: false, error: 'CATEGORY_HAS_PRODUCTS', count: directCount }
     }
 
     const nameConflictCount = deleteRow.name_conflict_count || 0
     if (nameConflictCount > 0) {
-        throw new Error(`CATEGORY_REPARENT_NAME_CONFLICT:${nameConflictCount}`)
+        return { success: false, error: 'CATEGORY_REPARENT_NAME_CONFLICT', count: nameConflictCount }
     }
 
     if (!deleteRow.deleted || !deleteRow.deleted_doc) {

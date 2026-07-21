@@ -93,7 +93,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             }],
         })
 
-        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_HAS_PRODUCTS:5')
+        await expect(deleteCategoryAction('cat-123')).resolves.toEqual({ success: false, error: 'CATEGORY_HAS_PRODUCTS', count: 5 })
     })
 
     it('TC-F08-05-33: throws CATEGORY_REPARENT_NAME_CONFLICT:N before delete when moving children to root would duplicate names', async () => {
@@ -107,7 +107,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             }],
         })
 
-        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_REPARENT_NAME_CONFLICT:2')
+        await expect(deleteCategoryAction('cat-123')).resolves.toEqual({ success: false, error: 'CATEGORY_REPARENT_NAME_CONFLICT', count: 2 })
     })
 
     it('TC-F08-05-06: returns deleted record from the atomic delete statement', async () => {

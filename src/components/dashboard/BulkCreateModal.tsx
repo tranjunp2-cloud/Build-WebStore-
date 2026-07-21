@@ -368,7 +368,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         // Create the category since it doesn't exist
                         try {
                             const newCat = await saveCategoryAction({ name: prod.category })
-                            if (newCat && newCat.id) {
+                            if (newCat && 'id' in newCat && newCat.id) {
                                 categoryId = newCat.id
                                 allCategories.push(newCat) // Update list to prevent duplicate creation for next items
                             }
