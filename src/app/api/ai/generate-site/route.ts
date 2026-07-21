@@ -55,6 +55,8 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -837,6 +839,7 @@ export async function POST(req: NextRequest) {
         // en/ms/vi to 'auto' and GPT's result.language often falls back to 'en', losing the real code.
         const generationLocale = effectiveGenerationLocale || result.language || language || 'en'
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
+        const productsGridContentLocale = detectedLocale === 'ms' ? 'ms' : 'en'
         const pendingLocaleConfirm = false
 
         if (existingSites.docs.length > 0) {
@@ -1079,6 +1082,14 @@ export async function POST(req: NextRequest) {
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
+            const normalizedLayout = Array.isArray(sanitizedLayout)
+                ? normalizeGeneratedProductsGridBlocks(
+                    sanitizedLayout,
+                    pageDefinition.slug,
+                    productsGridContentLocale,
+                    businessInfo.businessName,
+                  )
+                : sanitizedLayout
 
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
             // violation, block validation, stale _parent_id from drizzle
@@ -1102,7 +1113,7 @@ export async function POST(req: NextRequest) {
                                 site: site.id,
                                 isHomepage: pageDefinition.isHomepage,
                                 _status: 'published',
-                                layout: sanitizedLayout,
+                                layout: normalizedLayout,
                                 seo: pageDefinition.seo,
                             },
                         }),
@@ -1126,9 +1137,9 @@ export async function POST(req: NextRequest) {
                     console.warn(
                         `[generate-site] Retry without image refs after: ${firstMsg.slice(0, 160)}`,
                     )
-                    cleanupNonNumericImageFields(sanitizedLayout as Record<string, unknown>[])
+                    cleanupNonNumericImageFields(normalizedLayout as Record<string, unknown>[])
                     // Also null numeric image refs so Payload doesn't try them again.
-                    for (const block of sanitizedLayout as Record<string, unknown>[]) {
+                    for (const block of normalizedLayout as Record<string, unknown>[]) {
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') delete block[field]
                         }
@@ -1152,7 +1163,7 @@ export async function POST(req: NextRequest) {
                             site: site.id,
                             isHomepage: pageDefinition.isHomepage,
                             _status: 'published',
-                            layout: sanitizedLayout,
+                            layout: normalizedLayout,
                             seo: pageDefinition.seo,
                         },
                     }) as Record<string, unknown>
@@ -2124,6 +2135,60 @@ function buildGeneratedPages({
             },
         },
     ]
+}
+
+function normalizeGeneratedProductsGridBlocks(
+    blocks: AIBlock[],
+    pageSlug: string,
+    locale: 'en' | 'ms',
+    brandName: string,
+): AIBlock[] {
+    const shouldEnableCategoryFilter = pageSlug === '/products'
+    const defaults = resolveBlockContent('products', locale, brandName).content as {
+        headline?: unknown
+        subheadline?: unknown
+    }
+    const defaultHeadline = (typeof defaults.headline === 'string' && defaults.headline.trim() !== '')
+        ? defaults.headline
+        : 'Featured Products'
+    const defaultSubheadline = typeof defaults.subheadline === 'string' ? defaults.subheadline : ''
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'products-grid') return block
+
+        const normalizedBlock: AIBlock = {
+            ...block,
+            showCategoryFilter: shouldEnableCategoryFilter,
+        }
+
+        if (typeof normalizedBlock.headline !== 'string' || normalizedBlock.headline.trim() === '') {
+            normalizedBlock.headline = defaultHeadline
+        }
+
+        if (typeof normalizedBlock.subheadline !== 'string' || normalizedBlock.subheadline.trim() === '') {
+            normalizedBlock.subheadline = defaultSubheadline
+        }
+
+        const limitCandidate = (typeof normalizedBlock.limit === 'number'
+            && Number.isFinite(normalizedBlock.limit)
+            && normalizedBlock.limit > 0)
+            ? normalizedBlock.limit
+            : (typeof normalizedBlock.count === 'number'
+                && Number.isFinite(normalizedBlock.count)
+                && normalizedBlock.count > 0)
+                ? normalizedBlock.count
+                : PRODUCTS_GRID_LIMIT.default
+        normalizedBlock.limit = Math.min(
+            PRODUCTS_GRID_LIMIT.max,
+            Math.max(PRODUCTS_GRID_LIMIT.min, Math.trunc(limitCandidate)),
+        )
+
+        if ('count' in normalizedBlock) {
+            delete normalizedBlock.count
+        }
+
+        return normalizedBlock
+    })
 }
 
 /**

@@ -807,6 +807,7 @@ const ProductsGridBlock = {
         { name: 'subheadline', type: 'textarea' },
         { name: 'limit', type: 'number', defaultValue: 6 },
         { name: 'category', type: 'text' },
+        { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
     ],
 }
 

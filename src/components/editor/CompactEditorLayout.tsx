@@ -56,7 +56,7 @@ export interface CompactEditorLayoutProps {
     onRemoveLanguage: () => void
     onMakePrimary: (locale: string) => void
     onThemeChange: (key: string, value: string) => void
-    onBlockFieldChange: (index: number, field: string, value: string) => void
+    onBlockFieldChange: (index: number, field: string, value: string | boolean) => void
     onBlockUpdate: (index: number, changes: Record<string, unknown>) => void
     onHeaderUpdate: (changes: Record<string, unknown>) => void
     onFooterUpdate: (changes: Record<string, unknown>) => void

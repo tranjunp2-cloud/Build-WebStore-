@@ -1347,7 +1347,7 @@ export default function EditorPage() {
         void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, setLocaleOverride, activeLocale, saveWithRetry])
 
-    const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
+    const handleBlockFieldChange = useCallback((index: number, field: string, value: string | boolean) => {
         handleBlockUpdate(index, { [field]: value })
     }, [handleBlockUpdate])
 
