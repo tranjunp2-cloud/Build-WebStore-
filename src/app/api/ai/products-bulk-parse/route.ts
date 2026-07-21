@@ -87,7 +87,7 @@ const VARIANT_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
         'kecil', 'kuning', 'merah', 'oren', 'putih', 'saiz', 'sederhana', 'ungu', 'warna',
     ]),
     vi: new Set([
-        'cam', 'chat', 'den', 'do', 'hong', 'lieu', 'lon', 'mau', 'nau', 'nho',
+        'bac', 'cam', 'chat', 'den', 'do', 'hong', 'lieu', 'lon', 'mau', 'nau', 'nho',
         'tim', 'trang', 'vai', 'vang', 'vua', 'xam', 'xanh',
     ]),
 }

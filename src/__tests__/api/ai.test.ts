@@ -1371,7 +1371,7 @@ describe('AI Streaming APIs', () => {
       process.env.OPENAI_API_KEY = previousKey;
     });
 
-    it('TC-F08-04-91: rejects a common Malay color omitted by the original variant marker set', async () => {
+    it('TC-F08-04-91: rejects an accentless Vietnamese variant omitted by the original marker set', async () => {
       // Arrange
       mockRateLimitAllowed = true;
       const previousKey = process.env.OPENAI_API_KEY;
@@ -1380,13 +1380,13 @@ describe('AI Streaming APIs', () => {
       const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
       OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
         model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
-          products: [{ name: 'Hat', variants: [{ name: 'Oren', price: 10, stock: 0 }], variantConfigs: [{ name: 'Color', options: [{ value: 'Oren' }] }] }],
+          products: [{ name: 'Hat', variants: [{ name: 'Bạc', price: 10, stock: 0 }], variantConfigs: [{ name: 'Color', options: [{ value: 'Bạc' }] }] }],
         }) } }],
       });
 
       // Act
       const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
-        method: 'POST', body: JSON.stringify({ promptText: 'topi oren', locale: 'en' }),
+        method: 'POST', body: JSON.stringify({ promptText: 'ao thun bac', locale: 'en' }),
       }));
 
       // Assert
