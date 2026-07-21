@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Wallet, ExternalLink } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 // Warn the merchant when the EP wallet can't comfortably cover a label purchase (RM).
 const LOW_WALLET_THRESHOLD = 10
@@ -18,6 +19,8 @@ interface EpWalletBannerProps {
  * wallet data is a sidecar on that response).
  */
 export function EpWalletBanner({ tenantId, active }: EpWalletBannerProps) {
+    const { t, ti } = useI18n()
+    const copy = t.dashboard.settings.shipping.easyParcel
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
     const [walletLow, setWalletLow] = useState(false)
     const [cheapestRate, setCheapestRate] = useState<number | null>(null)
@@ -55,18 +58,18 @@ export function EpWalletBanner({ tenantId, active }: EpWalletBannerProps) {
         : null
 
     return (
-        <div className="flex items-center justify-between gap-3 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] px-4 py-3">
-            <div className="flex items-center gap-2 text-[13px] text-[hsl(var(--warning))]">
+        <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-2 text-[13px] leading-relaxed text-[hsl(var(--warning))] sm:items-center">
                 <Wallet className="h-4 w-4 shrink-0" />
-                <span>
-                    <strong>Wallet balance: {walletBalance}</strong>
-                    {ordersLeft != null && ` — enough for about ${ordersLeft} order${ordersLeft === 1 ? '' : 's'}.`}
-                    {walletLow && ' Top up to avoid interruptions.'}
+                <span className="break-words">
+                    <strong>{ti(copy.walletBalance, { balance: walletBalance })}</strong>
+                    {ordersLeft != null && ` ${ti(copy.walletOrders, { count: ordersLeft })}`}
+                    {walletLow && ` ${copy.walletLow}`}
                 </span>
             </div>
             <a href="https://app.easyparcel.com" target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[13px] font-medium text-[hsl(var(--warning))] hover:opacity-80 shrink-0">
-                Top up <ExternalLink className="h-3.5 w-3.5" />
+                className="flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-lg text-[13px] font-medium text-[hsl(var(--warning))] hover:opacity-80 sm:min-h-0">
+                {copy.topUp} <ExternalLink className="h-3.5 w-3.5" />
             </a>
         </div>
     )

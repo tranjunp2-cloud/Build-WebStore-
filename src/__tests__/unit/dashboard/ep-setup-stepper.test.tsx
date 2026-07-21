@@ -23,15 +23,23 @@ vi.mock('sonner', () => ({
     },
 }))
 
+vi.mock('@/i18n', async () => {
+    const locale = await import('@/i18n/locales/en.json')
+    return { useI18n: () => ({ t: locale.default }) }
+})
+
 vi.mock('@/app/(dashboard)/settings/shipping/pickup-addresses', () => ({
-    PickupAddresses: ({ value, onChange }: { value: any[]; onChange: (v: any[]) => void }) => (
+    PickupAddresses: ({ value, onChange, onEditingChange }: { value: any[]; onChange: (v: any[]) => void; onEditingChange?: (editing: boolean) => void }) => (
         <div data-testid="pickup-addresses">
             <button
                 data-testid="add-warehouse"
-                onClick={() => onChange([
-                    ...value,
-                    { id: 'w-' + Date.now(), label: 'New Warehouse', phone: '0123456789', address1: 'St', state: 'Selangor', postcode: '47810' },
-                ])}
+                onClick={() => {
+                    onChange([
+                        ...value,
+                        { id: 'w-' + Date.now(), label: 'New Warehouse', phone: '0123456789', address1: 'St', city: 'Petaling Jaya', state: 'Selangor', postcode: '47810' },
+                    ])
+                    onEditingChange?.(false)
+                }}
             >
                 Add Warehouse
             </button>
@@ -99,6 +107,42 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         expect(screen.getByText('Pickup')).toBeInTheDocument()
         const nextButton = screen.getByRole('button', { name: /next/i })
         expect(nextButton).toBeDisabled() // Can't proceed without warehouse
+    })
+
+    it('offers manual EasyParcel sync when connected without a warehouse', async () => {
+        const onSyncFromEp = vi.fn().mockResolvedValue(undefined)
+        render(
+            <EpSetupStepper
+                tenantId="tenant-1"
+                initialEpConfig={{ accessToken: 'token', warehouses: [], enabled: false }}
+                onSyncFromEp={onSyncFromEp}
+            />,
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /sync from easyparcel/i }))
+        expect(onSyncFromEp).not.toHaveBeenCalled()
+
+        const dialog = await screen.findByRole('dialog')
+        fireEvent.click(within(dialog).getByRole('button', { name: /^sync$/i }))
+
+        await waitFor(() => expect(onSyncFromEp).toHaveBeenCalledTimes(1))
+    })
+
+    it('renders continuous mobile connectors and flexible desktop connectors between every step', () => {
+        const { container } = render(
+            <EpSetupStepper
+                tenantId="tenant-1"
+                initialEpConfig={{ accessToken: 'token', warehouses: [], enabled: false }}
+            />,
+        )
+
+        const mobileConnectors = container.querySelectorAll('[data-step-connector-mobile]')
+        const desktopConnectors = container.querySelectorAll('[data-step-connector-desktop]')
+        expect(mobileConnectors).toHaveLength(2)
+        expect(desktopConnectors).toHaveLength(2)
+        expect(mobileConnectors[0]).toHaveClass('sm:hidden')
+        expect(desktopConnectors[0]).toHaveClass('flex-1', 'sm:block')
+        expect(screen.getByText('Pickup').parentElement).toHaveAttribute('aria-current', 'step')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -193,9 +237,8 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
     // TC-F36.37: Save & Activate button enabled when warehouse selected (no courier check)
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.37] Save & Activate button only enabled when warehouse selected', () => {
-        // Arrange: No warehouse initially
-        const { rerender } = render(
+    it('[TC-F36.37] Save & Activate button only enabled when warehouse selected', async () => {
+        render(
             <EpSetupStepper
                 tenantId="tenant-1"
                 initialEpConfig={{
@@ -210,13 +253,12 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         const addButton = screen.getByTestId('add-warehouse')
         fireEvent.click(addButton)
 
-        waitFor(() => {
-            const nextButton = screen.getByRole('button', { name: /next/i })
-            fireEvent.click(nextButton)
-        })
+        const nextButton = screen.getByRole('button', { name: /next/i })
+        await waitFor(() => expect(nextButton).toBeEnabled())
+        fireEvent.click(nextButton)
 
-        // Assert: On Step 2 with warehouse, Save & Activate should eventually appear
-        // (detailed check in next test)
+        const activateButton = await screen.findByRole('button', { name: /save (?:&|and) activate/i })
+        expect(activateButton).toBeEnabled()
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -252,10 +294,10 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert: POST body should have warehouses ONLY, NO selectedCourier
@@ -268,7 +310,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
                     credentials: 'include',
                     body: JSON.stringify({
                         enabled: true,
-                        warehouses: [completeWarehouse],
+                        warehouses: [{ ...completeWarehouse, phone: '60123456789' }],
                     }),
                 }),
             )
@@ -309,10 +351,10 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert
@@ -326,7 +368,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
     // TC-F36.40: Save & Activate error shows error toast + doesn't reload
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.40] Save & Activate error shows error toast and does NOT reload', async () => {
+    it('[TC-F36.40] Save & Activate uses localized fallback and does NOT reload', async () => {
         // Arrange
         const { toast } = await import('sonner')
         const mockFetch = vi.fn().mockResolvedValue({
@@ -356,15 +398,15 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Act: Click Save & Activate
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /save & activate/i })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /save (?:&|and) activate/i })).toBeInTheDocument()
         })
 
-        const activateButton = screen.getByRole('button', { name: /save & activate/i })
+        const activateButton = screen.getByRole('button', { name: /save (?:&|and) activate/i })
         fireEvent.click(activateButton)
 
         // Assert
         await waitFor(() => {
-            expect(vi.mocked(toast).error).toHaveBeenCalledWith('Failed to activate')
+            expect(vi.mocked(toast).error).toHaveBeenCalledWith('Failed to save EasyParcel settings')
             expect(mockReload).not.toHaveBeenCalled()
         })
     })
@@ -484,7 +526,7 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
 
         // Assert: Activate button should exist and be enabled (canActivate=true)
         await waitFor(() => {
-            const activateBtn = screen.getByRole('button', { name: /save & activate/i })
+            const activateBtn = screen.getByRole('button', { name: /save (?:&|and) activate/i })
             expect(activateBtn).not.toBeDisabled()
         })
     })

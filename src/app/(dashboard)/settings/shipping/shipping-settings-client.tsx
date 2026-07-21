@@ -12,12 +12,14 @@ import { FreeShippingCard } from './free-shipping-card'
 import { SettingsFooter } from './settings-footer'
 import { EasyParcelSettingsTab } from './easyparcel-settings-tab'
 import type { EasyParcelIntegrationConfig } from './easyparcel-settings-tab'
+import type { ShippingTab } from './shipping-tab'
 
 type Props = {
     siteId: string
     tenantId: string
     initial: ShippingConfig | null
     epConfig: EasyParcelIntegrationConfig | null
+    initialTab?: ShippingTab
 }
 
 const DEFAULTS = {
@@ -40,40 +42,51 @@ function snap(w: string, e: string, fe: boolean, fa: string): Snapshot {
 
 type BadgeVariant = 'live' | 'off' | 'fallback' | 'connected' | 'not-connected'
 
-function StatusBadge({ variant }: { variant: BadgeVariant }) {
-    const base = { borderRadius: 20, padding: '2px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 } as const
+function StatusBadge({ variant, label }: { variant: BadgeVariant; label: string }) {
+    const base = {
+        borderRadius: 20,
+        padding: '2px 8px',
+        fontSize: 11,
+        lineHeight: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+    } as const
     if (variant === 'live') return (
-        <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700, letterSpacing: '0.3px' }}>
+        <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgb(34,197,94)', display: 'inline-block' }} />
-            LIVE
+            {label}
         </span>
     )
     if (variant === 'fallback') return (
         <span style={{ ...base, background: 'rgba(245,158,11,0.18)', color: 'rgb(245,158,11)', fontWeight: 700 }}>
-            ⚠ FALLBACK
+            {label}
         </span>
     )
     if (variant === 'connected') return (
         <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700 }}>
             <CheckCircle2 size={10} />
-            Connected
+            {label}
         </span>
     )
     if (variant === 'not-connected') return (
         <span style={{ ...base, background: 'rgba(107,114,128,0.18)', color: 'rgb(107,114,128)', fontWeight: 600 }}>
-            Not connected
+            {label}
         </span>
     )
     return (
         <span style={{ ...base, background: 'rgba(107,114,128,0.18)', color: 'rgb(107,114,128)', fontWeight: 600 }}>
-            OFF
+            {label}
         </span>
     )
 }
 
-export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: Props) {
+export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, initialTab }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
+    const ep = s.easyParcel
     const [westRateRm, setWestRateRm] = useState(senToRm(initial?.westRate ?? 800))
     const [eastRateRm, setEastRateRm] = useState(senToRm(initial?.eastRate ?? 1500))
     const [freeEnabled, setFreeEnabled] = useState(
@@ -87,6 +100,7 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
     const [eastRateWarning, setEastRateWarning] = useState('')
     const [freeAboveWarning, setFreeAboveWarning] = useState('')
     const [isSaving, setIsSaving] = useState(false)
+    const [epLive, setEpLive] = useState(epConfig?.enabled === true)
     const savingRef = useRef(false)
 
     const snapshotRef = useRef<Snapshot>(snap(
@@ -222,8 +236,13 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
     }
 
     const flatRateLive = initial?.enabled !== false
-    const epLive = epConfig?.enabled === true
     const epConnected = Boolean(epConfig?.testedAt)
+
+    function persistTab(value: string) {
+        const url = new URL(window.location.href)
+        url.searchParams.set('tab', value)
+        window.history.replaceState({}, '', `${url.pathname}?${url.searchParams.toString()}`)
+    }
 
     // GH-1538: pb-4 -> pb-24 — SettingsFooter is `position: fixed`, doesn't push
     // content up on its own; matches pb-24 used by ProductForm/customers-detail's
@@ -234,39 +253,48 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
                 <h1 className="text-[32px] font-black text-[var(--dash-text)] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
                 <p className="mt-2 text-[14px] text-[var(--dash-text-muted)]">{s.pageSubtitle}</p>
             </div>
-            <Tabs defaultValue={epConfig?.enabled ? 'easyparcel' : 'flat-rate'}>
-                <TabsList style={{
-                    background: 'var(--dash-secondary-bg)',
-                    border: '1px solid var(--dash-border)',
-                    borderRadius: 14,
-                    padding: 4,
-                    height: 'auto',
-                    gap: 4,
-                }}>
+            <Tabs
+                defaultValue={initialTab ?? (epConfig?.enabled ? 'easyparcel' : 'flat-rate')}
+                onValueChange={persistTab}
+            >
+                <TabsList
+                    variant="underline"
+                    className="grid grid-cols-2 overflow-visible sm:flex sm:overflow-x-auto"
+                >
                     <TabsTrigger
                         value="flat-rate"
-                        className="flex items-center gap-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm"
-                        style={{ borderRadius: 10, padding: '10px 14px', height: 'auto' }}
+                        variant="underline"
+                        className="min-w-0 flex-1 flex-col gap-1.5 px-2 sm:flex-none sm:flex-row sm:gap-2 sm:px-4"
                     >
-                        <Calculator size={15} />
-                        <span className="font-semibold text-[14px]">Flat Rate</span>
-                        <StatusBadge variant={epLive ? 'fallback' : (flatRateLive ? 'live' : 'off')} />
+                        <span className="flex min-w-0 items-center justify-center gap-1.5">
+                            <Calculator className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{ep.tabFlatRate}</span>
+                        </span>
+                        <StatusBadge
+                            variant={epLive ? 'fallback' : (flatRateLive ? 'live' : 'off')}
+                            label={epLive ? ep.statusFallback : (flatRateLive ? ep.statusLive : ep.statusOff)}
+                        />
                     </TabsTrigger>
                     <TabsTrigger
                         value="easyparcel"
-                        className="flex items-center gap-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm"
-                        style={{ borderRadius: 10, padding: '10px 14px', height: 'auto' }}
+                        variant="underline"
+                        className="min-w-0 flex-1 flex-col gap-1.5 px-2 sm:flex-none sm:flex-row sm:gap-2 sm:px-4"
                     >
-                        <Truck size={15} />
-                        <span className="font-semibold text-[14px]">EasyParcel</span>
-                        <StatusBadge variant={epLive ? (epConnected ? 'connected' : 'not-connected') : 'off'} />
+                        <span className="flex min-w-0 items-center justify-center gap-1.5">
+                            <Truck className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{ep.tabEasyParcel}</span>
+                        </span>
+                        <StatusBadge
+                            variant={epLive ? (epConnected ? 'connected' : 'not-connected') : 'off'}
+                            label={epLive ? (epConnected ? ep.statusConnected : ep.statusNotConnected) : ep.statusOff}
+                        />
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="flat-rate">
                     {epLive && (
-                        <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.08)] px-4 py-3 text-[13px] text-[rgb(245,158,11)]">
+                        <div className="mt-5 flex items-start gap-3 rounded-lg border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] px-4 py-3 text-[13px] text-[hsl(var(--warning))]">
                             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                            <p><strong>Fallback Mode Active</strong> — EasyParcel is connected. These flat rates are a backup only if the live-rate API fails.</p>
+                            <p><strong>{ep.fallbackTitle}</strong> — {ep.fallbackDescription}</p>
                         </div>
                     )}
                     <div className="space-y-5 mt-5">
@@ -302,8 +330,12 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
                         onSave={handleSave}
                     />
                 </TabsContent>
-                <TabsContent value="easyparcel">
-                    <EasyParcelSettingsTab tenantId={tenantId} initialEpConfig={epConfig} />
+                <TabsContent value="easyparcel" forceMount className="data-[state=inactive]:hidden">
+                    <EasyParcelSettingsTab
+                        tenantId={tenantId}
+                        initialEpConfig={epConfig}
+                        onEnabledSaved={setEpLive}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

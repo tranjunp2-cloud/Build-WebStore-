@@ -13,7 +13,7 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
+import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedFallbackMedia, type MediaPipelineContext } from './media-pipeline'
 import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
@@ -531,6 +531,7 @@ export async function fulfillImageNeeds(
     // batchFetch / batchFetchFromPool already use an internal semaphore
     // (CONCURRENCY) so we won't spike Unsplash beyond their rate limit.
     const start = Date.now()
+    const curatedFallbackUsed = new Set<string>()
     const perBlockResults = await Promise.all(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
@@ -544,12 +545,30 @@ export async function fulfillImageNeeds(
             // cap prevents large sites from returning to the old 84-upload path;
             // a single oversized block may still request its full own count.
             const requestCount = Math.max(uniqueCount, Math.min(totalCount, bucketCap))
+            const completeWithCuratedFallback = async (ids: number[]) => {
+                if (ids.length >= requestCount) {
+                    return { blockType, groupNeeds, ids: ids.slice(0, requestCount), reusable: true }
+                }
+                const fallback = await getCuratedFallbackMedia(
+                    blockType,
+                    requestCount - ids.length,
+                    ctx,
+                    payload,
+                    curatedFallbackUsed,
+                )
+                if (fallback.failures.length > 0) {
+                    console.warn(
+                        `[Media Injector] ${blockType}: ${fallback.failures.length} curated fallback photo(s) failed`,
+                    )
+                }
+                return { blockType, groupNeeds, ids: [...ids, ...fallback.mediaIds], reusable: true }
+            }
 
             // GH-1185: people slots (testimonial avatars, team members,
             // doctor profiles) are PEOPLE — never pool photos (pool is built
             // from product keywords → food close-ups in face slots).
-            // Dedicated portrait search; on miss leave empty (initials
-            // placeholder beats a food avatar), so no pool/legacy fallback.
+            // Dedicated portrait search; on provider miss use only the curated
+            // people library, so product-pool photos never appear in face slots.
             if (PEOPLE_BLOCKS.has(blockType)) {
                 try {
                     const result = await getAvatarMedia(requestCount, ctx.language, ctx, payload, blockType)
@@ -558,11 +577,11 @@ export async function fulfillImageNeeds(
                             `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
                         )
                     }
-                    return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
+                    return completeWithCuratedFallback(result.mediaIds)
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err)
                     console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
-                    return { blockType, groupNeeds, ids: [] as number[], reusable: true }
+                    return completeWithCuratedFallback([])
                 }
             }
 
@@ -580,7 +599,7 @@ export async function fulfillImageNeeds(
                             )
                         }
                         if (result.mediaIds.length >= requestCount) {
-                            return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
+                            return completeWithCuratedFallback(result.mediaIds)
                         }
                         console.warn(
                             `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${requestCount}) — reusing only after unique IDs are exhausted`,
@@ -588,7 +607,7 @@ export async function fulfillImageNeeds(
                         // A separate search can return a photo already present in
                         // the pool under a new Media ID. Keep the partial unique set;
                         // the renderer fills only the missing slots with curated images.
-                        return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
+                        return completeWithCuratedFallback(result.mediaIds)
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
                         console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
@@ -617,11 +636,11 @@ export async function fulfillImageNeeds(
                         `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
                     )
                 }
-                return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
+                return completeWithCuratedFallback(result.mediaIds)
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
                 console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
-                return { blockType, groupNeeds, ids: [] as number[], reusable: true }
+                return completeWithCuratedFallback([])
             }
         }),
     )

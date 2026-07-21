@@ -9,7 +9,7 @@ import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import { BLOCK_IMAGE_SPEC, planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -22,6 +22,11 @@ import { blockRegistry } from '@/blocks/registry'
 import { withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
+import {
+    buildLanguageDetectionText,
+    detectLanguageFromText,
+    normalizeSupportedLocale,
+} from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
@@ -46,9 +51,12 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
-import { normalizeInternalUrl } from '@/lib/navigation-url'
+import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -118,6 +126,34 @@ export async function POST(req: NextRequest) {
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
+    let _generationCommitted = false
+    let _previousGenerationStatus: string | null = null
+    const _createdPageIds: Array<string | number> = []
+    const _createdProductIds: Array<string | number> = []
+    const _createdBlogIds: Array<string | number> = []
+
+    const recoverFailedGeneration = async () => {
+        if (_generationCommitted || !_payload || !_site?.id) return
+
+        // These rows belong exclusively to this request. Cleanup deliberately
+        // runs outside the generation write fence so a deadline cannot leave
+        // staged pages or sample content attached to the previous live site.
+        for (const [collection, ids] of [
+            ['pages', _createdPageIds],
+            ['products', _createdProductIds],
+            ['blogs', _createdBlogIds],
+        ] as const) {
+            for (const id of ids) {
+                await _payload.delete({ collection, id }).catch(() => undefined)
+            }
+        }
+
+        await _payload.update({
+            collection: 'sites',
+            id: _site.id as string | number,
+            data: { generationStatus: _previousGenerationStatus ?? 'failed' },
+        }).catch((_e: unknown) => console.error('[AI Generate] Failed to recover generation status:', _e))
+    }
 
     const assertRouteDeadline = () => {
         if (routeAbortController.signal.aborted || routeDeadlineExceeded || Date.now() >= routeDeadlineAt) {
@@ -160,6 +196,10 @@ export async function POST(req: NextRequest) {
             shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
+        const effectiveGenerationLocale = normalizeSupportedLocale(requestedGenerationLocale)
+            ?? (language !== 'auto'
+                ? language
+                : detectLanguageFromText(buildLanguageDetectionText(normalizedBusinessInfo)).locale)
 
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
@@ -368,6 +408,15 @@ export async function POST(req: NextRequest) {
                 { status: 400 },
             )
         }
+
+        // Shared by blog preparation and the persistence phase. Starting this
+        // read before the AI calls hides its latency and guarantees both paths
+        // reason about the same current site.
+        const existingSitesPromise = payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: resolvedTenantId } },
+            limit: 1,
+        })
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
@@ -658,7 +707,7 @@ export async function POST(req: NextRequest) {
                 trackPhase('products_prepare', () =>
                     generateSampleProducts(
                         businessInfo,
-                        (language as 'en' | 'ms' | 'auto'),
+                        effectiveGenerationLocale,
                         String(resolvedTenantId),
                         payload,
                         undefined,
@@ -670,7 +719,15 @@ export async function POST(req: NextRequest) {
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('site_ai', () =>
                 withSentrySpan('ai.generateSite', () =>
-                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
+                    generateSiteWithAI(
+                        businessInfo,
+                        extraInstructions,
+                        language,
+                        referencePrompt,
+                        blockPromptOverrides,
+                        onEvent,
+                        { targetLocale: effectiveGenerationLocale },
+                    ),
                 ),
             )
             assertRouteDeadline()
@@ -685,16 +742,19 @@ export async function POST(req: NextRequest) {
             // Thumbnail search is intentionally independent from sample-product
             // completion so a slow product upload cannot hold the blog tail.
             // Never rejects: null = prep failed → synchronous fallback seeding.
-            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
-                payload,
-                tenantId: resolvedTenantId,
-                category: normalizeComposerCategory(businessInfo.industry),
-                businessName: businessInfo.businessName,
-                products: parseProductsString(businessInfo.products),
-                industry: businessInfo.industry,
-                seed: computeGenSeed(businessInfo),
-                assertCanWrite: assertRouteDeadline,
-            }).catch((): null => null)
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = existingSitesPromise
+                .then((existingSites) => prepareBlogPosts({
+                    payload,
+                    tenantId: resolvedTenantId,
+                    siteId: existingSites.docs[0]?.id as string | number | undefined,
+                    category: normalizeComposerCategory(businessInfo.industry),
+                    businessName: businessInfo.businessName,
+                    products: parseProductsString(businessInfo.products),
+                    industry: businessInfo.industry,
+                    seed: computeGenSeed(businessInfo),
+                    assertCanWrite: assertRouteDeadline,
+                }))
+                .catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -914,13 +974,13 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         // RULE 1: 1 site per user — Update existing site OR create new
         // ────────────────────────────────────────────────────────────────────
-        const existingSites = await payload.find({
-            collection: 'sites',
-            where: { tenant: { equals: resolvedTenantId } },
-            limit: 1,
-        })
+        const existingSites = await existingSitesPromise
 
         let site: Record<string, unknown>
+        let stagedPageSwap: null | {
+            oldPageIds: Array<string | number>
+            pages: Array<{ id: string | number; slug: string; isHomepage: boolean }>
+        } = null
 
         // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
         const resolvedTheme = resolveTheme(result.theme)
@@ -941,58 +1001,65 @@ export async function POST(req: NextRequest) {
             return resolveSiteType(normalizeComposerCategory(businessInfo.industry))
         })()
 
-        // F26-01: Always show confirm dialog after AI generation so user can verify or correct detected locale.
+        // The builder resolves/accepts the generation locale before starting this request.
         // generationLocale = actual language the AI generated in (any locale, e.g. 'el', 'th').
         // detectedLocale = EN/MS only — used for Sites.locale (translation system, Phase 1 EN+MS only).
         // The user-confirmed locale (requestedGenerationLocale) wins: `language` collapses non
         // en/ms/vi to 'auto' and GPT's result.language often falls back to 'en', losing the real code.
-        const generationLocale = requestedGenerationLocale || result.language || language || 'en'
+        const generationLocale = effectiveGenerationLocale || result.language || language || 'en'
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
-        const pendingLocaleConfirm = true
+        const productsGridContentLocale = detectedLocale === 'ms' ? 'ms' : 'en'
+        const pendingLocaleConfirm = false
+        const siteGenerationData = {
+            name: result.siteName,
+            status: 'draft' as const,
+            siteType: safeSiteType,
+            locale: detectedLocale,
+            generationLocale,
+            pendingLocaleConfirm,
+            theme: resolvedTheme,
+            seo: {
+                metaTitle: result.seo.title,
+                metaDescription: result.seo.description,
+            },
+            aiGenerationMetadata: {
+                generatedAt: new Date().toISOString(),
+                originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
+                businessType: safeSiteType,
+            },
+        }
 
         if (existingSites.docs.length > 0) {
             assertRouteDeadline()
-            // UPDATE existing site (template swap — keep site ID, update content)
+            const previousSite = existingSites.docs[0] as Record<string, unknown>
+            _previousGenerationStatus = typeof previousSite.generationStatus === 'string'
+                ? previousSite.generationStatus
+                : 'completed'
+            // Keep the current site metadata and pages live until all new
+            // content passes the completion barriers. Only status is exposed.
             site = await payload.update({
                 collection: 'sites',
-                id: existingSites.docs[0].id,
-                data: {
-                    name: result.siteName,
-                    status: 'draft',
-                    generationStatus: 'generating',
-                    siteType: safeSiteType,
-                    locale: detectedLocale,
-                    generationLocale,
-                    pendingLocaleConfirm,
-                    theme: resolvedTheme,
-                    seo: {
-                        metaTitle: result.seo.title,
-                        metaDescription: result.seo.description,
-                    },
-                    aiGenerationMetadata: {
-                        generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: safeSiteType,
-                    },
-                },
+                id: previousSite.id as string | number,
+                data: { generationStatus: 'generating' },
             })
 
-            // Delete old pages for this site. depth:0 keeps relationships as IDs
-            // and skips the massive join across every block table — we only need
-            // ids for the delete loop. (Without this, default depth=2 produced a
-            // ~40-way join that failed loudly when any block table lagged a
-            // migration — cf. faq/pricing "variant" fixes in 355fc7c1/73dc271b.)
+            // Keep old pages untouched while the replacement is built under
+            // temporary slugs. The final delete+rename is one short transaction.
             const oldPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: site.id } },
                 limit: 100,
                 depth: 0,
                 pagination: false,
-                select: { id: true },
+                select: { id: true, slug: true },
             })
-            for (const oldPage of oldPages.docs) {
-                assertRouteDeadline()
-                await payload.delete({ collection: 'pages', id: oldPage.id })
+            stagedPageSwap = {
+                // Preserve the existing system 404 page; generated content pages
+                // are replaced exactly as before.
+                oldPageIds: oldPages.docs
+                    .filter((page) => String((page as { slug?: unknown }).slug ?? '') !== '404')
+                    .map((page) => page.id as string | number),
+                pages: [],
             }
         } else {
             assertRouteDeadline()
@@ -1001,23 +1068,8 @@ export async function POST(req: NextRequest) {
                 collection: 'sites',
                 data: {
                     tenant: resolvedTenantId,
-                    name: result.siteName,
-                    status: 'draft',
+                    ...siteGenerationData,
                     generationStatus: 'generating',
-                    siteType: safeSiteType,
-                    locale: detectedLocale,
-                    generationLocale,
-                    pendingLocaleConfirm,
-                    theme: resolvedTheme,
-                    seo: {
-                        metaTitle: result.seo.title,
-                        metaDescription: result.seo.description,
-                    },
-                    aiGenerationMetadata: {
-                        generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: safeSiteType,
-                    },
                 },
             })
         }
@@ -1199,6 +1251,18 @@ export async function POST(req: NextRequest) {
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
+            const normalizedLayout = Array.isArray(sanitizedLayout)
+                ? normalizeGeneratedProductsGridBlocks(
+                    sanitizedLayout,
+                    pageDefinition.slug,
+                    productsGridContentLocale,
+                    businessInfo.businessName,
+                  )
+                : sanitizedLayout
+            const persistenceSlug = stagedPageSwap
+                ? `generation-${generationRequestId.slice(0, 12)}-${slugify(String(pageDefinition.slug)) || 'home'}`
+                : pageDefinition.slug
+            const persistenceIsHomepage = stagedPageSwap ? false : pageDefinition.isHomepage
 
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
             // violation, block validation, stale _parent_id from drizzle
@@ -1221,11 +1285,11 @@ export async function POST(req: NextRequest) {
                                 collection: 'pages',
                                 data: {
                                     title: pageDefinition.title,
-                                    slug: pageDefinition.slug,
+                                    slug: persistenceSlug,
                                     site: site.id,
-                                    isHomepage: pageDefinition.isHomepage,
+                                    isHomepage: persistenceIsHomepage,
                                     _status: 'published',
-                                    layout: sanitizedLayout,
+                                    layout: normalizedLayout,
                                     seo: pageDefinition.seo,
                                 },
                             })
@@ -1250,25 +1314,28 @@ export async function POST(req: NextRequest) {
                     console.warn(
                         `[generate-site] Retry without image refs after: ${firstMsg.slice(0, 160)}`,
                     )
-                    cleanupNonNumericImageFields(sanitizedLayout as Record<string, unknown>[])
+                    cleanupNonNumericImageFields(normalizedLayout as Record<string, unknown>[])
                     // Also null numeric image refs so Payload doesn't try them again.
                     let droppedImageRefs = 0
-                    for (const block of sanitizedLayout as Record<string, unknown>[]) {
+                    for (const block of normalizedLayout as Record<string, unknown>[]) {
+                        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+                        const imageSpec = BLOCK_IMAGE_SPEC[blockType]
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') {
                                 delete block[field]
-                                droppedImageRefs++
+                                if (imageSpec?.topLevel?.includes(field)) droppedImageRefs++
                             }
                         }
                         for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
                             const arr = block[arrayField]
                             if (!Array.isArray(arr)) continue
+                            const nestedSpec = imageSpec?.nestedArray?.find((entry) => entry.arrayField === arrayField)
                             for (const item of arr as Record<string, unknown>[]) {
                                 if (item && typeof item === 'object') {
                                     for (const f of ['image', 'logo', 'avatar']) {
                                         if (typeof item[f] === 'number') {
                                             delete item[f]
-                                            droppedImageRefs++
+                                            if (nestedSpec?.itemField === f) droppedImageRefs++
                                         }
                                     }
                                 }
@@ -1280,18 +1347,32 @@ export async function POST(req: NextRequest) {
                         collection: 'pages',
                         data: {
                             title: pageDefinition.title,
-                            slug: pageDefinition.slug,
+                            slug: persistenceSlug,
                             site: site.id,
-                            isHomepage: pageDefinition.isHomepage,
+                            isHomepage: persistenceIsHomepage,
                             _status: 'published',
-                            layout: sanitizedLayout,
+                            layout: normalizedLayout,
                             seo: pageDefinition.seo,
                         },
                     }) as Record<string, unknown>
-                    // The write succeeded only after dropping media. Preserve the
-                    // page for diagnostics/retry, but never let the completion
-                    // barrier treat this as a visually complete generation.
-                    blockImageStats.failed += Math.max(1, droppedImageRefs)
+                    // Count only schema-declared required refs. Unsupported AI
+                    // image fields are discarded without failing completeness.
+                    blockImageStats.failed += droppedImageRefs
+                }
+                _createdPageIds.push(createdPage.id as string | number)
+                if (stagedPageSwap) {
+                    stagedPageSwap.pages.push({
+                        id: createdPage.id as string | number,
+                        slug: pageDefinition.slug,
+                        isHomepage: pageDefinition.isHomepage,
+                    })
+                    // Downstream navigation/completion logic must reason about
+                    // canonical pages, not their temporary persistence slugs.
+                    createdPage = {
+                        ...createdPage,
+                        slug: pageDefinition.slug,
+                        isHomepage: pageDefinition.isHomepage,
+                    }
                 }
                 createdPages.push(createdPage)
                 _createdPagesCount++
@@ -1413,7 +1494,7 @@ export async function POST(req: NextRequest) {
         // BUG-F05-005: Auto-create 404 page for every new site
         assertRouteDeadline()
         try {
-            await payload.create({
+            const created404 = await payload.create({
                 collection: 'pages',
                 data: {
                     title: '404 Not Found',
@@ -1432,6 +1513,7 @@ export async function POST(req: NextRequest) {
                     },
                 },
             })
+            _createdPageIds.push(created404.id as string | number)
         } catch (err404) {
             // Non-fatal: 404 page may already exist (e.g. re-generation)
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
@@ -1485,6 +1567,11 @@ export async function POST(req: NextRequest) {
         let productsCreatedCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
+        const createTrackedProduct = async (data: Record<string, unknown>) => {
+            const created = await payload.create({ collection: 'products', data })
+            _createdProductIds.push(created.id as string | number)
+            return created
+        }
         try {
             const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             assertRouteDeadline()
@@ -1532,7 +1619,7 @@ export async function POST(req: NextRequest) {
             const createProductWithoutImage = async (baseData: Record<string, unknown>): Promise<boolean> => {
                 assertRouteDeadline()
                 try {
-                    await payload.create({ collection: 'products', data: baseData })
+                    await createTrackedProduct(baseData)
                     productsCreatedCount++
                     productImageStats.noImage++
                     return true
@@ -1593,12 +1680,9 @@ export async function POST(req: NextRequest) {
                 const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
                     assertRouteDeadline()
-                    await payload.create({
-                        collection: 'products',
-                        data: {
-                            ...baseData,
-                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
-                        },
+                    await createTrackedProduct({
+                        ...baseData,
+                        ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                     })
                     productsCreatedCount++
                 } catch (err) {
@@ -1623,9 +1707,9 @@ export async function POST(req: NextRequest) {
                             if (retryImageId != null) {
                                 try {
                                     assertRouteDeadline()
-                                    await payload.create({
-                                        collection: 'products',
-                                        data: { ...baseData, images: [{ image: retryImageId, alt: fallbackAlt }] },
+                                    await createTrackedProduct({
+                                        ...baseData,
+                                        images: [{ image: retryImageId, alt: fallbackAlt }],
                                     })
                                     productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
@@ -1679,7 +1763,15 @@ export async function POST(req: NextRequest) {
                 )
             }
             blogsReadyCount = await trackPhase('blog_write', () =>
-                persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id, assertRouteDeadline),
+                persistBlogPosts(
+                    payload,
+                    preparedBlogs,
+                    resolvedTenantId,
+                    site.id as string | number,
+                    user.id,
+                    assertRouteDeadline,
+                    (id) => _createdBlogIds.push(id),
+                ),
             )
             console.info(`[generate-site] blog posts inline: ${blogsReadyCount}/${preparedBlogs.length}`)
         } else if (preparedBlogs === null) {
@@ -1694,6 +1786,7 @@ export async function POST(req: NextRequest) {
                 businessInfo.industry,
                 computeGenSeed(businessInfo),
                 assertRouteDeadline,
+                (id) => _createdBlogIds.push(id),
             ))
         }
 
@@ -1718,17 +1811,47 @@ export async function POST(req: NextRequest) {
         assertRouteDeadline()
 
         // Completion barrier: required pages, products, and inline-ready blogs
-        // have settled before the site becomes observable as completed.
-        await trackPhase('site_complete', () => payload.update({
-            collection: 'sites',
-            id: site.id as string | number,
-            data: {
-                generationStatus: 'completed',
-                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
-                ...cartPatch,
-            },
-        }))
-        assertRouteDeadline()
+        // have settled before the site becomes observable as completed. For a
+        // regeneration, delete old pages + promote staged pages + publish the
+        // new site metadata atomically so a failed swap leaves the old site live.
+        const completionData = {
+            ...siteGenerationData,
+            generationStatus: 'completed' as const,
+            ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+            ...cartPatch,
+        }
+        await trackPhase('site_complete', () => stagedPageSwap
+            ? withTenantRowLock(payload, resolvedTenantId, async (transactionReq) => {
+                assertRouteDeadline()
+                for (const oldPageId of stagedPageSwap.oldPageIds) {
+                    await payload.delete({ collection: 'pages', id: oldPageId, req: transactionReq })
+                }
+                for (const stagedPage of stagedPageSwap.pages) {
+                    await payload.update({
+                        collection: 'pages',
+                        id: stagedPage.id,
+                        data: {
+                            slug: stagedPage.slug,
+                            isHomepage: stagedPage.isHomepage,
+                        },
+                        req: transactionReq,
+                    })
+                }
+                await payload.update({
+                    collection: 'sites',
+                    id: site.id as string | number,
+                    data: completionData,
+                    req: transactionReq,
+                })
+            })
+            : (async () => {
+                await payload.update({
+                    collection: 'sites',
+                    id: site.id as string | number,
+                    data: completionData,
+                })
+            })())
+        _generationCommitted = true
 
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
@@ -1862,16 +1985,7 @@ export async function POST(req: NextRequest) {
                                 ),
                             )
                         } catch { /* stream already canceled — skip SSE write, still recover DB */ }
-                        // Error recovery: update site status if site was created before failure
-                        if (_site?.id && _payload && !routeAbortController.signal.aborted && Date.now() < routeDeadlineAt) {
-                            await _payload
-                                .update({
-                                    collection: 'sites',
-                                    id: _site.id as string | number,
-                                    data: { generationStatus: 'failed' },
-                                })
-                                .catch(() => {})
-                        }
+                        await recoverFailedGeneration()
                     } finally {
                         try { controller.close() } catch { /* already closed */ }
                     }
@@ -1937,16 +2051,11 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        // A partial site must never be observable as completed. The client can
-        // retry explicitly after inspecting the failed generation.
+        // A partial site must never be observable as completed. Recovery is
+        // intentionally allowed after the generation deadline: the write fence
+        // protects content creation, not terminal cleanup/status restoration.
         const _siteForCatch = _site as Record<string, unknown> | null
-        if (_siteForCatch?.id && _payload && !routeAbortController.signal.aborted && Date.now() < routeDeadlineAt) {
-            await _payload.update({
-                collection: 'sites',
-                id: _siteForCatch.id as string | number,
-                data: { generationStatus: 'failed' },
-            }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
-        }
+        await recoverFailedGeneration()
 
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
@@ -2344,6 +2453,60 @@ export function buildGeneratedPages({
             },
         },
     ]
+}
+
+function normalizeGeneratedProductsGridBlocks(
+    blocks: AIBlock[],
+    pageSlug: string,
+    locale: 'en' | 'ms',
+    brandName: string,
+): AIBlock[] {
+    const shouldEnableCategoryFilter = pageSlug === '/products'
+    const defaults = resolveBlockContent('products', locale, brandName).content as {
+        headline?: unknown
+        subheadline?: unknown
+    }
+    const defaultHeadline = (typeof defaults.headline === 'string' && defaults.headline.trim() !== '')
+        ? defaults.headline
+        : 'Featured Products'
+    const defaultSubheadline = typeof defaults.subheadline === 'string' ? defaults.subheadline : ''
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'products-grid') return block
+
+        const normalizedBlock: AIBlock = {
+            ...block,
+            showCategoryFilter: shouldEnableCategoryFilter,
+        }
+
+        if (typeof normalizedBlock.headline !== 'string' || normalizedBlock.headline.trim() === '') {
+            normalizedBlock.headline = defaultHeadline
+        }
+
+        if (typeof normalizedBlock.subheadline !== 'string' || normalizedBlock.subheadline.trim() === '') {
+            normalizedBlock.subheadline = defaultSubheadline
+        }
+
+        const limitCandidate = (typeof normalizedBlock.limit === 'number'
+            && Number.isFinite(normalizedBlock.limit)
+            && normalizedBlock.limit > 0)
+            ? normalizedBlock.limit
+            : (typeof normalizedBlock.count === 'number'
+                && Number.isFinite(normalizedBlock.count)
+                && normalizedBlock.count > 0)
+                ? normalizedBlock.count
+                : PRODUCTS_GRID_LIMIT.default
+        normalizedBlock.limit = Math.min(
+            PRODUCTS_GRID_LIMIT.max,
+            Math.max(PRODUCTS_GRID_LIMIT.min, Math.trunc(limitCandidate)),
+        )
+
+        if ('count' in normalizedBlock) {
+            delete normalizedBlock.count
+        }
+
+        return normalizedBlock
+    })
 }
 
 /**

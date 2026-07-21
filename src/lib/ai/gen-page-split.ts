@@ -344,6 +344,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     )
 
     let homeParsed = homeOutcome.parsed
+    if (homeParsed && !extractHomePage(homeParsed)) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable homepage — composer fallback required')
+        homeParsed = null
+    }
     // Scope enforcement in CODE, not just prompt: a scope-ignoring batch (the
     // measured failure mode) may emit a stray homepage or extra pages.
     // - a real homepage duplicate (slug '/') is discarded;

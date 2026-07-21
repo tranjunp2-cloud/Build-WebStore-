@@ -2,7 +2,7 @@
  * EasyParcel OAuth Callback Tests — F36 Phase 04 [GH-1333]
  * Tests that oauth-callback correctly:
  * 1. Does NOT set enabled=true (only stores token + testedAt + warehouses + accountName/email)
- * 2. Saves seeded warehouse from EP account info (one-time, non-overwriting)
+ * 2. Syncs the current EP pickup address after a clean reconnect without overwriting local edits
  * 3. Handles errors gracefully (non-critical account info fetch)
  * 4. Validates CSRF nonce and state parameter
  *
@@ -27,53 +27,21 @@ vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
 vi.mock('@/lib/shipping/easyparcel/client', () => ({
     getAccountInfo: vi.fn(),
 }))
-vi.mock('@/lib/shipping/easyparcel/normalize', () => ({
-    mapSubdivisionName: vi.fn((code) => {
-        // Simple mock mapping
-        const mapping: Record<string, string> = {
-            'KL': 'W.P. Kuala Lumpur',
-            'SG': 'Selangor',
-            'PJ': 'Selangor',
-            'JHR': 'Johor',
-        }
-        return mapping[code] || 'Unknown'
-    }),
-}))
 
 import { GET } from '@/app/api/easyparcel/oauth-callback/route'
 import { exchangeCodeForToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getAccountInfo } from '@/lib/shipping/easyparcel/client'
+import { NextRequest } from 'next/server'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
-function makeRequest(code: string, state: string, cookies: Record<string, string> = {}) {
+function makeCallbackRequest(code: string, state: string, tenantId: string, nonce: string) {
     const url = new URL('http://localhost/api/easyparcel/oauth-callback')
     url.searchParams.set('code', code)
     url.searchParams.set('state', state)
-
-    const req = new Request(url.toString())
-
-    // Inject cookies (simplified — NextRequest handles this differently)
-    // For testing, we'll mock via a wrapper since NextRequest cookie handling is complex
-    return req
-}
-
-// Helper to mock request with cookies
-function makeRequestWithCookies(
-    code: string,
-    state: string,
-    nonceCookie: string | null,
-) {
-    const url = new URL('http://localhost/api/easyparcel/oauth-callback')
-    url.searchParams.set('code', code)
-    url.searchParams.set('state', state)
-
-    // Create a basic request; in real test we'd use NextRequest but for Vitest
-    // we need to mock the cookies behavior
-    const req = new Request(url.toString(), { method: 'GET' })
-
-    // Return both request and a mock of NextRequest behavior
-    return { req, nonceCookie }
+    return new NextRequest(url, {
+        headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+    })
 }
 
 const tenantId = 'tenant-1'
@@ -121,108 +89,90 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
         // Mock update to capture what's being saved
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // For this test, we'll simulate the request manually since NextRequest
-        // cookie handling is complex in Vitest. We focus on verifying the update payload.
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        // Act: Simulate callback with valid code + state + nonce
-        // (In real test, would use actual NextRequest)
-        const now = Date.now()
-        const expectedExpiresAt = new Date(now + tokenResponse.expires_in * 1000).toISOString()
-
-        // Assert: Verify what update() should be called with
-        // We'll verify the mock is called correctly by testing the route behavior
-
-        // For now, test the core logic: if oauth-callback were called successfully,
-        // the update payload should NOT include enabled=true
-
-        const updatePayload = {
-            collection: 'tenants',
-            id: tenantId,
-            data: {
-                easyParcelIntegration: {
-                    accessToken: 'new-access-token',
-                    refreshToken: 'new-refresh-token',
-                    tokenExpiresAt: expect.any(String),
-                    tokenRefreshExpiresAt: expect.any(String),
-                    testedAt: expect.any(String),
-                    accountName: 'Test Merchant',
-                    accountEmail: null,
-                    // Note: enabled is NOT in this object
-                },
-            },
-            overrideAccess: true,
-        }
-
-        // Expected: update NOT called with enabled field
-        // (we're verifying the contract, not executing the route which requires NextRequest)
-        expect(updatePayload.data.easyParcelIntegration).not.toHaveProperty('enabled')
+        // Assert
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accessToken: 'new-access-token',
+            refreshToken: 'new-refresh-token',
+            tokenExpiresAt: expect.any(String),
+            tokenRefreshExpiresAt: expect.any(String),
+            testedAt: expect.any(String),
+            accountName: 'Test Merchant',
+            accountEmail: null,
+        })
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('enabled')
     })
 
     // ──────────────────────────────────────────────────────────────────
-    // TC-F36.21: Callback with account info — seeds warehouse only if none exists
+    // TC-F36.11: Reconnect syncs the current pickup address from account info
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.21] Seeds warehouse from EP account if tenant has no warehouses yet', async () => {
-        // Arrange: Tenant has no existing warehouses
+    it('[TC-F36.11] Syncs the current EP pickup address after reconnect', async () => {
+        // Arrange
         mockFindByID.mockResolvedValue({
             id: tenantId,
             easyParcelIntegration: {
-                warehouses: [], // Empty
-                // No legacy warehouse
+                warehouse: null,
+                warehouses: [],
             },
         })
-
-        const tokenResponse = {
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
             access_token: 'token-1',
             refresh_token: 'refresh-1',
             expires_in: 3600,
             refresh_token_expires_in: 86400,
-        }
-
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
-        // Mock account info with pickup address
-        const epPickupAddress = {
-            name: 'EP Default Pickup',
-            phone_number: '0123456789',
-            address1: 'EP Warehouse St',
-            address2: 'Suite 100',
-            city: 'Kuala Lumpur',
-            province_code: 'SG',
-            postcode: '47810',
-            email: 'warehouse@ep.com',
-        }
-
+        })
         vi.mocked(getAccountInfo).mockResolvedValue({
             data: {
                 account: { name: 'Merchant' },
-                address: { pickup_address: epPickupAddress },
+                address: {
+                    pickup_address: {
+                        name: 'Current EP Pickup',
+                        phone_number: '0123456789',
+                        address1: 'EP Warehouse St',
+                        address2: 'Suite 100',
+                        city: 'Kuala Lumpur',
+                        province_code: 'MY-10',
+                        postcode: '47810',
+                        email: 'warehouse@ep.com',
+                    },
+                },
             },
         })
-
         mockUpdate.mockResolvedValue({ id: tenantId })
+        const url = new URL('http://localhost/api/easyparcel/oauth-callback')
+        url.searchParams.set('code', code)
+        url.searchParams.set('state', state)
+        const request = new NextRequest(url, {
+            headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+        })
 
-        // Assert: Verify seeded warehouse structure
-        const expectedSeededWarehouse = {
-            id: expect.any(String), // crypto.randomUUID()
-            label: 'EP Default Pickup',
-            phone: '0123456789',
-            address1: 'EP Warehouse St',
-            address2: 'Suite 100',
-            city: 'Kuala Lumpur',
-            state: 'Selangor', // Mapped from province_code 'SG'
-            postcode: '47810',
-            country: 'MY',
-            isDefault: true,
-        }
+        // Act
+        await GET(request)
 
-        // Expected payload should include seededWarehouses
-        // In contract test: verify structure
-        expect(expectedSeededWarehouse).toMatchObject({
-            label: 'EP Default Pickup',
-            phone: '0123456789',
-            postcode: '47810',
-            isDefault: true,
+        // Assert
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('warehouse')
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accountName: 'Merchant',
+            accountEmail: 'warehouse@ep.com',
+            warehouses: [{
+                id: expect.any(String),
+                label: 'Current EP Pickup',
+                phone: '0123456789',
+                address1: 'EP Warehouse St',
+                address2: 'Suite 100',
+                city: 'Kuala Lumpur',
+                state: 'Selangor',
+                postcode: '47810',
+                country: 'MY',
+                isDefault: true,
+            }],
         })
     })
 
@@ -276,23 +226,20 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
 
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: Update should NOT include seededWarehouses field
-        // (existing warehouses should remain untouched)
-        const expectedPayload = {
-            easyParcelIntegration: {
-                accessToken: 'token-1',
-                refreshToken: 'refresh-1',
-                tokenExpiresAt: expect.any(String),
-                tokenRefreshExpiresAt: expect.any(String),
-                testedAt: expect.any(String),
-                accountName: 'Merchant',
-                accountEmail: null,
-                // warehouses field is NOT set — preserving existing
-            },
-        }
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        // Verify: seededWarehouses should not be in update if existing warehouses present
-        expect(expectedPayload.easyParcelIntegration).not.toHaveProperty('warehouses')
+        // Assert: existing warehouses stay untouched.
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        const update = mockUpdate.mock.calls[0][0]
+        expect(update.data.easyParcelIntegration).toMatchObject({
+            accessToken: 'token-1',
+            refreshToken: 'refresh-1',
+            testedAt: expect.any(String),
+            accountName: 'Merchant',
+            accountEmail: null,
+        })
+        expect(update.data.easyParcelIntegration).not.toHaveProperty('warehouses')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -320,37 +267,63 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
 
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: update should still be called with token fields
-        // (accountName/accountEmail may be undefined, but token is saved)
-        const expectedEssentials = {
+        // Act
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
+
+        // Assert: account-info failure remains non-critical and tokens are persisted.
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockUpdate.mock.calls[0][0].data.easyParcelIntegration).toMatchObject({
             accessToken: 'token-1',
             refreshToken: 'refresh-1',
             testedAt: expect.any(String),
-        }
-
-        expect(expectedEssentials.accessToken).toBe('token-1')
-        expect(expectedEssentials.testedAt).toBeDefined()
-
-        // In actual route: mockUpdate() should have been called despite getAccountInfo failure
+            accountName: null,
+            accountEmail: null,
+        })
     })
 
     // ──────────────────────────────────────────────────────────────────
     // TC-F36.24: Missing code parameter → error redirect
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.24] Missing code parameter → error redirect to /settings/shipping?ep=error', async () => {
-        // Arrange: Request without code
+    it('[TC-F36.201] Missing code parameter returns to the EasyParcel shipping tab', async () => {
+        // Arrange
         const url = new URL('http://localhost/api/easyparcel/oauth-callback')
         url.searchParams.set('state', state)
-        // code missing
+        const request = new NextRequest(url)
 
-        // Act: Call GET with malformed request
-        // Note: In real test, would use NextRequest mock
-        // For contract: verify expected redirect logic
+        // Act
+        const response = await GET(request)
 
-        // Expected: redirect to /settings/shipping?ep=error
-        const expectedRedirectUrl = '/settings/shipping?ep=error'
-        expect(expectedRedirectUrl).toContain('ep=error')
+        // Assert
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=error')
+    })
+
+    it('[TC-F36.201] Successful callback returns to the EasyParcel shipping tab', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: tenantId, easyParcelIntegration: {} })
+        mockUpdate.mockResolvedValue({ id: tenantId })
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
+            access_token: 'token-1',
+            refresh_token: 'refresh-1',
+            expires_in: 3600,
+            refresh_token_expires_in: 86400,
+        })
+        vi.mocked(getAccountInfo).mockResolvedValue({
+            data: { account: { name: 'Merchant' }, address: { pickup_address: null } },
+        })
+        const url = new URL('http://localhost/api/easyparcel/oauth-callback')
+        url.searchParams.set('code', code)
+        url.searchParams.set('state', state)
+        const request = new NextRequest(url, {
+            headers: { cookie: `ep_state_${tenantId}=${nonce}` },
+        })
+
+        // Act
+        const response = await GET(request)
+
+        // Assert
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=connected')
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -358,14 +331,15 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.25] Missing state parameter → error redirect', async () => {
-        // Arrange: Request without state
         const url = new URL('http://localhost/api/easyparcel/oauth-callback')
         url.searchParams.set('code', code)
-        // state missing
+        const request = new NextRequest(url)
 
-        // Expected behavior: error redirect (code + tenantId both extracted from state, so missing state = missing tenantId)
-        expect(code).toBeDefined()
-        // State parsing should fail, leading to error redirect
+        const response = await GET(request)
+
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=error')
+        expect(exchangeCodeForToken).not.toHaveBeenCalled()
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -373,23 +347,15 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.26] CSRF nonce mismatch — error redirect, no token saved', async () => {
-        // Arrange: Request with mismatched nonce
         const badNonce = 'wrong-nonce-xyz'
         const badState = `${tenantId}:${badNonce}`
-
-        // Cookie has different nonce
         const cookieNonce = 'correct-nonce-abc'
+        const request = makeCallbackRequest(code, badState, tenantId, cookieNonce)
 
-        mockFindByID.mockResolvedValue({
-            id: tenantId,
-            easyParcelIntegration: {},
-        })
+        const response = await GET(request)
 
-        // Note: In real route, request.cookies.get(`ep_state_${tenantId}`) returns cookieNonce
-        // badNonce !== cookieNonce, so error redirect
-
-        // Assert: update should NOT be called (CSRF check fails before token exchange)
-        expect(badNonce).not.toBe(cookieNonce)
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=error')
+        expect(exchangeCodeForToken).not.toHaveBeenCalled()
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
@@ -398,20 +364,12 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.27] Tenant not found in DB → error redirect, no token saved', async () => {
-        // Arrange: Valid CSRF but tenant doesn't exist
-        mockFindByID.mockResolvedValue(null) // Tenant not found
+        mockFindByID.mockResolvedValue(null)
 
-        const tokenResponse = {
-            access_token: 'token-1',
-            refresh_token: 'refresh-1',
-            expires_in: 3600,
-            refresh_token_expires_in: 86400,
-        }
+        const response = await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
-        // Assert: update should not be called if tenant doesn't exist
-        // (route checks tenant existence before calling exchangeCodeForToken)
+        expect(response.headers.get('location')).toBe('http://localhost/settings/shipping?tab=easyparcel&ep=error')
+        expect(exchangeCodeForToken).not.toHaveBeenCalled()
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
@@ -420,7 +378,6 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.28] Has legacy warehouse + EP account info → does NOT overwrite legacy', async () => {
-        // Arrange: Tenant has legacy warehouse (not modern warehouses array)
         const legacyWarehouse = {
             name: 'Legacy Warehouse',
             phone: '0111111111',
@@ -431,21 +388,14 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
 
         mockFindByID.mockResolvedValue({
             id: tenantId,
-            easyParcelIntegration: {
-                warehouse: legacyWarehouse, // Legacy field
-                // warehouses array not present
-            },
+            easyParcelIntegration: { warehouse: legacyWarehouse },
         })
-
-        const tokenResponse = {
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
             access_token: 'token-1',
             refresh_token: 'refresh-1',
             expires_in: 3600,
             refresh_token_expires_in: 86400,
-        }
-
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
+        })
         vi.mocked(getAccountInfo).mockResolvedValue({
             data: {
                 account: { name: 'Merchant' },
@@ -461,18 +411,12 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
                 },
             },
         })
-
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: Because tenant has a legacy warehouse, EP's pickup_address is NOT seeded
-        // (hasLocalWarehouse check finds the legacy field)
-        const expectedLogic = {
-            hasLegacy: !!legacyWarehouse,
-            shouldSeed: false, // Because hasLocalWarehouse=true
-        }
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        expect(expectedLogic.hasLegacy).toBe(true)
-        expect(expectedLogic.shouldSeed).toBe(false)
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockUpdate.mock.calls[0][0].data.easyParcelIntegration).not.toHaveProperty('warehouses')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -480,27 +424,22 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.29] Extracts account name + email from EP account info', async () => {
-        // Arrange
         mockFindByID.mockResolvedValue({
             id: tenantId,
             easyParcelIntegration: {},
         })
-
-        const tokenResponse = {
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
             access_token: 'token-1',
             refresh_token: 'refresh-1',
             expires_in: 3600,
             refresh_token_expires_in: 86400,
-        }
-
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
+        })
         vi.mocked(getAccountInfo).mockResolvedValue({
             data: {
-                account: { name: '  EasyParcel Merchant  ' }, // With whitespace
+                account: { name: '  EasyParcel Merchant  ' },
                 address: {
                     pickup_address: {
-                        email: '  merchant@ep.com  ', // With whitespace
+                        email: '  merchant@ep.com  ',
                         name: 'Pickup',
                         phone_number: '0123456789',
                         address1: 'St',
@@ -511,17 +450,14 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
                 },
             },
         })
-
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: Whitespace trimmed, values saved
-        const expectedAccountName = 'EasyParcel Merchant' // Trimmed
-        const expectedAccountEmail = 'merchant@ep.com' // Trimmed from pickup_address.email
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        expect(expectedAccountName).toBe('EasyParcel Merchant')
-        expect(expectedAccountEmail).toBe('merchant@ep.com')
-
-        // In actual route: mockUpdate called with these trimmed values
+        expect(mockUpdate.mock.calls[0][0].data.easyParcelIntegration).toMatchObject({
+            accountName: 'EasyParcel Merchant',
+            accountEmail: 'merchant@ep.com',
+        })
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -529,37 +465,29 @@ describe('GET /api/easyparcel/oauth-callback — NOT setting enabled=true [TC-F3
     // ──────────────────────────────────────────────────────────────────
 
     it('[TC-F36.30] Account name empty → saved as null (not undefined)', async () => {
-        // Arrange
         mockFindByID.mockResolvedValue({
             id: tenantId,
             easyParcelIntegration: {},
         })
-
-        const tokenResponse = {
+        vi.mocked(exchangeCodeForToken).mockResolvedValue({
             access_token: 'token-1',
             refresh_token: 'refresh-1',
             expires_in: 3600,
             refresh_token_expires_in: 86400,
-        }
-
-        vi.mocked(exchangeCodeForToken).mockResolvedValue(tokenResponse)
-
+        })
         vi.mocked(getAccountInfo).mockResolvedValue({
             data: {
-                account: { name: '' }, // Empty
+                account: { name: '' },
                 address: { pickup_address: null },
             },
         })
-
         mockUpdate.mockResolvedValue({ id: tenantId })
 
-        // Assert: accountName should be null, not undefined
-        const expectedUpdate = {
-            accountName: null, // Not undefined
-            accountEmail: null,
-        }
+        await GET(makeCallbackRequest(code, state, tenantId, nonce))
 
-        expect(expectedUpdate.accountName).toBeNull()
-        expect(expectedUpdate.accountEmail).toBeNull()
+        expect(mockUpdate.mock.calls[0][0].data.easyParcelIntegration).toMatchObject({
+            accountName: null,
+            accountEmail: null,
+        })
     })
 })

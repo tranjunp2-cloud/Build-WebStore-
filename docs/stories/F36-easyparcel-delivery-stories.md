@@ -101,7 +101,7 @@ THEN  throws AUTH_EXPIRED error (needs reconnect)
 - [ ] Phone normalized to 60-prefix (e.g. "0122134567" → "60122134567").
 - [ ] Force validate first-time save (or Validate button) → POST /api/tenant/[id]/easyparcel-test. Sai → error. Đúng → lưu. Edit sau không cần re-validate.
 - [ ] OAuth tokens stored in `tenant.easyParcelIntegration`: accessToken*, refreshToken*, tokenExpiresAt*, tokenRefreshExpiresAt* (all server-only, access.read=false). Encrypt at-rest if possible; decrypt on use.
-- [ ] Disconnect button: DELETE /api/tenant/[id]/easyparcel-disconnect — clears tokens, disables integration, keeps warehouse/courier config. Merchant can re-authorize anytime.
+- [ ] Disconnect button: DELETE /api/tenant/[id]/easyparcel-disconnect — clears tokens and all local pickup addresses, then disables the integration. Re-authorizing automatically imports the current EasyParcel default pickup address; Sync remains available for later manual refreshes.
 - [ ] Errors: OAuth flow errors (invalid state, user denied, invalid redirect_uri) → red Alert with retry. Network errors → generic "Failed to connect, retry" + details in logs only.
 
 ### Market Notes

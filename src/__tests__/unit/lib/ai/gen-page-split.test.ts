@@ -504,6 +504,55 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(result.siteName).toBeDefined()
 	})
 
+	it('[TC-GENPERF-W2-15] valid JSON without a homepage triggers composer fallback', async () => {
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const response = (pages: Array<Record<string, unknown>>, extra: Record<string, unknown> = {}) => ({
+			model: 'gpt-4o',
+			usage: { prompt_tokens: 100, completion_tokens: 200 },
+			choices: [{ message: { content: JSON.stringify({ ...extra, pages }) } }],
+		})
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return response([], { siteName: 'Malformed AI Home' })
+						}
+						if (sys.includes('Contact, Blog')) {
+							return response([
+								{ title: 'Contact', slug: '/contact', blocks: [] },
+								{ title: 'Blog', slug: '/blog', blocks: [] },
+							])
+						}
+						return response([
+							{ title: 'About', slug: '/about', blocks: [] },
+							{ title: 'Services', slug: '/services', blocks: [] },
+						])
+					}),
+				},
+			},
+		}
+
+		const result = await runParallelPageSplit({
+			openai: mockOpenai as any,
+			model: 'gpt-4o',
+			systemPrompt: 'System',
+			userPromptText: 'User prompt',
+			promptText: 'Prompt text',
+			businessInfo: { businessName: 'Test', siteType: 'service' },
+			seed: 42,
+			language: 'en',
+			blockLang: 'en',
+		})
+
+		expect(composeTemplateResult).toHaveBeenCalled()
+		expect(result.siteName).toBe('Fallback Site')
+		const pages = result.pages as Array<{ slug?: string; isHomepage?: boolean }>
+		expect(pages).toHaveLength(5)
+		expect(pages[0]).toMatchObject({ slug: '/', isHomepage: true })
+	})
+
 	it('TC-GENPERF-W2-10: SSE ordering — home page appears first in pages array', async () => {
 		// Arrange
 		const mockOpenai = {

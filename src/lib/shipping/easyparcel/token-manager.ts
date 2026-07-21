@@ -1,5 +1,6 @@
 import 'server-only'
-import type { BasePayload } from 'payload'
+import type { Payload } from 'payload'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 import { EP_OAUTH_BASE, EasyParcelError } from './types'
 import type { EpOAuthTokenResponse } from './types'
 
@@ -47,7 +48,7 @@ export async function exchangeCodeForToken(code: string): Promise<EpOAuthTokenRe
 export async function getValidToken(
     tenantEp: Record<string, unknown>,
     tenantId: string | number,
-    payload: BasePayload,
+    payload: Payload,
 ): Promise<string> {
     const accessToken = tenantEp.accessToken as string | null | undefined
     const refreshToken = tenantEp.refreshToken as string | null | undefined
@@ -88,7 +89,7 @@ const inFlightRefreshes = new Map<string, Promise<string>>()
 async function refreshAndPersist(
     refreshToken: string,
     tenantId: string | number,
-    payload: BasePayload,
+    payload: Payload,
 ): Promise<string> {
     const body = new URLSearchParams({
         grant_type: 'refresh_token',
@@ -116,22 +117,44 @@ async function refreshAndPersist(
         )
     }
 
-    const now = Date.now()
-    await payload.update({
-        collection: 'tenants',
-        id: tenantId,
-        data: {
-            easyParcelIntegration: {
-                accessToken: refreshed.access_token,
-                refreshToken: refreshed.refresh_token,
-                tokenExpiresAt: new Date(now + refreshed.expires_in * 1000).toISOString(),
-                tokenRefreshExpiresAt: new Date(
-                    now + refreshed.refresh_token_expires_in * 1000,
-                ).toISOString(),
-            },
-        } as any,
-        overrideAccess: true,
-    })
+    return withTenantRowLock(payload, tenantId, async (req) => {
+        const currentTenant = await payload.findByID({
+            collection: 'tenants',
+            id: tenantId,
+            depth: 0,
+            overrideAccess: true,
+            showHiddenFields: true,
+            req,
+        })
+        const currentIntegration = (currentTenant as { easyParcelIntegration?: Record<string, unknown> })
+            .easyParcelIntegration ?? {}
+        const currentRefreshToken = currentIntegration.refreshToken
 
-    return refreshed.access_token
+        if (!currentRefreshToken) {
+            throw new EasyParcelError('AUTH_EXPIRED', 'EasyParcel was disconnected while refreshing.')
+        }
+        if (currentRefreshToken !== refreshToken) {
+            throw new EasyParcelError('AUTH_REFRESH_FAILED', 'EasyParcel connection changed while refreshing. Please retry.')
+        }
+
+        const now = Date.now()
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                easyParcelIntegration: {
+                    accessToken: refreshed.access_token,
+                    refreshToken: refreshed.refresh_token,
+                    tokenExpiresAt: new Date(now + refreshed.expires_in * 1000).toISOString(),
+                    tokenRefreshExpiresAt: new Date(
+                        now + refreshed.refresh_token_expires_in * 1000,
+                    ).toISOString(),
+                },
+            } as any,
+            overrideAccess: true,
+            req,
+        })
+
+        return refreshed.access_token
+    })
 }

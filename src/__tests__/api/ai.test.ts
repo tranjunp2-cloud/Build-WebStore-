@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { POST as GenerateSitePOST, buildGeneratedPages, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -31,6 +32,12 @@ vi.mock('next/headers', () => ({
 
 // Mock RateLimiter
 let mockRateLimitAllowed = true
+const initialOpenAiApiKey = process.env.OPENAI_API_KEY
+
+afterEach(() => {
+    if (initialOpenAiApiKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = initialOpenAiApiKey
+})
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: vi.fn().mockImplementation(() => ({
         allowed: mockRateLimitAllowed,
@@ -48,6 +55,16 @@ vi.mock('@/lib/rateLimit', () => ({
 let mockSiteDB: any[] = []
 let mockPageDB: any[] = []
 let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
+let mockPageCreateFailure: { slug: string; error: Error } | null = null
+let mockMediaDB: Array<Record<string, unknown>> = []
+let mockFailedPageCreateData: Record<string, unknown> | null = null
+let mockIdCounter = 0
+
+type PersistedBlock = Record<string, unknown> & { blockType?: string }
+type PersistedPage = Record<string, unknown> & {
+    slug?: string
+    layout?: PersistedBlock[]
+}
 
 vi.mock('payload', () => {
     return {
@@ -63,24 +80,49 @@ vi.mock('payload', () => {
             find: vi.fn().mockImplementation(async ({ collection }) => {
                 if (collection === 'sites') return { docs: mockSiteDB }
                 if (collection === 'pages') return { docs: mockPageDB }
+                if (collection === 'media') return { docs: mockMediaDB }
                 return { docs: [] }
             }),
             count: vi.fn().mockResolvedValue({ totalDocs: 3 }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
-                const doc = { id: `new-${collection}-123`, ...data }
+                if (collection === 'pages' && mockPageCreateFailure && data.slug === mockPageCreateFailure.slug) {
+                    mockFailedPageCreateData = structuredClone(data)
+                    const { error } = mockPageCreateFailure
+                    mockPageCreateFailure = null
+                    throw error
+                }
+                if (collection === 'pages' && mockPageDB.some(
+                    page => page.site === data.site && page.slug === data.slug,
+                )) {
+                    throw new Error('duplicate page slug')
+                }
+                const doc = { id: `new-${collection}-${++mockIdCounter}`, ...data }
                 if (collection === 'sites') mockSiteDB.push(doc)
                 if (collection === 'pages') mockPageDB.push(doc)
                 return doc
             }),
             update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
+                if (collection === 'pages') {
+                    const pageIdx = mockPageDB.findIndex(page => page.id === id)
+                    if (pageIdx > -1) mockPageDB[pageIdx] = { ...mockPageDB[pageIdx], ...data }
+                    return mockPageDB[pageIdx]
+                }
                 const idx = mockSiteDB.findIndex(s => s.id === id)
                 if (idx > -1) mockSiteDB[idx] = { ...mockSiteDB[idx], ...data }
                 return mockSiteDB[idx]
             }),
-            delete: vi.fn().mockResolvedValue({})
+            delete: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'pages') mockPageDB = mockPageDB.filter(page => page.id !== id)
+                return {}
+            }),
         })
     }
 })
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (_payload, _tenantId, operation) =>
+        operation({ transactionID: 'test-generation-swap' })),
+}))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -190,6 +232,10 @@ describe('AI Streaming APIs', () => {
         mockPageDB = []
         mockTenant = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
         mockRateLimitAllowed = true
+        mockPageCreateFailure = null
+        mockMediaDB = []
+        mockFailedPageCreateData = null
+        mockIdCounter = 0
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -373,6 +419,225 @@ describe('AI Streaming APIs', () => {
              expect(footerUrls).not.toContain('free-trial')
         })
 
+        it('[TC-TF-025] normalizes generated products-grid defaults by page slug before persistence (GH-1588)', async () => {
+             // Arrange
+             const expectedProductsCopy = resolveBlockContent('products', 'en', 'Grid Shop').content as {
+                 headline?: string
+                 subheadline?: string
+             }
+
+             const generatedSite = {
+                 result: {
+                     siteName: 'Grid Shop',
+                     siteType: 'ecommerce',
+                     theme: {
+                         primaryColor: '#000000',
+                         secondaryColor: '#ffffff',
+                         fontHeading: 'DM Sans',
+                         fontBody: 'Inter',
+                         colorMode: 'light',
+                     },
+                     seo: { title: 'Grid Shop', description: 'Desc' },
+                     language: 'en',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 { blockType: 'hero', variant: 'centered', headline: 'Homepage Hero', subheadline: 'Welcome', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' },
+                                 {
+                                     blockType: 'products-grid',
+                                     variant: 'grid-3',
+                                     count: 24,
+                                     items: [
+                                         { name: 'Home Item 1', price: 'RM 10.00' },
+                                         { name: 'Home Item 2', price: 'RM 20.00' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Home', description: 'Home page' },
+                         },
+                         {
+                             title: 'Products',
+                             slug: '/products',
+                             isHomepage: false,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 { blockType: 'hero', variant: 'centered', headline: 'Products Hero', subheadline: 'Browse', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' },
+                                 {
+                                     blockType: 'products-grid',
+                                     variant: 'grid-3',
+                                     limit: 7.9,
+                                     count: 8,
+                                     items: [
+                                         { name: 'Product Item 1', price: 'RM 30.00' },
+                                         { name: 'Product Item 2', price: 'RM 40.00' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Products', description: 'Products page' },
+                         },
+                         { title: 'About', slug: '/about', isHomepage: false, blocks: [{ blockType: 'about', headline: 'About', body: 'About Grid Shop' }], seo: { title: 'About', description: 'About page' } },
+                         { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [{ blockType: 'blog-list', headline: 'Blog' }], seo: { title: 'Blog', description: 'Blog page' } },
+                         { title: 'Contact', slug: '/contact', isHomepage: false, blocks: [{ blockType: 'contact', headline: 'Contact', email: 'hello@grid.test' }], seo: { title: 'Contact', description: 'Contact page' } },
+                     ],
+                 },
+                 events: [],
+             } satisfies Awaited<ReturnType<typeof generateSiteWithAI>>
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce(generatedSite)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Grid Shop', industry: 'Retail', products: 'Curated goods', shortDescription: 'A modern shop' }
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+
+             const persistedPages = mockPageDB as PersistedPage[]
+             const homepageSaved = persistedPages.find((page) => page.slug === '/')
+             const productsSaved = persistedPages.find((page) => page.slug === '/products')
+             expect(homepageSaved).toBeDefined()
+             expect(productsSaved).toBeDefined()
+
+             const homepageGrid = homepageSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             const productsGrid = productsSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(homepageGrid).toBeDefined()
+             expect(productsGrid).toBeDefined()
+
+             expect(homepageGrid.showCategoryFilter).toBe(false)
+             expect(productsGrid.showCategoryFilter).toBe(true)
+             expect(homepageGrid.headline).toBe(expectedProductsCopy.headline)
+             expect(homepageGrid.subheadline).toBe(expectedProductsCopy.subheadline)
+             expect(productsGrid.headline).toBe(expectedProductsCopy.headline)
+             expect(productsGrid.subheadline).toBe(expectedProductsCopy.subheadline)
+             expect(homepageGrid.limit).toBe(20)
+             expect(productsGrid.limit).toBe(7)
+             expect(homepageGrid.count).toBeUndefined()
+             expect(productsGrid.count).toBeUndefined()
+
+             const homepageHero = homepageSaved?.layout?.find((block) => block.blockType === 'hero')
+             expect(homepageHero?.headline).toBe('Homepage Hero')
+        })
+
+        it('[TC-TF-026] keeps fallback /products page unchanged when no products-grid is generated (GH-1588)', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Fallback Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             const productsSaved = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/products')
+             expect(productsSaved).toBeDefined()
+             expect(productsSaved?.layout?.some((block) => block.blockType === 'products-grid')).toBe(false)
+        })
+
+        it('[TC-TF-027] preserves Malay products-grid defaults when page creation retries without image refs (GH-1588)', async () => {
+             // Arrange
+             const expectedProductsCopy = resolveBlockContent('products', 'ms', 'Retry Shop').content as {
+                 headline?: string
+                 subheadline?: string
+             }
+             const generatedSite = {
+                 result: {
+                     siteName: 'Retry Shop',
+                     siteType: 'ecommerce',
+                     theme: {
+                         primaryColor: '#000000',
+                         secondaryColor: '#ffffff',
+                         fontHeading: 'DM Sans',
+                         fontBody: 'Inter',
+                         colorMode: 'light',
+                     },
+                     seo: { title: 'Retry Shop', description: 'Desc' },
+                     language: 'ms',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [{ blockType: 'hero', variant: 'centered', headline: 'Home' }],
+                             seo: { title: 'Home', description: 'Home page' },
+                         },
+                         {
+                             title: 'Products',
+                             slug: '/products',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'products-grid',
+                                 variant: 'grid-3',
+                                 count: 9,
+                                 image: 123,
+                                 items: [{ name: 'Retry Item', price: 'RM 10.00' }],
+                             }],
+                             seo: { title: 'Products', description: 'Products page' },
+                         },
+                         { title: 'About', slug: '/about', isHomepage: false, blocks: [{ blockType: 'about', headline: 'Tentang', body: 'Tentang Retry Shop' }], seo: { title: 'Tentang', description: 'Tentang kami' } },
+                         { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [{ blockType: 'blog-list', headline: 'Blog' }], seo: { title: 'Blog', description: 'Blog' } },
+                         { title: 'Contact', slug: '/contact', isHomepage: false, blocks: [{ blockType: 'contact', headline: 'Hubungi', email: 'hello@retry.test' }], seo: { title: 'Hubungi', description: 'Hubungi kami' } },
+                     ],
+                 },
+                 events: [],
+             } satisfies Awaited<ReturnType<typeof generateSiteWithAI>>
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce(generatedSite)
+             mockMediaDB = [{
+                 id: 123,
+                 filename: 'retry-product.jpg',
+                 mimeType: 'image/jpeg',
+                 filesize: 1024,
+             }]
+             mockPageCreateFailure = {
+                 slug: '/products',
+                 error: new Error('upload foreign key failed'),
+             }
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Retry Shop', industry: 'Retail', products: 'Goods', shortDescription: 'A retry shop' },
+                     language: 'ms',
+                     generationLocale: 'ms',
+                 })
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             expect(mockPageCreateFailure).toBeNull()
+             const failedProductsPage = mockFailedPageCreateData as PersistedPage | null
+             const failedProductsGrid = failedProductsPage?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(failedProductsGrid?.image).toBe(123)
+             const productsSaved = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/products')
+             const productsGrid = productsSaved?.layout?.find((block) => block.blockType === 'products-grid')
+             expect(productsGrid).toMatchObject({
+                 showCategoryFilter: true,
+                 headline: expectedProductsCopy.headline,
+                 subheadline: expectedProductsCopy.subheadline,
+                 limit: 9,
+             })
+             expect(productsGrid?.count).toBeUndefined()
+             expect(productsGrid?.image).toBeUndefined()
+        })
+
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                  method: 'POST',
@@ -533,6 +798,85 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
         })
 
+        it('[TC-GENPERF-W3-25] regeneration keeps the previous pages when a late barrier fails', async () => {
+             const payload = await getPayload({ config: {} as never })
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 5 }, (_, index) => ({
+                     name: `Short Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `REGEN-SHORT-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             expect(mockPageDB.map(page => page.id)).toEqual([
+                 'old-home', 'old-about', 'old-products', 'old-blog', 'old-contact', 'old-404',
+             ])
+             const deletedIds = vi.mocked(payload.delete).mock.calls.map(([arg]) => arg.id)
+             expect(deletedIds).not.toContain('old-home')
+             expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
+        })
+
+        it('[TC-GENPERF-W3-26] regeneration swaps staged pages only after all barriers pass', async () => {
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             expect(mockSiteDB[0]?.name).toBe('AI Bakery')
+             expect(mockPageDB.map(page => page.slug).sort()).toEqual(
+                 ['/', '/about', '/blog', '/contact', '/products', '404'].sort(),
+             )
+             expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
+             expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
+             expect(mockPageDB.some(page => page.id === 'old-404')).toBe(true)
+        })
+
         it('[TC-GENPERF-W3-21] fails completion when fewer than three complete blogs exist', async () => {
              const payload = await getPayload({ config: {} as never })
              vi.mocked(payload.count).mockResolvedValueOnce({ totalDocs: 2 } as never)
@@ -558,6 +902,9 @@ describe('AI Streaming APIs', () => {
                  // Exhaust the transient retry wrapper so the strip-media
                  // fallback is the write that finally persists the page.
                  if (args.collection === 'pages' && args.data?.slug !== '404' && rejectedImageWrites < 3) {
+                     const hero = (args.data?.layout as Array<Record<string, unknown>> | undefined)
+                         ?.find(block => block.blockType === 'hero')
+                     if (hero) hero.image = 123
                      rejectedImageWrites++
                      throw new Error('pages_blocks_hero_image_id_media_id_fk violates foreign key constraint')
                  }
@@ -653,8 +1000,8 @@ describe('AI Streaming APIs', () => {
                  expect(res.status).toBe(500)
                  expect(vi.mocked(payload.create).mock.calls.some(([arg]) => arg.collection === 'products')).toBe(false)
                  expect(vi.mocked(payload.update).mock.calls.some(
-                     ([arg]) => arg.collection === 'sites' && ['completed', 'failed'].includes(arg.data?.generationStatus),
-                 )).toBe(false)
+                     ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'failed',
+                 )).toBe(true)
              } finally {
                  nowSpy.mockRestore()
              }
@@ -705,6 +1052,38 @@ describe('AI Streaming APIs', () => {
              const siteCreateCall = siteCreateCalls.at(-1)
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
+        })
+
+        it('[TC-F26-11-04] resolves a missing Auto override once for AI, products, and persistence', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Dolci Firenze',
+                         industry: 'ristorante italiano',
+                         products: 'ottimi dolci e birra',
+                         shortDescription: 'cucina tradizionale italiana',
+                     },
+                     language: 'auto',
+                 }),
+             })
+
+             // Act
+             await GenerateSitePOST(req)
+
+             // Assert
+             const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
+             expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
+             expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
+
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const siteCreateCall = vi.mocked(resolvedPayload.create).mock.calls.find(
+                 (call: [{ collection: string; data?: { generationLocale?: string } }]) =>
+                     call[0].collection === 'sites',
+             )
+             expect(siteCreateCall?.[0].data?.generationLocale).toBe('it')
         })
 
         // GH-1458 — generate-site creates products directly via payload.create(), bypassing the
@@ -1174,6 +1553,39 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(checkRateLimit)).toHaveBeenCalledWith('ai-bulk-parse:user-xyz', 10)
         })
 
+        it('TC-F08-04-81: rejects an invalid bulk-parse request before invoking OpenAI', async () => {
+            mockRateLimitAllowed = true
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } }
+
+            const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: { text: 'not a string' }, locale: 'vi' }),
+            }))
+
+            expect(res.status).toBe(400)
+            await expect(res.json()).resolves.toEqual({ error: 'invalidRequest' })
+            expect(OpenAI.prototype.chat.completions.create).not.toHaveBeenCalled()
+        })
+
+        it('returns parseError for a malformed AI product row', async () => {
+            mockRateLimitAllowed = true
+            process.env.OPENAI_API_KEY = 'test-key'
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } }
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [{ name: 'Hat', sku: {} }] }) } }],
+            })
+
+            const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST', body: JSON.stringify({ promptText: 'hat', locale: 'en' }),
+            }))
+
+            expect(res.status).toBe(500)
+            await expect(res.json()).resolves.toEqual({ error: 'parseError' })
+            expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce()
+        })
+
         it('returns fallback data when OPENAI_API_KEY is completely missing', async () => {
             mockRateLimitAllowed = true
             const prev = process.env.OPENAI_API_KEY
@@ -1181,16 +1593,492 @@ describe('AI Streaming APIs', () => {
             
             const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
                 method: 'POST',
-                body: JSON.stringify({ promptText: 'Áo thun 50k' })
+                body: JSON.stringify({ promptText: 'Áo thun 50k', locale: 'en' })
             })
             const res = await BulkParsePOST(req)
             const json = await res.json()
             expect(res.status).toBe(200)
-            expect(json.products[0].name).toContain('Không API Key')
+            expect(json.products[0].name).toContain('No API Key')
+            expect(json.products[0].variants[0].name).toBe('Black - M')
             
             process.env.OPENAI_API_KEY = prev
         })
-    })
+    it('TC-F08-04-78: returns Malay fallback data when the selected locale is ms and no API key exists', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'baju', locale: 'ms' }),
+      }));
+      const json = await res.json();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(json.products[0].name).toContain('Tiada Kunci API');
+      expect(json.products[0].variants[0].name).toBe('Hitam - M');
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it("TC-F08-04-65: includes variant names and option values in the English translation contract sent to OpenAI", async () => {
+      mockRateLimitAllowed = true;
+      const prev = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = "test-key";
+
+      const OpenAIMod = await import("openai");
+      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
+      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: "gpt-test",
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({ products: [] }) } }],
+      });
+
+      const req = new NextRequest(
+        "http://localhost:3000/api/ai/products-bulk-parse",
+        {
+          method: "POST",
+          body: JSON.stringify({ promptText: "áo thun màu đỏ", locale: "en" }),
+        },
+      );
+      const res = await BulkParsePOST(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.products).toEqual([]);
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0];
+      const systemPrompt = call.messages[0].content as string;
+      expect(systemPrompt).toContain(
+        "variants[].name, variantConfigs[].name, and variantConfigs[].options[].value",
+      );
+      expect(systemPrompt).toContain(
+        'the variant name MUST be "Red", NOT "Đỏ"',
+      );
+      expect(systemPrompt).toContain(
+        'An array of objects with a "value" string in ENGLISH',
+      );
+      expect(systemPrompt).not.toContain('use "Áo Thun" instead of "Áo"');
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+
+    it("TC-F08-04-66: includes Malay-specific variant and dimension examples in the translation contract sent to OpenAI", async () => {
+      mockRateLimitAllowed = true;
+      const prev = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = "test-key";
+
+      const OpenAIMod = await import("openai");
+      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
+      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: "gpt-test",
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({ products: [] }) } }],
+      });
+
+      const req = new NextRequest(
+        "http://localhost:3000/api/ai/products-bulk-parse",
+        {
+          method: "POST",
+          body: JSON.stringify({ promptText: "áo thun màu đỏ", locale: "ms" }),
+        },
+      );
+      const res = await BulkParsePOST(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.products).toEqual([]);
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0];
+      const systemPrompt = call.messages[0].content as string;
+      expect(systemPrompt).toContain(
+        'the variant name MUST be "Merah" and the dimension name MUST be "Warna"',
+      );
+      expect(systemPrompt).toContain("for Bahasa Melayu");
+      expect(systemPrompt).toContain(
+        "you MUST output exactly 1 variant in BAHASA MELAYU",
+      );
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+
+    it("TC-F08-04-72: uses one prompt call for an English-localized draft", async () => {
+      mockRateLimitAllowed = true;
+      const prev = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = "test-key";
+
+      const OpenAIMod = await import("openai");
+      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
+      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValue({
+        model: "gpt-test",
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                products: [
+                  {
+                    name: "T-Shirt",
+                    slug: "t-shirt",
+                    price: 5,
+                    category: "Fashion",
+                    sku: "TS-001",
+                    variants: [
+                      { name: "White", price: 5, sku: "TS-W", stock: 0 },
+                      { name: "Red", price: 5, sku: "TS-R", stock: 0 },
+                    ],
+                    variantConfigs: [
+                      {
+                        name: "Color",
+                        options: [{ value: "White" }, { value: "Red" }],
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+      const req = new NextRequest(
+        "http://localhost:3000/api/ai/products-bulk-parse",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            promptText: "áo thun màu trắng, đỏ giá 5rm",
+            locale: "en",
+          }),
+        },
+      );
+      const res = await BulkParsePOST(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      expect(json.products[0].name).toBe("T-Shirt");
+      expect(
+        json.products[0].variants.map(
+          (variant: { name: string }) => variant.name,
+        ),
+      ).toEqual(["White", "Red"]);
+
+      process.env.OPENAI_API_KEY = prev;
+    });
+
+    it('TC-F08-04-73: uses one prompt call for a Malay-localized draft', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Seluar Lelaki',
+            price: 100,
+            variants: [{ name: 'Putih - M', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Warna', options: [{ value: 'Putih' }] },
+              { name: 'Saiz', options: [{ value: 'M' }] },
+            ],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({
+          promptText: 'quần tây nam màu trắng size m giá 100',
+          locale: 'ms',
+        }),
+      }));
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      expect(json.products[0].name).toBe('Seluar Lelaki');
+      expect(json.products[0].variants[0].name).toBe('Putih - M');
+      expect(json.products[0].variantConfigs[0]).toEqual({
+        name: 'Warna',
+        options: [{ value: 'Putih' }],
+      });
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-84: rejects Vietnamese merchant text for an English store without a repair call', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Ao Thun',
+            price: 5,
+            variants: [
+              { name: 'Trang', price: 5, stock: 0 },
+              { name: 'Do', price: 5, stock: 0 },
+              { name: 'Xam', price: 5, stock: 0 },
+            ],
+            variantConfigs: [{
+              name: 'Mau sac',
+              options: [{ value: 'Trang' }, { value: 'Do' }, { value: 'Xam' }],
+            }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({
+          promptText: 'áo thun màu trắng, đỏ, xám giá 5rm',
+          locale: 'en',
+        }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-85: rejects English merchant text for a Malay store without a repair call', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Wool Coat',
+            description: 'A warm wool coat for men. Soft material for everyday wear.',
+            price: 100,
+            variants: [{ name: 'Red - Medium', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Color', options: [{ value: 'Red' }] },
+              { name: 'Size', options: [{ value: 'Medium' }] },
+            ],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'kot bulu merah saiz sederhana', locale: 'ms' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-87: rejects one Malay variant value for an English store', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: {},
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Hat',
+            variants: [{ name: 'Merah', price: 10, stock: 0 }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'topi merah', locale: 'en' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-88: rejects one English variant value for a Malay store', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: {},
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Topi',
+            variants: [{ name: 'Red', price: 10, stock: 0 }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'topi merah', locale: 'ms' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-89: rejects a Vietnamese product name even when Malay variants outvote it globally', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Quan Tay Lelaki',
+            variants: [{ name: 'Putih - M', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Warna', options: [{ value: 'Putih' }] },
+              { name: 'Saiz', options: [{ value: 'M' }] },
+            ],
+          }],
+        }) } }],
+      });
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'quần tây nam màu trắng size m', locale: 'ms' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-90: rejects a Vietnamese product name even when English variants outvote it globally', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Ao Thun',
+            variants: [
+              { name: 'White', price: 5, stock: 0 },
+              { name: 'Red', price: 5, stock: 0 },
+              { name: 'Grey', price: 5, stock: 0 },
+            ],
+            variantConfigs: [{ name: 'Color', options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }] }],
+          }],
+        }) } }],
+      });
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'áo thun trắng đỏ xám', locale: 'en' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-91: rejects an accentless Vietnamese variant omitted by the original marker set', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{ name: 'Hat', variants: [{ name: 'Bạc', price: 10, stock: 0 }], variantConfigs: [{ name: 'Color', options: [{ value: 'Bạc' }] }] }],
+        }) } }],
+      });
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'ao thun bac', locale: 'en' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-92: rejects malformed variant config fields before locale detection', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{ name: 'Hat', variantConfigs: [{ name: 42, options: [{ value: {} }] }] }],
+        }) } }],
+      });
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'hat', locale: 'en' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(500);
+      await expect(res.json()).resolves.toEqual({ error: 'parseError' });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+  });
 
     // ── gen-perf Wave 1 (plan 260703-1341, docs/qa/F01-gen-perf.md) ─────────
     // Proves blog + imglib seeding are scheduled via next/server after() and

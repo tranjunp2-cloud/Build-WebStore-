@@ -4,11 +4,16 @@ import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { ShippingSettingsClient } from './shipping-settings-client'
+import { resolveShippingTab } from './shipping-tab'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ShippingSettingsPage() {
-    const [user, tenantId] = await Promise.all([getCurrentUser(), getCurrentTenantId()])
+export default async function ShippingSettingsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string; ep?: string }>
+}) {
+    const [user, tenantId, query] = await Promise.all([getCurrentUser(), getCurrentTenantId(), searchParams])
     if (!user) redirect('/login?returnUrl=/settings/shipping')
     if (!tenantId) redirect('/dashboard')
 
@@ -54,6 +59,7 @@ export default async function ShippingSettingsPage() {
                 tenantId={String(tenantId)}
                 initial={(site as any).shippingConfig ?? null}
                 epConfig={(tenant as any)?.easyParcelIntegration ?? null}
+                initialTab={resolveShippingTab(query.tab, query.ep)}
             />
         </Suspense>
     )

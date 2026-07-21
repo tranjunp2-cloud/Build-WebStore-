@@ -37,7 +37,7 @@ import {
     MIN_BLOCKS_PER_PAGE,
     type ContentLang,
 } from './content-rules'
-import { detectLanguage } from './lang-detect'
+import { detectLanguage, resolveDetectedLanguage } from './lang-detect'
 import { getNavLabels, hasDedicatedStrings } from './block-i18n'
 import { prefetchNavLabels } from './nav-label-translator'
 import { prefetchBlockStrings } from './block-strings-translator'
@@ -62,11 +62,9 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
-// Language names for explicit user selections (not 'auto').
-const EXPLICIT_LANG_NAMES: Record<string, string> = {
-    en: 'English',
-    ms: 'Malay (Bahasa Melayu)',
-    vi: 'Vietnamese',
+export interface GenerateSiteOptions {
+    /** Locale already selected by the user or accepted in the confirmation popup. */
+    targetLocale?: string
 }
 
 /**
@@ -85,6 +83,7 @@ export async function generateSiteWithAI(
     referencePrompt?: string,
     blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
     onEvent?: (e: SSEEvent) => void,
+    options: GenerateSiteOptions = {},
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
@@ -122,10 +121,21 @@ export async function generateSiteWithAI(
         category: businessInfo.industry ?? undefined,
     })
 
+    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
+        .filter(Boolean).join(' ')
+    const { contentLang: detectedLang, gpLang, blockLang } = options.targetLocale
+        ? resolveDetectedLanguage(options.targetLocale)
+        : language === 'auto'
+            ? detectLanguage(inputText)
+            : resolveDetectedLanguage(language)
+
     const openai = getOpenAI()
     if (!openai) {
+        if (!['en', 'ms', 'vi'].includes(blockLang)) {
+            throw new Error(`OpenAI is required to generate content in ${gpLang}`)
+        }
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        const fallbackResult = await generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
         await finishCapture(cap, {
             status: 'success',
@@ -153,11 +163,6 @@ export async function generateSiteWithAI(
     // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
     // Skip it for explicit non-English languages and for 'auto' when user's input text
     // is detected as Malay/Vietnamese so AI-first generates fully localized content.
-    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
-        .filter(Boolean).join(' ')
-    const { contentLang: detectedLang, gpLang, blockLang } = language === 'auto'
-        ? detectLanguage(inputText)
-        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English', blockLang: language }
     if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en' && blockLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
@@ -736,12 +741,12 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
+        if (!['en', 'ms', 'vi'].includes(blockLang)) throw error
         // Fallback succeeded — site will still be created via smart templates.
         // Don't emit 'error' event (would show error UI even though generation succeeds).
         // Keep warn log for ops visibility on fallback rate.
         console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
-        const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
         await finishCapture(cap, {
             status: 'success',

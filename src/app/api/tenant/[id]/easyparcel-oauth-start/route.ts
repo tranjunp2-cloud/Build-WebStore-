@@ -29,7 +29,7 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
     if (!clientId || !redirectUri) {
         return NextResponse.json(
             { success: false, error: { code: 'CONFIG_ERROR', message: 'EasyParcel OAuth not configured' } },
-            { status: 500 },
+            { status: 400 },
         )
     }
 

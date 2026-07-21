@@ -4,6 +4,217 @@ import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { selectModel } from '@/lib/ai/config'
 import { logAiUsage } from '@/lib/ai/log-usage'
+import { detectLocaleFromText } from '@/lib/detect-locale'
+import { z } from 'zod'
+
+export const maxDuration = 60
+
+const INITIAL_PARSE_TIMEOUT_MS = 45_000
+
+const BulkParseRequestSchema = z.object({
+    promptText: z.string().trim().min(1).max(6_000),
+    locale: z.enum(['en', 'ms']).optional().default('en'),
+})
+
+type ParsedVariant = {
+    name?: string
+    price?: number
+    compareAtPrice?: number
+    sku?: string
+    stock?: number
+}
+
+type ParsedVariantConfig = {
+    name?: string
+    options?: { value?: string }[]
+}
+
+type ParsedProduct = {
+    name?: string
+    description?: string
+    seoTitle?: string
+    seoDescription?: string
+    slug?: string
+    category?: string
+    price?: number
+    compareAtPrice?: number
+    sku?: string
+    stock?: number
+    weight?: number
+    length?: number
+    width?: number
+    height?: number
+    variants?: ParsedVariant[]
+    variantConfigs?: ParsedVariantConfig[]
+}
+
+type BulkParseResult = {
+    products?: ParsedProduct[]
+}
+
+type MerchantLocale = 'en' | 'ms' | 'vi'
+
+const LANGUAGE_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
+    en: new Set([
+        'and', 'black', 'blue', 'brown', 'coat', 'color', 'cotton', 'everyday',
+        'for', 'green', 'grey', 'gray', 'large', 'made', 'material', 'medium',
+        'men', 'offers', 'orange', 'pants', 'pink', 'product', 'purple', 'quality', 'red', 'shirt', 'size',
+        'small', 'soft', 'style', 'suitable', 'trousers', 'warm', 'wear', 'white',
+        'with', 'women', 'yellow',
+    ]),
+    ms: new Set([
+        'bahan', 'baju', 'besar', 'berkualiti', 'biru', 'coklat', 'dengan',
+        'diperbuat', 'gaya', 'harian', 'hangat', 'hijau', 'hitam', 'kapas',
+        'kelabu', 'kecil', 'kuning', 'lelaki', 'lembut', 'menawarkan', 'merah',
+        'oren', 'produk', 'putih', 'saiz', 'sedang', 'sederhana', 'sesuai',
+        'seluar', 'ungu', 'untuk', 'wanita', 'warna', 'yang',
+    ]),
+    vi: new Set([
+        'ao', 'chat', 'cho', 'den', 'do', 'duoc', 'hop', 'lieu', 'lon', 'mau',
+        'nam', 'nau', 'nho', 'nu', 'pham', 'phu', 'quan', 'san', 'tay', 'thun',
+        'trang', 'vai', 'vang', 'va', 'vua', 'voi', 'xam', 'xanh',
+    ]),
+}
+
+const VARIANT_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
+    en: new Set([
+        'black', 'blue', 'brown', 'color', 'cotton', 'green', 'grey', 'gray',
+        'large', 'material', 'medium', 'orange', 'pink', 'purple', 'red', 'size',
+        'small', 'white', 'yellow',
+    ]),
+    ms: new Set([
+        'bahan', 'besar', 'biru', 'coklat', 'hijau', 'hitam', 'kapas', 'kelabu',
+        'kecil', 'kuning', 'merah', 'oren', 'putih', 'saiz', 'sederhana', 'ungu', 'warna',
+    ]),
+    vi: new Set([
+        'bac', 'cam', 'chat', 'den', 'do', 'hong', 'lieu', 'lon', 'mau', 'nau', 'nho',
+        'tim', 'trang', 'vai', 'vang', 'vua', 'xam', 'xanh',
+    ]),
+}
+
+function tokenizeMerchantText(text: string): Set<string> {
+    const normalized = text.toLocaleLowerCase('en')
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+    return new Set(normalized.match(/\p{L}+/gu) ?? [])
+}
+
+const VIETNAMESE_EXCLUSIVE_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/i
+
+function collectMerchantFacingText(result: BulkParseResult): string {
+    const values: string[] = []
+    const add = (value: string | undefined) => {
+        if (value?.trim()) values.push(value.trim())
+    }
+
+    for (const product of result.products ?? []) {
+        add(product.name)
+        add(product.description)
+        add(product.seoTitle)
+        add(product.seoDescription)
+        for (const variant of product.variants ?? []) add(variant.name)
+        for (const config of product.variantConfigs ?? []) {
+            add(config.name)
+            for (const option of config.options ?? []) add(option.value)
+        }
+    }
+
+    return values.join(' ')
+}
+
+function detectForeignVariantLocale(
+    result: BulkParseResult,
+    requestedLocale: Exclude<MerchantLocale, 'vi'>,
+): MerchantLocale | null {
+    const values: string[] = []
+    for (const product of result.products ?? []) {
+        for (const variant of product.variants ?? []) {
+            if (variant.name?.trim()) values.push(variant.name)
+        }
+        for (const config of product.variantConfigs ?? []) {
+            if (config.name?.trim()) values.push(config.name)
+            for (const option of config.options ?? []) {
+                if (option.value?.trim()) values.push(option.value)
+            }
+        }
+    }
+
+    const tokens = tokenizeMerchantText(values.join(' '))
+    const foreignLocale = (Object.entries(VARIANT_MARKERS) as [MerchantLocale, ReadonlySet<string>][])
+        .find(([candidate, markers]) =>
+            candidate !== requestedLocale && [...tokens].some(token => markers.has(token)))
+    return foreignLocale?.[0] ?? null
+}
+
+function detectTextLocale(text: string): string | null {
+    if (VIETNAMESE_EXCLUSIVE_RE.test(text)) return 'vi'
+
+    const tokens = tokenizeMerchantText(text)
+    const scores = (Object.entries(LANGUAGE_MARKERS) as [MerchantLocale, ReadonlySet<string>][])
+        .map(([locale, markers]) => ({
+            locale,
+            score: [...tokens].filter(token => markers.has(token)).length,
+        }))
+        .sort((a, b) => b.score - a.score)
+
+    if (scores[0].score >= 2 && scores[0].score > scores[1].score) {
+        return scores[0].locale
+    }
+
+    // Short product and brand names are too ambiguous for franc-min. Only trust its
+    // fallback when the combined merchant copy contains enough distinct words.
+    if (tokens.size < 4) return null
+    return detectLocaleFromText(text)
+}
+
+function detectForeignMerchantFieldLocale(
+    result: BulkParseResult,
+    requestedLocale: Exclude<MerchantLocale, 'vi'>,
+): string | null {
+    for (const product of result.products ?? []) {
+        const fields = [product.name, product.description, product.seoTitle, product.seoDescription]
+        for (const field of fields) {
+            if (!field?.trim()) continue
+            const detectedLocale = detectTextLocale(field)
+            if (detectedLocale && detectedLocale !== requestedLocale) return detectedLocale
+        }
+    }
+    return null
+}
+
+function detectMerchantFacingLocale(result: BulkParseResult): string | null {
+    const text = collectMerchantFacingText(result)
+    return text ? detectTextLocale(text) : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasOnlyOptionalStrings(record: Record<string, unknown>, fields: string[]): boolean {
+    return fields.every(field => record[field] === undefined || typeof record[field] === 'string')
+}
+
+function isValidBulkParseResult(value: unknown): value is BulkParseResult {
+    if (!isRecord(value) || !Array.isArray(value.products)) return false
+    return value.products.every(product => {
+        if (!isRecord(product) || typeof product.name !== 'string' || !product.name.trim()) return false
+        if (!hasOnlyOptionalStrings(product, ['description', 'seoTitle', 'seoDescription', 'slug', 'sku', 'category'])) return false
+        if (product.variants !== undefined && (!Array.isArray(product.variants) || !product.variants.every(
+            variant => isRecord(variant) && typeof variant.name === 'string' && variant.name.trim() &&
+                hasOnlyOptionalStrings(variant, ['sku'])
+        ))) return false
+        return product.variantConfigs === undefined || (
+            Array.isArray(product.variantConfigs) && product.variantConfigs.every(config =>
+                isRecord(config) &&
+                hasOnlyOptionalStrings(config, ['name']) &&
+                (config.options === undefined || (Array.isArray(config.options) && config.options.every(option =>
+                    isRecord(option) && hasOnlyOptionalStrings(option, ['value'])
+                )))
+            )
+        )
+    })
+}
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -25,28 +236,39 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const { promptText, locale } = await req.json()
-        if (!promptText) {
-            return NextResponse.json({ error: 'promptText is required' }, { status: 400 })
+        const request = BulkParseRequestSchema.safeParse(await req.json().catch(() => null))
+        if (!request.success) {
+            return NextResponse.json({ error: 'invalidRequest' }, { status: 400 })
         }
+        const { promptText, locale } = request.data
 
         const openai = getOpenAI()
 
         // Return dummy data if no key, ensuring tests/local dev won't crash
         if (!openai) {
-            console.warn('[AI] No OPENAI_API_KEY — using fallback dummy data for bulk parse')
-            return NextResponse.json({
-                products: [
+            console.warn('[AI] No OPENAI_API_KEY — using locale-aware fallback data for bulk parse')
+            const fallbackProducts = locale === 'ms'
+                ? [
                     {
-                        name: 'Áo thun Mẫu (Không API Key)', price: 45, category: 'Fashion', sku: 'AT-MAU',
+                        name: 'Baju Contoh (Tiada Kunci API)', price: 45, category: 'Fashion', sku: 'BJ-CTH',
                         variants: [
-                            { name: 'Đen - M', price: 45, sku: 'AT-BLK-M', stock: 0 },
-                            { name: 'Trắng - L', price: 45, sku: 'AT-WHT-L', stock: 0 }
+                            { name: 'Hitam - M', price: 45, sku: 'BJ-BLK-M', stock: 0 },
+                            { name: 'Putih - L', price: 45, sku: 'BJ-WHT-L', stock: 0 }
                         ]
                     },
-                    { name: 'Dép tổ ong (Không API Key)', price: 15, category: 'Footwear', sku: 'DTO-MAU', variants: [] }
+                    { name: 'Selipar Contoh (Tiada Kunci API)', price: 15, category: 'Footwear', sku: 'SP-CTH', variants: [] }
                 ]
-            })
+                : [
+                    {
+                        name: 'Sample T-Shirt (No API Key)', price: 45, category: 'Fashion', sku: 'TS-SAMPLE',
+                        variants: [
+                            { name: 'Black - M', price: 45, sku: 'TS-BLK-M', stock: 0 },
+                            { name: 'White - L', price: 45, sku: 'TS-WHT-L', stock: 0 }
+                        ]
+                    },
+                    { name: 'Sample Slippers (No API Key)', price: 15, category: 'Footwear', sku: 'SS-SAMPLE', variants: [] }
+                ]
+            return NextResponse.json({ products: fallbackProducts })
         }
 
         const languageMap: Record<string, string> = {
@@ -58,12 +280,19 @@ export const POST = withAuth(async (user, req) => {
         const systemPrompt = `
 You are an e-commerce product assistant. The user will provide a casual text listing multiple products to create.
 
-CRITICAL INSTRUCTION: All text fields (name, description, seoTitle, seoDescription) MUST be written entirely in: ${targetLanguage.toUpperCase()}. 
-You MUST TRANSLATE the user's input into ${targetLanguage.toUpperCase()} if they type in another language. For example, if the user types in Vietnamese "Muối tiêu" but target language is ENGLISH, you must output "Pepper Salt".
+CRITICAL INSTRUCTION: ALL merchant-facing text fields — including name, description, seoTitle, seoDescription, variants[].name, variantConfigs[].name, and variantConfigs[].options[].value — MUST be written entirely in: ${targetLanguage.toUpperCase()}.
+This applies to colors, sizes, materials, and every other option value.
+You MUST TRANSLATE the user's input into ${targetLanguage.toUpperCase()} if they type in another language.
+Examples:
+- If the user types Vietnamese "Muối tiêu" and target language is ENGLISH, you must output "Pepper Salt".
+- If the user types Vietnamese "quần màu đỏ" and target language is ENGLISH, the variant name MUST be "Red", NOT "Đỏ".
+- If the user types Vietnamese "quần màu đỏ" and target language is BAHASA MELAYU, the variant name MUST be "Merah" and the dimension name MUST be "Warna".
+- For Vietnamese input "áo thun màu variant trắng, đỏ, xám giá 5rm" and target language ENGLISH, output one product named "T-Shirt" with exactly 3 variants named "White", "Red", and "Grey", plus a "Color" variant config containing those same 3 option values.
+- For Vietnamese input "áo thun màu trắng, đỏ, size S, M giá 5rm" and target language ENGLISH, output exactly 4 Cartesian variants: "White - S", "White - M", "Red - S", and "Red - M", with "Color" and "Size" variant configs.
 
 Parse the text and return a JSON object with a single "products" array.
 Each product item MUST have:
-- name: (string) The product name. MUST BE AT LEAST 3 CHARACTERS LONG (e.g. use "Áo Thun" instead of "Áo").
+- name: (string) The product name in ${targetLanguage.toUpperCase()}. MUST BE AT LEAST 3 CHARACTERS LONG and must not copy untranslated words from the user's input.
 - price: (number) The price in RM (Malaysian Ringgit) — this store ONLY sells in MYR, never VND or any other currency. Parse "RM89" or a plain "89" as 89; "RM1.5k" or "1.5k" as 1500 (k/K = x1000 shorthand). Default to 0 if not specified.
 - compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
 - category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
@@ -74,30 +303,30 @@ Each product item MUST have:
 - height: (number) Estimated height in cm.
 - seoTitle: (string) A catchy SEO-friendly title under 70 characters.
 - seoDescription: (string) A compelling SEO meta description under 160 characters.
-- slug: (string) URL-friendly lowercase slug (e.g. "ao-khoac-da").
+- slug: (string) URL-friendly lowercase slug (e.g. "leather-jacket").
 - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on the product name abbreviation (e.g. "Leather Jacket" -> "LEA-JKT"). Always required, even for products with no variants.
-- variants: (array) Generate flat 1D array of variant objects if any color/size/attribute is mentioned (2-tier Cartesian flattened). EVEN IF ONLY A SINGLE specific color or size is mentioned (e.g., "quần màu đỏ"), you MUST STILL generate exactly 1 variant for it (e.g., name: "Đỏ" or "Red").
+- variants: (array) Generate flat 1D array of variant objects if any color/size/attribute is mentioned (2-tier Cartesian flattened). EVEN IF ONLY A SINGLE specific color or size is mentioned (e.g., Vietnamese input "quần màu đỏ"), you MUST STILL generate exactly 1 variant for it in ${targetLanguage.toUpperCase()} (e.g., "Red" in English or "Merah" in Bahasa Melayu).
   Each variant object MUST have:
-    - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
+    - name: (string) The full combination in ${targetLanguage.toUpperCase()}, e.g. "Red - M", "Brown - Size L", or just "Blue" if 1-tier only
     - price: (number) same as base price unless specified per variant
     - compareAtPrice: (number) same as the product-level compareAtPrice unless specified per variant, or omit if the product-level compareAtPrice was omitted
-    - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
+    - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "TS-RED-M")
     - stock: (number) default to 0 per variant (out of stock until the merchant confirms real stock)
   If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].
 - variantConfigs: (array) If variants exist, provide up to 2 tier configurations representing the dimensions.
   Each object MUST have:
     - name: (string) The dimension name in ${targetLanguage.toUpperCase()} (e.g., "Color", "Size", "Material", "Warna")
-    - options: (array) An array of objects with a "value" string, e.g., [{"value": "S"}, {"value": "M"}]
+    - options: (array) An array of objects with a "value" string in ${targetLanguage.toUpperCase()}, e.g., [{"value": "White"}, {"value": "Grey"}] for English or [{"value": "Putih"}, {"value": "Kelabu"}] for Bahasa Melayu
   If no variants exist, return an empty array [].
 
 Rules:
 - All prices are RM (Malaysian Ringgit). Extract correctly: k/K = x1000, e.g. "45k" = 45000. Ignore any other currency symbol the user types (Rp, VND, $, etc.) — always treat the number as RM.
 - STRICT RULE for VARIANTS (MAXIMUM 2 TIERS): Our database ONLY supports a maximum of 2 variant tiers (e.g. Color and Size). 
   If the user mentions 3 or MORE attributes (e.g. Color, Size, Material, Type), YOU MUST ONLY USE THE FIRST 2 ATTRIBUTES and COMPLETELY DISCARD/IGNORE the rest. Do not merge them.
-  Example: Tier 1 = Color (Xanh, Đỏ), Tier 2 = Size (S, M, L). Completely ignore attributes like "Vải len", "Loại thường".
+  Example: Tier 1 = Color (Red, Blue), Tier 2 = Size (S, M, L). Completely ignore attributes like Material or Type.
   NEVER generate 3 tiers in variantConfigs. variantConfigs array length must be <= 2.
-  Variant names MUST have at most ONE hyphen separating Tier 1 and Tier 2, e.g., "Xanh - S".
-- If only 1 dimension of options (e.g. only colors), create 1 variant per option. NOTE: If the user says "quần màu đỏ" (ONLY 1 color option exists), you MUST output exactly 1 variant named "Đỏ" instead of empty array.
+  Variant names MUST have at most ONE hyphen separating Tier 1 and Tier 2, e.g., "Red - S".
+- If only 1 dimension of options (e.g. only colors), create 1 variant per option. NOTE: If the user says Vietnamese "quần màu đỏ" (ONLY 1 color option exists), you MUST output exactly 1 variant in ${targetLanguage.toUpperCase()} — e.g. "Red" for English or "Merah" for Bahasa Melayu — instead of an empty array.
 - The category name MUST be in English.
 - Output ONLY valid JSON matching this exact schema, no other text
 `
@@ -115,7 +344,7 @@ Rules:
                 temperature: 0.2,
                 max_tokens: 3000,
                 response_format: { type: 'json_object' },
-            })
+            }, { timeout: INITIAL_PARSE_TIMEOUT_MS, maxRetries: 0 })
         } catch (err) {
             logAiUsage({
                 endpoint: 'bulk-parse',
@@ -145,8 +374,25 @@ Rules:
             throw new Error('Empty AI response')
         }
 
-        const parsed = JSON.parse(content)
-        return NextResponse.json(parsed)
+        const parsedResult = JSON.parse(content)
+        if (!isValidBulkParseResult(parsedResult)) {
+            throw new Error('Invalid AI response structure')
+        }
+        const detectedLocale = detectForeignVariantLocale(parsedResult, locale)
+            ?? detectForeignMerchantFieldLocale(parsedResult, locale)
+            ?? detectMerchantFacingLocale(parsedResult)
+        if (detectedLocale && detectedLocale !== locale) {
+            console.warn('[AI Bulk Parse] Merchant-facing language mismatch', {
+                requestedLocale: locale,
+                detectedLocale,
+                userId: user?.id ?? null,
+            })
+            return NextResponse.json(
+                { error: 'merchantLanguageMismatch', retryable: true },
+                { status: 422 },
+            )
+        }
+        return NextResponse.json(parsedResult)
     } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         

@@ -7,6 +7,7 @@
  */
 
 import OpenAI from 'openai'
+import { getLocaleLabel } from '@/lib/locale-labels'
 import type { BasePayload } from 'payload'
 import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
@@ -90,7 +91,7 @@ function isQuotaExhausted(err: unknown): boolean {
 /** Tier 1: ask GPT-4.1-nano for `count` products tailored to the business. */
 async function generateSampleProductsAI(
     businessInfo: BusinessInfoInput,
-    language: 'en' | 'ms' | 'auto',
+    language: string,
     count = 6,
     excludeNames: readonly string[] = [],
 ): Promise<Array<SampleProduct & { _imageKeyword: string }>> {
@@ -98,6 +99,9 @@ async function generateSampleProductsAI(
     if (!openai) throw new Error('OPENAI_API_KEY not set')
 
     const includeBM = language === 'ms' || language === 'auto'
+    const targetLanguage = language !== 'auto' && language !== 'en' && language !== 'ms'
+        ? getLocaleLabel(language).full
+        : null
     const systemPrompt = `You generate sample products for a small-business website.
 Products MUST be specific, realistic items the business would actually sell — never generic placeholders.
 Names should be 2-5 words, distinct from each other.
@@ -110,6 +114,7 @@ Output strictly JSON matching the requested schema. No markdown.`
     const prompt = `Generate ${count} sample products for a ${businessInfo.industry} business called "${businessInfo.businessName}".
 ${businessInfo.products ? `Products hint: ${businessInfo.products}` : ''}
 ${exclusion}
+${targetLanguage ? `Write product names and customer-facing descriptions in ${targetLanguage}.` : ''}
 Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
 Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
@@ -325,7 +330,7 @@ async function fetchProductImage(
  */
 export async function generateSampleProducts(
     businessInfo: BusinessInfoInput,
-    language: 'en' | 'ms' | 'auto',
+    language: string,
     tenantId: string,
     payload: BasePayload,
     siteId?: string | number,
@@ -355,14 +360,28 @@ export async function generateSampleProducts(
         }
     }
 
+    const canUseEnglishCuratedFallback = language === 'en' || language === 'ms' || language === 'auto'
     if (!aiSucceeded) {
-        rawProducts = getFallbackProducts(businessInfo)
+        rawProducts = canUseEnglishCuratedFallback ? getFallbackProducts(businessInfo) : []
     } else if (rawProducts.length < 6) {
         const needed = 6 - rawProducts.length
-        const fallback = getFallbackProducts(businessInfo)
-        const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
-        const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
-        rawProducts = [...rawProducts, ...fills]
+        if (canUseEnglishCuratedFallback) {
+            const fallback = getFallbackProducts(businessInfo)
+            const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
+            const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
+            rawProducts = [...rawProducts, ...fills]
+        } else {
+            try {
+                const topup = await generateSampleProductsAI(
+                    businessInfo, language, needed,
+                    rawProducts.map(p => p.name),
+                )
+                rawProducts = [...rawProducts, ...topup].slice(0, 6)
+            } catch (err) {
+                const message = isQuotaExhausted(err) ? 'quota exhausted' : (err as Error).message
+                console.warn(`[sample-products] localized AI top-up failed: ${message}`)
+            }
+        }
     }
 
     // Resolve images with bounded network concurrency; media writes remain globally serialized.

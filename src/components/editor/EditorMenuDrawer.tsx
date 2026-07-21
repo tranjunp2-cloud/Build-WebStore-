@@ -64,7 +64,7 @@ export function EditorMenuDrawer({
 }: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const router = useRouter()
-    const { t, locale, toggleLocale } = useI18n()
+    const { t, locale, toggleLocale, setLocale } = useI18n()
     const { theme, toggle: toggleTheme } = useTheme()
     const isDark = theme === 'dark'
     const menu = t.editor.menu
@@ -256,7 +256,7 @@ export function EditorMenuDrawer({
                         </div>
                     </div>
 
-                    <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
+                    <LanguageToggle locale={locale} setLocale={setLocale} />
 
                     <button
                         type="button"

@@ -7,7 +7,7 @@
  * module transparently falls back to it so existing configs keep working without a data migration.
  */
 
-import { hasUsablePhone } from './phone'
+import { hasUsablePhone, normalizeMyPhone } from './phone'
 
 export interface Warehouse {
     id?: string
@@ -23,6 +23,70 @@ export interface Warehouse {
     isDefault?: boolean
 }
 
+const WAREHOUSE_STRING_LIMITS = {
+    id: 100,
+    label: 100,
+    name: 100,
+    phone: 32,
+    address1: 200,
+    address2: 200,
+    city: 100,
+    state: 100,
+    postcode: 10,
+} as const
+
+function cleanString(value: unknown, maxLength: number): string | undefined {
+    if (typeof value !== 'string') return undefined
+    const cleaned = value.trim().slice(0, maxLength)
+    return cleaned || undefined
+}
+
+/** Whitelist and normalize one warehouse received from storage or an API client. */
+export function normalizeWarehouse(value: unknown): Warehouse | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    const source = value as Record<string, unknown>
+    const rawPhone = cleanString(source.phone, WAREHOUSE_STRING_LIMITS.phone)
+
+    return {
+        id: cleanString(source.id, WAREHOUSE_STRING_LIMITS.id),
+        label: cleanString(source.label, WAREHOUSE_STRING_LIMITS.label),
+        name: cleanString(source.name, WAREHOUSE_STRING_LIMITS.name),
+        phone: rawPhone ? normalizeMyPhone(rawPhone) : undefined,
+        address1: cleanString(source.address1, WAREHOUSE_STRING_LIMITS.address1),
+        address2: cleanString(source.address2, WAREHOUSE_STRING_LIMITS.address2),
+        city: cleanString(source.city, WAREHOUSE_STRING_LIMITS.city),
+        state: cleanString(source.state, WAREHOUSE_STRING_LIMITS.state),
+        postcode: cleanString(source.postcode, WAREHOUSE_STRING_LIMITS.postcode),
+        country: 'MY',
+        isDefault: source.isDefault === true,
+    }
+}
+
+interface NormalizeWarehousesOptions {
+    defaultFirst?: boolean
+}
+
+/** Canonicalize a list without mutating it, enforce one default, and optionally move it first. */
+export function normalizeWarehouses(
+    value: unknown,
+    { defaultFirst = true }: NormalizeWarehousesOptions = {},
+): Warehouse[] {
+    if (!Array.isArray(value)) return []
+    const warehouses = value
+        .map(normalizeWarehouse)
+        .filter((warehouse): warehouse is Warehouse => warehouse !== null)
+    if (warehouses.length === 0) return []
+
+    const defaultIndex = Math.max(0, warehouses.findIndex((warehouse) => warehouse.isDefault))
+    const normalized = warehouses.map((warehouse, index) => ({
+        ...warehouse,
+        isDefault: index === defaultIndex,
+    }))
+
+    if (!defaultFirst || defaultIndex === 0) return normalized
+    return [normalized[defaultIndex], ...normalized.filter((_, index) => index !== defaultIndex)]
+}
+
 interface EpIntegrationLike {
     warehouses?: unknown
     warehouse?: unknown
@@ -33,8 +97,7 @@ interface EpIntegrationLike {
 
 /** Normalise the stored warehouses array (guards against bad/missing data). */
 export function getWarehouses(ep: EpIntegrationLike | null | undefined): Warehouse[] {
-    const list = Array.isArray(ep?.warehouses) ? (ep!.warehouses as Warehouse[]) : []
-    return list.filter((w) => w && typeof w === 'object')
+    return normalizeWarehouses(ep?.warehouses)
 }
 
 /**
@@ -59,6 +122,7 @@ export function isWarehouseComplete(w: Warehouse | null | undefined): boolean {
         !!(w.label || w.name)?.trim() &&
         hasUsablePhone(w.phone) &&
         !!w.address1?.trim() &&
+        !!w.city?.trim() &&
         !!w.state?.trim() &&
         !!w.postcode?.trim()
     )

@@ -51,6 +51,7 @@ import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { Checkbox } from '@/components/ui/checkbox'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -281,7 +282,7 @@ interface SettingsPanelProps {
     footerBlock?: BlockData | null
     pages?: PageData[]
     onThemeChange: (key: string, value: string) => void
-    onBlockFieldChange: (idx: number, field: string, value: string) => void
+    onBlockFieldChange: (idx: number, field: string, value: string | boolean) => void
     onBlockUpdate: (idx: number, changes: Record<string, unknown>) => void
     onHeaderUpdate?: (changes: Record<string, unknown>) => void
     onFooterUpdate?: (changes: Record<string, unknown>) => void
@@ -1252,13 +1253,13 @@ function SettingsPanelInner({
                     <label className={labelCls}>{s.navCta}</label>
                     <div className="mt-2 space-y-2">
                         <label className="flex items-center gap-2 text-xs text-slate-400">
-                            <input
-                                type="checkbox"
+                            <Checkbox
                                 checked={Boolean((headerBlock?.ctaButton as Record<string, unknown>)?.show)}
-                                onChange={(e) => {
+                                onCheckedChange={(checked) => {
                                     const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: false, label: 'Get started', url: '/contact' }
-                                    onHeaderUpdate?.({ ctaButton: { ...current, show: e.target.checked } })
+                                    onHeaderUpdate?.({ ctaButton: { ...current, show: checked === true } })
                                 }}
+                                className="border-white/30 bg-white/5 data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))]"
                             />
                             {s.navCtaShow}
                         </label>
@@ -1748,7 +1749,18 @@ function SettingsPanelInner({
                                 </div>
                             </div>
                             {/* Variant Switcher */}
-                            {(info?.variants?.length || 0) > 1 && (
+                            {bt === 'products-grid' && block.showCategoryFilter !== undefined ? (
+                                <div className={sectionCls}>
+                                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-slate-500">
+                                        <Checkbox
+                                            checked={Boolean(block.showCategoryFilter)}
+                                            onCheckedChange={(checked) => onBlockFieldChange(currentBlockIndex, 'showCategoryFilter', checked === true)}
+                                            className="h-5 w-5 rounded-md border-white/30 bg-white/5 data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))]"
+                                        />
+                                        <span>{s.showCategoryFilter}</span>
+                                    </label>
+                                </div>
+                            ) : (info?.variants?.length || 0) > 1 && (
                                 <div>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1837,6 +1849,19 @@ function SettingsPanelInner({
                                         onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
                                         variant="editor"
                                         className={editorTextareaClassName} />
+                                </div>
+                            )}
+
+                            {bt !== 'products-grid' && block.showCategoryFilter !== undefined && (
+                                <div className={sectionCls}>
+                                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-slate-500">
+                                        <Checkbox
+                                            checked={Boolean(block.showCategoryFilter)}
+                                            onCheckedChange={(checked) => onBlockFieldChange(currentBlockIndex, 'showCategoryFilter', checked === true)}
+                                            className="h-5 w-5 rounded-md border-white/30 bg-white/5 data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))]"
+                                        />
+                                        <span>{s.showCategoryFilter}</span>
+                                    </label>
                                 </div>
                             )}
 

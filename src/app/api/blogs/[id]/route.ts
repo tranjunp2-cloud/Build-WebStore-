@@ -8,6 +8,10 @@ import { updateBlogSchema } from '@/lib/validations/blog'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+function isBlogCategoryTenantMismatch(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('BLOG_CATEGORY_TENANT_MISMATCH')
+}
+
 /**
  * GET /api/blogs/[id] — Get a single blog post
  */
@@ -83,6 +87,8 @@ export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContex
             collection: 'blogs',
             id,
             data: updateData,
+            user,
+            overrideAccess: false,
         })
 
         return NextResponse.json({ success: true, data: updated })
@@ -91,6 +97,12 @@ export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContex
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', details: 'Blog post not found' } },
                 { status: 404 }
+            )
+        }
+        if (isBlogCategoryTenantMismatch(error)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', details: 'Invalid category selection' } },
+                { status: 400 }
             )
         }
         console.error('PATCH /api/blogs/[id] error:', error)
@@ -127,6 +139,8 @@ export const DELETE = withFeatureGuard('content_management')(withAuth<RouteConte
         await payload.delete({
             collection: 'blogs',
             id,
+            user,
+            overrideAccess: false,
         })
 
         return NextResponse.json({ success: true, data: { deleted: id } })

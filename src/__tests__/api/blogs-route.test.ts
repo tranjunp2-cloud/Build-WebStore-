@@ -115,6 +115,8 @@ describe('POST /api/blogs [TC-F17]', () => {
             expect.objectContaining({
                 collection: 'blogs',
                 data: expect.objectContaining({ title: 'New Post' }),
+                user: mockUser,
+                overrideAccess: false,
             }),
         )
     })
@@ -136,5 +138,24 @@ describe('POST /api/blogs [TC-F17]', () => {
 
         // Restore for other tests
         mockUser.tenants = originalTenants
+    })
+
+    it('returns 400 VALIDATION_ERROR when category belongs to a different tenant', async () => {
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+            .mockResolvedValueOnce({ docs: [] })
+        mockCreate.mockRejectedValueOnce(new Error('BLOG_CATEGORY_TENANT_MISMATCH'))
+
+        const req = {
+            json: () => Promise.resolve({ title: 'New Post', category: '999' }),
+            url: 'http://localhost/api/blogs',
+        } as unknown as Request
+
+        const res = await POST(req, {} as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error.code).toBe('VALIDATION_ERROR')
+        expect(body.error.details).toBe('Invalid category selection')
     })
 })

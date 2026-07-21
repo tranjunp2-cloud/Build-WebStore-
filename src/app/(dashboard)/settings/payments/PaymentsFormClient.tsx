@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { StripeConnectBlock } from './StripeConnectBlock';
@@ -15,10 +15,28 @@ import { XenditConnectBlock } from './XenditConnectBlock';
 import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
 
-type Media = { id: string | number; url?: string; thumbnailURL?: string };
+type Media = {
+    id: string | number;
+    url?: string | null;
+    thumbnailURL?: string | null;
+    filename?: string | null;
+};
 
-function getImageUrl(image: Media | string | null): string | null {
-    if (!image || typeof image === 'string') return null;
+type PaymentSnapshot = {
+    paymentCod: boolean;
+    paymentQr: boolean;
+    cardEnabled: boolean;
+    fpxEnabled: boolean;
+    qrImageId: string | number | null;
+    qrPreviewUrl: string | null;
+    qrFileName: string | null;
+    accountHolderName: string;
+    bankName: string;
+    accountNumber: string;
+};
+
+function getImageUrl(image: Media | string | number | null): string | null {
+    if (!image || typeof image !== 'object') return null;
     let url = image.url || image.thumbnailURL || null;
     if (!url) return null;
     if (url.includes('/api/media/file/') || url.includes('minio:') || url.includes('localhost:9000')) {
@@ -100,11 +118,7 @@ export function PaymentsFormClient({
     // Holds the setInterval ID while polling Stripe status after opening the connect new tab
     const stripePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [bankTransferErrors, setBankTransferErrors] = useState<{ accountHolderName?: string; accountNumber?: string }>({});
-    const [serverPaymentValues, setServerPaymentValues] = useState<{
-        paymentCod: boolean; paymentQr: boolean; cardEnabled: boolean; fpxEnabled: boolean;
-        qrImageId: string | number | null; qrPreviewUrl: string | null; qrFileName: string | null;
-        accountHolderName: string; bankName: string; accountNumber: string;
-    } | null>(null);
+    const [serverPaymentValues, setServerPaymentValues] = useState<PaymentSnapshot | null>(null);
 
     // isDirty = state hiện tại KHÁC snapshot server (giá trị đã lưu). Tự động false khi chưa đổi gì,
     // hoặc khi user sửa rồi revert đúng về giá trị gốc → thanh unsaved chỉ hiện khi thực sự có thay đổi.
@@ -177,9 +191,13 @@ export function PaymentsFormClient({
                 const holderName = (d.account_holder_name as string) || '';
                 const bank = (d.bank_name as string) || '';
                 const acctNum = (d.account_number as string) || '';
+                const card = d.payment_card ?? initialCardEnabled;
+                const fpx = d.payment_fpx ?? initialFpxEnabled;
 
                 setPaymentCod(cod);
                 setPaymentQr(qr);
+                setCardEnabled(card);
+                setFpxEnabled(fpx);
                 if (imgId) setQrImageId(imgId);
                 if (imgUrl) setQrPreviewUrl(imgUrl);
                 if (imgName) setQrFileName(imgName);
@@ -187,17 +205,17 @@ export function PaymentsFormClient({
                 if (bank) setBankName(bank);
                 if (acctNum) setAccountNumber(acctNum);
 
-                // Capture server snapshot for Cancel; card/fpx come from props (not server action)
+                // Capture the freshest server values for diffing and Cancel.
                 setServerPaymentValues({
                     paymentCod: cod, paymentQr: qr,
-                    cardEnabled: initialCardEnabled, fpxEnabled: initialFpxEnabled,
+                    cardEnabled: card, fpxEnabled: fpx,
                     qrImageId: imgId, qrPreviewUrl: imgUrl, qrFileName: imgName,
                     accountHolderName: holderName, bankName: bank, accountNumber: acctNum,
                 });
             })
             .catch(console.error)
             .finally(() => setIsLoading(false));
-    }, [tenantId]);
+    }, [tenantId, initialCardEnabled, initialFpxEnabled]);
 
     // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28).
     // Also broadcasts result to parent tab via BroadcastChannel when this page loaded in the new tab
@@ -534,24 +552,55 @@ export function PaymentsFormClient({
         }
         setIsSavingAll(true);
         try {
-            const res = await updatePaymentSettings({
-                payment_cod: paymentCod,
-                payment_qr: paymentQr,
-                payment_card: cardEnabled,
-                payment_fpx: fpxEnabled,
-                qr_image: qrImageId,
-                account_holder_name: accountHolderName || null,
-                bank_name: bankName || null,
-                account_number: accountNumber || null,
-            });
+            if (!serverPaymentValues) return;
+
+            const updates: PaymentUpdates = {};
+            if (paymentCod !== serverPaymentValues.paymentCod) updates.payment_cod = paymentCod;
+            if (paymentQr !== serverPaymentValues.paymentQr) updates.payment_qr = paymentQr;
+            if (cardEnabled !== serverPaymentValues.cardEnabled) updates.payment_card = cardEnabled;
+            if (fpxEnabled !== serverPaymentValues.fpxEnabled) updates.payment_fpx = fpxEnabled;
+            if ((qrImageId ?? null) !== (serverPaymentValues.qrImageId ?? null)) updates.qr_image = qrImageId;
+            if (accountHolderName !== serverPaymentValues.accountHolderName) updates.account_holder_name = accountHolderName || null;
+            if (bankName !== serverPaymentValues.bankName) updates.bank_name = bankName || null;
+            if (accountNumber !== serverPaymentValues.accountNumber) updates.account_number = accountNumber || null;
+
+            const res = await updatePaymentSettings(updates);
             if (res.success) {
                 setBankTransferErrors({});
-                // Update server snapshot so Cancel targets the just-saved state
-                setServerPaymentValues({
-                    paymentCod, paymentQr, cardEnabled, fpxEnabled,
-                    qrImageId, qrPreviewUrl, qrFileName,
-                    accountHolderName, bankName, accountNumber,
-                });
+                const saved = res.payments;
+                const savedQrImage = saved.qr_image;
+                const savedQrImageId = savedQrImage && typeof savedQrImage === 'object'
+                    ? savedQrImage.id
+                    : savedQrImage;
+                const savedQrPreviewUrl = getImageUrl(savedQrImage)
+                    ?? (savedQrImageId === qrImageId ? qrPreviewUrl : null);
+                const savedQrFileName = savedQrImage && typeof savedQrImage === 'object'
+                    ? savedQrImage.filename ?? null
+                    : savedQrImageId === qrImageId ? qrFileName : null;
+                const savedSnapshot: PaymentSnapshot = {
+                    paymentCod: saved.payment_cod,
+                    paymentQr: saved.payment_qr,
+                    cardEnabled: saved.payment_card,
+                    fpxEnabled: saved.payment_fpx,
+                    qrImageId: savedQrImageId,
+                    qrPreviewUrl: savedQrPreviewUrl,
+                    qrFileName: savedQrFileName,
+                    accountHolderName: saved.account_holder_name ?? '',
+                    bankName: saved.bank_name ?? '',
+                    accountNumber: saved.account_number ?? '',
+                };
+
+                setPaymentCod(savedSnapshot.paymentCod);
+                setPaymentQr(savedSnapshot.paymentQr);
+                setCardEnabled(savedSnapshot.cardEnabled);
+                setFpxEnabled(savedSnapshot.fpxEnabled);
+                setQrImageId(savedSnapshot.qrImageId);
+                setQrPreviewUrl(savedSnapshot.qrPreviewUrl);
+                setQrFileName(savedSnapshot.qrFileName);
+                setAccountHolderName(savedSnapshot.accountHolderName);
+                setBankName(savedSnapshot.bankName);
+                setAccountNumber(savedSnapshot.accountNumber);
+                setServerPaymentValues(savedSnapshot);
                 toast.success(pt.successSave);
             } else {
                 toast.error(pt.failSaveSettings);

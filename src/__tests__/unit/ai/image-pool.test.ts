@@ -297,14 +297,13 @@ describe('TC-F01-W.15 — pickFromPool', () => {
 describe('TC-F01-W.16 — underfill backoff', () => {
   it('retries with relaxed query when landscape underfills', async () => {
     // First landscape call returns 1 photo (underfill), retry with relaxed returns 2.
-    // GH-1611: relaxed-tier photos are tagged for the RELAXED query ('restaurant
-    // interior') — that is what Pixabay would return for it, and what the gate checks.
-    const relaxedTags = 'restaurant interior, dining room, table'
+    // GH-1611: even though the SEARCH broadens to the category phrase, accepted
+    // photos must still match the merchant's product term.
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // initial landscape — underfill
       .mockResolvedValueOnce([
-        fakePhoto('RL1', 1920, 1080, relaxedTags),
-        fakePhoto('RL2', 1920, 1080, relaxedTags),
+        fakePhoto('RL1', 1920, 1080, RAMEN_TAGS),
+        fakePhoto('RL2', 1920, 1080, RAMEN_TAGS),
       ]) // relaxed retry
       .mockResolvedValueOnce(squareFixture) // square OK first try
 
@@ -604,7 +603,7 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
     // tier is gated on its own phrase (GH-1611) — a fixture tagged with anything
     // else would be (correctly) thrown away and would only be testing the gate.
     const productPhotoFixture = Array.from({ length: 12 }, (_, i) =>
-      fakePhoto(`P${i}`, 1920, 1080, 'product photography, studio, packaging'),
+      fakePhoto(`P${i}`, 1920, 1080, i === 0 ? 'pen, pensel, product photography, studio' : 'product photography, studio, packaging'),
     )
     mockSearchPhotos
       .mockResolvedValueOnce([]) // primary landscape
@@ -865,7 +864,7 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
       .mockResolvedValueOnce([]) // tier-1: product query, 0 hits
       .mockResolvedValue([
         fakePhoto('x1', 1920, 1080, 'jeans, knit hat, flatlay'), // off-phrase
-        fakePhoto('p1', 1920, 1080, 'product photography, studio, light'),
+        fakePhoto('p1', 1920, 1080, 'leather handbag, product photography, studio, light'),
       ])
 
     const pool = await buildImagePool({
@@ -928,5 +927,61 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
     })
 
     expect(pool.landscape.map((p) => p.id)).toEqual(['c1'])
+  })
+  it('[TC-GH1611-15] fallback is gated by product terms when products are provided (rejecting lookalike clothing)', async () => {
+    const clothingHit = fakePhoto('x1', 1920, 1080, 'dress, clothing, product photography')
+    const handbagHit = fakePhoto('h1', 1920, 1080, 'leather handbag, product photography')
+
+    mockSearchPhotos
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([clothingHit, handbagHit])
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: ['leather handbag'],
+      seed: 5,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape.map((p) => p.id)).toEqual(['h1'])
+  })
+
+  it('[TC-GH1611-16] unmapped category with empty products rejects all photos (returning empty bucket to use curated fallback)', async () => {
+    const lookalikeClothing = fakePhoto('x1', 1920, 1080, 'dress, clothing, product photography')
+    const productPhoto = fakePhoto('p1', 1920, 1080, 'product photography, watch, isolated')
+
+    mockSearchPhotos
+      .mockResolvedValueOnce([lookalikeClothing, productPhoto])
+
+    const pool = await buildImagePool({
+      category: 'ecommerce',
+      products: [],
+      gateProducts: [],
+      seed: 6,
+      squareSize: 0,
+    })
+
+    expect(pool.landscape).toEqual([])
+  })
+
+  it('[TC-GH1611-17] mapped F&B fallback still rejects food from the wrong product', async () => {
+    // Arrange
+    mockSearchPhotos
+      .mockResolvedValueOnce([]) // primary product query underfills
+      .mockResolvedValueOnce([
+        fakePhoto('s1', 1920, 1080, 'sushi, salmon, japanese food'),
+        fakePhoto('c1', 1920, 1080, 'chocolate cake, bakery, dessert'),
+      ]) // relaxed category query returns mixed food products
+
+    // Act
+    const pool = await buildImagePool({
+      category: 'fnb',
+      products: ['chocolate cake'],
+      seed: 7,
+      squareSize: 0,
+    })
+
+    // Assert
+    expect(pool.landscape.map((photo) => photo.id)).toEqual(['c1'])
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
-import { getAvatarMedia, batchFetchFromPool, getMediaForBlock } from '@/lib/ai/media-pipeline'
+import { getAvatarMedia, batchFetchFromPool, getMediaForBlock, getCuratedFallbackMedia } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
 // portrait search — mock the pipeline layer to observe routing.
@@ -9,6 +9,7 @@ vi.mock('@/lib/ai/media-pipeline', async (importOriginal) => ({
     getAvatarMedia: vi.fn().mockResolvedValue({ mediaIds: [901, 902, 903], photos: [], failures: [] }),
     batchFetchFromPool: vi.fn().mockResolvedValue({ mediaIds: [1], photos: [], failures: [] }),
     getMediaForBlock: vi.fn().mockResolvedValue({ mediaIds: [], photos: [], failures: [] }),
+    getCuratedFallbackMedia: vi.fn().mockResolvedValue({ mediaIds: [], photos: [], failures: [] }),
 }))
 
 beforeEach(() => {
@@ -316,6 +317,32 @@ describe('media-injector [plan-260414-unsplash]', () => {
     })
 
     describe('fulfillImageNeeds — testimonials avatar routing [TC-F38-RAW-13]', () => {
+        it('[TC-GENPERF-W3-27] fills a failed Pixabay gallery from persisted curated media without duplicates', async () => {
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            }]
+            vi.mocked(getMediaForBlock).mockResolvedValueOnce({
+                mediaIds: [],
+                photos: [],
+                failures: [{ photoId: 'search', error: 'SERVER_ERROR' }],
+            })
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [201, 202, 203, 204, 205, 206],
+                photos: [],
+                failures: [],
+            })
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Fallback Bakery', tenantId: '1', category: 'restaurant',
+            }, {} as never)
+
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+            const assigned = (blocks[0]!.images as Array<{ image?: number }>).map(item => item.image)
+            expect(assigned).toEqual([201, 202, 203, 204, 205, 206])
+            expect(new Set(assigned).size).toBe(6)
+        })
+
         it('[TC-GENPERF-W3-10] assigns distinct gallery image sets across pages', async () => {
             const makeGallery = () => ({
                 blockType: 'gallery',

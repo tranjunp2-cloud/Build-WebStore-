@@ -12,9 +12,8 @@
  * Alt-text: Pixabay license requires no attribution; alt text is built from the
  * photo tags + uploader as `${description} — Photo by ${photographer}`.
  *
- * Hero / blog / product last-resort fallbacks still hotlink curated static
- * images.unsplash.com URLs (no API key) — the SSRF allowlist in pixabay-client
- * permits those hosts.
+ * Provider-outage fallbacks use curated category-aware images.unsplash.com URLs
+ * (no API key), download them through the SSRF allowlist, and persist them.
  *
  * Server-only. Do NOT import from client components.
  */
@@ -40,6 +39,7 @@ import { normalizeComposerCategory } from './composer-category-resolver'
 import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
+import { getIndustryImages, IMAGE_LIBRARY } from '@/lib/images/industry-images'
 
 export interface MediaPipelineContext {
     businessName: string
@@ -409,6 +409,90 @@ async function heroFallbackChain(
     }
 }
 
+function curatedUrlKey(url: string): string {
+    return url.match(/photo-[^?&/]+/)?.[0] ?? url.split('?')[0]!
+}
+
+function curatedFallbackCandidates(blockType: string, rawCategory: string | undefined): string[] {
+    const category = normalizeComposerCategory(rawCategory)
+    const primary = getIndustryImages(category)
+    const business = getIndustryImages('business')
+    const isPeople = blockType === 'team' || blockType === 'testimonials' || blockType === 'doctor-profile'
+    const isProduct = blockType === 'products-grid' || blockType === 'products-featured'
+
+    const preferred = isPeople
+        ? [...primary.team, ...business.team]
+        : isProduct
+            ? [...primary.products, ...primary.gallery, ...primary.features, primary.about, ...primary.hero]
+            : [...primary.gallery, ...primary.features, primary.about, ...primary.hero, ...primary.products]
+    const reserve = isPeople
+        ? Object.values(IMAGE_LIBRARY).flatMap((images) => images.team)
+        : Object.values(IMAGE_LIBRARY).flatMap((images) => [
+            ...images.gallery,
+            ...images.features,
+            images.about,
+            ...images.hero,
+            ...images.products,
+        ])
+
+    const seen = new Set<string>()
+    return [...preferred, ...reserve].filter((url) => {
+        const key = curatedUrlKey(url)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+/** Persist deterministic category-aware media when Pixabay is unavailable.
+ * The request-scoped used set prevents the same underlying photo from being
+ * assigned to multiple generated blocks, even when library URLs use different sizes. */
+export async function getCuratedFallbackMedia(
+    blockType: string,
+    count: number,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+    usedUrlKeys: Set<string>,
+): Promise<BatchFetchResult> {
+    if (count <= 0) return { mediaIds: [], photos: [], failures: [] }
+
+    const selected: Array<{ url: string; key: string }> = []
+    for (const url of curatedFallbackCandidates(blockType, ctx.category)) {
+        const key = curatedUrlKey(url)
+        if (usedUrlKeys.has(key)) continue
+        usedUrlKeys.add(key)
+        selected.push({ url, key })
+        if (selected.length >= count) break
+    }
+
+    const semaphore = new Semaphore(3)
+    const settled: Array<{ id: number; key: string } | { key: string; error: string }> = await Promise.all(selected.map(({ url, key }, index) => semaphore.run(async () => {
+        try {
+            const { buffer, mimetype } = await downloadPhotoBuffer(url)
+            const extension = mimetype.includes('png') ? 'png' : 'jpg'
+            const id = await uploadBufferToMedia(payload, {
+                buffer,
+                filename: `${blockType}-curated-${key}-${Date.now()}-${index}.${extension}`,
+                mimetype,
+                alt: `${ctx.businessName} ${blockType}`,
+                tenantId: ctx.tenantId,
+                assertCanWrite: ctx.assertCanWrite,
+            })
+            return { id, key }
+        } catch (error) {
+            return { key, error: error instanceof Error ? error.message : String(error) }
+        }
+    })))
+
+    return {
+        mediaIds: settled.flatMap((result) => 'id' in result ? [result.id] : []),
+        photos: [],
+        failures: settled.flatMap((result) => 'error' in result
+            ? [{ photoId: result.key, error: result.error }]
+            : []),
+    }
+}
+
 /**
  * GH-1185: people-slot photos (testimonial avatars, team members, doctor
  * profiles) must be PEOPLE, not the site's product/food photos — the shared
@@ -488,8 +572,12 @@ export async function getMediaForBlock(
     // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
     // on-industry ones, leaving non-hero blocks with no image at all.
     const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[composerCategory])
     const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
-        if (terms.length === 0) return photos
+        if (terms.length === 0) {
+            if (categoryMapped) return photos
+            return []
+        }
         const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {
             console.info(
@@ -498,9 +586,8 @@ export async function getMediaForBlock(
         }
         return kept
     }
-    // Tier 3: trusted category phrase, ungated — mirrors image-pool
-    // searchBucket so the legacy path degrades to on-category photos instead
-    // of off-topic AND-match noise. VN queries use the curated Vietnamese
+    // Tier 3 broadens the search with a category phrase, then applies the same
+    // trusted product gate as earlier tiers. VN queries use the curated Vietnamese
     // phrase (lang=vi); non-VN queries (Malay/English zero-hit) fall to the
     // English category base keyword — an empty result here means the block
     // keeps whatever URL GPT hallucinated into it (GH-1185 QC retest).
@@ -521,11 +608,17 @@ export async function getMediaForBlock(
                 category: pixCategory,
                 ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
-            if (photos.length > 0) {
+            // Keep the merchant's product terms as the relevance contract on
+            // every tier. A Pixabay category only constrains the broad industry;
+            // it cannot distinguish a bakery photo from another food product.
+            // gateTerms handles the no-product case: mapped categories may rely
+            // on the server-side filter, while unmapped categories reject all.
+            const gatedPhotos = gateTerms(photos, subjectTerms)
+            if (gatedPhotos.length > 0) {
                 console.info(
-                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${photos.length} photo(s)`,
+                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
                 )
-                return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+                return batchFetch(pickRandomN(gatedPhotos, count), blockType, ctx, payload)
             }
         }
         return blockType === 'hero'
@@ -554,10 +647,10 @@ export async function getMediaForBlock(
                         width: targetWidth,
                         category: pixCategory,
                     }),
-                    // Broadening keeps the product subject only on the raw path;
-                    // on the scaffolding path broadQuery is a category keyword and
-                    // must not be used as a gate term (see subjectTerms).
-                    subjectTerms.length > 0 ? [broadQuery] : [],
+                    // Broadening changes only the SEARCH query. Relevance remains
+                    // anchored to all trusted merchant product terms, otherwise an
+                    // ambiguous first keyword can admit the wrong product at tier 2.
+                    subjectTerms,
                 )
                 if (broader.length === 0) {
                     // `await` is load-bearing: categoryFallback can throw

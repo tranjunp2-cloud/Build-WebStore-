@@ -146,19 +146,33 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
+    /** Existing site being regenerated. When present, only complete posts for
+     *  this site count toward the three-post completion contract. */
+    siteId?: number | string
     assertCanWrite?: () => void
     /** Settles when the request's other Pixabay consumers (image pool,
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
     pixabayGate?: Promise<unknown>
 }): Promise<PreparedBlogPost[] | null> {
-    const { payload, tenantId, category, businessName, products, industry, seed } = opts
+    const { payload, tenantId, category, businessName, products, industry, seed, siteId } = opts
     try {
-        const existing = await payload.count({
-            collection: 'blogs',
-            where: { tenant: { equals: tenantId } },
-        })
-        if (existing.totalDocs >= 3) return []
+        let targetCount = 3
+        if (siteId !== undefined) {
+            const existing = await payload.count({
+                collection: 'blogs',
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { site: { equals: siteId } },
+                        { content: { exists: true } },
+                        { thumbnail: { exists: true } },
+                    ],
+                },
+            })
+            targetCount = Math.max(0, 3 - existing.totalDocs)
+            if (targetCount === 0) return []
+        }
 
         let seeds: AnyBlogSeed[] = []
         try {
@@ -167,7 +181,7 @@ export async function prepareBlogPosts(opts: {
                 industry: industry ?? category,
                 products,
             })
-            seeds = aiSeeds.slice(0, 3)
+            seeds = aiSeeds.slice(0, targetCount)
         } catch (err) {
             if (isQuotaExhausted(err)) {
                 console.warn('[seed-blog-posts] OpenAI quota exhausted, using static seeds')
@@ -176,8 +190,8 @@ export async function prepareBlogPosts(opts: {
             }
         }
 
-        if (seeds.length < 3) {
-            const need = 3 - seeds.length
+        if (seeds.length < targetCount) {
+            const need = targetCount - seeds.length
             const usedSlugs = new Set(seeds.map((s) => s.slug.toLowerCase()))
             const fill = getBlogSeeds(
                 category,
@@ -246,6 +260,7 @@ export async function persistBlogPosts(
     siteId: number | string,
     userId: number | string,
     assertCanWrite?: () => void,
+    onCreated?: (id: number | string) => void,
 ): Promise<number> {
     let count = 0
     for (const post of prepared) {
@@ -263,7 +278,7 @@ export async function persistBlogPosts(
 
         assertCanWrite?.()
         try {
-            await payload.create({
+            const created = await payload.create({
                 collection: 'blogs',
                 data: {
                     tenant: tenantId,
@@ -278,6 +293,7 @@ export async function persistBlogPosts(
                 },
                 context: { skipPublishNotify: true },
             })
+            onCreated?.(created.id as number | string)
             count++
         } catch (err) {
             console.warn(`[seed-blog-posts] post "${post.slug}" failed (non-fatal):`, (err as Error).message)
@@ -298,12 +314,13 @@ export async function seedBlogPosts(
     industry?: string,
     seed?: number,
     assertCanWrite?: () => void,
+    onCreated?: (id: number | string) => void,
 ): Promise<number> {
     assertCanWrite?.()
     const prepared = await prepareBlogPosts({
-        payload, tenantId, category, businessName, products, industry, seed, assertCanWrite,
+        payload, tenantId, siteId, category, businessName, products, industry, seed, assertCanWrite,
     })
     if (!prepared || prepared.length === 0) return 0
     assertCanWrite?.()
-    return persistBlogPosts(payload, prepared, tenantId, siteId, userId, assertCanWrite)
+    return persistBlogPosts(payload, prepared, tenantId, siteId, userId, assertCanWrite, onCreated)
 }

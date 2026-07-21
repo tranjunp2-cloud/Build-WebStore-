@@ -2,6 +2,31 @@ import type { CollectionConfig } from 'payload'
 import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
 import { revalidateTenantAfterChange, revalidateTenantAfterDelete } from '@/lib/cache/revalidate-storefront'
 
+type PaymentQrHookArgs = {
+    value?: boolean
+    siblingData: Record<string, unknown>
+    previousSiblingDoc?: Record<string, unknown>
+}
+
+type PaymentQrImageHookArgs = {
+    value?: unknown
+    siblingData: Record<string, unknown>
+}
+
+export function requireQrImageWhenEnabled({ value, siblingData, previousSiblingDoc }: PaymentQrHookArgs) {
+    if (value !== true) return value
+    const effectiveImage = siblingData.qr_image !== undefined
+        ? siblingData.qr_image
+        : previousSiblingDoc?.qr_image
+    return effectiveImage ? value : false
+}
+
+export function disableQrWhenImageRemoved({ value, siblingData }: PaymentQrImageHookArgs) {
+    // An omitted field is `undefined` in a partial Payload update. Only an explicit null removes it.
+    if (value === null) siblingData.payment_qr = false
+    return value
+}
+
 export const Tenants: CollectionConfig = {
     slug: 'tenants',
     admin: {
@@ -472,13 +497,7 @@ export const Tenants: CollectionConfig = {
                     admin: { description: 'Enable QR Banking / Bank Transfer' },
                     hooks: {
                         beforeChange: [
-                            ({ siblingData, value }) => {
-                                // Enforce rule: cannot enable QR without an image
-                                if (value && !siblingData.qr_image) {
-                                    return false
-                                }
-                                return value
-                            },
+                            requireQrImageWhenEnabled,
                         ],
                     },
                 },
@@ -492,13 +511,7 @@ export const Tenants: CollectionConfig = {
                     },
                     hooks: {
                         beforeChange: [
-                            ({ value, siblingData }) => {
-                                // If image is removed, disable the qr toggle
-                                if (!value) {
-                                    siblingData.payment_qr = false
-                                }
-                                return value
-                            },
+                            disableQrWhenImageRemoved,
                         ],
                     },
                 },

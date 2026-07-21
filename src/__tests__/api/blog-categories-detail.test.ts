@@ -63,6 +63,12 @@ describe('PATCH /api/blog-categories/[id] [TC-F17.020b]', () => {
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
         expect(body.data.name).toBe('New Name')
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blog_categories',
+            id: 'cat-1',
+            user: mockUser,
+            overrideAccess: false,
+        }))
     })
 
     it('returns 403 for cross-tenant access [TC-F19.38]', async () => {
@@ -114,11 +120,22 @@ describe('DELETE /api/blog-categories/[id] [TC-F17.020]', () => {
         expect(res.status).toBe(200)
         expect(body.data.deleted).toBe('cat-1')
         expect(body.data.affectedPosts).toBe(2)
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            where: {
+                and: [
+                    { category: { equals: 'cat-1' } },
+                    { tenant: { equals: 'tenant-1' } },
+                ],
+            },
+            user: mockUser,
+            overrideAccess: false,
+        }))
         // Cascade: unset category on 2 blogs
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-1', data: { category: null } }))
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-2', data: { category: null } }))
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-1', data: { category: null }, user: mockUser, overrideAccess: false }))
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-2', data: { category: null }, user: mockUser, overrideAccess: false }))
         // Hard delete the category
-        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blog_categories', id: 'cat-1' }))
+        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blog_categories', id: 'cat-1', user: mockUser, overrideAccess: false }))
     })
 
     it('returns 403 for IDOR attempt [TC-F19.38]', async () => {

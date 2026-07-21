@@ -17,6 +17,10 @@ function toSlug(text: string): string {
         .replace(/^-|-$/g, '')
 }
 
+function isBlogCategoryTenantMismatch(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('BLOG_CATEGORY_TENANT_MISMATCH')
+}
+
 /**
  * GET /api/blogs — List blogs for current tenant
  * Query params: search, status, category, sort, page, limit
@@ -144,10 +148,18 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
                 author: user.id,
                 seo: data!.seo,
             },
+            user,
+            overrideAccess: false,
         })
 
         return NextResponse.json({ success: true, data: blog }, { status: 201 })
     } catch (error) {
+        if (isBlogCategoryTenantMismatch(error)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', details: 'Invalid category selection' } },
+                { status: 400 }
+            )
+        }
         console.error('POST /api/blogs error:', error)
         return NextResponse.json(
             { success: false, error: { code: 'SERVER_ERROR', details: 'Failed to create blog post' } },

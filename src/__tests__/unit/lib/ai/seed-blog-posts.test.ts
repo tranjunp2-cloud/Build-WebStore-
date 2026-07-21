@@ -648,22 +648,33 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
 		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
+			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
 		})
 
 		expect(prepared).toBeNull()
 		warnSpy.mockRestore()
 	})
 
-	it('returns [] when tenant already has posts (regenerate) and persistBlogPosts inserts prepared rows', async () => {
+	it('returns [] only when the current site already has three complete posts', async () => {
 		const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 
 		// Prep skip case
 		const payloadWithPosts = makePayload(3)
 		const prepared = await prepareBlogPosts({
-			payload: payloadWithPosts, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
+			payload: payloadWithPosts, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
 		})
 		expect(prepared).toEqual([])
+		expect(payloadWithPosts.count).toHaveBeenCalledWith({
+			collection: 'blogs',
+			where: {
+				and: [
+					{ tenant: { equals: 42 } },
+					{ site: { equals: 99 } },
+					{ content: { exists: true } },
+					{ thumbnail: { exists: true } },
+				],
+			},
+		})
 
 		// Persist path inserts exactly the prepared rows (site-dependent phase)
 		const payload = makePayload(0)
@@ -679,6 +690,17 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		expect(first.data.thumbnail).toBe(5)
 		const second = (payload.create as ReturnType<typeof vi.fn>).mock.calls[1][0]
 		expect(second.data.thumbnail).toBeUndefined()
+	})
+
+	it('prepares only the deficit when the current site has one complete post', async () => {
+		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+		const payload = makePayload(1)
+
+		const prepared = await prepareBlogPosts({
+			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+		})
+
+		expect(prepared).toHaveLength(2)
 	})
 
 	it('propagates the write guard and stops before the next blog insert after abort', async () => {
