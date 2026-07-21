@@ -417,6 +417,22 @@ export async function POST(req: NextRequest) {
             where: { tenant: { equals: resolvedTenantId } },
             limit: 1,
         })
+        const existingProductCountPromise = existingSitesPromise
+            .then(async (existingSites) => {
+                const existingSiteId = existingSites.docs[0]?.id
+                if (existingSiteId === undefined) return 0
+                const existingProducts = await payload.count({
+                    collection: 'products',
+                    where: {
+                        and: [
+                            { tenant: { equals: resolvedTenantId } },
+                            { site: { equals: existingSiteId } },
+                            { deletedAt: { exists: false } },
+                        ],
+                    },
+                })
+                return existingProducts.totalDocs
+            })
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
@@ -700,11 +716,23 @@ export async function POST(req: NextRequest) {
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = Promise.race([
-                imagePoolPromise.then(() => undefined),
-                new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-            ]).then(() =>
-                trackPhase('products_prepare', () =>
+            const sampleProductsPromise = existingProductCountPromise.then(async (existingProductsCount) => {
+                // Regeneration must preserve the merchant's catalog. Recreating
+                // deterministic sample SKUs would collide with the tenant-level
+                // unique index and should never replace real product data.
+                if (existingProductsCount > 0) {
+                    return {
+                        products: [],
+                        stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+                        existingProductsCount,
+                    }
+                }
+
+                await Promise.race([
+                    imagePoolPromise.then(() => undefined),
+                    new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+                ])
+                const generated = await trackPhase('products_prepare', () =>
                     generateSampleProducts(
                         businessInfo,
                         effectiveGenerationLocale,
@@ -713,8 +741,9 @@ export async function POST(req: NextRequest) {
                         undefined,
                         assertRouteDeadline,
                     ),
-                ),
-            )
+                )
+                return { ...generated, existingProductsCount: 0 }
+            })
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('site_ai', () =>
@@ -1035,6 +1064,9 @@ export async function POST(req: NextRequest) {
             _previousGenerationStatus = typeof previousSite.generationStatus === 'string'
                 ? previousSite.generationStatus
                 : 'completed'
+            // Recovery needs the stable existing ID before any status write or
+            // old-page read can be interrupted by the route deadline.
+            _site = previousSite
             // Keep the current site metadata and pages live until all new
             // content passes the completion barriers. Only status is exposed.
             site = await payload.update({
@@ -1042,6 +1074,7 @@ export async function POST(req: NextRequest) {
                 id: previousSite.id as string | number,
                 data: { generationStatus: 'generating' },
             })
+            _site = site
 
             // Keep old pages untouched while the replacement is built under
             // temporary slugs. The final delete+rename is one short transaction.
@@ -1072,8 +1105,8 @@ export async function POST(req: NextRequest) {
                     generationStatus: 'generating',
                 },
             })
+            _site = site
         }
-        _site = site
 
         // Derive nav links from AI multi-page output so menu reflects actual generated pages
         const aiPageLinks = extractPageLinks(
@@ -1565,6 +1598,7 @@ export async function POST(req: NextRequest) {
                 || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
         }
         let productsCreatedCount = 0
+        let existingProductsCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
         const createTrackedProduct = async (data: Record<string, unknown>) => {
@@ -1573,47 +1607,54 @@ export async function POST(req: NextRequest) {
             return created
         }
         try {
-            const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
+            const {
+                products: sampleProducts,
+                stats: imgStats,
+                existingProductsCount: preparedExistingProductsCount,
+            } = await sampleProductsPromise
             assertRouteDeadline()
+            existingProductsCount = preparedExistingProductsCount
             productImageStats = imgStats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
             let sampleCategoryId: number | undefined
-            try {
-                // GH-1611: form key wins over free-text scoring (see resolveBusinessCategory).
-                const composerCategory = resolveBusinessCategory(
-                    businessInfo.industry,
-                    `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
-                )
-                const { docs: catDocs } = await payload.find({
-                    collection: 'categories',
-                    where: { tenant: { equals: resolvedTenantId }, site: { equals: site.id }, deletedAt: { exists: false } },
-                    limit: 20,
-                    depth: 0,
-                })
-                if (catDocs.length === 0) {
-                    assertRouteDeadline()
-                    const created = await payload.create({
+            if (sampleProducts.length > 0) {
+                try {
+                    // GH-1611: form key wins over free-text scoring (see resolveBusinessCategory).
+                    const composerCategory = resolveBusinessCategory(
+                        businessInfo.industry,
+                        `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
+                    )
+                    const { docs: catDocs } = await payload.find({
                         collection: 'categories',
-                        data: {
-                            name: composerCategory.charAt(0).toUpperCase() + composerCategory.slice(1),
-                            slug: `${composerCategory}-${site.id}`,
-                            tenant: resolvedTenantId,
-                            site: site.id,
-                        },
+                        where: { tenant: { equals: resolvedTenantId }, site: { equals: site.id }, deletedAt: { exists: false } },
+                        limit: 20,
+                        depth: 0,
                     })
-                    sampleCategoryId = created.id as number
-                } else {
-                    const want = composerCategory.toLowerCase()
-                    const hit = catDocs.find(c => {
-                        const slug = String((c as any).slug ?? '').toLowerCase()
-                        const name = String((c as any).name ?? '').toLowerCase()
-                        return slug.includes(want) || name.includes(want)
-                    }) ?? catDocs[0]
-                    sampleCategoryId = hit!.id as number
+                    if (catDocs.length === 0) {
+                        assertRouteDeadline()
+                        const created = await payload.create({
+                            collection: 'categories',
+                            data: {
+                                name: composerCategory.charAt(0).toUpperCase() + composerCategory.slice(1),
+                                slug: `${composerCategory}-${site.id}`,
+                                tenant: resolvedTenantId,
+                                site: site.id,
+                            },
+                        })
+                        sampleCategoryId = created.id as number
+                    } else {
+                        const want = composerCategory.toLowerCase()
+                        const hit = catDocs.find(c => {
+                            const slug = String((c as any).slug ?? '').toLowerCase()
+                            const name = String((c as any).name ?? '').toLowerCase()
+                            return slug.includes(want) || name.includes(want)
+                        }) ?? catDocs[0]
+                        sampleCategoryId = hit!.id as number
+                    }
+                } catch (err) {
+                    console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
                 }
-            } catch (err) {
-                console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
             }
             assertRouteDeadline()
             const createProductWithoutImage = async (baseData: Record<string, unknown>): Promise<boolean> => {
@@ -1740,7 +1781,7 @@ export async function POST(req: NextRequest) {
         }
 
         assertRouteDeadline()
-        if (productsCreatedCount !== 6) {
+        if (existingProductsCount === 0 && productsCreatedCount !== 6) {
             throw new Error(`COMPLETION_INCOMPLETE_PRODUCTS expected=6 actual=${productsCreatedCount}`)
         }
         if (productImageStats.noImage > 0) {
@@ -1757,9 +1798,9 @@ export async function POST(req: NextRequest) {
         assertRouteDeadline()
         let blogsReadyCount = 0
         if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
-            if (preparedBlogs.length < 3 || preparedBlogs.some((post) => post.thumbnailId === undefined)) {
+            if (preparedBlogs.some((post) => post.thumbnailId === undefined)) {
                 throw new Error(
-                    `COMPLETION_INCOMPLETE_BLOG_MEDIA expected=3 actual=${preparedBlogs.filter((post) => post.thumbnailId !== undefined).length}`,
+                    `COMPLETION_INCOMPLETE_BLOG_MEDIA expected=${preparedBlogs.length} actual=${preparedBlogs.filter((post) => post.thumbnailId !== undefined).length}`,
                 )
             }
             blogsReadyCount = await trackPhase('blog_write', () =>
@@ -1923,13 +1964,15 @@ export async function POST(req: NextRequest) {
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
-                        } = await withRouteDeadline(async () => {
-                            const output = await runGenPipeline(onEvent)
-                            // F23: sync tenant slug now that generation succeeded (GH-1371)
-                            await trackPhase('slug_sync', syncTenantSlug)
-                            assertRouteDeadline()
-                            return output
-                        })
+                        } = await withRouteDeadline(() => runGenPipeline(onEvent))
+                        // The site is already committed. Slug sync is optional
+                        // post-response work and must not turn success into an SSE error.
+                        const _slugSyncStream = () => trackPhase('slug_sync', syncTenantSlug)
+                        try {
+                            after(_slugSyncStream)
+                        } catch {
+                            void _slugSyncStream()
+                        }
                         const timeMs = generationTimings.totalMs()
                         logGenerationDone({
                             pages: createdPages.length,
@@ -2010,13 +2053,15 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             productImageStats,
             blockImageStats,
-        } = await withRouteDeadline(async () => {
-            const output = await runGenPipeline()
-            // F23: sync tenant slug now that generation succeeded (GH-1371)
-            await trackPhase('slug_sync', syncTenantSlug)
-            assertRouteDeadline()
-            return output
-        })
+        } = await withRouteDeadline(() => runGenPipeline())
+        // JSON callers share the same terminal contract: once committed, only
+        // non-fatal post-response work remains.
+        const _slugSync = () => trackPhase('slug_sync', syncTenantSlug)
+        try {
+            after(_slugSync)
+        } catch {
+            void _slugSync()
+        }
         const timeMs = generationTimings.totalMs()
         logGenerationDone({
             pages: createdPages.length,

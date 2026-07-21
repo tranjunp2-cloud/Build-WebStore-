@@ -57,6 +57,8 @@ let mockPageDB: any[] = []
 let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
 let mockPageCreateFailure: { slug: string; error: Error } | null = null
 let mockMediaDB: Array<Record<string, unknown>> = []
+let mockProductDB: Array<Record<string, unknown>> = []
+let mockCompleteBlogCount = 3
 let mockFailedPageCreateData: Record<string, unknown> | null = null
 let mockIdCounter = 0
 
@@ -83,7 +85,11 @@ vi.mock('payload', () => {
                 if (collection === 'media') return { docs: mockMediaDB }
                 return { docs: [] }
             }),
-            count: vi.fn().mockResolvedValue({ totalDocs: 3 }),
+            count: vi.fn().mockImplementation(async ({ collection }) => {
+                if (collection === 'products') return { totalDocs: mockProductDB.length }
+                if (collection === 'blogs') return { totalDocs: mockCompleteBlogCount }
+                return { totalDocs: 3 }
+            }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
                 if (collection === 'pages' && mockPageCreateFailure && data.slug === mockPageCreateFailure.slug) {
                     mockFailedPageCreateData = structuredClone(data)
@@ -96,9 +102,16 @@ vi.mock('payload', () => {
                 )) {
                     throw new Error('duplicate page slug')
                 }
+                if (collection === 'products' && typeof data.sku === 'string' && mockProductDB.some(
+                    product => product.tenant === data.tenant
+                        && String(product.sku).toLowerCase() === data.sku.toLowerCase(),
+                )) {
+                    throw new Error('products_sku_tenant_uniq')
+                }
                 const doc = { id: `new-${collection}-${++mockIdCounter}`, ...data }
                 if (collection === 'sites') mockSiteDB.push(doc)
                 if (collection === 'pages') mockPageDB.push(doc)
+                if (collection === 'products') mockProductDB.push(doc)
                 return doc
             }),
             update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
@@ -113,6 +126,7 @@ vi.mock('payload', () => {
             }),
             delete: vi.fn().mockImplementation(async ({ collection, id }) => {
                 if (collection === 'pages') mockPageDB = mockPageDB.filter(page => page.id !== id)
+                if (collection === 'products') mockProductDB = mockProductDB.filter(product => product.id !== id)
                 return {}
             }),
         })
@@ -234,6 +248,8 @@ describe('AI Streaming APIs', () => {
         mockRateLimitAllowed = true
         mockPageCreateFailure = null
         mockMediaDB = []
+        mockProductDB = []
+        mockCompleteBlogCount = 3
         mockFailedPageCreateData = null
         mockIdCounter = 0
     })
@@ -875,6 +891,141 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-404')).toBe(true)
+        })
+
+        it('[TC-GENPERF-W3-29] regeneration preserves an existing catalog without recreating deterministic SKUs', async () => {
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             mockProductDB = Array.from({ length: 6 }, (_, index) => ({
+                 id: `existing-product-${index + 1}`,
+                 tenant: 'tenant-1',
+                 site: 'site-existing',
+                 sku: `BUS-${String(index + 1).padStart(3, '0')}`,
+             }))
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(vi.mocked(generateSampleProducts)).not.toHaveBeenCalled()
+             expect(mockProductDB).toHaveLength(6)
+             expect(mockProductDB.every(product => String(product.id).startsWith('existing-product-'))).toBe(true)
+        })
+
+        it('[TC-GENPERF-W3-30] regeneration accepts a two-post deficit when the final site count is three', async () => {
+             const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                 { title: 'Second', slug: 'second', content: '<p>second</p>', thumbnailId: 2 },
+                 { title: 'Third', slug: 'third', content: '<p>third</p>', thumbnailId: 3 },
+             ])
+             vi.mocked(persistBlogPosts).mockResolvedValueOnce(2)
+             mockCompleteBlogCount = 3
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledWith(
+                 expect.anything(),
+                 expect.arrayContaining([expect.objectContaining({ slug: 'second' }), expect.objectContaining({ slug: 'third' })]),
+                 'tenant-1',
+                 'site-existing',
+                 'user-xyz',
+                 expect.any(Function),
+                 expect.any(Function),
+             )
+        })
+
+        it('[TC-GENPERF-W3-31] restores the previous site status when the old-page read fails', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalFind = vi.mocked(payload.find).getMockImplementation()!
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             vi.mocked(payload.find).mockImplementation(async (args) => {
+                 if (args.collection === 'pages') throw new Error('old page read failed')
+                 return originalFind(args)
+             })
+
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+
+                 expect(res.status).toBe(500)
+                 expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             } finally {
+                 vi.mocked(payload.find).mockImplementation(originalFind)
+             }
+        })
+
+        it('[TC-GENPERF-W3-32] does not run optional slug sync inside the fatal completion deadline', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalFindByID = vi.mocked(payload.findByID).getMockImplementation()!
+             let now = 1_000_000
+             const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+             vi.mocked(payload.findByID).mockImplementation(async (args) => {
+                 if (args.collection === 'tenants') {
+                     now += 55_000
+                     return mockTenant
+                 }
+                 return originalFindByID(args)
+             })
+
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+
+                 expect(res.status).toBe(200)
+                 expect(vi.mocked(payload.findByID).mock.calls.some(([arg]) => arg.collection === 'tenants')).toBe(false)
+             } finally {
+                 nowSpy.mockRestore()
+                 vi.mocked(payload.findByID).mockImplementation(originalFindByID)
+             }
         })
 
         it('[TC-GENPERF-W3-21] fails completion when fewer than three complete blogs exist', async () => {
