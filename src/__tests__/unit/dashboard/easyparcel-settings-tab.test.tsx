@@ -81,6 +81,16 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
         global.fetch = vi.fn()
     })
 
+    it('keeps the connected toggle aligned with the title on mobile and desktop', () => {
+        render(<EasyParcelSettingsTab tenantId="tenant-1" initialEpConfig={initialEpConfig} />)
+
+        const header = screen.getByTestId('easyparcel-connected-header')
+        expect(header).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]')
+        const logoSrc = screen.getByRole('img', { name: 'EasyParcel' }).getAttribute('src') ?? ''
+        expect(decodeURIComponent(logoSrc)).toContain('/integrations/easyparcel-box.png')
+        expect(header).toContainElement(screen.getByRole('switch', { name: /EasyParcel/i }))
+    })
+
     it('keeps edits local until Save Settings is clicked', async () => {
         render(<EasyParcelSettingsTab tenantId="tenant-1" initialEpConfig={initialEpConfig} />)
 

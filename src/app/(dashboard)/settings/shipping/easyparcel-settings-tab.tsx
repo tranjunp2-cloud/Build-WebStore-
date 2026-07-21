@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import {
     BadgePercent,
@@ -42,6 +43,20 @@ export interface EasyParcelIntegrationConfig {
 }
 
 type TestStatus = 'idle' | 'testing' | 'connected' | 'invalid'
+
+function EasyParcelBrandMark() {
+    return (
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#F9278E] sm:h-[52px] sm:w-[52px]">
+            <Image
+                src="/integrations/easyparcel-box.png"
+                alt="EasyParcel"
+                width={32}
+                height={36}
+                className="h-8 w-auto sm:h-9"
+            />
+        </div>
+    )
+}
 
 interface Props {
     tenantId: string
@@ -254,9 +269,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             >
                 <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
                     <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))] sm:h-[52px] sm:w-[52px]">
-                            <PlugZap className="h-6 w-6 text-[hsl(var(--primary-foreground))]" />
-                        </div>
+                        <EasyParcelBrandMark />
                         <div className="min-w-0">
                             <h3 className="text-[18px] font-bold text-[var(--dash-text)]">{copy.connectTitle}</h3>
                             <p className="mt-1 break-words text-[13px] leading-relaxed text-[var(--dash-text-muted)]">{copy.connectDescription}</p>
@@ -304,21 +317,22 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             className="mt-5 min-w-0 overflow-hidden rounded-[16px]"
             style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
         >
-            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))] sm:h-[52px] sm:w-[52px]">
-                        <PlugZap className="h-6 w-6 text-[hsl(var(--primary-foreground))]" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-[18px] font-bold text-[var(--dash-text)]">{copy.connectTitle}</h3>
-                        <p className="mt-1 break-words text-[13px] leading-relaxed text-[var(--dash-text-muted)]">{copy.connectDescription}</p>
-                    </div>
+            <div
+                data-testid="easyparcel-connected-header"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 p-4 sm:gap-4 sm:p-6"
+            >
+                <div className="self-center">
+                    <EasyParcelBrandMark />
+                </div>
+                <div className="min-w-0">
+                    <h3 className="text-[18px] font-bold text-[var(--dash-text)]">{copy.connectTitle}</h3>
+                    <p className="mt-1 break-words text-[13px] leading-relaxed text-[var(--dash-text-muted)]">{copy.connectDescription}</p>
                 </div>
                 <Switch
                     checked={enabled}
                     onCheckedChange={handleToggleEnabled}
                     aria-label={copy.toggleLabel}
-                    className="mt-1"
+                    className="mt-1 shrink-0"
                 />
             </div>
 

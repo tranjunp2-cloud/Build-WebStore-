@@ -74,7 +74,10 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
     const prefersReducedMotion = useReducedMotion()
-    const mustBeDefault = editingKey === null && !warehouses.some((warehouse) => warehouse.isDefault)
+    const mustBeDefault = (
+        (editingKey === null && !warehouses.some((warehouse) => warehouse.isDefault))
+        || (editingKey !== null && warehouses.length === 1)
+    )
 
     useEffect(() => {
         onEditingChange?.(formOpen)

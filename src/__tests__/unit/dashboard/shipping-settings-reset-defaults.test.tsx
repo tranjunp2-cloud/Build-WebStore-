@@ -156,6 +156,14 @@ describe('ShippingSettingsClient — tab persistence [TC-F36.201]', () => {
         expect(screen.getByRole('tablist').className).toContain('border-bottom')
     })
 
+    it('uses equal-width stacked tabs on mobile and restores the inline layout on larger screens', () => {
+        renderClient()
+
+        expect(screen.getByRole('tablist')).toHaveClass('grid-cols-2', 'sm:flex')
+        expect(screen.getByRole('tab', { name: /Flat Rate/i })).toHaveClass('flex-col', 'sm:flex-row')
+        expect(screen.getByRole('tab', { name: /EasyParcel/i })).toHaveClass('flex-col', 'sm:flex-row')
+    })
+
     it('recognizes both persisted tab values and falls back to EasyParcel for OAuth results', () => {
         expect(resolveShippingTab('flat-rate')).toBe('flat-rate')
         expect(resolveShippingTab('easyparcel')).toBe('easyparcel')

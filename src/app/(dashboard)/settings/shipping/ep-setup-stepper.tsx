@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -89,25 +89,39 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
             style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
         >
             {/* Step indicator */}
-            <div className="grid grid-cols-3 gap-2 p-4 sm:flex sm:items-center sm:p-6 sm:pb-4">
+            <div className="grid grid-cols-3 gap-2 p-4 sm:flex sm:items-center sm:gap-0 sm:p-6 sm:pb-4">
                 {steps.map((label, i) => {
                     const done = i < step
                     const current = i === step
                     return (
-                        <div key={label} className="flex min-w-0 items-center gap-2 sm:flex-1">
-                            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center sm:flex-row sm:text-left">
+                        <Fragment key={label}>
+                            <div
+                                className="relative flex min-w-0 flex-col items-center gap-1.5 text-center sm:shrink-0 sm:flex-row sm:text-left"
+                                aria-current={current ? 'step' : undefined}
+                            >
+                                {i < steps.length - 1 && (
+                                    <span
+                                        data-step-connector-mobile
+                                        className="absolute left-[calc(50%+12px)] right-[calc(-50%+12px)] top-3 h-px bg-[var(--dash-border)] sm:hidden"
+                                    />
+                                )}
                                 <span className={[
-                                    'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold',
+                                    'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-solid text-[11px] font-bold',
                                     done ? 'bg-[hsl(var(--primary))] text-white'
-                                        : current ? 'border-2 border-[hsl(var(--primary))] text-[hsl(var(--primary))]'
-                                            : 'border-2 border-[var(--dash-border)] text-[var(--dash-text-muted)]',
+                                        : current ? 'border-2 border-[hsl(var(--primary))] bg-[var(--dash-surface-hover)] text-[hsl(var(--primary))]'
+                                            : 'border-2 border-[var(--dash-border)] bg-[var(--dash-surface-hover)] text-[var(--dash-text-muted)]',
                                 ].join(' ')}>
                                     {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                                 </span>
-                                <span className={['min-w-0 break-words text-[12px] font-medium sm:text-[13px]', current || done ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'].join(' ')}>{label}</span>
+                                <span className={['relative z-10 min-w-0 break-words text-[12px] font-medium sm:whitespace-nowrap sm:text-[13px]', current || done ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'].join(' ')}>{label}</span>
                             </div>
-                            {i < steps.length - 1 && <span className="hidden h-px flex-1 bg-[var(--dash-border)] sm:block" />}
-                        </div>
+                            {i < steps.length - 1 && (
+                                <span
+                                    data-step-connector-desktop
+                                    className="mx-3 hidden h-px min-w-6 flex-1 bg-[var(--dash-border)] sm:block"
+                                />
+                            )}
+                        </Fragment>
                     )
                 })}
             </div>

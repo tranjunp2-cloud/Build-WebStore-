@@ -66,6 +66,21 @@ describe('PickupAddresses [TC-F36.204]', () => {
         expect(formPanel?.nextElementSibling).toBe(rows[1])
     })
 
+    it('keeps the only warehouse selected and locked as the default while editing', () => {
+        const onChange = vi.fn()
+        render(<PickupAddresses value={[warehouse]} onChange={onChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit pickup address' }))
+        const defaultCheckbox = screen.getAllByRole('checkbox', { name: /Set as default pickup address/i }).at(-1)
+
+        expect(defaultCheckbox).toBeChecked()
+        expect(defaultCheckbox).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Update address' }))
+        expect(onChange).toHaveBeenCalledWith([
+            expect.objectContaining({ id: 'w-1', isDefault: true }),
+        ])
+    })
+
     it('shows field errors instead of silently disabling the form action', () => {
         render(<PickupAddresses value={[]} onChange={vi.fn()} />)
 

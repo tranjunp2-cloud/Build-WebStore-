@@ -43,7 +43,17 @@ function snap(w: string, e: string, fe: boolean, fa: string): Snapshot {
 type BadgeVariant = 'live' | 'off' | 'fallback' | 'connected' | 'not-connected'
 
 function StatusBadge({ variant, label }: { variant: BadgeVariant; label: string }) {
-    const base = { borderRadius: 20, padding: '2px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 } as const
+    const base = {
+        borderRadius: 20,
+        padding: '2px 8px',
+        fontSize: 11,
+        lineHeight: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+    } as const
     if (variant === 'live') return (
         <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgb(34,197,94)', display: 'inline-block' }} />
@@ -247,18 +257,33 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
                 defaultValue={initialTab ?? (epConfig?.enabled ? 'easyparcel' : 'flat-rate')}
                 onValueChange={persistTab}
             >
-                <TabsList variant="underline">
-                    <TabsTrigger value="flat-rate" variant="underline">
-                        <Calculator className="h-4 w-4" />
-                        <span>{ep.tabFlatRate}</span>
+                <TabsList
+                    variant="underline"
+                    className="grid grid-cols-2 overflow-visible sm:flex sm:overflow-x-auto"
+                >
+                    <TabsTrigger
+                        value="flat-rate"
+                        variant="underline"
+                        className="min-w-0 flex-1 flex-col gap-1.5 px-2 sm:flex-none sm:flex-row sm:gap-2 sm:px-4"
+                    >
+                        <span className="flex min-w-0 items-center justify-center gap-1.5">
+                            <Calculator className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{ep.tabFlatRate}</span>
+                        </span>
                         <StatusBadge
                             variant={epLive ? 'fallback' : (flatRateLive ? 'live' : 'off')}
                             label={epLive ? ep.statusFallback : (flatRateLive ? ep.statusLive : ep.statusOff)}
                         />
                     </TabsTrigger>
-                    <TabsTrigger value="easyparcel" variant="underline">
-                        <Truck className="h-4 w-4" />
-                        <span>{ep.tabEasyParcel}</span>
+                    <TabsTrigger
+                        value="easyparcel"
+                        variant="underline"
+                        className="min-w-0 flex-1 flex-col gap-1.5 px-2 sm:flex-none sm:flex-row sm:gap-2 sm:px-4"
+                    >
+                        <span className="flex min-w-0 items-center justify-center gap-1.5">
+                            <Truck className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{ep.tabEasyParcel}</span>
+                        </span>
                         <StatusBadge
                             variant={epLive ? (epConnected ? 'connected' : 'not-connected') : 'off'}
                             label={epLive ? (epConnected ? ep.statusConnected : ep.statusNotConnected) : ep.statusOff}

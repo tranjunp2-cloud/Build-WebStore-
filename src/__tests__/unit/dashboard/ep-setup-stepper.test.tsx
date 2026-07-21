@@ -109,6 +109,23 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         expect(nextButton).toBeDisabled() // Can't proceed without warehouse
     })
 
+    it('renders continuous mobile connectors and flexible desktop connectors between every step', () => {
+        const { container } = render(
+            <EpSetupStepper
+                tenantId="tenant-1"
+                initialEpConfig={{ accessToken: 'token', warehouses: [], enabled: false }}
+            />,
+        )
+
+        const mobileConnectors = container.querySelectorAll('[data-step-connector-mobile]')
+        const desktopConnectors = container.querySelectorAll('[data-step-connector-desktop]')
+        expect(mobileConnectors).toHaveLength(2)
+        expect(desktopConnectors).toHaveLength(2)
+        expect(mobileConnectors[0]).toHaveClass('sm:hidden')
+        expect(desktopConnectors[0]).toHaveClass('flex-1', 'sm:block')
+        expect(screen.getByText('Pickup').parentElement).toHaveAttribute('aria-current', 'step')
+    })
+
     // ──────────────────────────────────────────────────────────────────
     // TC-F36.31: Step 1 Next button enabled when ≥1 warehouse added
     // ──────────────────────────────────────────────────────────────────
