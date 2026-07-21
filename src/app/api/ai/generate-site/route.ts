@@ -47,7 +47,8 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
-import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
+import { normalizeInternalUrl } from '@/lib/navigation-url'
+import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
 
 
@@ -1280,7 +1281,9 @@ export async function POST(req: NextRequest) {
                             return { ...block, columns: patchedColumns }
                         }
 
-                        return block
+                        const patchedCtaBlock = patchBlockCtaUrlsFromLinks(block, survivingLinks)
+                        if (patchedCtaBlock !== block) layoutChanged = true
+                        return patchedCtaBlock
                     })
 
                     if (!layoutChanged) continue
@@ -1870,11 +1873,11 @@ function cloneBlockData<T>(value: T): T {
 }
 
 /**
- * Fix hero and cta block CTA URLs across all page definitions to use
+ * Fix hero, CTA, and pricing block URLs across all page definitions to use
  * canonical slugs from the generated site. Runs after buildGeneratedPages
  * so real page slugs are known. Mutates layouts in-place (pages are
  * already cloned by buildGeneratedPages).
- * Buttons with no matching page are removed — prevents phantom-click hrefs.
+ * Buttons with no matching page are removed or redirected to a real fallback.
  */
 function patchPageCtaUrls(
     pageDefinitions: Array<{ layout?: unknown[] }>,
@@ -1883,29 +1886,10 @@ function patchPageCtaUrls(
     for (const page of pageDefinitions) {
         const layout = page.layout
         if (!Array.isArray(layout)) continue
-        for (const block of layout as Array<AIBlock | null>) {
-            if (!block) continue
-            if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
-                block.ctaButtons = (block.ctaButtons as Array<Record<string, unknown> | string>)
-                    .flatMap((btn): AIBlock[] => {
-                        if (typeof btn === 'string') return []
-                        const url = resolveCtaSlugFromLinks(btn.url, canonicalLinks)
-                        return url ? [{ ...btn, url } as AIBlock] : []
-                    })
-            }
-            if (block.blockType === 'cta' && block.ctaButton && typeof block.ctaButton === 'object') {
-                const url = resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
-                if (url) {
-                    (block.ctaButton as Record<string, unknown>).url = url
-                } else {
-                    block.ctaButton = undefined
-                }
-            }
-            if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
-                block.plans = (block.plans as Array<Record<string, unknown>>)
-                    .map(p => resolvePricingPlanCta(p, canonicalLinks))
-            }
-        }
+        page.layout = layout.map(block => {
+            if (!block || typeof block !== 'object') return block
+            return patchBlockCtaUrlsFromLinks(block as AIBlock, canonicalLinks)
+        })
     }
 }
 

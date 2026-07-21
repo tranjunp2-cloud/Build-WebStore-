@@ -214,6 +214,72 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
         })
 
+        it('removes generated CTA links whose target pages do not exist', async () => {
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'Butter & Bloom Bakery',
+                     siteType: 'business',
+                     theme: { primaryColor: '#7c2d12' },
+                     seo: { title: 'Butter & Bloom Bakery', description: 'Fresh artisan bakery' },
+                     language: 'en',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'hero', variant: 'centered', headline: 'Fresh every morning', subheadline: 'Bread and pastries baked daily' },
+                                 {
+                                     blockType: 'cta',
+                                     variant: 'banner',
+                                     headline: 'Ready to order?',
+                                     ctaLabel: 'Order Now',
+                                     ctaUrl: '/order',
+                                     secondaryCtaLabel: 'View Menu',
+                                     secondaryCtaUrl: '/menu',
+                                 },
+                             ],
+                             seo: { title: 'Home', description: 'Bakery homepage' },
+                         },
+                         {
+                             title: 'Contact',
+                             slug: '/contact',
+                             blocks: [
+                                 { blockType: 'contact', variant: 'split', headline: 'Contact us', email: 'hello@butterandbloom.test' },
+                             ],
+                             seo: { title: 'Contact', description: 'Contact the bakery' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } as any)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Butter & Bloom Bakery',
+                         industry: 'Food & Beverage',
+                         products: 'Artisan bread, pastries, and celebration cakes',
+                         shortDescription: 'A neighborhood bakery serving fresh handcrafted bakes every day',
+                     },
+                 }),
+             })
+
+             const res = await GenerateSitePOST(req)
+             expect(res.status).toBe(200)
+
+             const homepage = mockPageDB.find((page: any) => page.slug === '/')
+             const cta = homepage?.layout?.find((block: any) => block.blockType === 'cta')
+             expect(cta).toMatchObject({
+                 ctaLabel: 'Order Now',
+                 ctaUrl: '/contact',
+             })
+             expect(cta?.secondaryCtaLabel).toBeUndefined()
+             expect(cta?.secondaryCtaUrl).toBeUndefined()
+        })
+
         // TC-F01.SLUG.01 — GH-820: AI multi-page path normalizes canonical slugs
         // Regression: AI was generating "free-trial" slug for contact page on SaaS businesses.
         it('normalizes canonical page slugs when AI returns non-standard slugs (GH-820)', async () => {
