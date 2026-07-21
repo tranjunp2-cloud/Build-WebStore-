@@ -1936,6 +1936,7 @@
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
                 "parseButton": "Analyze NLP",
+                "retry": "Retry",
                 "parsing": "Parsing...",
                 "parseSuccess": "Successfully extracted {count} products",
                 "parseInvalidData": "AI returned invalid data",

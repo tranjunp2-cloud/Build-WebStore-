@@ -1,6 +1,7 @@
 'use server'
 
-import { getPayload, type Where } from 'payload'
+import { getPayload } from 'payload'
+import { sql } from 'drizzle-orm'
 import configPromise from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
@@ -8,8 +9,6 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
 
-// Upper bound for SKU conflict query results. If totalDocs exceeds this, the save is aborted
-// with a user-facing error. In practice a single SKU or small batch rarely matches > 100 products.
 // NOTE: This check is best-effort, fast-path UX — two limitations apply:
 //   1. NOT concurrent-safe on its own: two parallel saves with the same SKU can both pass this
 //      SELECT before either INSERT commits (TOCTOU). The DB-level unique index
@@ -19,10 +18,8 @@ import { buildProductAlt } from '@/lib/products/build-product-alt'
 //      so callers (incl. BulkCreateModal's SKU-retry loop) handle both layers identically.
 //      Cross-product variant-sku uniqueness has NO DB-level backstop (only same-product variant
 //      SKUs are DB-enforced, via `products_variants_sku_parent_uniq`) — remains app-check-only.
-//   2. Case-sensitive match only: the `in:` query generates SQL IN (...) which is case-sensitive
-//      on Postgres. "ABC-001" and "abc-001" are treated as distinct SKUs here; the app-layer
-//      case-fold below only catches cross-case conflicts among rows this exact-case query found.
-const SKU_CONFLICT_QUERY_LIMIT = 100
+//   2. The candidate query compares `lower(sku)` exactly. It deliberately does not use
+//      Payload's `like` operator: `_` and `%` are valid SKU characters but SQL wildcards.
 
 // Converts a DB-level unique-constraint rejection (the rare TOCTOU race that slips past
 // findConflictingSkus's non-atomic pre-check) into the same `{code:'FIELD_ERRORS', fieldErrors}`
@@ -73,43 +70,45 @@ async function findConflictingSkus(
     excludeId?: number
 ): Promise<string[]> {
     if (skus.length === 0) return []
-    // When tenantId is null (super-admin or single-tenant setup) no tenant filter is applied —
-    // the query spans all tenants. This is intentional: null-tenant users should not be able
-    // to create SKUs that conflict with any tenant's products.
-    const where: Where = {
-        and: [
-            { deletedAt: { exists: false } },
-            ...(tenantId ? [{ tenant: { equals: tenantId } }] : []),
-            ...(excludeId ? [{ id: { not_equals: excludeId } }] : []),
-            // Payload 3 dotted-path on array sub-fields (variants.sku → JOIN products_variants).
-            // WHERE shape locked by TC-F08-SKU-GLOBAL-10.
-            { or: [
-                { sku: { in: skus } },
-                { 'variants.sku': { in: skus } },
-            ]},
-        ],
-    }
-    const result = await payload.find({ collection: 'products', where, limit: SKU_CONFLICT_QUERY_LIMIT, depth: 0 })
-    if (result.docs.length === 0) return []
-    if (result.totalDocs > result.docs.length) {
-        throw new Error(
-            'Cannot verify SKU uniqueness: your account has too many matching products. Please contact support.'
-        )
-    }
-    // Case-fold both sides so the application-layer check is case-insensitive.
-    // The SQL IN query above is case-sensitive, so this only catches exact-case matches
-    // returned by the DB — it does NOT detect cross-case conflicts (e.g. "ABC" vs "abc").
-    const skusLower = new Set(skus.map(s => s.toLowerCase()))
-    const matched = new Set<string>()
-    for (const doc of result.docs) {
-        if (typeof doc.sku === 'string' && skusLower.has(doc.sku.toLowerCase())) matched.add(doc.sku)
-        if (Array.isArray(doc.variants)) {
-            for (const v of doc.variants as Array<{ sku?: string }>) {
-                if (v?.sku && typeof v.sku === 'string' && skusLower.has(v.sku.toLowerCase())) matched.add(v.sku)
-            }
-        }
-    }
-    return Array.from(matched)
+    const submittedSkuByNormalized = new Map(skus.map(sku => [sku.toLowerCase(), sku]))
+    const normalizedSkus = Array.from(submittedSkuByNormalized.keys())
+    const skuValues = sql.join(normalizedSkus.map(sku => sql`${sku}`), sql`, `)
+    // A null tenant means the caller is allowed to see all tenants; otherwise, scope both
+    // base and variant SKU checks to the product's tenant.
+    const tenantFilter = tenantId != null ? sql`AND p.tenant_id = ${tenantId}` : sql``
+    const excludeFilter = excludeId !== undefined ? sql`AND p.id <> ${excludeId}` : sql``
+
+    // `DISTINCT lower(...)` bounds the result to the submitted SKU set, rather than to every
+    // product that happens to substring-match it. Values are parameterized, so `%` and `_`
+    // remain literal, valid SKU characters.
+    const result = await payload.db.drizzle.execute(sql`
+        SELECT DISTINCT lower(conflicting_skus.sku) AS sku
+        FROM (
+            SELECT p.sku
+            FROM products p
+            WHERE p.deleted_at IS NULL
+              AND p.sku IS NOT NULL
+              ${tenantFilter}
+              ${excludeFilter}
+              AND lower(p.sku) IN (${skuValues})
+
+            UNION ALL
+
+            SELECT v.sku
+            FROM products p
+            INNER JOIN products_variants v ON v._parent_id = p.id
+            WHERE p.deleted_at IS NULL
+              AND v.sku IS NOT NULL
+              ${tenantFilter}
+              ${excludeFilter}
+              AND lower(v.sku) IN (${skuValues})
+        ) AS conflicting_skus
+    `) as { rows: Array<{ sku: string | null }> }
+
+    return result.rows.flatMap(row => {
+        if (typeof row.sku !== 'string') return []
+        return [submittedSkuByNormalized.get(row.sku) ?? row.sku]
+    })
 }
 
 export async function getProductsAction() {
@@ -175,11 +174,15 @@ export async function getProductAction(id: string | number) {
 
 import { z } from 'zod'
 
+const SKU_SCHEMA = z.string().trim().min(1, 'SKU cannot be empty').max(100)
+
 const ProductServerSchema = z.object({
     // max(120) matches product-form/schema.ts's client-side cap — without it here, a direct
     // saveProductAction call could submit an arbitrarily long name, which then flows unbounded
     // into the alt-text fallback below ("{name} - {store}") despite that field's own .max(500).
     name: z.string().min(3, "Name must be at least 3 characters").max(120, "Name must not exceed 120 characters"),
+    sku: SKU_SCHEMA.optional(),
+    variants: z.array(z.object({ sku: SKU_SCHEMA.optional() }).passthrough()).max(900).optional(),
     images: z.array(z.object({
         image: z.union([z.string(), z.number(), z.record(z.unknown())]).optional(),
         // ImageUploader.tsx enforces a 125-char UX cap (MAX_ALT_LENGTH) via <textarea maxLength>,
@@ -196,6 +199,34 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
     if (!user) throw new Error('Unauthorized')
 
     const data = ProductServerSchema.parse(rawData);
+
+    // The database only enforces duplicate variant SKUs after Payload validates the
+    // collection, which produces an unhelpful generic "Variants" error. Reject duplicate
+    // values in this request first, including a collision with the base SKU, so callers can
+    // identify and regenerate the affected variant deterministically.
+    const fieldErrors: Record<string, { code: string; values: string[] }> = {}
+    const seenSkus = new Set<string>()
+    if (typeof data.sku === 'string' && data.sku.trim()) {
+        seenSkus.add(data.sku.trim().toLowerCase())
+    }
+    const submittedVariants = (data.variants as Array<{ sku?: string }> | undefined) || []
+    submittedVariants.forEach((variant, index) => {
+        const sku = typeof variant?.sku === 'string' ? variant.sku.trim() : ''
+        if (!sku) return
+        const normalizedSku = sku.toLowerCase()
+        if (seenSkus.has(normalizedSku)) {
+            fieldErrors[`variants.${index}.skuCode`] = { code: 'DUPLICATE_SKU_IN_REQUEST', values: [sku] }
+            return
+        }
+        seenSkus.add(normalizedSku)
+    })
+    if (Object.keys(fieldErrors).length > 0) {
+        throw new Error(JSON.stringify({
+            code: 'FIELD_ERRORS',
+            fieldErrors,
+            message: 'Each product and variant SKU must be unique.',
+        }))
+    }
 
     const payload = await getPayload({ config: configPromise })
 

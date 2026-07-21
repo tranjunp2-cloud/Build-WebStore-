@@ -1936,6 +1936,7 @@
                 "promptPlaceholder": "Contoh: 2 capybara coklat rantai kunci $15, 1 selipar merah saiz M $5...",
                 "parseEmptyError": "Sila masukkan penerangan senarai produk",
                 "parseButton": "Analisa NLP",
+                "retry": "Cuba lagi",
                 "parsing": "Akan Dianalisa...",
                 "parseSuccess": "Berjaya mengekstrak {count} produk",
                 "parseInvalidData": "AI mengembalikan data tidak sah",
