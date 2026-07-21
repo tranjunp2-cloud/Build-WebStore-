@@ -13,7 +13,7 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
+import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedMediaForBlock, type MediaPipelineContext } from './media-pipeline'
 import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
@@ -549,45 +549,38 @@ export async function fulfillImageNeeds(
                                 `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
                             )
                         }
-                        // Pool may be smaller than totalCount (multi-page templates exhaust
-                        // the bucket). Fall through to legacy search to fill the deficit
-                        // instead of leaving later pages without images.
+                        // GH-1611 QA regression: the pool may be smaller than totalCount,
+                        // or some pool uploads may fail. Never supplement a verified pool
+                        // with a separate legacy search: that produced the exact
+                        // "4 bakery + 2 fashion" gallery reported by QA. Fill the deficit
+                        // only from the checked-in library for the normalized category.
                         if (result.mediaIds.length >= totalCount) {
                             return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — supplementing with legacy search`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — using curated category fallback`,
                         )
-                        // Supplement pool result with legacy search for the deficit.
                         const deficit = totalCount - result.mediaIds.length
-                        const keywords = deriveKeywords(category, blockType, {
-                            businessName: ctx.businessName,
-                            industry: ctx.category,
-                            language: ctx.language,
-                            products: ctx.products,
-                            mood: ctx.mood,
-                            englishKeywords: ctx.englishKeywords,
-                        })
-                        try {
-                            const legacyResult = await getMediaForBlock(blockType, keywords, deficit, ctx, payload)
-                            return {
-                                blockType,
-                                groupNeeds,
-                                ids: [...result.mediaIds, ...legacyResult.mediaIds],
-                                succeeded: 0,
-                                failed: 0,
-                            }
-                        } catch {
-                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        const curated = await getCuratedMediaForBlock(blockType, deficit, ctx, payload)
+                        return {
+                            blockType,
+                            groupNeeds,
+                            ids: [...result.mediaIds, ...curated.mediaIds],
+                            succeeded: 0,
+                            failed: 0,
                         }
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
-                        console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
+                        console.warn(`[Media Injector] ${blockType} pool path failed, using curated category fallback: ${msg}`)
+                        const curated = await getCuratedMediaForBlock(blockType, totalCount, ctx, payload)
+                        return { blockType, groupNeeds, ids: curated.mediaIds, succeeded: 0, failed: 0 }
                     }
                 } else {
                     console.warn(
-                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — falling back to legacy search`,
+                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — using curated category fallback`,
                     )
+                    const curated = await getCuratedMediaForBlock(blockType, totalCount, ctx, payload)
+                    return { blockType, groupNeeds, ids: curated.mediaIds, succeeded: 0, failed: 0 }
                 }
             }
 
