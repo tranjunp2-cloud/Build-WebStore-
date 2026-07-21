@@ -193,13 +193,13 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         expect(urls[0]).toContain('/api/storefront/products?')
     })
 
-    it('[TC-F09.239a] uses 6 products without the category filter, 9 on desktop filters, and 10 on mobile filters', async () => {
+    it('[TC-F09.239a] uses the configured limit without filters, 9 on desktop filters, and 10 on mobile filters', async () => {
         const plainFetch = mockStorefrontFetch()
         const plainView = render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: false, limit: 20 }} theme={{} as never} site={baseSite as never} />)
 
         await waitFor(() => expect(screen.getByTestId('product-card')).toBeInTheDocument())
         const plainUrls = plainFetch.mock.calls.map(([url]) => String(url))
-        expect(plainUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=6'))).toBe(true)
+        expect(plainUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=20'))).toBe(true)
 
         plainView.unmount()
 

@@ -52,7 +52,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const [isMobileViewport, setIsMobileViewport] = useState(() => (
         typeof window !== 'undefined' ? window.innerWidth < MOBILE_PRODUCTS_GRID_BREAKPOINT : false
     ))
-    const productsPerPage = filtersEnabled ? (isMobileViewport ? 10 : 9) : 6
+    const productsPerPage = filtersEnabled ? (isMobileViewport ? 10 : 9) : block.limit
     const siteId = site?.id ? String(site.id) : null
     const blockTopRef = useRef<HTMLDivElement>(null)
     const previousFilterScrollSignatureRef = useRef<string | null>(null)

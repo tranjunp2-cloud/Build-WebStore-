@@ -141,6 +141,29 @@ describe('GET /api/storefront/products [TC-F08-831]', () => {
         }))
     })
 
+    it('[TC-F09.247a] stale or cross-site categoryId returns an empty result without querying products', async () => {
+        // Arrange
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 20, parent: null }],
+            page: 1,
+            totalPages: 1,
+        })
+        const req = new Request('http://localhost/api/storefront/products?site=1&categoryId=999&page=2')
+
+        // Act
+        const res = await GET(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body).toEqual({ docs: [], totalDocs: 0, page: 2, totalPages: 1 })
+        expect(mockFind).toHaveBeenCalledTimes(1)
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'categories',
+            where: { and: [{ site: { equals: 1 } }, { deletedAt: { exists: false } }] },
+        }))
+    })
+
     it('[TC-F09.247] category descendant lookup paginates through every category page', async () => {
         // Arrange
         mockFind

@@ -115,9 +115,10 @@ export async function GET(req: Request) {
         ))
         if (categoryIds.length > 0) {
             const descendantIds = await getCategoryDescendantIds(payload, siteIdNum, categoryIds)
-            if (descendantIds) {
-                ;(where.and as Where[]).push({ category: { in: descendantIds } })
+            if (!descendantIds) {
+                return NextResponse.json({ docs: [], totalDocs: 0, page, totalPages: 1 })
             }
+            ;(where.and as Where[]).push({ category: { in: descendantIds } })
         }
 
         const minPriceRaw = url.searchParams.get('minPrice')
