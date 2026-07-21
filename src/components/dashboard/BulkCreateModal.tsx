@@ -264,6 +264,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [isSaving, setIsSaving] = useState(false)
     const [products, setProducts] = useState<ParsedProduct[]>([])
     const [hasParsed, setHasParsed] = useState(false)
+    const [canRetryParse, setCanRetryParse] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [showExitConfirm, setShowExitConfirm] = useState(false)
     // GH-1491 issue 1 audit: parent only mounts this component while the modal should be
@@ -283,6 +284,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
 
     const handleParse = async (promptText: string) => {
         setIsParsing(true)
+        setCanRetryParse(false)
         try {
             const res = await fetch('/api/ai/products-bulk-parse', {
                 method: 'POST',
@@ -345,13 +347,16 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             // Non-ok fetch responses throw JSON.stringify(data) (see the isSkuConflictError /
             // SKU-retry convention above) so 429's resetAt survives the throw — parse once here,
             // falling back to the raw message as the code when it isn't JSON (e.g. a network error).
-            let parsed: { error?: string; resetAt?: number } | null = null
+            let parsed: { error?: string; resetAt?: number; retryable?: boolean } | null = null
             try {
                 parsed = JSON.parse(errBase.message)
             } catch {
                 parsed = null
             }
             const code = parsed?.error ?? errBase.message
+            if (code === 'merchantLanguageMismatch' && parsed?.retryable === true) {
+                setCanRetryParse(true)
+            }
 
             let errMsg = t.dashboard?.products?.bulkCreate?.parseError || 'Failed to parse products summary'
             if (code === 'rateLimitExceeded') {
@@ -577,8 +582,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                 not the design mockup's own one-off hex palette. */}
                             <div className="flex flex-col gap-3 shrink-0">
                                 {products.length === 0 ? (
-                                    <div className="h-[62px] flex items-center justify-center text-center text-[hsl(var(--muted-foreground))] text-[13px] rounded-xl border border-solid border-[hsl(var(--border))]">
-                                        {t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}
+                                    <div className="min-h-[96px] flex flex-col items-center justify-center gap-3 text-center text-[hsl(var(--muted-foreground))] text-[13px] rounded-xl border border-solid border-[hsl(var(--border))]">
+                                        <span>{t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}</span>
+                                        {canRetryParse ? (
+                                            <Button variant="dashSecondary" size="dash" onClick={() => handleParse(initialPrompt)} disabled={isParsing || isSaving}>
+                                                {t.dashboard?.products?.bulkCreate?.retry || 'Retry'}
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 ) : products.map((p) => {
                                     const hasVariants = Boolean(p.variants?.length)

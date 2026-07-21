@@ -911,7 +911,7 @@ describe('AI Streaming APIs', () => {
             expect(OpenAI.prototype.chat.completions.create).not.toHaveBeenCalled()
         })
 
-        it('returns parseError for a malformed AI product row before language repair', async () => {
+        it('returns parseError for a malformed AI product row', async () => {
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
             const OpenAIMod = await import('openai')
@@ -1005,6 +1005,7 @@ describe('AI Streaming APIs', () => {
       expect(systemPrompt).toContain(
         'An array of objects with a "value" string in ENGLISH',
       );
+      expect(systemPrompt).not.toContain('use "Áo Thun" instead of "Áo"');
 
       process.env.OPENAI_API_KEY = prev;
     });
@@ -1050,144 +1051,7 @@ describe('AI Streaming APIs', () => {
       process.env.OPENAI_API_KEY = prev;
     });
 
-    it("TC-F08-04-71: runs a language-repair pass when merchant-facing text does not match the selected Malay locale", async () => {
-      mockRateLimitAllowed = true;
-      const prev = process.env.OPENAI_API_KEY;
-      process.env.OPENAI_API_KEY = "test-key";
-
-      const OpenAIMod = await import("openai");
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
-      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({
-          model: "gpt-test",
-          usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  products: [
-                    {
-                      name: "Quần Tây Lelaki",
-                      slug: "quan-tay-lelaki",
-                      price: 100,
-                      category: "Fashion",
-                      sku: "QTL-001",
-                      variants: [
-                        {
-                          name: "Trắng - M",
-                          price: 100,
-                          sku: "QTL-W-M",
-                          stock: 0,
-                        },
-                        {
-                          name: "Đen - L",
-                          price: 120,
-                          sku: "QTL-B-L",
-                          stock: 0,
-                        },
-                      ],
-                      variantConfigs: [
-                        {
-                          name: "Warna",
-                          options: [{ value: "Trắng" }, { value: "Đen" }],
-                        },
-                        {
-                          name: "Saiz",
-                          options: [{ value: "M" }, { value: "L" }],
-                        },
-                      ],
-                    },
-                  ],
-                }),
-              },
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          model: "gpt-test",
-          usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  products: [
-                    {
-                      name: "Seluar Lelaki",
-                      slug: "seluar-lelaki",
-                      price: 100,
-                      category: "Fashion",
-                      sku: "QTL-001",
-                      variants: [
-                        {
-                          name: "Putih - M",
-                          price: 100,
-                          sku: "QTL-W-M",
-                          stock: 0,
-                        },
-                        {
-                          name: "Hitam - L",
-                          price: 120,
-                          sku: "QTL-B-L",
-                          stock: 0,
-                        },
-                      ],
-                      variantConfigs: [
-                        {
-                          name: "Warna",
-                          options: [{ value: "Putih" }, { value: "Hitam" }],
-                        },
-                        {
-                          name: "Saiz",
-                          options: [{ value: "M" }, { value: "L" }],
-                        },
-                      ],
-                    },
-                  ],
-                }),
-              },
-            },
-          ],
-        });
-
-      const req = new NextRequest(
-        "http://localhost:3000/api/ai/products-bulk-parse",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            promptText:
-              "quần tây nam màu trắng, đen, size m, l, xl giá 100 120 140",
-            locale: "ms",
-          }),
-        },
-      );
-      const res = await BulkParsePOST(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      expect(json.products[0].name).toBe("Seluar Lelaki");
-      expect(
-        json.products[0].variants.map(
-          (variant: { name: string }) => variant.name,
-        ),
-      ).toEqual(["Putih - M", "Hitam - L"]);
-      expect(json.products[0].variantConfigs[0].options).toEqual([
-        { value: "Putih" },
-        { value: "Hitam" },
-      ]);
-
-      const repairCall =
-        OpenAI.prototype.chat.completions.create.mock.calls[1][0];
-      expect(repairCall.messages[0].content).toContain(
-        "Rewrite merchant-facing text so it is entirely in BAHASA MELAYU",
-      );
-
-      process.env.OPENAI_API_KEY = prev;
-    });
-
-    it("TC-F08-04-72: repairs English output to guard against ambiguous Latin language detection", async () => {
+    it("TC-F08-04-72: uses one prompt call for an English-localized draft", async () => {
       mockRateLimitAllowed = true;
       const prev = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = "test-key";
@@ -1242,7 +1106,7 @@ describe('AI Streaming APIs', () => {
       const json = await res.json();
 
       expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
       expect(json.products[0].name).toBe("T-Shirt");
       expect(
         json.products[0].variants.map(
@@ -1253,323 +1117,310 @@ describe('AI Streaming APIs', () => {
       process.env.OPENAI_API_KEY = prev;
     });
 
-    it('TC-F08-04-82: repairs short Malay variant text when the selected locale is English', async () => {
+    it('TC-F08-04-73: uses one prompt call for a Malay-localized draft', async () => {
       mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = 'test-key';
+
       const OpenAIMod = await import('openai');
       const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({ model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [{ name: 'Hat', variants: [{ name: 'Merah' }] }] }) } }] })
-        .mockResolvedValueOnce({ model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [{ name: 'Hat', variants: [{ name: 'Red' }] }] }) } }] });
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Seluar Lelaki',
+            price: 100,
+            variants: [{ name: 'Putih - M', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Warna', options: [{ value: 'Putih' }] },
+              { name: 'Saiz', options: [{ value: 'M' }] },
+            ],
+          }],
+        }) } }],
+      });
 
       const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
-        method: 'POST', body: JSON.stringify({ promptText: 'topi merah', locale: 'en' }),
+        method: 'POST',
+        body: JSON.stringify({
+          promptText: 'quần tây nam màu trắng size m giá 100',
+          locale: 'ms',
+        }),
       }));
       const json = await res.json();
 
       expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      expect(json.products[0].variants[0].name).toBe('Red');
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      expect(json.products[0].name).toBe('Seluar Lelaki');
+      expect(json.products[0].variants[0].name).toBe('Putih - M');
+      expect(json.products[0].variantConfigs[0]).toEqual({
+        name: 'Warna',
+        options: [{ value: 'Putih' }],
+      });
+      process.env.OPENAI_API_KEY = previousKey;
     });
 
-    it('TC-F08-04-79: repairs a clearly English draft for a Malay store instead of treating all ASCII output as Malay', async () => {
+    it('TC-F08-04-84: rejects Vietnamese merchant text for an English store without a repair call', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Ao Thun',
+            price: 5,
+            variants: [
+              { name: 'Trang', price: 5, stock: 0 },
+              { name: 'Do', price: 5, stock: 0 },
+              { name: 'Xam', price: 5, stock: 0 },
+            ],
+            variantConfigs: [{
+              name: 'Mau sac',
+              options: [{ value: 'Trang' }, { value: 'Do' }, { value: 'Xam' }],
+            }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({
+          promptText: 'áo thun màu trắng, đỏ, xám giá 5rm',
+          locale: 'en',
+        }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-85: rejects English merchant text for a Malay store without a repair call', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Wool Coat',
+            description: 'A warm wool coat for men. Soft material for everyday wear.',
+            price: 100,
+            variants: [{ name: 'Red - Medium', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Color', options: [{ value: 'Red' }] },
+              { name: 'Size', options: [{ value: 'Medium' }] },
+            ],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'kot bulu merah saiz sederhana', locale: 'ms' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-87: rejects one Malay variant value for an English store', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: {},
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Hat',
+            variants: [{ name: 'Merah', price: 10, stock: 0 }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'topi merah', locale: 'en' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-88: rejects one English variant value for a Malay store', async () => {
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test',
+        usage: {},
+        choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Topi',
+            variants: [{ name: 'Red', price: 10, stock: 0 }],
+          }],
+        }) } }],
+      });
+
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST',
+        body: JSON.stringify({ promptText: 'topi merah', locale: 'ms' }),
+      }));
+
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({
+        error: 'merchantLanguageMismatch',
+        retryable: true,
+      });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
+    it('TC-F08-04-89: rejects a Vietnamese product name even when Malay variants outvote it globally', async () => {
       // Arrange
       mockRateLimitAllowed = true;
       const previousKey = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = 'test-key';
       const OpenAIMod = await import('openai');
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
-      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({
-          model: 'gpt-test', usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [{ message: { content: JSON.stringify({ products: [{
-            name: 'Wool Coat', slug: 'wool-coat', price: 100, category: 'Fashion', sku: 'WC-001',
-            variants: [{ name: 'Red - M', price: 100, sku: 'WC-R-M', stock: 0 }],
-            variantConfigs: [{ name: 'Color', options: [{ value: 'Red' }] }],
-          }] }) } }],
-        })
-        .mockResolvedValueOnce({
-          model: 'gpt-test', usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [{ message: { content: JSON.stringify({ products: [{
-            name: 'Kot Bulu', slug: 'kot-bulu', price: 100, category: 'Fashion', sku: 'WC-001',
-            variants: [{ name: 'Merah - M', price: 100, sku: 'WC-R-M', stock: 0 }],
-            variantConfigs: [{ name: 'Warna', options: [{ value: 'Merah' }] }],
-          }] }) } }],
-        });
-
-      // Act
-      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
-        method: 'POST',
-        body: JSON.stringify({ promptText: 'wool coat red', locale: 'ms' }),
-      }));
-      const json = await res.json();
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      expect(OpenAI.prototype.chat.completions.create.mock.calls[0][1]).toEqual({ timeout: 45_000, maxRetries: 0 });
-      expect(OpenAI.prototype.chat.completions.create.mock.calls[1][1]).toEqual({ timeout: 12_000, maxRetries: 0 });
-      expect(json.products[0].name).toBe('Kot Bulu');
-      expect(json.products[0].variants[0].name).toBe('Merah - M');
-      process.env.OPENAI_API_KEY = previousKey;
-    });
-
-    it('TC-F08-04-80: repairs a non-empty short English draft for a Malay store', async () => {
-      // Arrange
-      mockRateLimitAllowed = true;
-      process.env.OPENAI_API_KEY = 'test-key';
-      const OpenAIMod = await import('openai');
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
-      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({ model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [{ name: 'Red' }] }) } }] })
-        .mockResolvedValueOnce({ model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [{ name: 'Merah' }] }) } }] });
-
-      // Act
-      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
-        method: 'POST',
-        body: JSON.stringify({ promptText: 'red', locale: 'ms' }),
-      }));
-      const json = await res.json();
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      expect(json.products[0].name).toBe('Merah');
-    });
-
-    it('TC-F08-04-73: repair keeps an already-correct Malay draft unchanged when ASCII detection is ambiguous', async () => {
-      mockRateLimitAllowed = true;
-      const prev = process.env.OPENAI_API_KEY;
-      process.env.OPENAI_API_KEY = "test-key";
-
-      const OpenAIMod = await import("openai");
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
       const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
       OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
-        model: "gpt-test",
-        usage: { prompt_tokens: 1, completion_tokens: 1 },
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                products: [
-                  {
-                    name: "Seluar Lelaki",
-                    slug: "seluar-lelaki",
-                    price: 100,
-                    category: "Fashion",
-                    sku: "SL-001",
-                    variants: [
-                      {
-                        name: "Putih - M",
-                        price: 100,
-                        sku: "SL-W-M",
-                        stock: 2,
-                      },
-                    ],
-                    variantConfigs: [
-                      { name: "Warna", options: [{ value: "Putih" }] },
-                    ],
-                  },
-                ],
-              }),
-            },
-          },
-        ],
-      }).mockResolvedValueOnce({
-        model: 'gpt-test',
-        usage: { prompt_tokens: 1, completion_tokens: 1 },
-        choices: [{ message: { content: JSON.stringify({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
           products: [{
-            name: 'Seluar Lelaki', slug: 'seluar-lelaki', price: 100, category: 'Fashion', sku: 'SL-001',
-            variants: [{ name: 'Putih - M', price: 100, sku: 'SL-W-M', stock: 2 }],
-            variantConfigs: [{ name: 'Warna', options: [{ value: 'Putih' }] }],
+            name: 'Quan Tay Lelaki',
+            variants: [{ name: 'Putih - M', price: 100, stock: 0 }],
+            variantConfigs: [
+              { name: 'Warna', options: [{ value: 'Putih' }] },
+              { name: 'Saiz', options: [{ value: 'M' }] },
+            ],
           }],
         }) } }],
       });
 
-      const req = new NextRequest(
-        "http://localhost:3000/api/ai/products-bulk-parse",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            promptText: "quần tây nam màu trắng giá 100",
-            locale: "ms",
-          }),
-        },
-      );
-      const res = await BulkParsePOST(req);
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'quần tây nam màu trắng size m', locale: 'ms' }),
+      }));
 
-      const json = await res.json();
-      expect(res.status).toBe(200);
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      expect(json.products[0].name).toBe('Seluar Lelaki');
-      expect(json.products[0].variants[0].name).toBe('Putih - M');
-      process.env.OPENAI_API_KEY = prev;
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
     });
 
-    it("TC-F08-04-74: preserves non-language data when the repair response changes it", async () => {
+    it('TC-F08-04-90: rejects a Vietnamese product name even when English variants outvote it globally', async () => {
+      // Arrange
       mockRateLimitAllowed = true;
-      const prev = process.env.OPENAI_API_KEY;
-      process.env.OPENAI_API_KEY = "test-key";
-
-      const OpenAIMod = await import("openai");
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
       const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({
-          model: "gpt-test",
-          usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  products: [
-                    {
-                      name: "Quần Tây",
-                      slug: "quan-tay",
-                      price: 100,
-                      category: "Fashion",
-                      sku: "QT-001",
-                      variants: [
-                        {
-                          name: "Trắng - M",
-                          price: 100,
-                          sku: "QT-W-M",
-                          stock: 3,
-                        },
-                      ],
-                      variantConfigs: [
-                        { name: "Warna", options: [{ value: "Trắng" }] },
-                      ],
-                    },
-                  ],
-                }),
-              },
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          model: "gpt-test",
-          usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  products: [
-                    {
-                      name: "Seluar Lelaki",
-                      slug: "seluar-lelaki",
-                      price: 1,
-                      category: "Other",
-                      sku: "CHANGED",
-                      variants: [
-                        {
-                          name: "Putih - M",
-                          price: 1,
-                          sku: "CHANGED",
-                          stock: 99,
-                        },
-                      ],
-                      variantConfigs: [
-                        { name: "Warna", options: [{ value: "Putih" }] },
-                      ],
-                    },
-                  ],
-                }),
-              },
-            },
-          ],
-        });
-
-      const req = new NextRequest(
-        "http://localhost:3000/api/ai/products-bulk-parse",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            promptText: "quần tây trắng size m giá 100",
-            locale: "ms",
-          }),
-        },
-      );
-      const res = await BulkParsePOST(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(json.products[0]).toMatchObject({
-        price: 100,
-        category: "Fashion",
-        sku: "QT-001",
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{
+            name: 'Ao Thun',
+            variants: [
+              { name: 'White', price: 5, stock: 0 },
+              { name: 'Red', price: 5, stock: 0 },
+              { name: 'Grey', price: 5, stock: 0 },
+            ],
+            variantConfigs: [{ name: 'Color', options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }] }],
+          }],
+        }) } }],
       });
-      expect(json.products[0].variants[0]).toMatchObject({
-        name: "Putih - M",
-        price: 100,
-        sku: "QT-W-M",
-        stock: 3,
-      });
-      process.env.OPENAI_API_KEY = prev;
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'áo thun trắng đỏ xám', locale: 'en' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
     });
 
-    it("TC-F08-04-75: returns the initial parse result when language repair fails", async () => {
+    it('TC-F08-04-91: rejects a common Malay color omitted by the original variant marker set', async () => {
+      // Arrange
       mockRateLimitAllowed = true;
-      const prev = process.env.OPENAI_API_KEY;
-      process.env.OPENAI_API_KEY = "test-key";
-
-      const OpenAIMod = await import("openai");
-      // The module mock replaces OpenAI's constructor with vi.fn; its production type cannot
-      // expose Vitest's mock helpers, so narrow only the mocked completion boundary.
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
       const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
-      OpenAI.prototype.chat.completions.create
-        .mockResolvedValueOnce({
-          model: "gpt-test",
-          usage: { prompt_tokens: 1, completion_tokens: 1 },
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  products: [
-                    {
-                      name: "Quần Tây",
-                      price: 100,
-                      category: "Fashion",
-                      sku: "QT-001",
-                      variants: [
-                        { name: "Trắng", price: 100, sku: "QT-W", stock: 0 },
-                      ],
-                      variantConfigs: [],
-                    },
-                  ],
-                }),
-              },
-            },
-          ],
-        })
-        .mockRejectedValueOnce(new Error("repair timeout"));
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{ name: 'Hat', variants: [{ name: 'Oren', price: 10, stock: 0 }], variantConfigs: [{ name: 'Color', options: [{ value: 'Oren' }] }] }],
+        }) } }],
+      });
 
-      const req = new NextRequest(
-        "http://localhost:3000/api/ai/products-bulk-parse",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            promptText: "quần tây trắng giá 100",
-            locale: "ms",
-          }),
-        },
-      );
-      const res = await BulkParsePOST(req);
-      const json = await res.json();
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'topi oren', locale: 'en' }),
+      }));
 
-      expect(res.status).toBe(200);
-      expect(json.products[0].name).toBe("Quần Tây");
-      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledTimes(2);
-      process.env.OPENAI_API_KEY = prev;
+      // Assert
+      expect(res.status).toBe(422);
+      await expect(res.json()).resolves.toEqual({ error: 'merchantLanguageMismatch', retryable: true });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
     });
+
+    it('TC-F08-04-92: rejects malformed variant config fields before locale detection', async () => {
+      // Arrange
+      mockRateLimitAllowed = true;
+      const previousKey = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'test-key';
+      const OpenAIMod = await import('openai');
+      const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } };
+      OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+        model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({
+          products: [{ name: 'Hat', variantConfigs: [{ name: 42, options: [{ value: {} }] }] }],
+        }) } }],
+      });
+
+      // Act
+      const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+        method: 'POST', body: JSON.stringify({ promptText: 'hat', locale: 'en' }),
+      }));
+
+      // Assert
+      expect(res.status).toBe(500);
+      await expect(res.json()).resolves.toEqual({ error: 'parseError' });
+      expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce();
+      process.env.OPENAI_API_KEY = previousKey;
+    });
+
   });
 
     // ── gen-perf Wave 1 (plan 260703-1341, docs/qa/F01-gen-perf.md) ─────────

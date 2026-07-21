@@ -10,8 +10,6 @@ import { z } from 'zod'
 export const maxDuration = 60
 
 const INITIAL_PARSE_TIMEOUT_MS = 45_000
-const REPAIR_TIMEOUT_MS = 12_000
-const RESPONSE_RESERVE_MS = 3_000
 
 const BulkParseRequestSchema = z.object({
     promptText: z.string().trim().min(1).max(6_000),
@@ -54,6 +52,141 @@ type BulkParseResult = {
     products?: ParsedProduct[]
 }
 
+type MerchantLocale = 'en' | 'ms' | 'vi'
+
+const LANGUAGE_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
+    en: new Set([
+        'and', 'black', 'blue', 'brown', 'coat', 'color', 'cotton', 'everyday',
+        'for', 'green', 'grey', 'gray', 'large', 'made', 'material', 'medium',
+        'men', 'offers', 'orange', 'pants', 'pink', 'product', 'purple', 'quality', 'red', 'shirt', 'size',
+        'small', 'soft', 'style', 'suitable', 'trousers', 'warm', 'wear', 'white',
+        'with', 'women', 'yellow',
+    ]),
+    ms: new Set([
+        'bahan', 'baju', 'besar', 'berkualiti', 'biru', 'coklat', 'dengan',
+        'diperbuat', 'gaya', 'harian', 'hangat', 'hijau', 'hitam', 'kapas',
+        'kelabu', 'kecil', 'kuning', 'lelaki', 'lembut', 'menawarkan', 'merah',
+        'oren', 'produk', 'putih', 'saiz', 'sedang', 'sederhana', 'sesuai',
+        'seluar', 'ungu', 'untuk', 'wanita', 'warna', 'yang',
+    ]),
+    vi: new Set([
+        'ao', 'chat', 'cho', 'den', 'do', 'duoc', 'hop', 'lieu', 'lon', 'mau',
+        'nam', 'nau', 'nho', 'nu', 'pham', 'phu', 'quan', 'san', 'tay', 'thun',
+        'trang', 'vai', 'vang', 'va', 'vua', 'voi', 'xam', 'xanh',
+    ]),
+}
+
+const VARIANT_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
+    en: new Set([
+        'black', 'blue', 'brown', 'color', 'cotton', 'green', 'grey', 'gray',
+        'large', 'material', 'medium', 'orange', 'pink', 'purple', 'red', 'size',
+        'small', 'white', 'yellow',
+    ]),
+    ms: new Set([
+        'bahan', 'besar', 'biru', 'coklat', 'hijau', 'hitam', 'kapas', 'kelabu',
+        'kecil', 'kuning', 'merah', 'oren', 'putih', 'saiz', 'sederhana', 'ungu', 'warna',
+    ]),
+    vi: new Set([
+        'cam', 'chat', 'den', 'do', 'hong', 'lieu', 'lon', 'mau', 'nau', 'nho',
+        'tim', 'trang', 'vai', 'vang', 'vua', 'xam', 'xanh',
+    ]),
+}
+
+function tokenizeMerchantText(text: string): Set<string> {
+    const normalized = text.toLocaleLowerCase('en')
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+    return new Set(normalized.match(/\p{L}+/gu) ?? [])
+}
+
+const VIETNAMESE_EXCLUSIVE_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/i
+
+function collectMerchantFacingText(result: BulkParseResult): string {
+    const values: string[] = []
+    const add = (value: string | undefined) => {
+        if (value?.trim()) values.push(value.trim())
+    }
+
+    for (const product of result.products ?? []) {
+        add(product.name)
+        add(product.description)
+        add(product.seoTitle)
+        add(product.seoDescription)
+        for (const variant of product.variants ?? []) add(variant.name)
+        for (const config of product.variantConfigs ?? []) {
+            add(config.name)
+            for (const option of config.options ?? []) add(option.value)
+        }
+    }
+
+    return values.join(' ')
+}
+
+function detectForeignVariantLocale(
+    result: BulkParseResult,
+    requestedLocale: Exclude<MerchantLocale, 'vi'>,
+): MerchantLocale | null {
+    const values: string[] = []
+    for (const product of result.products ?? []) {
+        for (const variant of product.variants ?? []) {
+            if (variant.name?.trim()) values.push(variant.name)
+        }
+        for (const config of product.variantConfigs ?? []) {
+            if (config.name?.trim()) values.push(config.name)
+            for (const option of config.options ?? []) {
+                if (option.value?.trim()) values.push(option.value)
+            }
+        }
+    }
+
+    const tokens = tokenizeMerchantText(values.join(' '))
+    const foreignLocale = (Object.entries(VARIANT_MARKERS) as [MerchantLocale, ReadonlySet<string>][])
+        .find(([candidate, markers]) =>
+            candidate !== requestedLocale && [...tokens].some(token => markers.has(token)))
+    return foreignLocale?.[0] ?? null
+}
+
+function detectTextLocale(text: string): string | null {
+    if (VIETNAMESE_EXCLUSIVE_RE.test(text)) return 'vi'
+
+    const tokens = tokenizeMerchantText(text)
+    const scores = (Object.entries(LANGUAGE_MARKERS) as [MerchantLocale, ReadonlySet<string>][])
+        .map(([locale, markers]) => ({
+            locale,
+            score: [...tokens].filter(token => markers.has(token)).length,
+        }))
+        .sort((a, b) => b.score - a.score)
+
+    if (scores[0].score >= 2 && scores[0].score > scores[1].score) {
+        return scores[0].locale
+    }
+
+    // Short product and brand names are too ambiguous for franc-min. Only trust its
+    // fallback when the combined merchant copy contains enough distinct words.
+    if (tokens.size < 4) return null
+    return detectLocaleFromText(text)
+}
+
+function detectForeignMerchantFieldLocale(
+    result: BulkParseResult,
+    requestedLocale: Exclude<MerchantLocale, 'vi'>,
+): string | null {
+    for (const product of result.products ?? []) {
+        const fields = [product.name, product.description, product.seoTitle, product.seoDescription]
+        for (const field of fields) {
+            if (!field?.trim()) continue
+            const detectedLocale = detectTextLocale(field)
+            if (detectedLocale && detectedLocale !== requestedLocale) return detectedLocale
+        }
+    }
+    return null
+}
+
+function detectMerchantFacingLocale(result: BulkParseResult): string | null {
+    const text = collectMerchantFacingText(result)
+    return text ? detectTextLocale(text) : null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -73,170 +206,14 @@ function isValidBulkParseResult(value: unknown): value is BulkParseResult {
         ))) return false
         return product.variantConfigs === undefined || (
             Array.isArray(product.variantConfigs) && product.variantConfigs.every(config =>
-                isRecord(config) && (config.options === undefined || (Array.isArray(config.options) && config.options.every(isRecord)))
+                isRecord(config) &&
+                hasOnlyOptionalStrings(config, ['name']) &&
+                (config.options === undefined || (Array.isArray(config.options) && config.options.every(option =>
+                    isRecord(option) && hasOnlyOptionalStrings(option, ['value'])
+                )))
             )
         )
     })
-}
-
-function collectMerchantFacingFields(parsed: BulkParseResult): string[] {
-    if (!Array.isArray(parsed.products)) return []
-
-    return parsed.products.flatMap(product => {
-        // AI JSON is untrusted even with response_format. Ignore malformed rows so a
-        // language-repair best effort never turns a usable parse response into a 500.
-        if (!isRecord(product)) return []
-        const variants = Array.isArray(product.variants) ? product.variants.filter(isRecord) : []
-        const variantConfigs = Array.isArray(product.variantConfigs) ? product.variantConfigs.filter(isRecord) : []
-        return [
-            product.name,
-            product.description,
-            product.seoTitle,
-            product.seoDescription,
-            ...variants.map(variant => variant.name),
-            ...variantConfigs.flatMap(config => {
-                const options = Array.isArray(config.options) ? config.options.filter(isRecord) : []
-                return [config.name, ...options.map(option => option.value)]
-            }),
-        ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    })
-}
-
-function detectMerchantFacingLocale(parsed: BulkParseResult): string | null {
-    const merchantFacingText = collectMerchantFacingFields(parsed).join(' ').trim()
-    if (!merchantFacingText) return null
-    return detectLocaleFromText(merchantFacingText)
-}
-
-function needsMerchantLanguageRepair(parsed: BulkParseResult, locale: unknown): boolean {
-    if (locale !== 'en' && locale !== 'ms') return false
-    if (collectMerchantFacingFields(parsed).length === 0) return false
-    const detectedLocale = detectMerchantFacingLocale(parsed)
-
-    // Malay and English share ASCII. For an English store, detection cannot prove that
-    // short/ambiguous output (for example "Hat Merah") is actually English, so run the
-    // bounded repair pass. The repair prompt preserves already-correct English text.
-    if (locale === 'en') return true
-
-    // ASCII Malay and English cannot be reliably separated by franc. Repair every
-    // English-detected Malay draft; the repair prompt explicitly preserves text that
-    // is already natural Malay, preventing a mixed-language result from slipping through.
-    return Boolean(detectedLocale && detectedLocale !== locale)
-}
-
-function mergeRepairedMerchantFacingText(original: BulkParseResult, repaired: unknown): BulkParseResult {
-    if (!isRecord(repaired) || !Array.isArray(repaired.products) || !Array.isArray(original.products)) {
-        return original
-    }
-    if (repaired.products.length !== original.products.length || !repaired.products.every(isRecord)) {
-        return original
-    }
-    const repairedProducts = repaired.products as Record<string, unknown>[]
-
-    return {
-        ...original,
-        products: original.products.map((product, productIndex) => {
-            const repairedProduct = repairedProducts[productIndex]
-            const mergedProduct: ParsedProduct = { ...product }
-
-            for (const field of ['name', 'description', 'seoTitle', 'seoDescription', 'slug'] as const) {
-                if (typeof repairedProduct[field] === 'string') mergedProduct[field] = repairedProduct[field]
-            }
-
-            if (Array.isArray(product.variants)) {
-                if (!Array.isArray(repairedProduct.variants) || repairedProduct.variants.length !== product.variants.length || !repairedProduct.variants.every(isRecord)) {
-                    return product
-                }
-                const repairedVariants = repairedProduct.variants as Record<string, unknown>[]
-                mergedProduct.variants = product.variants.map((variant, variantIndex) => ({
-                    ...variant,
-                    ...(typeof repairedVariants[variantIndex].name === 'string'
-                        ? { name: repairedVariants[variantIndex].name as string }
-                        : {}),
-                }))
-            }
-
-            if (Array.isArray(product.variantConfigs)) {
-                if (!Array.isArray(repairedProduct.variantConfigs) || repairedProduct.variantConfigs.length !== product.variantConfigs.length || !repairedProduct.variantConfigs.every(isRecord)) {
-                    return product
-                }
-                mergedProduct.variantConfigs = product.variantConfigs.map((config, configIndex) => {
-                    const repairedConfig = (repairedProduct.variantConfigs as Record<string, unknown>[])[configIndex]
-                    if (!Array.isArray(config.options) || !Array.isArray(repairedConfig.options) || repairedConfig.options.length !== config.options.length || !repairedConfig.options.every(isRecord)) {
-                        return config
-                    }
-                    const repairedOptions = repairedConfig.options as Record<string, unknown>[]
-                    return {
-                        ...config,
-                        ...(typeof repairedConfig.name === 'string' ? { name: repairedConfig.name } : {}),
-                        options: config.options.map((option, optionIndex) => ({
-                            ...option,
-                            ...(typeof repairedOptions[optionIndex].value === 'string'
-                                ? { value: repairedOptions[optionIndex].value as string }
-                                : {}),
-                        })),
-                    }
-                })
-            }
-
-            return mergedProduct
-        }),
-    }
-}
-
-async function repairMerchantLanguage(
-    openai: OpenAI,
-    model: string,
-    targetLanguage: string,
-    parsed: BulkParseResult,
-    userId: string | number | null | undefined,
-    timeoutMs: number,
-): Promise<BulkParseResult> {
-    const systemPrompt = [
-        'You are fixing language consistency in an e-commerce products JSON payload.',
-        `Rewrite merchant-facing text so it is entirely in ${targetLanguage.toUpperCase()}.`,
-        'Merchant-facing fields: name, description, seoTitle, seoDescription, variants[].name, variantConfigs[].name, and variantConfigs[].options[].value.',
-        'Also rewrite each product slug so it matches the corrected product name in lowercase ASCII kebab-case.',
-        'Rules:',
-        '- Return ONLY valid JSON with exactly the same top-level/object/array structure and keys.',
-        '- Preserve product count, product order, variant count, variant order, option count, and all numeric values.',
-        '- Preserve category values in English, preserve SKUs, stock, compareAtPrice, dimensions, and prices.',
-        '- Do NOT add, remove, merge, or split products, variants, or options.',
-        '- Keep variant names to maximum 2 tiers with a single " - " separator when already present.',
-        '- If a field already matches the target language, keep it natural and consistent; only fix mixed-language or wrong-language text.',
-    ].join('\n')
-
-    const repairStart = Date.now()
-    const completion = await openai.chat.completions.create({
-        model,
-        temperature: 0,
-        max_tokens: 3000,
-        response_format: { type: 'json_object' },
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: JSON.stringify(parsed) },
-        ],
-    }, { timeout: timeoutMs, maxRetries: 0 })
-
-    logAiUsage({
-        endpoint: 'bulk-parse',
-        model: completion.model,
-        tokensIn: completion.usage?.prompt_tokens ?? 0,
-        tokensOut: completion.usage?.completion_tokens ?? 0,
-        durationMs: Date.now() - repairStart,
-        success: true,
-        userId,
-    })
-
-    const content = completion.choices[0]?.message?.content
-    if (!content) return parsed
-
-    try {
-        return mergeRepairedMerchantFacingText(parsed, JSON.parse(content))
-    } catch (error) {
-        console.warn('[AI bulk-parse] language repair returned invalid JSON', error)
-        return parsed
-    }
 }
 
 function getOpenAI(): OpenAI | null {
@@ -310,10 +287,12 @@ Examples:
 - If the user types Vietnamese "Muối tiêu" and target language is ENGLISH, you must output "Pepper Salt".
 - If the user types Vietnamese "quần màu đỏ" and target language is ENGLISH, the variant name MUST be "Red", NOT "Đỏ".
 - If the user types Vietnamese "quần màu đỏ" and target language is BAHASA MELAYU, the variant name MUST be "Merah" and the dimension name MUST be "Warna".
+- For Vietnamese input "áo thun màu variant trắng, đỏ, xám giá 5rm" and target language ENGLISH, output one product named "T-Shirt" with exactly 3 variants named "White", "Red", and "Grey", plus a "Color" variant config containing those same 3 option values.
+- For Vietnamese input "áo thun màu trắng, đỏ, size S, M giá 5rm" and target language ENGLISH, output exactly 4 Cartesian variants: "White - S", "White - M", "Red - S", and "Red - M", with "Color" and "Size" variant configs.
 
 Parse the text and return a JSON object with a single "products" array.
 Each product item MUST have:
-- name: (string) The product name. MUST BE AT LEAST 3 CHARACTERS LONG (e.g. use "Áo Thun" instead of "Áo").
+- name: (string) The product name in ${targetLanguage.toUpperCase()}. MUST BE AT LEAST 3 CHARACTERS LONG and must not copy untranslated words from the user's input.
 - price: (number) The price in RM (Malaysian Ringgit) — this store ONLY sells in MYR, never VND or any other currency. Parse "RM89" or a plain "89" as 89; "RM1.5k" or "1.5k" as 1500 (k/K = x1000 shorthand). Default to 0 if not specified.
 - compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
 - category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
@@ -324,14 +303,14 @@ Each product item MUST have:
 - height: (number) Estimated height in cm.
 - seoTitle: (string) A catchy SEO-friendly title under 70 characters.
 - seoDescription: (string) A compelling SEO meta description under 160 characters.
-- slug: (string) URL-friendly lowercase slug (e.g. "ao-khoac-da").
+- slug: (string) URL-friendly lowercase slug (e.g. "leather-jacket").
 - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on the product name abbreviation (e.g. "Leather Jacket" -> "LEA-JKT"). Always required, even for products with no variants.
 - variants: (array) Generate flat 1D array of variant objects if any color/size/attribute is mentioned (2-tier Cartesian flattened). EVEN IF ONLY A SINGLE specific color or size is mentioned (e.g., Vietnamese input "quần màu đỏ"), you MUST STILL generate exactly 1 variant for it in ${targetLanguage.toUpperCase()} (e.g., "Red" in English or "Merah" in Bahasa Melayu).
   Each variant object MUST have:
     - name: (string) The full combination in ${targetLanguage.toUpperCase()}, e.g. "Red - M", "Brown - Size L", or just "Blue" if 1-tier only
     - price: (number) same as base price unless specified per variant
     - compareAtPrice: (number) same as the product-level compareAtPrice unless specified per variant, or omit if the product-level compareAtPrice was omitted
-    - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
+    - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "TS-RED-M")
     - stock: (number) default to 0 per variant (out of stock until the merchant confirms real stock)
   If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].
 - variantConfigs: (array) If variants exist, provide up to 2 tier configurations representing the dimensions.
@@ -399,45 +378,21 @@ Rules:
         if (!isValidBulkParseResult(parsedResult)) {
             throw new Error('Invalid AI response structure')
         }
-        let parsed = parsedResult
-
-        const detectedMerchantLocale = detectMerchantFacingLocale(parsed)
-        if (needsMerchantLanguageRepair(parsed, locale)) {
-            const remainingMs = maxDuration * 1_000 - (Date.now() - callStart) - RESPONSE_RESERVE_MS
-            const repairTimeoutMs = Math.min(REPAIR_TIMEOUT_MS, remainingMs)
-            if (repairTimeoutMs < 3_000) {
-                console.warn('[AI bulk-parse] skipping language repair because the request budget is nearly exhausted', {
-                    locale,
-                    detectedMerchantLocale,
-                    remainingMs,
-                })
-            } else {
-                console.warn('[AI bulk-parse] detected merchant-facing language mismatch after parse; running language repair pass', {
-                    locale,
-                    detectedMerchantLocale,
-                    productCount: parsed.products?.length ?? 0,
-                    repairTimeoutMs,
-                })
-                const repairStart = Date.now()
-                try {
-                    parsed = await repairMerchantLanguage(openai, modelName, targetLanguage, parsed, user?.id, repairTimeoutMs)
-                } catch (error) {
-                console.warn('[AI bulk-parse] language repair failed; returning original parse result', error)
-                    logAiUsage({
-                        endpoint: 'bulk-parse',
-                        model: modelName,
-                        tokensIn: 0,
-                        tokensOut: 0,
-                        durationMs: Date.now() - repairStart,
-                        success: false,
-                        userId: user?.id ?? null,
-                        errorCode: error instanceof Error ? error.name : 'unknown',
-                    })
-                }
-            }
+        const detectedLocale = detectForeignVariantLocale(parsedResult, locale)
+            ?? detectForeignMerchantFieldLocale(parsedResult, locale)
+            ?? detectMerchantFacingLocale(parsedResult)
+        if (detectedLocale && detectedLocale !== locale) {
+            console.warn('[AI Bulk Parse] Merchant-facing language mismatch', {
+                requestedLocale: locale,
+                detectedLocale,
+                userId: user?.id ?? null,
+            })
+            return NextResponse.json(
+                { error: 'merchantLanguageMismatch', retryable: true },
+                { status: 422 },
+            )
         }
-
-        return NextResponse.json(parsed)
+        return NextResponse.json(parsedResult)
     } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         

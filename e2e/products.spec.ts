@@ -108,4 +108,95 @@ test.describe('Products Management', () => {
             await expect(priceInput.first()).toBeVisible()
         }
     })
+
+    test('[TC-F08-04-83] AI bulk draft localizes Vietnamese variants for an English store', async ({ page }) => {
+        test.setTimeout(90_000)
+
+        // Arrange
+        await page.addInitScript(() => {
+            localStorage.setItem('prefer_lang', 'en')
+            document.cookie = 'prefer_lang=en; path=/; samesite=lax'
+        })
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+
+        const aiChatTextarea = page.locator('textarea').first()
+        await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
+        const parseResponsePromise = page.waitForResponse(response =>
+            response.request().method() === 'POST' &&
+            response.url().includes('/api/ai/products-bulk-parse'),
+            { timeout: 60_000 },
+        )
+
+        // Act
+        await aiChatTextarea.fill('áo thun màu variant trắng, đỏ, xám giá 5rm')
+        await aiChatTextarea.press('Enter')
+        const parseResponse = await parseResponsePromise
+        const body = await parseResponse.json() as {
+            products?: Array<{
+                name?: string
+                variants?: Array<{ name?: string }>
+                variantConfigs?: Array<{ name?: string; options?: Array<{ value?: string }> }>
+            }>
+        }
+
+        // Assert
+        expect(parseResponse.ok()).toBe(true)
+        expect(body.products).toHaveLength(1)
+        const product = body.products?.[0]
+        expect(product?.name).toBe('T-Shirt')
+        expect(product?.variants?.map(variant => variant.name)).toEqual(['White', 'Red', 'Grey'])
+        expect(product?.variantConfigs?.[0]).toEqual({
+            name: 'Color',
+            options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
+        })
+        await expect(page.locator('[role="dialog"] input[type="text"]').first()).toHaveValue('T-Shirt')
+        await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
+    })
+
+    test('[TC-F08-04-86] AI bulk draft creates localized two-tier Cartesian variants', async ({ page }) => {
+        test.setTimeout(90_000)
+
+        // Arrange
+        await page.addInitScript(() => {
+            localStorage.setItem('prefer_lang', 'en')
+            document.cookie = 'prefer_lang=en; path=/; samesite=lax'
+        })
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+
+        const aiChatTextarea = page.locator('textarea').first()
+        await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
+        const parseResponsePromise = page.waitForResponse(response =>
+            response.request().method() === 'POST' &&
+            response.url().includes('/api/ai/products-bulk-parse'),
+            { timeout: 60_000 },
+        )
+
+        // Act
+        await aiChatTextarea.fill('áo thun màu trắng, đỏ, size S, M giá 5rm')
+        await aiChatTextarea.press('Enter')
+        const parseResponse = await parseResponsePromise
+        const body = await parseResponse.json() as {
+            products?: Array<{
+                variants?: Array<{ name?: string }>
+                variantConfigs?: Array<{ name?: string; options?: Array<{ value?: string }> }>
+            }>
+        }
+
+        // Assert
+        expect(parseResponse.ok()).toBe(true)
+        expect(body.products).toHaveLength(1)
+        const product = body.products?.[0]
+        expect(product?.variants?.map(variant => variant.name).sort()).toEqual([
+            'Red - M',
+            'Red - S',
+            'White - M',
+            'White - S',
+        ])
+        expect(product?.variantConfigs).toEqual([
+            { name: 'Color', options: [{ value: 'White' }, { value: 'Red' }] },
+            { name: 'Size', options: [{ value: 'S' }, { value: 'M' }] },
+        ])
+    })
 })

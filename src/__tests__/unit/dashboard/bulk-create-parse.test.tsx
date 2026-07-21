@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import enLocale from '@/i18n/locales/en.json'
 
 // ── Mocks (must be top-level, before imports) ─────────────────────────────────
@@ -142,5 +142,32 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         await waitFor(() => {
             expect(mockToastError).toHaveBeenCalledWith(enLocale.dashboard.products.bulkCreate.parseError)
         })
+    })
+
+    it('TC-F08-04-93: retryable locale mismatch exposes one manual retry without an automatic loop', async () => {
+        // Arrange
+        global.fetch = vi.fn()
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 422,
+                json: async () => ({ error: 'merchantLanguageMismatch', retryable: true }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    products: [{ name: 'Recovered Hat', price: 10, stock: 0, category: '', variants: [] }],
+                }),
+            }) as unknown as typeof fetch
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="topi merah" />)
+
+        // Act
+        const retryButton = await screen.findByRole('button', { name: 'Retry' })
+
+        // Assert: the retryable response does not trigger another request by itself.
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+        fireEvent.click(retryButton)
+        await waitFor(() => expect(screen.getByDisplayValue('Recovered Hat')).toBeVisible())
+        expect(global.fetch).toHaveBeenCalledTimes(2)
     })
 })
