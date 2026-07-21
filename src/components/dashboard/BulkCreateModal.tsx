@@ -9,6 +9,7 @@ import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
 import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
@@ -68,6 +69,19 @@ export function generateFallbackSku(name: string) {
     return `${base}-${suffix}`
 }
 
+function generateUniqueSku(name: string, usedSkus: Set<string>) {
+    let sku = generateFallbackSku(name)
+    for (let attempt = 0; usedSkus.has(sku.toLowerCase()); attempt++) {
+        // Random suffixes make collisions extremely unlikely; this deterministic escape hatch
+        // still guarantees progress if Math.random is mocked or an unlikely collision repeats.
+        sku = attempt < 9
+            ? generateFallbackSku(name)
+            : `${slugify(name).slice(0, 16).toUpperCase() || 'PRD'}-${attempt + 1}`
+    }
+    usedSkus.add(sku.toLowerCase())
+    return sku
+}
+
 const textToLexical = (text: string) => {
     if (!text) return undefined;
     return {
@@ -117,7 +131,23 @@ function coerceFiniteNumber(value: unknown, fallback = 0): number {
     return Number.isFinite(n) ? n : fallback
 }
 
-export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | number | null, categoryId: string | number | null, defaultVariantName: string = 'Default') {
+type VariantTierLabels = {
+    first: string
+    second: string
+}
+
+const DEFAULT_VARIANT_TIER_LABELS: VariantTierLabels = {
+    first: 'Color',
+    second: 'Size',
+}
+
+export function buildSavePayload(
+    prod: ParsedProduct,
+    cartonMediaId: string | number | null,
+    categoryId: string | number | null,
+    defaultVariantName: string = 'Default',
+    tierLabels: VariantTierLabels = DEFAULT_VARIANT_TIER_LABELS,
+) {
     const hasVariants = Boolean(prod.variants?.length)
     const baseSlug = prod.slug || slugify(prod.name)
     const finalSlug = baseSlug + '-' + Math.random().toString(36).substring(2, 7)
@@ -133,7 +163,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         
         if (validNumTiers > 0) {
             variantConfigs = Array.from({ length: validNumTiers }).map((_, i) => ({
-                name: i === 0 ? 'Color' : 'Size',
+                name: i === 0 ? tierLabels.first : tierLabels.second,
                 options: Array.from(
                     new Set(splitVariants.map(v => {
                         // Drop excess splits if AI provided too many
@@ -168,10 +198,37 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         safeName = safeName + ' (Bulk)';
     }
 
+    // AI can repeat a SKU across variant rows (and Payload rejects them as a generic
+    // "Variants" validation error). Reserve the base SKU first, then keep only unique
+    // AI SKUs case-insensitively; regenerate missing or colliding variant values.
+    const usedSkus = new Set<string>()
+    const requestedBaseSku = sanitizeXSS(prod.sku || '').trim()
+    const baseSku = requestedBaseSku && !usedSkus.has(requestedBaseSku.toLowerCase())
+        ? requestedBaseSku
+        : generateUniqueSku(safeName, usedSkus)
+    usedSkus.add(baseSku.toLowerCase())
+
+    const variants = hasVariants ? safeVariants!.map(v => {
+        const variantPrice = Number(v.price || prod.price) || 0
+        const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
+        const requestedSku = sanitizeXSS(v.sku || '').trim()
+        const sku = requestedSku && !usedSkus.has(requestedSku.toLowerCase())
+            ? requestedSku
+            : generateUniqueSku(`${safeName}-${v.name || defaultVariantName}`, usedSkus)
+        usedSkus.add(sku.toLowerCase())
+        return {
+            name: sanitizeXSS(v.name || defaultVariantName),
+            price: variantPrice,
+            compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+            stock: coerceFiniteNumber(v.stock),
+            sku,
+        }
+    }) : undefined
+
     return {
         name: safeName,
         slug: finalSlug,
-        sku: sanitizeXSS(prod.sku || '').trim() || generateFallbackSku(safeName),
+        sku: baseSku,
         price: Number(prod.price) || 0,
         compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
         description: prod.description ? textToLexical(sanitizeXSS(prod.description)) : undefined,
@@ -190,20 +247,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             width: Number(prod.width) || 0,
             height: Number(prod.height) || 0
         },
-        variants: hasVariants ? safeVariants!.map(v => {
-            const variantPrice = Number(v.price || prod.price) || 0
-            // Fall back to the product-level compareAtPrice when the AI omits a per-variant
-            // one (the bulk-parse prompt only asks the AI for compareAtPrice at product level
-            // in some responses) — otherwise variants silently lose the "was" price entirely.
-            const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
-            return {
-                name: sanitizeXSS(v.name || defaultVariantName),
-                price: variantPrice,
-                compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
-                stock: coerceFiniteNumber(v.stock),
-                sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
-            }
-        }) : undefined,
+        variants,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
         // (Products.ts beforeChange hook overrides whatever is sent) — computed here too so the
         // payload is internally consistent with what the review drawer displayed (Stock there
@@ -220,6 +264,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [isSaving, setIsSaving] = useState(false)
     const [products, setProducts] = useState<ParsedProduct[]>([])
     const [hasParsed, setHasParsed] = useState(false)
+    const [canRetryParse, setCanRetryParse] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [showExitConfirm, setShowExitConfirm] = useState(false)
     // GH-1491 issue 1 audit: parent only mounts this component while the modal should be
@@ -239,6 +284,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
 
     const handleParse = async (promptText: string) => {
         setIsParsing(true)
+        setCanRetryParse(false)
         try {
             const res = await fetch('/api/ai/products-bulk-parse', {
                 method: 'POST',
@@ -301,13 +347,16 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             // Non-ok fetch responses throw JSON.stringify(data) (see the isSkuConflictError /
             // SKU-retry convention above) so 429's resetAt survives the throw — parse once here,
             // falling back to the raw message as the code when it isn't JSON (e.g. a network error).
-            let parsed: { error?: string; resetAt?: number } | null = null
+            let parsed: { error?: string; resetAt?: number; retryable?: boolean } | null = null
             try {
                 parsed = JSON.parse(errBase.message)
             } catch {
                 parsed = null
             }
             const code = parsed?.error ?? errBase.message
+            if (code === 'merchantLanguageMismatch' && parsed?.retryable === true) {
+                setCanRetryParse(true)
+            }
 
             let errMsg = t.dashboard?.products?.bulkCreate?.parseError || 'Failed to parse products summary'
             if (code === 'rateLimitExceeded') {
@@ -378,7 +427,11 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 }
 
                 const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
-                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName)
+                const tierLabels = {
+                    first: t.dashboard?.products?.form?.sections?.color || DEFAULT_VARIANT_TIER_LABELS.first,
+                    second: t.dashboard?.products?.form?.sections?.size || DEFAULT_VARIANT_TIER_LABELS.second,
+                }
+                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName, tierLabels)
 
                 // Retry with freshly regenerated SKUs on a uniqueness conflict — the AI/fallback
                 // generator can't see the merchant's existing catalog, so an occasional collision
@@ -397,10 +450,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         break
                     } catch (err) {
                         if (isSkuConflictError(err) && attempt < MAX_SKU_ATTEMPTS) {
+                            const retrySkus = new Set<string>()
                             payload = {
                                 ...payload,
-                                sku: generateFallbackSku(payload.name),
-                                variants: payload.variants?.map(v => ({ ...v, sku: generateFallbackSku(`${payload.name}-${v.name}`) })),
+                                sku: generateUniqueSku(payload.name, retrySkus),
+                                variants: payload.variants?.map(v => ({
+                                    ...v,
+                                    sku: generateUniqueSku(`${payload.name}-${v.name}`, retrySkus),
+                                })),
                             }
                             continue
                         }
@@ -525,8 +582,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                 not the design mockup's own one-off hex palette. */}
                             <div className="flex flex-col gap-3 shrink-0">
                                 {products.length === 0 ? (
-                                    <div className="h-[62px] flex items-center justify-center text-center text-[hsl(var(--muted-foreground))] text-[13px] rounded-xl border border-solid border-[hsl(var(--border))]">
-                                        {t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}
+                                    <div className="min-h-[96px] flex flex-col items-center justify-center gap-3 text-center text-[hsl(var(--muted-foreground))] text-[13px] rounded-xl border border-solid border-[hsl(var(--border))]">
+                                        <span>{t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}</span>
+                                        {canRetryParse ? (
+                                            <Button variant="dashSecondary" size="dash" onClick={() => handleParse(initialPrompt)} disabled={isParsing || isSaving}>
+                                                {t.dashboard?.products?.bulkCreate?.retry || 'Retry'}
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 ) : products.map((p) => {
                                     const hasVariants = Boolean(p.variants?.length)
@@ -582,7 +644,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                         title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
                                                         className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
                                                     />
-                                                    <div className="hidden md:block w-[110px] shrink-0 self-center text-[12px] text-[hsl(var(--muted-foreground))] truncate">
+                                                    <div className="hidden md:block min-w-[110px] w-[110px] shrink-0 self-start pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))] whitespace-normal break-words">
                                                         {hasVariants ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
                                                     </div>
                                                 </div>
@@ -611,21 +673,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                             : (t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`)}
                     </span>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleClose}
-                            disabled={isSaving}
-                            className="h-[42px] px-5 rounded-2xl bg-transparent border border-solid border-[hsl(var(--border))] text-[14px] font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
+                        <Button variant="dashSecondary" size="dash" onClick={handleClose} disabled={isSaving}>
                             {t.dashboard?.products?.bulkCreate?.discard || 'Discard'}
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || isParsing || draftCount === 0}
-                            className="h-[42px] px-5 rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-[14px] font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
+                        </Button>
+                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={isSaving || isParsing || draftCount === 0}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             {t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

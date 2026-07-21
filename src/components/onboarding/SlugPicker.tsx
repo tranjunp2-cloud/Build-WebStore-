@@ -25,21 +25,6 @@ interface SlugPickerProps {
     skipInitialCheck?: boolean
 }
 
-/** Client-side slugify for instant preview (mirrors server-side logic) */
-function clientSlugify(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 63)
-    return slug.length >= 3 ? slug : ''
-}
-
 export default function SlugPicker({ businessName = '', onSlugChange, platformDomain, skipInitialCheck }: SlugPickerProps) {
     const { t } = useI18n()
     const f = t.onboarding.form
@@ -57,11 +42,23 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
 
     // Auto-generate slug from business name
     useEffect(() => {
-        if (businessName) {
-            const generated = clientSlugify(businessName)
-            if (generated) {
-                setSlug(generated)
+        let active = true
+
+        const generateSlug = async () => {
+            if (!businessName) return
+
+            try {
+                const { slugify } = await import('@/lib/utils/slugify')
+                const generated = slugify(businessName)
+                if (active && generated) setSlug(generated)
+            } catch (error) {
+                console.error('[SlugPicker] Failed to load slug transliteration', error)
             }
+        }
+
+        void generateSlug()
+        return () => {
+            active = false
         }
     }, [businessName])
 

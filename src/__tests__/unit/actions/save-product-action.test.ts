@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFind, mockCreate, mockUpdate, mockFindByID, mockGetOrCreateCrateCartonId } = vi.hoisted(() => ({
+const { mockFind, mockCreate, mockUpdate, mockFindByID, mockDrizzleExecute, mockGetOrCreateCrateCartonId } = vi.hoisted(() => ({
     mockFind: vi.fn(),
     mockCreate: vi.fn(),
     mockUpdate: vi.fn(),
     mockFindByID: vi.fn(),
+    mockDrizzleExecute: vi.fn(),
     mockGetOrCreateCrateCartonId: vi.fn(),
 }))
 
@@ -15,6 +16,7 @@ vi.mock('payload', () => ({
         create: mockCreate,
         update: mockUpdate,
         findByID: mockFindByID,
+        db: { drizzle: { execute: mockDrizzleExecute } },
     }),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -55,6 +57,7 @@ describe('saveProductAction', () => {
         mockCreate.mockResolvedValue({ id: 42, name: 'Test Product' })
         mockUpdate.mockResolvedValue({ id: 42, name: 'Test Product' })
         mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product' })
+        mockDrizzleExecute.mockResolvedValue({ rows: [] })
         mockGetOrCreateCrateCartonId.mockResolvedValue(99)
     })
 
@@ -70,6 +73,18 @@ describe('saveProductAction', () => {
     })
 
     // ── Validation ────────────────────────────────────────────────────────────
+
+    it('[TC-F08-SKU-GLOBAL-09] allows literal SQL wildcard characters in SKU values', async () => {
+        // Arrange
+        const sku = 'TS_RED%M'
+
+        // Act
+        await expect(saveProductAction({ name: 'Test Product', sku })).resolves.not.toThrow()
+
+        // Assert
+        expect(mockDrizzleExecute).toHaveBeenCalledOnce()
+        expect(mockCreate).toHaveBeenCalledOnce()
+    })
 
     it('[TC-F08-04-04] invalid data (name too short) → throws Zod error', async () => {
         // Arrange
@@ -219,7 +234,7 @@ describe('saveProductAction', () => {
 
         it('[TC-F08-SKU-GLOBAL-01] baseSku conflicts with active product → throws JSON field error on baseSku', async () => {
             // Arrange
-            mockFind.mockResolvedValueOnce({ docs: [{ id: 99, sku: 'SKU-001' }] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'sku-001' }] })
 
             // Act
             let thrown: Error | null = null
@@ -235,17 +250,13 @@ describe('saveProductAction', () => {
             expect(parsed.fieldErrors.baseSku.code).toBe('SKU_ALREADY_IN_USE')
             expect(parsed.fieldErrors.baseSku.values).toEqual(['SKU-001'])
             expect(parsed.message).toContain('SKU-001')
-            expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
-                collection: 'products',
-                limit: 100,
-                depth: 0,
-            }))
+            expect(mockDrizzleExecute).toHaveBeenCalledOnce()
             expect(mockCreate).not.toHaveBeenCalled()
         })
 
         it('[TC-F08-SKU-GLOBAL-02] variant sku conflicts → throws JSON field error on variants.0.skuCode', async () => {
             // Arrange
-            mockFind.mockResolvedValueOnce({ docs: [{ id: 99, variants: [{ sku: 'VAR-001' }] }] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'var-001' }] })
 
             // Act
             let thrown: Error | null = null
@@ -263,9 +274,33 @@ describe('saveProductAction', () => {
             expect(mockCreate).not.toHaveBeenCalled()
         })
 
+        it('[TC-F08-04-77] duplicate base/variant SKUs in one request → returns structured variant field error', async () => {
+            let thrown: Error | null = null
+            try {
+                await saveProductAction({
+                    name: 'Wool Coat',
+                    sku: 'COAT-001',
+                    variants: [
+                        { sku: 'COAT-RED-M' },
+                        { sku: 'coat-red-m' },
+                        { sku: 'COAT-001' },
+                    ],
+                })
+            } catch (error) { thrown = error as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('FIELD_ERRORS')
+            expect(parsed.fieldErrors).toHaveProperty('variants.1.skuCode')
+            expect(parsed.fieldErrors).toHaveProperty('variants.2.skuCode')
+            expect(parsed.fieldErrors['variants.1.skuCode'].code).toBe('DUPLICATE_SKU_IN_REQUEST')
+            expect(mockDrizzleExecute).not.toHaveBeenCalled()
+            expect(mockCreate).not.toHaveBeenCalled()
+        })
+
         it('[TC-F08-SKU-GLOBAL-03] sku conflicts with soft-deleted product → allowed (no throw)', async () => {
             // Arrange — soft-deleted product excluded by query filter, mockFind returns empty
-            mockFind.mockResolvedValueOnce({ docs: [] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
             // Act & Assert — no error thrown
             await expect(
@@ -276,20 +311,14 @@ describe('saveProductAction', () => {
 
         it('[TC-F08-SKU-GLOBAL-04] update — same product own SKU → allowed (self excluded)', async () => {
             // Arrange — Payload excludes id=42 from query, returns empty
-            mockFind.mockResolvedValueOnce({ docs: [] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
             // Act & Assert
             await expect(
                 saveProductAction({ name: 'Existing Product', sku: 'OWN-SKU' }, 42)
             ).resolves.not.toThrow()
 
-            expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
-                where: expect.objectContaining({
-                    and: expect.arrayContaining([
-                        { id: { not_equals: 42 } },
-                    ]),
-                }),
-            }))
+            expect(JSON.stringify(mockDrizzleExecute.mock.calls[0][0])).toContain('p.id <>')
             expect(mockUpdate).toHaveBeenCalledOnce()
         })
 
@@ -299,14 +328,14 @@ describe('saveProductAction', () => {
             // Act
             await saveProductAction({ name: 'No SKU Product' })
 
-            // Assert — mockFind not called for SKU check (only carton lookup would call find)
-            expect(mockFind).not.toHaveBeenCalled()
+            // Assert — exact SKU query is skipped when no SKU is submitted.
+            expect(mockDrizzleExecute).not.toHaveBeenCalled()
             expect(mockCreate).toHaveBeenCalledOnce()
         })
 
         it('[TC-F08-SKU-GLOBAL-06] different tenant SKU → no conflict (tenant scoped)', async () => {
             // Arrange — mockFind returns empty (tenant filter excludes other tenants' products)
-            mockFind.mockResolvedValueOnce({ docs: [] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
             // Act & Assert
             await expect(
@@ -317,9 +346,7 @@ describe('saveProductAction', () => {
 
         it('[TC-F08-SKU-GLOBAL-07] both baseSku AND variant conflict → both paths in fieldErrors', async () => {
             // Arrange — DB has a product with both sku and variant sku conflicting
-            mockFind.mockResolvedValueOnce({
-                docs: [{ id: 99, sku: 'B-001', variants: [{ sku: 'V-001' }] }],
-            })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'b-001' }, { sku: 'v-001' }] })
 
             // Act
             let thrown: Error | null = null
@@ -342,7 +369,7 @@ describe('saveProductAction', () => {
 
         it('[TC-F08-SKU-GLOBAL-08] case-insensitive conflict detection → field error mapped correctly', async () => {
             // Arrange — DB stores 'SKU-001' (uppercase), input is 'sku-001' (lowercase)
-            mockFind.mockResolvedValueOnce({ docs: [{ id: 99, sku: 'SKU-001' }] })
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'sku-001' }] })
 
             // Act
             let thrown: Error | null = null
@@ -358,54 +385,30 @@ describe('saveProductAction', () => {
             expect(mockCreate).not.toHaveBeenCalled()
         })
 
-        it('[TC-F08-SKU-GLOBAL-09] totalDocs > docs.length → throws plain verification error (not FIELD_ERRORS)', async () => {
-            // Arrange — Payload reports 150 matching docs but only returns first 100
-            mockFind.mockResolvedValueOnce({
-                docs: Array.from({ length: 100 }, (_, i) => ({ id: i + 1, sku: `OTHER-${i}` })),
-                totalDocs: 150,
-            })
+        it('[TC-F08-SKU-GLOBAL-10] exact SQL checks base and variant SKUs without LIKE wildcards (shape-lock)', async () => {
+            // Arrange — no conflicts; purpose is to capture and assert the exact SQL shape.
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
-            // Act
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', sku: 'SKU-NEW' })
-            } catch (e) { thrown = e as Error }
-
-            // Assert — plain Error (not FIELD_ERRORS JSON), human-readable
-            expect(thrown).not.toBeNull()
-            expect(thrown!.message).toContain('Cannot verify SKU uniqueness')
-            expect(() => JSON.parse(thrown!.message)).toThrow() // not JSON
-            expect(mockCreate).not.toHaveBeenCalled()
-        })
-
-        it('[TC-F08-SKU-GLOBAL-10] WHERE clause includes both sku and variants.sku branches (shape-lock)', async () => {
-            // Arrange — no conflicts; purpose is to capture and assert the exact WHERE shape
-            mockFind.mockResolvedValueOnce({ docs: [], totalDocs: 0 })
-
-            // Act — both a base SKU and a variant SKU so both IN arrays are non-empty
+            // Act — both a base SKU and a variant SKU so both normalized comparisons are present.
             await saveProductAction({
                 name: 'Probe Product',
                 sku: 'BASE-001',
                 variants: [{ sku: 'VAR-001' }],
             })
 
-            // Assert — verify the WHERE clause passed to payload.find contains both OR branches
-            const call = mockFind.mock.calls[0][0]
-            const where = call.where as { and: Array<Record<string, unknown>> }
-            expect(where).toHaveProperty('and')
-            const orBranch = where.and.find(c => 'or' in c) as { or: Array<Record<string, unknown>> } | undefined
-            expect(orBranch).toBeDefined()
-            expect(orBranch!.or).toEqual(expect.arrayContaining([
-                expect.objectContaining({ sku: expect.objectContaining({ in: expect.arrayContaining(['BASE-001', 'VAR-001']) }) }),
-                expect.objectContaining({ 'variants.sku': expect.objectContaining({ in: expect.arrayContaining(['BASE-001', 'VAR-001']) }) }),
-            ]))
+            // Assert — both tables use exact normalized comparison; SQL LIKE is absent.
+            const sqlText = JSON.stringify(mockDrizzleExecute.mock.calls[0][0])
+            expect(sqlText).toContain('lower(p.sku) IN')
+            expect(sqlText).toContain('lower(v.sku) IN')
+            expect(sqlText).toContain('products_variants')
+            expect(sqlText).not.toContain('LIKE')
         })
     })
 
     // ── TC-09.38: alt-text fallback threading (GH-1458) ─────────────────────────
 
     describe('alt-text fallback (GH-1458)', () => {
-        it('[TC-09.38] blank alt + tenant has a site name → "{name} - {store}"', async () => {
+        it('[TC-09.38] blank alt + tenant has a site name → "{name}"', async () => {
             vi.mocked(tenantIdForQuery).mockReturnValue(83)
             mockFind.mockImplementation((args: { collection: string }) =>
                 args.collection === 'sites'
@@ -414,8 +417,9 @@ describe('saveProductAction', () => {
 
             await saveProductAction({ name: 'Baju Pink', images: [{ image: 10, alt: '' }] })
 
+            expect(mockFind).not.toHaveBeenCalled()
             expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink - My Shop' }] }),
+                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink' }] }),
             }))
         })
 
@@ -455,7 +459,7 @@ describe('saveProductAction', () => {
             await saveProductAction({ name: 'Baju Pink' })
 
             expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-                data: expect.objectContaining({ images: [{ image: 99, alt: 'Baju Pink - My Shop' }] }),
+                data: expect.objectContaining({ images: [{ image: 99, alt: 'Baju Pink' }] }),
             }))
         })
     })

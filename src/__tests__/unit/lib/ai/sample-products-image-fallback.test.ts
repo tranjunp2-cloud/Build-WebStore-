@@ -397,4 +397,28 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
         expect(products[4]!.weight).toBe(5)
         expect(products[4]!.length).toBe(10)
     })
+
+    it('[TC-F26-11-04] requests customer-facing product copy in the confirmed locale', async () => {
+        // Arrange
+        setupImageMocks()
+        mockAIResponse(Array.from({ length: 6 }, (_, i) => aiProduct({ name: `Prodotto ${i}` })))
+
+        // Act
+        await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
+
+        // Assert
+        const request = mockOpenAICreate.mock.calls[0]?.[0] as { messages?: Array<{ content?: string }> }
+        expect(request.messages?.[1]?.content).toContain('Write product names and customer-facing descriptions in Italian.')
+    })
+
+    it('[TC-F26-11-04] does not inject English curated products when Italian AI generation fails', async () => {
+        // Arrange
+        mockOpenAICreate.mockRejectedValue(new Error('OpenAI unavailable'))
+
+        // Act
+        const { products } = await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
+
+        // Assert
+        expect(products).toEqual([])
+    })
 })

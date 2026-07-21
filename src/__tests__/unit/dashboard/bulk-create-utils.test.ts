@@ -332,7 +332,28 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.variants![0].name).toBe('Default')
     })
 
-    it('generates variantConfigs successfully from 2-tier variants', () => {
+    it('TC-F08-04-76: keeps only case-insensitively unique SKUs across base and variants', () => {
+        const payload = buildSavePayload({
+            selected: true,
+            name: 'Wool Coat',
+            price: 100,
+            sku: 'COAT-001',
+            category: '',
+            variants: [
+                { name: 'Red - M', price: 100, sku: 'COAT-RED-M', stock: 0 },
+                { name: 'Red - L', price: 100, sku: 'coat-red-m', stock: 0 },
+                { name: 'Yellow - M', price: 100, sku: 'COAT-001', stock: 0 },
+                { name: 'Yellow - L', price: 100, sku: '', stock: 0 },
+            ],
+        }, null, null)
+
+        const skus = [payload.sku, ...payload.variants!.map(variant => variant.sku)]
+        expect(payload.sku).toBe('COAT-001')
+        expect(payload.variants![0].sku).toBe('COAT-RED-M')
+        expect(new Set(skus.map(sku => sku.toLowerCase())).size).toBe(skus.length)
+    })
+
+    it('TC-F08-04-67: generates variantConfigs with default EN tier labels from 2-tier variants', () => {
         const product = {
             selected: true,
             name: 'Fashion Dress',
@@ -350,6 +371,27 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.variantConfigs![0].name).toBe('Color')
         expect(payload.variantConfigs![0].options).toEqual([{ value: 'Red' }])
         expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('TC-F08-04-68: uses provided localized tier labels when regenerating variantConfigs', () => {
+        const product = {
+            selected: true,
+            name: 'Fashion Dress',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Putih - S', price: 50, sku: 'DR-WH-S', stock: 10 },
+                { name: 'Putih - M', price: 50, sku: 'DR-WH-M', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null, 'Default', { first: 'Warna', second: 'Saiz' })
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2)
+        expect(payload.variantConfigs![0].name).toBe('Warna')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Putih' }])
+        expect(payload.variantConfigs![1].name).toBe('Saiz')
         expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
     })
 
@@ -374,7 +416,7 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
     })
 
-    it('ignores AI provided variantConfigs and regenerates from variant names', () => {
+    it('TC-F08-04-69: ignores AI provided variantConfigs and regenerates options from variant names', () => {
         const product = {
             selected: true,
             name: 'Perfume',
@@ -384,15 +426,17 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
                 { name: 'Rose - 50ml', price: 100, sku: 'P-R-50', stock: 5 }
             ],
             variantConfigs: [
-                { name: 'Scent', options: [{ value: 'Rose' }] },
-                { name: 'Volume', options: [{ value: '50ml' }] }
+                { name: 'Scent', options: [{ value: 'Lavender' }] },
+                { name: 'Volume', options: [{ value: '100ml' }] }
             ]
         }
         const payload = buildSavePayload(product, null, null)
 
         expect(payload.variantConfigs).toBeDefined()
         expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Rose' }])
         expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: '50ml' }])
     })
 
     it('defaults variant price to product price when 0', () => {

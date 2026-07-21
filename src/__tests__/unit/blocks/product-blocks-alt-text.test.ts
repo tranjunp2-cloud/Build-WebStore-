@@ -129,9 +129,9 @@ describe('products-grid and products-featured single-image alt extraction [TC-F0
 // unit coverage of buildProductAlt itself (src/__tests__/unit/products/build-product-alt.test.ts).
 
 describe('buildProductAlt composed with block data pipeline [TC-09.38]', () => {
-    it('pairImagesWithAlts blank alt ("") + buildProductAlt -> "{name} - {store}"', () => {
+    it('pairImagesWithAlts blank alt ("") + buildProductAlt -> "{name}"', () => {
         const { imageAlts } = pairImagesWithAlts([{ image: { url: 'https://cdn/a.jpg' } }])
-        expect(buildProductAlt(imageAlts[0], 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
+        expect(buildProductAlt(imageAlts[0], 'Baju Pink', 'My Shop')).toBe('Baju Pink')
     })
 
     it('pairImagesWithAlts real alt passes through buildProductAlt unchanged', () => {
