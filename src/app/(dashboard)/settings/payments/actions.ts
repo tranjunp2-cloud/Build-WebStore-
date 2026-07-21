@@ -8,6 +8,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
 import { xenditFetch, XenditError } from '@/lib/payment/xendit-client'
 import { setCallbackUrl } from '@/lib/payment/xendit';
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -19,6 +20,60 @@ export type PaymentUpdates = {
     bank_name?: string | null;
     account_number?: string | null;
 };
+
+type PaymentMedia = {
+    id: string | number;
+    url?: string | null;
+    thumbnailURL?: string | null;
+    filename?: string | null;
+};
+
+export type SavedPaymentSettings = Omit<PaymentUpdates, 'qr_image'> & {
+    payment_cod: boolean;
+    payment_qr: boolean;
+    payment_card: boolean;
+    payment_fpx: boolean;
+    qr_image: string | number | PaymentMedia | null;
+    account_holder_name: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+};
+
+export type UpdatePaymentSettingsResult =
+    | { success: true; payments: SavedPaymentSettings }
+    | { success: false; error: string };
+
+function editablePaymentSettings(value: unknown): SavedPaymentSettings {
+    const payments = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+    const rawQrImage = payments.qr_image;
+    let qrImage: SavedPaymentSettings['qr_image'] = null;
+    if (typeof rawQrImage === 'string' || typeof rawQrImage === 'number') {
+        qrImage = rawQrImage;
+    } else if (rawQrImage && typeof rawQrImage === 'object' && !Array.isArray(rawQrImage)) {
+        const media = rawQrImage as Record<string, unknown>;
+        if (typeof media.id === 'string' || typeof media.id === 'number') {
+            qrImage = {
+                id: media.id,
+                ...(typeof media.url === 'string' ? { url: media.url } : {}),
+                ...(typeof media.thumbnailURL === 'string' ? { thumbnailURL: media.thumbnailURL } : {}),
+                ...(typeof media.filename === 'string' ? { filename: media.filename } : {}),
+            };
+        }
+    }
+
+    return {
+        payment_cod: payments.payment_cod === true,
+        payment_qr: payments.payment_qr === true,
+        payment_card: payments.payment_card === true,
+        payment_fpx: payments.payment_fpx === true,
+        qr_image: qrImage,
+        account_holder_name: typeof payments.account_holder_name === 'string' ? payments.account_holder_name : null,
+        bank_name: typeof payments.bank_name === 'string' ? payments.bank_name : null,
+        account_number: typeof payments.account_number === 'string' ? payments.account_number : null,
+    };
+}
 
 export async function getPaymentSettings() {
     try {
@@ -41,7 +96,7 @@ export async function getPaymentSettings() {
     }
 }
 
-export async function updatePaymentSettings(updates: PaymentUpdates) {
+export async function updatePaymentSettings(updates: PaymentUpdates): Promise<UpdatePaymentSettingsResult> {
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
@@ -135,28 +190,42 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             return { success: false, error: 'No valid payment fields provided' };
         }
 
-        // Defence in depth: ensure at least one method stays active after this update.
-        // Must merge with current DB state because paymentsData is a partial update.
-        const currentTenant = await payload.findByID({ collection: 'tenants', id: tenantId });
-        const currentPayments = (currentTenant as any).payments || {};
-        const effective = {
-            payment_cod: currentPayments.payment_cod ?? false,
-            payment_qr: currentPayments.payment_qr ?? false,
-            payment_card: currentPayments.payment_card ?? false,
-            payment_fpx: currentPayments.payment_fpx ?? false,
-            ...paymentsData,
-        };
-        if (!effective.payment_cod && !effective.payment_qr && !effective.payment_card && !effective.payment_fpx) {
-            return { success: false, error: 'At least one payment method must remain active.' };
-        }
+        return await withTenantRowLock(payload, tenantId, async (req) => {
+            // The row lock keeps the read/validate/write sequence atomic across tabs.
+            const currentTenant = await payload.findByID({ collection: 'tenants', id: tenantId, req });
+            const currentPayments = (currentTenant as { payments?: Record<string, unknown> }).payments || {};
+            const effective = {
+                payment_cod: currentPayments.payment_cod === true,
+                payment_qr: currentPayments.payment_qr === true,
+                payment_card: currentPayments.payment_card === true,
+                payment_fpx: currentPayments.payment_fpx === true,
+                ...paymentsData,
+            };
+            const effectiveQrImage = paymentsData.qr_image !== undefined
+                ? paymentsData.qr_image
+                : currentPayments.qr_image;
+            if (paymentsData.qr_image === null || (effective.payment_qr && !effectiveQrImage)) {
+                effective.payment_qr = false;
+            }
+            const stripeReady = (currentTenant as { stripeOnboardingComplete?: boolean }).stripeOnboardingComplete === true;
+            if (paymentsData.payment_card === true && !stripeReady) effective.payment_card = false;
+            if (paymentsData.payment_fpx === true && !stripeReady) effective.payment_fpx = false;
+            if (!effective.payment_cod && !effective.payment_qr && !effective.payment_card && !effective.payment_fpx) {
+                return { success: false, error: 'At least one payment method must remain active.' } as const;
+            }
 
-        await payload.update({
-            collection: 'tenants',
-            id: tenantId,
-            data: { payments: paymentsData } as any,
+            const updatedTenant = await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                data: { payments: paymentsData } as any,
+                req,
+            });
+
+            return {
+                success: true,
+                payments: editablePaymentSettings((updatedTenant as { payments?: unknown }).payments),
+            } as const;
         });
-
-        return { success: true };
     } catch (error: unknown) {
         console.error("Failed to update payment settings via action:", error);
         return { success: false, error: 'Internal server error' };
@@ -341,4 +410,3 @@ export async function disconnectStripe() {
         return { success: false, error: 'Internal server error' };
     }
 }
-

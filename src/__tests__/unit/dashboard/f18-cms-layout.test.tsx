@@ -138,12 +138,12 @@ describe('F18 CMS Core Layout', () => {
             expect(screen.queryByRole('link', { name: /Media/i })).toBeNull()
         })
 
-        it('[TC-F18.10] Toggles Language (MY/EN)', () => {
-            const toggleLocaleMock = vi.fn()
+        it('[TC-F18.10] Selects dashboard language (MY/EN/VI)', () => {
+            const setLocaleMock = vi.fn()
             vi.spyOn(i18n, 'useI18n').mockReturnValue({ 
                 locale: 'en', 
-                setLocale: vi.fn(), 
-                toggleLocale: toggleLocaleMock, 
+                setLocale: setLocaleMock,
+                toggleLocale: vi.fn(),
                 t: { cms: { profile: 'Profile', logout: 'Logout', appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' } }, dashboard: { overview: { greeting: 'Good' } } } as any,
                 tp: vi.fn(),
                 ti: vi.fn()
@@ -153,7 +153,7 @@ describe('F18 CMS Core Layout', () => {
             
             const myBtns = screen.getAllByText('MY')
             fireEvent.click(myBtns[0]) 
-            expect(toggleLocaleMock).toHaveBeenCalled()
+            expect(setLocaleMock).toHaveBeenCalledWith('ms')
         })
         
         it('[TC-F18.05] Renders Help Center link', () => {

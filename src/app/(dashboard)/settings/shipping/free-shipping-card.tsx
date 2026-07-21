@@ -24,11 +24,14 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
     const showHelper = freeEnabled && freeAboveRm !== '' && !isNaN(parsedAmount)
 
     return (
-        <div className="flex flex-col rounded-[16px] border border-solid border-dash-border bg-[hsl(var(--card))] overflow-hidden">
+        <div
+            className="flex flex-col overflow-hidden rounded-[16px]"
+            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+        >
             {/* Card header: icon + title + subtitle + toggle. GH-1538 #7: dropped the border-b
                 divider here — PaymentMethodCard (the sync target) uses a single outer border
                 only, no internal header/body separator. */}
-            <div className="flex items-start justify-between gap-4 px-6 py-5">
+            <div className="flex items-start justify-between gap-4 p-4 sm:px-[25px] sm:py-5">
                 <div className="flex items-start gap-4">
                     <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-warning/10 border border-warning/20 shrink-0">
                         <Gift className="h-5 w-5 text-warning" />
@@ -47,7 +50,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
             </div>
 
             {/* Input section */}
-            <div className={cn("flex flex-col gap-2 px-6 py-5 transition-opacity", !freeEnabled && "opacity-40")}>
+            <div className={cn("flex flex-col gap-2 p-4 pt-0 transition-opacity sm:px-[25px] sm:pb-[25px]", !freeEnabled && "opacity-40")}>
                 <label htmlFor="ship-free-threshold" className="text-[14px] font-semibold text-[var(--dash-text)]">{s.freeMinLabel}</label>
                 <div className="relative w-full">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">

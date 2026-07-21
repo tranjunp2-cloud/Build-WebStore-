@@ -8,6 +8,14 @@ vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: vi.fn(),
 }));
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: string,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'tx-1' })),
+}));
+
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
         id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
@@ -106,18 +114,96 @@ describe('Payment Actions', () => {
             vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             // Backend guard fetches current tenant to merge effective payment state
             mockPayloadContext.findByID.mockResolvedValue({ payments: {} });
-            mockPayloadContext.update.mockResolvedValue({});
+            mockPayloadContext.update.mockResolvedValue({
+                payments: {
+                    payment_cod: true,
+                    payment_qr: false,
+                    payment_card: false,
+                    payment_fpx: false,
+                    qr_image: null,
+                    account_holder_name: null,
+                    bank_name: null,
+                    account_number: null,
+                },
+            });
 
             // Act
             const result = await updatePaymentSettings({ payment_cod: true });
 
             // Assert
             expect(result.success).toBe(true);
+            expect(result.payments).toEqual({
+                payment_cod: true,
+                payment_qr: false,
+                payment_card: false,
+                payment_fpx: false,
+                qr_image: null,
+                account_holder_name: null,
+                bank_name: null,
+                account_number: null,
+            });
             expect(mockPayloadContext.update).toHaveBeenCalledWith({
                 collection: 'tenants',
                 id: 'tenant-123',
                 data: { payments: { payment_cod: true } },
+                req: { transactionID: 'tx-1' },
             });
+        });
+
+        it('should preserve unrelated payment methods by only writing submitted fields', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            mockPayloadContext.findByID.mockResolvedValue({
+                payments: {
+                    payment_cod: false,
+                    payment_qr: true,
+                    payment_card: true,
+                    payment_fpx: false,
+                },
+            });
+            mockPayloadContext.update.mockResolvedValue({
+                payments: {
+                    payment_cod: true,
+                    payment_qr: true,
+                    payment_card: true,
+                    payment_fpx: false,
+                },
+            });
+
+            // Act
+            const result = await updatePaymentSettings({ payment_cod: true });
+
+            // Assert
+            expect(mockPayloadContext.update).toHaveBeenCalledWith(expect.objectContaining({
+                data: { payments: { payment_cod: true } },
+            }));
+            expect(result.success && result.payments).toEqual(expect.objectContaining({
+                payment_cod: true,
+                payment_qr: true,
+                payment_card: true,
+                payment_fpx: false,
+            }));
+        });
+
+        it('blocks removing the QR image when QR is the only active method', async () => {
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            mockPayloadContext.findByID.mockResolvedValue({
+                payments: {
+                    payment_cod: false,
+                    payment_qr: true,
+                    payment_card: false,
+                    payment_fpx: false,
+                    qr_image: 42,
+                },
+            });
+
+            const result = await updatePaymentSettings({ qr_image: null });
+
+            expect(result).toEqual({
+                success: false,
+                error: 'At least one payment method must remain active.',
+            });
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
         });
 
         it('should return error if payment_cod is not a boolean', async () => {

@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 import { LocaleFlag } from '@/components/locale-flag'
 
 const LABEL: Record<Locale, string> = { en: 'EN', ms: 'MY' }
+const LANGUAGE_NAME: Record<Locale, string> = { en: 'English', ms: 'Bahasa Melayu' }
+const LOCALES: Locale[] = ['en', 'ms']
 
 export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'minimal' | 'globe' | 'segmented' }) {
     const { locale, toggleLocale, setLocale } = useI18n()
@@ -16,8 +18,8 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
             <button
                 onClick={() => toggleLocale()}
                 className="group relative flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-all duration-200 px-2 py-1.5 rounded-lg hover:bg-zinc-100"
-                aria-label={`Switch to ${nextLocale === 'en' ? 'English' : 'Bahasa Melayu'}`}
-                title={locale === 'en' ? 'English' : 'Bahasa Melayu'}
+                aria-label={`Switch to ${LANGUAGE_NAME[nextLocale]}`}
+                title={LANGUAGE_NAME[locale]}
             >
                 <Globe className="w-4 h-4" />
                 <span className="font-medium text-xs uppercase">{LABEL[locale]}</span>
@@ -93,26 +95,20 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                         border: '1px solid var(--auth-input-border)',
                     }}
                 >
-                    <button
-                        type="button"
-                        onClick={() => locale !== 'ms' && toggleLocale()}
-                        style={{
-                            ...tabBase,
-                            ...(locale === 'ms' ? activeStyle : inactiveStyle),
-                        }}
-                    >
-                        MY
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => locale !== 'en' && toggleLocale()}
-                        style={{
-                            ...tabBase,
-                            ...(locale === 'en' ? activeStyle : inactiveStyle),
-                        }}
-                    >
-                        EN
-                    </button>
+                    {LOCALES.map((lang) => (
+                        <button
+                            key={lang}
+                            type="button"
+                            onClick={() => setLocale(lang)}
+                            style={{
+                                ...tabBase,
+                                ...(locale === lang ? activeStyle : inactiveStyle),
+                            }}
+                            aria-label={`Switch to ${LANGUAGE_NAME[lang]}`}
+                        >
+                            {LABEL[lang]}
+                        </button>
+                    ))}
                 </div>
             </div>
         )
@@ -120,7 +116,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
 
     return (
         <div className="flex items-center bg-white/5 rounded-full p-0.5 border border-white/10">
-            {(['en', 'ms'] as Locale[]).map((lang) => (
+            {LOCALES.map((lang) => (
                 <button
                     key={lang}
                     onClick={() => setLocale(lang)}
@@ -130,7 +126,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                             ? 'bg-sky-500/20 text-sky-400 shadow-sm'
                             : 'text-zinc-500 hover:text-zinc-300'
                     )}
-                    aria-label={`Switch to ${lang === 'en' ? 'English' : 'Bahasa Melayu'}`}
+                    aria-label={`Switch to ${LANGUAGE_NAME[lang]}`}
                 >
                     <LocaleFlag locale={lang} className="w-5 rounded-[2px]" />
                     <span>{LABEL[lang]}</span>
