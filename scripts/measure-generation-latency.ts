@@ -175,6 +175,12 @@ function summarize(results: RunResult[]) {
     }
 }
 
+export function assertBenchmarkSuccessful(summary: { attempts: number; failures: number }): void {
+    if (summary.failures > 0) {
+        throw new Error(`benchmark completed with ${summary.failures}/${summary.attempts} failed run(s)`)
+    }
+}
+
 async function main() {
     const args = parseArgs()
     const results: RunResult[] = []
@@ -201,6 +207,7 @@ async function main() {
         '',
     ].join('\n'))
     console.info(JSON.stringify(summary, null, 2))
+    assertBenchmarkSuccessful(summary)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

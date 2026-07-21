@@ -68,6 +68,8 @@ export interface MediaPipelineContext {
     // Absent/empty when the flag is off — falls through to the legacy inline
     // download+upload path unchanged.
     preUploadedPool?: Map<string, number>
+    // Request-scoped fence checked inside serialized media writes.
+    assertCanWrite?: () => void
 }
 
 export interface BatchFetchResult {
@@ -171,6 +173,7 @@ export async function uploadBufferToMedia(
         mimetype: string
         alt: string
         tenantId: string
+        assertCanWrite?: () => void
     },
 ): Promise<number> {
     const createArgs = {
@@ -190,15 +193,22 @@ export async function uploadBufferToMedia(
     // media creates silently lose rows (drizzle transaction race, see
     // media-create-lock.ts). Downloads/S3 stay parallel upstream.
     try {
-        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        const doc = await withMediaCreateLock(() => {
+            args.assertCanWrite?.()
+            return payload.create(createArgs)
+        })
         return doc.id
     } catch (err) {
+        args.assertCanWrite?.()
         // Belt & braces for genuinely transient failures (network, S3 hiccup).
         console.warn(
             `[Media Pipeline] media create failed for ${args.filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
         )
         await new Promise((r) => setTimeout(r, 300))
-        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        const doc = await withMediaCreateLock(() => {
+            args.assertCanWrite?.()
+            return payload.create(createArgs)
+        })
         return doc.id
     }
 }
@@ -221,6 +231,7 @@ async function fetchAndStorePhoto(
         mimetype,
         alt,
         tenantId: ctx.tenantId,
+        assertCanWrite: ctx.assertCanWrite,
     })
 }
 
@@ -246,6 +257,7 @@ async function fetchAndStorePoolPhoto(
         mimetype,
         alt,
         tenantId: ctx.tenantId,
+        assertCanWrite: ctx.assertCanWrite,
     })
 }
 
@@ -388,6 +400,7 @@ async function heroFallbackChain(
             mimetype,
             alt: `${ctx.businessName} — Stock Photo from Unsplash`,
             tenantId: ctx.tenantId,
+            assertCanWrite: ctx.assertCanWrite,
         })
         return { mediaIds: [id], photos: [], failures: [] }
     } catch (err) {

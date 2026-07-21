@@ -28,8 +28,12 @@ async function fetchBlogThumbnail(
     category: string,
     searchRateLimited: boolean,
     payload: BasePayload,
+    assertCanWrite?: () => void,
 ): Promise<{ thumbnailId: number | undefined; wasRateLimited: boolean }> {
     const filename = `blog-${tenantId}-${seed.slug}.jpg`
+    const upload = (url: string) => assertCanWrite
+        ? uploadImageUrl(url, filename, seed.title, tenantId, payload, assertCanWrite)
+        : uploadImageUrl(url, filename, seed.title, tenantId, payload)
     const keyword =
         ('imageKeyword' in seed && seed.imageKeyword) ||
         ('category' in seed && seed.category) ||
@@ -51,7 +55,7 @@ async function fetchBlogThumbnail(
             if (photos.length > 0) {
                 const photo = photos[0]!
                 // photo.url is already sized by the client (Pixabay fixed sizes).
-                const id = await uploadImageUrl(photo.url, filename, seed.title, tenantId, payload)
+                const id = await upload(photo.url)
                 if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
                 console.warn(`[seed-blog-posts] Tier A orphan for "${seed.slug}", falling to Tier B`)
             }
@@ -66,9 +70,10 @@ async function fetchBlogThumbnail(
     }
 
     // Tier B: curated CDN URL (stable, bypasses search API)
+    assertCanWrite?.()
     try {
         const fallbackUrl = blogThumbnails[i % blogThumbnails.length]!
-        const id = await uploadImageUrl(fallbackUrl, filename, seed.title, tenantId, payload)
+        const id = await upload(fallbackUrl)
         if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
         console.warn(`[seed-blog-posts] Tier B orphan for "${seed.slug}", falling to Tier C`)
     } catch (err) {
@@ -76,7 +81,11 @@ async function fetchBlogThumbnail(
     }
 
     // Tier C: carton placeholder — local file, zero external dependency
-    const carton = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
+    assertCanWrite?.()
+    const carton = await (assertCanWrite
+        ? findOrCreateCartonMedia(payload, tenantId, undefined, assertCanWrite)
+        : findOrCreateCartonMedia(payload, tenantId)
+    ).catch(() => null)
     if (carton) {
         console.warn(`[seed-blog-posts] Tier C carton used for "${seed.slug}"`)
         return { thumbnailId: carton.id, wasRateLimited }
@@ -137,6 +146,7 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
+    assertCanWrite?: () => void
     /** Settles when the request's other Pixabay consumers (image pool,
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
@@ -198,13 +208,13 @@ export async function prepareBlogPosts(opts: {
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)
         const firstThumbnail = await fetchBlogThumbnail(
-            seeds[0]!, 0, blogThumbnails, tenantId, category, false, payload,
+            seeds[0]!, 0, blogThumbnails, tenantId, category, false, payload, opts.assertCanWrite,
         )
         console.log(`[seed-blog-posts] blog 1/${seeds.length} "${seeds[0]!.slug}" → thumbnailId=${firstThumbnail.thumbnailId ?? 'none'}`)
         const remainingThumbnails = await Promise.all(seeds.slice(1).map(async (seed, offset) => {
             const i = offset + 1
             const { thumbnailId } = await fetchBlogThumbnail(
-                seed, i, blogThumbnails, tenantId, category, firstThumbnail.wasRateLimited, payload,
+                seed, i, blogThumbnails, tenantId, category, firstThumbnail.wasRateLimited, payload, opts.assertCanWrite,
             )
             console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seed.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
             return thumbnailId
@@ -235,9 +245,11 @@ export async function persistBlogPosts(
     tenantId: number | string,
     siteId: number | string,
     userId: number | string,
+    assertCanWrite?: () => void,
 ): Promise<number> {
     let count = 0
     for (const post of prepared) {
+        assertCanWrite?.()
         // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
         let finalSlug = `${tenantId}-${post.slug}`
         try {
@@ -249,6 +261,7 @@ export async function persistBlogPosts(
             if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
         } catch { /* proceed with original slug */ }
 
+        assertCanWrite?.()
         try {
             await payload.create({
                 collection: 'blogs',
@@ -284,8 +297,13 @@ export async function seedBlogPosts(
     products?: string[],
     industry?: string,
     seed?: number,
+    assertCanWrite?: () => void,
 ): Promise<number> {
-    const prepared = await prepareBlogPosts({ payload, tenantId, category, businessName, products, industry, seed })
+    assertCanWrite?.()
+    const prepared = await prepareBlogPosts({
+        payload, tenantId, category, businessName, products, industry, seed, assertCanWrite,
+    })
     if (!prepared || prepared.length === 0) return 0
-    return persistBlogPosts(payload, prepared, tenantId, siteId, userId)
+    assertCanWrite?.()
+    return persistBlogPosts(payload, prepared, tenantId, siteId, userId, assertCanWrite)
 }

@@ -548,6 +548,118 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
         })
 
+        it('[TC-GENPERF-W3-22] fails completion when a page persists only after media refs are stripped', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalCreate = vi.mocked(payload.create).getMockImplementation()!
+             let rejectedImageWrites = 0
+             vi.mocked(payload.create).mockImplementation(async (args) => {
+                 // Payload reports the nested image FK failure at insert time;
+                 // the persisted shape has already passed through media normalization.
+                 // Exhaust the transient retry wrapper so the strip-media
+                 // fallback is the write that finally persists the page.
+                 if (args.collection === 'pages' && args.data?.slug !== '404' && rejectedImageWrites < 3) {
+                     rejectedImageWrites++
+                     throw new Error('pages_blocks_hero_image_id_media_id_fk violates foreign key constraint')
+                 }
+                 return originalCreate(args)
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(rejectedImageWrites).toBe(3)
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             const completedWrites = vi.mocked(payload.update).mock.calls.filter(
+                 ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
+             )
+             expect(completedWrites).toHaveLength(0)
+        })
+
+        it('[TC-GENPERF-W3-23] fails completion when stale product media falls back to image-less rows', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalCreate = vi.mocked(payload.create).getMockImplementation()!
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 6 }, (_, index) => ({
+                     name: `Image Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `IMAGE-${index + 1}`,
+                     inventory: 0,
+                     imageId: 700 + index,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+             vi.mocked(payload.create).mockImplementation(async (args) => {
+                 if (args.collection === 'products' && Array.isArray(args.data?.images)) {
+                     const error = new Error('products_images_image_id_media_id_fk violates foreign key constraint') as Error & { code?: string }
+                     error.code = '23503'
+                     throw error
+                 }
+                 return originalCreate(args)
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
+                 ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
+             )
+             expect(imageLessProducts).toHaveLength(6)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+        })
+
+        it('[TC-GENPERF-W3-24] starts no further writes after the route deadline aborts', async () => {
+             const payload = await getPayload({ config: {} as never })
+             let now = 1_000_000
+             const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+             let resolveProducts: (value: Awaited<ReturnType<typeof generateSampleProducts>>) => void = () => {}
+             vi.mocked(generateSampleProducts).mockReturnValueOnce(new Promise((resolve) => { resolveProducts = resolve }))
+
+             try {
+                 const responsePromise = GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+                 await vi.waitFor(() => expect(mockPageDB).toHaveLength(6))
+
+                 now += 55_000
+                 resolveProducts({
+                     products: Array.from({ length: 6 }, (_, index) => ({
+                         name: `Late Product ${index + 1}`,
+                         shortDescription: 'Sample product',
+                         description: 'A complete sample product.',
+                         price: 10,
+                         sku: `LATE-${index + 1}`,
+                         inventory: 0,
+                         status: 'active',
+                     })),
+                     stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+                 })
+
+                 const res = await responsePromise
+                 expect(res.status).toBe(500)
+                 expect(vi.mocked(payload.create).mock.calls.some(([arg]) => arg.collection === 'products')).toBe(false)
+                 expect(vi.mocked(payload.update).mock.calls.some(
+                     ([arg]) => arg.collection === 'sites' && ['completed', 'failed'].includes(arg.data?.generationStatus),
+                 )).toBe(false)
+             } finally {
+                 nowSpy.mockRestore()
+             }
+        })
+
         it('sets generationStatus to generating before creating pages', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',

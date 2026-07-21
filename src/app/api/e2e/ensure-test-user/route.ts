@@ -107,7 +107,44 @@ export async function POST(req: NextRequest) {
             tenantId = newTenant.id
         }
 
-        // Step 2: find or create user
+        // Step 2: ensure the isolated benchmark tenant can pass the same
+        // subscription gate as a tenant provisioned through the SSO flow.
+        const subscriptionsResult = await payload.find({
+            collection: 'plan-subscriptions',
+            where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
+            limit: 1,
+            sort: '-createdAt',
+            overrideAccess: true,
+        })
+        const subscriptionData = {
+            plan: 'FREEMIUM' as const,
+            status: 'active' as const,
+            startsAt: new Date().toISOString(),
+            endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            canceledAt: null,
+            canceledImmediately: false,
+            packCode: 'FREEMIUM',
+        }
+        if (subscriptionsResult.docs.length > 0) {
+            await payload.update({
+                collection: 'plan-subscriptions',
+                id: subscriptionsResult.docs[0].id,
+                overrideAccess: true,
+                data: subscriptionData,
+            })
+        } else {
+            await payload.create({
+                collection: 'plan-subscriptions',
+                overrideAccess: true,
+                data: {
+                    tenant: tenantId,
+                    name: 'main',
+                    ...subscriptionData,
+                },
+            })
+        }
+
+        // Step 3: find or create user
         const usersResult = await payload.find({
             collection: 'users',
             where: { email: { equals: email } },
