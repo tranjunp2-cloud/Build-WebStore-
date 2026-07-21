@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   buildImagePool,
+  backfillImagePool,
   pickFromPool,
   pickManyFromPool,
   mergePool,
@@ -409,6 +410,41 @@ describe('image-pool helpers', () => {
       ],
     }
     expect(poolSize(withSquare)).toBe(3)
+  })
+
+  it('[TC-GENPERF-W3-13] backfills the exact deficit without reusing existing source IDs', async () => {
+    const initial: ImagePool = {
+      landscape: landscapeFixture.slice(0, 6).map((photo) => ({
+        ...photo,
+        alt: photo.alt ?? '',
+        role: 'gallery' as const,
+        aspectRatio: '16:9' as const,
+      })),
+      square: [],
+      portrait: [],
+      queryUsed: 'ramen',
+      underfill: true,
+    }
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture.slice(0, 9))
+
+    const result = await backfillImagePool(initial, baseCtx({ squareSize: 0 }), {
+      landscape: 9,
+      square: 0,
+    })
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(9)
+    expect(result.added.landscape.map((photo) => photo.id)).toEqual(['L6', 'L7', 'L8'])
+    expect(result.pool.landscape.map((photo) => photo.id)).toEqual([
+      'L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8',
+    ])
+  })
+
+  it('[TC-GENPERF-W3-14] skips Pixabay when the speculative pool already meets actual slots', async () => {
+    const result = await backfillImagePool(basePool, baseCtx(), { landscape: 2, square: 0 })
+    expect(mockSearchPhotos).not.toHaveBeenCalled()
+    expect(result.pool).toBe(basePool)
+    expect(result.added.landscape).toEqual([])
   })
 })
 

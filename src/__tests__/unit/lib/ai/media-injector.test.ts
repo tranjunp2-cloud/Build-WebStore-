@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
 import { getAvatarMedia, batchFetchFromPool, getMediaForBlock } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
@@ -470,5 +470,26 @@ describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
 
 	it('accepts an explicit enabled set (pure function, no env read)', () => {
 		expect(computePoolBucketSizes(new Set(['hero']))).toEqual({ landscape: 3, square: 0, landscapeMin: 1, squareMin: 0 })
+	})
+})
+
+describe('computePoolTargetsForNeeds — actual generated slots', () => {
+	it('uses the largest real gallery across pages instead of the schema minimum', () => {
+		const targets = computePoolTargetsForNeeds([
+			{ blockType: 'gallery', count: 6 },
+			{ blockType: 'gallery', count: 9 },
+			{ blockType: 'hero', count: 1 },
+		])
+		expect(targets).toEqual({ landscape: 9, square: 0 })
+	})
+
+	it('excludes people and logo blocks from stock-pool targets', () => {
+		const targets = computePoolTargetsForNeeds([
+			{ blockType: 'team', count: 5 },
+			{ blockType: 'testimonials', count: 4 },
+			{ blockType: 'logo-cloud', count: 8 },
+			{ blockType: 'products-grid', count: 4 },
+		])
+		expect(targets).toEqual({ landscape: 0, square: 4 })
 	})
 })

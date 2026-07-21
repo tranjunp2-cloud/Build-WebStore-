@@ -167,6 +167,21 @@ export interface ImageNeed {
     assign: (mediaIds: number[]) => void
 }
 
+/** Actual pool capacity required after AI has produced every page/block. */
+export function computePoolTargetsForNeeds(
+    needs: ReadonlyArray<Pick<ImageNeed, 'blockType' | 'count'>>,
+): { landscape: number; square: number } {
+    let landscape = 0
+    let square = 0
+    for (const need of needs) {
+        if (PEOPLE_BLOCKS.has(need.blockType) || NO_STOCK_BLOCKS.has(need.blockType)) continue
+        const bucket = bucketForRole(roleForBlock(need.blockType))
+        if (bucket === 'square') square = Math.max(square, need.count)
+        else landscape = Math.max(landscape, need.count)
+    }
+    return { landscape, square }
+}
+
 export interface FulfillmentContext extends MediaPipelineContext {
     language?: KeywordLanguage
 }

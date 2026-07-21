@@ -10,7 +10,7 @@ import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -27,7 +27,7 @@ import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
-import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
+import { backfillImagePool, buildImagePool, poolSize, type BuildPoolCtx, type ImagePool } from '@/lib/ai/image-pool'
 import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
 import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
@@ -478,7 +478,7 @@ export async function POST(req: NextRequest) {
 
             // NOTE: field keeps the historical name `englishKeywords` — it now carries
             // the RAW user-language keywords (see plan 260702-1607-GH-1185).
-            type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
+            type _PoolResult = { pool: ImagePool | null; englishKeywords: string[]; buildCtx: BuildPoolCtx | null }
             const imagePoolPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
                     // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
@@ -526,13 +526,14 @@ export async function POST(req: NextRequest) {
                     // preserved for the fulfillImageNeeds legacy search path even
                     // when pool build fails (e.g. Pixabay 429 / missing key).
                     let pool: ImagePool | null = null
+                    let buildCtx: BuildPoolCtx | null = null
                     try {
                         // Size the pool to what the enabled image blocks can
                         // actually consume (default hero-only → ~3 landscape, 0
                         // square) instead of a fixed 12+6 — cuts speculative
                         // download + pre-upload and the orphan media it left.
                         const poolSizes = computePoolBucketSizes()
-                        pool = await buildImagePool({
+                        buildCtx = {
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
                             topProduct: poolKeywords[0],
@@ -554,7 +555,8 @@ export async function POST(req: NextRequest) {
                             // last slots were patched from an off-pool search.
                             landscapeMin: poolSizes.landscapeMin,
                             squareMin: poolSizes.squareMin,
-                        })
+                        }
+                        pool = await buildImagePool(buildCtx)
                         // GH-1611: surface a REAL deficit — QC could not tell from
                         // the Editor whether a weak gallery came from a thin pool.
                         // Keyed on the actual shortfall, not `pool.underfill`: that
@@ -571,9 +573,9 @@ export async function POST(req: NextRequest) {
                     } catch {
                         // pool stays null; rawKeywords still returned for legacy search
                     }
-                    return { pool, englishKeywords: rawKeywords }
-                })().catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
-                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] }))
+                    return { pool, englishKeywords: rawKeywords, buildCtx }
+                })().catch((): _PoolResult => ({ pool: null, englishKeywords: [], buildCtx: null }))
+                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [], buildCtx: null }))
 
             // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
             // photos to Payload `media` DURING the GPT window instead of after
@@ -725,7 +727,7 @@ export async function POST(req: NextRequest) {
 
                     // O1: await pre-built pool (GH-1190) — typically 0ms wait since
                     // buildImagePool completed during AI generation above.
-                    const { pool: imagePool, englishKeywords } = await imagePoolPromise
+                    const { pool: imagePool, englishKeywords, buildCtx } = await imagePoolPromise
                     if (imagePool) {
                         console.info(
                             `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
@@ -737,7 +739,37 @@ export async function POST(req: NextRequest) {
                     // pool needs = resolves an already-empty Map (0ms wait),
                     // and batchFetchFromPool treats an empty map exactly like
                     // an absent one (legacy inline download+upload path).
-                    const preUploadedPool = await preUploadedPoolPromise
+                    const backfillPromise = imagePool && buildCtx
+                        ? trackPhase('pool_backfill', () => backfillImagePool(
+                            imagePool,
+                            buildCtx,
+                            computePoolTargetsForNeeds(needs),
+                        ))
+                        : Promise.resolve({
+                            pool: imagePool,
+                            added: null,
+                        })
+                    const [preUploadedPool, backfillResult] = await Promise.all([
+                        preUploadedPoolPromise,
+                        backfillPromise,
+                    ])
+                    const fulfillmentPool = backfillResult.pool
+                    const addedPool = backfillResult.added
+
+                    if (GEN_POOL_PREUPLOAD && addedPool && poolSize(addedPool) > 0) {
+                        const backfillUploads = await trackPhase('pool_backfill_upload', () => preUploadPool(
+                            addedPool,
+                            String(resolvedTenantId),
+                            businessInfo.businessName,
+                            payload as unknown as Parameters<typeof preUploadPool>[3],
+                        ))
+                        for (const [photoId, mediaId] of backfillUploads) {
+                            preUploadedPool.set(photoId, mediaId)
+                        }
+                        console.info(
+                            `[Image Pool] backfill added=${poolSize(addedPool)} uploaded=${backfillUploads.size}`,
+                        )
+                    }
 
                     blockImageStats = await trackPhase('media_fulfill', () =>
                         fulfillImageNeeds(
@@ -752,7 +784,7 @@ export async function POST(req: NextRequest) {
                                 language: resolvedLang,
                                 products: _parsedProductsForPool.length > 0 ? _parsedProductsForPool : undefined,
                                 mood: _themeMoodForPool,
-                                pool: imagePool ?? undefined,
+                                pool: fulfillmentPool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                                 preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
                             },
