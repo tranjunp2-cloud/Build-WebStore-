@@ -37,6 +37,8 @@ export interface PixabaySearchOptions {
     orientation?: PixabayOrientation
     /** Target render width — client picks largeImageURL (≥900) or webformatURL. */
     width?: number
+    /** Per-request deadline for latency-sensitive callers. */
+    timeoutMs?: number
     page?: number
     /**
      * GH-1185: Pixabay category slug (uploader-assigned, fixed vocabulary:
@@ -138,10 +140,60 @@ const DOWNLOAD_HOST_ALLOWLIST = [
     'images.unsplash.com',
     'plus.unsplash.com',
 ]
-const DEFAULT_TIMEOUT_MS = 15_000
+const SEARCH_TIMEOUT_MS = 5_000
+const DOWNLOAD_TIMEOUT_MS = 15_000
 const DEFAULT_MAX_BYTES = 10_000_000 // 10 MB
 const RATE_LIMIT_WARN_THRESHOLD = 20
 const LARGE_SIZE_MIN_WIDTH = 700 // ≥ this → largeImageURL (1280px), else webformatURL (640px)
+const CIRCUIT_OPEN_MS = 60_000
+const SERVER_ERROR_CIRCUIT_THRESHOLD = 3
+
+let circuitOpenUntil = 0
+let circuitError: PixabayError | null = null
+let consecutiveServerErrors = 0
+
+function openCircuit(error: PixabayError): void {
+    // A timeout may be query-specific and must not suppress unrelated users on
+    // the same warm instance. Rate limits are provider-wide; repeated 5xxs are
+    // treated as an outage only after a small failure threshold.
+    if (error.code === 'TIMEOUT') return
+    if (error.code === 'SERVER_ERROR') {
+        consecutiveServerErrors += 1
+        if (consecutiveServerErrors < SERVER_ERROR_CIRCUIT_THRESHOLD) return
+    } else if (error.code !== 'RATE_LIMITED') {
+        return
+    }
+    circuitOpenUntil = Date.now() + CIRCUIT_OPEN_MS
+    circuitError = error
+}
+
+function recordProviderSuccess(): void {
+    consecutiveServerErrors = 0
+}
+
+function assertCircuitClosed(): void {
+    if (circuitOpenUntil === 0) return
+    if (Date.now() >= circuitOpenUntil) {
+        circuitOpenUntil = 0
+        circuitError = null
+        consecutiveServerErrors = 0
+        return
+    }
+    const source = circuitError
+    throw new PixabayError(
+        source?.code ?? 'SERVER_ERROR',
+        source?.status ?? 0,
+        false,
+        `[Pixabay] circuit open after ${source?.code ?? 'provider outage'}`,
+    )
+}
+
+/** Test isolation for the process-wide provider circuit. */
+export function __resetPixabayCircuitForTests(): void {
+    circuitOpenUntil = 0
+    circuitError = null
+    consecutiveServerErrors = 0
+}
 
 /** Recommended orientation per block type — used by media-pipeline callers. */
 export const PIXABAY_ORIENTATION_BY_BLOCK: Record<string, PixabayOrientation> = {
@@ -199,22 +251,23 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
     while (attempt <= 1) {
         try {
             const res = await fetch(url, init)
-            if (res.ok) return res
+            if (res.ok) {
+                recordProviderSuccess()
+                return res
+            }
             if (res.status === 401 || res.status === 403) {
                 throw new PixabayError('UNAUTHORIZED', res.status, false)
             }
             if (res.status === 429 || res.status >= 500) {
-                if (attempt === 0) {
-                    attempt++
-                    const jitter = 2000 + Math.floor(Math.random() * 500)
-                    await new Promise((r) => setTimeout(r, jitter))
-                    continue
-                }
-                throw new PixabayError(
+                const error = new PixabayError(
                     res.status === 429 ? 'RATE_LIMITED' : 'SERVER_ERROR',
                     res.status,
                     true,
                 )
+                // Retrying the same unavailable provider multiplied one 503 into
+                // a 56s pool ladder, followed by product/blog/legacy retries.
+                openCircuit(error)
+                throw error
             }
             throw new PixabayError('SERVER_ERROR', res.status, false)
         } catch (err) {
@@ -227,17 +280,23 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
             // so the second fetch rejected instantly and surfaced as a
             // misclassified SERVER_ERROR.)
             if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
-                throw new PixabayError('TIMEOUT', 0, true, err.message)
+                const error = new PixabayError('TIMEOUT', 0, true, err.message)
+                openCircuit(error)
+                throw error
             }
             if (attempt === 0) {
                 attempt++
                 await new Promise((r) => setTimeout(r, 1500))
                 continue
             }
-            throw new PixabayError('SERVER_ERROR', 0, false, (err as Error).message)
+            const error = new PixabayError('SERVER_ERROR', 0, true, (err as Error).message)
+            openCircuit(error)
+            throw error
         }
     }
-    throw new PixabayError('SERVER_ERROR', 0, false, 'retry exhausted')
+    const error = new PixabayError('SERVER_ERROR', 0, true, 'retry exhausted')
+    openCircuit(error)
+    throw error
 }
 
 /** Pick the pre-sized URL for a hit given the caller's target width. */
@@ -463,6 +522,7 @@ export async function searchPhotos(
         warnNoKeyOnce()
         return []
     }
+    assertCircuitClosed()
     // Pixabay has no 'squarish' orientation (mapped to 'all'). Over-fetch candidates
     // so we can prefer near-square hits for avatar/team buckets — see reordering below.
     const isSquarish = opts.orientation === 'squarish'
@@ -490,7 +550,7 @@ export async function searchPhotos(
 
     const url = `${BASE}?${params.toString()}`
     const res = await fetchWithRetry(url, {
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? SEARCH_TIMEOUT_MS),
     })
     logRateLimit(res.headers)
     const json = (await res.json()) as PixabaySearchResponse
@@ -537,7 +597,7 @@ export async function downloadPhotoBuffer(
     let res: Response
     try {
         res = await fetch(url, {
-            signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+            signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
             headers: { 'User-Agent': 'ech-prime-web-v2/1.0' },
         })
     } catch (err) {

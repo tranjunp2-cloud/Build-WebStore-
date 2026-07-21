@@ -43,6 +43,7 @@
     "harness:report": "tsx scripts/test-harness/report/generate.ts",
     "harness:score": "tsx scripts/test-harness/rubric/scorer.ts",
     "measure:variety": "tsx scripts/measure-variety.ts",
+    "measure:generation": "tsx scripts/measure-generation-latency.ts",
     "harness:all": "tsx scripts/test-harness/cli.ts --mode=full && tsx scripts/test-harness/check.ts && (playwright test --config=scripts/test-harness/render/playwright.config.ts || true) && tsx scripts/test-harness/render/visual-report.ts; tsx scripts/test-harness/report/generate.ts"
   },
   "dependencies": {

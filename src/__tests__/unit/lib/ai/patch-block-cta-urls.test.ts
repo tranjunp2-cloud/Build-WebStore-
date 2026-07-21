@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
     patchBlockCtaUrls,
+    patchBlockCtaUrlsFromLinks,
     patchLocaleInitCtaUrls,
 } from '@/lib/ai/patch-block-cta-urls'
 import type { NavPageLike } from '@/lib/navigation-url'
@@ -135,7 +136,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Action CTAs (pricing)', () => 
     })
 
     // ── TC-F01.CTA-DRAG-06: Pricing with empty pages → fallback /contact ─
-    it('TC-F01.CTA-DRAG-06: pricing with pages=[] → ctaUrl becomes /contact (fallback)', () => {
+    it('TC-F01.CTA-DRAG-06: pricing with pages=[] → ctaUrl falls back to homepage', () => {
         const block = {
             blockType: 'pricing',
             title: 'Plans',
@@ -147,7 +148,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Action CTAs (pricing)', () => 
         const result = patchBlockCtaUrls(block, pagesEmpty)
 
         expect(result.plans).toHaveLength(1)
-        expect(result.plans[0].ctaUrl).toBe('/contact')
+        expect(result.plans[0].ctaUrl).toBe('/')
     })
 
     it('pricing with resolved CTA URL → preserve resolved URL (no fallback)', () => {
@@ -226,7 +227,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
         expect(result.ctaUrl).toBe('/contact')
     })
 
-    it('cta with pages=[] → ctaUrl falls back to /contact', () => {
+    it('cta with pages=[] → ctaUrl falls back to homepage', () => {
         const block = {
             blockType: 'cta',
             ctaLabel: 'Go',
@@ -235,7 +236,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
 
         const result = patchBlockCtaUrls(block, pagesEmpty)
 
-        expect(result.ctaUrl).toBe('/contact')
+        expect(result.ctaUrl).toBe('/')
     })
 
     it('cta external ctaUrl → passthrough unchanged', () => {
@@ -266,7 +267,7 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
         expect(result.secondaryCtaLabel).toBe('Learn')
     })
 
-    it('cta primary falls back to /contact while secondary still resolves (site missing /contact)', () => {
+    it('cta primary falls back to an existing page while secondary still resolves (site missing /contact)', () => {
         const block = {
             blockType: 'cta',
             ctaLabel: 'Primary',
@@ -277,9 +278,44 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
 
         const result = patchBlockCtaUrls(block, pagesNoContact)
 
-        expect(result.ctaUrl).toBe('/contact')
+        expect(result.ctaUrl).toBe('/about')
         expect(result.secondaryCtaUrl).toBe('/about')
         expect(result.secondaryCtaLabel).toBe('Learn')
+    })
+
+    it('TC-F01.CTA-AIGEN-02: generated Bakery CTA removes ghost /order and /menu links', () => {
+        const block = {
+            blockType: 'cta',
+            headline: 'Fresh from the oven',
+            ctaLabel: 'Order Now',
+            ctaUrl: '/order',
+            secondaryCtaLabel: 'View Menu',
+            secondaryCtaUrl: '/menu',
+        }
+
+        const result = patchBlockCtaUrlsFromLinks(block, [
+            { url: '/' },
+            { url: '/about' },
+            { url: '/contact' },
+            { url: '/blog' },
+        ])
+
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.secondaryCtaUrl).toBeUndefined()
+        expect((result as Record<string, unknown>).secondaryCtaLabel).toBeUndefined()
+    })
+
+    it('keeps legacy nested CTA payload resolution compatible with AI generation', () => {
+        const result = patchBlockCtaUrlsFromLinks({
+            blockType: 'cta',
+            headline: 'Visit us',
+            ctaButton: { label: 'Contact', url: '#contact' },
+        }, [
+            { url: '/' },
+            { url: '/contact' },
+        ])
+
+        expect(result.ctaButton).toEqual({ label: 'Contact', url: '/contact' })
     })
 
     it('cta secondary CTA dropped when no matching page', () => {
@@ -388,7 +424,7 @@ describe('[TC-F01.CTA-DRAG] patchLocaleInitCtaUrls — en/ms locale slots', () =
         expect(result.ms.ctaButtons[0].url).toBe('/about')
     })
 
-    it('patchLocaleInitCtaUrls: pricing in locale slots → fallback /contact preserved', () => {
+    it('patchLocaleInitCtaUrls: pricing in locale slots → fallback points to homepage', () => {
         const localeInit = {
             en: {
                 plans: [
@@ -404,8 +440,8 @@ describe('[TC-F01.CTA-DRAG] patchLocaleInitCtaUrls — en/ms locale slots', () =
 
         const result = patchLocaleInitCtaUrls(localeInit, pagesEmpty)
 
-        expect(result.en.plans[0].ctaUrl).toBe('/contact')
-        expect(result.ms.plans[0].ctaUrl).toBe('/contact')
+        expect(result.en.plans[0].ctaUrl).toBe('/')
+        expect(result.ms.plans[0].ctaUrl).toBe('/')
     })
 
     it('patchLocaleInitCtaUrls: non-CTA content → unchanged', () => {

@@ -28,8 +28,12 @@ async function fetchBlogThumbnail(
     category: string,
     searchRateLimited: boolean,
     payload: BasePayload,
+    assertCanWrite?: () => void,
 ): Promise<{ thumbnailId: number | undefined; wasRateLimited: boolean }> {
     const filename = `blog-${tenantId}-${seed.slug}.jpg`
+    const upload = (url: string) => assertCanWrite
+        ? uploadImageUrl(url, filename, seed.title, tenantId, payload, assertCanWrite)
+        : uploadImageUrl(url, filename, seed.title, tenantId, payload)
     const keyword =
         ('imageKeyword' in seed && seed.imageKeyword) ||
         ('category' in seed && seed.category) ||
@@ -42,11 +46,16 @@ async function fetchBlogThumbnail(
             // GH-1185: site-domain filter — blog topics follow the site's
             // industry, so a loose keyword match still lands on-domain.
             const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
-            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200, category: pixCategory })
+            const photos = await searchPhotos(keyword, 1, {
+                orientation: 'landscape',
+                width: 1200,
+                category: pixCategory,
+                timeoutMs: 6_000,
+            })
             if (photos.length > 0) {
                 const photo = photos[0]!
                 // photo.url is already sized by the client (Pixabay fixed sizes).
-                const id = await uploadImageUrl(photo.url, filename, seed.title, tenantId, payload)
+                const id = await upload(photo.url)
                 if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
                 console.warn(`[seed-blog-posts] Tier A orphan for "${seed.slug}", falling to Tier B`)
             }
@@ -61,9 +70,10 @@ async function fetchBlogThumbnail(
     }
 
     // Tier B: curated CDN URL (stable, bypasses search API)
+    assertCanWrite?.()
     try {
         const fallbackUrl = blogThumbnails[i % blogThumbnails.length]!
-        const id = await uploadImageUrl(fallbackUrl, filename, seed.title, tenantId, payload)
+        const id = await upload(fallbackUrl)
         if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
         console.warn(`[seed-blog-posts] Tier B orphan for "${seed.slug}", falling to Tier C`)
     } catch (err) {
@@ -71,7 +81,11 @@ async function fetchBlogThumbnail(
     }
 
     // Tier C: carton placeholder — local file, zero external dependency
-    const carton = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
+    assertCanWrite?.()
+    const carton = await (assertCanWrite
+        ? findOrCreateCartonMedia(payload, tenantId, undefined, assertCanWrite)
+        : findOrCreateCartonMedia(payload, tenantId)
+    ).catch(() => null)
     if (carton) {
         console.warn(`[seed-blog-posts] Tier C carton used for "${seed.slug}"`)
         return { thumbnailId: carton.id, wasRateLimited }
@@ -91,6 +105,22 @@ function disambiguateSlugs(seeds: AnyBlogSeed[]): AnyBlogSeed[] {
     })
 }
 
+function escapeHtml(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+}
+
+export function buildFallbackBlogContent(seed: Pick<AnyBlogSeed, 'title' | 'excerpt'>, businessName: string): string {
+    const title = escapeHtml(seed.title)
+    const excerpt = escapeHtml(seed.excerpt)
+    const name = escapeHtml(businessName)
+    return `<h2>${title}</h2><p>${excerpt}</p><h3>Why it matters</h3><p>${name} focuses on practical choices, clear expectations, and dependable results. Use this guide as a starting point, then choose the option that best matches your needs.</p><h3>What to consider</h3><ul><li>Define the outcome you need before comparing options.</li><li>Ask questions about quality, timing, and ongoing support.</li><li>Choose a solution that remains useful as your needs change.</li></ul><h3>Next steps</h3><p>Contact ${name} for advice tailored to your situation and a clear path forward.</p>`
+}
+
 export type PreparedBlogPost = {
     title: string
     slug: string
@@ -100,13 +130,13 @@ export type PreparedBlogPost = {
 
 /**
  * Phase 1 — no site dependency: AI seed topics + full article bodies (3
- * parallel GPT calls, 30s-bounded each) + thumbnails. gen-perf blog-inline:
+ * parallel GPT calls, 12s-bounded each) + thumbnails. gen-perf blog-inline:
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
- * insert all 3 posts BEFORE the `done` event; also reused by the legacy
- * post-response `seedBlogPosts` path.
+ * insert all 3 posts BEFORE the `done` event; also reused by the fallback
+ * `seedBlogPosts` path.
  * Returns [] when the tenant already has posts (regenerate — nothing to
- * seed), null when preparation failed entirely (caller falls back to legacy
- * post-response seeding). Never throws.
+ * seed), null when preparation failed entirely (caller falls back to the
+ * synchronous static seeding path). Never throws.
  */
 export async function prepareBlogPosts(opts: {
     payload: BasePayload
@@ -116,18 +146,33 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
+    /** Existing site being regenerated. When present, only complete posts for
+     *  this site count toward the three-post completion contract. */
+    siteId?: number | string
+    assertCanWrite?: () => void
     /** Settles when the request's other Pixabay consumers (image pool,
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
     pixabayGate?: Promise<unknown>
 }): Promise<PreparedBlogPost[] | null> {
-    const { payload, tenantId, category, businessName, products, industry, seed } = opts
+    const { payload, tenantId, category, businessName, products, industry, seed, siteId } = opts
     try {
-        const existing = await payload.count({
-            collection: 'blogs',
-            where: { tenant: { equals: tenantId } },
-        })
-        if (existing.totalDocs > 0) return []
+        let targetCount = 3
+        if (siteId !== undefined) {
+            const existing = await payload.count({
+                collection: 'blogs',
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { site: { equals: siteId } },
+                        { content: { exists: true } },
+                        { thumbnail: { exists: true } },
+                    ],
+                },
+            })
+            targetCount = Math.max(0, 3 - existing.totalDocs)
+            if (targetCount === 0) return []
+        }
 
         let seeds: AnyBlogSeed[] = []
         try {
@@ -136,7 +181,7 @@ export async function prepareBlogPosts(opts: {
                 industry: industry ?? category,
                 products,
             })
-            seeds = aiSeeds.slice(0, 3)
+            seeds = aiSeeds.slice(0, targetCount)
         } catch (err) {
             if (isQuotaExhausted(err)) {
                 console.warn('[seed-blog-posts] OpenAI quota exhausted, using static seeds')
@@ -145,8 +190,8 @@ export async function prepareBlogPosts(opts: {
             }
         }
 
-        if (seeds.length < 3) {
-            const need = 3 - seeds.length
+        if (seeds.length < targetCount) {
+            const need = targetCount - seeds.length
             const usedSlugs = new Set(seeds.map((s) => s.slug.toLowerCase()))
             const fill = getBlogSeeds(
                 category,
@@ -176,23 +221,25 @@ export async function prepareBlogPosts(opts: {
 
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)
-        const thumbnailIds: (number | undefined)[] = []
-        let searchRateLimited = false
-        for (let i = 0; i < seeds.length; i++) {
-            if (i > 0) await new Promise(r => setTimeout(r, 500))
-            const { thumbnailId, wasRateLimited } = await fetchBlogThumbnail(
-                seeds[i]!, i, blogThumbnails, tenantId, category, searchRateLimited, payload,
+        const firstThumbnail = await fetchBlogThumbnail(
+            seeds[0]!, 0, blogThumbnails, tenantId, category, false, payload, opts.assertCanWrite,
+        )
+        console.log(`[seed-blog-posts] blog 1/${seeds.length} "${seeds[0]!.slug}" → thumbnailId=${firstThumbnail.thumbnailId ?? 'none'}`)
+        const remainingThumbnails = await Promise.all(seeds.slice(1).map(async (seed, offset) => {
+            const i = offset + 1
+            const { thumbnailId } = await fetchBlogThumbnail(
+                seed, i, blogThumbnails, tenantId, category, firstThumbnail.wasRateLimited, payload, opts.assertCanWrite,
             )
-            if (wasRateLimited) searchRateLimited = true
-            thumbnailIds.push(thumbnailId)
-            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seeds[i]!.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
-        }
+            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seed.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
+            return thumbnailId
+        }))
+        const thumbnailIds = [firstThumbnail.thumbnailId, ...remainingThumbnails]
 
         const contents = await Promise.all(contentPromises)
         return seeds.map((s, i) => ({
             title: s.title,
             slug: s.slug,
-            content: contents[i] ?? `<p>${s.excerpt}</p>`,
+            content: contents[i] ?? buildFallbackBlogContent(s, businessName),
             ...(thumbnailIds[i] !== undefined ? { thumbnailId: thumbnailIds[i] } : {}),
         }))
     } catch (err) {
@@ -212,9 +259,12 @@ export async function persistBlogPosts(
     tenantId: number | string,
     siteId: number | string,
     userId: number | string,
+    assertCanWrite?: () => void,
+    onCreated?: (id: number | string) => void,
 ): Promise<number> {
     let count = 0
     for (const post of prepared) {
+        assertCanWrite?.()
         // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
         let finalSlug = `${tenantId}-${post.slug}`
         try {
@@ -226,8 +276,9 @@ export async function persistBlogPosts(
             if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
         } catch { /* proceed with original slug */ }
 
+        assertCanWrite?.()
         try {
-            await payload.create({
+            const created = await payload.create({
                 collection: 'blogs',
                 data: {
                     tenant: tenantId,
@@ -242,6 +293,7 @@ export async function persistBlogPosts(
                 },
                 context: { skipPublishNotify: true },
             })
+            onCreated?.(created.id as number | string)
             count++
         } catch (err) {
             console.warn(`[seed-blog-posts] post "${post.slug}" failed (non-fatal):`, (err as Error).message)
@@ -250,7 +302,7 @@ export async function persistBlogPosts(
     return count
 }
 
-/** Legacy single-shot path (post-response fallback): prepare + persist. */
+/** Single-shot fallback: prepare + persist inside the completion barrier. */
 export async function seedBlogPosts(
     payload: BasePayload,
     tenantId: number | string,
@@ -261,8 +313,14 @@ export async function seedBlogPosts(
     products?: string[],
     industry?: string,
     seed?: number,
+    assertCanWrite?: () => void,
+    onCreated?: (id: number | string) => void,
 ): Promise<number> {
-    const prepared = await prepareBlogPosts({ payload, tenantId, category, businessName, products, industry, seed })
+    assertCanWrite?.()
+    const prepared = await prepareBlogPosts({
+        payload, tenantId, siteId, category, businessName, products, industry, seed, assertCanWrite,
+    })
     if (!prepared || prepared.length === 0) return 0
-    return persistBlogPosts(payload, prepared, tenantId, siteId, userId)
+    assertCanWrite?.()
+    return persistBlogPosts(payload, prepared, tenantId, siteId, userId, assertCanWrite, onCreated)
 }

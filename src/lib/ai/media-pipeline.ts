@@ -12,9 +12,8 @@
  * Alt-text: Pixabay license requires no attribution; alt text is built from the
  * photo tags + uploader as `${description} — Photo by ${photographer}`.
  *
- * Hero / blog / product last-resort fallbacks still hotlink curated static
- * images.unsplash.com URLs (no API key) — the SSRF allowlist in pixabay-client
- * permits those hosts.
+ * Provider-outage fallbacks use curated category-aware images.unsplash.com URLs
+ * (no API key), download them through the SSRF allowlist, and persist them.
  *
  * Server-only. Do NOT import from client components.
  */
@@ -69,6 +68,8 @@ export interface MediaPipelineContext {
     // Absent/empty when the flag is off — falls through to the legacy inline
     // download+upload path unchanged.
     preUploadedPool?: Map<string, number>
+    // Request-scoped fence checked inside serialized media writes.
+    assertCanWrite?: () => void
 }
 
 export interface BatchFetchResult {
@@ -172,6 +173,7 @@ export async function uploadBufferToMedia(
         mimetype: string
         alt: string
         tenantId: string
+        assertCanWrite?: () => void
     },
 ): Promise<number> {
     const createArgs = {
@@ -191,15 +193,22 @@ export async function uploadBufferToMedia(
     // media creates silently lose rows (drizzle transaction race, see
     // media-create-lock.ts). Downloads/S3 stay parallel upstream.
     try {
-        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        const doc = await withMediaCreateLock(() => {
+            args.assertCanWrite?.()
+            return payload.create(createArgs)
+        })
         return doc.id
     } catch (err) {
+        args.assertCanWrite?.()
         // Belt & braces for genuinely transient failures (network, S3 hiccup).
         console.warn(
             `[Media Pipeline] media create failed for ${args.filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
         )
         await new Promise((r) => setTimeout(r, 300))
-        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        const doc = await withMediaCreateLock(() => {
+            args.assertCanWrite?.()
+            return payload.create(createArgs)
+        })
         return doc.id
     }
 }
@@ -222,6 +231,7 @@ async function fetchAndStorePhoto(
         mimetype,
         alt,
         tenantId: ctx.tenantId,
+        assertCanWrite: ctx.assertCanWrite,
     })
 }
 
@@ -247,6 +257,7 @@ async function fetchAndStorePoolPhoto(
         mimetype,
         alt,
         tenantId: ctx.tenantId,
+        assertCanWrite: ctx.assertCanWrite,
     })
 }
 
@@ -320,26 +331,7 @@ export async function getCuratedMediaForBlock(
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
 ): Promise<BatchFetchResult> {
-    if (count <= 0) return { mediaIds: [], photos: [], failures: [] }
-
-    const category = normalizeComposerCategory(ctx.category)
-    const library = getIndustryImages(category)
-    const candidates = blockType === 'gallery' || blockType === 'portfolio-grid'
-        ? library.gallery
-        : blockType === 'hero'
-            ? library.hero
-            : blockType === 'about'
-                ? [library.about]
-                : library.products
-    const urls = Array.from({ length: count }, (_, index) => candidates[index % candidates.length])
-        .filter((url): url is string => Boolean(url))
-    const photos = urls.map((url, index) => ({
-        id: `curated-${category}-${blockType}-${index}`,
-        url,
-        alt: `${ctx.businessName} ${category} ${blockType}`,
-    }))
-
-    return batchFetchFromPool(photos, blockType, ctx, payload)
+    return getCuratedFallbackMedia(blockType, count, ctx, payload, new Set())
 }
 
 /**
@@ -424,11 +416,93 @@ async function heroFallbackChain(
             mimetype,
             alt: `${ctx.businessName} — Stock Photo from Unsplash`,
             tenantId: ctx.tenantId,
+            assertCanWrite: ctx.assertCanWrite,
         })
         return { mediaIds: [id], photos: [], failures: [] }
     } catch (err) {
         console.warn('[Media Pipeline] hero fallback chain exhausted', (err as Error).message)
         return { mediaIds: [], photos: [], failures: [] }
+    }
+}
+
+function curatedUrlKey(url: string): string {
+    return url.match(/photo-[^?&/]+/)?.[0] ?? url.split('?')[0]!
+}
+
+function curatedFallbackCandidates(blockType: string, rawCategory: string | undefined): string[] {
+    const category = normalizeComposerCategory(rawCategory)
+    const primary = getIndustryImages(category)
+    const isPeople = blockType === 'team' || blockType === 'testimonials' || blockType === 'doctor-profile'
+    const isProduct = blockType === 'products-grid' || blockType === 'products-featured'
+    const isGallery = blockType === 'gallery' || blockType === 'portfolio-grid'
+
+    const preferred = isPeople
+        ? primary.team
+        : isProduct
+            ? [...primary.products, ...primary.gallery, ...primary.features, primary.about, ...primary.hero]
+            : isGallery
+                ? [...primary.gallery, ...primary.features, primary.about, ...primary.hero, ...primary.products]
+                : blockType === 'hero'
+                    ? [...primary.hero, ...primary.gallery, ...primary.features, primary.about, ...primary.products]
+                    : blockType === 'about'
+                        ? [primary.about, ...primary.hero, ...primary.gallery, ...primary.features, ...primary.products]
+                        : [...primary.features, ...primary.gallery, primary.about, ...primary.hero, ...primary.products]
+
+    const seen = new Set<string>()
+    return preferred.filter((url) => {
+        const key = curatedUrlKey(url)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
+/** Persist deterministic category-aware media when Pixabay is unavailable.
+ * The request-scoped used set prevents the same underlying photo from being
+ * assigned to multiple generated blocks, even when library URLs use different sizes. */
+export async function getCuratedFallbackMedia(
+    blockType: string,
+    count: number,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+    usedUrlKeys: Set<string>,
+): Promise<BatchFetchResult> {
+    if (count <= 0) return { mediaIds: [], photos: [], failures: [] }
+
+    const selected: Array<{ url: string; key: string }> = []
+    for (const url of curatedFallbackCandidates(blockType, ctx.category)) {
+        const key = curatedUrlKey(url)
+        if (usedUrlKeys.has(key)) continue
+        usedUrlKeys.add(key)
+        selected.push({ url, key })
+        if (selected.length >= count) break
+    }
+
+    const semaphore = new Semaphore(3)
+    const settled: Array<{ id: number; key: string } | { key: string; error: string }> = await Promise.all(selected.map(({ url, key }, index) => semaphore.run(async () => {
+        try {
+            const { buffer, mimetype } = await downloadPhotoBuffer(url)
+            const extension = mimetype.includes('png') ? 'png' : 'jpg'
+            const id = await uploadBufferToMedia(payload, {
+                buffer,
+                filename: `${blockType}-curated-${key}-${Date.now()}-${index}.${extension}`,
+                mimetype,
+                alt: `${ctx.businessName} ${blockType}`,
+                tenantId: ctx.tenantId,
+                assertCanWrite: ctx.assertCanWrite,
+            })
+            return { id, key }
+        } catch (error) {
+            return { key, error: error instanceof Error ? error.message : String(error) }
+        }
+    })))
+
+    return {
+        mediaIds: settled.flatMap((result) => 'id' in result ? [result.id] : []),
+        photos: [],
+        failures: settled.flatMap((result) => 'error' in result
+            ? [{ photoId: result.key, error: result.error }]
+            : []),
     }
 }
 

@@ -5,7 +5,7 @@
  * (Contact+Blog). Wall-clock drops to ~max of the three. Started as a 2-call
  * split, escalated per plan after measurement showed the 4-subpage call was
  * both the long pole AND truncating at max_tokens. Behind env flag
- * GEN_PARALLEL_PAGES — flag OFF (default) leaves the single-call path untouched.
+ * GEN_PARALLEL_PAGES — default ON; setting it to false restores the single-call path.
  *
  * Brand consistency (palette/tone/CTA labels) is already shared automatically
  * because both calls reuse the SAME base systemPrompt + userPromptText. Only
@@ -127,6 +127,7 @@ async function runSplitCall(
     systemPrompt: string,
     userPrompt: string,
     maxTokens: number,
+    timeoutMs = 38_000,
 ): Promise<SplitCallOutcome> {
     const start = Date.now()
     try {
@@ -139,7 +140,7 @@ async function runSplitCall(
             temperature: 0.7,
             max_tokens: maxTokens,
             response_format: { type: 'json_object' },
-        })
+        }, { timeout: timeoutMs })
         const choice = completion.choices[0]
         const content = choice?.message?.content
         if (!content) throw new Error('Empty AI response')
@@ -269,7 +270,33 @@ function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Rec
     if (scope === 'home') {
         return { siteName: gr.siteName, category: gr.siteType, theme: gr.theme, seo: gr.seo, language: gr.language, pages: [gr.pages[0]] }
     }
-    return gr.pages.length > 1 ? { pages: gr.pages.slice(1) } : null
+    const candidates = gr.pages.slice(1)
+    if (candidates.length === 0) return null
+
+    const unused = new Set(candidates.map((_page, index) => index))
+    const slots = [
+        { title: 'About', slug: '/about', matches: /about|story|company/i },
+        { title: 'Services', slug: '/services', matches: /service|product|menu|program|class|treatment/i },
+        { title: 'Contact', slug: '/contact', matches: /contact|book|visit|location|get-in-touch/i },
+        { title: 'Blog', slug: '/blog', matches: /blog|news|article|insight/i },
+    ] as const
+
+    const pages = slots.map((slot) => {
+        const matchedIndex = candidates.findIndex((page, index) => {
+            if (!unused.has(index)) return false
+            return slot.matches.test(`${String(page.slug ?? '')} ${String(page.title ?? '')}`)
+        })
+        const fallbackIndex = matchedIndex >= 0 ? matchedIndex : [...unused][0]
+        const source = fallbackIndex === undefined ? candidates[0]! : candidates[fallbackIndex]!
+        if (fallbackIndex !== undefined) unused.delete(fallbackIndex)
+        return {
+            ...structuredClone(source),
+            title: slot.title,
+            slug: slot.slug,
+            isHomepage: false,
+        }
+    })
+    return { pages }
 }
 
 export type ParallelSplitInput = {
@@ -317,6 +344,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     )
 
     let homeParsed = homeOutcome.parsed
+    if (homeParsed && !extractHomePage(homeParsed)) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable homepage — composer fallback required')
+        homeParsed = null
+    }
     // Scope enforcement in CODE, not just prompt: a scope-ignoring batch (the
     // measured failure mode) may emit a stray homepage or extra pages.
     // - a real homepage duplicate (slug '/') is discarded;
@@ -354,7 +385,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // contact page". One retry on the MAIN model rescues nearly all
     // intermittent nano/parse failures; composer stays as the last resort.
     const failedIdx = batchOutcomes
-        .map((o, i) => (o.parsed !== null && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length ? -1 : i))
+        // Retry only a valid JSON response with the wrong page shape. Network,
+        // timeout, and parse failures already consumed their budget and go
+        // directly to deterministic composer fallback.
+        .map((o, i) => (o.parsed !== null && batchPages[i]!.length !== SUBPAGE_BATCHES[i]!.pages.length ? i : -1))
         .filter((i) => i >= 0)
     if (failedIdx.length > 0) {
         console.warn(`[AI][GEN_PARALLEL_PAGES] retrying ${failedIdx.length} failed batch(es) with main model`)
@@ -366,6 +400,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     SUBPAGE_BATCH_MAX_TOKENS,
+                    10_000,
                 )
             }),
         )

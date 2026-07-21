@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getMediaForBlock } from '@/lib/ai/media-pipeline'
+import { getCuratedFallbackMedia, getMediaForBlock } from '@/lib/ai/media-pipeline'
 import { searchPhotos, downloadPhotoBuffer, PixabayError } from '@/lib/ai/pixabay-client'
 
 vi.mock('@/lib/ai/pixabay-client', async (importOriginal) => ({
@@ -331,5 +331,26 @@ describe('TC-F38-RAW-24 — non-VN zero-hit falls back to EN category base keywo
         expect(result.mediaIds).toEqual([])
         expect(vi.mocked(searchPhotos)).toHaveBeenCalledTimes(3)
         expect(vi.mocked(downloadPhotoBuffer)).not.toHaveBeenCalled()
+    })
+})
+
+describe('[TC-GENPERF-W3-28] curated provider-outage fallback', () => {
+    it('downloads and persists distinct category-aware fallback photos', async () => {
+        vi.mocked(downloadPhotoBuffer).mockResolvedValue({
+            buffer: Buffer.from('img'),
+            mimetype: 'image/jpeg',
+        } as never)
+        createMock
+            .mockResolvedValueOnce({ id: 71 })
+            .mockResolvedValueOnce({ id: 72 })
+            .mockResolvedValueOnce({ id: 73 })
+        const used = new Set<string>()
+
+        const result = await getCuratedFallbackMedia('gallery', 3, ctx, payloadStub, used)
+
+        expect(result.mediaIds).toEqual([71, 72, 73])
+        expect(result.failures).toEqual([])
+        expect(vi.mocked(downloadPhotoBuffer)).toHaveBeenCalledTimes(3)
+        expect(used.size).toBe(3)
     })
 })

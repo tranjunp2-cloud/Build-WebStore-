@@ -8,7 +8,8 @@ import type { BusinessInfoInput } from './system-prompt'
 export async function generateAndUploadHeroImage(
     businessInfo: BusinessInfoInput,
     tenantId: string,
-    payload: any
+    payload: any,
+    assertCanWrite?: () => void,
 ): Promise<any | null> {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
@@ -40,6 +41,7 @@ export async function generateAndUploadHeroImage(
         
         // Upload to payload CMS Media collection
         // Payload's `create` with `file` requires the file object
+        assertCanWrite?.()
         const mediaDoc = await payload.create({
             collection: 'media',
             data: {
@@ -58,6 +60,7 @@ export async function generateAndUploadHeroImage(
         return mediaDoc
 
     } catch (e: any) {
+        assertCanWrite?.()
         console.error('[DALL-E] Generation failed, falling back to stock/placeholder:', e.message)
         
         // Fallback: Fetch a generic professional business stock image from Unsplash
@@ -69,7 +72,8 @@ export async function generateAndUploadHeroImage(
             
             const arrayBuffer = await imgRes.arrayBuffer()
             const buffer = Buffer.from(arrayBuffer)
-            
+
+            assertCanWrite?.()
             const mediaDoc = await payload.create({
                 collection: 'media',
                 data: {

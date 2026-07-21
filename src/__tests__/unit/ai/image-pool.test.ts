@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   buildImagePool,
+  backfillImagePool,
   pickFromPool,
   pickManyFromPool,
   mergePool,
@@ -409,6 +410,41 @@ describe('image-pool helpers', () => {
     }
     expect(poolSize(withSquare)).toBe(3)
   })
+
+  it('[TC-GENPERF-W3-13] backfills the exact deficit without reusing existing source IDs', async () => {
+    const initial: ImagePool = {
+      landscape: landscapeFixture.slice(0, 6).map((photo) => ({
+        ...photo,
+        alt: photo.alt ?? '',
+        role: 'gallery' as const,
+        aspectRatio: '16:9' as const,
+      })),
+      square: [],
+      portrait: [],
+      queryUsed: 'ramen',
+      underfill: true,
+    }
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture.slice(0, 9))
+
+    const result = await backfillImagePool(initial, baseCtx({ squareSize: 0 }), {
+      landscape: 9,
+      square: 0,
+    })
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(9)
+    expect(result.added.landscape.map((photo) => photo.id)).toEqual(['L6', 'L7', 'L8'])
+    expect(result.pool.landscape.map((photo) => photo.id)).toEqual([
+      'L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8',
+    ])
+  })
+
+  it('[TC-GENPERF-W3-14] skips Pixabay when the speculative pool already meets actual slots', async () => {
+    const result = await backfillImagePool(basePool, baseCtx(), { landscape: 2, square: 0 })
+    expect(mockSearchPhotos).not.toHaveBeenCalled()
+    expect(result.pool).toBe(basePool)
+    expect(result.added.landscape).toEqual([])
+  })
 })
 
 describe('TC-F01-W.17 — integration cohesion spy', () => {
@@ -616,10 +652,9 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
 })
 
 // ── TC-F38-RAW-25: 429 short-circuits the fallback ladder ───────────────────
-describe('TC-F38-RAW-25 — RATE_LIMITED short-circuits the pool fallback ladder', () => {
+describe('TC-F38-RAW-25 — provider outage short-circuits the pool fallback ladder', () => {
   it('tier-1 RATE_LIMITED → no tier-2/tier-3 calls, underfill=true', async () => {
-    // Arrange — Pixabay rate-limits the primary search (already retried once
-    // inside the client). Any further tier is a guaranteed-fail request.
+    // Arrange — any further tier is a guaranteed-fail request.
     mockSearchPhotos.mockRejectedValueOnce(new PixabayError('RATE_LIMITED', 429, true))
 
     // Act
@@ -646,25 +681,16 @@ describe('TC-F38-RAW-25 — RATE_LIMITED short-circuits the pool fallback ladder
     expect(pool.underfill).toBe(true)
   })
 
-  it('non-429 tier-1 error → ladder continues to tier-2 and tier-3', async () => {
-    // Arrange — transient server error must NOT abort the ladder.
-    // GH-1611: two products keep the three tiers distinct — tier-2 broadens to
-    // products[0] ("ramen"), tier-3 is the category phrase ("restaurant
-    // interior"). With a single product tier-2 already IS the category phrase,
-    // so tier-3 is (correctly) skipped as a byte-identical repeat call.
-    mockSearchPhotos
-      .mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 500, true)) // tier-1
-      .mockResolvedValueOnce([]) // tier-2: 0 hits
-      .mockResolvedValueOnce(landscapeFixture) // tier-3
+  it('tier-1 SERVER_ERROR → no retry ladder', async () => {
+    mockSearchPhotos.mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 503, true))
 
     // Act
     const pool = await buildImagePool(
       baseCtx({ squareSize: 0, topProduct: undefined, products: ['ramen', 'gyoza'] }),
     )
 
-    // Assert — all 3 tiers fired, tier-3 filled the bucket
-    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
-    expect(pool.landscape.length).toBeGreaterThan(0)
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(pool.landscape).toEqual([])
     expect(pool.underfill).toBe(true)
   })
 })
@@ -805,14 +831,10 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
     expect(pool.landscape.map((p) => p.id)).toEqual(['s1', 's2']) // not emptied
   })
 
-  it('[TC-GH1611-10] single-product ladder survives a transient tier-2 error', async () => {
-    // With one product, tier-2 broadens straight to the category phrase, so tier-3
-    // is normally the same query and is skipped. But when tier-2 ERRORS the query was
-    // never answered — skipping it too would leave the bucket empty.
+  it('[TC-GH1611-10] single-product ladder stops after a tier-2 provider outage', async () => {
     mockSearchPhotos
       .mockResolvedValueOnce([]) // tier-1: 0 hits
       .mockRejectedValueOnce(new PixabayError('SERVER_ERROR', 500, true)) // tier-2 transient
-      .mockResolvedValueOnce([CAKE('c1'), CAKE('c2'), CAKE('c3')]) // tier-3 retries the phrase
 
     const pool = await buildImagePool({
       category: 'fnb',
@@ -821,8 +843,8 @@ describe('TC-GH1611 — industry-correct pool (bakery gallery got clothing photo
       squareSize: 0,
     })
 
-    expect(mockSearchPhotos).toHaveBeenCalledTimes(3)
-    expect(pool.landscape.length).toBeGreaterThan(0)
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+    expect(pool.landscape).toEqual([])
   })
 
   it('[TC-GH1611-11] bucket never exceeds its size (every pool photo is downloaded + uploaded)', async () => {

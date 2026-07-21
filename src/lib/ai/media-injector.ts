@@ -13,7 +13,7 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedMediaForBlock, type MediaPipelineContext } from './media-pipeline'
+import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedFallbackMedia, type MediaPipelineContext } from './media-pipeline'
 import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
@@ -165,6 +165,28 @@ export interface ImageNeed {
     blockType: string
     count: number
     assign: (mediaIds: number[]) => void
+}
+
+/**
+ * Actual pool capacity required after AI has produced every page/block.
+ * Sum real slots so repeated block types can receive different photos, while
+ * retaining the existing per-bucket caps that bound Pixabay and upload work.
+ */
+export function computePoolTargetsForNeeds(
+    needs: ReadonlyArray<Pick<ImageNeed, 'blockType' | 'count'>>,
+): { landscape: number; square: number } {
+    let landscape = 0
+    let square = 0
+    for (const need of needs) {
+        if (PEOPLE_BLOCKS.has(need.blockType) || NO_STOCK_BLOCKS.has(need.blockType)) continue
+        const bucket = bucketForRole(roleForBlock(need.blockType))
+        if (bucket === 'square') {
+            square = Math.min(DEFAULT_SQUARE_SIZE, square + need.count)
+        } else {
+            landscape = Math.min(DEFAULT_LANDSCAPE_SIZE, landscape + need.count)
+        }
+    }
+    return { landscape, square }
 }
 
 export interface FulfillmentContext extends MediaPipelineContext {
@@ -509,38 +531,65 @@ export async function fulfillImageNeeds(
     // batchFetch / batchFetchFromPool already use an internal semaphore
     // (CONCURRENCY) so we won't spike Unsplash beyond their rate limit.
     const start = Date.now()
+    const curatedFallbackUsed = new Set<string>()
     const perBlockResults = await Promise.all(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
-            if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
+            if (totalCount === 0) return { blockType, groupNeeds, ids: [] as number[], reusable: true }
+            const uniqueCount = Math.max(...groupNeeds.map((need) => need.count))
+            const role = roleForBlock(blockType)
+            const bucketCap = bucketForRole(role) === 'square'
+                ? DEFAULT_SQUARE_SIZE
+                : DEFAULT_LANDSCAPE_SIZE
+            // Fetch enough IDs to keep repeated block instances distinct. The
+            // cap prevents large sites from returning to the old 84-upload path;
+            // a single oversized block may still request its full own count.
+            const requestCount = Math.max(uniqueCount, Math.min(totalCount, bucketCap))
+            const completeWithCuratedFallback = async (ids: number[]) => {
+                if (ids.length >= requestCount) {
+                    return { blockType, groupNeeds, ids: ids.slice(0, requestCount), reusable: true }
+                }
+                const fallback = await getCuratedFallbackMedia(
+                    blockType,
+                    requestCount - ids.length,
+                    ctx,
+                    payload,
+                    curatedFallbackUsed,
+                )
+                if (fallback.failures.length > 0) {
+                    console.warn(
+                        `[Media Injector] ${blockType}: ${fallback.failures.length} curated fallback photo(s) failed`,
+                    )
+                }
+                return { blockType, groupNeeds, ids: [...ids, ...fallback.mediaIds], reusable: true }
+            }
 
             // GH-1185: people slots (testimonial avatars, team members,
             // doctor profiles) are PEOPLE — never pool photos (pool is built
             // from product keywords → food close-ups in face slots).
-            // Dedicated portrait search; on miss leave empty (initials
-            // placeholder beats a food avatar), so no pool/legacy fallback.
+            // Dedicated portrait search; on provider miss use only the curated
+            // people library, so product-pool photos never appear in face slots.
             if (PEOPLE_BLOCKS.has(blockType)) {
                 try {
-                    const result = await getAvatarMedia(totalCount, ctx.language, ctx, payload, blockType)
+                    const result = await getAvatarMedia(requestCount, ctx.language, ctx, payload, blockType)
                     if (result.failures.length > 0) {
                         console.warn(
                             `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
                         )
                     }
-                    return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: Math.max(0, totalCount - result.mediaIds.length) }
+                    return completeWithCuratedFallback(result.mediaIds)
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err)
                     console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
-                    return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                    return completeWithCuratedFallback([])
                 }
             }
 
             // Phase-03 pool-aware fast path: pick from pre-built site pool to
             // preserve visual cohesion across blocks.
             if (ctx.pool) {
-                const role = roleForBlock(blockType)
                 const poolSeed = hashBlockSeed(blockType, ctx.businessName)
-                const picks = pickManyFromPool(ctx.pool, role, poolSeed, totalCount)
+                const picks = pickManyFromPool(ctx.pool, role, poolSeed, requestCount)
                 if (picks.length > 0) {
                     try {
                         const result = await batchFetchFromPool(picks, blockType, ctx, payload)
@@ -549,38 +598,26 @@ export async function fulfillImageNeeds(
                                 `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
                             )
                         }
-                        // GH-1611 QA regression: the pool may be smaller than totalCount,
-                        // or some pool uploads may fail. Never supplement a verified pool
-                        // with a separate legacy search: that produced the exact
-                        // "4 bakery + 2 fashion" gallery reported by QA. Fill the deficit
-                        // only from the checked-in library for the normalized category.
-                        if (result.mediaIds.length >= totalCount) {
-                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        if (result.mediaIds.length >= requestCount) {
+                            return completeWithCuratedFallback(result.mediaIds)
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — using curated category fallback`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${requestCount}) — using unique same-category fallback`,
                         )
-                        const deficit = totalCount - result.mediaIds.length
-                        const curated = await getCuratedMediaForBlock(blockType, deficit, ctx, payload)
-                        return {
-                            blockType,
-                            groupNeeds,
-                            ids: [...result.mediaIds, ...curated.mediaIds],
-                            succeeded: 0,
-                            failed: 0,
-                        }
+                        // Never supplement a verified pool with a separate search:
+                        // it can return the same source under a new Media ID or drift
+                        // into another industry. Fill only from the checked-in library.
+                        return completeWithCuratedFallback(result.mediaIds)
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
-                        console.warn(`[Media Injector] ${blockType} pool path failed, using curated category fallback: ${msg}`)
-                        const curated = await getCuratedMediaForBlock(blockType, totalCount, ctx, payload)
-                        return { blockType, groupNeeds, ids: curated.mediaIds, succeeded: 0, failed: 0 }
+                        console.warn(`[Media Injector] ${blockType} pool path failed, using unique same-category fallback: ${msg}`)
+                        return completeWithCuratedFallback([])
                     }
                 } else {
                     console.warn(
-                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — using curated category fallback`,
+                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — using unique same-category fallback`,
                     )
-                    const curated = await getCuratedMediaForBlock(blockType, totalCount, ctx, payload)
-                    return { blockType, groupNeeds, ids: curated.mediaIds, succeeded: 0, failed: 0 }
+                    return completeWithCuratedFallback([])
                 }
             }
 
@@ -595,17 +632,17 @@ export async function fulfillImageNeeds(
             })
 
             try {
-                const result = await getMediaForBlock(blockType, keywords, totalCount, ctx, payload)
+                const result = await getMediaForBlock(blockType, keywords, requestCount, ctx, payload)
                 if (result.failures.length > 0) {
                     console.warn(
                         `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
                     )
                 }
-                return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                return completeWithCuratedFallback(result.mediaIds)
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
                 console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
-                return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                return completeWithCuratedFallback([])
             }
         }),
     )
@@ -615,18 +652,53 @@ export async function fulfillImageNeeds(
     let succeeded = 0
     let failed = 0
     for (const r of perBlockResults) {
-        const ids = [...r.ids]
+        let offset = 0
+        let wrapped = false
+        const greatestCommonDivisor = (a: number, b: number): number => {
+            let left = Math.abs(a)
+            let right = Math.abs(b)
+            while (right !== 0) {
+                const next = left % right
+                left = right
+                right = next
+            }
+            return left
+        }
+        const allocationStride = (poolSize: number, take: number): number => {
+            if (poolSize <= 1) return 0
+            let stride = Math.max(1, take % poolSize)
+            while (greatestCommonDivisor(stride, poolSize) !== 1) {
+                stride += 1
+            }
+            return stride % poolSize
+        }
         for (const need of r.groupNeeds) {
-            const slice = ids.splice(0, need.count)
+            const take = Math.min(need.count, r.ids.length)
+            const slice = r.reusable && take > 0
+                ? Array.from({ length: take }, (_, index) => r.ids[(offset + index) % r.ids.length]!)
+                : []
             if (slice.length > 0) {
                 need.assign(slice)
                 succeeded += slice.length
                 failed += need.count - slice.length
+
+                const rawNextOffset = offset + take
+                if (!wrapped && rawNextOffset < r.ids.length) {
+                    // Consume disjoint windows first while the pool can satisfy
+                    // them without overlap.
+                    offset = rawNextOffset
+                } else if (!wrapped) {
+                    wrapped = true
+                    offset = take < r.ids.length ? 1 : 0
+                } else {
+                    // Once the first pass wraps, a stride coprime with the pool
+                    // size visits every cyclic window before repeating.
+                    offset = (offset + allocationStride(r.ids.length, take)) % r.ids.length
+                }
             } else {
                 failed += need.count
             }
         }
-        failed += r.failed
     }
 
     console.info(

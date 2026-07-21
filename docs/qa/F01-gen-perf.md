@@ -2,7 +2,7 @@
 
 **Plan Reference:** [plans/260703-1341-gen-perf-async-parallel](../../plans/260703-1341-gen-perf-async-parallel/plan.md)
 
-**Feature:** F01 AI Site Generator — performance optimization via async parallel seeding (blog + imglib post-response)
+**Feature:** F01 AI Site Generator — bounded completion path (required blogs inline, image-library seeding post-response)
 
 **Baseline (2026-07-03 local timing, pre-optimization):**
 | Language | Time-to-`done` | Notes |
@@ -88,11 +88,31 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 | TC-GENPERF-W2-15 | unit | chrome share-nothing (review fix A2) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | nav/footer structuredClone per page — mutate nested links/columns của home không leak sang page khác; syncFooterAcrossPages cũng share-nothing |
 | TC-GENPERF-BI-01 | route | blog-inline: persist TRƯỚC done | ✅ PASS | src/__tests__/api/ai.test.ts | prep xong trong cửa sổ GPT → persistBlogPosts chạy in-request (trước mọi after() task), seedBlogPosts legacy KHÔNG được gọi |
 | TC-GENPERF-BI-02 | route | blog-inline: regenerate skip | ✅ PASS | src/__tests__/api/ai.test.ts | prepare trả [] (tenant đã có posts) → không persist, không legacy seeding |
-| TC-GENPERF-BI-03 | route | blog-inline: grace fallback | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong tại persist site (grace GEN_BLOG_PREP_GRACE_MS) → done không bị chặn; prep xong sau response → after() task persist đủ 3 bài |
+| TC-GENPERF-BI-03 | route | blog completion barrier | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong → response vẫn pending; chỉ emit `done` sau khi persist đủ 3 bài |
 | TC-F08-BS.24 | unit | blog prep chờ pixabayGate | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepareBlogPosts không gọi searchPhotos khi gate chưa settle (GH-1190 serialization); gate mở → thumbnail phase chạy, trả đủ 3 prepared posts |
 | TC-F08-BS.25 | unit | prepare/persist contract | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepare trả null khi hard-fail (count throw) để caller fallback legacy; trả [] khi tenant có posts; persistBlogPosts insert đúng prepared rows (slug prefix, thumbnail optional) |
 | TC-F01-W.18 | unit | pool size động theo block | ✅ PASS | src/__tests__/unit/ai/image-pool.test.ts | buildImagePool tôn trọng landscapeSize/squareSize; size 0 → skip Pixabay call bucket đó (không tính underfill); cả 2 = 0 → 0 call, pool rỗng |
 | TC-MI-POOLSIZE | unit | computePoolBucketSizes | ✅ PASS | src/__tests__/unit/lib/ai/media-injector.test.ts | pool size = max nhu cầu block bật ảnh (theo bucket) + buffer, cap 12/6, người→getAvatarMedia loại trừ. Default hero-only → {landscape:3, square:0} thay vì 12+6; gallery→9; products-grid→6 square |
+
+---
+
+## Wave 3 Test Matrix (GH-1190 Critical Path)
+
+| TC-ID | Level | Scenario | Status | Mapped To | Notes |
+|---|---|---|---|---|---|
+| TC-GENPERF-W3-01 | unit | named phase timings aggregate repeated phases | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | compact request-correlated timing snapshot |
+| TC-GENPERF-W3-02 | unit | generation request ID validation/correlation | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | unsafe IDs replaced with UUID |
+| TC-GENPERF-W3-03 | unit | browser retries only before any SSE event | ✅ PASS | src/__tests__/unit/builder/generation-sse-retry.test.ts | accepted/dispatched work is never automatically re-POSTed |
+| TC-GENPERF-W3-04 | route | site remains `generating` until product barrier settles | ✅ PASS | src/__tests__/api/ai.test.ts | completion status moves after required product persistence |
+| TC-GENPERF-W3-05 | unit | percentile uses nearest-rank semantics | ✅ PASS | src/__tests__/unit/lib/ai/generation-timings.test.ts | shared by staging benchmark report |
+| TC-GENPERF-W3-06 | unit | partial product AI result uses curated fill without second model call | ✅ PASS | src/__tests__/unit/lib/ai/sample-products-image-fallback.test.ts | removes serial top-up latency |
+| TC-GENPERF-W3-07 | unit | product image search is bounded to two 6s attempts per product | ✅ PASS | src/__tests__/unit/lib/ai/sample-products-image-fallback.test.ts | gallery/carton fallbacks remain mandatory |
+| TC-GENPERF-W3-08 | unit | article AI failure returns structured full HTML fallback | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | contains headings, body sections, and list |
+| TC-GENPERF-W3-09 | route | accepted event is first and `done` payload remains compatible | ✅ PASS | src/__tests__/api/ai.test.ts | request ID returned in event/header |
+| TC-GENPERF-W3-E2E | Playwright | real generation renders five complete pages, products/blogs/media, stable refresh | ⏳ PENDING | tests/ai-builder-generation.spec.ts | requires valid generation environment and cleanup ownership |
+| TC-GENPERF-W3-STAGING | benchmark | EN/MS/VN/JP first-event p95 <=5s and done p95 <=60s | ⏳ PENDING | scripts/measure-generation-latency.ts | run >=20 successes/language across five industries |
+
+**Wave 3 verdict:** automated critical-path contracts pass in focused suites. Latency DoD remains open until the staging distribution and real-browser completeness gate pass.
 
 ---
 

@@ -341,9 +341,12 @@ describe('[TC-F01.CTA-DRAG] resolvePricingPlanCta — pricing CTA + actionType s
         expect(result.ctaActionType).toBe('internal')
     })
 
-    it('TC-F01.CTA-DRAG-11: unresolvable slug → fallback /contact + internal', () => {
-        const result = resolvePricingPlanCta({ name: 'Enterprise', ctaUrl: '#services' }, [{ url: '/' }])
-        expect(result.ctaUrl).toBe('/contact')
+    it('TC-F01.CTA-DRAG-11: unresolvable slug → fallback to an existing page', () => {
+        const result = resolvePricingPlanCta(
+            { name: 'Enterprise', ctaUrl: '#services' },
+            [{ url: '/' }, { url: '/about' }],
+        )
+        expect(result.ctaUrl).toBe('/about')
         expect(result.ctaActionType).toBe('internal')
     })
 

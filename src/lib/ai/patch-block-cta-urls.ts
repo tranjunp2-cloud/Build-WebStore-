@@ -1,6 +1,5 @@
 import { resolveCtaSlugFromLinks, resolvePricingPlanCta, type NavPageLike } from '@/lib/navigation-url'
 import type { CTAConfig } from '@/blocks/cta/config'
-import type { BlockData } from '@/store/editorStore'
 
 /**
  * GH-1359 — Resolve a freshly-inserted block's hardcoded CTA placeholders
@@ -9,8 +8,8 @@ import type { BlockData } from '@/store/editorStore'
  *
  * - Navigation CTAs (hero `ctaButtons`): resolve to a matching page slug; drop
  *   the button when no page matches (per-button hide, never per-block).
- * - Action CTAs (pricing `plans[].ctaUrl`): fall back to `/contact` on no-match
- *   so the buy button is never lost (every seed template ships `/contact`).
+ * - Action CTAs (pricing `plans[].ctaUrl`): fall back to an existing canonical
+ *   page so the buy button remains usable without creating a ghost link.
  *
  * Pure & React-free. Returns a new object; non-CTA blocks pass through.
  */
@@ -36,6 +35,23 @@ export function patchBlockCtaUrls<T extends Record<string, unknown>>(
     pages: NavPageLike[] | null | undefined,
 ): T {
     const links = pagesToLinks(pages)
+    return patchBlockCtaUrlsFromLinks(block, links)
+}
+
+function resolveActionFallback(links: Array<{ url: string }>): string {
+    if (links.some(link => link.url === '/contact')) return '/contact'
+    return links.find(link => link.url !== '/')?.url ?? '/'
+}
+
+/**
+ * Resolve CTA URLs against canonical links that are already known by the
+ * generate-site pipeline. Keeping this in the same helper as editor insertion
+ * prevents the two paths from drifting when a block schema changes.
+ */
+export function patchBlockCtaUrlsFromLinks<T extends Record<string, unknown>>(
+    block: T,
+    links: Array<{ url: string }>,
+): T {
     const b = block as Record<string, unknown>
 
     // Hero (also cta/banner → normalized to hero blockType): navigation CTAs.
@@ -49,8 +65,7 @@ export function patchBlockCtaUrls<T extends Record<string, unknown>>(
         }
     }
 
-    // Pricing: action CTAs — keep the button, default to /contact, sync action
-    // type. Shared with AI-gen via resolvePricingPlanCta (DRY).
+    // Pricing: action CTAs — keep the button, use a real page, sync action type.
     if (Array.isArray(b.plans)) {
         return {
             ...block,
@@ -58,12 +73,24 @@ export function patchBlockCtaUrls<T extends Record<string, unknown>>(
         }
     }
 
-    // GH-1412 — CTA block (`ctaUrl`/`secondaryCtaUrl` string fields): primary CTA
-    // is the block's whole point → keep it, default to /contact on no-match
-    // (like pricing). Optional secondary CTA → drop both label+url when unresolved.
+    // Legacy CTA payloads used a nested `ctaButton`. Keep resolving them so
+    // previously generated content remains compatible with the shared pass.
+    if (b.blockType === 'cta' && b.ctaButton && typeof b.ctaButton === 'object') {
+        const url = resolveCtaSlugFromLinks((b.ctaButton as Record<string, unknown>).url, links)
+        return {
+            ...block,
+            ctaButton: url
+                ? { ...(b.ctaButton as Record<string, unknown>), url }
+                : undefined,
+        }
+    }
+
+    // GH-1412 — CTA block (`ctaUrl`/`secondaryCtaUrl` string fields): keep the
+    // primary action but only point it at a page that exists. Optional secondary
+    // CTA is removed when unresolved.
     if (typeof b.ctaUrl === 'string' && !Array.isArray(b.ctaButtons) && !Array.isArray(b.plans)) {
         const next = { ...block } as Record<string, unknown>
-        next.ctaUrl = resolveCtaSlugFromLinks(b.ctaUrl, links) || '/contact'
+        next.ctaUrl = resolveCtaSlugFromLinks(b.ctaUrl, links) || resolveActionFallback(links)
         if (typeof b.secondaryCtaUrl === 'string') {
             const secondary = resolveCtaSlugFromLinks(b.secondaryCtaUrl, links)
             if (secondary) {

@@ -56,6 +56,7 @@ export async function findOrCreateCartonMedia(
     payload: BasePayload,
     tenantId: number | string | null,
     user?: object,
+    assertCanWrite?: () => void,
 ): Promise<CartonResult | null> {
     const altKey = tenantId ? `Crate Carton Placeholder - ${tenantId}` : 'Crate Carton Placeholder'
 
@@ -110,6 +111,7 @@ export async function findOrCreateCartonMedia(
         // Stale — rename so a new record can be created without alt key collision
         replacedStaleId = doc.id as number
         try {
+            assertCanWrite?.()
             await payload.update({
                 collection: 'media',
                 id: replacedStaleId,
@@ -147,6 +149,7 @@ export async function findOrCreateCartonMedia(
     }
 
     try {
+        assertCanWrite?.()
         const res = await payload.create({
             collection: 'media',
             data: { alt: altKey },
