@@ -7,10 +7,83 @@ import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subs
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { sanitizeBlocksRequiredFields, sanitizeSingleBlockRequiredFields } from '@/lib/ai/normalize-required-titles'
+import { blockRegistry } from '@/blocks/registry'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
+
+// GH-1621 P1: singular label for a nested-array item, keyed by its Payload field
+// name — used to build a human-readable validation-error location like
+// "Portfolio Grid → Project 5 → Title" instead of the raw path segment. Falls
+// back to a capitalized field name for any array not listed here.
+const ARRAY_ITEM_LABELS: Record<string, string> = {
+    projects: 'Project',
+    services: 'Service',
+    members: 'Member',
+    products: 'Product',
+    properties: 'Property',
+    doctors: 'Doctor',
+    images: 'Image',
+    reviews: 'Review',
+    events: 'Event',
+    posts: 'Post',
+    classes: 'Class',
+    videos: 'Video',
+    caseStudies: 'Case Study',
+    steps: 'Step',
+    categories: 'Category',
+    testimonials: 'Testimonial',
+    plans: 'Plan',
+    faqs: 'FAQ',
+}
+
+/**
+ * Turns a raw Payload validation-error path (e.g. `layout.6.projects.4.title`)
+ * into a human-readable location using the page's own layout (block type +
+ * nested array field are only knowable from the actual data at the error site,
+ * not from the path string alone). Returns `null` if the path doesn't match the
+ * expected `layout.<blockIndex>...` shape (e.g. a top-level page field).
+ */
+function friendlyValidationLocation(path: string, layout: unknown[]): string | null {
+    const segments = path.split('.')
+    if (segments[0] !== 'layout') return null
+    const blockIndex = Number(segments[1])
+    if (!Number.isInteger(blockIndex)) return null
+    const block = Array.isArray(layout) ? (layout[blockIndex] as Record<string, unknown> | undefined) : undefined
+    const blockType = typeof block?.blockType === 'string' ? block.blockType : undefined
+    const blockLabel = blockType ? (blockRegistry.getBlockMeta(blockType)?.name ?? blockType) : `Block ${blockIndex + 1}`
+
+    // layout.<blockIndex>.<arrayField>.<itemIndex>.<fieldName> — exactly ONE
+    // array level. Guarded to === 5 (not >=5): a doubly-nested array (e.g.
+    // menu-food/menu-display's `categories[].items[].name`, 7 segments) would
+    // otherwise read segments[4] ("items", the nested array's field name) as if
+    // it were the leaf field — a confidently WRONG label, worse than falling
+    // through to the field-name-only case below (which is always correct, just
+    // less specific about which item).
+    if (segments.length === 5) {
+        const arrayField = segments[2]
+        const itemIndex = Number(segments[3])
+        const fieldName = segments[4]
+        if (Number.isInteger(itemIndex)) {
+            const itemLabel = ARRAY_ITEM_LABELS[arrayField] || (arrayField.charAt(0).toUpperCase() + arrayField.slice(1).replace(/s$/, ''))
+            return `${blockLabel} → ${itemLabel} ${itemIndex + 1} → ${fieldName}`
+        }
+    }
+
+    // layout.<blockIndex>.<fieldName> (top-level block field) OR deeper nesting
+    // than this function resolves an item label for — the leaf field name (last
+    // path segment) is always correct regardless of depth, so use that alone.
+    const fieldName = segments[segments.length - 1]
+    return `${blockLabel} → ${fieldName}`
+}
+
+function sanitizePublishScopedBlock(block: unknown): unknown {
+    return block && typeof block === 'object'
+        ? sanitizeSingleBlockRequiredFields(block as Record<string, unknown>)
+        : block
+}
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -140,12 +213,14 @@ export async function PATCH(
         const failedPageIds: string[] = []
         const failureDetails: Array<{
             pageId: string
+            pageTitle?: string
             errName?: string
             errMsg?: string
             pgCode?: string
             pgColumn?: string
             pgTable?: string
             causeMsg?: string
+            friendlyDetail?: string
             validationErrors?: Array<{ path?: string; message?: string }>
         }> = []
         // Soft-deleted pages must NEVER be promoted: writing their main row trips the
@@ -243,6 +318,15 @@ export async function PATCH(
                         // may still have removed variant strings ('expanded', 'mega-footer')
                         // that cause ValidationError → 500 on publish.
                         data.layout = normalizeBlocksForPersistence(data.layout as Record<string, unknown>[])
+                        // GH-1621: backfill/drop required array-item fields (portfolio-grid
+                        // projects[].title, team members[].name, etc — see
+                        // normalize-required-titles.ts for full coverage + rationale) right
+                        // before this is validated by payload.update below. Deliberately
+                        // placed HERE, not on every draft autosave — this is the one point
+                        // where "the draft is about to become the live site" is actually
+                        // true, so nothing gets silently rewritten while the user is still
+                        // mid-edit.
+                        data.layout = sanitizeBlocksRequiredFields(data.layout as Record<string, unknown>[])
                     }
 
                     await payload.update({
@@ -283,8 +367,29 @@ export async function PATCH(
                         }))
                         : []
 
+                    // GH-1621 P1: build a human-readable location for the toast, e.g.
+                    // "About Us → Portfolio Grid → Project 5 → Title" instead of the raw
+                    // "title" field name — uses `pg.layout` (the ORIGINAL draft, not the
+                    // `data.layout` derived from it above) to resolve the failing block's
+                    // type + item index. Safe because blockType at a given index never
+                    // changes across stripArrayItemIds/normalizeBlocksForPersistence/
+                    // sanitizeBlocksRequiredFields (all pure, order-preserving `.map()`s —
+                    // sanitizeTestimonialItems is the one exception that can drop items,
+                    // but only for testimonials' OWN required fields, which by definition
+                    // can no longer be the cause of a validation error reaching this catch
+                    // block, since sanitizeBlocksRequiredFields already fixed them above).
+                    // `pg.layout` is also simpler to reach here — `data` is try-block-scoped.
+                    const firstPathSegments = validationErrors[0]?.path
+                    const pageTitle = typeof (pg as Record<string, unknown>).title === 'string' ? (pg as Record<string, unknown>).title as string : undefined
+                    const pageLayout = Array.isArray((pg as Record<string, unknown>).layout) ? (pg as Record<string, unknown>).layout as unknown[] : []
+                    const location = firstPathSegments ? friendlyValidationLocation(firstPathSegments, pageLayout) : null
+                    const friendlyDetail = location
+                        ? `${pageTitle ? `${pageTitle} → ` : ''}${location}: ${validationErrors[0]?.message || 'This field is required.'}`
+                        : undefined
+
                     console.warn('[Publish] Failed to promote page', JSON.stringify({
                         pageId,
+                        pageTitle,
                         errName,
                         errMsg: errMsg.slice(0, 300),
                         pgCode: pgErr?.code,
@@ -292,16 +397,19 @@ export async function PATCH(
                         pgTable: pgErr?.table,
                         causeMsg: pgErr?.message?.slice(0, 300),
                         validationErrors,
+                        friendlyDetail,
                     }))
                     failedPageIds.push(pageId)
                     failureDetails.push({
                         pageId,
+                        pageTitle,
                         errName,
                         errMsg: errMsg.slice(0, 300),
                         pgCode: pgErr?.code,
                         pgColumn: pgErr?.column,
                         pgTable: pgErr?.table,
                         causeMsg: pgErr?.message?.slice(0, 300),
+                        friendlyDetail,
                         validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
                     })
                 }
@@ -360,23 +468,23 @@ export async function PATCH(
         }
 
         if (hasBodyHeaderBlock) {
-            publishData.headerBlock = bodyHeaderBlock
+            publishData.headerBlock = sanitizePublishScopedBlock(bodyHeaderBlock)
             publishData.pendingHeaderBlock = null
         } else {
             const pendingHb = sitePending?.pendingHeaderBlock
             if (pendingHb !== undefined && pendingHb !== null) {
-                publishData.headerBlock = pendingHb
+                publishData.headerBlock = sanitizePublishScopedBlock(pendingHb)
                 publishData.pendingHeaderBlock = null
             }
         }
 
         if (hasBodyFooterBlock) {
-            publishData.footerBlock = bodyFooterBlock
+            publishData.footerBlock = sanitizePublishScopedBlock(bodyFooterBlock)
             publishData.pendingFooterBlock = null
         } else {
             const pendingFb = sitePending?.pendingFooterBlock
             if (pendingFb !== undefined && pendingFb !== null) {
-                publishData.footerBlock = pendingFb
+                publishData.footerBlock = sanitizePublishScopedBlock(pendingFb)
                 publishData.pendingFooterBlock = null
             }
         }

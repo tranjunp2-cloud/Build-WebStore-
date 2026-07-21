@@ -206,7 +206,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                 onKeyDown={e => e.key === 'Enter' && handleUpdate()}
                                                 autoFocus
                                                 disabled={isUpdating}
-                                                className="flex-1 h-9 bg-[var(--dash-bg)] border border-[var(--dash-border)] rounded-[8px] px-[12px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] outline-none text-[var(--dash-text)] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] disabled:opacity-50"
+                                                className="flex-1 h-10 bg-[var(--dash-bg)] border border-[var(--dash-border)] rounded-[8px] px-[12px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] outline-none text-[var(--dash-text)] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] disabled:opacity-50"
                                             />
                                             <div className="flex flex-row items-center gap-[24px]">
                                                 <button
@@ -287,7 +287,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                     onKeyDown={e => e.key === 'Enter' && handleCreate()}
                                     autoFocus
                                     placeholder={t.dashboard.blog.categoryModal.categoryNamePlaceholder}
-                                    className="flex-1 min-w-0 h-9"
+                                    className="flex-1 min-w-0 h-10"
                                 />
                                 <Button
                                     onClick={handleCreate}

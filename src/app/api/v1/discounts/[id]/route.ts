@@ -21,6 +21,7 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
             depth: 1,
             user,
             overrideAccess: false,
+            disableErrors: true,
         })
 
         if (!discount) {

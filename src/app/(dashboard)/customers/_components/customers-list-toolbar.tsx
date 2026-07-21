@@ -53,7 +53,7 @@ function FilterChip<T extends string>({
                 // either way. Moved to Tailwind classes: opaque `--card` + a subtle hover wash
                 // (matches dashSecondary Button / Discounts "Export CSV").
                 className={cn(
-                    "flex items-center gap-1.5 h-9 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
+                    "flex items-center gap-1.5 h-10 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
                     active
                         ? "bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.4)] text-[hsl(var(--primary))]"
                         : "bg-[hsl(var(--card))] border-[hsl(var(--input-border))] text-[var(--dash-text-muted)] hover:bg-white/[0.05]"
@@ -99,7 +99,7 @@ function FilterChip<T extends string>({
     )
 }
 
-const DATE_INPUT_CLS = 'h-8 px-2 rounded-[6px] text-[12px] outline-none transition-colors w-full'
+const DATE_INPUT_CLS = 'h-10 px-2 rounded-[6px] text-[12px] outline-none transition-colors w-full'
 
 function DateFilterChip({
     value,
@@ -157,7 +157,7 @@ function DateFilterChip({
                 // Same fix as the Rank FilterChip above: opaque `--card` bg (was inline
                 // `transparent`) + Tailwind `hover:` (inline style blocks hover otherwise).
                 className={cn(
-                    "flex items-center gap-1.5 h-9 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
+                    "flex items-center gap-1.5 h-10 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
                     active
                         ? "bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.4)] text-[hsl(var(--primary))]"
                         : "bg-[hsl(var(--card))] border-[hsl(var(--input-border))] text-[var(--dash-text-muted)] hover:bg-white/[0.05]"
@@ -243,7 +243,7 @@ function DateFilterChip({
                                 type="button"
                                 disabled={!localFrom || !localTo || localFrom > localTo}
                                 onClick={() => { onCustomRangeApply(localFrom, localTo); setOpen(false) }}
-                                className="w-full h-8 rounded-[6px] text-[12px] font-medium border-none cursor-pointer disabled:opacity-40"
+                                className="w-full h-10 rounded-[6px] text-[12px] font-medium border-none cursor-pointer disabled:opacity-40"
                                 style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)', color: '#fff' }}
                             >
                                 {applyLabel}

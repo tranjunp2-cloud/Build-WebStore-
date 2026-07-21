@@ -1,8 +1,98 @@
-import type { CollectionConfig, Where } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+
+function unwrapRelationId(
+    value: string | number | { id: string | number } | null | undefined,
+): string | number | null | undefined {
+    if (value == null) return value
+    return typeof value === 'object' ? value.id : value
+}
+
+function getActorTenantId(user: unknown) {
+    const typedUser = user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> } | null | undefined
+    return unwrapRelationId(typedUser?.tenants?.[0]?.tenant)
+}
+
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+    const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
+    const actorTenantId = getActorTenantId(req.user)
+    const originalTenantId = unwrapRelationId(originalDoc?.tenant)
+    const requestedTenantId = unwrapRelationId(data.tenant)
+    const effectiveTenantId = req.user && !isSuperAdmin
+        ? (operation === 'update' ? (originalTenantId ?? actorTenantId) : actorTenantId)
+        : (requestedTenantId ?? originalTenantId)
+
+    if (req.user && !isSuperAdmin) {
+        const safeTenantId = effectiveTenantId
+        if (!safeTenantId) {
+            throw new Error('Không thể xác định thương hiệu (tenant) của bài viết')
+        }
+        data.tenant = safeTenantId
+
+        const originalSiteId = operation === 'update' ? unwrapRelationId(originalDoc?.site) : undefined
+        const requestedSiteId = unwrapRelationId(data.site)
+        if (requestedSiteId != null && String(requestedSiteId) !== String(originalSiteId ?? '')) {
+            const siteCheck = await req.payload.find({
+                collection: 'sites',
+                where: { id: { equals: requestedSiteId }, tenant: { equals: safeTenantId } },
+                limit: 1,
+            })
+            data.site = siteCheck.docs.length > 0 ? requestedSiteId : originalSiteId
+        } else if (originalSiteId != null) {
+            data.site = originalSiteId
+        }
+    }
+
+    const categoryWasProvided = Object.prototype.hasOwnProperty.call(data, 'category')
+    const finalCategoryId = categoryWasProvided
+        ? unwrapRelationId(data.category)
+        : unwrapRelationId(originalDoc?.category)
+    const tenantWasProvided = Object.prototype.hasOwnProperty.call(data, 'tenant')
+
+    if (categoryWasProvided && (finalCategoryId == null || finalCategoryId === '')) {
+        data.category = null
+    } else if (
+        finalCategoryId != null &&
+        finalCategoryId !== '' &&
+        (categoryWasProvided || tenantWasProvided || operation === 'create')
+    ) {
+        const categoryDoc = await req.payload.findByID({
+            collection: 'blog_categories',
+            id: finalCategoryId,
+            overrideAccess: true,
+            disableErrors: true,
+        })
+        const categoryTenantId = unwrapRelationId(categoryDoc?.tenant)
+        if (!categoryDoc || categoryDoc.status === 'deleted' || !effectiveTenantId || !categoryTenantId || String(categoryTenantId) !== String(effectiveTenantId)) {
+            throw new Error('BLOG_CATEGORY_TENANT_MISMATCH')
+        }
+        if (categoryWasProvided) {
+            data.category = finalCategoryId
+        }
+    }
+
+    if (operation === 'create' && req.user) {
+        if (!data.tenant) {
+            data.tenant = actorTenantId
+        }
+        if (!data.site && data.tenant) {
+            const siteRes = await req.payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: data.tenant } },
+                limit: 1,
+            })
+            if (siteRes.docs.length > 0) {
+                data.site = siteRes.docs[0].id
+            }
+        }
+    }
+
+    return data
+}
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
     hooks: {
+        beforeChange: [beforeChangeHook],
         afterChange: [
             async ({ doc, previousDoc, req, context }) => {
                 const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
@@ -32,10 +122,10 @@ export const Blogs: CollectionConfig = {
     access: {
         create: ({ req }) => Boolean(req.user),
         read: ({ req }) => {
-            // Public read — only published posts
-            if (!req.user) {
-                return { status: { equals: 'published' } } as Where
-            }
+            // GH-1587 Phase 02: no live consumer reads this collection unauthenticated
+            // (storefront uses /api/storefront/blogs with overrideAccess:true + tenant filter).
+            // Block anonymous entirely rather than leak cross-tenant blog content.
+            if (!req.user) return false
             // Authenticated — tenant-scoped
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>
@@ -70,6 +160,10 @@ export const Blogs: CollectionConfig = {
             relationTo: 'tenants',
             required: true,
             index: true,
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'site',
@@ -77,6 +171,10 @@ export const Blogs: CollectionConfig = {
             relationTo: 'sites',
             required: true,
             index: true,
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
         },
         {
             name: 'title',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectLanguage } from '@/lib/ai/lang-detect'
+import { detectLanguage, resolveDetectedLanguage } from '@/lib/ai/lang-detect'
 
 // GH-1442: plain English business input was generating sites in a random Latin
 // language because franc-min misguessed it (e.g. "Yoga Studio" → Italian) and that
@@ -27,5 +27,12 @@ describe('GH-1442: genuine non-English still drives correct generation', () => {
     })
     it('Italian WITH diacritics → Italian (not over-corrected)', () => {
         expect(detectLanguage('Ristorante italiano cucina tradizionale qualità è autenticità').gpLang).toBe('Italian')
+    })
+    it('[TC-F26-11-04] confirmed Italian locale bypasses re-detection and drives block/prompt locale', () => {
+        expect(resolveDetectedLanguage('it')).toEqual({
+            contentLang: 'en',
+            gpLang: 'Italian',
+            blockLang: 'it',
+        })
     })
 })

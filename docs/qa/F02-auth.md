@@ -160,7 +160,6 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02-RTOKEN-06** | `Unit` | Preserve mfa_verified:true từ token gốc | SignJWT được gọi với `mfa_verified: true` khi token gốc có claim này. | High |
 | **TC-F02-RTOKEN-07** | `Unit` | Mặc định mfa_verified=true khi claim vắng mặt | Token cũ (chưa có claim) → SignJWT vẫn nhận `mfa_verified: true`. | High |
 | **TC-F02-RTOKEN-08** | `Unit` | Happy path → 200, set httpOnly cookie | Trả `{ ok: true }`, cookie `payload-token` được set với `httpOnly: true`. | Blocker |
-
 ---
 
 ## 4. End-to-End User Flow (Acceptance Test)

@@ -603,25 +603,33 @@ describe('TC-GENPERF-W1-04 — blog seeder skip on regeneration (Wave 1 integrat
     })
 })
 
-describe('TC-F08-BS.24 — prepareBlogPosts starts thumbnails without a product-image gate', () => {
+describe('TC-F08-BS.24 — prepareBlogPosts waits for pixabayGate before any Pixabay search', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})
 
-	it('starts thumbnail search without waiting for an external Pixabay task (GH-1190 latency bound)', async () => {
-		// Arrange
+	it('holds the thumbnail phase until the gate settles (GH-1190 rate-limit serialization)', async () => {
 		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 		const searchPhotos = await getSearchPhotos()
 		const payload = makePayload(0)
 
-		// Act
-		const prepPromise = prepareBlogPosts({
-			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
-		})
+		let releaseGate: () => void = () => {}
+		const gate = new Promise<void>((r) => { releaseGate = r })
 
-		// Assert — thumbnails are independent from product image enrichment.
-		await vi.waitFor(() => expect(vi.mocked(searchPhotos)).toHaveBeenCalled(), { timeout: 1_000 })
+		// Act — start prep with a pending gate
+		const prepPromise = prepareBlogPosts({
+			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz', pixabayGate: gate,
+		})
+		// Drain microtasks + a real tick: seeds AI resolves, gate still pending
+		await new Promise((r) => setTimeout(r, 20))
+
+		// Assert — no Pixabay search while the gate is closed
+		expect(vi.mocked(searchPhotos)).not.toHaveBeenCalled()
+
+		// Release the gate → thumbnail phase runs
+		releaseGate()
 		const prepared = await prepPromise
+		expect(vi.mocked(searchPhotos)).toHaveBeenCalled()
 		expect(prepared).toHaveLength(3)
 	})
 })

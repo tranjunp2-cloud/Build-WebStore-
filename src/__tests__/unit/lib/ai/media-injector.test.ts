@@ -48,7 +48,7 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(blocks[0]!.backgroundImage).toBe(99)
         })
 
-        it('pads gallery array to minCount when below', () => {
+        it('GH-1621: does NOT pad gallery array to minCount — only injects images for AI-generated items', () => {
             const blocks = [
                 {
                     blockType: 'gallery',
@@ -57,16 +57,43 @@ describe('media-injector [plan-260414-unsplash]', () => {
             ]
             const needs = planImageNeeds(blocks)
             expect(needs.length).toBe(1)
-            expect(needs[0]!.count).toBeGreaterThanOrEqual(6) // gallery minCount = 6
-            // Array should be padded
-            expect((blocks[0]!.images as unknown[]).length).toBe(6)
+            expect(needs[0]!.count).toBe(2) // NOT padded to minCount=6
+            expect((blocks[0]!.images as unknown[]).length).toBe(2)
         })
 
-        it('creates empty gallery array when missing', () => {
+        it('GH-1621: skips block entirely when array field missing — never fabricates empty items', () => {
             const blocks = [{ blockType: 'gallery' }]
             const needs = planImageNeeds(blocks)
+            expect(needs.length).toBe(0)
+            expect(blocks[0]!.images).toBeUndefined()
+        })
+
+        it('GH-1621: portfolio-grid — never pads to minCount=6, and assign() only ever touches the image field (title backfill is normalize-required-titles.ts\'s job, not this function\'s)', () => {
+            // Old padding pushed `{}` placeholders that only ever received an `image`
+            // via assign() below — so any padded item's `title` stayed empty forever.
+            // This test proves two separate things: (1) no synthetic items get created
+            // (4 stays 4, not padded to minCount=6), and (2) assign() genuinely never
+            // reads or writes `title` — a real AI-omitted title (item 2) is left exactly
+            // as the AI produced it, neither fabricated nor silently dropped.
+            const blocks = [
+                {
+                    blockType: 'portfolio-grid',
+                    projects: [
+                        { title: 'Project A' },
+                        {}, // AI omitted title — media-injector must not care or touch it
+                    ],
+                },
+            ]
+            const needs = planImageNeeds(blocks)
             expect(needs.length).toBe(1)
-            expect((blocks[0]!.images as unknown[]).length).toBe(6)
+            expect(needs[0]!.count).toBe(2) // NOT padded to minCount=6
+            needs[0]!.assign([1, 2])
+            const projects = blocks[0]!.projects as Record<string, unknown>[]
+            expect(projects.length).toBe(2)
+            expect(projects[0]!.title).toBe('Project A') // untouched
+            expect(projects[1]!.title).toBeUndefined() // media-injector does not backfill titles
+            expect(projects[0]!.image).toBe(1)
+            expect(projects[1]!.image).toBe(2)
         })
 
         it('creates need for team members[].image (Payload schema)', () => {
@@ -354,24 +381,26 @@ describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
 		delete process.env.PIXABAY_BLOCKS // default set = {hero}
 		// hero: top-level (1 slot) on the landscape bucket. base 1 → +2 = 3.
 		// No square-role block enabled → square bucket skipped (0).
-		expect(computePoolBucketSizes()).toEqual({ landscape: 3, square: 0 })
+		expect(computePoolBucketSizes()).toEqual({ landscape: 3, square: 0, landscapeMin: 1, squareMin: 0 })
 	})
 
 	it('gallery-only → landscape sized to gallery minCount (6) + buffer, square 0', () => {
 		process.env.PIXABAY_BLOCKS = 'gallery'
 		// gallery nested minCount 6 → ceil(6*1.4)=9 (> 6+2=8). Landscape bucket.
-		expect(computePoolBucketSizes()).toEqual({ landscape: 9, square: 0 })
+		// GH-1611: landscapeMin = the raw gallery need (6) — the pool is only "filled"
+		// once it can serve the hungriest block, not at half the bucket.
+		expect(computePoolBucketSizes()).toEqual({ landscape: 9, square: 0, landscapeMin: 6, squareMin: 0 })
 	})
 
 	it('products-grid-only → square sized to products minCount (4) + buffer, landscape 0', () => {
 		process.env.PIXABAY_BLOCKS = 'products-grid'
 		// products-grid nested minCount 4 → max(4+2=6, ceil(5.6)=6)=6, cap 6.
-		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 6 })
+		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 6, landscapeMin: 0, squareMin: 4 })
 	})
 
 	it('people-only blocks → both buckets 0 (avatars use getAvatarMedia, not the pool)', () => {
 		process.env.PIXABAY_BLOCKS = 'team,testimonials'
-		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 0 })
+		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 0, landscapeMin: 0, squareMin: 0 })
 	})
 
 	it('never exceeds the legacy 12/6 caps even with every block enabled', () => {
@@ -384,6 +413,6 @@ describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
 	})
 
 	it('accepts an explicit enabled set (pure function, no env read)', () => {
-		expect(computePoolBucketSizes(new Set(['hero']))).toEqual({ landscape: 3, square: 0 })
+		expect(computePoolBucketSizes(new Set(['hero']))).toEqual({ landscape: 3, square: 0, landscapeMin: 1, squareMin: 0 })
 	})
 })

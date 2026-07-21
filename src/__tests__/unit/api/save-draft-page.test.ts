@@ -157,4 +157,30 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
 
         expect(mockUpdate).not.toHaveBeenCalled()
     })
+
+    it('TC-F01-pub-17 — GH-1621: draft save does NOT backfill/mutate required array-item fields (moved to publish-time, see publish.test.ts)', async () => {
+        // Regression guard for the OPPOSITE of what this test used to assert: an
+        // earlier version of this fix ran the required-field sanitizer on every
+        // draft autosave, which silently backfilled/dropped content on blocks the
+        // user wasn't even editing (caught in code review before merge — see
+        // GH-1621 journal "Correction"). Draft saves must persist blocks verbatim;
+        // sanitization only happens once, right before Publish.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: '42', site: 1, _status: 'draft', layout: [] })
+
+        const blocks = [{
+            blockType: 'portfolio-grid',
+            projects: [{ title: 'Real Project' }, { title: '' }, {}],
+        }]
+        const res = await PATCH(makeReq('1', '42', { blocks, isDraft: true }), makeParams('1'))
+
+        expect(res.status).toBe(200)
+        const savedLayout = mockUpdate.mock.calls[0][0].data.layout
+        expect(savedLayout[0].projects).toEqual([
+            { title: 'Real Project' },
+            { title: '' },
+            {},
+        ])
+    })
 })

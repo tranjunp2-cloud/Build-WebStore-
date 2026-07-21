@@ -25,21 +25,6 @@ interface SlugPickerProps {
     skipInitialCheck?: boolean
 }
 
-/** Client-side slugify for instant preview (mirrors server-side logic) */
-function clientSlugify(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 63)
-    return slug.length >= 3 ? slug : ''
-}
-
 export default function SlugPicker({ businessName = '', onSlugChange, platformDomain, skipInitialCheck }: SlugPickerProps) {
     const { t } = useI18n()
     const f = t.onboarding.form
@@ -57,11 +42,23 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
 
     // Auto-generate slug from business name
     useEffect(() => {
-        if (businessName) {
-            const generated = clientSlugify(businessName)
-            if (generated) {
-                setSlug(generated)
+        let active = true
+
+        const generateSlug = async () => {
+            if (!businessName) return
+
+            try {
+                const { slugify } = await import('@/lib/utils/slugify')
+                const generated = slugify(businessName)
+                if (active && generated) setSlug(generated)
+            } catch (error) {
+                console.error('[SlugPicker] Failed to load slug transliteration', error)
             }
+        }
+
+        void generateSlug()
+        return () => {
+            active = false
         }
     }, [businessName])
 
@@ -162,7 +159,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                         value={slug}
                         onChange={(e) => handleInputChange(e.target.value)}
                         placeholder={f.slugPlaceholder}
-                        className="h-[44px] w-full px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#1E293B]/40 text-[14px] text-[#F8FAFC] font-mono placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+                        className="h-12 w-full px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#1E293B]/40 text-[14px] text-[#F8FAFC] font-mono placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
                     {/* Status icon */}
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -173,7 +170,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                 </div>
 
                 {/* Domain suffix */}
-                <div className="h-[44px] flex items-center px-3 rounded-r-[12px] border border-l-0 border-white/[0.08] bg-[#0B1120]/60 text-[13px] text-slate-500 whitespace-nowrap">
+                <div className="h-12 flex items-center px-3 rounded-r-[12px] border border-l-0 border-white/[0.08] bg-[#0B1120]/60 text-[13px] text-slate-500 whitespace-nowrap">
                     .{domain}
                 </div>
             </div>

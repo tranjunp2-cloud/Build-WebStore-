@@ -115,20 +115,9 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
-vi.mock('@/lib/ai/generate-sample-products', () => {
-    const generateSampleProducts = vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } })
-    return {
-        generateSampleProducts,
-        prepareSampleProducts: vi.fn().mockImplementation(async () => {
-            const generated = await generateSampleProducts()
-        return { products: generated.products, imageKeywords: [], category: 'business' }
-        }),
-        enrichSampleProductImages: vi.fn().mockImplementation(async (prepared) => ({
-            products: prepared.products,
-            stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
-        })),
-    }
-})
+vi.mock('@/lib/ai/generate-sample-products', () => ({
+    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
+}))
 
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
 // prove seeding is DEFERRED (scheduled, not awaited in-request) and then
@@ -667,6 +656,38 @@ describe('AI Streaming APIs', () => {
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
 
+        it('[TC-F26-11-04] resolves a missing Auto override once for AI, products, and persistence', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Dolci Firenze',
+                         industry: 'ristorante italiano',
+                         products: 'ottimi dolci e birra',
+                         shortDescription: 'cucina tradizionale italiana',
+                     },
+                     language: 'auto',
+                 }),
+             })
+
+             // Act
+             await GenerateSitePOST(req)
+
+             // Assert
+             const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
+             expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
+             expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
+
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const siteCreateCall = vi.mocked(resolvedPayload.create).mock.calls.find(
+                 (call: [{ collection: string; data?: { generationLocale?: string } }]) =>
+                     call[0].collection === 'sites',
+             )
+             expect(siteCreateCall?.[0].data?.generationLocale).toBe('it')
+        })
+
         // GH-1458 — generate-site creates products directly via payload.create(), bypassing the
         // publish-guard/alt-fallback logic in saveProductAction. These verify the parity fix.
         // Phase 2 correction: generateSampleProducts' AI tier estimates weight/dimensions PER
@@ -813,7 +834,7 @@ describe('AI Streaming APIs', () => {
             )
             expect(productCreateCall).toBeDefined()
             // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
-            expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread - AI Bakery')
+            expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread')
         })
 
         it('[TC-09.49] persisted alt-text fallback is capped at 500 chars, matching saveProductAction (code-review fix)', async () => {
@@ -1200,6 +1221,14 @@ describe('AI Streaming APIs', () => {
             // Post-response: captured after() tasks run the seeder exactly once
             await runCapturedAfterTasks()
             expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledWith(
+                expect.anything(),
+                'tenant-1',
+                expect.any(String),
+                'ecommerce',
+                undefined,
+                'Bread',
+            )
         })
 
         it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {
@@ -1352,67 +1381,6 @@ describe('AI Streaming APIs', () => {
                 delete process.env.GEN_BLOG_PREP_GRACE_MS
             }
         })
-
-        it('[TC-GENPERF-PI-01] slow product image enrichment does not block catalog creation or mutate a regenerated product', async () => {
-            // Arrange — copy is ready, but the external image provider remains pending.
-            const { prepareSampleProducts, enrichSampleProductImages } = await import('@/lib/ai/generate-sample-products')
-            const { after } = await import('next/server')
-            vi.mocked(prepareSampleProducts).mockResolvedValueOnce({
-                products: [{
-                    name: 'Sample Bread',
-                    shortDescription: 'Fresh bread',
-                    description: 'Delicious fresh bread',
-                    price: 10,
-                    sku: 'BREAD-001',
-                    inventory: 0,
-                    status: 'active',
-                }],
-                imageKeywords: ['artisan bread'],
-                category: 'food',
-            })
-            let resolveImages: (value: { products: Array<Record<string, unknown>>; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
-            vi.mocked(enrichSampleProductImages).mockReturnValueOnce(new Promise((resolve) => {
-                resolveImages = resolve
-            }) as ReturnType<typeof enrichSampleProductImages>)
-            // Act — response must not wait for the unresolved image promise.
-            const res = await GenerateSitePOST(genPerfReq())
-
-            // Assert — product data persisted and a third after() task was queued
-            // alongside the existing blog and image-library tasks.
-            expect(res.status).toBe(200)
-            const mockPayload = await vi.mocked(getPayload).mock.results.at(-1)?.value
-            expect(vi.mocked(mockPayload.create).mock.calls.some((call) => call[0].collection === 'products')).toBe(true)
-            expect(vi.mocked(after).mock.calls.length).toBeGreaterThanOrEqual(3)
-
-            // Product enrichment is the first deferred task scheduled by the
-            // route. It must return its promise so Next/Vercel keeps the
-            // request lifecycle alive until image updates finish.
-            const deferredTasks = vi.mocked(after).mock.calls.map(([task]) => task as () => unknown)
-            const productImageTask = deferredTasks[0]!
-            const productImageTaskResult = productImageTask()
-            expect(productImageTaskResult).toBeInstanceOf(Promise)
-
-            resolveImages({
-                products: [{
-                    name: 'Sample Bread', sku: 'BREAD-001', imageId: 123,
-                }],
-                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
-            })
-            await productImageTaskResult
-            for (const task of deferredTasks.slice(1)) await task()
-
-            // The deferred task must update the product created by this request.
-            // Re-querying all products for the site by deterministic SKU would
-            // allow a prior generation to overwrite a regenerated product.
-            expect(vi.mocked(mockPayload.update)).toHaveBeenCalledWith(expect.objectContaining({
-                collection: 'products',
-                id: 'new-products-123',
-                data: expect.objectContaining({ images: [{ image: 123, alt: expect.any(String) }] }),
-            }))
-            expect(vi.mocked(mockPayload.find).mock.calls.some((call) =>
-                call[0].collection === 'products' && call[0].where?.site?.equals,
-            )).toBe(false)
-        }, 10_000)
     })
 
     describe('canonicalizePageSlug — trust canonical slug over title/content [GH-820 + dental /contact fix]', () => {

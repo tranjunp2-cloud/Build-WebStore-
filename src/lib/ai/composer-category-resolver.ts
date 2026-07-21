@@ -61,8 +61,37 @@ const TIE_BREAK_ORDER: ComposerCategory[] = [
  */
 export function normalizeComposerCategory(input: string | undefined): ComposerCategory {
     if (!input) return 'business'
-    if (input in COMPOSER_TYPE_KEYWORDS) return input as ComposerCategory
+    if (isComposerCategory(input)) return input
     return resolveComposerCategory(input)
+}
+
+/**
+ * `Object.hasOwn`, not `in` — `in` walks the prototype chain, so an API client
+ * posting industry="constructor" (or "toString", "__proto__") would be accepted
+ * as a valid category and leak Object.prototype members into downstream lookups.
+ */
+function isComposerCategory(input: string): input is ComposerCategory {
+    return Object.hasOwn(COMPOSER_TYPE_KEYWORDS, input)
+}
+
+/**
+ * GH-1611: resolve the category of a business whose `industry` comes from the
+ * builder form (an authoritative composer key) but may also be free text (URL
+ * extraction, API clients).
+ *
+ * The form's key WINS — it is the user's explicit answer. Only fall back to
+ * scoring the surrounding text (business name, products) when `industry` is not
+ * a key. Scoring the concatenated text unconditionally is what let a bakery
+ * called "Maison Dubois" selling "gateau, macaron" score zero and land on
+ * 'business' — the site was fnb everywhere else, so its product grid pulled
+ * corporate stock photos while the rest of the page showed cakes.
+ */
+export function resolveBusinessCategory(
+    industry: string | undefined,
+    freeText: string,
+): ComposerCategory {
+    if (industry && isComposerCategory(industry)) return industry
+    return resolveComposerCategory(`${industry ?? ''} ${freeText}`.trim())
 }
 
 export function resolveComposerCategory(prompt: string): ComposerCategory {

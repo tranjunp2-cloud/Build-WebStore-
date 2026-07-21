@@ -134,7 +134,7 @@ export function SEOKeywordTracker({ initialKeywords }: { initialKeywords: Tracke
                                     <input
                                         type="text" value={newKeyword} onChange={(e) => setNewKeyword(e.target.value)}
                                         placeholder={modal.placeholder || 'Enter keyword...'}
-                                        className="w-full h-[44px] px-4 bg-[#0F141E] rounded-[10px] text-[14px] text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all border-none"
+                                        className="w-full h-10 px-4 bg-[#0F141E] rounded-[10px] text-[14px] text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all border-none"
                                         autoFocus
                                         onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setIsModalOpen(false) }}
                                     />

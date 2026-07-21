@@ -25,6 +25,7 @@ const S = {
         background: 'var(--dash-surface)',
         border: '1px solid var(--dash-border)',
         borderRadius: 8,
+        height: 40,
         padding: '8px 12px',
         color: 'var(--dash-text)',
         fontFamily: 'Inter, sans-serif',

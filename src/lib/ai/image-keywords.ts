@@ -209,7 +209,16 @@ export function deriveKeywords(
     const base = pickRandom(baseList) ?? 'modern business'
     const modifiers = BLOCK_MODIFIER_KEYWORDS[blockType] ?? []
     const modifier = pickRandom(modifiers)
-    const industryBoost = translateIndustryToEn(ctx.industry, ctx.language)
+    // GH-1611: `industry` may now be a resolved composer KEY, not free text — the
+    // route threads the normalized category through MediaPipelineContext. A key is
+    // not a searchable word: translateIndustryToEn passes 'fnb'/'realestate'
+    // through its ASCII escape hatch, and Pixabay AND-matches `q`, so one junk
+    // token zeroed the whole search. The category's own base keywords already
+    // carry the industry signal, so drop the boost when it IS the category.
+    const industryIsComposerKey = Boolean(ctx.industry && Object.hasOwn(CATEGORY_BASE_KEYWORDS, ctx.industry))
+    const industryBoost = industryIsComposerKey
+        ? ''
+        : translateIndustryToEn(ctx.industry, ctx.language)
 
     // Raw keyword path — return verbatim, undiluted (GH-1185 AND-match rule).
     if (ctx.englishKeywords && ctx.englishKeywords.length > 0) {

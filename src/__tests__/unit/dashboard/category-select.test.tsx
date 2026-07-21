@@ -46,6 +46,10 @@ function renderSelect(
     ) }
 }
 
+function getCategoryRow(text: string, occurrence = 0) {
+    return screen.getAllByText(text)[occurrence]?.closest('[class*="cursor-pointer"]') as Element
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe('TC-F08-05-03 — CategorySelect trigger display', () => {
@@ -59,9 +63,14 @@ describe('TC-F08-05-03 — CategorySelect trigger display', () => {
         expect(screen.getByText('Fashion / Men / T-Shirts')).toBeInTheDocument()
     })
 
+    it('renders the selected breadcrumb in a bolder trigger style', () => {
+        renderSelect(cats3Level, ['l3'])
+        expect(screen.getByText('Fashion / Men / T-Shirts')).toHaveClass('font-semibold')
+    })
+
     it('falls back to category name when breadcrumbs field absent', () => {
         renderSelect(cats2Level, ['l2'])
-        expect(screen.getByText('Men')).toBeInTheDocument()
+        expect(screen.getAllByText('Men').length).toBeGreaterThan(0)
     })
 })
 
@@ -69,14 +78,35 @@ describe('TC-F08-05-03 — Leaf-node selection', () => {
     it('opens panel on trigger click', () => {
         renderSelect()
         fireEvent.click(screen.getByText('Select categories...'))
-        expect(screen.getByText('Fashion')).toBeInTheDocument()
-        expect(screen.getByText('Accessories')).toBeInTheDocument()
+        expect(screen.getAllByText('Fashion').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Accessories').length).toBeGreaterThan(0)
+    })
+
+    it('renders the dropdown with elevated panel styling', () => {
+        const { container } = renderSelect()
+        fireEvent.click(screen.getByText('Select categories...'))
+        const panel = container.querySelector('.shadow-2xl')
+        expect(panel).toBeInTheDocument()
+        expect(panel).toHaveClass('rounded-xl', 'border-solid', 'flex-col', 'max-w-full', 'md:flex-row', 'md:max-w-[calc(100vw-2rem)]')
+    })
+
+    it('stacks child levels vertically on mobile instead of clipping sideways', () => {
+        renderSelect()
+        fireEvent.click(screen.getByText('Select categories...'))
+        const expandedParent = getCategoryRow('Fashion', 0)
+        fireEvent.click(expandedParent)
+        expect(screen.getAllByText('Fashion').length).toBeGreaterThan(0)
+        expect(expandedParent.querySelector('svg')).toHaveClass('rotate-90')
+        fireEvent.click(getCategoryRow('Men', 0))
+        const nestedLeaf = getCategoryRow('T-Shirts', 0)
+        expect(nestedLeaf).toBeInTheDocument()
+        expect(nestedLeaf).toHaveClass('pl-11')
     })
 
     it('selecting L1 leaf calls onChange([id]) immediately', () => {
         const { onChange } = renderSelect()
         fireEvent.click(screen.getByText('Select categories...'))
-        fireEvent.click(screen.getByText('Accessories'))
+        fireEvent.click(getCategoryRow('Accessories', 0))
         expect(onChange).toHaveBeenCalledWith(['l1-leaf'])
     })
 
@@ -96,9 +126,9 @@ describe('TC-F08-05-03 — Leaf-node selection', () => {
     it('TC-F08-05-11: selectLeaf/handleL3Select REPLACES selection with single value (single-select, not append)', () => {
         const { onChange } = renderSelect(cats3Level, ['l1-leaf'])
         fireEvent.click(screen.getByText('Accessories'))
-        fireEvent.mouseEnter(screen.getByText('Fashion').closest('[class*="cursor-pointer"]') as Element)
-        fireEvent.click(screen.getByText('Men').closest('[class*="cursor-pointer"]') as Element)
-        fireEvent.click(screen.getByText('T-Shirts').closest('[class*="cursor-pointer"]') as Element)
+        fireEvent.mouseEnter(getCategoryRow('Fashion', 1))
+        fireEvent.click(getCategoryRow('Men', 0))
+        fireEvent.click(getCategoryRow('T-Shirts', 0))
         // onChange should be called with [l3] only, not ['l1-leaf', 'l3'] (replaces, not appends)
         expect(onChange).toHaveBeenLastCalledWith(['l3'])
     })
@@ -108,15 +138,15 @@ describe('TC-F08-05-03 — Col 1 panel: parent categories show ChevronRight', ()
     it('L1 with children renders without immediate onChange call on hover', () => {
         const { onChange } = renderSelect()
         fireEvent.click(screen.getByText('Select categories...'))
-        fireEvent.mouseEnter(screen.getByText('Fashion').closest('[class*="cursor-pointer"]') as Element)
+        fireEvent.mouseEnter(getCategoryRow('Fashion', 1))
         expect(onChange).not.toHaveBeenCalled()
     })
 
     it('hovering L1 with children reveals L2 column', () => {
         renderSelect()
         fireEvent.click(screen.getByText('Select categories...'))
-        fireEvent.mouseEnter(screen.getByText('Fashion').closest('[class*="cursor-pointer"]') as Element)
-        expect(screen.getByText('Men')).toBeInTheDocument()
+        fireEvent.mouseEnter(getCategoryRow('Fashion', 1))
+        expect(screen.getAllByText('Men').length).toBeGreaterThan(0)
     })
 })
 

@@ -208,17 +208,6 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
     // Fix B: coerce to number so SKU scope and tenant filter match Neon integer FK
     const tenantId = tenantIdForQuery(user)
 
-    // Alt-text fallback (GH-1458) needs the store name — fetched once per save, same
-    // "one site per tenant" lookup pattern used elsewhere in the dashboard (see
-    // src/app/(dashboard)/actions.ts addTrackedKeyword).
-    let storeName: string | undefined
-    if (tenantId != null) {
-        const sitesRes = await payload.find({
-            collection: 'sites', where: { tenant: { equals: tenantId } }, limit: 1, depth: 0,
-        })
-        storeName = sitesRes.docs[0]?.name ?? undefined
-    }
-
     // `id != null` (not truthy `id`) — a falsy `id === 0` is a legitimate Payload primary key
     // and must route to the update branch below, not silently fall through to create.
     const hasId = id != null && id !== ''
@@ -286,12 +275,13 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
         }
     }
 
-    // Alt-text fallback (GH-1458): blank alt -> "{name} - {store}", so the storefront <img alt>
-    // is never empty. Single source of truth shared with the storefront render paths. Re-capped
-    // at 500 (matches the schema's alt max) since the derived string is computed AFTER Zod
-    // validation and isn't re-checked otherwise.
+    // Dashboard/manual product saves intentionally derive blank image alt text from the product
+    // name only. We do NOT fetch/pass the tenant site name here, so manual saves never persist
+    // noisy local/staging suffixes like "Product - localhost". Re-capped at 500 (matches the
+    // schema's alt max) since the derived string is computed AFTER Zod validation and isn't
+    // re-checked otherwise.
     if (data.images && data.images.length > 0) {
-        data.images = data.images.map((img) => ({ ...img, alt: buildProductAlt(img.alt, data.name, storeName).slice(0, 500) }))
+        data.images = data.images.map((img) => ({ ...img, alt: buildProductAlt(img.alt, data.name, undefined).slice(0, 500) }))
     }
 
     if (hasId) {

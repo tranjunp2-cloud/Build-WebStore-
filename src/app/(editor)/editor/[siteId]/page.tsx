@@ -105,6 +105,44 @@ function friendlyValidationDetail(path: string, message?: string): string {
     return `${label}: ${message || 'invalid'}`
 }
 
+/** Shared publish/re-publish error detail extractor — DRYs up the identical
+ *  error-parsing block that was duplicated across handlePublish and handleRepublish.
+ *  Returns a human-readable detail string for the toast. */
+type PublishFailureBody = {
+    error?: {
+        message?: string
+        failures?: Array<{
+            errName?: string
+            errMsg?: string
+            pgColumn?: string
+            pgTable?: string
+            causeMsg?: string
+            friendlyDetail?: string
+            validationErrors?: Array<{ path?: string; message?: string }>
+        }>
+    }
+} | null
+
+function extractPublishErrorDetail(body: PublishFailureBody, status: number): string {
+    const firstFailure = body?.error?.failures?.[0]
+    const firstValidation = firstFailure?.validationErrors?.[0]
+    if (firstFailure?.friendlyDetail) {
+        // GH-1621 P1: server already resolved the failing block/item, e.g.
+        // "Portfolio Grid → Project 5 → Title: This field is required."
+        return firstFailure.friendlyDetail
+    }
+    if (firstValidation?.path) {
+        return friendlyValidationDetail(firstValidation.path, firstValidation.message)
+    }
+    if (firstFailure?.pgColumn && firstFailure?.pgTable) {
+        return `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
+    }
+    const isDev = process.env.NODE_ENV === 'development'
+    return (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
+        || body?.error?.message
+        || `Server returned ${status}`
+}
+
 // F26: top-level block fields NEVER sent to the translator. Two groups (see docs/prd/F26 §7b
 // Content Classification): (1) structural/media/link fields, and (2) "business data" that must
 // stay identical across locales — shop name (logoText), contact info (email/phone/address),
@@ -1788,32 +1826,8 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                const body = await res.json().catch(() => null) as {
-                    error?: {
-                        message?: string
-                        failures?: Array<{
-                            errName?: string
-                            errMsg?: string
-                            pgColumn?: string
-                            pgTable?: string
-                            causeMsg?: string
-                            validationErrors?: Array<{ path?: string; message?: string }>
-                        }>
-                    }
-                } | null
-                const firstFailure = body?.error?.failures?.[0]
-                const firstValidation = firstFailure?.validationErrors?.[0]
-                let detail: string | undefined
-                if (firstValidation?.path) {
-                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
-                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
-                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
-                } else {
-                    const isDev = process.env.NODE_ENV === 'development'
-                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
-                        || body?.error?.message
-                }
-                throw new Error(detail || `Server returned ${res.status}`)
+                const body = await res.json().catch(() => null) as PublishFailureBody
+                throw new Error(extractPublishErrorDetail(body, res.status))
             }
 
             setPublishSuccess(true)
@@ -1913,35 +1927,8 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                // Try to surface the actual server-side cause (PG column missing,
-                // Payload ValidationError on a required field, etc.) instead of
-                // a generic "Server returned 500".
-                const body = await res.json().catch(() => null) as {
-                    error?: {
-                        message?: string
-                        failures?: Array<{
-                            errName?: string
-                            errMsg?: string
-                            pgColumn?: string
-                            pgTable?: string
-                            causeMsg?: string
-                            validationErrors?: Array<{ path?: string; message?: string }>
-                        }>
-                    }
-                } | null
-                const firstFailure = body?.error?.failures?.[0]
-                const firstValidation = firstFailure?.validationErrors?.[0]
-                let detail: string | undefined
-                if (firstValidation?.path) {
-                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
-                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
-                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
-                } else {
-                    const isDev = process.env.NODE_ENV === 'development'
-                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
-                        || body?.error?.message
-                }
-                throw new Error(detail || `Server returned ${res.status}`)
+                const body = await res.json().catch(() => null) as PublishFailureBody
+                throw new Error(extractPublishErrorDetail(body, res.status))
             }
 
             markPublished()

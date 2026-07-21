@@ -164,6 +164,65 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(body.data.domain).toContain('coffee-shop')
     })
 
+    it('TC-F01-pub-03b: sanitizes pending header/footer blocks before promoting site-level publish data', async () => {
+        const { getPayload } = await import('payload')
+        const siteRecordWithPending = {
+            ...mockSiteRecord,
+            pendingHeaderBlock: {
+                blockType: 'navigation',
+                links: [
+                    { label: 'Home', url: '/' },
+                    { label: 'Broken' },
+                ],
+            },
+            pendingFooterBlock: {
+                blockType: 'footer',
+                columns: [
+                    { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken link only' }] },
+                    { links: [{ label: 'Missing title', url: '/x' }] },
+                ],
+            },
+        }
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...siteRecordWithPending, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return siteRecordWithPending
+                }
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({ docs: [], hasNextPage: false }),
+            update: updateSpy,
+            db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [] }) } },
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const siteUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'sites')
+        expect(siteUpdate).toBeTruthy()
+        expect(siteUpdate![0].data.headerBlock).toEqual({
+            blockType: 'navigation',
+            links: [{ label: 'Home', url: '/' }, { label: 'Broken' }],
+        })
+        expect(siteUpdate![0].data.footerBlock).toEqual({
+            blockType: 'footer',
+            columns: [
+                { title: 'Company', links: [{ label: 'About', url: '/about' }, { label: 'Broken link only' }] },
+                { links: [{ label: 'Missing title', url: '/x' }] },
+            ],
+        })
+    })
+
     it('TC-F01-pub-04: returns 401 when user is not authenticated', async () => {
         // Arrange — no authenticated user
         vi.mocked(getCurrentUser).mockResolvedValueOnce(null)
@@ -620,6 +679,204 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(failure.validationErrors).toEqual([
             { path: 'layout.2.doctors.0.name', message: 'This field is required.' },
         ])
+    })
+
+    it('TC-F01-pub-16: GH-1621 P1 — failures[].friendlyDetail resolves block/item/page from the raw path instead of a bare field name', async () => {
+        // Regression: the old toast only ever showed "title: This field is
+        // required." with zero indication of WHICH block/item/page — exactly
+        // the GH-1621 complaint. friendlyDetail must resolve the actual block
+        // type + 1-indexed item position + page title from the failing page's
+        // own layout (the only place that data is knowable from).
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: layout.6.projects.4.title')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [
+                        { path: 'layout.6.projects.4.title', message: 'This field is required.' },
+                    ],
+                }
+            }
+        }
+
+        const failingPageLayout = Array.from({ length: 7 }, (_, i) =>
+            i === 6
+                ? { blockType: 'portfolio-grid', projects: [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }, {}, {}] }
+                : { blockType: 'hero' },
+        )
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-3710', title: 'About Us', _status: 'draft', site: 'site-123', layout: failingPageLayout },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'pages' && id === 'page-3710') throw new FakeValidationError()
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        const failure = body.error.failures[0]
+        expect(failure.pageTitle).toBe('About Us')
+        // Block 6 (index) is portfolio-grid; item index 4 → "Project 5" (1-indexed).
+        expect(failure.friendlyDetail).toBe('About Us → Portfolio → Project 5 → title: This field is required.')
+    })
+
+    it('TC-F01-pub-18: GH-1621 code-review follow-up — sanitizeBlocksRequiredFields runs right before promote, NOT on every draft autosave', async () => {
+        // The sanitizer moved from /api/sites/[siteId]/save (every autosave — caught
+        // in review as a silent-mutation/data-loss risk) to here, right before a
+        // page's draft is promoted to published. Verify payload.update actually
+        // receives the backfilled layout at publish time.
+        const { getPayload } = await import('payload')
+        const layout = [{ blockType: 'portfolio-grid', projects: [{ title: 'Real Project' }, {}] }]
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [{ id: 'page-42', title: 'Home', _status: 'draft', site: 'site-123', layout }],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockResolvedValue({ id: 'page-42' })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+
+        expect(res.status).toBe(200)
+        const savedLayout = updateSpy.mock.calls[0][0].data.layout
+        expect(savedLayout[0].projects).toEqual([
+            { title: 'Real Project' },
+            { title: 'Project 2' },
+        ])
+    })
+
+    it('TC-F01-pub-19: GH-1621 code-review follow-up — friendlyValidationLocation falls back to field-name-only for doubly-nested arrays, never a wrong item label', async () => {
+        // menu-food/menu-display's categories[].items[].name is a real doubly-nested
+        // required field. A path like layout.2.categories.1.items.0.name (7
+        // segments) must NOT be misread as "Category 2 → items" (segments[4] is the
+        // nested array's field name, not the leaf field) — fall back to the always-
+        // correct leaf field name instead.
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: layout.2.categories.1.items.0.name')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [{ path: 'layout.2.categories.1.items.0.name', message: 'This field is required.' }],
+                }
+            }
+        }
+
+        const failingPageLayout = [
+            { blockType: 'hero' },
+            { blockType: 'hero' },
+            { blockType: 'menu-food', categories: [{ name: 'Mains' }, { name: 'Drinks', items: [{}] }] },
+        ]
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [{ id: 'page-55', title: 'Menu', _status: 'draft', site: 'site-123', layout: failingPageLayout }],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'pages' && id === 'page-55') throw new FakeValidationError()
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        const failure = body.error.failures[0]
+        // Must NOT be "Menu → Category 2 → items" (wrong field) — field-name-only fallback.
+        expect(failure.friendlyDetail).toBe('Menu → Food Menu → name: This field is required.')
+    })
+
+    it('TC-F01-pub-20: GH-1621 re-review — about cards stats get safe label backfill, but missing unsafe fields still raise a friendly validation error instead of being dropped', async () => {
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: layout.0.stats.0.label')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [{ path: 'layout.0.stats.0.label', message: 'This field is required.' }],
+                }
+            }
+        }
+
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'pages' && id === 'page-about') {
+                expect(data.layout).toEqual([
+                    {
+                        blockType: 'about',
+                        layout: 'cards',
+                        stats: [
+                            { value: '99%' },
+                            { value: '12', title: 'Years', label: 'Years' },
+                        ],
+                    },
+                ])
+                throw new FakeValidationError()
+            }
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({
+                docs: [{ id: 'page-about', title: 'About Us', _status: 'draft', site: 'site-123', layout: [{ blockType: 'about', layout: 'cards', stats: [{ value: '99%' }, { value: '12', title: 'Years' }] }] }],
+                hasNextPage: false,
+            }),
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(409)
+        const failure = body.error.failures[0]
+        expect(failure.pageTitle).toBe('About Us')
+        expect(failure.friendlyDetail).toBe('About Us → About → Stat 1 → label: This field is required.')
     })
 
     it('TC-F01-pub-11: surfaces generic errors without .cause in failures[] (errName + errMsg always present)', async () => {

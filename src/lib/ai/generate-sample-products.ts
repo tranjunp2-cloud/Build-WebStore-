@@ -7,10 +7,11 @@
  */
 
 import OpenAI from 'openai'
+import { getLocaleLabel } from '@/lib/locale-labels'
 import type { BasePayload } from 'payload'
 import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
-import { resolveComposerCategory } from './composer-category-resolver'
+import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
 import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
@@ -51,14 +52,6 @@ export interface GeneratedProductsResult {
     stats: ProductImageStats
 }
 
-/** Product copy and image work are deliberately separate so a slow stock-image
- * provider cannot delay creating the generated catalog. */
-export interface PreparedSampleProducts {
-    products: SampleProduct[]
-    imageKeywords: string[]
-    category: string
-}
-
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -81,7 +74,7 @@ function isQuotaExhausted(err: unknown): boolean {
 /** Tier 1: ask GPT-4.1-nano for `count` products tailored to the business. */
 async function generateSampleProductsAI(
     businessInfo: BusinessInfoInput,
-    language: 'en' | 'ms' | 'auto',
+    language: string,
     count = 6,
     excludeNames: readonly string[] = [],
 ): Promise<Array<SampleProduct & { _imageKeyword: string }>> {
@@ -89,6 +82,9 @@ async function generateSampleProductsAI(
     if (!openai) throw new Error('OPENAI_API_KEY not set')
 
     const includeBM = language === 'ms' || language === 'auto'
+    const targetLanguage = language !== 'auto' && language !== 'en' && language !== 'ms'
+        ? getLocaleLabel(language).full
+        : null
     const systemPrompt = `You generate sample products for a small-business website.
 Products MUST be specific, realistic items the business would actually sell — never generic placeholders.
 Names should be 2-5 words, distinct from each other.
@@ -101,6 +97,7 @@ Output strictly JSON matching the requested schema. No markdown.`
     const prompt = `Generate ${count} sample products for a ${businessInfo.industry} business called "${businessInfo.businessName}".
 ${businessInfo.products ? `Products hint: ${businessInfo.products}` : ''}
 ${exclusion}
+${targetLanguage ? `Write product names and customer-facing descriptions in ${targetLanguage}.` : ''}
 Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
 Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
@@ -154,8 +151,12 @@ Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a ch
 
 /** Tier 2: deterministic curated products from library, keyed by category. */
 function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProduct & { _imageKeyword: string }> {
-    const category = resolveComposerCategory(
-        `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products}`,
+    // GH-1611: form key wins — otherwise a bakery whose name/products carry no
+    // 'fnb' keyword fell to 'business' and its product grid pulled corporate stock
+    // while the rest of the site showed cakes.
+    const category = resolveBusinessCategory(
+        businessInfo.industry,
+        `${businessInfo.businessName} ${businessInfo.products}`,
     )
     const pool = SAMPLE_PRODUCTS_BY_CATEGORY[category] ?? SAMPLE_PRODUCTS_BY_CATEGORY['business'] ?? []
     // businessName-only seed is intentional: curated fallback products are generic
@@ -309,11 +310,13 @@ async function fetchProductImage(
  * Never throws — returns whatever was successfully generated (may be []).
  * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
  */
-export async function prepareSampleProducts(
+export async function generateSampleProducts(
     businessInfo: BusinessInfoInput,
-    language: 'en' | 'ms' | 'auto',
+    language: string,
+    tenantId: string,
+    payload: BasePayload,
     siteId?: string | number,
-): Promise<PreparedSampleProducts> {
+): Promise<GeneratedProductsResult> {
     const MAX_RETRIES = 3
     let rawProducts: Array<SampleProduct & { _imageKeyword: string }> = []
     let aiSucceeded = false
@@ -336,8 +339,9 @@ export async function prepareSampleProducts(
         }
     }
 
+    const canUseEnglishCuratedFallback = language === 'en' || language === 'ms' || language === 'auto'
     if (!aiSucceeded) {
-        rawProducts = getFallbackProducts(businessInfo)
+        rawProducts = canUseEnglishCuratedFallback ? getFallbackProducts(businessInfo) : []
     } else if (rawProducts.length < 6) {
         const needed = 6 - rawProducts.length
         try {
@@ -352,18 +356,22 @@ export async function prepareSampleProducts(
             } else {
                 console.warn('[sample-products] AI top-up failed, filling from curated:', (err as Error).message)
             }
-            const fallback = getFallbackProducts(businessInfo)
-            const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
-            const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
-            rawProducts = [...rawProducts, ...fills]
+            if (canUseEnglishCuratedFallback) {
+                const fallback = getFallbackProducts(businessInfo)
+                const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
+                const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
+                rawProducts = [...rawProducts, ...fills]
+            }
         }
     }
 
-    // Prepare stable product data before any external image provider work. The
-    // route can safely persist this result even if enrichment later times out.
+    // Fetch images sequentially with delay to stay within Unsplash rate limits (demo: 50/hr)
     const siteKey = siteId ? String(siteId) : Date.now().toString(36)
-    const category = resolveComposerCategory(
-        `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+    // GH-1611: form key wins (see getFallbackProducts) — this one drives the
+    // product IMAGE search, so a wrong category is a wrong-industry photo.
+    const category = resolveBusinessCategory(
+        businessInfo.industry,
+        `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
     )
     // Pre-fetch product URLs as Tier-C fallback (direct download, no search API needed)
     // Seed-shuffle the fixed industry pool (6 items) so each product gets a distinct URL
@@ -373,49 +381,19 @@ export async function prepareSampleProducts(
     // Derive SKU prefix from composer category (first 3 chars, uppercase)
     const skuPrefix = category.substring(0, 3).toUpperCase()
 
-    const products: SampleProduct[] = rawProducts.map((p, i) => {
-        const { _imageKeyword: _, ...product } = p
-        return {
-            ...product,
-            imageId: undefined,
-            galleryUrl: productUrls[i % productUrls.length],
-            sku: `${skuPrefix}-${String(i + 1).padStart(3, '0')}`,
-            inventory: 0,
-        }
-    })
-
-    return {
-        products,
-        imageKeywords: rawProducts.map((product) => product._imageKeyword),
-        category,
-    }
-}
-
-/**
- * Enrich prepared products with Payload media IDs. Kept separate from copy
- * generation so callers can bound this external-I/O phase independently.
- */
-export async function enrichSampleProductImages(
-    prepared: PreparedSampleProducts,
-    tenantId: string,
-    payload: BasePayload,
-    siteId?: string | number,
-): Promise<GeneratedProductsResult> {
-    const siteKey = siteId ? String(siteId) : Date.now().toString(36)
-    const { products, imageKeywords, category } = prepared
     const withImages: SampleProduct[] = []
     const stats: ProductImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
     // Set to true after first 429 — no point searching for remaining products this gen
     let searchRateLimited = false
     const fallbackOnly = process.env.PIXABAY_FALLBACK_ONLY === '1'
 
-    for (let i = 0; i < products.length; i++) {
-        const product = products[i]!
+    for (let i = 0; i < rawProducts.length; i++) {
+        const p = rawProducts[i]!
         if (i > 0) await new Promise(resolve => setTimeout(resolve, 500))
         const skipSearch = fallbackOnly || searchRateLimited
         const { imageId, reason } = await fetchProductImage(
-            imageKeywords[i] ?? '', i, siteKey, product.name, category, payload, tenantId,
-            product.galleryUrl,
+            p._imageKeyword, i, siteKey, p.name, category, payload, tenantId,
+            productUrls[i % productUrls.length],
             skipSearch,
         )
         if (reason === 'rate_limited') {
@@ -427,24 +405,16 @@ export async function enrichSampleProductImages(
         }
         if (!imageId) stats.noImage++
         const reasonStr = reason ? ` reason=${reason}` : ''
-        console.log(`[sample-products] product ${i + 1}/${products.length} "${product.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
+        console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
+        const { _imageKeyword: _, ...product } = p
         withImages.push({
             ...product,
             imageId,
+            galleryUrl: productUrls[i % productUrls.length],
+            sku: `${skuPrefix}-${String(i + 1).padStart(3, '0')}`,
+            inventory: 0,
         })
     }
 
     return { products: withImages, stats }
-}
-
-/** Backward-compatible convenience API for callers that require images inline. */
-export async function generateSampleProducts(
-    businessInfo: BusinessInfoInput,
-    language: 'en' | 'ms' | 'auto',
-    tenantId: string,
-    payload: BasePayload,
-    siteId?: string | number,
-): Promise<GeneratedProductsResult> {
-    const prepared = await prepareSampleProducts(businessInfo, language, siteId)
-    return enrichSampleProductImages(prepared, tenantId, payload, siteId)
 }

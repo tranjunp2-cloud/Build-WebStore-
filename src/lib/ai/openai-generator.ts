@@ -12,15 +12,15 @@ import { generateBlocks, type GenerationResult, type GeneratedBlock, type Genera
 import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
 import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
-import { isUnsupportedBlock } from './unsupported-blocks'
+import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBlocks } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
+import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
-import { resolveComposerCategory } from './composer-category-resolver'
+import { resolveBusinessCategory } from './composer-category-resolver'
 import { startCapture, finishCapture } from './capture-generation'
 import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
@@ -37,7 +37,7 @@ import {
     MIN_BLOCKS_PER_PAGE,
     type ContentLang,
 } from './content-rules'
-import { detectLanguage } from './lang-detect'
+import { detectLanguage, resolveDetectedLanguage } from './lang-detect'
 import { getNavLabels, hasDedicatedStrings } from './block-i18n'
 import { prefetchNavLabels } from './nav-label-translator'
 import { prefetchBlockStrings } from './block-strings-translator'
@@ -62,11 +62,9 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
-// Language names for explicit user selections (not 'auto').
-const EXPLICIT_LANG_NAMES: Record<string, string> = {
-    en: 'English',
-    ms: 'Malay (Bahasa Melayu)',
-    vi: 'Vietnamese',
+export interface GenerateSiteOptions {
+    /** Locale already selected by the user or accepted in the confirmation popup. */
+    targetLocale?: string
 }
 
 /**
@@ -85,6 +83,7 @@ export async function generateSiteWithAI(
     referencePrompt?: string,
     blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
     onEvent?: (e: SSEEvent) => void,
+    options: GenerateSiteOptions = {},
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
@@ -122,10 +121,21 @@ export async function generateSiteWithAI(
         category: businessInfo.industry ?? undefined,
     })
 
+    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
+        .filter(Boolean).join(' ')
+    const { contentLang: detectedLang, gpLang, blockLang } = options.targetLocale
+        ? resolveDetectedLanguage(options.targetLocale)
+        : language === 'auto'
+            ? detectLanguage(inputText)
+            : resolveDetectedLanguage(language)
+
     const openai = getOpenAI()
     if (!openai) {
+        if (!['en', 'ms', 'vi'].includes(blockLang)) {
+            throw new Error(`OpenAI is required to generate content in ${gpLang}`)
+        }
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        const fallbackResult = await generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
         await finishCapture(cap, {
             status: 'success',
@@ -153,11 +163,6 @@ export async function generateSiteWithAI(
     // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
     // Skip it for explicit non-English languages and for 'auto' when user's input text
     // is detected as Malay/Vietnamese so AI-first generates fully localized content.
-    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
-        .filter(Boolean).join(' ')
-    const { contentLang: detectedLang, gpLang, blockLang } = language === 'auto'
-        ? detectLanguage(inputText)
-        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English', blockLang: language }
     if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en' && blockLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
@@ -210,7 +215,10 @@ export async function generateSiteWithAI(
         // explicit RHYTHM section — hard-constrained block sequence drawn
         // from 3 curated recipes per category (story-first/menu-first/...).
         // Without this, GPT reverts to its prior and every site rhymes.
-        const presetCategory = resolveComposerCategory(promptText)
+        // GH-1611: the form's industry key is authoritative. Scoring promptText alone
+        // let a bakery named "Maison Dubois" score 0 and land on 'business', so the
+        // site theme/mood/recipe disagreed with the image pool (which resolves the key).
+        const presetCategory = resolveBusinessCategory(businessInfo.industry, promptText)
         const themeSeed = computeGenSeed(businessInfo)
         const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
         const layoutRecipe = pickRecipe(presetCategory, themeSeed)
@@ -287,10 +295,10 @@ export async function generateSiteWithAI(
                     temperature: 0.7,
                     // Plan 260416: 6000 was too tight — 5-page sites need
                     // ~6500-7500 tokens, so JSON was truncated on every gen
-                    // causing 100% fallback to legacy composer. 10000 gives
+                    // causing 100% fallback to legacy composer. 12000 gives
                     // safe headroom. Cost unchanged (GPT charges actual output,
                     // not the cap — typical output stays ~5200-7000 tokens).
-                    max_tokens: 10000,
+                    max_tokens: 12000,
                     response_format: { type: 'json_object' },
                 })
             } catch (err) {
@@ -343,9 +351,13 @@ export async function generateSiteWithAI(
                 success: true,
             })
 
-            const content = completion.choices[0]?.message?.content
+            const choice = completion.choices[0]
+            const content = choice?.message?.content
             if (!content) {
                 throw new Error('Empty AI response')
+            }
+            if (choice?.finish_reason === 'length') {
+                console.warn(`[AI] WARNING: AI response was truncated due to max_tokens limit (${completion.usage?.completion_tokens} tokens used).`)
             }
 
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
@@ -398,26 +410,24 @@ export async function generateSiteWithAI(
         // Unsupported block drop list lives in ./unsupported-blocks for reuse
         // between happy path (here) and fallback path (fallback-adapter).
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
+            const sanitizedBlocks = rawBlocks.map((block) =>
+                sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
+            )
+            const filtered = filterUnsupportedBlocks(sanitizedBlocks, 'ai')
             const valid: Record<string, unknown>[] = []
-            for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
-                const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
+            for (const blockData of filtered) {
+                const blockType = typeof blockData.blockType === 'string' ? blockData.blockType : ''
                 if (!blockType) continue
 
-                if (isUnsupportedBlock(blockType)) {
-                    console.warn(`[AI] Dropping "${blockType}" block — needs media pipeline or not in Payload schema`)
-                    continue
-                }
-
                 if (blockRegistry.has(blockType)) {
-                    const validation = blockRegistry.validate(blockType, sanitized)
-                    const blockData = validation.success ? validation.data as Record<string, unknown> : sanitized
+                    const validation = blockRegistry.validate(blockType, blockData)
+                    const validatedData = validation.success ? validation.data as Record<string, unknown> : blockData
 
                     // GH-1219: drop menu-food blocks with empty categories — blank section on page
                     // !Array.isArray covers the sanitized fallback path; on Zod-success path
                     // categories is always an array (schema uses .default([]))
                     if (blockType === 'menu-food') {
-                        const cats = blockData.categories
+                        const cats = validatedData.categories
                         if (!Array.isArray(cats) || cats.length === 0) {
                             console.warn('[AI] Dropping "menu-food" block — categories empty (AI failed to generate content)')
                             continue
@@ -428,7 +438,7 @@ export async function generateSiteWithAI(
                         valid.push(validation.data as Record<string, unknown>)
                     } else {
                         console.warn(`[AI] Block "${blockType}" validation warning:`, validation.error)
-                        valid.push(sanitized)
+                        valid.push(blockData)
                     }
                 } else {
                     console.warn(`[AI] Unknown block type: ${blockType}, skipping`)
@@ -503,21 +513,26 @@ export async function generateSiteWithAI(
                 // twice or inject mandatory blocks that don't belong on /about
                 // etc. Sub-pages still get item padding + grid alignment via the
                 // other enforcers below (plan 1.3 B5 fix).
-                if (detectedCategory) {
-                    if (p === 0) {
-                        pageBlocks = enforceMinimumStructure(
-                            pageBlocks as Record<string, unknown>[],
-                            detectedCategory,
-                            enforcerCtx,
-                        ) as typeof pageBlocks
-                    }
-                    pageBlocks = enforceMinItems(
+                const enforcerCategory = presetCategory || detectedCategory || 'business'
+                if (p === 0) {
+                    pageBlocks = enforceMinimumStructure(
                         pageBlocks as Record<string, unknown>[],
-                        detectedCategory,
+                        enforcerCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
-                    enforceGridAlignment(pageBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
+                } else {
+                    pageBlocks = enforceSubpageStructure(
+                        pageBlocks as Record<string, unknown>[],
+                        enforcerCategory,
+                        enforcerCtx,
+                    ) as typeof pageBlocks
                 }
+                pageBlocks = enforceMinItems(
+                    pageBlocks as Record<string, unknown>[],
+                    enforcerCategory,
+                    enforcerCtx,
+                ) as typeof pageBlocks
+                enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
                 generatedPages.push({
@@ -726,12 +741,12 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
+        if (!['en', 'ms', 'vi'].includes(blockLang)) throw error
         // Fallback succeeded — site will still be created via smart templates.
         // Don't emit 'error' event (would show error UI even though generation succeeds).
         // Keep warn log for ops visibility on fallback rate.
         console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
-        const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
         await finishCapture(cap, {
             status: 'success',
@@ -2138,7 +2153,8 @@ async function generateTemplateFirst(
 ): Promise<{ result: GenerationResult; events: SSEEvent[] } | null> {
     events.push({ event: 'step', data: { step: 'composing', label: 'Building from templates...', progress: 15 } })
 
-    const presetCategory = resolveComposerCategory(promptText)
+    // GH-1611: same as above — form key wins over free-text scoring.
+    const presetCategory = resolveBusinessCategory(businessInfo.industry, promptText)
     const themeSeed = computeGenSeed(businessInfo)
     const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
     const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
@@ -2229,6 +2245,7 @@ async function generateTemplateFirst(
                 continue
             }
             let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = enforceSubpageStructure(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
             page.blocks = pageBlocks as GeneratedBlock[]

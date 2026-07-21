@@ -23,7 +23,7 @@ import {
     searchPhotos,
     downloadPhotoBuffer,
     detectQueryLang,
-    photoMatchesQuery,
+    photoMatchesTerms,
     PIXABAY_CATEGORY_BY_COMPOSER,
     PIXABAY_ORIENTATION_BY_BLOCK,
     PixabayError,
@@ -462,23 +462,35 @@ export async function getMediaForBlock(
     // GH-1185: domain filter — keeps loose/fallback matches on-topic (see
     // PixabaySearchOptions.category). Unmapped composer categories → no filter.
     const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[composerCategory]
-    // GH-1185: Vietnamese queries get the same relevance gate as the pool
-    // path — Pixabay AND-matching is loose ("phở bò" hits a moose photo
-    // tagged "bò đực"), so every query word must appear in the photo tags.
+    // GH-1185: queries get the same relevance gate as the pool path — Pixabay
+    // AND-matching is loose ("phở bò" hits a moose photo tagged "bò đực").
+    // GH-1611: gate EVERY language (the gate used to run for Vietnamese only,
+    // while the default pipeline searches in English) and gate on the keyword
+    // TERMS rather than the joined query, so a multi-product query does not
+    // demand one photo satisfy every product at once.
     const isVN = detectQueryLang(query) === 'vi'
-    const gateVN = (photos: PixabayPhoto[], q: string): PixabayPhoto[] => {
-        if (!isVN) return photos
-        const kept = photos.filter((p) => photoMatchesQuery(p.alt, q))
+    // Gate ONLY on the user's product terms (the raw-keyword path). On the
+    // scaffolding path `keywords` is category base + block modifier + mood
+    // adjectives — gating on those would both admit off-industry photos (a
+    // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
+    // on-industry ones, leaving non-hero blocks with no image at all.
+    const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[composerCategory])
+    const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
+        if (terms.length === 0) {
+            if (categoryMapped) return photos
+            return []
+        }
+        const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
         if (kept.length < photos.length) {
             console.info(
-                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${q}"`,
+                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${terms.join(' | ')}"`,
             )
         }
         return kept
     }
-    // Tier 3: trusted category phrase, ungated — mirrors image-pool
-    // searchBucket so the legacy path degrades to on-category photos instead
-    // of off-topic AND-match noise. VN queries use the curated Vietnamese
+    // Tier 3 broadens the search with a category phrase, then applies the same
+    // trusted product gate as earlier tiers. VN queries use the curated Vietnamese
     // phrase (lang=vi); non-VN queries (Malay/English zero-hit) fall to the
     // English category base keyword — an empty result here means the block
     // keeps whatever URL GPT hallucinated into it (GH-1185 QC retest).
@@ -499,11 +511,17 @@ export async function getMediaForBlock(
                 category: pixCategory,
                 ...(vnQuery ? { lang: 'vi' as const } : {}),
             })
-            if (photos.length > 0) {
+            // Keep the merchant's product terms as the relevance contract on
+            // every tier. A Pixabay category only constrains the broad industry;
+            // it cannot distinguish a bakery photo from another food product.
+            // gateTerms handles the no-product case: mapped categories may rely
+            // on the server-side filter, while unmapped categories reject all.
+            const gatedPhotos = gateTerms(photos, subjectTerms)
+            if (gatedPhotos.length > 0) {
                 console.info(
-                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${photos.length} photo(s)`,
+                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
                 )
-                return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+                return batchFetch(pickRandomN(gatedPhotos, count), blockType, ctx, payload)
             }
         }
         return blockType === 'hero'
@@ -512,13 +530,13 @@ export async function getMediaForBlock(
     }
     try {
         // Request 2x count to have random pool, then pickRandomN
-        const photos = gateVN(
+        const photos = gateTerms(
             await searchPhotos(query, Math.max(count * 2, 10), {
                 orientation,
                 width: targetWidth,
                 category: pixCategory,
             }),
-            query,
+            subjectTerms,
         )
         if (photos.length === 0) {
             // Broaden: try first keyword only. Skip when the query was already
@@ -526,13 +544,16 @@ export async function getMediaForBlock(
             // call (raw 1-term keywords are common after GH-1185).
             if (keywords[0] && keywords[0].trim() !== query) {
                 const broadQuery = keywords[0].trim()
-                const broader = gateVN(
+                const broader = gateTerms(
                     await searchPhotos(broadQuery, Math.max(count * 2, 10), {
                         orientation,
                         width: targetWidth,
                         category: pixCategory,
                     }),
-                    broadQuery,
+                    // Broadening changes only the SEARCH query. Relevance remains
+                    // anchored to all trusted merchant product terms, otherwise an
+                    // ambiguous first keyword can admit the wrong product at tier 2.
+                    subjectTerms,
                 )
                 if (broader.length === 0) {
                     // `await` is load-bearing: categoryFallback can throw
