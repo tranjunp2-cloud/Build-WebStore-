@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
-import { POST as GenerateSitePOST, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
+import { POST as GenerateSitePOST, buildGeneratedPages, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
@@ -1238,4 +1238,37 @@ describe('AI Streaming APIs', () => {
         })
     })
 
+    describe('buildGeneratedPages — fallback hero image allocation', () => {
+        it('[TC-GENPERF-W3-17] gives cloned subpage heroes their reserved Media IDs', () => {
+            const pages = buildGeneratedPages({
+                blocks: [{
+                    blockType: 'hero',
+                    variant: 'centered',
+                    headline: 'Home',
+                    image: 100,
+                    backgroundImage: 100,
+                }],
+                businessInfo: {
+                    businessName: 'Butter & Bloom',
+                    shortDescription: 'Neighborhood artisan bakery',
+                    products: 'Bread and pastries',
+                },
+                result: {
+                    seo: { title: 'Butter & Bloom', description: 'Fresh bakes' },
+                },
+                fallbackHeroMediaIds: [101, 102, 103],
+            })
+
+            const heroMediaIds = pages.map(page => {
+                const hero = page.layout.find(block => block.blockType === 'hero')
+                return [hero?.image, hero?.backgroundImage]
+            })
+            expect(heroMediaIds).toEqual([
+                [100, 100],
+                [101, 101],
+                [102, 102],
+                [103, 103],
+            ])
+        })
+    })
 })

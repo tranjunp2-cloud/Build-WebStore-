@@ -316,14 +316,14 @@ describe('media-injector [plan-260414-unsplash]', () => {
     })
 
     describe('fulfillImageNeeds — testimonials avatar routing [TC-F38-RAW-13]', () => {
-        it('[TC-GENPERF-W3-10] reuses one gallery image set across pages', async () => {
+        it('[TC-GENPERF-W3-10] assigns distinct gallery image sets across pages', async () => {
             const makeGallery = () => ({
                 blockType: 'gallery',
                 images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
             })
             const blocks = [makeGallery(), makeGallery()]
             const needs = planImageNeeds(blocks)
-            const mediaIds = [101, 102, 103, 104, 105, 106]
+            const mediaIds = [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
             vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
             const poolPhotos = mediaIds.map((id) => ({
                 id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'spa',
@@ -338,11 +338,60 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(vi.mocked(batchFetchFromPool)).toHaveBeenCalledWith(
                 expect.any(Array), 'gallery', expect.anything(), expect.anything(),
             )
-            expect((vi.mocked(batchFetchFromPool).mock.calls[0]![0] as unknown[])).toHaveLength(6)
-            for (const block of blocks) {
-                expect(block.images.map((item) => item.image)).toEqual(mediaIds)
-            }
+            expect((vi.mocked(batchFetchFromPool).mock.calls[0]![0] as unknown[])).toHaveLength(12)
+            expect(blocks[0]!.images.map((item) => item.image)).toEqual(mediaIds.slice(0, 6))
+            expect(blocks[1]!.images.map((item) => item.image)).toEqual(mediaIds.slice(6, 12))
             expect(result).toEqual({ succeeded: 12, failed: 0 })
+        })
+
+        it('[TC-GENPERF-W3-15] assigns a different pool image to each page hero', async () => {
+            const blocks = [
+                { blockType: 'hero', headline: 'Home' },
+                { blockType: 'hero', headline: 'About' },
+            ]
+            const mediaIds = [201, 202]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'bakery',
+                width: 1200, height: 800, photographer: 'A', role: 'hero' as const, aspectRatio: '16:9' as const,
+            }))
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Butter & Bloom', tenantId: '1', category: 'fnb',
+                pool: { queryUsed: 'bakery', landscape: poolPhotos, square: [], portrait: [], underfill: false },
+            }, {} as never)
+
+            expect(blocks[0]!.image).toBe(201)
+            expect(blocks[0]!.backgroundImage).toBe(201)
+            expect(blocks[1]!.image).toBe(202)
+            expect(blocks[1]!.backgroundImage).toBe(202)
+            expect(result).toEqual({ succeeded: 2, failed: 0 })
+        })
+
+        it('[TC-GENPERF-W3-16] rotates gallery windows when the pool cannot fully separate them', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const mediaIds = [301, 302, 303, 304, 305, 306, 307, 308, 309]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'seafood',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Ocean Table', tenantId: '1', category: 'restaurant',
+                pool: { queryUsed: 'seafood', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            const first = blocks[0]!.images.map((item) => item.image)
+            const second = blocks[1]!.images.map((item) => item.image)
+            expect(new Set(first).size).toBe(6)
+            expect(new Set(second).size).toBe(6)
+            expect(second).not.toEqual(first)
+            expect(second).toEqual([307, 308, 309, 301, 302, 303])
         })
 
         it('[TC-GENPERF-W3-12] partial pool does not legacy-search duplicate photos', async () => {
@@ -474,13 +523,13 @@ describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
 })
 
 describe('computePoolTargetsForNeeds — actual generated slots', () => {
-	it('uses the largest real gallery across pages instead of the schema minimum', () => {
+	it('sums real slots across pages and caps the landscape pool', () => {
 		const targets = computePoolTargetsForNeeds([
 			{ blockType: 'gallery', count: 6 },
 			{ blockType: 'gallery', count: 9 },
 			{ blockType: 'hero', count: 1 },
 		])
-		expect(targets).toEqual({ landscape: 9, square: 0 })
+		expect(targets).toEqual({ landscape: 12, square: 0 })
 	})
 
 	it('excludes people and logo blocks from stock-pool targets', () => {

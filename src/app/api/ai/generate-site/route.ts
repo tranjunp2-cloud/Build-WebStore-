@@ -717,12 +717,33 @@ export async function POST(req: NextRequest) {
         }
 
         let blockImageStats = { succeeded: 0, failed: 0 }
+        const fallbackHeroMediaIds: number[] = []
         if (!ENABLE_DALLE_HERO) {
             try {
                 const allBuckets = collectAllBlockBuckets()
                 // Flatten image needs across homepage + every subpage so a
                 // single fulfillImageNeeds call covers the whole site.
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
+                const aiPagesForMedia = (result as { pages?: unknown[] }).pages
+                if (!Array.isArray(aiPagesForMedia) || aiPagesForMedia.length === 0) {
+                    // Single-page AI responses are expanded into Home + three
+                    // subpages later by buildGeneratedPages. Reserve their hero
+                    // photos in this same batch so cloning the base hero does not
+                    // clone its Media ID onto every page as well.
+                    const hasFallbackHero = Array.isArray(result.blocks)
+                        && result.blocks.some(block => block?.blockType === 'hero')
+                    if (hasFallbackHero) {
+                        for (let index = 0; index < 3; index++) {
+                            needs.push({
+                                blockType: 'hero',
+                                count: 1,
+                                assign: (ids) => {
+                                    if (ids[0] != null) fallbackHeroMediaIds.push(ids[0])
+                                },
+                            })
+                        }
+                    }
+                }
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
 
@@ -1035,6 +1056,7 @@ export async function POST(req: NextRequest) {
             blocks: sanitizedBlocks,
             businessInfo,
             result,
+            fallbackHeroMediaIds,
         })
 
         // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
@@ -1973,6 +1995,7 @@ function createPageHero(baseHero: AIBlock | null, options: {
     secondaryLabel?: string
     secondaryUrl?: string
     badgeText?: string
+    mediaId?: number
 }): AIBlock {
     const hero = cloneBlockData(baseHero || {
         blockType: 'hero',
@@ -1991,6 +2014,10 @@ function createPageHero(baseHero: AIBlock | null, options: {
     hero.badge = options.badgeText
         ? { show: true, text: options.badgeText }
         : hero.badge
+    if (options.mediaId != null) {
+        hero.image = options.mediaId
+        hero.backgroundImage = options.mediaId
+    }
 
     hero.ctaButtons = [
         {
@@ -2053,14 +2080,16 @@ export function canonicalizePageSlug(
     return raw.startsWith('/') ? raw : `/${raw}`
 }
 
-function buildGeneratedPages({
+export function buildGeneratedPages({
     blocks,
     businessInfo,
     result,
+    fallbackHeroMediaIds,
 }: {
     blocks: AIBlock[]
     businessInfo: { businessName: string; shortDescription: string; products: string }
     result: Record<string, unknown>
+    fallbackHeroMediaIds?: number[]
 }) {
     // Use AI-generated multi-page content when available
     const aiPages = (result as { pages?: Array<{ title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[]; seo?: Record<string, unknown> }> }).pages
@@ -2119,6 +2148,7 @@ function buildGeneratedPages({
                     secondaryLabel: 'View services',
                     secondaryUrl: '/products',
                     badgeText: 'About Us',
+                    mediaId: fallbackHeroMediaIds?.[0],
                 }),
                 about,
                 testimonials,
@@ -2143,6 +2173,7 @@ function buildGeneratedPages({
                     secondaryLabel: 'About us',
                     secondaryUrl: '/about',
                     badgeText: 'Products & Services',
+                    mediaId: fallbackHeroMediaIds?.[1],
                 }),
                 features,
                 testimonials,
@@ -2167,6 +2198,7 @@ function buildGeneratedPages({
                     secondaryLabel: 'View services',
                     secondaryUrl: '/products',
                     badgeText: 'Contact Us',
+                    mediaId: fallbackHeroMediaIds?.[2],
                 }),
                 contact,
                 footer,

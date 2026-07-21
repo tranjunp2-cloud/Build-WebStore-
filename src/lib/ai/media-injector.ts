@@ -167,7 +167,11 @@ export interface ImageNeed {
     assign: (mediaIds: number[]) => void
 }
 
-/** Actual pool capacity required after AI has produced every page/block. */
+/**
+ * Actual pool capacity required after AI has produced every page/block.
+ * Sum real slots so repeated block types can receive different photos, while
+ * retaining the existing per-bucket caps that bound Pixabay and upload work.
+ */
 export function computePoolTargetsForNeeds(
     needs: ReadonlyArray<Pick<ImageNeed, 'blockType' | 'count'>>,
 ): { landscape: number; square: number } {
@@ -176,8 +180,11 @@ export function computePoolTargetsForNeeds(
     for (const need of needs) {
         if (PEOPLE_BLOCKS.has(need.blockType) || NO_STOCK_BLOCKS.has(need.blockType)) continue
         const bucket = bucketForRole(roleForBlock(need.blockType))
-        if (bucket === 'square') square = Math.max(square, need.count)
-        else landscape = Math.max(landscape, need.count)
+        if (bucket === 'square') {
+            square = Math.min(DEFAULT_SQUARE_SIZE, square + need.count)
+        } else {
+            landscape = Math.min(DEFAULT_LANDSCAPE_SIZE, landscape + need.count)
+        }
     }
     return { landscape, square }
 }
@@ -528,10 +535,15 @@ export async function fulfillImageNeeds(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
             if (totalCount === 0) return { blockType, groupNeeds, ids: [] as number[], reusable: true }
-            // Images only need to be distinct within one block. Reuse the same
-            // category-cohesive set across pages instead of searching/uploading
-            // every slot (a six-page site previously requested 84 unique images).
             const uniqueCount = Math.max(...groupNeeds.map((need) => need.count))
+            const role = roleForBlock(blockType)
+            const bucketCap = bucketForRole(role) === 'square'
+                ? DEFAULT_SQUARE_SIZE
+                : DEFAULT_LANDSCAPE_SIZE
+            // Fetch enough IDs to keep repeated block instances distinct. The
+            // cap prevents large sites from returning to the old 84-upload path;
+            // a single oversized block may still request its full own count.
+            const requestCount = Math.max(uniqueCount, Math.min(totalCount, bucketCap))
 
             // GH-1185: people slots (testimonial avatars, team members,
             // doctor profiles) are PEOPLE — never pool photos (pool is built
@@ -540,7 +552,7 @@ export async function fulfillImageNeeds(
             // placeholder beats a food avatar), so no pool/legacy fallback.
             if (PEOPLE_BLOCKS.has(blockType)) {
                 try {
-                    const result = await getAvatarMedia(uniqueCount, ctx.language, ctx, payload, blockType)
+                    const result = await getAvatarMedia(requestCount, ctx.language, ctx, payload, blockType)
                     if (result.failures.length > 0) {
                         console.warn(
                             `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
@@ -557,9 +569,8 @@ export async function fulfillImageNeeds(
             // Phase-03 pool-aware fast path: pick from pre-built site pool to
             // preserve visual cohesion across blocks.
             if (ctx.pool) {
-                const role = roleForBlock(blockType)
                 const poolSeed = hashBlockSeed(blockType, ctx.businessName)
-                const picks = pickManyFromPool(ctx.pool, role, poolSeed, uniqueCount)
+                const picks = pickManyFromPool(ctx.pool, role, poolSeed, requestCount)
                 if (picks.length > 0) {
                     try {
                         const result = await batchFetchFromPool(picks, blockType, ctx, payload)
@@ -568,11 +579,11 @@ export async function fulfillImageNeeds(
                                 `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
                             )
                         }
-                        if (result.mediaIds.length >= uniqueCount) {
+                        if (result.mediaIds.length >= requestCount) {
                             return { blockType, groupNeeds, ids: result.mediaIds, reusable: true }
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${uniqueCount}) — leaving missing slots to industry fallback`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${requestCount}) — reusing only after unique IDs are exhausted`,
                         )
                         // A separate search can return a photo already present in
                         // the pool under a new Media ID. Keep the partial unique set;
@@ -600,7 +611,7 @@ export async function fulfillImageNeeds(
             })
 
             try {
-                const result = await getMediaForBlock(blockType, keywords, uniqueCount, ctx, payload)
+                const result = await getMediaForBlock(blockType, keywords, requestCount, ctx, payload)
                 if (result.failures.length > 0) {
                     console.warn(
                         `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
@@ -620,12 +631,27 @@ export async function fulfillImageNeeds(
     let succeeded = 0
     let failed = 0
     for (const r of perBlockResults) {
+        let offset = 0
+        let exactWraps = 0
         for (const need of r.groupNeeds) {
-            const slice = r.reusable ? r.ids.slice(0, need.count) : []
+            const take = Math.min(need.count, r.ids.length)
+            const slice = r.reusable && take > 0
+                ? Array.from({ length: take }, (_, index) => r.ids[(offset + index) % r.ids.length]!)
+                : []
             if (slice.length > 0) {
                 need.assign(slice)
                 succeeded += slice.length
                 failed += need.count - slice.length
+
+                const rawNextOffset = offset + take
+                offset = rawNextOffset % r.ids.length
+                // When a full pass ends exactly on the boundary, shift the next
+                // multi-image window so a later gallery does not receive the
+                // exact same set again. Single-image blocks naturally cycle.
+                if (rawNextOffset >= r.ids.length && offset === 0 && take > 1 && r.ids.length > take) {
+                    exactWraps += 1
+                    offset = exactWraps % r.ids.length
+                }
             } else {
                 failed += need.count
             }
