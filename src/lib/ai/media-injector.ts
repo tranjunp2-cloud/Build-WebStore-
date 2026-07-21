@@ -602,20 +602,22 @@ export async function fulfillImageNeeds(
                             return completeWithCuratedFallback(result.mediaIds)
                         }
                         console.warn(
-                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${requestCount}) — reusing only after unique IDs are exhausted`,
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${requestCount}) — using unique same-category fallback`,
                         )
-                        // A separate search can return a photo already present in
-                        // the pool under a new Media ID. Keep the partial unique set;
-                        // the renderer fills only the missing slots with curated images.
+                        // Never supplement a verified pool with a separate search:
+                        // it can return the same source under a new Media ID or drift
+                        // into another industry. Fill only from the checked-in library.
                         return completeWithCuratedFallback(result.mediaIds)
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
-                        console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
+                        console.warn(`[Media Injector] ${blockType} pool path failed, using unique same-category fallback: ${msg}`)
+                        return completeWithCuratedFallback([])
                     }
                 } else {
                     console.warn(
-                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — falling back to legacy search`,
+                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — using unique same-category fallback`,
                     )
+                    return completeWithCuratedFallback([])
                 }
             }
 

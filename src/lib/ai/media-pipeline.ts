@@ -37,9 +37,9 @@ interface SizePreset {
 
 import { normalizeComposerCategory } from './composer-category-resolver'
 import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
+import { getIndustryImages } from '@/lib/images/industry-images'
 import type { ThemeMood } from './theme-moods'
 import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
-import { getIndustryImages, IMAGE_LIBRARY } from '@/lib/images/industry-images'
 
 export interface MediaPipelineContext {
     businessName: string
@@ -57,8 +57,8 @@ export interface MediaPipelineContext {
     // (warm/candlelit/minimalist/...) to every Unsplash query for cohesion.
     mood?: ThemeMood
     // Plan 260414-2249 phase-03: per-site image pool (1-2 Unsplash calls total
-    // before fulfillment runs). When present, block needs pick from pool
-    // instead of calling searchPhotos per block → visual cohesion by design.
+    // before fulfillment runs). When present, block needs pick from the verified
+    // pool; deficits use only the checked-in same-category image library.
     pool?: ImagePool
     // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
     englishKeywords?: string[]
@@ -319,6 +319,22 @@ export async function batchFetchFromPool(
 }
 
 /**
+ * Upload trusted, category-curated images for a pool deficit.
+ *
+ * GH-1611: this is deliberately not a search. Every URL comes from the checked-in
+ * IMAGE_LIBRARY for the normalized composer category, so filling the final gallery
+ * slots cannot cross into another industry when the dynamic pool is thin.
+ */
+export async function getCuratedMediaForBlock(
+    blockType: string,
+    count: number,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+): Promise<BatchFetchResult> {
+    return getCuratedFallbackMedia(blockType, count, ctx, payload, new Set())
+}
+
+/**
  * Concurrent batch fetch with partial-failure tolerance.
  * INVARIANT: never rejects — every per-photo error is caught inside the
  * semaphore closure and returned via `failures`. Callers rely on this to
@@ -416,27 +432,24 @@ function curatedUrlKey(url: string): string {
 function curatedFallbackCandidates(blockType: string, rawCategory: string | undefined): string[] {
     const category = normalizeComposerCategory(rawCategory)
     const primary = getIndustryImages(category)
-    const business = getIndustryImages('business')
     const isPeople = blockType === 'team' || blockType === 'testimonials' || blockType === 'doctor-profile'
     const isProduct = blockType === 'products-grid' || blockType === 'products-featured'
+    const isGallery = blockType === 'gallery' || blockType === 'portfolio-grid'
 
     const preferred = isPeople
-        ? [...primary.team, ...business.team]
+        ? primary.team
         : isProduct
             ? [...primary.products, ...primary.gallery, ...primary.features, primary.about, ...primary.hero]
-            : [...primary.gallery, ...primary.features, primary.about, ...primary.hero, ...primary.products]
-    const reserve = isPeople
-        ? Object.values(IMAGE_LIBRARY).flatMap((images) => images.team)
-        : Object.values(IMAGE_LIBRARY).flatMap((images) => [
-            ...images.gallery,
-            ...images.features,
-            images.about,
-            ...images.hero,
-            ...images.products,
-        ])
+            : isGallery
+                ? [...primary.gallery, ...primary.features, primary.about, ...primary.hero, ...primary.products]
+                : blockType === 'hero'
+                    ? [...primary.hero, ...primary.gallery, ...primary.features, primary.about, ...primary.products]
+                    : blockType === 'about'
+                        ? [primary.about, ...primary.hero, ...primary.gallery, ...primary.features, ...primary.products]
+                        : [...primary.features, ...primary.gallery, primary.about, ...primary.hero, ...primary.products]
 
     const seen = new Set<string>()
-    return [...preferred, ...reserve].filter((url) => {
+    return preferred.filter((url) => {
         const key = curatedUrlKey(url)
         if (seen.has(key)) return false
         seen.add(key)

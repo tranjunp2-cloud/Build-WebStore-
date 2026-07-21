@@ -463,8 +463,8 @@ async function searchBucket(
  *
  * Failure modes:
  *   - Pixabay returns 0 results → retry once with relaxed (broadened) query
- *   - Still underfills → set `pool.underfill = true`; the caller may run a
- *     source-aware post-generation backfill before using curated fallbacks
+ *   - Still underfills → set `pool.underfill = true`; callers fill missing
+ *     slots from unique checked-in images for the normalized category
  *   - searchPhotos throws → returns empty pool, underfill=true (non-fatal)
  */
 export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {

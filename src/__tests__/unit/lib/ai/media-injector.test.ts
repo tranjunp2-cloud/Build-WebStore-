@@ -524,6 +524,150 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(members.map((m) => m.image)).toEqual([901, 902, 903])
         })
     })
+
+    describe('fulfillImageNeeds — verified pool provenance [TC-GH1611-18]', () => {
+        it('fills a gallery deficit with curated same-industry images instead of legacy search', async () => {
+            // Arrange — reproduce QA: six gallery slots, but only four verified
+            // bakery pool photos survive download/upload.
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({
+                mediaIds: [101, 102, 103, 104],
+                photos: [],
+                failures: [
+                    { photoId: 'cake-5', error: 'upload failed' },
+                    { photoId: 'cake-6', error: 'upload failed' },
+                ],
+            })
+            vi.mocked(getMediaForBlock).mockResolvedValueOnce({
+                mediaIds: [901, 902], // would represent the two off-industry photos
+                photos: [],
+                failures: [],
+            })
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [201, 202],
+                photos: [],
+                failures: [],
+            })
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: {
+                    queryUsed: 'cake',
+                    landscape: Array.from({ length: 6 }, (_, i) => ({
+                        id: `cake-${i + 1}`,
+                        url: `https://cdn.pixabay.com/cake-${i + 1}.jpg`,
+                        alt: 'cake bakery dessert',
+                        width: 1200,
+                        height: 800,
+                        photographer: 'QA',
+                        role: 'gallery' as const,
+                        aspectRatio: '4:3' as const,
+                    })),
+                    square: [],
+                    portrait: [],
+                    underfill: false,
+                },
+            }
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+            cleanupNonNumericImageFields(blocks)
+
+            // Assert — four verified pool IDs plus two curated F&B IDs fill all
+            // slots. The simulated off-industry legacy IDs cannot enter the gallery.
+            const images = blocks[0]!.images as Array<Record<string, unknown>>
+            expect(images.map((item) => item.image)).toEqual([101, 102, 103, 104, 201, 202])
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 2, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+
+        it('fills all slots from curated same-industry images when the verified pool bucket is empty', async () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: { queryUsed: 'cake', landscape: [], square: [], portrait: [], underfill: true },
+            }
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [301, 302, 303, 304, 305, 306],
+                photos: [],
+                failures: [],
+            })
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+            cleanupNonNumericImageFields(blocks)
+
+            // Assert
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 6, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect((blocks[0]!.images as Array<Record<string, unknown>>).map((item) => item.image))
+                .toEqual([301, 302, 303, 304, 305, 306])
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+
+        it('fills all six slots from curated images when the pool upload path throws', async () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            vi.mocked(batchFetchFromPool).mockRejectedValueOnce(new Error('unexpected pool failure'))
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [401, 402, 403, 404, 405, 406],
+                photos: [],
+                failures: [],
+            })
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: {
+                    queryUsed: 'cake',
+                    landscape: [{
+                        id: 'cake-1', url: 'https://cdn.pixabay.com/cake-1.jpg', alt: 'cake',
+                        width: 1200, height: 800, photographer: 'QA',
+                        role: 'gallery' as const, aspectRatio: '4:3' as const,
+                    }],
+                    square: [],
+                    portrait: [],
+                    underfill: true,
+                },
+            }
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+
+            // Assert
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 6, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect((blocks[0]!.images as Array<Record<string, unknown>>).map((item) => item.image))
+                .toEqual([401, 402, 403, 404, 405, 406])
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+    })
 })
 
 describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
