@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 
 const mockRefreshCart = vi.fn()
 const mockActivateSiteCart = vi.fn()
+const mockCartState = { changes: [], refreshStatus: 'idle', resolvedSignature: 'cart-sig', items: [{ productId: 'product-1', quantity: 1 }], requiresConfirmation: false }
 
 vi.mock('next/navigation', () => ({
     usePathname: vi.fn(() => '/sites/the-hehe/checkout'),
@@ -52,6 +53,8 @@ vi.mock('@/store/cartStore', () => ({
 
 import { I18nProvider } from '@/i18n'
 import { CheckoutClient } from '@/app/sites/[slug]/checkout/CheckoutClient'
+import { useCartStore } from '@/store/cartStore'
+;(useCartStore as typeof useCartStore & { getState: () => typeof mockCartState }).getState = () => mockCartState
 
 const initialSiteData = {
     siteId: 'site-1',
@@ -89,6 +92,7 @@ describe('[TC-F14.159] CheckoutClient shipping money-unit integration', () => {
                 return jsonResponse([{ id: 10, name: 'Petaling' }])
             }
             if (url === '/api/geo/postcodes?districtId=10') return jsonResponse(['47810'])
+            if (url === '/api/orders/checkout') return jsonResponse({ success: true, data: { orderId: 1, orderNumber: 'ORD-1', total: 48.01, currency: 'MYR' } })
             if (url === '/api/orders/calculate-shipping') {
                 return jsonResponse({
                     success: true,
@@ -145,5 +149,49 @@ describe('[TC-F14.159] CheckoutClient shipping money-unit integration', () => {
         const quoteCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url) === '/api/orders/calculate-shipping')
         expect(quoteCall).toBeDefined()
         expect(JSON.parse(String(quoteCall![1]?.body))).toMatchObject({ subtotalSen: 4000 })
+    })
+
+    it('sends one checkout request for two clicks while refreshCart is pending', async () => {
+        let resolveRefresh!: () => void
+        mockRefreshCart.mockReturnValueOnce(new Promise<void>(resolve => { resolveRefresh = resolve }))
+
+        render(
+            <I18nProvider>
+                <CheckoutClient
+                    slug="the-hehe"
+                    initialThemeCSS=""
+                    initialFontHeading="Outfit"
+                    initialFontBody="Inter"
+                    initialSiteData={initialSiteData}
+                />
+            </I18nProvider>,
+        )
+
+        fireEvent.change(await screen.findByPlaceholderText('e.g. Ahmad bin Ibrahim'), { target: { value: 'Ahmad' } })
+        fireEvent.change(screen.getByPlaceholderText('ahmad@email.com'), { target: { value: 'ahmad@example.com' } })
+        fireEvent.change(screen.getByPlaceholderText('+60 12 345 6789'), { target: { value: '+60123456789' } })
+        fireEvent.change(screen.getByPlaceholderText(/No\. 17, Jalan Kenari/), { target: { value: 'No. 1' } })
+
+        const stateOption = await screen.findByRole('option', { name: 'Selangor' })
+        fireEvent.change(stateOption.closest('select')!, { target: { value: '1' } })
+        const districtOption = await screen.findByRole('option', { name: 'Petaling' })
+        fireEvent.change(districtOption.closest('select')!, { target: { value: '10' } })
+        const postcodeOption = await screen.findByRole('option', { name: '47810' })
+        fireEvent.change(postcodeOption.closest('select')!, { target: { value: '47810' } })
+
+        const button = await screen.findByRole('button', { name: /place order/i })
+        await waitFor(() => expect(button).toBeEnabled())
+
+        await act(async () => {
+            button.click()
+            button.click()
+        })
+        expect(mockRefreshCart).toHaveBeenCalledTimes(1)
+
+        await act(async () => { resolveRefresh() })
+        await waitFor(() => {
+            const checkoutCalls = vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === '/api/orders/checkout')
+            expect(checkoutCalls).toHaveLength(1)
+        })
     })
 })

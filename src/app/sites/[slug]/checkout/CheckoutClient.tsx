@@ -61,6 +61,12 @@ const initialForm: CheckoutForm = {
 const ACCEPTED_IMAGE_TYPES = PROOF_ACCEPTED_TYPES
 const MAX_FILE_SIZE = PROOF_MAX_SIZE_BYTES
 
+export function acquireSubmitLock(lock: { current: boolean }): boolean {
+    if (lock.current) return false
+    lock.current = true
+    return true
+}
+
 export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, initialFontBody, initialSiteData }: CheckoutClientProps) {
     const { t } = useI18n()
     const ck = t.storefront.checkout
@@ -114,6 +120,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const [mounted, setMounted] = useState(false)
     const [isPlacing, setIsPlacing] = useState(false)
+    const submitLockRef = useRef(false)
 
     // ── Discount state ───────────────────────────────────────────────
     const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; type: 'percentage' | 'fixed'; value: number } | null>(null)
@@ -464,23 +471,38 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     }
 
     const handlePlaceOrder = async () => {
-        if (!canPlaceOrder) return
+        if (!canPlaceOrder || !acquireSubmitLock(submitLockRef)) return
+        setIsPlacing(true)
         const beforeRefresh = useCartStore.getState()
         const pendingChangesBeforeRefresh = JSON.stringify(beforeRefresh.changes)
-        await refreshCart()
+        try {
+            await refreshCart()
+        } catch (err: unknown) {
+            submitLockRef.current = false
+            setIsPlacing(false)
+            toast.error(err instanceof Error ? err.message : ck.networkError)
+            return
+        }
         const latestCart = useCartStore.getState()
-        if (latestCart.refreshStatus !== 'idle' || latestCart.resolvedSignature !== cartSignature(latestCart.items) || latestCart.items.some(item => item.unavailable)) return
+        if (latestCart.refreshStatus !== 'idle' || latestCart.resolvedSignature !== cartSignature(latestCart.items) || latestCart.items.some(item => item.unavailable)) {
+            submitLockRef.current = false
+            setIsPlacing(false)
+            return
+        }
         if (latestCart.requiresConfirmation) {
             const pendingChangesChanged = JSON.stringify(latestCart.changes) !== pendingChangesBeforeRefresh
             // A newly discovered change must paint before the customer can confirm it.
-            if (!beforeRefresh.requiresConfirmation || pendingChangesChanged) return
+            if (!beforeRefresh.requiresConfirmation || pendingChangesChanged) {
+                submitLockRef.current = false
+                setIsPlacing(false)
+                return
+            }
             // This click confirms the already-visible, still-current values.
             acknowledgeChanges()
         }
         // Clear any prior discount-exhausted warning so re-submitting the SAME exhausted code re-triggers
         // the inline warning (the field effect keys on a value change, so null→message must transition).
         setDiscountRejection(null)
-        setIsPlacing(true)
         let navigatedToConfirm = false
         // Show overlay after 300ms if API still running (avoids flash on fast responses)
         overlayTimerRef.current = setTimeout(() => {
@@ -604,7 +626,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             dismissOverlay()
             toast.error(err instanceof Error ? err.message : ck.networkError)
         } finally {
-            if (!navigatedToConfirm) setIsPlacing(false)
+            if (!navigatedToConfirm) {
+                submitLockRef.current = false
+                setIsPlacing(false)
+            }
         }
     }
 
