@@ -176,11 +176,11 @@ Exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`
 - `score`: integer 0–100 (clamped)
 - `breakdown`: object with per-bucket scores for diagnostics
 
-**Input:** `LocalSeoScoreInput` interface with 13 boolean + numeric signals:
+**Input:** business + structured + AI signals, plus F03 technical inputs (or precomputed `f03Technical` 0–100):
 - 7 business data signals (businessName, address, phone, hours, category, website, description) — 5 pts each
 - 4 structured data signals (localBusinessSchema, industrySubtype, faqSchema, orgSchema) with weighted deductions (10/5/8/7)
 - 2 AI discoverability signals (allowsSearchBots, sitemapPresent) — 12/8 pts
-- 3 technical health signals (coreWebVitals 0–100, mobileResponsive, httpsEnabled) — 8/4/3 deductions for failures
+- **Technical Health:** reuse F03 `calculateTechnicalSeoScore()` (OG image, Google verification, bad slugs, noIndex) then scale → 15 pts
 
 **Bucket breakdown:**
 | Bucket | Max | Composition |
@@ -188,12 +188,27 @@ Exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`
 | Business Data | 35 | 7 signals × 5 pts each |
 | Structured Data | 30 | LocalBusiness schema 10 + industry subtype 5 + FAQ 8 + Organization 7 |
 | AI Discoverability | 20 | allowsSearchBots 12 + sitemapPresent 8 |
-| Technical Health | 15 | coreWebVitals ≥80 (8 pts deduction if <80) + mobileResponsive (4) + httpsEnabled (3) |
+| Technical Health | 15 | `floor(calculateTechnicalSeoScore(...) × 15 / 100)` — F03 signals only |
 | **Total** | **100** | |
+
+**Technical Health detail (Decision A, PM 2026-07-21):**
+
+| F03 signal | Deduction on 0–100 scale | Cap |
+|------------|--------------------------|-----|
+| Missing `site.seo.ogImage` | −15 | — |
+| Missing `site.seo.googleVerificationToken` | −10 | — |
+| Bad page slug | −5 / slug | max −15 |
+| `seo.noIndex` page | −5 / page | max −10 |
+
+```
+technicalHealth = floor(max(0, 100 − deductions) × 15 / 100)
+```
+
+**Do NOT** use CWV / mobileResponsive / httpsEnabled (removed — no real measurement; PRD previously misstated them). Same pure function as General SEO Technical pillar (`src/lib/seo/technical-score.ts`).
 
 **Critical architectural decision (locked in code + tests):** AI Discoverability bucket is exactly `allowsSearchBots(12) + sitemapPresent(8)` with **no "blocks suspicious bots" sub-signal**. PRD §13.8 explicitly forbids this sub-signal because it contradicts BR-03 (the platform's default-allow policy for AI crawlers). A pre-implementation research proposal suggested a 10/5/5 split including that forbidden sub-signal; that approach was explicitly rejected and is NOT in shipping code. Test case TC-F37-01-11 validates this via type-level guarantee (`LocalSeoScoreInput` has no `blocksSuspiciousBots` field) + runtime assertion.
 
-**Known limitation — flagged for Phase 06 PM review:** `coreWebVitals`, `mobileResponsive`, `httpsEnabled` are hardcoded assume-passing values (80, true, true) with no real Lighthouse/CWV measurement infrastructure. This is a documented Phase 05 stopgap. Before US-F37-04's dashboard surfaces this score to sellers, PM should decide: keep assume-passing (status quo, no infrastructure cost but overstates score accuracy), implement real measurement (add Lighthouse integration), or apply PRD §13.8's "earned/applicable" normalization pattern (reweight buckets based on what's measurable per-site).
+**Implementation note:** Code may still temporarily hardcode CWV/mobile/HTTPS until US-F37-04 wires F03 inputs — **target state is Decision A above**. Replace placeholders when implementing dashboard score surface.
 
 ### API Endpoint
 
@@ -209,7 +224,7 @@ Exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`
 - **orgSchema:** always true (platform emits for all sites)
 - **allowsSearchBots:** currently false (AI crawlers blocked by default until US-F37-03 ships); will become dynamic post-US-F37-03
 - **sitemapPresent:** true if `site.status === 'published'` (sitemap route 404s for unpublished sites — real signal, not assumed)
-- **coreWebVitals, mobileResponsive, httpsEnabled:** hardcoded 80/true/true (placeholders; see "Known limitation" above)
+- **Technical Health (Decision A):** call `calculateTechnicalSeoScore({ siteHasOgImage, siteHasGoogleVerification, pageSlugs, noIndexCount })` then `floor(score × 15 / 100)`. Source: `site.seo.ogImage`, `site.seo.googleVerificationToken`, pages `slug` + `seo.noIndex`. *(Legacy placeholder CWV/mobile/HTTPS must be removed when wiring this.)*
 
 ### Exported Types (API Surface)
 
@@ -308,7 +323,7 @@ Formalizes 12 TC-IDs with Acceptance Criteria (AC) / Functional Requirement (FR)
 ## Open Questions / Future Work
 
 - **Phase 06 (QA):** Permanent test coverage for Phase 04 JSON-LD behaviors + Phase 05 route integration.
-- **Technical Health measurement:** Before US-F37-04 dashboard ships, determine: hardcode placeholders (current), implement real Lighthouse/CWV measurement, or apply earned/applicable normalization.
+- **Technical Health (RESOLVED Decision A):** Reuse F03 `technical-score.ts` (OG, Google verification, slugs, noIndex) scaled to 15pts. No Lighthouse/CWV. Code still needs rewiring off CWV placeholders.
 - **US-F37-04 (Local SEO Dashboard):** Consumer UI for score + actionable checklist.
 - **Multi-language support:** Checklist items + improvement hints (Phase 06+).
 - **Structured data testing:** Google Search Console + Rich Results Test can validate emitted JSON-LD after deployment.
