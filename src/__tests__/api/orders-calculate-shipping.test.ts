@@ -28,6 +28,20 @@ const validBase = { siteId: 'site-1', state: 'Selangor', subtotalSen: 5000 }
 describe('POST /api/orders/calculate-shipping — happy path [TC-F14]', () => {
     beforeEach(() => vi.clearAllMocks())
 
+    it('[TC-F14.159] preserves legacy fee and returns exact RateOption price in sen', async () => {
+        // Arrange
+        mockSite({ enabled: true, westRate: 801, eastRate: 1500, freeAbove: null })
+
+        // Act
+        const res = await callPost(validBase)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.data.fee).toBe(801)
+        expect(body.data.rates[0].priceSen).toBe(801)
+    })
+
     it('[TC-F14.01] Selangor → fee=800, region=west, no hint', async () => {
         mockSite(null)
         const res = await callPost(validBase)

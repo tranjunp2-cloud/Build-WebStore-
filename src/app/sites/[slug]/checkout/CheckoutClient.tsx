@@ -17,6 +17,7 @@ import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { type CheckoutForm, validateEmail, validatePhone, validatePaymentProof, PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront'
+import { shippingRateToRM } from '@/lib/shipping'
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
@@ -311,7 +312,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (cancelled) return
                 if (j?.success && j.data) {
                     const r0 = j.data.rates?.[0]
-                    setShipCalc({ feeRM: j.data.fee ?? 0, courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded, codAvailable: j.data.codAvailable })
+                    setShipCalc({ feeRM: shippingRateToRM(r0, baseShipping), courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded, codAvailable: j.data.codAvailable })
                     // Every fetch carries the probe verdict (codProbeSen above) — refresh unconditionally
                     setCodBlockReason(j.data.codIneligibleReason ?? null)
                 } else {
