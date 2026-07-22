@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
-import { getAvatarMedia, batchFetchFromPool } from '@/lib/ai/media-pipeline'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import { getAvatarMedia, batchFetchFromPool, getMediaForBlock, getCuratedFallbackMedia } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
 // portrait search — mock the pipeline layer to observe routing.
@@ -9,9 +9,11 @@ vi.mock('@/lib/ai/media-pipeline', async (importOriginal) => ({
     getAvatarMedia: vi.fn().mockResolvedValue({ mediaIds: [901, 902, 903], photos: [], failures: [] }),
     batchFetchFromPool: vi.fn().mockResolvedValue({ mediaIds: [1], photos: [], failures: [] }),
     getMediaForBlock: vi.fn().mockResolvedValue({ mediaIds: [], photos: [], failures: [] }),
+    getCuratedFallbackMedia: vi.fn().mockResolvedValue({ mediaIds: [], photos: [], failures: [] }),
 }))
 
 beforeEach(() => {
+    vi.clearAllMocks()
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.PIXABAY_BLOCKS = 'all'
@@ -315,6 +317,158 @@ describe('media-injector [plan-260414-unsplash]', () => {
     })
 
     describe('fulfillImageNeeds — testimonials avatar routing [TC-F38-RAW-13]', () => {
+        it('[TC-GENPERF-W3-27] fills a failed Pixabay gallery from persisted curated media without duplicates', async () => {
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            }]
+            vi.mocked(getMediaForBlock).mockResolvedValueOnce({
+                mediaIds: [],
+                photos: [],
+                failures: [{ photoId: 'search', error: 'SERVER_ERROR' }],
+            })
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [201, 202, 203, 204, 205, 206],
+                photos: [],
+                failures: [],
+            })
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Fallback Bakery', tenantId: '1', category: 'restaurant',
+            }, {} as never)
+
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+            const assigned = (blocks[0]!.images as Array<{ image?: number }>).map(item => item.image)
+            expect(assigned).toEqual([201, 202, 203, 204, 205, 206])
+            expect(new Set(assigned).size).toBe(6)
+        })
+
+        it('[TC-GENPERF-W3-10] assigns distinct gallery image sets across pages', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const needs = planImageNeeds(blocks)
+            const mediaIds = [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'spa',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            const result = await fulfillImageNeeds(needs, {
+                businessName: 'Lumi Skin Studio', tenantId: '1', category: 'beauty',
+                pool: { queryUsed: 'spa', landscape: poolPhotos, square: [], portrait: [], underfill: false },
+            }, {} as never)
+
+            expect(vi.mocked(batchFetchFromPool)).toHaveBeenCalledWith(
+                expect.any(Array), 'gallery', expect.anything(), expect.anything(),
+            )
+            expect((vi.mocked(batchFetchFromPool).mock.calls[0]![0] as unknown[])).toHaveLength(12)
+            expect(blocks[0]!.images.map((item) => item.image)).toEqual(mediaIds.slice(0, 6))
+            expect(blocks[1]!.images.map((item) => item.image)).toEqual(mediaIds.slice(6, 12))
+            expect(result).toEqual({ succeeded: 12, failed: 0 })
+        })
+
+        it('[TC-GENPERF-W3-15] assigns a different pool image to each page hero', async () => {
+            const blocks = [
+                { blockType: 'hero', headline: 'Home' },
+                { blockType: 'hero', headline: 'About' },
+            ]
+            const mediaIds = [201, 202]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'bakery',
+                width: 1200, height: 800, photographer: 'A', role: 'hero' as const, aspectRatio: '16:9' as const,
+            }))
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Butter & Bloom', tenantId: '1', category: 'fnb',
+                pool: { queryUsed: 'bakery', landscape: poolPhotos, square: [], portrait: [], underfill: false },
+            }, {} as never)
+
+            expect(blocks[0]!.image).toBe(201)
+            expect(blocks[0]!.backgroundImage).toBe(201)
+            expect(blocks[1]!.image).toBe(202)
+            expect(blocks[1]!.backgroundImage).toBe(202)
+            expect(result).toEqual({ succeeded: 2, failed: 0 })
+        })
+
+        it('[TC-GENPERF-W3-16] rotates gallery windows when the pool cannot fully separate them', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const mediaIds = [301, 302, 303, 304, 305, 306, 307, 308, 309]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'seafood',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Ocean Table', tenantId: '1', category: 'restaurant',
+                pool: { queryUsed: 'seafood', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            const first = blocks[0]!.images.map((item) => item.image)
+            const second = blocks[1]!.images.map((item) => item.image)
+            expect(new Set(first).size).toBe(6)
+            expect(new Set(second).size).toBe(6)
+            expect(second).not.toEqual(first)
+            expect(second).toEqual([307, 308, 309, 301, 302, 303])
+        })
+
+        it('[TC-GENPERF-W3-19] does not repeat a gallery window before exhausting pool rotations', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = Array.from({ length: 5 }, makeGallery)
+            const mediaIds = Array.from({ length: 12 }, (_, index) => 401 + index)
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'bakery',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Butter & Bloom', tenantId: '1', category: 'fnb',
+                pool: { queryUsed: 'bakery', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            const windows = blocks.map((block) => block.images.map((item) => item.image).join(','))
+            expect(new Set(windows).size).toBe(windows.length)
+        })
+
+        it('[TC-GENPERF-W3-12] partial pool does not legacy-search duplicate photos', async () => {
+            const makeGallery = () => ({
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, index) => ({ caption: `Photo ${index + 1}` })),
+            })
+            const blocks = [makeGallery(), makeGallery()]
+            const mediaIds = [101, 102, 103, 104, 105]
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({ mediaIds, photos: [], failures: [] })
+            const poolPhotos = mediaIds.map((id) => ({
+                id: String(id), url: `https://cdn.pixabay.com/${id}.jpg`, alt: 'seafood',
+                width: 1200, height: 800, photographer: 'A', role: 'gallery' as const, aspectRatio: '4:3' as const,
+            }))
+
+            const result = await fulfillImageNeeds(planImageNeeds(blocks), {
+                businessName: 'Hai San Bien Dong', tenantId: '1', category: 'restaurant',
+                pool: { queryUsed: 'seafood', landscape: poolPhotos, square: [], portrait: [], underfill: true },
+            }, {} as never)
+
+            expect(vi.mocked(getMediaForBlock)).not.toHaveBeenCalled()
+            for (const block of blocks) {
+                expect(block.images.slice(0, 5).map((item) => item.image)).toEqual(mediaIds)
+                expect(block.images[5]!.image).toBeUndefined()
+            }
+            expect(result).toEqual({ succeeded: 10, failed: 2 })
+        })
+
         it('routes testimonials to getAvatarMedia (people portraits), never the pool', async () => {
             // Arrange — 3 testimonial items without avatars
             const blocks = [
@@ -370,6 +524,150 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(members.map((m) => m.image)).toEqual([901, 902, 903])
         })
     })
+
+    describe('fulfillImageNeeds — verified pool provenance [TC-GH1611-18]', () => {
+        it('fills a gallery deficit with curated same-industry images instead of legacy search', async () => {
+            // Arrange — reproduce QA: six gallery slots, but only four verified
+            // bakery pool photos survive download/upload.
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            vi.mocked(batchFetchFromPool).mockResolvedValueOnce({
+                mediaIds: [101, 102, 103, 104],
+                photos: [],
+                failures: [
+                    { photoId: 'cake-5', error: 'upload failed' },
+                    { photoId: 'cake-6', error: 'upload failed' },
+                ],
+            })
+            vi.mocked(getMediaForBlock).mockResolvedValueOnce({
+                mediaIds: [901, 902], // would represent the two off-industry photos
+                photos: [],
+                failures: [],
+            })
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [201, 202],
+                photos: [],
+                failures: [],
+            })
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: {
+                    queryUsed: 'cake',
+                    landscape: Array.from({ length: 6 }, (_, i) => ({
+                        id: `cake-${i + 1}`,
+                        url: `https://cdn.pixabay.com/cake-${i + 1}.jpg`,
+                        alt: 'cake bakery dessert',
+                        width: 1200,
+                        height: 800,
+                        photographer: 'QA',
+                        role: 'gallery' as const,
+                        aspectRatio: '4:3' as const,
+                    })),
+                    square: [],
+                    portrait: [],
+                    underfill: false,
+                },
+            }
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+            cleanupNonNumericImageFields(blocks)
+
+            // Assert — four verified pool IDs plus two curated F&B IDs fill all
+            // slots. The simulated off-industry legacy IDs cannot enter the gallery.
+            const images = blocks[0]!.images as Array<Record<string, unknown>>
+            expect(images.map((item) => item.image)).toEqual([101, 102, 103, 104, 201, 202])
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 2, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+
+        it('fills all slots from curated same-industry images when the verified pool bucket is empty', async () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: { queryUsed: 'cake', landscape: [], square: [], portrait: [], underfill: true },
+            }
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [301, 302, 303, 304, 305, 306],
+                photos: [],
+                failures: [],
+            })
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+            cleanupNonNumericImageFields(blocks)
+
+            // Assert
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 6, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect((blocks[0]!.images as Array<Record<string, unknown>>).map((item) => item.image))
+                .toEqual([301, 302, 303, 304, 305, 306])
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+
+        it('fills all six slots from curated images when the pool upload path throws', async () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'gallery',
+                images: Array.from({ length: 6 }, (_, i) => ({ caption: `Cake ${i + 1}` })),
+            }]
+            const needs = planImageNeeds(blocks)
+            vi.mocked(batchFetchFromPool).mockRejectedValueOnce(new Error('unexpected pool failure'))
+            vi.mocked(getCuratedFallbackMedia).mockResolvedValueOnce({
+                mediaIds: [401, 402, 403, 404, 405, 406],
+                photos: [],
+                failures: [],
+            })
+            const ctx = {
+                businessName: 'Tiệm Bánh QA',
+                tenantId: '1',
+                category: 'fnb',
+                products: ['bánh'],
+                pool: {
+                    queryUsed: 'cake',
+                    landscape: [{
+                        id: 'cake-1', url: 'https://cdn.pixabay.com/cake-1.jpg', alt: 'cake',
+                        width: 1200, height: 800, photographer: 'QA',
+                        role: 'gallery' as const, aspectRatio: '4:3' as const,
+                    }],
+                    square: [],
+                    portrait: [],
+                    underfill: true,
+                },
+            }
+
+            // Act
+            const result = await fulfillImageNeeds(needs, ctx as never, {} as never)
+
+            // Assert
+            expect(getMediaForBlock).not.toHaveBeenCalled()
+            expect(getCuratedFallbackMedia).toHaveBeenCalledWith(
+                'gallery', 6, expect.anything(), expect.anything(), expect.any(Set),
+            )
+            expect((blocks[0]!.images as Array<Record<string, unknown>>).map((item) => item.image))
+                .toEqual([401, 402, 403, 404, 405, 406])
+            expect(result).toEqual({ succeeded: 6, failed: 0 })
+        })
+    })
 })
 
 describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
@@ -414,5 +712,26 @@ describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
 
 	it('accepts an explicit enabled set (pure function, no env read)', () => {
 		expect(computePoolBucketSizes(new Set(['hero']))).toEqual({ landscape: 3, square: 0, landscapeMin: 1, squareMin: 0 })
+	})
+})
+
+describe('computePoolTargetsForNeeds — actual generated slots', () => {
+	it('sums real slots across pages and caps the landscape pool', () => {
+		const targets = computePoolTargetsForNeeds([
+			{ blockType: 'gallery', count: 6 },
+			{ blockType: 'gallery', count: 9 },
+			{ blockType: 'hero', count: 1 },
+		])
+		expect(targets).toEqual({ landscape: 12, square: 0 })
+	})
+
+	it('excludes people and logo blocks from stock-pool targets', () => {
+		const targets = computePoolTargetsForNeeds([
+			{ blockType: 'team', count: 5 },
+			{ blockType: 'testimonials', count: 4 },
+			{ blockType: 'logo-cloud', count: 8 },
+			{ blockType: 'products-grid', count: 4 },
+		])
+		expect(targets).toEqual({ landscape: 0, square: 4 })
 	})
 })

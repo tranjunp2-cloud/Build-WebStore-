@@ -49,7 +49,7 @@ the external items below block QC handover.
 
 ## F37 (US-01) — Local Business Data Model
 
-- ⚠️ **Technical Health signals measurement (US-F37-04 blocker)** — Phase 05 hardcoded assume-passing values for 3 signals: coreWebVitals (80), mobileResponsive (true), httpsEnabled (true). No real Lighthouse/CWV measurement infrastructure. Flagged for PM decision before US-F37-04 dashboard ships: (1) keep hardcoding (status quo, no cost but overstates score), (2) implement real Lighthouse measurement (adds dependency, accurate), (3) apply PRD §13.8 "earned/applicable" normalization (reweight buckets per-site). See `docs/architecture/F37-local-seo.md` § "Known limitation" for full context.
+- ⚠️ **Technical Health rewire (US-F37-04)** — **PM Decision A (2026-07-21):** reuse F03 `technical-score.ts` (OG, Google verification, bad slugs, noIndex) → `floor(score × 15 / 100)`. Product decision closed. Code still hardcodes CWV/mobile/HTTPS — rewire before dashboard surfaces Local SEO score. See PRD §13.8.
 
 ## QC test backfill (post-merge)
 

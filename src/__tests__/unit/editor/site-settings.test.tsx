@@ -44,6 +44,11 @@ vi.mock('@/store/cartStore', () => ({
         closeCart: vi.fn(),
         removeItem: vi.fn(),
         updateQuantity: vi.fn(),
+        refreshStatus: 'idle',
+        refreshCart: vi.fn(),
+        changes: [],
+        siteId: '',
+        siteSlug: '',
         subtotal: () => 100,
         itemCount: () => 1,
     })

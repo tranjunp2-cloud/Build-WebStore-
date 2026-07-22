@@ -172,11 +172,11 @@ export async function POST(request: Request) {
         }
 
         // Flat-rate path (backward-compat: no items, or EP disabled)
-        const fee = getShippingRate(state, shippingConfig, subtotalSen)
+        const feeSen = getShippingRate(state, shippingConfig, subtotalSen)
         const region = classifyRegion(state)
         const shippingEnabled = shippingConfig?.enabled !== false
         const isFree =
-            fee === 0 &&
+            feeSen === 0 &&
             shippingEnabled &&
             shippingConfig?.freeAbove != null &&
             subtotalSen >= shippingConfig.freeAbove
@@ -194,14 +194,14 @@ export async function POST(request: Request) {
             serviceId: 'flat',
             courierName: 'Standard Delivery',
             serviceName: 'Standard Delivery',
-            priceSen: Math.round(fee * 100),
+            priceSen: feeSen,
             codAvailable: false,
             estDelivery: '3–5 business days',
         }
 
         return NextResponse.json({
             success: true,
-            data: { fee, isFree, region, ...(hint ? { hint } : {}), rates: [flatRate], degraded: false },
+            data: { fee: feeSen, isFree, region, ...(hint ? { hint } : {}), rates: [flatRate], degraded: false },
         })
     } catch (error: any) {
         console.error('[Calculate Shipping Error]', error)

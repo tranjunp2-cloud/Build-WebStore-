@@ -11,7 +11,7 @@ export interface BlogSeedAI {
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
-    return new OpenAI({ apiKey: key })
+    return new OpenAI({ apiKey: key, timeout: 12_000, maxRetries: 0 })
 }
 
 export function isQuotaExhausted(err: unknown): boolean {
@@ -67,7 +67,7 @@ Output strictly JSON. No markdown.`,
             },
             { role: 'user', content: userPrompt },
         ],
-    }, { timeout: 30_000 })
+    }, { timeout: 12_000 })
 
     const content = response.choices[0]?.message?.content ?? ''
     const parsed = JSON.parse(content) as { posts?: unknown }
@@ -119,7 +119,7 @@ Be specific and practical. No markdown. JSON only.`,
 Return JSON: {"content":"<h2>...</h2><p>...</p>..."}`,
             },
         ],
-    }, { timeout: 30_000 })
+    }, { timeout: 12_000 })
 
     const raw = response.choices[0]?.message?.content ?? ''
     const parsed = JSON.parse(raw) as { content?: string }

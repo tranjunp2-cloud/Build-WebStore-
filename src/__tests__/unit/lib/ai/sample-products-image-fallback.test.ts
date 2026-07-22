@@ -266,6 +266,42 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
     })
 })
 
+describe('[TC-GENPERF-W3] bounded sample-product preparation', () => {
+    it('[TC-GENPERF-W3-06] fills a partial AI result from curated data without a second model call', async () => {
+        mockOpenAICreate.mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({ products: [{
+                name: 'AI Product',
+                shortDescription: 'Short desc',
+                description: 'Full desc',
+                price: 50,
+                imageKeyword: 'ai product',
+            }] }) } }],
+        })
+        mockSearchPhotos.mockResolvedValue([])
+        mockUploadImageUrl.mockResolvedValue(77)
+        mockFindByID.mockResolvedValue({ id: 77 })
+
+        const { products } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload, 'site-1')
+
+        expect(products).toHaveLength(6)
+        expect(products[0]!.name).toBe('AI Product')
+        expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
+    })
+
+    it('[TC-GENPERF-W3-07] caps image search at two six-second queries per product', async () => {
+        mockSearchPhotos.mockResolvedValue([])
+        mockUploadImageUrl.mockResolvedValue(77)
+        mockFindByID.mockResolvedValue({ id: 77 })
+
+        const { products } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload, 'site-1')
+
+        expect(mockSearchPhotos.mock.calls.length).toBeLessThanOrEqual(products.length * 2)
+        for (const call of mockSearchPhotos.mock.calls) {
+            expect(call[2]).toMatchObject({ timeoutMs: 6_000 })
+        }
+    })
+})
+
 describe('[TC-F09-1383] sample product fields — sku / inventory / category', () => {
     // Image mocks: all tiers fail non-fatally so products are still generated
     // with imageId=undefined — sufficient since these tests assert on sku/inventory/category

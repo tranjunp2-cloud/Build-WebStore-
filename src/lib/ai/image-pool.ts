@@ -89,6 +89,21 @@ export interface BuildPoolCtx {
    */
   landscapeMin?: number
   squareMin?: number
+  /** Existing source IDs to skip when fetching a post-generation deficit. */
+  landscapeExcludeIds?: ReadonlySet<string>
+  squareExcludeIds?: ReadonlySet<string>
+  /** Per-request deadline; backfill uses a tighter budget than speculative preload. */
+  timeoutMs?: number
+}
+
+export interface ImagePoolTargets {
+  landscape: number
+  square: number
+}
+
+export interface ImagePoolBackfillResult {
+  pool: ImagePool
+  added: ImagePool
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -306,6 +321,7 @@ async function searchBucket(
   size: number,
   width: number,
   minCount: number,
+  excludeIds: ReadonlySet<string> = new Set(),
 ): Promise<{ photos: PixabayPhoto[]; usedFallback: boolean }> {
   const isVietnamese = detectQueryLang(query) === 'vi'
   // GH-1185: Pixabay category filter keeps loose matches on-domain (a "phở
@@ -315,18 +331,22 @@ async function searchBucket(
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
-  // 429 short-circuit: once Pixabay rate-limits, every further tier is a
-  // guaranteed-fail request that deepens the storm (each searchPhotos already
-  // retries 429 once internally with ~2s sleep). Return thin/empty — the
-  // caller marks underfill and downstream paths have their own guards.
-  const isRateLimited = (err: unknown): boolean =>
-    err instanceof PixabayError && err.code === 'RATE_LIMITED'
+  // Provider-outage short-circuit: every further tier is a guaranteed-fail
+  // request that deepens the storm. Return thin/empty and let the caller use
+  // its deterministic industry fallback.
+  const isProviderUnavailable = (err: unknown): boolean =>
+    err instanceof PixabayError
+    && (err.code === 'RATE_LIMITED' || err.code === 'SERVER_ERROR' || err.code === 'TIMEOUT')
 
+  // Ask for enough rows to move past the already-used first page. The result is
+  // still capped to `size`, which is the exact deficit this call must fill.
+  const requestCount = Math.min(200, size + excludeIds.size)
+  const searchOptions = { orientation, width, category, timeoutMs: ctx.timeoutMs }
   try {
-    photos = (await searchPhotos(query, size, { orientation, width, category })) ?? []
+    photos = (await searchPhotos(query, requestCount, searchOptions)) ?? []
   } catch (err) {
     console.warn(`[image-pool] ${orientation} search failed:`, err)
-    if (isRateLimited(err)) return { photos, usedFallback: true }
+    if (isProviderUnavailable(err)) return { photos, usedFallback: true }
   }
   // GH-1611: gate EVERY language, not just Vietnamese. The pool query is
   // English by default (GEN_TRANSLATE_POOL_KEYWORDS), so a VN-only gate never
@@ -351,7 +371,7 @@ async function searchBucket(
   // GH-1611: tiers overlap (the broadened query re-returns the primary query's
   // hits), so merging must dedupe by photo id — otherwise the same photo counts
   // twice toward minCount and the gallery renders it twice.
-  const seenIds = new Set<string>()
+  const seenIds = new Set<string>(excludeIds)
   const merge = (incoming: PixabayPhoto[]): void => {
     for (const p of incoming) {
       if (seenIds.has(p.id)) continue
@@ -383,7 +403,7 @@ async function searchBucket(
   if (relaxedQuery !== query) {
     usedFallback = true
     try {
-      const extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
+      const extra = (await searchPhotos(relaxedQuery, requestCount, searchOptions)) ?? []
       // Product terms remain the relevance contract even after broadening. The
       // Pixabay category filter only protects the industry (food vs fashion),
       // not the merchant's product (cake vs sushi). With no trusted product,
@@ -391,7 +411,7 @@ async function searchBucket(
       merge(gate(extra, gateTerms, relaxedQuery))
     } catch (err) {
       console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
-      if (isRateLimited(err)) return { photos, usedFallback: true }
+      if (isProviderUnavailable(err)) return { photos, usedFallback: true }
       tier2Failed = true
     }
   }
@@ -415,8 +435,8 @@ async function searchBucket(
       // (fnb) carry only ambiguous diacritics, so auto-detection would miss
       // them and the search would run diacritic-stripped under Pixabay's
       // default lang=en. EN base keywords use the default lang.
-      const extra = (await searchPhotos(catQuery, size, {
-        orientation, width, category, ...(vnQuery ? { lang: 'vi' as const } : {}),
+      const extra = (await searchPhotos(catQuery, requestCount, {
+        ...searchOptions, ...(vnQuery ? { lang: 'vi' as const } : {}),
       })) ?? []
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} category fallback "${catQuery}": +${extra.length}`)
@@ -443,8 +463,8 @@ async function searchBucket(
  *
  * Failure modes:
  *   - Pixabay returns 0 results → retry once with relaxed (broadened) query
- *   - Still underfills → set `pool.underfill = true`, caller can backfill via
- *     legacy per-block searchPhotos if needed
+ *   - Still underfills → set `pool.underfill = true`; callers fill missing
+ *     slots from unique checked-in images for the normalized category
  *   - searchPhotos throws → returns empty pool, underfill=true (non-fatal)
  */
 export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
@@ -470,6 +490,7 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
     )
     const landscape = await searchBucket(
       ctx, query, 'landscape', landscapeSize, 1200, landscapeMin,
+      ctx.landscapeExcludeIds,
     )
     landscapePhotos = landscape.photos
     if (landscape.usedFallback || landscapePhotos.length === 0) underfill = true
@@ -484,6 +505,7 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
     )
     const square = await searchBucket(
       ctx, query, 'squarish', squareSize, 1000, squareMin,
+      ctx.squareExcludeIds,
     )
     squarePhotos = square.photos
     if (square.usedFallback || squarePhotos.length === 0) underfill = true
@@ -624,6 +646,49 @@ export function mergePool(pool: ImagePool, extra: Partial<ImagePool>): ImagePool
     queryUsed: extra.queryUsed ?? pool.queryUsed,
     underfill: pool.underfill || !!extra.underfill,
   }
+}
+
+/**
+ * Top up a speculative pool after the generated block tree reveals its actual
+ * slot counts. Existing Pixabay source IDs seed the search deduper, so a wider
+ * query page can add only unseen photos instead of re-uploading an old result.
+ */
+export async function backfillImagePool(
+  pool: ImagePool,
+  ctx: BuildPoolCtx,
+  targets: ImagePoolTargets,
+): Promise<ImagePoolBackfillResult> {
+  const landscapeDeficit = Math.max(0, targets.landscape - pool.landscape.length)
+  const squareDeficit = Math.max(0, targets.square - pool.square.length)
+  const emptyAdded: ImagePool = {
+    landscape: [],
+    square: [],
+    portrait: [],
+    queryUsed: pool.queryUsed,
+    underfill: false,
+  }
+
+  if (landscapeDeficit === 0 && squareDeficit === 0) {
+    return { pool, added: emptyAdded }
+  }
+
+  const existingIds = new Set([
+    ...pool.landscape,
+    ...pool.square,
+    ...pool.portrait,
+  ].map((photo) => photo.id))
+  const added = await buildImagePool({
+    ...ctx,
+    landscapeSize: landscapeDeficit,
+    squareSize: squareDeficit,
+    landscapeMin: landscapeDeficit,
+    squareMin: squareDeficit,
+    landscapeExcludeIds: existingIds,
+    squareExcludeIds: existingIds,
+    timeoutMs: Math.min(ctx.timeoutMs ?? 2_500, 2_500),
+  })
+
+  return { pool: mergePool(pool, added), added }
 }
 
 /** Total count across all buckets — used for SSE debug events. */
