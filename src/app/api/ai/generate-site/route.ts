@@ -669,17 +669,15 @@ export async function POST(req: NextRequest) {
             // Thumbnail search is intentionally independent from sample-product
             // completion so a slow product upload cannot hold the blog tail.
             // Never rejects: null = prep failed → synchronous fallback seeding.
-            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = existingSitesPromise
-                .then((existingSites) => prepareBlogPosts({
-                    payload,
-                    tenantId: resolvedTenantId,
-                    category: normalizeComposerCategory(businessInfo.industry),
-                    businessName: businessInfo.businessName,
-                    products: parseProductsString(businessInfo.products),
-                    industry: businessInfo.industry,
-                    seed: computeGenSeed(businessInfo),
-                    siteId: existingSites.docs[0]?.id,
-                }))
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+                payload,
+                tenantId: resolvedTenantId,
+                category: normalizeComposerCategory(businessInfo.industry),
+                businessName: businessInfo.businessName,
+                products: parseProductsString(businessInfo.products),
+                industry: businessInfo.industry,
+                seed: computeGenSeed(businessInfo),
+            })
                 .catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -1495,6 +1493,10 @@ export async function POST(req: NextRequest) {
                     tenant: resolvedTenantId,
                     site: site.id,
                     name,
+                    // Products' collection hook uses ASCII-only slugification. Supplying the
+                    // shared CJK-aware slug here prevents pure CJK names from being rejected
+                    // while the hook still handles uniqueness suffixes.
+                    slug: slugify(name),
                     shortDescription: product.shortDescription,
                     description: product.description,
                     ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),

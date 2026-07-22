@@ -648,32 +648,25 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
 		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
 		})
 
 		expect(prepared).toBeNull()
 		warnSpy.mockRestore()
 	})
 
-	it('returns [] only when the current site already has three complete posts', async () => {
+	it('returns [] when the tenant already has posts', async () => {
 		const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 
 		// Prep skip case
 		const payloadWithPosts = makePayload(3)
 		const prepared = await prepareBlogPosts({
-			payload: payloadWithPosts, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+			payload: payloadWithPosts, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
 		})
 		expect(prepared).toEqual([])
 		expect(payloadWithPosts.count).toHaveBeenCalledWith({
 			collection: 'blogs',
-			where: {
-				and: [
-					{ tenant: { equals: 42 } },
-					{ site: { equals: 99 } },
-					{ content: { exists: true } },
-					{ thumbnail: { exists: true } },
-				],
-			},
+			where: { tenant: { equals: 42 } },
 		})
 
 		// Persist path inserts exactly the prepared rows (site-dependent phase)
@@ -690,17 +683,6 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		expect(first.data.thumbnail).toBe(5)
 		const second = (payload.create as ReturnType<typeof vi.fn>).mock.calls[1][0]
 		expect(second.data.thumbnail).toBeUndefined()
-	})
-
-	it('prepares only the deficit when the current site has one complete post', async () => {
-		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-		const payload = makePayload(1)
-
-		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
-		})
-
-		expect(prepared).toHaveLength(2)
 	})
 
 })

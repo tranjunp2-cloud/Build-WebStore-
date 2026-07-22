@@ -990,49 +990,6 @@ describe('AI Streaming APIs', () => {
              expect(mockProductDB.filter(product => String(product.id).startsWith('existing-product-'))).toHaveLength(6)
         })
 
-        it('[TC-GENPERF-W3-30] regeneration accepts a two-post deficit when the final site count is three', async () => {
-             const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-             mockSiteDB = [{
-                 id: 'site-existing',
-                 tenant: 'tenant-1',
-                 name: 'Existing Bakery',
-                 generationStatus: 'completed',
-             }]
-             mockPageDB = [
-                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
-                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
-                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
-                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
-                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
-                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
-             ]
-             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
-                 { title: 'Second', slug: 'second', content: '<p>second</p>', thumbnailId: 2 },
-                 { title: 'Third', slug: 'third', content: '<p>third</p>', thumbnailId: 3 },
-             ])
-             vi.mocked(persistBlogPosts).mockResolvedValueOnce(2)
-             mockCompleteBlogCount = 3
-
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
-
-             expect(res.status).toBe(200)
-             expect(vi.mocked(prepareBlogPosts)).toHaveBeenCalledWith(
-                 expect.objectContaining({ tenantId: 'tenant-1', siteId: 'site-existing' }),
-             )
-             expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledWith(
-                 expect.anything(),
-                 expect.arrayContaining([expect.objectContaining({ slug: 'second' }), expect.objectContaining({ slug: 'third' })]),
-                 'tenant-1',
-                 'site-existing',
-                 'user-xyz',
-             )
-        })
-
         it('[TC-GENPERF-W3-31] marks regeneration failed when the old-page read fails', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalFind = vi.mocked(payload.find).getMockImplementation()!
@@ -1452,6 +1409,38 @@ describe('AI Streaming APIs', () => {
             expect(productCreateCall).toBeDefined()
             // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
             expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread')
+        })
+
+        it('[TC-F08.164] sample product create persists a valid slug for a CJK-only name', async () => {
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: '节能吊灯',
+                    shortDescription: '节能照明产品',
+                    description: '适合现代家居的节能吊灯。',
+                    price: 799,
+                    sku: 'ECO-001',
+                    inventory: 0,
+                    status: 'active',
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: '智能家居', industry: 'Home', products: '灯具', shortDescription: '现代家居产品' },
+                    generationLocale: 'zh-CN',
+                }),
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const productCreateCall = vi.mocked(resolvedPayload.create).mock.calls.find(
+                (call: [{ collection: string; data?: { slug?: string } }]) => call[0].collection === 'products',
+            )
+            expect(productCreateCall?.[0].data?.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+            expect(productCreateCall?.[0].data?.slug.length).toBeGreaterThanOrEqual(3)
         })
 
         it('[TC-09.49] persisted alt-text fallback is capped at 500 chars, matching saveProductAction (code-review fix)', async () => {
