@@ -277,7 +277,13 @@ export async function deleteCategoryAction(id: string | number) {
 
     const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
     if (!isSuperAdmin) {
-        const tenantId = tenantIdForQuery(user)
+        // Entitlement must be checked against the tenant of the resource that passed Payload's
+        // access control, not the first membership. A team member may belong to multiple
+        // tenants with different plans, and Payload relationships may be populated or raw IDs.
+        const categoryTenant = authorizedCategory.tenant
+        const tenantId = typeof categoryTenant === 'object' && categoryTenant !== null
+            ? categoryTenant.id
+            : categoryTenant
         if (tenantId == null) {
             throw new Error('Product management is not available on your current plan.')
         }

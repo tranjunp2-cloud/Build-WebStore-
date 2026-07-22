@@ -54,7 +54,7 @@ describe.skipIf(!runIntegration)('category delete action breadcrumbs (GH-1571)',
             vi.mocked(getActivePlanSubscription).mockResolvedValue({ plan: 'PROFESSIONAL_TM_USER' } as unknown as ActiveSubscription)
             vi.mocked(canUse).mockResolvedValue(true)
             vi.mocked(getPayload).mockResolvedValue({
-                findByID: vi.fn().mockResolvedValue({ id: 1, name: 'Parent', parent: null }),
+                findByID: vi.fn().mockResolvedValue({ id: 1, name: 'Parent', parent: null, tenant: 1 }),
                 db: { drizzle: drizzle(client) },
             } as unknown as PayloadInstance)
 

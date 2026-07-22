@@ -301,7 +301,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
         it('TC-F08-05-06: deleteCategoryAction still sets deletedAt despite field-level access: false', async () => {
             // Arrange: the delete path now uses one raw SQL statement instead of 2 payload.update
             // calls, so the regression proof is the returned deletedAt + the SQL soft-delete branch.
-            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
             mockExecute.mockResolvedValue({
                 rows: [{
                     direct_count: 0,
@@ -319,7 +319,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
         })
 
         it('TC-F08-05-06: deleteCategoryAction no longer relies on payload.update to re-parent children', async () => {
-            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+            mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
             mockExecute.mockResolvedValue({
                 rows: [{
                     direct_count: 0,

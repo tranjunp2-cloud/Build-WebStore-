@@ -179,7 +179,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-64** | `GH-1502-PR-1568-review-tap-tooltip-fix` | `Unit` | `useTapToggleTooltip` closes an open tooltip on pointerdown outside the trigger. | Unit: open via click, then `fireEvent.pointerDown` on a sibling element. | - Tooltip content removed after outside pointerdown. | Medium | [x] |
 
 ---
-### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (13 Cases)
+### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (20 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -201,6 +201,8 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-05-16** | `GH-1587-C/Sec` | `Sec` | Chặn tenant/site field-spoof (không cần `parent`) — `beforeChange` hook force `data.tenant`/`data.site` về actor's tenant | 1. Tenant A, gửi PATCH với body `{tenant: <Tenant B's ID>}` hoặc `{site: <Tenant B's site>}`.<br>2. Kiểm tra DB sau update. | - Hook re-ghi `data.tenant` thành Tenant A's tenant (unspoofable).<br>- Site handling: **giữ nguyên** giá trị sẵn có (nếu update không kèm site), HOẶC validate client-requested site khớp tenant actor.<br>- **KHÔNG dùng naive site-lookup** nếu không, nó sẽ sai lệch với multi-site-per-tenant (BUG được phát hiện + fix tại review round 3).<br>- Payload trả về confirm success + data đã re-scoped.<br>- Live test: `getById` sau update cho thấy `tenant` = Tenant A's (buộc), `site` = an toàn. | Blocker | [x] |
 | **TC-F08-05-17** | `US-05/UX` | `UX` | Modal tạo danh mục giữ focus ô tên và không submit khi nhấn Enter | 1. Mở `/products/categories`.<br>2. Click `Add Category` để mở modal.<br>3. Gõ nhiều ký tự vào ô `Category Name`.<br>4. Nhấn `Enter` khi đang focus trong ô tên. | - Ô `Category Name` vẫn giữ focus sau mỗi lần nhập.<br>- Giá trị đã gõ không bị mất.<br>- Modal vẫn mở.<br>- Không save category cho tới khi bấm nút `Save Category`. | High | [x] |
 | **TC-F08-05-18** | `GH-1571/Bug` | `E2E` | Parent ID từ Radix Select được chuẩn hóa trước khi tạo danh mục con | 1. Tạo một danh mục Root bằng modal Add Category.<br>2. Mở lại Add Category.<br>3. Chọn Root qua Parent Category Select.<br>4. Tạo một danh mục Con. | - Cả hai Server Action trả status thành công.<br>- Danh mục Con được lưu dưới Root sau reload.<br>- Không xuất hiện lỗi Payload `The following field is invalid: Parent`. | Blocker | [x] |
+| **TC-F08-05-19** | `GH-1571/Review-P0` | `Sec` | Delete kiểm tra entitlement theo tenant của category đã authorize | 1. User thuộc Tenant A và B. A có `product_management`, B không có.<br>2. Category cần xóa thuộc B.<br>3. Gọi delete action. | - Subscription được resolve bằng Tenant B, không phải membership đầu tiên A.<br>- Action bị từ chối trước raw SQL. | Blocker | [x] |
+| **TC-F08-05-20** | `GH-1571/Review-P0` | `Sec` | Delete hỗ trợ populated tenant relationship khi kiểm tra entitlement | 1. User thuộc Tenant A và B. A không có `product_management`, B có.<br>2. Category thuộc B và `tenant` trả về dạng populated object.<br>3. Gọi delete action. | - Tenant ID B được unwrap từ relationship.<br>- Delete được phép và raw SQL chạy đúng một lần. | Blocker | [x] |
 
 ---
 
