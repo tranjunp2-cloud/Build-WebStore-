@@ -75,7 +75,7 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập Dashboard → SEO Health. | - Chỉ có một score /100.<br>- Hiển thị Business Data /20, Schema /35, AI Discoverability /15, Technical Health /30.<br>- Tối đa 3 actions; AI Fix chỉ cho metadata. | Blocker | [x] |
+| **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập Dashboard → SEO Health. | - Chỉ có một score /100.<br>- Không có Score History.<br>- Bốn bucket bars hiển thị dạng 2×2, không hiện điểm bucket.<br>- Root-cause issues dùng đúng badge AI/You, CTA và destination theo F37 §12.3.<br>- AI Fix All chỉ hiện khi còn metadata issue AI-fixable.<br>- Derived/platform metrics không tạo issue trùng. | Blocker | [ ] |
 | **TC-F03.30** | `US-03/AC-2` | `Func` | **[Sitemap]** Tạo Sitemap XML tự động | 1. Nhấn **Generate Sitemap**. | - File Sitemap được tạo trong thư mục static route của server.<br>- Toast thông báo xanh lá xuất hiện trong < 2 giây. | High | [x] |
 | **TC-F03.31** | `US-03/AC-3` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
 
@@ -95,18 +95,19 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 
 ---
 
-### US-05: AI SEO Fix All Issues
+### US-05: AI Metadata Fix All
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **TC-F03.39** | `QA/Auto` | `Locator` | **[Data-TestID]** Nút AI Fix All có testid chuẩn | 1. Inspect F12 phần tử nút **AI Fix All**. | - Phần tử có attribute `data-testid="btn-ai-fix-all"`. | High | [x] |
-| **TC-F03.40** | `US-05/AC-1` | `UX` | **[Propose Mode]** Xem trước thay đổi trước khi áp dụng | 1. Nhấn nút **AI Fix All**. | - Modal hiển thị danh sách Before/After từng lỗi.<br>- Có checkbox để chọn từng dòng muốn áp dụng hoặc bỏ qua. | Blocker | [x] |
+| **TC-F03.39** | `QA/Auto` | `Locator` | **[Conditional CTA]** Nút Fix all with AI | 1. Render có rồi không có title/description issue. | - Có metadata issue: nút `Fix all with AI` hiển thị.<br>- Không có metadata issue: nút vắng mặt.<br>- Total human issues không được dùng để bật nút. | High | [ ] |
+| **TC-F03.40** | `US-05/AC-1` | `UX` | **[Propose Mode]** Xem trước thay đổi trước khi áp dụng | 1. Nhấn nút **Fix all with AI**. | - Modal chỉ hiển thị Before/After của meta title/description.<br>- Có checkbox để chọn từng dòng muốn áp dụng hoặc bỏ qua. | Blocker | [ ] |
 | **TC-F03.41** | `US-05/AC-1` | `Perf/SLA` | **[SSE 15s Load]** Stream dữ liệu qua SSE < 15 giây | 1. Kích hoạt AI Fix với 20 lỗi meta cần sửa. | - API trả dữ liệu dạng Server-Sent Events (SSE).<br>- Toàn bộ kết quả nhận về trong < 15 giây. | Blocker | [x] |
-| **TC-F03.41b** | `US-05/AC-1` | `UI/State` | **[Tracking Checklist]** Hiển thị tiến độ SSE theo từng hạng mục | 1. Quan sát UI trong khi SSE đang nhận dữ liệu. | - Thanh progress tăng dần.<br>- Từng hạng mục (Tối ưu ảnh, Sinh tiêu đề...) có dấu tick xanh xuất hiện tuần tự theo dữ liệu trả về. | High | [ ] |
+| **TC-F03.41b** | `US-05/AC-1` | `UI/State` | **[Tracking Checklist]** Hiển thị tiến độ SSE theo từng metadata item | 1. Quan sát UI trong khi SSE đang nhận dữ liệu. | - Thanh progress tăng dần.<br>- Từng meta title/description item có dấu tick xanh xuất hiện tuần tự theo dữ liệu trả về.<br>- Không có content, alt, Local Business, schema, crawler hoặc technical item. | High | [ ] |
 | **TC-F03.42** | `NFR/UX` | `Button` | **[State Disable]** Khóa nút khi SSE đang chạy | 1. Nhấn nút sửa dữ liệu trong khi SSE đang kéo. | - Nút chuyển sang Disabled với loading icon.<br>- Không thể gửi thêm request. | High | [x] |
 | **TC-F03.43** | `US-05/AC-2` | `Failover` | **[Timeout UI]** Xử lý SSE bị gián đoạn quá 15 giây | 1. Giả lập mạng bị đứt giữa chừng, SSE không nhận response > 15 giây. | - Hiển thị alert "Sự cố kết nối, vui lòng thử lại".<br>- Không treo UI hay vòng lặp vô hạn. | Blocker | [x] |
 | **TC-F03.44** | `US-05/AC-2` | `SQL/DB` | **[Rollback DB]** Hoàn tác transaction khi insert thất bại | 1. Gây sự cố ngắt kết nối giữa chừng khi transaction đang insert (từ TC-F03.43). | - Hệ thống rollback toàn bộ transaction.<br>- Không có dữ liệu dở dang hoặc lỗi nửa vời trong DB. | Blocker | [x] |
 | **TC-F03.45** | `US-05/AC-1` | `Func` | **[Batch Undo]** Hoàn tác toàn bộ thay đổi AI bằng 1 click | 1. Approve toàn bộ thay đổi AI.<br>2. Nhận thấy kết quả sai, nhấn nút **Hoàn Tác**. | - Toàn bộ nội dung khôi phục về trạng thái trước khi AI sửa.<br>- Hoạt động như Ctrl+Z cho 1 batch. | Blocker | [x] |
+| **TC-F03.45b** | `US-05/AC-1` | `Regression` | **[Metadata Boundary]** AI Fix không sửa seller-owned signals | 1. Lưu snapshot Local Business, schema, content, alt text, crawler, publish, domain, verification.<br>2. Chạy Fix all with AI cho metadata. | - Chỉ meta title/description thay đổi.<br>- Toàn bộ seller-owned snapshot giữ nguyên. | Blocker | [ ] |
 
 ---
 

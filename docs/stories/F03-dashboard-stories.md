@@ -176,8 +176,9 @@ GIVEN user ở /dashboard/seo
 WHEN  page load
 THEN  Overall SEO Score (0-100) hiển thị rõ
   AND đây là score duy nhất, không có Local SEO card thứ hai
-  AND breakdown hiển thị Business Data /20, Schema /35, AI Discoverability /15, Technical Health /30
-  AND tối đa 3 actions được xếp theo điểm tăng; AI Fix chỉ áp dụng metadata
+  AND bốn bucket bars hiển thị Business Data, Schema, AI Discoverability, Technical Health theo layout 2×2 mà không hiện điểm bucket
+  AND mỗi unresolved root-cause issue hiển thị đúng badge AI/You, CTA và destination theo F37 §12.3
+  AND AI Fix chỉ áp dụng metadata; derived/platform metrics không tạo issue trùng
   AND người dùng nhìn vào biết ngay cần cải thiện phần nào
 ```
 
@@ -271,7 +272,7 @@ THEN  hiển thị so sánh bản cũ vs bản mới
 
 ---
 
-## US-F03-05: AI SEO Fix All Issues
+## US-F03-05: AI Metadata Fix All
 
 **Wave 3** | **P0** | **L** | **Status:** Ready
 
@@ -279,8 +280,8 @@ THEN  hiển thị so sánh bản cũ vs bản mới
 
 ```
 As a   store owner reviewing SEO dashboard
-I want một nút fix toàn bộ SEO issues tự động
-So that tôi cải thiện search ranking chỉ với 1 action
+I want một nút fix toàn bộ metadata issues mà AI được phép xử lý
+So that tôi cải thiện meta coverage mà không ghi đè seller-owned data
 ```
 
 ### Acceptance Criteria
@@ -288,10 +289,11 @@ So that tôi cải thiện search ranking chỉ với 1 action
 #### AC-1: Happy Path — Fix All với Preview
 
 ```gherkin
-GIVEN my SEO dashboard shows warnings (missing alt text, heavy titles)
-WHEN  I click "AI Fix All Issues"
+GIVEN my SEO dashboard has at least one missing meta title or description
+WHEN  I click "Fix all with AI"
 THEN  AI proposes changes — user can approve or skip individual fixes
   AND SEO score updates to reflect improvements
+  AND không thay đổi Local Business, schema, content, alt text, crawler, publish, domain, hoặc verification data
   AND tất cả trong 15 giây
   AND all fixes undoable as single batch action
 ```
@@ -299,7 +301,7 @@ THEN  AI proposes changes — user can approve or skip individual fixes
 #### AC-2: Timeout or Partial Failure
 
 ```gherkin
-GIVEN I click "AI Fix All Issues"
+GIVEN I click "Fix all with AI"
 WHEN  tiến trình bị quá 15 giây hoặc lỗi nội bộ
 THEN  hiển thị toast lỗi: "Không thể hoàn tất AI Fix All, vui lòng thử lại"
   AND giữ nguyên tiến trình đã sinh và cho phép resume (Thử lại)
@@ -314,6 +316,10 @@ THEN  hệ thống chỉ gửi mảng batch 5-10 items gồm [Tên, Chuyên mụ
   AND ép Output dưới định dạng JSON thuần
   AND sinh Meta Tags tuân thủ chuẩn SEO: Title 50-60 ký tự, Meta Desc 150-160 ký tự kết hợp CTA.
   AND sử dụng trackedKeywords từ cài đặt site để từ khoá mục tiêu xuất hiện tự nhiên trong meta sinh ra
+
+GIVEN không còn missing meta title hoặc description
+WHEN  SEO Issues render
+THEN  nút "Fix all with AI" không hiển thị
 ```
 
 ### Analytics / Tracking Notes

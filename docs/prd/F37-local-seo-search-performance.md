@@ -1,6 +1,6 @@
 # PRD: Local SEO Score & Storefront Discoverability (F37)
 
-> **Version:** 2.4 | **Status:** Phase 2 — subtype dropdown approved 2026-07-22 | **Priority:** P0 | **Size:** L
+> **Version:** 2.5 | **Status:** Phase 2 — issue-action UI approved 2026-07-22 | **Priority:** P0 | **Size:** L
 > **Depends on:** F03 Dashboard Suite, F02 Auth, F05 Editor  
 > **Replaces:** F37 PRD v1.0 (target-state rewrite)
 
@@ -16,7 +16,7 @@ SME sellers on PrimeCommerce storefronts are hard to discover in local search an
 | Actor             | Type     | Goal                                                                                    |
 | ----------------- | -------- | --------------------------------------------------------------------------------------- |
 | SME seller (MY)   | Primary  | Complete minimal business facts, raise Local SEO score, get found via schema + crawlers |
-| Platform (system) | System   | Emit JSON-LD / robots / sitemap / llms.txt; compute score; surface checklist            |
+| Platform (system) | System   | Emit JSON-LD / robots / sitemap / llms.txt; compute score; surface actionable root causes |
 | F03 General SEO   | Adjacent | AI Fix All for page/product/blog meta only — does not write Local Business fields       |
 
 
@@ -32,7 +32,7 @@ SME sellers on PrimeCommerce storefronts are hard to discover in local search an
 - **Schema completeness** signals that all affect score (LocalBusiness, subtype, hours, geo, telephone, url, priceRange, Organization)
 - **AI Discoverability:** AI crawlers toggle, sitemap when published, llms.txt
 - **Technical Health:** metadata coverage + content quality + search verification + indexability
-- One unified SEO Health score 0–100 + checklist (max 3 items) on **Dashboard > SEO**
+- One unified SEO Health score 0–100 + actionable root-cause issues on **Dashboard > SEO**
 - Tenant storefront only: `/sites/[slug]/*`
 
 
@@ -49,7 +49,7 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 | Sellers with name + full address + phone | ≥ 60% of active sites within 14 days of ship                  | Do not count draft-only sites                 |
 | Local SEO score median                   | ≥ 60 within 30 days of first Editor open after ship           | Baseline measured at feature flag on          |
 | Score API p95                            | < 2s                                                          | Auth + rate limit preserved                   |
-| Checklist click → Editor deep-link       | ≥ 40% of sellers who see checklist open Editor within session | [NEED: analytics event name if F22 not ready] |
+| Human issue CTA → correct destination    | ≥ 40% of sellers who see an actionable issue open its destination within session | [NEED: analytics event name if F22 not ready] |
 
 
 
@@ -144,13 +144,17 @@ flowchart TB
   publish_site --> sitemap_ok[sitemap_and_llms_available]
   sitemap_ok --> evaluate_health[evaluate_metadata_content_and_technical_health]
   evaluate_health --> calc_score[calc_local_seo_score_100]
-  calc_score --> show_dashboard[show_score_and_checklist_dashboard_seo]
+  calc_score --> show_dashboard[show_score_and_root_cause_issues]
   show_dashboard --> fix_loop{score_below_target?}
-  fix_loop -->|yes| edit_or_ai{issue_type?}
-  edit_or_ai -->|business_schema_content_technical| human_edit[human_edit_in_editor]
+  fix_loop -->|yes| edit_or_ai{issue_owner?}
+  edit_or_ai -->|seller_input| human_edit[human_edit_at_destination]
+  edit_or_ai -->|seller_toggle_publish_setup| seller_action[seller_action_at_destination]
   edit_or_ai -->|page_product_blog_metadata| ai_fix_all[ai_fix_all_meta_only]
+  edit_or_ai -->|platform_managed| platform_auto[platform_maintains_signal]
   human_edit --> calc_score
+  seller_action --> calc_score
   ai_fix_all --> calc_score
+  platform_auto --> calc_score
   fix_loop -->|no| end_ok([end_local_seo_ready])
 ```
 
@@ -173,8 +177,11 @@ flowchart TB
 | `publish_site` / `sitemap_and_llms_available`   | Publish unlocks sitemap +5, llms +1            |
 | `evaluate_metadata_content_and_technical_health` | F03 metadata, content, and technical signals   |
 | `calc_local_seo_score_100`                      | Pure score function                            |
-| `show_score_and_checklist_dashboard_seo`        | Dashboard > SEO card                           |
-| `human_edit_in_editor` / `ai_fix_all_meta_only` | Fix paths                                      |
+| `show_score_and_root_cause_issues`              | Dashboard > SEO card                           |
+| `human_edit_at_destination`                     | Open the exact Editor/settings destination     |
+| `seller_action_at_destination`                  | Enable, publish, or set up at the owning surface |
+| `ai_fix_all_meta_only`                          | Existing F03 metadata fix flow                 |
+| `platform_maintains_signal`                     | No seller issue row or CTA                     |
 | `end_local_seo_ready`                           | Seller done for this cycle                     |
 
 
@@ -224,18 +231,20 @@ flowchart TB
 
 
 
-### US-F37-04: Score, checklist, fix loop
+### US-F37-04: Score, issues, fix loop
 
-**Path:** `evaluate_metadata_content_and_technical_health → calc_local_seo_score_100 → show_score_and_checklist_dashboard_seo → fix_loop → human_edit | ai_fix_all → calc_score → end_local_seo_ready`
-**Story:** As an SME seller, I want one SEO Health score and up to three next actions so that I know what to edit in the Editor (or use F03 AI Fix All only for meta) to improve the score.
+**Path:** `evaluate_metadata_content_and_technical_health → calc_local_seo_score_100 → show_score_and_root_cause_issues → fix_loop → human_edit | seller_action | ai_fix_all | platform_auto → calc_score → end_local_seo_ready`
+**Story:** As an SME seller, I want one SEO Health score and a compact list of unresolved root causes so that I can use AI only for metadata and reach the exact destination for every seller-owned fix.
 
 **AC**
 
-- **Happy — AC-01:** GIVEN a site with all score criteria met WHEN seller opens Dashboard > SEO THEN the single SEO Health score is 100 AND checklist has zero incomplete high-priority items.
-- **Edge — AC-02:** GIVEN an eligible record lacks meta title or description, or F03 reports a content/technical issue WHEN score runs THEN only the matching Technical Health sub-score loses points AND the checklist offers AI Fix for metadata or an Editor action for content/technical issues.
+- **Happy — AC-01:** GIVEN a site with all score criteria met WHEN seller opens Dashboard > SEO THEN the single SEO Health score is 100 AND SEO Issues shows All clear.
+- **Edge — AC-02:** GIVEN unresolved metadata and seller-owned issues WHEN score runs THEN each root cause appears once with an `AI` or `You` badge AND its approved CTA and destination.
 - **Error — AC-03:** GIVEN score API unauthorized WHEN client requests score THEN 401/403 is returned AND Dashboard shows error state without inventing a score number.
-- **Happy — AC-04:** GIVEN checklist item for missing Local Business field WHEN seller clicks the action THEN Editor opens focused on the relevant Settings section.
-- **Edge — AC-05:** GIVEN missing page meta only WHEN seller runs F03 AI Fix All THEN page meta is proposed/applied AND Local Business fields are unchanged.
+- **Happy — AC-04:** GIVEN an issue for a missing Local Business field WHEN seller clicks Edit THEN Editor opens focused on the owning Settings section.
+- **Edge — AC-05:** GIVEN at least one missing title or description WHEN seller runs F03 AI Fix All THEN only those metadata records are proposed/applied AND Local Business fields are unchanged.
+- **Edge — AC-06:** GIVEN multiple score metrics depend on one missing source field WHEN issues render THEN the seller sees one root-cause row, not duplicate rows for derived schema metrics.
+- **Edge — AC-07:** GIVEN no AI-fixable metadata issue remains WHEN issues render THEN the AI Fix All strip is hidden.
 
 
 
@@ -247,7 +256,7 @@ flowchart TB
 | US-F37-01 | fill_minimal → incomplete           | AC-01..03 | FR-01..03 |
 | US-F37-02 | enrich_schema → emit_jsonld         | AC-01..04 | FR-04..11 |
 | US-F37-03 | crawlers → publish → sitemap/llms   | AC-01..03 | FR-12..14 |
-| US-F37-04 | technical → score → dashboard → fix | AC-01..05 | FR-15..21 |
+| US-F37-04 | technical → score → dashboard → fix | AC-01..07 | FR-15..21 |
 
 
 
@@ -276,8 +285,8 @@ flowchart TB
 | FR-17 | F03 Content Quality MUST load real page layouts and scale its 0–100 result to 0–8 points                                                             | US-F37-04 | P0       |
 | FR-18 | Technical SEO MUST award 3 points for Google verification plus up to 3 for indexable eligible pages                                                | US-F37-04 | P0       |
 | FR-19 | `calculateLocalSeoScore` MUST implement §5 exactly; API returns score + four-bucket breakdown                                                        | US-F37-04 | P0       |
-| FR-20 | Existing Dashboard `SeoHealth` MUST become the single score card, showing §5 score + ≤3 actions sorted by point gain                               | US-F37-04 | P0       |
-| FR-21 | Checklist MUST NOT claim AI can fix Local Business, schema, content, or technical issues; AI Fix All remains metadata-only (F03)                  | US-F37-04 | P0       |
+| FR-20 | Existing Dashboard `SeoHealth` MUST show one score, four compact bucket bars, and all unresolved root-cause issues in a two-column desktop grid; no per-issue point values | US-F37-04 | P0       |
+| FR-21 | Every issue MUST use the actor, CTA, and destination in §12.3; AI Fix All remains metadata-only and appears only while an AI-fixable issue exists | US-F37-04 | P0       |
 
 
 
@@ -318,7 +327,7 @@ flowchart TB
 > `/editor/[siteId]` (`src/app/(editor)/editor/[siteId]/page.tsx`) → right **SettingsPanel**  
 > (`src/components/editor/SettingsPanel.tsx`, desktop width `SETTINGS_PANEL_WIDTH = 320`).  
 > Compact: same panel inside `EditorToolsSheet` / `CompactEditorLayout`.  
-> Dashboard only **reads** score/checklist and hosts existing `SeoTools` (AI crawlers).  
+> Dashboard reads score/issues and hosts existing `SeoTools` (AI crawlers).
 > Wireframes: low-fi, no score chips inside form chrome, mobile noted where layout changes.
 
 
@@ -502,35 +511,63 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 **Interactions**
 
 - Load the authoritative §5 score on section render; do not show the old F03 score separately.
-- Show four bucket bars as earned points / bucket maximum, not percentages.
-- Sort next actions by highest available point gain; show at most three.
-- Checklist item CTA → deep-link Editor: `/editor/[siteId]` + Settings tab/section (`requestedTab` pattern already used for breadcrumb/footer).
-- Metadata action → existing F03 AI Fix flow. Every other action → Editor.
+- Remove the non-functional Score History placeholder. Use its space for four compact bucket bars in a 2×2 desktop grid; show qualitative status, not bucket point values.
+- Show only unresolved root causes. Hide completed checks and deduplicate derived metrics that share one source field.
+- Desktop issues use the existing two-column row pattern; mobile collapses to one column. Sort by score impact internally without showing point gain/loss.
+- Each row shows one owner badge: `AI` for metadata or `You` for seller-owned data/actions.
+- Metadata `Fix` opens the existing F03 AI Fix modal filtered to the affected field. Show `Fix all with AI` only when at least one AI-fixable metadata issue exists.
+- `Edit`, `Set up`, `Enable`, and `Publish` use the destination contract below. Platform-managed signals do not create seller issue rows.
 - Retry on error. Never invent a score number.
 
 **Success**
 
 ```text
-┌ SEO Health ─────────────────────────────────────────────────────┐
-│  ┌─────────┐   Business Data             14/20  ███████░░░     │
-│  │   62    │   Schema                    23/35  ███████░░░     │
-│  │  /100   │   AI Discoverability         7/15  █████░░░░░     │
-│  └─────────┘   Technical Health          18/30  ██████░░░░     │
-│                                                                │
-│  Next actions                                       3 remaining │
-│  Add opening hours                         +5  [ Open Editor ]  │
-│  Add map location                          +4  [ Open Editor ]  │
-│  Add meta description                      +3  [ Fix with AI ]  │
-└────────────────────────────────────────────────────────────────┘
+┌ SEO Health ───────────────────────────────────────────────────────────┐
+│  ┌─────────┐   Business Data        ██████░░  Needs work             │
+│  │   67    │   Schema               ████░░░░  Needs work             │
+│  │  /100   │   AI Discoverability   ████████  Good                   │
+│  └─────────┘   Technical Health     █████░░░  Needs work             │
+├──────────────────────────────────────────────────────────────────────┤
+│ ✦ AI can fix 2 issues automatically              [ Fix all with AI ] │
+├──────────────────────────────────────────────────────────────────────┤
+│ SEO issues                                                   6 open  │
+│ [AI]  3 meta descriptions missing [Fix] │ [YOU] Address incomplete [Edit] │
+│ [AI]  2 meta titles missing       [Fix] │ [YOU] Opening hours      [Edit] │
+│ [YOU] Map location missing       [Edit] │ [YOU] Crawlers off     [Enable] │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 `SeoTools` remains a separate existing card below this unified score card.
 
-**Empty (new site)** — earned score + highest-impact incomplete actions only.
-**Loading** — skeleton for gauge, four bars, and actions; no number.
+#### Root-cause action contract
+
+| Score metric(s) | Root-cause issue | Owner | CTA | Destination / behavior |
+|---|---|---|---|---|
+| Name | Store name missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=brand` |
+| Address + LocalBusiness JSON-LD | Business address incomplete | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=address` |
+| Phone + schema telephone | Phone number missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=contact&focus=phone` |
+| Schema subtype | Business subtype missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=schemaSubtype` |
+| Opening hours | Opening hours missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=openingHours` |
+| Geo | Map location missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=map` |
+| URL | Primary domain missing | You | Set up | `/settings/domains` |
+| Price range | Price range missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=priceRange` |
+| Organization | No separate issue | System | — | Auto-emitted from valid Brand data; missing Brand remains the root issue |
+| AI crawlers | AI crawlers disabled | You | Enable | One-click enable; `#section-seo-tools` reflects the new state |
+| Sitemap + llms.txt | Store unpublished | You | Publish | `/editor/[siteId]?publish=1`; do not create two derived issue rows |
+| Meta title | Meta titles missing | AI | Fix | Existing AI Fix modal filtered to title |
+| Meta description | Meta descriptions missing | AI | Fix | Existing AI Fix modal filtered to description |
+| Content headings / depth / contact | Content needs improvement | You | Edit | `/editor/[siteId]?pageId=[pageId]` → affected page canvas |
+| Image alt | Product images missing alt text | You | Edit | `/products/[productId]` |
+| Google verification | Search verification missing | You | Set up | **NEW field:** `/editor/[siteId]?settingsTab=seo&section=searchVerification` |
+| Indexability | No seller issue | System | — | Platform maintains indexability; platform failure is operational, not a seller task |
+
+`pageId` and `publish=1` reuse existing Editor query behavior. `settingsTab`, `section`, and `focus` are the target extension of the current `requestedTab` mechanism; an issue CTA MUST NOT ship until its destination opens and focuses correctly.
+
+**Empty (new site)** — earned score + all unresolved root-cause issues.
+**Loading** — skeleton for gauge, four bars, AI strip, and issues; no number.
 **Error** — message + Retry; no score or stale breakdown.
-**Complete (100)** — four full bars + “All clear”; no actions.
-**Mobile 375** — gauge → four bars → actions; each CTA full width and ≥44px height.
+**Complete (100)** — four full bars + “All clear”; no AI strip or issue rows.
+**Mobile 375** — gauge → four bars → conditional AI strip → one-column issues; each CTA full width and ≥44px height.
 
 ---
 
@@ -572,9 +609,11 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | F03 Content Quality wiring | `getSeoData()` must load real page layouts before scaling `contentQualityScore`; the current page query omits layout data |
 | Subtype mapping freshness | Keep the category→subtype mapping as a versioned code snapshot; refresh it against Google + Schema.org during implementation and future SEO maintenance, never at request time |
 | Domain setup UX | Schema `url` points depend on existing `Sites.domain` flows |
-| Dual checklist confusion | Editor `CompletionChecklist` (address / hours / category only) ≠ Dashboard SEO Health actions (max 3 from score engine). Copy and placement must stay distinct |
-| Deep-link targets | Checklist CTA → Editor Settings. **Chốt:** query `?settingsTab=global&section=localBusiness` (SEO: `settingsTab=seo`); reuse `requestedTab` pattern in `SettingsPanel` / editor page |
-| F22 events | Funnel metric for checklist→Editor if event pipeline ready; else measure later |
+| Dual-list confusion | Editor `CompletionChecklist` (address / hours / category only) ≠ Dashboard SEO Issues (unresolved score root causes). Copy and placement must stay distinct |
+| Deep-link targets | Issue CTA → the exact destination in §12.3. Extend the existing `requestedTab` pattern with stable section/focus targets; never land the seller at a generic Editor home |
+| Google verification destination | Add the approved seller field at Editor → Settings → SEO → Search verification; do not ship its issue row before the destination exists |
+| Platform-managed metrics | Organization and indexability never create seller tasks; monitor platform failures operationally |
+| F22 events | Funnel metric for issue CTA→destination if event pipeline ready; else measure later |
 
 
 
@@ -587,23 +626,25 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 
 - [x] Mermaid approved (2026-07-21)
 - [x] Score table locked (§5)
-- [x] Scope locked: one SEO Health score + Editor data + Dashboard actions/tools on tenant storefront path
-- [x] Deep-link contract: `?settingsTab=global&section=localBusiness` · `?settingsTab=seo` (reuse `requestedTab`)
+- [x] Scope locked: one SEO Health score + Editor data + Dashboard root-cause issues/tools on tenant storefront path
+- [x] Actor/CTA/destination contract locked in §12.3
 - [ ] Eng capacity for score rewire + existing Dashboard `SeoHealth` replacement
 
 ### Definition of Done
 
 - [ ] Every AC in §7 passes (manual or automated)
 - [ ] Unit tests: `calculateLocalSeoScore` matches §5 point-for-point
-- [ ] E2E: unified Dashboard SEO Health card loads score; action deep-link opens Editor Settings section
+- [ ] E2E: unified Dashboard SEO Health card loads score; every issue CTA reaches or performs the §12.3 destination/behavior
 - [ ] Storefront emits LocalBusiness / Org per FR-04..11
 - [ ] Category→subtype dropdown filters correctly; invalid pairs fail server validation; emitted `@type` matches the saved subtype
 - [ ] robots / sitemap / llms per FR-12..14
-- [ ] Dashboard score + checklist per FR-19..21
-- [ ] Dual checklist copy distinct (Editor form vs Dashboard score)
+- [ ] Dashboard score + root-cause issues per FR-19..21
+- [ ] AI Fix All hidden when no metadata issue is AI-fixable
+- [ ] Derived metrics deduplicated; Organization/indexability create no seller issue rows
+- [ ] Editor checklist and Dashboard SEO Issues copy remain distinct
 - [ ] NFRs §10 met
 - [ ] Behavior matches §6.1 Mermaid
-- [ ] Docs/stories aligned with this PRD v2.0
+- [ ] Docs/stories aligned with this PRD v2.5
 
 ---
 
@@ -618,6 +659,6 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | Business fields scored | name, address, phone only                                                          |
 | Schema                 | Every emitted property in §5 has points                                            |
 | Technical              | Meta title 8 · meta description 8 · Content Quality 8 · Technical SEO 6           |
-| Surfaces               | Editor for data; one Dashboard `SeoHealth` card for score/actions; `SeoTools` for toggles |
+| Surfaces               | Editor for data; one Dashboard `SeoHealth` card for score/root-cause issues; `SeoTools` for toggles |
 | Engine files           | `local-seo-score.ts`, `seo-data.ts`, `content-score.ts`, `technical-score.ts`      |
 |                        |                                                                                    |

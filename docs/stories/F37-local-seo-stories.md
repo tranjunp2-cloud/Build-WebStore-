@@ -232,8 +232,8 @@ F37 replaces the existing F03 score contents. Dashboard shows one SEO Health sco
 
 ```
 As a   chủ shop SME không rành kỹ thuật
-I want một điểm SEO Health và danh sách "Việc cần làm" ưu tiên rõ ràng
-So that tôi biết chính xác phải làm gì tiếp theo để khách tìm thấy mình
+I want một điểm SEO Health và danh sách root-cause issues có actor + CTA rõ ràng
+So that tôi biết AI xử lý được gì và mình phải sửa ở đâu
 ```
 
 ### Acceptance Criteria
@@ -244,35 +244,38 @@ So that tôi biết chính xác phải làm gì tiếp theo để khách tìm th
 GIVEN site còn thiếu các signal trong scorecard F37 §5
 WHEN  vào `Dashboard > SEO`
 THEN  một SEO Health Score hiển thị đúng tổng điểm đã earn
-  AND actions hiển thị tối đa 3 items, xếp theo điểm tăng
+  AND bốn bucket bars hiển thị dạng 2×2 mà không hiện điểm bucket
+  AND unresolved root causes hiển thị trong SEO Issues, không lặp derived metrics
+  AND mỗi issue có badge AI/You, CTA và destination đúng theo F37 PRD §12.3
 
 GIVEN seller hoàn thành địa chỉ cấu trúc + giờ mở cửa + bật AI crawlers (Phase 1)
 WHEN  hệ thống tính lại score
 THEN  SEO Health Score tăng tương ứng các hạng mục đã earn
-  AND số items High priority (không phụ thuộc GBP) = 0
+  AND các root-cause issues tương ứng biến mất
 ```
 
 #### AC-2: One-click fix
 
 ```gherkin
-GIVEN seller thấy checklist item "Bật AI crawlers" trạng thái Chưa hoàn thành
-WHEN  click nút "Bật ngay"
+GIVEN seller thấy issue "AI crawlers disabled" với badge You
+WHEN  click nút "Enable"
 THEN  toggle "Cho phép AI crawlers" tự động bật
   AND robots.txt của storefront cập nhật ngay
-  AND checklist item đổi sang ✓ Done và Score tăng tương ứng
+  AND issue biến mất và Score tính lại
 ```
 
 ### Additional Criteria
 
 - [ ] Công thức: Business Data 20 / Schema 35 / AI Discoverability 15 / Technical Health 30 — xem F37 PRD §5
 - [ ] Score tính lại khi seller thay đổi signal thuộc §5; PostHog website analytics không ảnh hưởng score
-- [ ] Checklist tối đa 3 items, ẩn item đã done (BR-10)
+- [ ] Chỉ unresolved root causes hiển thị; completed, derived duplicates, Organization và indexability không tạo seller issue
+- [ ] AI Fix All chỉ hiển thị khi còn title/description issue AI-fixable
 - [ ] Pure function `src/lib/seo/local-seo-score.ts` (mới)
-- [ ] Mỗi item: mô tả seller-friendly, impact label, nút action
+- [ ] Mỗi issue: seller-friendly copy, badge AI/You, CTA và destination theo PRD §12.3; không hiển thị điểm cộng/trừ
 
 ### Analytics / Tracking Notes
 
-- Track `local_seo_checklist_completed` với property `item_id` (F22).
+- Track `local_seo_issue_action_clicked` với `item_id`, `actor`, `cta`, và `destination` khi F22 sẵn sàng.
 
 ### Definition of Done
 
@@ -393,7 +396,7 @@ THEN  hiển thị data từ cache (nếu cache < 6h) + banner "Đang dùng dữ
 GIVEN screen width < 768px
 WHEN  seller vào `Dashboard > SEO`
 THEN  Google activity cards xếp 1 cột hoặc 2 cột theo pattern dashboard hiện có
-  AND checklist items full width, touch target ≥ 44px
+  AND SEO issue rows xếp một cột; CTA full width, touch target ≥ 44px
   AND không có horizontal overflow
 ```
 
@@ -433,7 +436,7 @@ So that thông tin doanh nghiệp nhất quán, tăng độ tin cậy với Goog
 GIVEN seller đã connect GBP và GBP listing có SĐT khác Sites.contactInfo.phone
 WHEN  hệ thống chạy business info difference check (sau khi GBP connected hoặc sau khi save site settings)
 THEN  `Settings > Business Info` hiển thị "Phone number is different"
-  AND checklist trong `Dashboard > SEO` có item dẫn về Business Info
+  AND SEO Issues trong `Dashboard > SEO` có root-cause item dẫn về Business Info
   AND Local SEO Score trừ 10 điểm cho inconsistency
 ```
 
@@ -443,7 +446,7 @@ THEN  `Settings > Business Info` hiển thị "Phone number is different"
 GIVEN Name/Address/Phone khớp giữa Sites record và GBP
 WHEN  business info difference check chạy
 THEN  không hiển thị warning trong `Settings > Business Info`
-  AND không có checklist item về business info differences
+  AND không có SEO issue về business info differences
 ```
 
 ### Additional Criteria
@@ -455,7 +458,7 @@ THEN  không hiển thị warning trong `Settings > Business Info`
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Business info differences surface đúng trong Business Info và checklist
+- [ ] Business info differences surface đúng trong Business Info và SEO Issues
 
 ---
 

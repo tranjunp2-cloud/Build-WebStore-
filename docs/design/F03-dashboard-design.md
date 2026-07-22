@@ -31,10 +31,10 @@ Tài liệu này cung cấp wireframe thô (ASCII / cấu trúc text) để minh
                               | 
 - Order #1002 từ [John Doe]   |  Điểm SEO: [ 75/100 ] (Circle Chart)
   (Pending - RM 250)    [->]  |
-                              |  [Warning] Thiếu Meta Title ở 5 sản phẩm
-- Order #1001 từ [Jane]       |  [Warning] Cần tối ưu hình ảnh
+                              |  [AI] Thiếu Meta Title ở 5 sản phẩm       [Fix]
+- Order #1001 từ [Jane]       |  [You] Cần tối ưu hình ảnh                [Edit]
   (Pending - RM 150)    [->]  |
-                              |  [ ✨ AI Fix All Issues ] (Button bật Modal)
+                              |  [ ✨ Fix all with AI ] (chỉ hiện khi còn metadata issue)
 [ View all Orders ->        ] |
 ```
 
@@ -77,8 +77,9 @@ Dashboard         [ Filter: 7 days v ]
 
 [ SEO Health Widget ]
 Điểm SEO: [ 75/100 ]
-Thiếu Meta title, Chưa tối ưu ảnh...
-[ ✨ AI Fix All Issues ]
+[AI] Thiếu Meta title [Fix]
+[You] Chưa tối ưu ảnh [Edit]
+[ ✨ Fix all with AI ] — conditional
 ```
 
 ---
@@ -120,17 +121,19 @@ Thiếu Meta title, Chưa tối ưu ảnh...
 
 ```text
 [ Dashboard ] > [ SEO Dashboard ]
-┌ SEO Health ─────────────────────────────────────────────────────┐
-│  ┌─────────┐   Business Data             14/20  ███████░░░     │
-│  │   62    │   Schema                    23/35  ███████░░░     │
-│  │  /100   │   AI Discoverability         7/15  █████░░░░░     │
-│  └─────────┘   Technical Health          18/30  ██████░░░░     │
-│                                                                │
-│  Next actions                                       3 remaining │
-│  Add opening hours                         +5  [ Open Editor ]  │
-│  Add map location                          +4  [ Open Editor ]  │
-│  Add meta description                      +3  [ Fix with AI ]  │
-└────────────────────────────────────────────────────────────────┘
+┌ SEO Health ───────────────────────────────────────────────────────────┐
+│  ┌─────────┐   Business Data        ██████░░  Needs work             │
+│  │   67    │   Schema               ████░░░░  Needs work             │
+│  │  /100   │   AI Discoverability   ████████  Good                   │
+│  └─────────┘   Technical Health     █████░░░  Needs work             │
+├──────────────────────────────────────────────────────────────────────┤
+│ ✦ AI can fix 2 issues automatically              [ Fix all with AI ] │
+├──────────────────────────────────────────────────────────────────────┤
+│ SEO issues                                                   6 open  │
+│ [AI]  3 meta descriptions missing [Fix] │ [YOU] Address incomplete [Edit] │
+│ [AI]  2 meta titles missing       [Fix] │ [YOU] Opening hours      [Edit] │
+│ [YOU] Map location missing       [Edit] │ [YOU] Crawlers off     [Enable] │
+└──────────────────────────────────────────────────────────────────────┘
 
 [ SEO Automation ]
 Sitemap [ Resubmit ]  Auto Meta [ ON ]  AI Crawlers [ ON ]
@@ -144,6 +147,13 @@ Sitemap [ Resubmit ]  Auto Meta [ ON ]  AI Crawlers [ ON ]
 | (Empty slot)        |                |       |          |
 | (Empty slot)        |                |       |          |
 ```
+
+**SEO Health interaction contract:**
+
+- Remove the Score History placeholder; use the space for four compact 2×2 bucket bars without numeric bucket points.
+- Show unresolved root causes only, in the existing two-column issue grid; never duplicate downstream schema metrics that share one missing field.
+- `AI` rows use `Fix`; `You` rows use `Edit`, `Set up`, `Enable`, or `Publish` and open/perform the exact destination defined in F37 PRD §12.3.
+- Show `Fix all with AI` only while at least one title/description issue is AI-fixable. Mobile collapses issue rows to one column.
 
 ---
 
@@ -189,9 +199,9 @@ Thay vì kéo thả khó thao tác trên di động, mobile sử dụng nút Lê
 +---------------------------------------+
 ```
 
-### 4.3 Quá trình AI SEO Fix All (SSE Streaming)
+### 4.3 Quá trình AI SEO Fix All — metadata only (SSE Streaming)
 
-Khi click `[ ✨ AI Fix All Issues ]` từ Overview hoặc SEO Dashboard:
+Khi còn title/description issue và seller click `[ ✨ Fix all with AI ]` từ Overview hoặc SEO Dashboard:
 
 ```text
 +-------------------------------------------------------------+
@@ -202,8 +212,8 @@ Khi click `[ ✨ AI Fix All Issues ]` từ Overview hoặc SEO Dashboard:
 |                                                             |
 | - [x] Tạo Meta Title cho 12 sản phẩm                        |
 | - [x] Tối ưu Meta Description cho trang chủ                 |
-| - [ ] Đang thêm Alt Text cho hình ảnh... (Streaming)        |
-| - [ ] Cập nhật tốc độ tải trang...                          |
+| - [ ] Tạo Meta Title cho blog posts... (Streaming)          |
+| - [ ] Tối ưu Meta Description cho sản phẩm...               |
 |                                                             |
 | (Vui lòng không đóng cửa sổ này, quá trình mất khoảng 15s)  |
 |                                     [ Dừng (Cancel) ]       |
@@ -258,11 +268,11 @@ Khi bỏ Tab, người dùng tiếp cận thông tin bằng **scroll**. Thứ t�
 │    [ Pages | Blogs | Referrers | Products(Soon) ]                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │ ④ SEO HEALTH & OPTIMIZATION  (#section-seo-health)                   │  ← ỔN ĐỊNH hơn (theo chu kỳ)
-│    [ Gauge 75/100 | SEO History (placeholder) ]  · 3 progress bars   │     → tối ưu định kỳ, ko cần
-│    ✨ AI Fix All · footer: preview lỗi nghiêm trọng nhất             │     đập mắt mỗi lần vào
+│    [ Gauge 75/100 | 4 bucket bars 2×2 ] · SEO Issues 2 columns       │     → tối ưu định kỳ, ko cần
+│    Conditional AI strip · issue rows with AI/You + destination CTA   │     đập mắt mỗi lần vào
 ├─────────────────────────────────────────────────────────────────────┤
 │ ⑤ SEO ACTION TOOLS  (#section-seo-tools)                             │  ← hạ tầng kỹ thuật (ít đổi)
-│    Sitemap & Meta · SEO Issues List · Keyword Tracker (placeholder)  │
+│    Sitemap & Meta · AI Crawlers · Keyword Tracker (placeholder)      │
 ├─────────────────────────────────────────────────────────────────────┤
 │ ⑥ Pending Orders (OFF mặc định — F10, bật qua Customize)            │  ← cuối cùng
 └─────────────────────────────────────────────────────────────────────┘

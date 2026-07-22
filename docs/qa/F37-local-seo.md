@@ -1,7 +1,7 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 2.9 | **Updated:** 2026-07-22 | **Owner:** QA Team
-> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.4
+> **Version:** 3.0 | **Updated:** 2026-07-22 | **Owner:** QA Team
+> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.5
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
@@ -173,11 +173,14 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-04-07** | §5 | Func | Engine — Business Data 7/8/5 | target engine `[NOT-BUILT]` | Name + address + phone total exactly 20. | Bucket đúng |
 | **TC-F37-04-08** | §5 | Func | Engine — Schema totals 35 | target engine `[NOT-BUILT]` | Eight approved schema signals total exactly 35. | Bucket đúng |
 | **TC-F37-04-09** | §5 | Func | Engine — four buckets sum exactly 100 | target engine `[NOT-BUILT]` | Business 20 + Schema 35 + AI 15 + Technical 30 = total. | No-drift rule |
-| **TC-F37-04-10** | AC-1 | Func | **[NOT-BUILT]** Incomplete site → earned score + ≤3 actions | pending unified widget | No fabricated score; actions sorted by point gain. | US-04 core UI |
-| **TC-F37-04-11** | AC-2 | Func | **[NOT-BUILT]** One-click "Bật ngay" AI crawler → toggle + robots.txt + item Done + score↑ | pending (phụ thuộc US-03) | Full chain 1-click fix. | US-04 core UI |
-| **TC-F37-04-12** | FR-20 | Func | **[NOT-BUILT]** Actions tối đa 3 item, ẩn item done | pending unified widget | ≤3; done bị ẩn. | UX actions |
+| **TC-F37-04-10** | AC-1 / FR-20 | Func | **[NOT-BUILT]** Unified KISS layout | pending unified widget | One gauge; no Score History; four bucket bars in a 2×2 desktop grid without bucket point values; SEO Issues uses the existing two-column row pattern. | US-04 core UI |
+| **TC-F37-04-11** | AC-2 | Func | **[NOT-BUILT]** One-click Enable AI crawler | pending (phụ thuộc US-03) | `You` issue + Enable CTA updates the toggle and robots.txt, removes the issue, and recalculates score. | US-04 core UI |
+| **TC-F37-04-12** | FR-20 / FR-21 | Func | **[NOT-BUILT]** Actor, CTA, and destination contract | pending unified widget | Every unresolved seller issue uses `AI` or `You` and the matching Fix/Edit/Set up/Enable/Publish behavior from PRD §12.3; completed issues are hidden. | Action clarity |
 | **TC-F37-04-13** | FR-19 | Func | Score recalc khi seller thay đổi signal thuộc §5 | integration | Save → recompute; PostHog analytics không ảnh hưởng score. | Freshness |
 | **TC-F37-04-14** | AC-1 | Func | `completion-checklist.tsx` — addressDone cần đủ 4 field, hoursDone predicate | component `[UNTESTED]` | addressDone chỉ khi street+city+state+postcode; hoursDone khi có ≥1 ngày mở. | US-01 indicator đúng |
+| **TC-F37-04-16** | AC-05 / AC-07 | Func | **[NOT-BUILT]** Conditional AI Fix strip | pending unified widget | Strip and Fix All show only when at least one title/description issue is AI-fixable; Fix opens the existing modal filtered to the affected field; Local Business data is unchanged. | Prevents false AI capability |
+| **TC-F37-04-17** | AC-06 | Func | **[NOT-BUILT]** Root-cause deduplication | target issue derivation | Missing address creates one Address issue, not separate Address + LocalBusiness rows; missing phone creates one Phone issue, not Phone + schema telephone rows; unpublished creates one Publish issue, not Sitemap + llms.txt rows. | KISS issue list |
+| **TC-F37-04-18** | FR-21 | Func | **[NOT-BUILT]** Platform-managed metrics create no seller task | target issue derivation | Organization and indexability never render AI/You issue rows; Google verification renders Set up only after its Editor SEO destination exists. | No dead-end CTA |
 
 ## 3.9 US-F37-09: Malaysia Market Optimization **[PARTIAL — geo built, Waze/Halal NOT built]**
 
@@ -200,7 +203,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-09-13** | AC-18 | Edge | **[NOT-BUILT]** Thiếu lat HOẶC lng → KHÔNG render Waze button (BR-16) | pending | Không href rỗng. | Không link vỡ |
 | **TC-F37-09-14** | AC-19 | Func | **[NOT-BUILT]** Halal ON → badge + JSON-LD `additionalProperty` PropertyValue "Halal Certified" + JAKIM `sameAs` | pending | Badge render + schema property + cert/sameAs khi có số cert. | Halal signal |
 | **TC-F37-09-15** | AC-19 | Func | **[NOT-BUILT]** Halal OFF → KHÔNG badge, KHÔNG additionalProperty | pending | Vắng cả 2. | Toggle sạch |
-| **TC-F37-09-16** | AC-14 | Func | Mobile 375px — checklist ≤3 full-width, touch ≥44px, no overflow | responsive | Không tràn ngang, target đủ lớn. | Mobile UX |
+| **TC-F37-09-16** | AC-14 | Func | Mobile 375px — SEO issues one column, CTA ≥44px, no overflow | responsive | Gauge → four bars → conditional AI strip → one-column issues; no horizontal overflow; action targets are full-width and ≥44px. | Mobile UX |
 
 ---
 
@@ -475,7 +478,7 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 > Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
 
 1. **🔴 robots.txt spec conflict (US-03, BLOCKER):** `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03/BR-03 "default ALLOW". Score engine cũng hardcode `allowsSearchBots: false`. **PM chốt:** default-allow (theo spec) hay giữ block-list? → quyết TC-F37-03-01/09. Toàn US-03 (llms.txt + per-site toggle) chưa build.
-2. **US-04 checklist widget chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng widget checklist one-click-fix (US-04 core, AC-1/AC-2) chưa implement → TC-04-10/11/12 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
+2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe chưa implement → TC-04-10..12/16..18 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
 4. **Technical Health rewire (US-04):** Code còn placeholder CWV/mobile/HTTPS → phải thay bằng metadata coverage + F03 Content Quality + verification/indexability trước khi surface score cho seller.
 5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.

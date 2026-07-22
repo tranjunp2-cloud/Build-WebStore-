@@ -213,6 +213,16 @@ The score engine must be rewired to this contract before the unified Dashboard s
 - **AI Discoverability:** tenant crawler toggle, published sitemap, and reachable llms.txt
 - **Technical Health:** eligible metadata coverage, F03 Content Quality, Google verification, and indexable eligible pages
 
+### Dashboard issue derivation (target)
+
+- Extend the existing `SeoData.issues` contract; do not introduce a second checklist API or card.
+- Derive issues from missing **root fields**, then sort internally by score impact. Do not expose or render point gain/loss per row.
+- One root field produces one issue even when it affects multiple score metrics: address→Address + LocalBusiness, phone→Phone + schema telephone, unpublished→Sitemap + llms.txt.
+- Metadata title/description issues use owner `AI` and the existing filtered AI Fix modal. Seller-owned issues use owner `You` plus `Edit`, `Set up`, `Enable`, or `Publish` from PRD §12.3.
+- Organization and indexability are platform-managed and never enter the seller issue list.
+- `Fix all with AI` visibility is derived from `issues.some(issue => issue.owner === 'AI')`; it must not depend on total issue count.
+- Google verification may enter the issue list only after Editor → Settings → SEO exposes the approved Search verification destination.
+
 ### Exported Types (API Surface)
 
 **From `src/lib/seo/json-ld.ts`:** Phase 05 made 3 symbols public (previously internal to JSON-LD generators):
@@ -293,14 +303,14 @@ Formalizes 12 TC-IDs with Acceptance Criteria (AC) / Functional Requirement (FR)
 - **Phase 04 (JSON-LD Emission):** Covered above.
 - **Phase 05 (Scoring):** Covered above.
 - **Phase 06 (Testing):** Covered above. 34 unit tests, permanent TC-ID-tagged coverage for all behaviors.
-- **US-F37-04 (Dashboard):** Not yet implemented. Will consume `GET /api/sites/[siteId]/local-seo-score` to display score + checklist widget.
+- **US-F37-04 (Dashboard):** Not yet implemented. Will consume the authoritative score and extend existing `SeoHealth` with four compact bucket bars plus root-cause SEO Issues.
 - **F01 AI Gen:** Shares `src/lib/seo/schema-helpers.ts` mappings for AI-gen categories (read-only; no overlap with F37).
 
 ## Open Questions / Future Work
 
 - **Phase 06 (QA):** Permanent test coverage for Phase 04 JSON-LD behaviors + Phase 05 route integration.
 - **Technical Health:** rewire the legacy F37 engine to the canonical 30-point contract before the unified Dashboard score ships.
-- **US-F37-04 (Local SEO Dashboard):** Consumer UI for score + actionable checklist.
+- **US-F37-04 (Local SEO Dashboard):** Consumer UI for score + actor/CTA/destination-aware root-cause issues.
 - **Multi-language support:** Checklist items + improvement hints (Phase 06+).
 - **Structured data testing:** Google Search Console + Rich Results Test can validate emitted JSON-LD after deployment.
 
