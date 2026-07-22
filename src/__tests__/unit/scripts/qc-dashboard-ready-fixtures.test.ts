@@ -45,6 +45,7 @@ describe('[TC-GH1432-QC-01] QC dashboard-ready fixtures', () => {
       membershipRole: 'owner',
       plan: 'STARTER_NON_TM_USER',
       dashboardReady: true,
+      loadTestEligible: true,
     }
 
     // Act
@@ -75,6 +76,7 @@ describe('[TC-GH1432-QC-01] QC dashboard-ready fixtures', () => {
       membershipRole: 'owner',
       plan: 'STARTER_NON_TM_USER',
       dashboardReady: false,
+      loadTestEligible: false,
     }
 
     // Act
@@ -84,5 +86,21 @@ describe('[TC-GH1432-QC-01] QC dashboard-ready fixtures', () => {
     // Assert
     expect(userData.has_seen_ai_wizard).toBe(false)
     expect(tenantData.onboardingCompleted).toBe(false)
+  })
+
+  it('keeps suspended state fixtures out of the VU credential pool', () => {
+    // Arrange
+    const users = buildUsers(5)
+    const tenants = buildTenants(5)
+
+    // Act
+    const eligibleTenants = tenants.filter((tenant) => tenant.loadTestEligible)
+    const suspendedTenant = tenants.find((tenant) => tenant.status === 'suspended')
+    const suspendedOwner = users.find((user) => user.email === suspendedTenant?.ownerEmail)
+
+    // Assert
+    expect(eligibleTenants.every((tenant) => tenant.status !== 'suspended')).toBe(true)
+    expect(suspendedTenant?.loadTestEligible).toBe(false)
+    expect(suspendedOwner?.loadTestEligible).toBe(false)
   })
 })

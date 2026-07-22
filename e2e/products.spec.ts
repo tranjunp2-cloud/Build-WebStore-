@@ -24,6 +24,19 @@ test.describe('Products Management', () => {
         }
     })
 
+    test('[TC-GH1432-PERF-03] canonical dashboard products endpoint is available to the signed-in owner', async ({ request }) => {
+        // Arrange — authenticated storage state comes from auth.setup.ts.
+
+        // Act
+        const response = await request.get('/api/dashboard/products')
+        const body = await response.json()
+
+        // Assert
+        expect(response.status()).toBe(200)
+        expect(body.success).toBe(true)
+        expect(Array.isArray(body.data)).toBe(true)
+    })
+
     test('[TC-F08.01] products page loads with list or empty state', async ({ page }) => {
         await navigateTo(page, '/products')
         await expectPageLoaded(page)

@@ -59,7 +59,7 @@ Seeded by `npm run db:seed-qc` (see `scripts/seed-qc-data.ts`).
 | Role | Email pattern | Count |
 |------|--------------|-------|
 | Super admin | `qc-admin-{1,2}@primeweb.local` | 2 |
-| Tenant owner | `qc-owner-{1..5}@primeweb.local` | 5 |
+| Tenant owner | `qc-owner-{1..5}@primeweb.local` | 5 seeded / 4 VU-eligible |
 | Editor | `qc-staff-{1,2}@primeweb.local` | 2 |
 | Viewer | `qc-staff-3@primeweb.local` | 1 |
 
@@ -74,12 +74,14 @@ tests.
 
 ### Dashboard-ready seed invariant
 
-`qc-owner-*` accounts are load-test fixtures, so a fresh `qc:reset` +
-`qc:seed` must leave them ready to open `/dashboard` directly:
+VU-eligible `qc-owner-*` accounts are load-test fixtures, so a fresh `qc:reset` +
+`qc:seed` must leave them ready to open `/dashboard` directly. State-transition
+fixtures such as the suspended tenant remain seeded but are excluded from the VU pool:
 
 | TC ID | Verification |
 |-------|--------------|
 | `TC-GH1432-QC-01` | Owner has `has_seen_ai_wizard=true`, tenant has `onboardingCompleted=true`, and its site has `generationStatus=completed`. |
+| `TC-GH1432-QC-02` | Every VU-eligible owner belongs to a non-suspended tenant; `qc-owner-5` is reserved for suspended-state testing. |
 
 The seed command validates this invariant before reporting success. Fixtures
 intended for onboarding must use `dashboardReady=false`; the content phase skips
@@ -90,16 +92,24 @@ usable site exists" state.
 
 | TC ID | Verification |
 |-------|--------------|
-| `TC-GH1432-PERF-01` | Dashboard product list uses an explicit field allowlist, `depth=1`, and no pagination count query. |
+| `TC-GH1432-PERF-01` | Dashboard product list and `GET /api/dashboard/products` use the same explicit field allowlist, `depth=1`, and no pagination count query. |
 | `TC-GH1432-PERF-02` | Product list and product array tables have idempotent indexes matching tenant/newest filtering and `_parent_id`/`_order` hydration. |
+| `TC-GH1432-PERF-03` | Authenticated `GET /api/dashboard/products` returns the canonical Products Dashboard workload for load testing. |
 
-**Required JMeter update for GH-1432:** QC must change the Products sampler from
-`/api/products?limit=20` to `/api/products?limit=20&depth=1`. The bare endpoint
-falls back to Payload's global `defaultDepth=2`, performs relationship population
-that the dashboard list does not request, and therefore does not represent the
-real Products Dashboard query. Keep `depth=1` explicit in the `.jmx` file even if
-the application's global default changes later. Add a matching `select` allowlist
-when the test plan supports the dashboard response contract.
+**Required JMeter updates for GH-1432 after deployment:**
+
+1. Remove the stale `/api/dashboard/summary` sampler. The endpoint had no application
+   caller and has been removed; the existing `/dashboard` RSC sampler already exercises
+   the real Dashboard data flow.
+2. Change the Products sampler from `/api/products?limit=20` to
+   `/api/dashboard/products`. This authenticated endpoint calls the same query helper as
+   the Products UI, so field selection, relationship depth, sorting, tenant access, and
+   pagination behavior cannot drift between the application and the load test.
+3. Exclude `qc-owner-5@primeweb.local` from VU credentials because its tenant is
+   intentionally suspended for state-transition testing and login correctly returns 403.
+
+The source repository does not contain the original `.jmx` referenced by GH-1432. QC
+owns these test-plan edits; Dev owns the endpoint and fixture contract above.
 
 ## JMeter setup
 

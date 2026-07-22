@@ -30,6 +30,7 @@ export interface UserSpec {
   lastName: string
   roles: UserRole[]
   dashboardReady?: boolean
+  loadTestEligible?: boolean
 }
 
 export interface TenantSpec {
@@ -40,6 +41,7 @@ export interface TenantSpec {
   membershipRole: TenantRole
   plan: PlanCode
   dashboardReady: boolean
+  loadTestEligible?: boolean
 }
 
 // First 5 tenants keep the original status variety so functional tests
@@ -61,6 +63,12 @@ const SCALE_PLAN_CODES: PlanCode[] = [
   'PROFESSIONAL_NON_TM_USER',
 ]
 
+function tenantStatusForIndex(index: number): TenantStatus {
+  return index < BASE_TENANT_STATUSES.length
+    ? BASE_TENANT_STATUSES[index]
+    : 'active'
+}
+
 const ADMIN_USERS: UserSpec[] = [
   { email: 'qc-admin-1@primeweb.local', firstName: 'QC', lastName: 'Admin1', roles: ['super-admin'] },
   { email: 'qc-admin-2@primeweb.local', firstName: 'QC', lastName: 'Admin2', roles: ['super-admin'] },
@@ -81,6 +89,9 @@ export function buildUsers(merchantCount: number): UserSpec[] {
     lastName: `Owner${i + 1}`,
     roles: ['tenant-owner'],
     dashboardReady: true,
+    // Suspended tenants are retained for functional state tests, but their
+    // owners must not enter the VU credential pool because login returns 403.
+    loadTestEligible: tenantStatusForIndex(i) !== 'suspended',
   }))
   return [...ADMIN_USERS, ...owners, ...STAFF_USERS]
 }
@@ -88,9 +99,7 @@ export function buildUsers(merchantCount: number): UserSpec[] {
 export function buildTenants(merchantCount: number): TenantSpec[] {
   return Array.from({ length: merchantCount }, (_, i) => {
     const idx = i + 1
-    const status: TenantStatus = i < BASE_TENANT_STATUSES.length
-      ? BASE_TENANT_STATUSES[i]
-      : 'active'
+    const status = tenantStatusForIndex(i)
     return {
       name: `QC Tenant ${idx}`,
       slug: `qc-shop-${idx}`,
@@ -99,6 +108,7 @@ export function buildTenants(merchantCount: number): TenantSpec[] {
       membershipRole: 'owner',
       plan: SCALE_PLAN_CODES[i % SCALE_PLAN_CODES.length],
       dashboardReady: true,
+      loadTestEligible: status !== 'suspended',
     }
   })
 }

@@ -28,7 +28,11 @@
 import { getPayload, type Payload } from 'payload'
 import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
-import { seedTenantProducts, seedTenantExtraPages } from './qc-seed-products'
+import {
+  findMissingQcProducts,
+  seedTenantProducts,
+  seedTenantExtraPages,
+} from './qc-seed-products'
 import {
   buildQcSiteData,
   buildQcTenantData,
@@ -255,6 +259,7 @@ async function seedPlanSubscriptions(
 async function seedTenantContent(
   payload: Payload,
   tenantId: string | number,
+  tenantSlug: string,
   tenantName: string,
 ): Promise<{ productsCreated: number; extraPagesCreated: number }> {
   // Site + home page: create if missing, otherwise reuse the existing one
@@ -293,7 +298,7 @@ async function seedTenantContent(
     console.log(`  + site + home page created for ${tenantName}`)
   }
 
-  const productsCreated = await seedTenantProducts(payload, tenantId, siteId, tenantName)
+  const productsCreated = await seedTenantProducts(payload, tenantId, tenantSlug, siteId, tenantName)
   const extraPagesCreated = await seedTenantExtraPages(payload, tenantId, siteId, tenantName)
   if (productsCreated) console.log(`  + ${productsCreated} products for ${tenantName}`)
   if (extraPagesCreated) console.log(`  + ${extraPagesCreated} extra pages for ${tenantName}`)
@@ -315,8 +320,13 @@ async function assertDashboardReadyFixtures(
     .filter((spec) => spec.dashboardReady)
     .map((spec) => tenantIds[spec.name])
     .filter((id): id is string | number => id !== undefined)
+  const loadTestTenants = tenants.flatMap((spec) => {
+    const id = tenantIds[spec.name]
+    return spec.loadTestEligible && id !== undefined ? [{ id, slug: spec.slug }] : []
+  })
+  const loadTestTenantIds = new Set(loadTestTenants.map((tenant) => String(tenant.id)))
 
-  const [userResult, tenantResult, siteResult] = await Promise.all([
+  const [userResult, tenantResult, siteResult, productResult] = await Promise.all([
     payload.find({
       collection: 'users',
       where: { id: { in: dashboardUserIds } },
@@ -335,6 +345,13 @@ async function assertDashboardReadyFixtures(
       collection: 'sites',
       where: { tenant: { in: dashboardTenantIds } },
       limit: dashboardTenantIds.length,
+      depth: 0,
+      overrideAccess: true,
+    }),
+    payload.find({
+      collection: 'products',
+      where: { tenant: { in: loadTestTenants.map((tenant) => tenant.id) } },
+      pagination: false,
       depth: 0,
       overrideAccess: true,
     }),
@@ -358,9 +375,19 @@ async function assertDashboardReadyFixtures(
   const staleUsers = dashboardUserIds.filter((id) => !readyUserIds.has(String(id)))
   const staleTenants = dashboardTenantIds.filter((id) => !readyTenantIds.has(String(id)))
   const tenantsWithoutReadySites = dashboardTenantIds.filter((id) => !tenantsWithReadySites.has(String(id)))
-  if (staleUsers.length || staleTenants.length || tenantsWithoutReadySites.length) {
+  const suspendedLoadTestTenants = tenantResult.docs.filter(
+    (tenant) => loadTestTenantIds.has(String(tenant.id)) && tenant.status === 'suspended',
+  )
+  const missingQcProducts = findMissingQcProducts(productResult.docs, loadTestTenants)
+  if (
+    staleUsers.length
+    || staleTenants.length
+    || tenantsWithoutReadySites.length
+    || suspendedLoadTestTenants.length
+    || missingQcProducts.length
+  ) {
     throw new Error(
-      `Dashboard-ready fixture invariant failed: users=${staleUsers.length}, tenants=${staleTenants.length}, sites=${tenantsWithoutReadySites.length}`,
+      `Dashboard-ready fixture invariant failed: users=${staleUsers.length}, tenants=${staleTenants.length}, sites=${tenantsWithoutReadySites.length}, suspendedLoadTestTenants=${suspendedLoadTestTenants.length}, missingQcProducts=${missingQcProducts.length}${missingQcProducts.length ? ` (${missingQcProducts.slice(0, 5).join(', ')})` : ''}`,
     )
   }
 }
@@ -371,11 +398,13 @@ async function main(): Promise<void> {
   const merchantCount = readMerchantCount()
   const users = buildUsers(merchantCount)
   const tenants = buildTenants(merchantCount)
+  const loadTestOwnerCount = users.filter((user) => user.loadTestEligible).length
 
   const t0 = Date.now()
   const payload = await getPayload({ config })
 
   console.log(`🌱 Seeding QC test data (merchants=${merchantCount})...`)
+  console.log(`  Load-test owner pool: ${loadTestOwnerCount} eligible (${merchantCount - loadTestOwnerCount} state-test owner excluded)`)
   console.log('  Users:')
   const userIds = await seedUsers(payload, users, password)
   console.log('  Tenants:')
@@ -405,7 +434,7 @@ async function main(): Promise<void> {
         if (!tid || !spec.dashboardReady) {
           return Promise.resolve({ productsCreated: 0, extraPagesCreated: 0 })
         }
-        return seedTenantContent(payload, tid, spec.name)
+        return seedTenantContent(payload, tid, spec.slug, spec.name)
       }),
     )
     for (const r of batchResults) {
@@ -421,7 +450,7 @@ async function main(): Promise<void> {
 
   console.log('  Dashboard-ready fixture validation:')
   await assertDashboardReadyFixtures(payload, users, tenants, userIds, tenantIds)
-  console.log('    ✓ users, tenants, and sites have consistent onboarding state')
+  console.log('    ✓ users, tenants, sites, and QC products are load-test ready')
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
   console.log(

@@ -43,6 +43,7 @@ page.tsx (Server Component)
 
 ```typescript
 // GET /api/analytics/summary (Detail Charts & Lists)
+// GET /api/dashboard/products (canonical Products Dashboard query for HTTP/load clients)
 // POST /api/seo/analyze (Trigger API scan)
 // POST /api/seo/fix (SSE Stream cho AI Fix)
 // GET/POST/DELETE /api/seo/keywords (Keyword Tracker)

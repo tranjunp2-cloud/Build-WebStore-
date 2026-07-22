@@ -8,6 +8,7 @@ import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subs
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
+import { findDashboardProducts } from '@/lib/products/dashboard-product-list'
 
 // NOTE: This check is best-effort, fast-path UX — two limitations apply:
 //   1. NOT concurrent-safe on its own: two parallel saves with the same SKU can both pass this
@@ -115,69 +116,9 @@ export async function getProductsAction() {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
-    // Fix B: coerce to number so payload WHERE matches Neon integer FK (tenant_id integer)
-    const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
-    const res = await payload.find({
-        collection: 'products',
-        user,
-        overrideAccess: false,
-        where: {
-            and: [
-                { deletedAt: { exists: false } },
-                ...(tenantId != null ? [{ tenant: { equals: tenantId } }] : []),
-            ],
-        },
-        limit: 100,
-        pagination: false,
-        sort: '-createdAt',
-        depth: 1,
-        // Keep the list/quick-view contract while excluding large edit-only fields
-        // such as SEO, BM description, tags, variant configs, dimensions, and halal data.
-        select: {
-            name: true,
-            slug: true,
-            sku: true,
-            shortDescription: true,
-            description: true,
-            price: true,
-            compareAtPrice: true,
-            currency: true,
-            status: true,
-            inventory: true,
-            weight: true,
-            category: true,
-            images: {
-                image: true,
-                alt: true,
-            },
-            createdAt: true,
-            hasVariants: true,
-            variants: {
-                name: true,
-                sku: true,
-                price: true,
-                compareAtPrice: true,
-                stock: true,
-            },
-            attributes: {
-                key: true,
-                value: true,
-            },
-            aiReviewPending: true,
-        },
-        populate: {
-            media: {
-                url: true,
-                thumbnailURL: true,
-            },
-            categories: {
-                name: true,
-                breadcrumbs: true,
-            },
-        },
-    })
-    return JSON.parse(JSON.stringify(res.docs))
+    const docs = await findDashboardProducts(payload, user)
+    return JSON.parse(JSON.stringify(docs))
 }
 
 // NOTE: not a pure read — fetching a product with `aiReviewPending: true` clears that flag
