@@ -1121,7 +1121,7 @@ describe('AI Streaming APIs', () => {
              }
         })
 
-        it('[TC-GENPERF-W3-24] continues generation after 55 seconds have elapsed', async () => {
+        it('[TC-GENPERF-W3-24] continues generation after 75 seconds have elapsed', async () => {
              const payload = await getPayload({ config: {} as never })
              let now = 1_000_000
              const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -1137,7 +1137,7 @@ describe('AI Streaming APIs', () => {
                  }))
                  await vi.waitFor(() => expect(mockPageDB).toHaveLength(6))
 
-                 now += 55_000
+                 now += 75_000
                  resolveProducts({
                      products: Array.from({ length: 6 }, (_, index) => ({
                          name: `Late Product ${index + 1}`,

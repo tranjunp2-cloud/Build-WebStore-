@@ -1,6 +1,4 @@
 export const dynamic = 'force-dynamic'
-// Deployment runtime limit. Generation itself has no application-level deadline.
-export const maxDuration = 60
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'

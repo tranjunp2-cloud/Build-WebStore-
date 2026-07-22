@@ -190,7 +190,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const abortControllerRef = useRef<AbortController | null>(null)
     const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
     const [showDraftDialog, setShowDraftDialog] = useState(false)
@@ -518,10 +517,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             clearTimeout(warningTimeoutRef.current)
             warningTimeoutRef.current = null
         }
-        if (hardTimeoutRef.current) {
-            clearTimeout(hardTimeoutRef.current)
-            hardTimeoutRef.current = null
-        }
         setElapsedSeconds(0)
         setShowTimeoutWarning(false)
     }, [])
@@ -565,18 +560,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // Route budget is 60s. Give the browser 15s extra to receive a final
-        // frame or surface a terminated network stream cleanly.
-        const hardTimeout = setTimeout(() => {
-            controller.abort()
-            clearGenerationTimers()
-            const genError = getGenerationError(408)
-            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
-            setError({ code: 'timeout', message, retryable: true })
-            setStep('info')
-            toast.error(message)
-        }, 75_000)
-        hardTimeoutRef.current = hardTimeout
         let receivedAnyEvent = false
         let receivedDone = false
 
