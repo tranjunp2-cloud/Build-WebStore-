@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 
 // ── Mutable state driving useCartStore mock ───────────────────────────────
@@ -13,6 +13,7 @@ let mockRequiresConfirmation = false
 const mockRefreshCart = vi.fn()
 const mockAcknowledgeChanges = vi.fn()
 const mockUpdateQuantity = vi.fn()
+const mockCloseCart = vi.fn()
 
 // ── Mutable state driving usePathname mock ────────────────────────────────
 let mockPathname = '/sites/test-site'
@@ -26,7 +27,7 @@ vi.mock('@/store/cartStore', () => ({
     useCartStore: vi.fn(() => ({
         items: mockItems,
         isOpen: mockIsOpen,
-        closeCart: vi.fn(),
+        closeCart: mockCloseCart,
         removeItem: vi.fn(),
         updateQuantity: mockUpdateQuantity,
         subtotal: vi.fn(() => mockItems.reduce((s, i) => s + i.price * i.quantity, 0)),
@@ -184,6 +185,62 @@ describe('CartDrawer — checkout routing', () => {
             expect(screen.getByTestId('cart-drawer-backdrop'))
                 .toHaveStyle({ opacity: '0' })
         })
+
+        it('keeps keyboard focus inside the modal and closes on Escape', async () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            render(<CartDrawer siteSlug="test-site" />)
+            const closeButton = screen.getByRole('button', { name: 'Close cart' })
+            const checkoutLink = screen.getByRole('link', { name: /proceed to checkout/i })
+
+            // Act + Assert — initial focus enters the dialog
+            await waitFor(() => expect(closeButton).toHaveFocus())
+
+            // Act + Assert — Shift+Tab/Tab wrap at the dialog boundaries
+            fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+            expect(checkoutLink).toHaveFocus()
+            fireEvent.keyDown(document, { key: 'Tab' })
+            expect(closeButton).toHaveFocus()
+
+            // Act + Assert — Escape delegates closing to the cart store
+            fireEvent.keyDown(document, { key: 'Escape' })
+            expect(mockCloseCart).toHaveBeenCalledTimes(1)
+        })
+
+        it('restores focus to the opener after the drawer exits', async () => {
+            // Arrange
+            const opener = document.createElement('button')
+            opener.textContent = 'Open cart'
+            document.body.appendChild(opener)
+            opener.focus()
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            const { rerender } = render(<CartDrawer siteSlug="test-site" />)
+            await waitFor(() => expect(screen.getByRole('button', { name: 'Close cart' })).toHaveFocus())
+
+            // Act
+            mockIsOpen = false
+            rerender(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            await waitFor(() => expect(opener).toHaveFocus())
+            opener.remove()
+        })
+
+        it('provides accessible names for item actions', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('button', { name: 'Remove Test Product from cart' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Decrease quantity for Test Product' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Increase quantity for Test Product' })).toBeInTheDocument()
+        })
     })
 
     // ── TC-F09.220: Items + siteSlug → checkout link ───────────────────────
@@ -264,11 +321,8 @@ describe('CartDrawer — checkout routing', () => {
             mockItems = [ITEM_ONE]
             mockIsOpen = true
             render(<CartDrawer siteSlug="test-site" />)
-            const quantityStepper = screen.getByText('1').parentElement
-            expect(quantityStepper).not.toBeNull()
-
             // Act
-            fireEvent.click(within(quantityStepper as HTMLElement).getAllByRole('button')[0])
+            fireEvent.click(screen.getByRole('button', { name: 'Decrease quantity for Test Product' }))
 
             // Assert
             expect(mockUpdateQuantity).toHaveBeenCalledTimes(1)
