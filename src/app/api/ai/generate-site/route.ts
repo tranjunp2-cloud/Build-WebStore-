@@ -1195,10 +1195,6 @@ export async function POST(req: NextRequest) {
             ),
         )
 
-        if (pageDefinitions.length !== 5) {
-            throw new Error(`COMPLETION_INCOMPLETE_PAGES expected=5 actual=${pageDefinitions.length}`)
-        }
-
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
@@ -1500,12 +1496,6 @@ export async function POST(req: NextRequest) {
         // contended with critical-path uploads before `done`.
 
         generationTimings.record('pages_write', Date.now() - dbPhaseStart)
-
-        if (createdPages.length !== 5 || pageFailures.length > 0) {
-            throw new Error(
-                `COMPLETION_INCOMPLETE_PAGE_WRITES expected=5 actual=${createdPages.length} failures=${pageFailures.length}`,
-            )
-        }
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
