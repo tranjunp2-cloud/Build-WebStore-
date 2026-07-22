@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic'
-// Finish or fail explicitly before Vercel's 60-second hard limit so the client
-// always receives a terminal SSE event and partial sites stay non-completed.
+// Deployment runtime limit. Generation itself has no application-level deadline.
 export const maxDuration = 60
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
@@ -118,9 +117,6 @@ interface AIBlock {
  */
 export async function POST(req: NextRequest) {
     const startTime = Date.now()
-    const routeDeadlineAt = startTime + 55_000
-    const routeAbortController = new AbortController()
-    let routeDeadlineExceeded = false
     const generationRequestId = normalizeGenerationRequestId(req.headers.get('x-generation-request-id'))
     const generationTimings = new GenerationTimings(startTime)
     let _site: Record<string, unknown> | null = null
@@ -135,9 +131,8 @@ export async function POST(req: NextRequest) {
     const recoverFailedGeneration = async () => {
         if (_generationCommitted || !_payload || !_site?.id) return
 
-        // These rows belong exclusively to this request. Cleanup deliberately
-        // runs outside the generation write fence so a deadline cannot leave
-        // staged pages or sample content attached to the previous live site.
+        // These rows belong exclusively to this request, so failed generations
+        // must not leave staged pages or sample content attached to the live site.
         for (const [collection, ids] of [
             ['pages', _createdPageIds],
             ['products', _createdProductIds],
@@ -153,33 +148,6 @@ export async function POST(req: NextRequest) {
             id: _site.id as string | number,
             data: { generationStatus: _previousGenerationStatus ?? 'failed' },
         }).catch((_e: unknown) => console.error('[AI Generate] Failed to recover generation status:', _e))
-    }
-
-    const assertRouteDeadline = () => {
-        if (routeAbortController.signal.aborted || routeDeadlineExceeded || Date.now() >= routeDeadlineAt) {
-            routeDeadlineExceeded = true
-            if (!routeAbortController.signal.aborted) routeAbortController.abort()
-            throw new Error('GENERATION_DEADLINE_EXCEEDED')
-        }
-    }
-
-    const withRouteDeadline = async <T>(fn: () => Promise<T>): Promise<T> => {
-        let timer: ReturnType<typeof setTimeout> | undefined
-        try {
-            return await Promise.race([
-                fn(),
-                new Promise<T>((_resolve, reject) => {
-                    const remaining = Math.max(0, routeDeadlineAt - Date.now())
-                    timer = setTimeout(() => {
-                        routeDeadlineExceeded = true
-                        routeAbortController.abort()
-                        reject(new Error('GENERATION_DEADLINE_EXCEEDED'))
-                    }, remaining)
-                }),
-            ])
-        } finally {
-            if (timer) clearTimeout(timer)
-        }
     }
 
     try {
@@ -274,7 +242,6 @@ export async function POST(req: NextRequest) {
                     limit: 1,
                 })
                 if (anySubRow.totalDocs === 0) {
-                    assertRouteDeadline()
                     await payload.create({
                         collection: 'plan-subscriptions',
                         data: {
@@ -289,7 +256,6 @@ export async function POST(req: NextRequest) {
                     })
                 }
 
-                assertRouteDeadline()
                 await payload.update({
                     collection: 'users',
                     id: user.id,
@@ -308,7 +274,6 @@ export async function POST(req: NextRequest) {
                 const baseSlug = userChosenSlug || slugify(businessName || firstName)
                 const tenantSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
 
-                assertRouteDeadline()
                 const newTenant = await payload.create({
                     collection: 'tenants',
                     data: {
@@ -318,7 +283,6 @@ export async function POST(req: NextRequest) {
                 })
                 // Provision FREEMIUM subscription so subsequent subscription checks pass for new tenants.
                 // SSO provision normally does this; here we cover non-SSO / legacy-recovery paths.
-                assertRouteDeadline()
                 await payload.create({
                     collection: 'plan-subscriptions',
                     data: {
@@ -331,7 +295,6 @@ export async function POST(req: NextRequest) {
                         packCode: 'FREEMIUM',
                     },
                 })
-                assertRouteDeadline()
                 await payload.update({
                     collection: 'users',
                     id: user.id,
@@ -372,7 +335,6 @@ export async function POST(req: NextRequest) {
                 // Case 1: User explicitly chose a slug in the builder → always sync
                 if (userChosenSlug && userChosenSlug !== currentSlug) {
                     const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
-                    assertRouteDeadline()
                     await payload.update({
                         collection: 'tenants',
                         id: resolvedTenantId,
@@ -384,7 +346,6 @@ export async function POST(req: NextRequest) {
                     const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
                         const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
-                        assertRouteDeadline()
                         await payload.update({
                             collection: 'tenants',
                             id: resolvedTenantId,
@@ -447,7 +408,7 @@ export async function POST(req: NextRequest) {
         // Kept for research/rollback. Plan 260414-1400-ai-gen-unsplash-pipeline.
         const ENABLE_DALLE_HERO = process.env.ENABLE_DALLE_HERO === 'true'
         const heroImagePromise = ENABLE_DALLE_HERO
-            ? generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload, assertRouteDeadline)
+            ? generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
             : Promise.resolve(null)
 
         // Build reference prompt from ContentBrief (if provided from URL/Image extraction)
@@ -558,9 +519,7 @@ export async function POST(req: NextRequest) {
             blockImageStats: { succeeded: number; failed: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
-            assertRouteDeadline()
             await trackPhase('translation', () => translatedBusinessInfoPromise)
-            assertRouteDeadline()
             // GH-1185: keywords are sent to Pixabay RAW (user input language, no
             // GPT/dict translation). Pixabay q is AND-matched on tags with default
             // lang=en; translation was producing off-industry generic terms.
@@ -701,7 +660,6 @@ export async function POST(req: NextRequest) {
                                 String(resolvedTenantId),
                                 businessInfo.businessName,
                                 payload as unknown as Parameters<typeof preUploadPool>[3],
-                                assertRouteDeadline,
                             )
                             : new Map<string, number>(),
                     )
@@ -739,7 +697,6 @@ export async function POST(req: NextRequest) {
                         String(resolvedTenantId),
                         payload,
                         undefined,
-                        assertRouteDeadline,
                     ),
                 )
                 return { ...generated, existingProductsCount: 0 }
@@ -759,8 +716,6 @@ export async function POST(req: NextRequest) {
                     ),
                 ),
             )
-            assertRouteDeadline()
-
             // gen-perf blog-inline: prepare 3 blog posts (AI seed topics + full
             // article bodies + thumbnails). Kicked AFTER the site GPT resolves,
             // NOT during it — the site's parallel split calls own the OpenAI
@@ -781,7 +736,6 @@ export async function POST(req: NextRequest) {
                     products: parseProductsString(businessInfo.products),
                     industry: businessInfo.industry,
                     seed: computeGenSeed(businessInfo),
-                    assertCanWrite: assertRouteDeadline,
                 }))
                 .catch((): null => null)
 
@@ -907,7 +861,6 @@ export async function POST(req: NextRequest) {
                         preUploadedPoolPromise,
                         backfillPromise,
                     ])
-                    assertRouteDeadline()
                     const fulfillmentPool = backfillResult.pool
                     const addedPool = backfillResult.added
 
@@ -917,7 +870,6 @@ export async function POST(req: NextRequest) {
                             String(resolvedTenantId),
                             businessInfo.businessName,
                             payload as unknown as Parameters<typeof preUploadPool>[3],
-                            assertRouteDeadline,
                         ))
                         for (const [photoId, mediaId] of backfillUploads) {
                             preUploadedPool.set(photoId, mediaId)
@@ -943,7 +895,6 @@ export async function POST(req: NextRequest) {
                                 pool: fulfillmentPool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                                 preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
-                                assertCanWrite: assertRouteDeadline,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
@@ -1059,13 +1010,12 @@ export async function POST(req: NextRequest) {
         }
 
         if (existingSites.docs.length > 0) {
-            assertRouteDeadline()
             const previousSite = existingSites.docs[0] as Record<string, unknown>
             _previousGenerationStatus = typeof previousSite.generationStatus === 'string'
                 ? previousSite.generationStatus
                 : 'completed'
             // Recovery needs the stable existing ID before any status write or
-            // old-page read can be interrupted by the route deadline.
+            // old-page read can fail.
             _site = previousSite
             // Keep the current site metadata and pages live until all new
             // content passes the completion barriers. Only status is exposed.
@@ -1095,7 +1045,6 @@ export async function POST(req: NextRequest) {
                 pages: [],
             }
         } else {
-            assertRouteDeadline()
             // CREATE new site (first time)
             site = await payload.create({
                 collection: 'sites',
@@ -1254,7 +1203,6 @@ export async function POST(req: NextRequest) {
 
         const dbPhaseStart = Date.now()
         for (const pageDefinition of pageDefinitions) {
-            assertRouteDeadline()
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
             // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
             // layout (not just homepage), so sub-page team/testimonials/faq
@@ -1310,11 +1258,8 @@ export async function POST(req: NextRequest) {
                 // window). Reuses the save-route retry wrapper.
                 let createdPage: Record<string, unknown>
                 try {
-                    assertRouteDeadline()
                     createdPage = await withPayloadRetry(
-                        () => {
-                            assertRouteDeadline()
-                            return payload.create({
+                        () => payload.create({
                                 collection: 'pages',
                                 data: {
                                     title: pageDefinition.title,
@@ -1325,8 +1270,7 @@ export async function POST(req: NextRequest) {
                                     layout: normalizedLayout,
                                     seo: pageDefinition.seo,
                                 },
-                            })
-                        },
+                            }),
                         {
                             onRetry: (attempt, kind) => {
                                 console.warn(
@@ -1375,7 +1319,6 @@ export async function POST(req: NextRequest) {
                             }
                         }
                     }
-                    assertRouteDeadline()
                     createdPage = await payload.create({
                         collection: 'pages',
                         data: {
@@ -1495,7 +1438,6 @@ export async function POST(req: NextRequest) {
                     if (!layoutChanged) continue
 
                     const cleanedPatchedLayout = stripArrayItemIds(patchedLayout) as Record<string, unknown>[]
-                    assertRouteDeadline()
                     try {
                         await payload.update({
                             collection: 'pages',
@@ -1525,7 +1467,6 @@ export async function POST(req: NextRequest) {
         }
 
         // BUG-F05-005: Auto-create 404 page for every new site
-        assertRouteDeadline()
         try {
             const created404 = await payload.create({
                 collection: 'pages',
@@ -1612,7 +1553,6 @@ export async function POST(req: NextRequest) {
                 stats: imgStats,
                 existingProductsCount: preparedExistingProductsCount,
             } = await sampleProductsPromise
-            assertRouteDeadline()
             existingProductsCount = preparedExistingProductsCount
             productImageStats = imgStats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
@@ -1632,7 +1572,6 @@ export async function POST(req: NextRequest) {
                         depth: 0,
                     })
                     if (catDocs.length === 0) {
-                        assertRouteDeadline()
                         const created = await payload.create({
                             collection: 'categories',
                             data: {
@@ -1656,9 +1595,7 @@ export async function POST(req: NextRequest) {
                     console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
                 }
             }
-            assertRouteDeadline()
             const createProductWithoutImage = async (baseData: Record<string, unknown>): Promise<boolean> => {
-                assertRouteDeadline()
                 try {
                     await createTrackedProduct(baseData)
                     productsCreatedCount++
@@ -1669,7 +1606,6 @@ export async function POST(req: NextRequest) {
                 }
             }
             for (const product of sampleProducts) {
-                assertRouteDeadline()
                 // Guard: name must be at least 3 chars (Products schema minLength)
                 const name = product.name?.trim()
                 if (!name || name.length < 3) {
@@ -1720,7 +1656,6 @@ export async function POST(req: NextRequest) {
                 // is unbounded AI output, unlike the form's client-validated 120-char product name.
                 const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
-                    assertRouteDeadline()
                     await createTrackedProduct({
                         ...baseData,
                         ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
@@ -1740,14 +1675,12 @@ export async function POST(req: NextRequest) {
                                     name,
                                     resolvedTenantId,
                                     payload,
-                                    assertRouteDeadline,
                                 )
                             } catch {
                                 // re-upload failed — fall through to create without image
                             }
                             if (retryImageId != null) {
                                 try {
-                                    assertRouteDeadline()
                                     await createTrackedProduct({
                                         ...baseData,
                                         images: [{ image: retryImageId, alt: fallbackAlt }],
@@ -1780,7 +1713,6 @@ export async function POST(req: NextRequest) {
             generationTimings.record('products_write', Date.now() - productsWriteStarted)
         }
 
-        assertRouteDeadline()
         if (existingProductsCount === 0 && productsCreatedCount !== 6) {
             throw new Error(`COMPLETION_INCOMPLETE_PRODUCTS expected=6 actual=${productsCreatedCount}`)
         }
@@ -1795,7 +1727,6 @@ export async function POST(req: NextRequest) {
         // enrichment may be deferred, but the three visible rows and content
         // must exist before the site becomes completed or `done` is emitted.
         const preparedBlogs = await trackPhase('blog_prepare_wait', () => blogPrepPromise)
-        assertRouteDeadline()
         let blogsReadyCount = 0
         if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
             if (preparedBlogs.some((post) => post.thumbnailId === undefined)) {
@@ -1810,7 +1741,7 @@ export async function POST(req: NextRequest) {
                     resolvedTenantId,
                     site.id as string | number,
                     user.id,
-                    assertRouteDeadline,
+                    undefined,
                     (id) => _createdBlogIds.push(id),
                 ),
             )
@@ -1826,7 +1757,7 @@ export async function POST(req: NextRequest) {
                 parseProductsString(businessInfo.products),
                 businessInfo.industry,
                 computeGenSeed(businessInfo),
-                assertRouteDeadline,
+                undefined,
                 (id) => _createdBlogIds.push(id),
             ))
         }
@@ -1849,8 +1780,6 @@ export async function POST(req: NextRequest) {
             throw new Error(`COMPLETION_INCOMPLETE_BLOGS expected=3 actual=${blogsReadyCount}`)
         }
 
-        assertRouteDeadline()
-
         // Completion barrier: required pages, products, and inline-ready blogs
         // have settled before the site becomes observable as completed. For a
         // regeneration, delete old pages + promote staged pages + publish the
@@ -1863,7 +1792,6 @@ export async function POST(req: NextRequest) {
         }
         await trackPhase('site_complete', () => stagedPageSwap
             ? withTenantRowLock(payload, resolvedTenantId, async (transactionReq) => {
-                assertRouteDeadline()
                 for (const oldPageId of stagedPageSwap.oldPageIds) {
                     await payload.delete({ collection: 'pages', id: oldPageId, req: transactionReq })
                 }
@@ -1904,11 +1832,9 @@ export async function POST(req: NextRequest) {
         if (resolvedTenantId) {
             const _seedCategory = safeSiteType
             const _imglibSeedTask = () => {
-                if (routeAbortController.signal.aborted) return Promise.resolve()
                 const t = Date.now()
                 console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
                 return imagePoolPromise.then(({ englishKeywords }) => {
-                    if (routeAbortController.signal.aborted) return
                     const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
                     return import('@/lib/images/image-library-seeder')
                         .then(({ seedImageLibraryForSite }) =>
@@ -1964,7 +1890,7 @@ export async function POST(req: NextRequest) {
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
-                        } = await withRouteDeadline(() => runGenPipeline(onEvent))
+                        } = await runGenPipeline(onEvent)
                         // The site is already committed. Slug sync is optional
                         // post-response work and must not turn success into an SSE error.
                         const _slugSyncStream = () => trackPhase('slug_sync', syncTenantSlug)
@@ -2053,7 +1979,7 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             productImageStats,
             blockImageStats,
-        } = await withRouteDeadline(() => runGenPipeline())
+        } = await runGenPipeline()
         // JSON callers share the same terminal contract: once committed, only
         // non-fatal post-response work remains.
         const _slugSync = () => trackPhase('slug_sync', syncTenantSlug)
@@ -2096,9 +2022,7 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        // A partial site must never be observable as completed. Recovery is
-        // intentionally allowed after the generation deadline: the write fence
-        // protects content creation, not terminal cleanup/status restoration.
+        // A partial site must never be observable as completed.
         const _siteForCatch = _site as Record<string, unknown> | null
         await recoverFailedGeneration()
 
