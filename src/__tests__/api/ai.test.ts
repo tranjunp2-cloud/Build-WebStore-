@@ -1058,20 +1058,24 @@ describe('AI Streaming APIs', () => {
                  return originalCreate(args)
              })
 
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
 
-             expect(rejectedImageWrites).toBe(3)
-             expect(res.status).toBe(500)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
-             const completedWrites = vi.mocked(payload.update).mock.calls.filter(
-                 ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
-             )
-             expect(completedWrites).toHaveLength(0)
+                 expect(rejectedImageWrites).toBe(3)
+                 expect(res.status).toBe(500)
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 const completedWrites = vi.mocked(payload.update).mock.calls.filter(
+                     ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
+                 )
+                 expect(completedWrites).toHaveLength(0)
+             } finally {
+                 vi.mocked(payload.create).mockImplementation(originalCreate)
+             }
         })
 
         it('[TC-GENPERF-W3-23] fails completion when stale product media falls back to image-less rows', async () => {
@@ -1098,19 +1102,23 @@ describe('AI Streaming APIs', () => {
                  return originalCreate(args)
              })
 
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
 
-             expect(res.status).toBe(500)
-             const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
-                 ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
-             )
-             expect(imageLessProducts).toHaveLength(6)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 expect(res.status).toBe(500)
+                 const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
+                     ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
+                 )
+                 expect(imageLessProducts).toHaveLength(6)
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             } finally {
+                 vi.mocked(payload.create).mockImplementation(originalCreate)
+             }
         })
 
         it('[TC-GENPERF-W3-24] continues generation after 55 seconds have elapsed', async () => {
