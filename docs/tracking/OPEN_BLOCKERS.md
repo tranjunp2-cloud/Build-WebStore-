@@ -49,7 +49,7 @@ the external items below block QC handover.
 
 ## F37 (US-01) — Local Business Data Model
 
-- ⚠️ **Technical Health rewire (US-F37-04)** — **PM Decision A (2026-07-21):** reuse F03 `technical-score.ts` (OG, Google verification, bad slugs, noIndex) → `floor(score × 15 / 100)`. Product decision closed. Code still hardcodes CWV/mobile/HTTPS — rewire before dashboard surfaces Local SEO score. See PRD §13.8.
+- ⚠️ **SEO Health score rewire (US-F37-04)** — replace the legacy F37 engine with the approved 20/35/15/30 scorecard, then replace existing `SeoHealth` contents with the single unified score + max 3 actions. See F37 PRD §5 and §12.3.
 
 ## QC test backfill (post-merge)
 

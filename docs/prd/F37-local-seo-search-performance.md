@@ -1,6 +1,6 @@
 # PRD: Local SEO Score & Storefront Discoverability (F37)
 
-> **Version:** 2.0 | **Status:** Phase 2 — flow approved 2026-07-21 | **Priority:** P0 | **Size:** L  
+> **Version:** 2.4 | **Status:** Phase 2 — subtype dropdown approved 2026-07-22 | **Priority:** P0 | **Size:** L
 > **Depends on:** F03 Dashboard Suite, F02 Auth, F05 Editor  
 > **Replaces:** F37 PRD v1.0 (target-state rewrite)
 
@@ -29,10 +29,10 @@ SME sellers on PrimeCommerce storefronts are hard to discover in local search an
 ### In scope
 
 - Minimal **Business Data** in Editor (name, structured address, phone)
-- **Schema completeness** signals that all affect score (LocalBusiness, subtype, hours, geo, telephone, url, priceRange, FAQPage, Organization)
+- **Schema completeness** signals that all affect score (LocalBusiness, subtype, hours, geo, telephone, url, priceRange, Organization)
 - **AI Discoverability:** AI crawlers toggle, sitemap when published, llms.txt
-- **Technical Health:** OG image + SEO-friendly page slugs (always index; no noIndex seller control)
-- Local SEO score 0–100 + checklist (max 3 items) on **Dashboard > SEO**
+- **Technical Health:** metadata coverage + content quality + search verification + indexability
+- One unified SEO Health score 0–100 + checklist (max 3 items) on **Dashboard > SEO**
 - Tenant storefront only: `/sites/[slug]/*`
 
 
@@ -60,30 +60,36 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 **Engine (target):** `src/lib/seo/local-seo-score.ts` · `GET /api/sites/[siteId]/local-seo-score`
 
 
-| Bucket                      | Tiêu chí                    | Điểm | Mô tả brief                                       | Editable by              | Route / file                                                                                             | Màn hình                                       |
-| --------------------------- | --------------------------- | ---- | ------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| **Business Data** (20)      | Name                        | 7    | Tên shop — required for LocalBusiness `name`      | Human only               | `Sites.name` · `local-seo-score.ts` · `api/sites/[siteId]/local-seo-score/route.ts`                      | Editor → Settings → Global → Brand             |
-| Business Data               | Address                     | 8    | PostalAddress: street + city + postcode + country | Human only               | `Sites.localBusiness.{streetAddress,city,postcode,country,state}` · `components/editor/local-business/*` | Editor → Global → Local Business               |
-| Business Data               | Phone                       | 5    | Contact telephone                                 | Human only               | `Sites.contactInfo.phone`                                                                                | Editor → Global → Contact                      |
-| **Schema** (40)             | LocalBusiness JSON-LD       | 8    | Valid emit when name + address present            | Human (data) → auto emit | `src/lib/seo/json-ld.ts` → `generateLocalBusinessSchema`                                                 | Storefront head; data from Local Business form |
-| Schema                      | `@type` subtype             | 5    | Specific subtype ≠ generic `LocalBusiness`        | Human only               | `schema-helpers.ts` · `businessCategory`                                                                 | Editor → Local Business → Category             |
-| Schema                      | `openingHoursSpecification` | 6    | ≥1 open day (`opens`+`closes`, not closed)        | Human only               | `localBusiness.openingHours[]`                                                                           | Editor → Opening hours                         |
-| Schema                      | `geo`                       | 5    | Finite lat + lng → GeoCoordinates                 | Human only               | `latitude`/`longitude` · `api/local-seo/resolve-maps-link`                                               | Editor → Map / coordinates                     |
-| Schema                      | `telephone` in schema       | 3    | Phone emitted on LocalBusiness                    | Human only               | `contactInfo.phone` → json-ld                                                                            | Editor → Contact                               |
-| Schema                      | `url` in schema             | 3    | Domain emitted as `url`                           | Human only               | `Sites.domain`                                                                                           | Site domain setup                              |
-| Schema                      | `priceRange`                | 3    | Explicit field or derived from category           | Human only               | `priceRange` / `priceRangeForLocalBusinessCategory`                                                      | Editor → Price range                           |
-| Schema                      | FAQPage                     | 4    | FAQ block with ≥1 item                            | Human only               | `generateFAQSchema`                                                                                      | Editor canvas → FAQ block                      |
-| Schema                      | Organization                | 3    | Organization schema for site                      | Platform auto            | `generateOrganizationSchema`                                                                             | Auto (brand/contact feed fields)               |
-| **AI Discoverability** (20) | AI crawlers allowed         | 12   | AI bots allowed in robots.txt                     | Human toggle             | `api/seo/ai-crawlers-toggle` · `sites/[slug]/robots.txt/route.ts`                                        | Dashboard → SEO tools                          |
-| AI Discoverability          | Sitemap present             | 6    | Published site serves sitemap                     | Human (publish)          | `sites/[slug]/sitemap.xml/route.ts`                                                                      | Editor → Publish                               |
-| AI Discoverability          | llms.txt reachable          | 2    | Dynamic `/llms.txt` for storefront                | Platform auto            | `sites/[slug]/llms.txt/route.ts`                                                                         | Auto                                           |
-| **Technical Health** (20)   | OG image                    | 12   | Site has social/OG image                          | Human only               | `Sites.seo.ogImage` · `og-image-editor.tsx`                                                              | Editor → SEO → Social image                    |
-| Technical Health            | Bad slug                    | 8    | SEO-friendly page slugs (no bad pattern)          | Human only               | `Pages.slug`                                                                                             | Editor → SEO → URL slug                        |
+| Bucket                      | Tiêu chí                    | Điểm | Mô tả brief                                                                 | Editable by              | Route / file                                                                                             | Màn hình                                       |
+| --------------------------- | --------------------------- | ---- | --------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Business Data** (20)      | Name                        | 7    | Tên shop — required for LocalBusiness `name`                                | Human only               | `Sites.name` · `local-seo-score.ts` · `api/sites/[siteId]/local-seo-score/route.ts`                      | Editor → Settings → Global → Brand             |
+| Business Data               | Address                     | 8    | PostalAddress: street + city + postcode + country                           | Human only               | `Sites.localBusiness.{streetAddress,city,postcode,country,state}` · `components/editor/local-business/*` | Editor → Global → Local Business               |
+| Business Data               | Phone                       | 5    | Contact telephone                                                           | Human only               | `Sites.contactInfo.phone`                                                                                | Editor → Global → Contact                      |
+| **Schema** (35)             | LocalBusiness JSON-LD       | 10   | Valid emit when name + address present                                      | Human (data) → auto emit | `src/lib/seo/json-ld.ts` → `generateLocalBusinessSchema`                                                 | Storefront head; data from Local Business form |
+| Schema                      | `@type` subtype             | 4    | Compatible specific subtype selected after business category                | Human only               | `localBusiness.schemaSubtype` · versioned category→subtype mapping                                     | Editor → Local Business → Category → Subtype   |
+| Schema                      | `openingHoursSpecification` | 5    | ≥1 open day (`opens`+`closes`, not closed)                                  | Human only               | `localBusiness.openingHours[]`                                                                           | Editor → Opening hours                         |
+| Schema                      | `geo`                       | 4    | Finite lat + lng → GeoCoordinates                                           | Human only               | `latitude`/`longitude` · `api/local-seo/resolve-maps-link`                                               | Editor → Map / coordinates                     |
+| Schema                      | `telephone` in schema       | 3    | Phone emitted on LocalBusiness                                              | Human only               | `contactInfo.phone` → json-ld                                                                            | Editor → Contact                               |
+| Schema                      | `url` in schema             | 3    | Domain emitted as `url`                                                     | Human only               | `Sites.domain`                                                                                           | Site domain setup                              |
+| Schema                      | `priceRange`                | 3    | Explicit field or derived from category                                     | Human only               | `priceRange` / `priceRangeForLocalBusinessCategory`                                                      | Editor → Price range                           |
+| Schema                      | Organization                | 3    | Organization schema for site                                                | Platform auto            | `generateOrganizationSchema`                                                                             | Auto (brand/contact feed fields)               |
+| **AI Discoverability** (15) | AI crawlers allowed         | 9    | AI bots allowed in robots.txt                                               | Human toggle             | `api/seo/ai-crawlers-toggle` · `sites/[slug]/robots.txt/route.ts`                                        | Dashboard → SEO tools                          |
+| AI Discoverability          | Sitemap present             | 5    | Published site serves sitemap                                               | Human (publish)          | `sites/[slug]/sitemap.xml/route.ts`                                                                      | Editor → Publish                               |
+| AI Discoverability          | llms.txt reachable          | 1    | Dynamic `/llms.txt` for storefront                                          | Platform auto            | `sites/[slug]/llms.txt/route.ts`                                                                         | Auto                                           |
+| **Technical Health** (30)   | Meta title coverage         | 8    | Coverage across eligible pages, active products, and published blogs        | Human or F03 AI          | `src/lib/dashboard/seo-data.ts`                                                                          | Dashboard → SEO / Editor SEO                   |
+| Technical Health            | Meta description coverage   | 8    | Coverage across eligible pages, active products, and published blogs        | Human or F03 AI          | `src/lib/dashboard/seo-data.ts`                                                                          | Dashboard → SEO / Editor SEO                   |
+| Technical Health            | Content Quality             | 8    | Scale F03 content score: headings, content depth, image alt text, contact    | Human only               | `src/lib/seo/content-score.ts`                                                                           | Editor canvas / Products                       |
+| Technical Health            | Technical SEO               | 6    | Search verification 3 + indexable eligible pages 3                         | Human / platform         | `Sites.seo.googleVerificationToken` · `Pages.seo.noIndex`                                                | Dashboard → SEO / Editor SEO                   |
 
 
-**Pages are always indexable** for scoring purposes (no noIndex control in this feature).
+**Coverage rules**
 
-**F03 adjacency:** AI Fix All / page Auto SEO only fill page·product·blog meta title/description. They do not change Local SEO Business Data or Schema fields above.
+- Eligible metadata records: visible, non-deleted pages; active products; published blogs.
+- Meta title and description each earn `floor(8 × completed / eligible)`; an empty eligible set earns 0.
+- Content Quality earns `floor(F03 contentQualityScore × 8 / 100)` after F03 loads real page layouts.
+- Technical SEO earns 3 points when Google verification is configured, plus `floor(3 × indexable / eligiblePages)`; an empty eligible page set earns 0.
+
+**F03 reuse:** AI Fix All / page Auto SEO can raise title and description coverage. They do not change Local SEO Business Data or Schema fields above.
 
 ### LocalBusiness JSON-LD contract
 
@@ -93,15 +99,27 @@ Aligned with [schema.org/LocalBusiness](https://schema.org/LocalBusiness) and [G
 | Property                    | Source              | Score link                  |
 | --------------------------- | ------------------- | --------------------------- |
 | `name`                      | `site.name`         | Business Name 7             |
-| `address` (PostalAddress)   | `localBusiness.*`   | Address 8 + LocalBusiness 8 |
+| `address` (PostalAddress)   | `localBusiness.*`   | Address 8 + LocalBusiness 10 |
 | `telephone`                 | `contactInfo.phone` | Phone 5 + telephone 3       |
 | `url`                       | `site.domain`       | url 3                       |
-| `@type` subtype             | `businessCategory`  | subtype 5                   |
-| `openingHoursSpecification` | `openingHours[]`    | hours 6                     |
-| `geo`                       | lat/lng             | geo 5                       |
+| `@type` subtype             | `localBusiness.schemaSubtype` | subtype 4                |
+| `openingHoursSpecification` | `openingHours[]`    | hours 5                     |
+| `geo`                       | lat/lng             | geo 4                       |
 | `priceRange`                | field / derived     | priceRange 3                |
-| FAQPage (separate graph)    | FAQ blocks          | FAQ 4                       |
 | Organization (separate)     | site brand/contact  | Org 3                       |
+
+
+**Category → subtype dropdown contract**
+
+- `businessCategory` is the broad seller-facing category; it does not directly set JSON-LD `@type`.
+- `schemaSubtype` is a second dropdown directly below Business category and is disabled until a category is selected.
+- Options are filtered by a versioned `businessCategory → allowed LocalBusiness subtype[]` mapping built from the current [Google Local Business structured data documentation](https://developers.google.com/search/docs/appearance/structured-data/local-business) and [Schema.org LocalBusiness hierarchy](https://schema.org/LocalBusiness) at implementation time. Do not fetch these sources at runtime.
+- Show the most specific compatible types. Example only: `Food & Beverage → Restaurant | Bakery | CafeOrCoffeeShop | FastFoodRestaurant`.
+- If a category has one compatible subtype, auto-select it. If it has multiple, require an explicit seller choice.
+- Changing category preserves the subtype only when still compatible; otherwise clear it and require a new choice.
+- Empty subtype emits generic `LocalBusiness` and earns 0 subtype points. A compatible specific subtype emits exactly that `@type` and earns 4 points.
+- Server validation MUST reject a category/subtype pair absent from the same mapping; UI filtering is not the security boundary.
+- MVP stores one primary subtype. Multiple `@type` values are out of scope.
 
 
 Do not emit `aggregateRating` on LocalBusiness.
@@ -117,20 +135,20 @@ flowchart TB
   start([seller_opens_editor]) --> fill_minimal[fill_name_address_phone]
   fill_minimal --> incomplete{missing_required?}
   incomplete -->|name_or_address_missing| end_blocked([end_score_capped_no_localbusiness])
-  incomplete -->|ok| enrich_schema[fill_hours_category_geo_price_faq]
-  enrich_schema --> emit_jsonld[system_emits_localbusiness_faq_org]
+  incomplete -->|ok| enrich_schema[fill_hours_category_subtype_geo_price]
+  enrich_schema --> emit_jsonld[system_emits_localbusiness_org]
   emit_jsonld --> toggle_crawlers{ai_crawlers_on?}
   toggle_crawlers -->|yes_default| publish_site[publish_site]
-  toggle_crawlers -->|seller_opts_out| crawlers_off[crawlers_disallow_minus_12]
+  toggle_crawlers -->|seller_opts_out| crawlers_off[crawlers_disallow_minus_9]
   crawlers_off --> publish_site
   publish_site --> sitemap_ok[sitemap_and_llms_available]
-  sitemap_ok --> set_og_slug[set_og_image_and_seo_slugs]
-  set_og_slug --> calc_score[calc_local_seo_score_100]
+  sitemap_ok --> evaluate_health[evaluate_metadata_content_and_technical_health]
+  evaluate_health --> calc_score[calc_local_seo_score_100]
   calc_score --> show_dashboard[show_score_and_checklist_dashboard_seo]
   show_dashboard --> fix_loop{score_below_target?}
   fix_loop -->|yes| edit_or_ai{issue_type?}
-  edit_or_ai -->|local_business_schema_technical| human_edit[human_edit_in_editor]
-  edit_or_ai -->|page_product_blog_meta_f03| ai_fix_all[ai_fix_all_meta_only]
+  edit_or_ai -->|business_schema_content_technical| human_edit[human_edit_in_editor]
+  edit_or_ai -->|page_product_blog_metadata| ai_fix_all[ai_fix_all_meta_only]
   human_edit --> calc_score
   ai_fix_all --> calc_score
   fix_loop -->|no| end_ok([end_local_seo_ready])
@@ -149,11 +167,11 @@ flowchart TB
 | `fill_name_address_phone`                       | Minimal Business Data (20 pts max)             |
 | `missing_required?`                             | Name or address incomplete                     |
 | `end_score_capped_no_localbusiness`             | Score without full LocalBusiness schema points |
-| `fill_hours_category_geo_price_faq`             | Remaining schema human inputs                  |
-| `system_emits_localbusiness_faq_org`            | JSON-LD generation on storefront               |
-| `ai_crawlers_on?`                               | Default allow; opt-out −12                     |
-| `publish_site` / `sitemap_and_llms_available`   | Publish unlocks sitemap +6, llms +2            |
-| `set_og_image_and_seo_slugs`                    | Technical Health                               |
+| `fill_hours_category_subtype_geo_price`         | Remaining schema human inputs                  |
+| `system_emits_localbusiness_org`                | JSON-LD generation on storefront               |
+| `ai_crawlers_on?`                               | Default allow; opt-out −9                      |
+| `publish_site` / `sitemap_and_llms_available`   | Publish unlocks sitemap +5, llms +1            |
+| `evaluate_metadata_content_and_technical_health` | F03 metadata, content, and technical signals   |
 | `calc_local_seo_score_100`                      | Pure score function                            |
 | `show_score_and_checklist_dashboard_seo`        | Dashboard > SEO card                           |
 | `human_edit_in_editor` / `ai_fix_all_meta_only` | Fix paths                                      |
@@ -181,14 +199,15 @@ flowchart TB
 
 ### US-F37-02: Schema-rich local markup
 
-**Path:** `enrich_schema → system_emits_localbusiness_faq_org`  
-**Story:** As an SME seller, I want hours, category, map coordinates, price range, and FAQ content to power JSON-LD so that search/AI systems receive complete LocalBusiness and FAQPage markup and I earn Schema points.
+**Path:** `enrich_schema → system_emits_localbusiness_org`
+**Story:** As an SME seller, I want hours, business category, a compatible schema subtype, map coordinates, and price range to power JSON-LD so that search/AI systems receive complete LocalBusiness and Organization markup and I earn Schema points.
 
 **AC**
 
-- **Happy — AC-01:** GIVEN name+address and at least one open hours row, a specific category, valid lat/lng, and priceRange WHEN storefront homepage is rendered THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and a non-generic `@type` AND corresponding Schema points are earned.
-- **Edge — AC-02:** GIVEN a page with FAQ block items WHEN that page is rendered THEN FAQPage JSON-LD is present AND FAQ Schema points are earned.
+- **Happy — AC-01:** GIVEN name+address, business category, a compatible specific schema subtype, at least one open hours row, valid lat/lng, and priceRange WHEN storefront homepage is rendered THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and the selected `@type` AND corresponding Schema points are earned.
+- **Edge — AC-02:** GIVEN all opening-hours rows are closed or incomplete WHEN score and emit run THEN `openingHoursSpecification` is omitted AND opening-hours points are 0 while other valid Schema points remain earned.
 - **Error — AC-03:** GIVEN only one of lat/lng is set WHEN score and emit run THEN geo is omitted from JSON-LD AND geo points are 0 (no crash).
+- **Error — AC-04:** GIVEN a subtype is incompatible with the selected business category WHEN seller saves THEN save is rejected, the previous valid pair remains, AND invalid `@type` is not emitted.
 
 
 
@@ -207,13 +226,13 @@ flowchart TB
 
 ### US-F37-04: Score, checklist, fix loop
 
-**Path:** `set_og_image_and_seo_slugs → calc_local_seo_score_100 → show_score_and_checklist_dashboard_seo → fix_loop → human_edit | ai_fix_all → calc_score → end_local_seo_ready`  
-**Story:** As an SME seller, I want a Local SEO score and up to three next actions so that I know what to edit in the Editor (or use F03 AI Fix All only for meta) to improve the score.
+**Path:** `evaluate_metadata_content_and_technical_health → calc_local_seo_score_100 → show_score_and_checklist_dashboard_seo → fix_loop → human_edit | ai_fix_all → calc_score → end_local_seo_ready`
+**Story:** As an SME seller, I want one SEO Health score and up to three next actions so that I know what to edit in the Editor (or use F03 AI Fix All only for meta) to improve the score.
 
 **AC**
 
-- **Happy — AC-01:** GIVEN a site with all score criteria met WHEN seller opens Dashboard > SEO THEN Local SEO score is 100 AND checklist has zero incomplete high-priority local items.
-- **Edge — AC-02:** GIVEN missing OG image and one bad slug WHEN score runs THEN Technical Health reflects OG and slug deductions only AND checklist includes an item deep-linking to Editor SEO for OG or slug.
+- **Happy — AC-01:** GIVEN a site with all score criteria met WHEN seller opens Dashboard > SEO THEN the single SEO Health score is 100 AND checklist has zero incomplete high-priority items.
+- **Edge — AC-02:** GIVEN an eligible record lacks meta title or description, or F03 reports a content/technical issue WHEN score runs THEN only the matching Technical Health sub-score loses points AND the checklist offers AI Fix for metadata or an Editor action for content/technical issues.
 - **Error — AC-03:** GIVEN score API unauthorized WHEN client requests score THEN 401/403 is returned AND Dashboard shows error state without inventing a score number.
 - **Happy — AC-04:** GIVEN checklist item for missing Local Business field WHEN seller clicks the action THEN Editor opens focused on the relevant Settings section.
 - **Edge — AC-05:** GIVEN missing page meta only WHEN seller runs F03 AI Fix All THEN page meta is proposed/applied AND Local Business fields are unchanged.
@@ -226,9 +245,9 @@ flowchart TB
 | US        | Path (abbrev)                       | AC        | FR        |
 | --------- | ----------------------------------- | --------- | --------- |
 | US-F37-01 | fill_minimal → incomplete           | AC-01..03 | FR-01..03 |
-| US-F37-02 | enrich_schema → emit_jsonld         | AC-01..03 | FR-04..12 |
-| US-F37-03 | crawlers → publish → sitemap/llms   | AC-01..03 | FR-13..15 |
-| US-F37-04 | technical → score → dashboard → fix | AC-01..05 | FR-16..20 |
+| US-F37-02 | enrich_schema → emit_jsonld         | AC-01..04 | FR-04..11 |
+| US-F37-03 | crawlers → publish → sitemap/llms   | AC-01..03 | FR-12..14 |
+| US-F37-04 | technical → score → dashboard → fix | AC-01..05 | FR-15..21 |
 
 
 
@@ -241,23 +260,24 @@ flowchart TB
 | FR-01 | Sites MUST store `name` editable in Editor Brand; missing → 0 of 7 Name points                                                                      | US-F37-01 | P0       |
 | FR-02 | Sites MUST store structured `localBusiness` address (street, city, postcode, country; state if used); all required parts present → 8 Address points | US-F37-01 | P0       |
 | FR-03 | Sites MUST store `contactInfo.phone`; present → 5 Phone points                                                                                      | US-F37-01 | P0       |
-| FR-04 | System MUST emit LocalBusiness JSON-LD when name + address present → 8 points                                                                       | US-F37-02 | P0       |
-| FR-05 | System MUST map `businessCategory` to Schema.org subtype; specific type → 5 points                                                                  | US-F37-02 | P0       |
-| FR-06 | System MUST emit `openingHoursSpecification` from open rows → 6 points                                                                              | US-F37-02 | P0       |
-| FR-07 | System MUST emit `geo` only when both lat and lng are finite → 5 points                                                                             | US-F37-02 | P0       |
+| FR-04 | System MUST emit LocalBusiness JSON-LD when name + address present → 10 points                                                                      | US-F37-02 | P0       |
+| FR-05 | Editor MUST filter `schemaSubtype` by `businessCategory`; server validates the pair; compatible specific subtype emits as `@type` → 4 points       | US-F37-02 | P0       |
+| FR-06 | System MUST emit `openingHoursSpecification` from open rows → 5 points                                                                              | US-F37-02 | P0       |
+| FR-07 | System MUST emit `geo` only when both lat and lng are finite → 4 points                                                                             | US-F37-02 | P0       |
 | FR-08 | System MUST emit `telephone` when phone present → 3 points                                                                                          | US-F37-02 | P0       |
 | FR-09 | System MUST emit `url` when domain present → 3 points                                                                                               | US-F37-02 | P0       |
 | FR-10 | System MUST emit `priceRange` when set or derived → 3 points                                                                                        | US-F37-02 | P0       |
-| FR-11 | System MUST emit FAQPage when FAQ items exist → 4 points                                                                                            | US-F37-02 | P0       |
-| FR-12 | System MUST emit Organization for valid site → 3 points                                                                                             | US-F37-02 | P0       |
-| FR-13 | AI crawlers default ALLOW; seller toggle OFF disallows AI bots → 12 or 0 points                                                                     | US-F37-03 | P0       |
-| FR-14 | Published site MUST expose sitemap → 6 points when present                                                                                          | US-F37-03 | P0       |
-| FR-15 | Storefront MUST expose dynamic llms.txt → 2 points when reachable                                                                                   | US-F37-03 | P0       |
-| FR-16 | OG image on site → 12 Technical points when present                                                                                                 | US-F37-04 | P0       |
-| FR-17 | Page slugs MUST be scorable; bad slugs reduce Technical up to 8 points                                                                              | US-F37-04 | P0       |
-| FR-18 | `calculateLocalSeoScore` MUST implement §5 exactly; API returns score + breakdown                                                                   | US-F37-04 | P0       |
-| FR-19 | Dashboard > SEO MUST show Local SEO score + ≤3 checklist items with Editor deep-links                                                               | US-F37-04 | P0       |
-| FR-20 | Checklist MUST NOT claim AI can fix Local Business / schema / OG / slug; AI Fix All remains meta-only (F03)                                         | US-F37-04 | P0       |
+| FR-11 | System MUST emit Organization for valid site → 3 points                                                                                             | US-F37-02 | P0       |
+| FR-12 | AI crawlers default ALLOW; seller toggle OFF disallows AI bots → 9 or 0 points                                                                      | US-F37-03 | P0       |
+| FR-13 | Published site MUST expose sitemap → 5 points when present                                                                                          | US-F37-03 | P0       |
+| FR-14 | Storefront MUST expose dynamic llms.txt → 1 point when reachable                                                                                    | US-F37-03 | P0       |
+| FR-15 | Eligible metadata records MUST earn up to 8 points for meta title coverage using §5                                                                 | US-F37-04 | P0       |
+| FR-16 | Eligible metadata records MUST earn up to 8 points for meta description coverage using §5                                                           | US-F37-04 | P0       |
+| FR-17 | F03 Content Quality MUST load real page layouts and scale its 0–100 result to 0–8 points                                                             | US-F37-04 | P0       |
+| FR-18 | Technical SEO MUST award 3 points for Google verification plus up to 3 for indexable eligible pages                                                | US-F37-04 | P0       |
+| FR-19 | `calculateLocalSeoScore` MUST implement §5 exactly; API returns score + four-bucket breakdown                                                        | US-F37-04 | P0       |
+| FR-20 | Existing Dashboard `SeoHealth` MUST become the single score card, showing §5 score + ≤3 actions sorted by point gain                               | US-F37-04 | P0       |
+| FR-21 | Checklist MUST NOT claim AI can fix Local Business, schema, content, or technical issues; AI Fix All remains metadata-only (F03)                  | US-F37-04 | P0       |
 
 
 
@@ -329,7 +349,7 @@ flowchart TB
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **Route**                                 | `/editor/[siteId]` · Settings tab **Global**                                                         |
 | **Code**                                  | `SettingsPanel.tsx` → `renderGlobalContent()` · accordions `brand` → `contact` → `localBusiness`     |
-| **Local Business order (locked in code)** | Address → Coordinates (+ map) → Category & offer → Opening hours → CompletionChecklist               |
+| **Local Business order (target)** | Address → Coordinates (+ map) → Category → Schema subtype → Offer → Opening hours → CompletionChecklist |
 | **Save**                                  | Per-field `onBlur` → `onSiteSettingsChange` / `handleLocalBusinessChange` (autosave; no Save button) |
 
 
@@ -338,8 +358,9 @@ flowchart TB
 - Blur valid field → autosave + existing success toast path.
 - Invalid phone → `toast.error` + skip save (same as today).
 - Paste Maps URL → Extract → `POST /api/local-seo/resolve-maps-link` → lat/lng chips + `MapsEmbedPreview`.
+- Select Business category → enable and filter Schema subtype. Category change clears an incompatible subtype.
 - Opening hours → `OpeningHoursEditor` (+ modal for bulk edit).
-- CompletionChecklist (US-01 only): client ✓ for address / hours / category — **not** the Dashboard Local SEO score checklist.
+- CompletionChecklist (US-01 only): client ✓ for address / hours / category — **not** the Dashboard SEO Health actions.
 
 **Desktop 320px — Local Business open (empty / default)**
 
@@ -374,8 +395,12 @@ flowchart TB
 │   ▸ Enter coordinates manually (advanced)              │
 │   (map preview hidden until lat+lng valid)             │
 │   ───────────────────────────────────────────          │
-│   CATEGORY & OFFER                                     │
+│   CATEGORY & SCHEMA                                    │
 │   Business category  [ select                     ▾ ]  │
+│   Schema subtype     [ select compatible type     ▾ ]  │
+│   (disabled until Business category is selected)       │
+│   ───────────────────────────────────────────          │
+│   OFFER                                                │
 │   Price range        [ select                     ▾ ]  │
 │   Service area       [ textarea                   ]    │
 │   ───────────────────────────────────────────          │
@@ -464,43 +489,48 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 
 
 
-### 12.3 Dashboard — Local SEO score card (target US-F37-04)
+### 12.3 Dashboard — unified SEO Health card (target US-F37-04)
 
 
-|                   |                                                                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Route**         | `/dashboard` — SEO section (same page as existing revamp sections)                                                                   |
-| **Code (target)** | New card beside / below existing `SeoHealth` (`seo-health.tsx` = F03 general score). Data: `GET /api/sites/[siteId]/local-seo-score` |
-| **Not**           | Not inside Editor SettingsPanel; not a new dashboard route                                                                           |
+|                   |                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Route**         | `/dashboard` — existing SEO section                                                                                                          |
+| **Code (target)** | Replace the contents of existing `SeoHealth`; §5 score from `GET /api/sites/[siteId]/local-seo-score` is the only displayed SEO score       |
+| **Reuse**         | Keep existing `SeoHealth` route position, gauge primitives, card shell, and `SeoTools`; extend its data contract instead of adding a second card |
 
 
 **Interactions**
 
-- Load score on section render.
+- Load the authoritative §5 score on section render; do not show the old F03 score separately.
+- Show four bucket bars as earned points / bucket maximum, not percentages.
+- Sort next actions by highest available point gain; show at most three.
 - Checklist item CTA → deep-link Editor: `/editor/[siteId]` + Settings tab/section (`requestedTab` pattern already used for breadcrumb/footer).
+- Metadata action → existing F03 AI Fix flow. Every other action → Editor.
 - Retry on error. Never invent a score number.
 
 **Success**
 
 ```text
-┌ /dashboard · SEO section ──────────────────────────────┐
-│ (existing SeoHealth — F03 general score — unchanged)   │
-│                                                        │
-│ ┌ Local SEO ──────────────────────────── 62/100 ─────┐ │
-│ │ Business · Schema · AI Discover · Technical        │ │
-│ │ Next steps (max 3)                                 │ │
-│ │ 1. Add opening hours          [ Open Editor ]      │ │
-│ │ 2. Add map location           [ Open Editor ]      │ │
-│ │ 3. Add social image           [ Open Editor ]      │ │
-│ └────────────────────────────────────────────────────┘ │
-│ (existing SeoTools — §12.4)                            │
-└────────────────────────────────────────────────────────┘
+┌ SEO Health ─────────────────────────────────────────────────────┐
+│  ┌─────────┐   Business Data             14/20  ███████░░░     │
+│  │   62    │   Schema                    23/35  ███████░░░     │
+│  │  /100   │   AI Discoverability         7/15  █████░░░░░     │
+│  └─────────┘   Technical Health          18/30  ██████░░░░     │
+│                                                                │
+│  Next actions                                       3 remaining │
+│  Add opening hours                         +5  [ Open Editor ]  │
+│  Add map location                          +4  [ Open Editor ]  │
+│  Add meta description                      +3  [ Fix with AI ]  │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-**Empty (new site)** — low score + checklist only incomplete high-impact local items.  
-**Loading** — skeleton, no number.  
-**Error** — message + Retry, no fake score.  
-**Mobile 375** — single column; CTA full width ≥44px height.
+`SeoTools` remains a separate existing card below this unified score card.
+
+**Empty (new site)** — earned score + highest-impact incomplete actions only.
+**Loading** — skeleton for gauge, four bars, and actions; no number.
+**Error** — message + Retry; no score or stale breakdown.
+**Complete (100)** — four full bars + “All clear”; no actions.
+**Mobile 375** — gauge → four bars → actions; each CTA full width and ≥44px height.
 
 ---
 
@@ -539,8 +569,10 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | Item | Note |
 |------|------|
 | Rewire `local-seo-score.ts` | Engine must match §5 point-for-point before Dashboard surfaces score |
+| F03 Content Quality wiring | `getSeoData()` must load real page layouts before scaling `contentQualityScore`; the current page query omits layout data |
+| Subtype mapping freshness | Keep the category→subtype mapping as a versioned code snapshot; refresh it against Google + Schema.org during implementation and future SEO maintenance, never at request time |
 | Domain setup UX | Schema `url` points depend on existing `Sites.domain` flows |
-| Dual checklist confusion | Editor `CompletionChecklist` (address / hours / category only) ≠ Dashboard Local SEO score checklist (max 3 from score engine). Copy and placement must stay distinct |
+| Dual checklist confusion | Editor `CompletionChecklist` (address / hours / category only) ≠ Dashboard SEO Health actions (max 3 from score engine). Copy and placement must stay distinct |
 | Deep-link targets | Checklist CTA → Editor Settings. **Chốt:** query `?settingsTab=global&section=localBusiness` (SEO: `settingsTab=seo`); reuse `requestedTab` pattern in `SettingsPanel` / editor page |
 | F22 events | Funnel metric for checklist→Editor if event pipeline ready; else measure later |
 
@@ -555,18 +587,19 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 
 - [x] Mermaid approved (2026-07-21)
 - [x] Score table locked (§5)
-- [x] Scope locked: Local SEO score + Editor data + Dashboard card/tools on tenant storefront path
+- [x] Scope locked: one SEO Health score + Editor data + Dashboard actions/tools on tenant storefront path
 - [x] Deep-link contract: `?settingsTab=global&section=localBusiness` · `?settingsTab=seo` (reuse `requestedTab`)
-- [ ] Eng capacity for score rewire + Dashboard Local SEO card
+- [ ] Eng capacity for score rewire + existing Dashboard `SeoHealth` replacement
 
 ### Definition of Done
 
 - [ ] Every AC in §7 passes (manual or automated)
 - [ ] Unit tests: `calculateLocalSeoScore` matches §5 point-for-point
-- [ ] E2E: Dashboard Local SEO card loads score; checklist deep-link opens Editor Settings section
-- [ ] Storefront emits LocalBusiness / FAQ / Org per FR-04..12
-- [ ] robots / sitemap / llms per FR-13..15
-- [ ] Dashboard score + checklist per FR-18..20
+- [ ] E2E: unified Dashboard SEO Health card loads score; action deep-link opens Editor Settings section
+- [ ] Storefront emits LocalBusiness / Org per FR-04..11
+- [ ] Category→subtype dropdown filters correctly; invalid pairs fail server validation; emitted `@type` matches the saved subtype
+- [ ] robots / sitemap / llms per FR-12..14
+- [ ] Dashboard score + checklist per FR-19..21
 - [ ] Dual checklist copy distinct (Editor form vs Dashboard score)
 - [ ] NFRs §10 met
 - [ ] Behavior matches §6.1 Mermaid
@@ -581,12 +614,10 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 
 | Area                   | Target state                                                                       |
 | ---------------------- | ---------------------------------------------------------------------------------- |
-| Score buckets          | Business 20 · Schema 40 · AI Discover 20 · Technical 20                            |
+| Score buckets          | Business 20 · Schema 35 · AI Discover 15 · Technical 30                            |
 | Business fields scored | name, address, phone only                                                          |
 | Schema                 | Every emitted property in §5 has points                                            |
-| Technical              | OG + slug only; pages always index for this feature                                |
-| Surfaces               | Editor for data; Dashboard for score/checklist/crawlers toggle                     |
-| Engine files           | `local-seo-score.ts`, `json-ld.ts`, `technical-score` inputs for OG/slug as needed |
+| Technical              | Meta title 8 · meta description 8 · Content Quality 8 · Technical SEO 6           |
+| Surfaces               | Editor for data; one Dashboard `SeoHealth` card for score/actions; `SeoTools` for toggles |
+| Engine files           | `local-seo-score.ts`, `seo-data.ts`, `content-score.ts`, `technical-score.ts`      |
 |                        |                                                                                    |
-
-

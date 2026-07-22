@@ -55,7 +55,7 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 - **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget. Cấp số liệu từ **PostHog** + internal analytics fallback.
 - **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị. Trạng thái lọc được hỗ trợ bởi **Redis Cache** dự phòng lỗi Rate Limit.
 - **Analytics Details:** Visitors, Clicks, Orders, Sales, Daily bar chart, Top Pages, Top Products. Dùng PostHog + internal analytics fallback.
-- **SEO Health:** Overall score (0-100) and breakdown, Basic Keyword Tracker nhập tay, AI "Fix All Issues ✨" với SSE streaming (ứng dụng Prompt Batching và Context Limit 150 ký tự), Auto meta tag generation (chuẩn SEO 60/160 chars), Sitemap, JSON-LD Schema.
+- **SEO Health:** Một score 0–100 theo F37 với 4 buckets (Business Data, Schema, AI Discoverability, Technical Health), tối đa 3 actions; AI Fix chỉ áp dụng metadata. Basic Keyword Tracker, Auto Meta, Sitemap và SEO tools giữ riêng.
 - **Connectivity:** PostHog analytics integration cho website traffic/clicks/funnels. Không dùng GA4 hoặc Google Search Console vì phần lớn seller dùng platform subdomain.
 
 ### Out of Scope
@@ -98,7 +98,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 | FR-06 | **Analytics:** 4 stat cards: Visitors, Clicks, Orders, Sales | US-F03-02 | P0 | Source: PostHog + Orders |
 | FR-07 | **Analytics:** Daily bar chart with period selector (Today, 7d, 30d) | US-F03-02 | P0 | Low-tech chart, no technical labels |
 | FR-08 | **Analytics:** Top Pages + Top Products list (max 10 rows) | US-F03-02 | P0 | Source: PostHog/internal tracking |
-| FR-09 | **SEO:** Overall SEO score (0-100) + 3 category breakdown theo trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%). Dashboard hiển thị điểm từng hạng mục dạng thanh tiến trình hoặc con số để người dùng biết cần cải thiện phần nào. | US-F03-03 | P0 | |
+| FR-09 | **SEO:** Chỉ hiển thị một SEO Health score 0–100 theo F37: Business Data 20, Schema 35, AI Discoverability 15, Technical Health 30; kèm tối đa 3 actions xếp theo điểm tăng. | US-F03-03 | P0 | F37 §5, §12.3 |
 | FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, rank & trend) | US-F03-06 | P1 | Chỉ nhập từ khoá thủ công (manual input). Không tích hợp Google Search Console trong F03/F37 vì seller dùng platform subdomain. |
 | FR-11 | **SEO:** "Fix All Issues ✨" → SSE streaming. Tối ưu context (chỉ truyền 150 ký tự đầu tiên), Batch process. | US-F03-05 | P0 | < 15s, Token cost optimization. MVP: dùng Promise.all xử lý song song (đủ cho 5-10 trang, ~3-5 giây). SSE streaming sẽ nâng cấp sau khi cần hỗ trợ >10 trang. |
 | FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all qua DB Transaction) | US-F03-05 | P0 | |
@@ -156,7 +156,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   - Tabs Navigation: Toolbar gồm 3 tab `[Overview]`, `[Analytics]`, `[SEO Health]` để chuyển đổi màn hình.
   - Stat Cards View (4 cột): Traffic, Leads, Orders, Revenue.
   - Action Required List: Các tác vụ đang pending.
-  - SEO Health Widget: Biểu đồ tròn điểm tổng quát và CTA AI Fix.
+  - SEO Health Widget: Một gauge, 4 bucket bars theo điểm đạt/tối đa, và tối đa 3 actions; AI Fix chỉ xuất hiện cho metadata.
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]text
   - [Link tới file wireframe/design trong thư mục docs/design/...]

@@ -120,21 +120,22 @@ Thiếu Meta title, Chưa tối ưu ảnh...
 
 ```text
 [ Dashboard ] > [ SEO Dashboard ]
-                              |
----------------------------------------------------------------------------------------------------
-| [ Tổng quan SEO Health ]                                 | [ Sitemap & Meta Tags ]              |
-|                                                          | [ Generate Sitemap ]                 |
-|       /---\       Score: 75/100                          | Last updated: 24/05/2026             |
-|      | 75  |      [ ✨ AI Fix All Issues ]               | Auto Meta Generation: [x] Enabled    |
-|       \---/                                              |                                      |
-| Breakdown:                                               |                                      |
-| - Meta Tags: 60/100 (Cần cải thiện)                      |                                      |
-| - Content: 80/100   (Tốt)                                |                                      |
-| - Technical: 90/100 (Rất tốt)                            |                                      |
----------------------------------------------------------------------------------------------------
-                              |
+┌ SEO Health ─────────────────────────────────────────────────────┐
+│  ┌─────────┐   Business Data             14/20  ███████░░░     │
+│  │   62    │   Schema                    23/35  ███████░░░     │
+│  │  /100   │   AI Discoverability         7/15  █████░░░░░     │
+│  └─────────┘   Technical Health          18/30  ██████░░░░     │
+│                                                                │
+│  Next actions                                       3 remaining │
+│  Add opening hours                         +5  [ Open Editor ]  │
+│  Add map location                          +4  [ Open Editor ]  │
+│  Add meta description                      +3  [ Fix with AI ]  │
+└────────────────────────────────────────────────────────────────┘
+
+[ SEO Automation ]
+Sitemap [ Resubmit ]  Auto Meta [ ON ]  AI Crawlers [ ON ]
+
 [ Keyword Tracker (Max 5) ]   | [ + Thêm Từ Khóa ]
-                              |
 | Keyword             | Rank on Google | Trend | Action   |
 -----------------------------------------------------------
 | "buy shoes online"  | #5             | [ ↗ ] | [ Del ]  |

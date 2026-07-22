@@ -50,7 +50,7 @@ interface SEOScore {
 // Trọng số theo plan SEO Sprint 1:
 // - Meta Tags: 40% (title exists, title length, desc exists, desc length)
 // - Content:   35% (H1/hero, word count ≥300, alt text coverage, contact section)
-// - Technical: 25% (OG image, noIndex check, slug SEO-friendly, Google verification)
+// - Technical: 25% (OG image, noIndex check, Google verification)
 //
 // overall = meta * 0.4 + content * 0.35 + technical * 0.25
 

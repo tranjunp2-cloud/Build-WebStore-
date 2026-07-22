@@ -175,8 +175,9 @@ So that Google index site tốt hơn
 GIVEN user ở /dashboard/seo
 WHEN  page load
 THEN  Overall SEO Score (0-100) hiển thị rõ
-  AND breakdown 3 hạng mục có trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%)
-  AND mỗi hạng mục hiển thị điểm riêng (0-100) dạng thanh tiến trình hoặc con số
+  AND đây là score duy nhất, không có Local SEO card thứ hai
+  AND breakdown hiển thị Business Data /20, Schema /35, AI Discoverability /15, Technical Health /30
+  AND tối đa 3 actions được xếp theo điểm tăng; AI Fix chỉ áp dụng metadata
   AND người dùng nhìn vào biết ngay cần cải thiện phần nào
 ```
 

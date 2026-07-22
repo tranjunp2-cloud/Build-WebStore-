@@ -75,7 +75,7 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập `/dashboard/seo`. | - Hiển thị vòng tròn điểm SEO /100.<br>- Liệt kê các nhóm: Lỗi kỹ thuật, Meta Tags thiếu, Nội dung kém. | Blocker | [x] |
+| **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập Dashboard → SEO Health. | - Chỉ có một score /100.<br>- Hiển thị Business Data /20, Schema /35, AI Discoverability /15, Technical Health /30.<br>- Tối đa 3 actions; AI Fix chỉ cho metadata. | Blocker | [x] |
 | **TC-F03.30** | `US-03/AC-2` | `Func` | **[Sitemap]** Tạo Sitemap XML tự động | 1. Nhấn **Generate Sitemap**. | - File Sitemap được tạo trong thư mục static route của server.<br>- Toast thông báo xanh lá xuất hiện trong < 2 giây. | High | [x] |
 | **TC-F03.31** | `US-03/AC-3` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
 

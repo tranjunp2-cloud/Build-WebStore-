@@ -61,10 +61,10 @@ So that hệ thống có dữ liệu chuẩn để hiển thị tôi trên Googl
 
 ```gherkin
 GIVEN seller ở Site Settings → section "Thông tin doanh nghiệp địa phương"
-WHEN  điền streetAddress, city, state, postcode, country, chọn businessCategory, nhập giờ mở cửa
+WHEN  điền streetAddress, city, state, postcode, country, chọn businessCategory rồi chọn schemaSubtype tương thích, nhập giờ mở cửa
   AND nhấn Save
 THEN  dữ liệu lưu vào Sites collection, group `localBusiness`
-  AND LocalBusiness JSON-LD trên storefront homepage emit đầy đủ PostalAddress, openingHoursSpecification, @type đúng sub-type
+  AND LocalBusiness JSON-LD trên storefront homepage emit đầy đủ PostalAddress, openingHoursSpecification, @type đúng schemaSubtype đã chọn
   AND Local SEO Score tăng ≥ 20 điểm
   AND checklist items "Thêm địa chỉ" và "Cập nhật giờ mở cửa" đổi sang ✓ Done
 ```
@@ -222,17 +222,17 @@ THEN  response là text/plain, HTTP 200, format Markdown
 
 ---
 
-## US-F37-04: Local SEO Score & Actionable Checklist
+## US-F37-04: Unified SEO Health Score & Actions
 
 **Wave 4** | **P0** | **L** | **Status:** Draft
 
-> **Reality note:** F03 đã có general SEO score. Local SEO Score là điểm **riêng biệt**, không thay thế. **RESOLVED (CF-4):** score normalize trên bucket đang áp dụng. Phase 1 (Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15%) đạt 100; Google Business Profile/Reviews/Business Info/Citations unlock ở Phase 2 và không làm tụt điểm Phase 1.
+F37 replaces the existing F03 score contents. Dashboard shows one SEO Health score only: Business Data 20 / Schema 35 / AI Discoverability 15 / Technical Health 30.
 
 ### Story
 
 ```
 As a   chủ shop SME không rành kỹ thuật
-I want một điểm Local SEO và danh sách "Việc cần làm" ưu tiên rõ ràng
+I want một điểm SEO Health và danh sách "Việc cần làm" ưu tiên rõ ràng
 So that tôi biết chính xác phải làm gì tiếp theo để khách tìm thấy mình
 ```
 
@@ -241,14 +241,14 @@ So that tôi biết chính xác phải làm gì tiếp theo để khách tìm th
 #### AC-1: Happy Path — Score phản ánh completeness
 
 ```gherkin
-GIVEN site chưa có local business data, chưa kết nối Google Business Profile
+GIVEN site còn thiếu các signal trong scorecard F37 §5
 WHEN  vào `Dashboard > SEO`
-THEN  Local SEO Score hiển thị ≤ 30/100
-  AND checklist hiển thị tối đa 3 items "Việc cần làm" priority High
+THEN  một SEO Health Score hiển thị đúng tổng điểm đã earn
+  AND actions hiển thị tối đa 3 items, xếp theo điểm tăng
 
 GIVEN seller hoàn thành địa chỉ cấu trúc + giờ mở cửa + bật AI crawlers (Phase 1)
 WHEN  hệ thống tính lại score
-THEN  Local SEO Score tăng tương ứng các hạng mục đã earn
+THEN  SEO Health Score tăng tương ứng các hạng mục đã earn
   AND số items High priority (không phụ thuộc GBP) = 0
 ```
 
@@ -264,8 +264,8 @@ THEN  toggle "Cho phép AI crawlers" tự động bật
 
 ### Additional Criteria
 
-- [ ] Công thức Phase 1: Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15% (normalize, đạt 100). Phase 2 thêm Google Business Profile/Reviews/Business Info/Citations — xem PRD §13.8
-- [ ] Score tính lại khi save site settings hoặc khi GBP metrics refresh (max 1 lần/24h) — BR-07. PostHog website analytics không ảnh hưởng Local SEO Score
+- [ ] Công thức: Business Data 20 / Schema 35 / AI Discoverability 15 / Technical Health 30 — xem F37 PRD §5
+- [ ] Score tính lại khi seller thay đổi signal thuộc §5; PostHog website analytics không ảnh hưởng score
 - [ ] Checklist tối đa 3 items, ẩn item đã done (BR-10)
 - [ ] Pure function `src/lib/seo/local-seo-score.ts` (mới)
 - [ ] Mỗi item: mô tả seller-friendly, impact label, nút action
@@ -459,66 +459,6 @@ THEN  không hiển thị warning trong `Settings > Business Info`
 
 ---
 
-## US-F37-08: Auto SEO/AEO Generation for Tenant Sites
-
-**Wave 4** | **P0 (metadata fallback) / P1 (AI FAQ)** | **M** | **Status:** Draft
-
-> **Reality note:** Phần lớn đã có sẵn. ① Metadata fallback cascading đã chạy (`sites/[slug]/[[...path]]/page.tsx:191`, `autoMetaEnabled` đã có). ② FAQPage JSON-LD đã auto-emit (`generateFAQSchema()` + `generatePageSchemas()`). ③ Scope isolation đã đúng (robots/sitemap per-tenant). → Story này **VERIFY + bịt gap**, phần **mới** chỉ là: fallback cuối cùng khi mọi field trống + AI-generated FAQ draft.
-
-### Story
-
-```
-As a   chủ shop SME không điền SEO fields
-I want mọi trang storefront luôn có metadata đầy đủ và FAQ schema tự động
-So that tôi không bao giờ vô hình với Google/AI dù không biết gì về SEO
-```
-
-### Acceptance Criteria
-
-#### AC-1: Happy Path — Empty fields vẫn có metadata đầy đủ
-
-```gherkin
-GIVEN một trang product trên tenant storefront chưa được điền SEO title/description/OG fields
-WHEN  crawler hoặc browser fetch /sites/[slug]/products/[product-slug]
-THEN  HTML <head> chứa: <title> (50–60 chars), <meta name="description"> (150–160 chars), og:title, og:description, og:url, <link rel="canonical">
-  AND title auto-generated từ product name + business name (không "undefined", không rỗng)
-  AND không tag nào bị content="" hoặc thiếu hoàn toàn
-```
-
-#### AC-2: Auto FAQPage JSON-LD
-
-```gherkin
-GIVEN trang tenant storefront có FAQ block với ≥ 1 cặp câu hỏi/trả lời
-WHEN  fetch HTML của trang
-THEN  chứa JSON-LD script @type "FAQPage"
-  AND mỗi câu hỏi map thành entity "Question" với "acceptedAnswer"
-  AND validator Schema.org không báo lỗi
-```
-
-#### AC-3: Scope isolation — Platform không bị ảnh hưởng
-
-```gherkin
-GIVEN request đến route platform main site (/, /dashboard, /admin, /api/v1/*)
-WHEN  server xử lý request
-THEN  không áp dụng llms.txt, AI crawler logic, hay metadata fallback của F37
-  AND fetch {platform-domain}/llms.txt trả về 404
-  AND robots.txt của platform KHÔNG bị modify bởi logic F37
-```
-
-### Additional Criteria
-
-- [ ] Util mới `src/lib/seo/auto-meta-fallback.ts` — pure function, < 1ms, không async, không gọi AI (BR-14)
-- [ ] FAQ content: AI-generated draft (reuse OpenAI hiện có `src/lib/ai/generate-meta.ts`), seller edit trước khi publish
-- [ ] KHÔNG duplicate F03 AI Fix-All (on-demand bulk); F37 là systematic always-on default
-- [ ] Verify các route storefront thiếu generateMetadata (checkout/orders) có cần fallback không
-
-### Definition of Done
-
-- [ ] 9-Point Checklist pass
-- [ ] Metadata fallback verified trên page/product/blog với fields trống
-
----
-
 ## US-F37-09: Malaysia Market Optimization
 
 **Wave 4** | **P0 (states/MYR/phone) / P1 (Waze/Halal)** | **L** | **Status:** Draft
@@ -606,15 +546,10 @@ THEN  hreflang chưa implement; unblock khi F21 có URL-based locale routing /en
 
 | Story     | PRD FR                          | Phase                     |
 | --------- | ------------------------------- | ------------------------- |
-| US-F37-01 | FR-01, FR-02, FR-03             | 1                         |
-| US-F37-02 | FR-04, FR-05, FR-06             | 1                         |
-| US-F37-03 | FR-07, FR-08, FR-09             | 1                         |
-| US-F37-04 | FR-10, FR-11, FR-12, FR-13      | 1                         |
-| US-F37-05 | FR-14, FR-15, FR-16             | 2                         |
-| US-F37-06 | FR-17, FR-18, FR-19             | 2                         |
-| US-F37-07 | FR-20, FR-21                    | 2                         |
-| US-F37-08 | FR-22, FR-23, FR-24             | 1                         |
-| US-F37-09 | FR-25, FR-26 (P2), FR-27, FR-28 | 1 (hreflang → 2/deferred) |
+| US-F37-01 | FR-01..03                       | Current                   |
+| US-F37-02 | FR-04..11                       | Current                   |
+| US-F37-03 | FR-12..14                       | Current                   |
+| US-F37-04 | FR-15..21                       | Current                   |
 
 
 ---
@@ -623,4 +558,4 @@ THEN  hreflang chưa implement; unblock khi F21 có URL-based locale routing /en
 
 Không còn — tất cả đã chốt thành decision.
 
-> Đã chốt: thị trường MY duy nhất (không scope VN), Local SEO Score Phase 1/2 (PRD §13.8), Geocoding paste-link 3 lớp (PRD §13.9).
+> Đã chốt: thị trường MY duy nhất; scorecard theo F37 PRD §5; Geocoding paste-link 3 lớp.
