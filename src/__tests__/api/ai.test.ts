@@ -11,6 +11,7 @@ import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -916,6 +917,7 @@ describe('AI Streaming APIs', () => {
         })
 
         it('[TC-GENPERF-W3-26] regeneration swaps staged pages only after all barriers pass', async () => {
+             const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
                  tenant: 'tenant-1',
@@ -947,6 +949,15 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-404')).toBe(true)
+
+             const promotionUpdates = vi.mocked(payload.update).mock.calls.filter(
+                 ([arg]) => arg.collection === 'pages' && typeof arg.data?.slug === 'string',
+             )
+             expect(promotionUpdates).toHaveLength(5)
+             for (const [arg] of promotionUpdates) {
+                 expect(Array.isArray(arg.data?.layout)).toBe(true)
+                 expect(arg.data?.layout).toEqual(stripArrayItemIds(arg.data?.layout))
+             }
         })
 
         it('[TC-GENPERF-W3-29] regeneration preserves an existing catalog without recreating deterministic SKUs', async () => {

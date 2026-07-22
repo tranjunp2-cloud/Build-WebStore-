@@ -960,7 +960,12 @@ export async function POST(req: NextRequest) {
         let site: Record<string, unknown>
         let stagedPageSwap: null | {
             oldPageIds: Array<string | number>
-            pages: Array<{ id: string | number; slug: string; isHomepage: boolean }>
+            pages: Array<{
+                id: string | number
+                slug: string
+                isHomepage: boolean
+                layout: Record<string, unknown>[]
+            }>
         } = null
 
         // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
@@ -1338,6 +1343,9 @@ export async function POST(req: NextRequest) {
                         id: createdPage.id as string | number,
                         slug: pageDefinition.slug,
                         isHomepage: pageDefinition.isHomepage,
+                        layout: Array.isArray(normalizedLayout)
+                            ? normalizedLayout as Record<string, unknown>[]
+                            : [],
                     })
                     // Downstream navigation/completion logic must reason about
                     // canonical pages, not their temporary persistence slugs.
@@ -1441,6 +1449,10 @@ export async function POST(req: NextRequest) {
                             id: createdPage.id as string | number,
                             data: { layout: cleanedPatchedLayout },
                         })
+                        const stagedPage = stagedPageSwap?.pages.find(
+                            page => page.id === createdPage.id,
+                        )
+                        if (stagedPage) stagedPage.layout = cleanedPatchedLayout
                     } catch (syncErr) {
                         console.warn(
                             '[generate-site] layout-sync patch failed page=%s: %s',
@@ -1793,6 +1805,14 @@ export async function POST(req: NextRequest) {
                         data: {
                             slug: stagedPage.slug,
                             isHomepage: stagedPage.isHomepage,
+                            // Payload 3.79 merges the stored document during a
+                            // partial update. Array-row IDs from that stored layout
+                            // are not valid input fields and trigger
+                            // "The following field is invalid: id". Supplying the
+                            // sanitized layout avoids merging those managed IDs.
+                            layout: normalizeBlocksForPersistence(
+                                stripArrayItemIds(stagedPage.layout) as Record<string, unknown>[],
+                            ),
                         },
                         req: transactionReq,
                     })
