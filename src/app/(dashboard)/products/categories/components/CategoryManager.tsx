@@ -333,7 +333,19 @@ export default function CategoryManager() {
             if (formData.parent) payload.parent = formData.parent
             else payload.parent = null // explicit null to clear parent
 
-            await saveCategoryAction(payload, formData.id)
+            const result = await saveCategoryAction(payload, formData.id)
+            if (typeof result === 'object' && result !== null && 'success' in result && result.success === false) {
+                const errMsg = result.error === 'CATEGORY_NAME_DUPLICATE'
+                    ? (t.dashboard.products.categories.form.errors?.nameDuplicate || 'Category name already exists in this level.')
+                    : result.error === 'CATEGORY_PARENT_ID_INVALID'
+                        ? t.dashboard.products.categories.toast.parentInvalid
+                        : result.error === 'CATEGORY_SLUG_DUPLICATE'
+                            ? (t.dashboard.products.categories.form.errors?.slugDuplicate || 'This URL slug is already used in your store.')
+                            : t.dashboard.products.categories.toast.saveError
+                if (result.error === 'CATEGORY_NAME_DUPLICATE') setNameError(errMsg)
+                toast.error(errMsg)
+                return
+            }
 
             const msg = formData.id
                 ? t.dashboard.products.categories.toast.updated.replace('{name}', formData.name)
@@ -353,6 +365,8 @@ export default function CategoryManager() {
                 toast.error(t.dashboard.products.categories.toast.cycleError)
             } else if (message === 'CATEGORY_MAX_DEPTH_ERROR') {
                 toast.error(t.dashboard.products.categories.toast.maxDepthError)
+            } else if (message === 'CATEGORY_PARENT_ID_INVALID') {
+                toast.error(t.dashboard.products.categories.toast.parentInvalid)
             } else if (message === 'CATEGORY_PARENT_TENANT_MISMATCH') {
                 toast.error(t.dashboard.products.categories.toast.parentTenantMismatch)
             } else if (message === 'CATEGORY_PARENT_SOFT_DELETED') {
@@ -369,12 +383,20 @@ export default function CategoryManager() {
         if (!categoryToDelete) return
         try {
             setIsDeleting(true)
-            await deleteCategoryAction(categoryToDelete.id)
+            const result = await deleteCategoryAction(categoryToDelete.id)
+            if (typeof result === 'object' && result !== null && 'success' in result && result.success === false) {
+                const count = result.count ?? 0
+                const message = result.error === 'CATEGORY_HAS_PRODUCTS'
+                    ? t.dashboard.products.categories.deleteModal.hasProductsError.replace('{count}', String(count))
+                    : t.dashboard.products.categories.deleteModal.reparentNameConflictError.replace('{count}', String(count))
+                toast.error(message)
+                return
+            }
 
             toast.success(t.dashboard.products.categories.toast.deleted.replace('{name}', categoryToDelete.name))
             setIsDeleteOpen(false)
             setCategoryToDelete(null)
-            fetchCategories()
+            await fetchCategories()
         } catch (error: any) {
             const message = error?.message || ''
             if (message.startsWith('CATEGORY_HAS_PRODUCTS:')) {
