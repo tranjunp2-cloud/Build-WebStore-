@@ -9,7 +9,7 @@ import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { BLOCK_IMAGE_SPEC, planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -351,22 +351,6 @@ export async function POST(req: NextRequest) {
             where: { tenant: { equals: resolvedTenantId } },
             limit: 1,
         })
-        const existingProductCountPromise = existingSitesPromise
-            .then(async (existingSites) => {
-                const existingSiteId = existingSites.docs[0]?.id
-                if (existingSiteId === undefined) return 0
-                const existingProducts = await payload.count({
-                    collection: 'products',
-                    where: {
-                        and: [
-                            { tenant: { equals: resolvedTenantId } },
-                            { site: { equals: existingSiteId } },
-                            { deletedAt: { exists: false } },
-                        ],
-                    },
-                })
-                return existingProducts.totalDocs
-            })
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
@@ -486,7 +470,6 @@ export async function POST(req: NextRequest) {
             createdPages: Record<string, unknown>[]
             pageFailures: Array<{ slug: string; title: string; error: string }>
             productsCreatedCount: number
-            blogsReadyCount: number
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             blockImageStats: { succeeded: number; failed: number }
@@ -647,23 +630,11 @@ export async function POST(req: NextRequest) {
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = existingProductCountPromise.then(async (existingProductsCount) => {
-                // Regeneration must preserve the merchant's catalog. Recreating
-                // deterministic sample SKUs would collide with the tenant-level
-                // unique index and should never replace real product data.
-                if (existingProductsCount > 0) {
-                    return {
-                        products: [],
-                        stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
-                        existingProductsCount,
-                    }
-                }
-
-                await Promise.race([
-                    imagePoolPromise.then(() => undefined),
-                    new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-                ])
-                const generated = await trackPhase('products_prepare', () =>
+            const sampleProductsPromise = Promise.race([
+                imagePoolPromise.then(() => undefined),
+                new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+            ]).then(() =>
+                trackPhase('products_prepare', () =>
                     generateSampleProducts(
                         businessInfo,
                         effectiveGenerationLocale,
@@ -671,9 +642,8 @@ export async function POST(req: NextRequest) {
                         payload,
                         undefined,
                     ),
-                )
-                return { ...generated, existingProductsCount: 0 }
-            })
+                ),
+            )
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('site_ai', () =>
@@ -703,7 +673,6 @@ export async function POST(req: NextRequest) {
                 .then((existingSites) => prepareBlogPosts({
                     payload,
                     tenantId: resolvedTenantId,
-                    siteId: existingSites.docs[0]?.id as string | number | undefined,
                     category: normalizeComposerCategory(businessInfo.industry),
                     businessName: businessInfo.businessName,
                     products: parseProductsString(businessInfo.products),
@@ -785,14 +754,14 @@ export async function POST(req: NextRequest) {
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 const aiPagesForMedia = (result as { pages?: unknown[] }).pages
                 if (!Array.isArray(aiPagesForMedia) || aiPagesForMedia.length === 0) {
-                    // Single-page AI responses are expanded into Home + four
+                    // Single-page AI responses are expanded into Home + three
                     // subpages later by buildGeneratedPages. Reserve their hero
                     // photos in this same batch so cloning the base hero does not
                     // clone its Media ID onto every page as well.
                     const hasFallbackHero = Array.isArray(result.blocks)
                         && result.blocks.some(block => block?.blockType === 'hero')
                     if (hasFallbackHero) {
-                        for (let index = 0; index < 4; index++) {
+                        for (let index = 0; index < 3; index++) {
                             needs.push({
                                 blockType: 'hero',
                                 count: 1,
@@ -990,9 +959,8 @@ export async function POST(req: NextRequest) {
             })
             _site = site
 
-            // Regeneration replaces page content immediately. If a later phase
-            // fails, request-created rows are cleaned up and the site remains
-            // failed so the user can generate again from scratch.
+            // Regeneration replaces page content immediately, matching the
+            // original direct-write flow used before PR #1658.
             const oldPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: site.id } },
@@ -1244,26 +1212,20 @@ export async function POST(req: NextRequest) {
                     )
                     cleanupNonNumericImageFields(normalizedLayout as Record<string, unknown>[])
                     // Also null numeric image refs so Payload doesn't try them again.
-                    let droppedImageRefs = 0
                     for (const block of normalizedLayout as Record<string, unknown>[]) {
-                        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
-                        const imageSpec = BLOCK_IMAGE_SPEC[blockType]
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') {
                                 delete block[field]
-                                if (imageSpec?.topLevel?.includes(field)) droppedImageRefs++
                             }
                         }
                         for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
                             const arr = block[arrayField]
                             if (!Array.isArray(arr)) continue
-                            const nestedSpec = imageSpec?.nestedArray?.find((entry) => entry.arrayField === arrayField)
                             for (const item of arr as Record<string, unknown>[]) {
                                 if (item && typeof item === 'object') {
                                     for (const f of ['image', 'logo', 'avatar']) {
                                         if (typeof item[f] === 'number') {
                                             delete item[f]
-                                            if (nestedSpec?.itemField === f) droppedImageRefs++
                                         }
                                     }
                                 }
@@ -1282,9 +1244,6 @@ export async function POST(req: NextRequest) {
                             seo: pageDefinition.seo,
                         },
                     }) as Record<string, unknown>
-                    // Count only schema-declared required refs. Unsupported AI
-                    // image fields are discarded without failing completeness.
-                    blockImageStats.failed += droppedImageRefs
                 }
                 createdPages.push(createdPage)
                 _createdPagesCount++
@@ -1468,16 +1427,10 @@ export async function POST(req: NextRequest) {
                 || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
         }
         let productsCreatedCount = 0
-        let existingProductsCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
         try {
-            const {
-                products: sampleProducts,
-                stats: imgStats,
-                existingProductsCount: preparedExistingProductsCount,
-            } = await sampleProductsPromise
-            existingProductsCount = preparedExistingProductsCount
+            const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             productImageStats = imgStats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
@@ -1517,16 +1470,6 @@ export async function POST(req: NextRequest) {
                     }
                 } catch (err) {
                     console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
-                }
-            }
-            const createProductWithoutImage = async (baseData: Record<string, unknown>): Promise<boolean> => {
-                try {
-                    await payload.create({ collection: 'products', data: baseData })
-                    productsCreatedCount++
-                    productImageStats.noImage++
-                    return true
-                } catch {
-                    return false
                 }
             }
             for (const product of sampleProducts) {
@@ -1619,15 +1562,24 @@ export async function POST(req: NextRequest) {
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
                                 } catch {
                                     // retry with new id also failed — give up gracefully
-                                    await createProductWithoutImage(baseData)
+                                    try {
+                                        await payload.create({ collection: 'products', data: baseData })
+                                        productsCreatedCount++
+                                    } catch { /* non-fatal */ }
                                     console.warn(`[generate-site] STALE_MEDIA_FK_GIVE_UP product="${name}" oldId=${safeImageId} reason=retry_fk`)
                                 }
                             } else {
-                                await createProductWithoutImage(baseData)
+                                try {
+                                    await payload.create({ collection: 'products', data: baseData })
+                                    productsCreatedCount++
+                                } catch { /* non-fatal */ }
                                 console.warn(`[generate-site] STALE_MEDIA_FK_RETRY_FAIL product="${name}" oldId=${safeImageId} reason=reupload_fail`)
                             }
                         } else {
-                            await createProductWithoutImage(baseData)
+                            try {
+                                await payload.create({ collection: 'products', data: baseData })
+                                productsCreatedCount++
+                            } catch { /* non-fatal */ }
                             console.warn(`[generate-site] STALE_MEDIA_FK_NO_FALLBACK product="${name}" imageId=${safeImageId}`)
                         }
                     } else {
@@ -1643,28 +1595,21 @@ export async function POST(req: NextRequest) {
             generationTimings.record('products_write', Date.now() - productsWriteStarted)
         }
 
-        if (existingProductsCount === 0 && productsCreatedCount !== 6) {
-            throw new Error(`COMPLETION_INCOMPLETE_PRODUCTS expected=6 actual=${productsCreatedCount}`)
-        }
-        if (productImageStats.noImage > 0) {
-            throw new Error(`COMPLETION_INCOMPLETE_PRODUCT_MEDIA missing=${productImageStats.noImage}`)
-        }
-        if (blockImageStats.failed > 0) {
-            throw new Error(`COMPLETION_INCOMPLETE_BLOCK_MEDIA missing=${blockImageStats.failed}`)
-        }
-
-        // Blogs are part of the completion contract. Better-match thumbnail
-        // enrichment may be deferred, but the three visible rows and content
-        // must exist before the site becomes completed or `done` is emitted.
-        const preparedBlogs = await trackPhase('blog_prepare_wait', () => blogPrepPromise)
-        let blogsReadyCount = 0
+        // Give blog preparation a bounded grace window. If it is still pending
+        // or failed, finish the optional seeding after the response.
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 8_000
+        let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
+        const blogGraceStarted = Date.now()
+        const preparedBlogs = await Promise.race([
+            blogPrepPromise,
+            new Promise<'pending'>((resolve) => {
+                blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS)
+            }),
+        ])
+        generationTimings.record('blog_grace', Date.now() - blogGraceStarted)
+        if (blogGraceTimer) clearTimeout(blogGraceTimer)
         if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
-            if (preparedBlogs.some((post) => post.thumbnailId === undefined)) {
-                throw new Error(
-                    `COMPLETION_INCOMPLETE_BLOG_MEDIA expected=${preparedBlogs.length} actual=${preparedBlogs.filter((post) => post.thumbnailId !== undefined).length}`,
-                )
-            }
-            blogsReadyCount = await trackPhase('blog_write', () =>
+            const blogsCreated = await trackPhase('blog_write', () =>
                 persistBlogPosts(
                     payload,
                     preparedBlogs,
@@ -1672,52 +1617,55 @@ export async function POST(req: NextRequest) {
                     site.id as string | number,
                     user.id,
                 ),
-            )
-            console.info(`[generate-site] blog posts inline: ${blogsReadyCount}/${preparedBlogs.length}`)
-        } else if (preparedBlogs === null) {
-            blogsReadyCount = await trackPhase('blog_write_fallback', () => seedBlogPosts(
-                payload,
-                resolvedTenantId,
-                site.id as string | number,
-                normalizeComposerCategory(businessInfo.industry),
-                businessInfo.businessName,
-                user.id,
-                parseProductsString(businessInfo.products),
-                businessInfo.industry,
-                computeGenSeed(businessInfo),
-            ))
+            ).catch(err => {
+                console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message)
+                return 0
+            })
+            console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
+        } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
+            const _blogSeedTask = () =>
+                blogPrepPromise
+                    .then((prepared) => {
+                        if (Array.isArray(prepared) && prepared.length > 0) {
+                            return persistBlogPosts(
+                                payload,
+                                prepared,
+                                resolvedTenantId,
+                                site.id as string | number,
+                                user.id,
+                            )
+                        }
+                        if (prepared === null) {
+                            return seedBlogPosts(
+                                payload,
+                                resolvedTenantId,
+                                site.id as string | number,
+                                normalizeComposerCategory(businessInfo.industry),
+                                businessInfo.businessName,
+                                user.id,
+                                parseProductsString(businessInfo.products),
+                                businessInfo.industry,
+                                computeGenSeed(businessInfo),
+                            )
+                        }
+                        return 0
+                    })
+                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+            try {
+                after(_blogSeedTask)
+            } catch {
+                void _blogSeedTask()
+            }
         }
 
-        // Verify complete persisted rows rather than treating a settled promise
-        // as proof. This also covers regeneration where prep returns [].
-        const completeBlogs = await trackPhase('blog_count', () => payload.count({
-            collection: 'blogs',
-            where: {
-                and: [
-                    { tenant: { equals: resolvedTenantId } },
-                    { site: { equals: site.id } },
-                    { content: { exists: true } },
-                    { thumbnail: { exists: true } },
-                ],
-            },
-        }))
-        blogsReadyCount = completeBlogs.totalDocs
-        if (blogsReadyCount < 3) {
-            throw new Error(`COMPLETION_INCOMPLETE_BLOGS expected=3 actual=${blogsReadyCount}`)
-        }
-
-        // Completion barrier: required pages, products, and inline-ready blogs
-        // have settled before the site becomes observable as completed.
-        const completionData = {
-            ...siteGenerationData,
-            generationStatus: 'completed' as const,
-            ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
-            ...cartPatch,
-        }
         await trackPhase('site_complete', () => payload.update({
             collection: 'sites',
             id: site.id as string | number,
-            data: completionData,
+            data: {
+                generationStatus: 'completed',
+                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+                ...cartPatch,
+            },
         }))
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
@@ -1751,7 +1699,7 @@ export async function POST(req: NextRequest) {
         }
 
             const timeMs = generationTimings.totalMs()
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, blogsReadyCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1783,7 +1731,6 @@ export async function POST(req: NextRequest) {
                             createdPages,
                             pageFailures,
                             productsCreatedCount,
-                            blogsReadyCount,
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
@@ -1818,9 +1765,6 @@ export async function POST(req: NextRequest) {
                                 siteLanguage: result.language || language,
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
-                                productsCount: productsCreatedCount,
-                                blogsCount: blogsReadyCount,
-                                imagesFailed: blockImageStats.failed,
                                 timeMs,
                             })}\n\n`
                         generationTimings.record('done_sent', 0)
@@ -2213,13 +2157,6 @@ export function buildGeneratedPages({
     const features = blocks.find((block) => block.blockType === 'features') || null
     const testimonials = blocks.find((block) => block.blockType === 'testimonials') || null
     const contact = blocks.find((block) => block.blockType === 'contact') || null
-    const blogList = blocks.find((block) => block.blockType === 'blog-list') || {
-        blockType: 'blog-list',
-        variant: 'grid',
-        headline: 'Latest Insights',
-        subheadline: `News and practical advice from ${businessInfo.businessName}.`,
-        limit: 6,
-    }
     const footer = blocks.find((block) => block.blockType === 'footer') || null
 
     const compact = (pageBlocks: Array<AIBlock | null>) =>
@@ -2287,30 +2224,6 @@ export function buildGeneratedPages({
             },
         },
         {
-            title: 'Blog',
-            slug: '/blog',
-            isHomepage: false,
-            layout: compact([
-                navigation,
-                createPageHero(hero, {
-                    headline: `${businessInfo.businessName} Insights`,
-                    subheadline: 'Helpful ideas, updates, and practical guides.',
-                    primaryLabel: 'Contact us',
-                    primaryUrl: '/contact',
-                    secondaryLabel: 'Back to home',
-                    secondaryUrl: '/',
-                    badgeText: 'Blog',
-                    mediaId: fallbackHeroMediaIds?.[2],
-                }),
-                blogList,
-                footer,
-            ]),
-            seo: {
-                title: `${businessInfo.businessName} Blog`,
-                description: `Latest insights and updates from ${businessInfo.businessName}.`,
-            },
-        },
-        {
             title: 'Contact',
             slug: '/contact',
             isHomepage: false,
@@ -2324,7 +2237,7 @@ export function buildGeneratedPages({
                     secondaryLabel: 'View services',
                     secondaryUrl: '/products',
                     badgeText: 'Contact Us',
-                    mediaId: fallbackHeroMediaIds?.[3],
+                    mediaId: fallbackHeroMediaIds?.[2],
                 }),
                 contact,
                 footer,

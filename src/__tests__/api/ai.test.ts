@@ -276,9 +276,9 @@ describe('AI Streaming APIs', () => {
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
-             expect(mockPageDB.length).toBe(6) // Five generated pages + system 404
-             expect(result.totalPages).toBe(5)
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/blog', '/contact', '404'])
+             expect(mockPageDB.length).toBe(5) // Four generated pages + system 404
+             expect(result.totalPages).toBe(4)
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
         })
 
         it('accepts a valid generated site with six pages', async () => {
@@ -841,7 +841,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
-        it('[TC-GENPERF-W3-20] fails completion when fewer than six products persist', async () => {
+        it('[TC-GENPERF-W3-20] completes when fewer than six products persist', async () => {
              vi.mocked(generateSampleProducts).mockResolvedValueOnce({
                  products: Array.from({ length: 5 }, (_, index) => ({
                      name: `Short Product ${index + 1}`,
@@ -861,11 +861,11 @@ describe('AI Streaming APIs', () => {
                  }),
              }))
 
-             expect(res.status).toBe(500)
+             expect(res.status).toBe(200)
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
-        it('[TC-GENPERF-W3-25] regeneration preserves direct replacement pages when a late barrier fails', async () => {
+        it('[TC-GENPERF-W3-25] regeneration accepts partial product generation', async () => {
              const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
@@ -900,10 +900,10 @@ describe('AI Streaming APIs', () => {
                  }),
              }))
 
-             expect(res.status).toBe(500)
+             expect(res.status).toBe(200)
              expect(mockSiteDB[0]?.generationStatus).toBe('completed')
              expect(mockPageDB.map(page => page.slug).sort()).toEqual(
-                 ['/', '/about', '/blog', '/contact', '/products', '404'].sort(),
+                 ['/', '/about', '/contact', '/products', '404'].sort(),
              )
              const deletedIds = vi.mocked(payload.delete).mock.calls.map(([arg]) => arg.id)
              expect(deletedIds).toContain('old-home')
@@ -941,7 +941,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB[0]?.generationStatus).toBe('completed')
              expect(mockSiteDB[0]?.name).toBe('AI Bakery')
              expect(mockPageDB.map(page => page.slug).sort()).toEqual(
-                 ['/', '/about', '/blog', '/contact', '/products', '404'].sort(),
+                 ['/', '/about', '/contact', '/products', '404'].sort(),
              )
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
@@ -950,12 +950,12 @@ describe('AI Streaming APIs', () => {
              const generatedPageCreates = vi.mocked(payload.create).mock.calls.filter(
                  ([arg]) => arg.collection === 'pages' && arg.data?.slug !== '404',
              )
-             expect(generatedPageCreates).toHaveLength(5)
+             expect(generatedPageCreates).toHaveLength(4)
              expect(generatedPageCreates.some(([arg]) => arg.data?.slug === '/' && arg.data?.isHomepage === true)).toBe(true)
              expect(generatedPageCreates.every(([arg]) => !String(arg.data?.slug).startsWith('generation-'))).toBe(true)
         })
 
-        it('[TC-GENPERF-W3-29] regeneration preserves an existing catalog without recreating deterministic SKUs', async () => {
+        it('[TC-GENPERF-W3-29] regeneration follows the original sample-product flow', async () => {
              mockSiteDB = [{
                  id: 'site-existing',
                  tenant: 'tenant-1',
@@ -985,9 +985,9 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(200)
-             expect(vi.mocked(generateSampleProducts)).not.toHaveBeenCalled()
-             expect(mockProductDB).toHaveLength(6)
-             expect(mockProductDB.every(product => String(product.id).startsWith('existing-product-'))).toBe(true)
+             expect(vi.mocked(generateSampleProducts)).toHaveBeenCalledTimes(1)
+             expect(mockProductDB).toHaveLength(12)
+             expect(mockProductDB.filter(product => String(product.id).startsWith('existing-product-'))).toHaveLength(6)
         })
 
         it('[TC-GENPERF-W3-30] regeneration accepts a two-post deficit when the final site count is three', async () => {
@@ -1084,7 +1084,7 @@ describe('AI Streaming APIs', () => {
              }
         })
 
-        it('[TC-GENPERF-W3-21] fails completion when fewer than three complete blogs exist', async () => {
+        it('[TC-GENPERF-W3-21] does not block completion on blog count', async () => {
              const payload = await getPayload({ config: {} as never })
              vi.mocked(payload.count).mockResolvedValueOnce({ totalDocs: 2 } as never)
 
@@ -1095,11 +1095,11 @@ describe('AI Streaming APIs', () => {
                  }),
              }))
 
-             expect(res.status).toBe(500)
+             expect(res.status).toBe(200)
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
-        it('[TC-GENPERF-W3-22] fails completion when a page persists only after media refs are stripped', async () => {
+        it('[TC-GENPERF-W3-22] completes when a page persists after media refs are stripped', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalCreate = vi.mocked(payload.create).getMockImplementation()!
              let rejectedImageWrites = 0
@@ -1127,7 +1127,7 @@ describe('AI Streaming APIs', () => {
                  }))
 
                  expect(rejectedImageWrites).toBe(3)
-                 expect(res.status).toBe(500)
+                 expect(res.status).toBe(200)
                  expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
                  const completedWrites = vi.mocked(payload.update).mock.calls.filter(
                      ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
@@ -1138,7 +1138,7 @@ describe('AI Streaming APIs', () => {
              }
         })
 
-        it('[TC-GENPERF-W3-23] fails completion when stale product media falls back to image-less rows', async () => {
+        it('[TC-GENPERF-W3-23] completes when stale product media falls back to image-less rows', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalCreate = vi.mocked(payload.create).getMockImplementation()!
              vi.mocked(generateSampleProducts).mockResolvedValueOnce({
@@ -1170,7 +1170,7 @@ describe('AI Streaming APIs', () => {
                      }),
                  }))
 
-                 expect(res.status).toBe(500)
+                 expect(res.status).toBe(200)
                  const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
                      ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
                  )
@@ -1195,7 +1195,7 @@ describe('AI Streaming APIs', () => {
                          businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
                      }),
                  }))
-                 await vi.waitFor(() => expect(mockPageDB).toHaveLength(6))
+                 await vi.waitFor(() => expect(mockPageDB).toHaveLength(5))
 
                  now += 75_000
                  resolveProducts({
@@ -2354,7 +2354,7 @@ describe('AI Streaming APIs', () => {
             )
         })
 
-        it('[TC-GENPERF-W1-02] fallback blog seeding completes in-request', async () => {
+        it('[TC-GENPERF-W1-02] fallback blog seeding is deferred until after the response', async () => {
             // Arrange
             const { prepareBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(prepareBlogPosts).mockResolvedValueOnce(null)
@@ -2362,9 +2362,11 @@ describe('AI Streaming APIs', () => {
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
-            // Assert
-            expect(res.status).toBe(200)
-            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+             // Assert
+             expect(res.status).toBe(200)
+             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+             await runCapturedAfterTasks()
+             expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
         })
 
         it('[TC-GENPERF-W1-05] optional image-library seeder rejection is non-fatal', async () => {
@@ -2383,7 +2385,7 @@ describe('AI Streaming APIs', () => {
             errorSpy.mockRestore()
         })
 
-        it('[TC-GENPERF-W1-06] SSE done payload includes completion evidence', async () => {
+        it('[TC-GENPERF-W1-06] SSE done payload keeps the original terminal contract', async () => {
             // Arrange
             const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                 method: 'POST',
@@ -2406,7 +2408,7 @@ describe('AI Streaming APIs', () => {
             const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
             expect(m).toBeTruthy()
             expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
-                ['blogsCount', 'imagesFailed', 'pageId', 'productsCount', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
             )
         })
 
@@ -2548,7 +2550,6 @@ describe('AI Streaming APIs', () => {
                 [101, 101],
                 [102, 102],
                 [103, 103],
-                [104, 104],
             ])
         })
     })
