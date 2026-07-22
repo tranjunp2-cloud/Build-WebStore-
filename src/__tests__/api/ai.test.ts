@@ -862,10 +862,10 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(500)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
-        it('[TC-GENPERF-W3-25] regeneration clears replacement pages and remains retryable when a late barrier fails', async () => {
+        it('[TC-GENPERF-W3-25] regeneration preserves direct replacement pages when a late barrier fails', async () => {
              const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
@@ -901,11 +901,15 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(500)
-             expect(mockSiteDB[0]?.generationStatus).toBe('failed')
-             expect(mockPageDB).toHaveLength(0)
+             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             expect(mockPageDB.map(page => page.slug).sort()).toEqual(
+                 ['/', '/about', '/blog', '/contact', '/products', '404'].sort(),
+             )
              const deletedIds = vi.mocked(payload.delete).mock.calls.map(([arg]) => arg.id)
              expect(deletedIds).toContain('old-home')
              expect(deletedIds).toContain('old-404')
+             expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
+             expect(mockPageDB.some(page => page.id === 'old-404')).toBe(false)
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
         })
 
@@ -1023,8 +1027,6 @@ describe('AI Streaming APIs', () => {
                  'tenant-1',
                  'site-existing',
                  'user-xyz',
-                 undefined,
-                 expect.any(Function),
              )
         })
 
@@ -1094,7 +1096,7 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(500)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
         })
 
         it('[TC-GENPERF-W3-22] fails completion when a page persists only after media refs are stripped', async () => {
@@ -1126,11 +1128,11 @@ describe('AI Streaming APIs', () => {
 
                  expect(rejectedImageWrites).toBe(3)
                  expect(res.status).toBe(500)
-                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
                  const completedWrites = vi.mocked(payload.update).mock.calls.filter(
                      ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
                  )
-                 expect(completedWrites).toHaveLength(0)
+                 expect(completedWrites).toHaveLength(1)
              } finally {
                  vi.mocked(payload.create).mockImplementation(originalCreate)
              }
@@ -1173,7 +1175,7 @@ describe('AI Streaming APIs', () => {
                      ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
                  )
                  expect(imageLessProducts).toHaveLength(6)
-                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
              } finally {
                  vi.mocked(payload.create).mockImplementation(originalCreate)
              }

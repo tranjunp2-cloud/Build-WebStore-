@@ -122,32 +122,6 @@ export async function POST(req: NextRequest) {
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
-    let _generationCommitted = false
-    const _createdPageIds: Array<string | number> = []
-    const _createdProductIds: Array<string | number> = []
-    const _createdBlogIds: Array<string | number> = []
-
-    const recoverFailedGeneration = async () => {
-        if (_generationCommitted || !_payload || !_site?.id) return
-
-        // These rows belong exclusively to this request, so failed generations
-        // must not leave replacement pages or sample content attached to the site.
-        for (const [collection, ids] of [
-            ['pages', _createdPageIds],
-            ['products', _createdProductIds],
-            ['blogs', _createdBlogIds],
-        ] as const) {
-            for (const id of ids) {
-                await _payload.delete({ collection, id }).catch(() => undefined)
-            }
-        }
-
-        await _payload.update({
-            collection: 'sites',
-            id: _site.id as string | number,
-            data: { generationStatus: 'failed' },
-        }).catch((_e: unknown) => console.error('[AI Generate] Failed to recover generation status:', _e))
-    }
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -1312,7 +1286,6 @@ export async function POST(req: NextRequest) {
                     // image fields are discarded without failing completeness.
                     blockImageStats.failed += droppedImageRefs
                 }
-                _createdPageIds.push(createdPage.id as string | number)
                 createdPages.push(createdPage)
                 _createdPagesCount++
             } catch (pageErr) {
@@ -1431,7 +1404,7 @@ export async function POST(req: NextRequest) {
 
         // BUG-F05-005: Auto-create 404 page for every new site
         try {
-            const created404 = await payload.create({
+            await payload.create({
                 collection: 'pages',
                 data: {
                     title: '404 Not Found',
@@ -1450,7 +1423,6 @@ export async function POST(req: NextRequest) {
                     },
                 },
             })
-            _createdPageIds.push(created404.id as string | number)
         } catch (err404) {
             // Non-fatal: 404 page may already exist (e.g. re-generation)
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
@@ -1499,11 +1471,6 @@ export async function POST(req: NextRequest) {
         let existingProductsCount = 0
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
-        const createTrackedProduct = async (data: Record<string, unknown>) => {
-            const created = await payload.create({ collection: 'products', data })
-            _createdProductIds.push(created.id as string | number)
-            return created
-        }
         try {
             const {
                 products: sampleProducts,
@@ -1554,7 +1521,7 @@ export async function POST(req: NextRequest) {
             }
             const createProductWithoutImage = async (baseData: Record<string, unknown>): Promise<boolean> => {
                 try {
-                    await createTrackedProduct(baseData)
+                    await payload.create({ collection: 'products', data: baseData })
                     productsCreatedCount++
                     productImageStats.noImage++
                     return true
@@ -1613,9 +1580,12 @@ export async function POST(req: NextRequest) {
                 // is unbounded AI output, unlike the form's client-validated 120-char product name.
                 const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
-                    await createTrackedProduct({
-                        ...baseData,
-                        ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
+                    await payload.create({
+                        collection: 'products',
+                        data: {
+                            ...baseData,
+                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
+                        },
                     })
                     productsCreatedCount++
                 } catch (err) {
@@ -1638,9 +1608,12 @@ export async function POST(req: NextRequest) {
                             }
                             if (retryImageId != null) {
                                 try {
-                                    await createTrackedProduct({
-                                        ...baseData,
-                                        images: [{ image: retryImageId, alt: fallbackAlt }],
+                                    await payload.create({
+                                        collection: 'products',
+                                        data: {
+                                            ...baseData,
+                                            images: [{ image: retryImageId, alt: fallbackAlt }],
+                                        },
                                     })
                                     productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
@@ -1698,8 +1671,6 @@ export async function POST(req: NextRequest) {
                     resolvedTenantId,
                     site.id as string | number,
                     user.id,
-                    undefined,
-                    (id) => _createdBlogIds.push(id),
                 ),
             )
             console.info(`[generate-site] blog posts inline: ${blogsReadyCount}/${preparedBlogs.length}`)
@@ -1714,8 +1685,6 @@ export async function POST(req: NextRequest) {
                 parseProductsString(businessInfo.products),
                 businessInfo.industry,
                 computeGenSeed(businessInfo),
-                undefined,
-                (id) => _createdBlogIds.push(id),
             ))
         }
 
@@ -1750,8 +1719,6 @@ export async function POST(req: NextRequest) {
             id: site.id as string | number,
             data: completionData,
         }))
-        _generationCommitted = true
-
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
         // fire-and-forget) so it runs reliably post-response on Vercel and
@@ -1884,7 +1851,17 @@ export async function POST(req: NextRequest) {
                                 ),
                             )
                         } catch { /* stream already canceled — skip SSE write, still recover DB */ }
-                        await recoverFailedGeneration()
+                        // Error recovery: update site status if site was created before failure
+                        if (_site?.id && _payload) {
+                            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+                            await _payload
+                                .update({
+                                    collection: 'sites',
+                                    id: _site.id as string | number,
+                                    data: { generationStatus: status },
+                                })
+                                .catch(() => {})
+                        }
                     } finally {
                         try { controller.close() } catch { /* already closed */ }
                     }
@@ -1952,9 +1929,15 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        // A partial site must never be observable as completed.
         const _siteForCatch = _site as Record<string, unknown> | null
-        await recoverFailedGeneration()
+        if (_siteForCatch?.id && _payload) {
+            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+            await _payload.update({
+                collection: 'sites',
+                id: _siteForCatch.id as string | number,
+                data: { generationStatus: status },
+            }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
+        }
 
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
