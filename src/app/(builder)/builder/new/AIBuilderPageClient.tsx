@@ -190,6 +190,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const abortControllerRef = useRef<AbortController | null>(null)
     const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
     const [showDraftDialog, setShowDraftDialog] = useState(false)
@@ -517,6 +518,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             clearTimeout(warningTimeoutRef.current)
             warningTimeoutRef.current = null
         }
+        if (hardTimeoutRef.current) {
+            clearTimeout(hardTimeoutRef.current)
+            hardTimeoutRef.current = null
+        }
         setElapsedSeconds(0)
         setShowTimeoutWarning(false)
     }, [])
@@ -559,6 +564,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         // 60s warning timeout — shows "still working..." hint (non-blocking)
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
+
+        // Restore the pre-#1658 five-minute client guard. This leaves enough
+        // headroom for long-tail generation while still cleaning up a hung request.
+        const hardTimeout = setTimeout(() => {
+            controller.abort()
+            clearGenerationTimers()
+            const genError = getGenerationError(408)
+            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+            setError({ code: 'timeout', message, retryable: true })
+            setStep('info')
+            toast.error(message)
+        }, 300_000)
+        hardTimeoutRef.current = hardTimeout
 
         let receivedAnyEvent = false
         let receivedDone = false

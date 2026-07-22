@@ -1,4 +1,7 @@
 export const dynamic = 'force-dynamic'
+// AI site generation runs OpenAI, image pipelines, and Payload persistence.
+// Keep the pre-#1658 headroom for long-tail generations on Vercel.
+export const maxDuration = 300
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
