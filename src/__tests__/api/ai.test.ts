@@ -965,7 +965,7 @@ describe('AI Streaming APIs', () => {
                  'tenant-1',
                  'site-existing',
                  'user-xyz',
-                 expect.any(Function),
+                 undefined,
                  expect.any(Function),
              )
         })
@@ -999,14 +999,11 @@ describe('AI Streaming APIs', () => {
              }
         })
 
-        it('[TC-GENPERF-W3-32] does not run optional slug sync inside the fatal completion deadline', async () => {
+        it('[TC-GENPERF-W3-32] schedules optional slug sync after the response path', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalFindByID = vi.mocked(payload.findByID).getMockImplementation()!
-             let now = 1_000_000
-             const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
              vi.mocked(payload.findByID).mockImplementation(async (args) => {
                  if (args.collection === 'tenants') {
-                     now += 55_000
                      return mockTenant
                  }
                  return originalFindByID(args)
@@ -1023,7 +1020,6 @@ describe('AI Streaming APIs', () => {
                  expect(res.status).toBe(200)
                  expect(vi.mocked(payload.findByID).mock.calls.some(([arg]) => arg.collection === 'tenants')).toBe(false)
              } finally {
-                 nowSpy.mockRestore()
                  vi.mocked(payload.findByID).mockImplementation(originalFindByID)
              }
         })
@@ -1062,20 +1058,24 @@ describe('AI Streaming APIs', () => {
                  return originalCreate(args)
              })
 
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
 
-             expect(rejectedImageWrites).toBe(3)
-             expect(res.status).toBe(500)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
-             const completedWrites = vi.mocked(payload.update).mock.calls.filter(
-                 ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
-             )
-             expect(completedWrites).toHaveLength(0)
+                 expect(rejectedImageWrites).toBe(3)
+                 expect(res.status).toBe(500)
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 const completedWrites = vi.mocked(payload.update).mock.calls.filter(
+                     ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
+                 )
+                 expect(completedWrites).toHaveLength(0)
+             } finally {
+                 vi.mocked(payload.create).mockImplementation(originalCreate)
+             }
         })
 
         it('[TC-GENPERF-W3-23] fails completion when stale product media falls back to image-less rows', async () => {
@@ -1102,22 +1102,26 @@ describe('AI Streaming APIs', () => {
                  return originalCreate(args)
              })
 
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
 
-             expect(res.status).toBe(500)
-             const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
-                 ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
-             )
-             expect(imageLessProducts).toHaveLength(6)
-             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+                 expect(res.status).toBe(500)
+                 const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
+                     ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
+                 )
+                 expect(imageLessProducts).toHaveLength(6)
+                 expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             } finally {
+                 vi.mocked(payload.create).mockImplementation(originalCreate)
+             }
         })
 
-        it('[TC-GENPERF-W3-24] starts no further writes after the route deadline aborts', async () => {
+        it('[TC-GENPERF-W3-24] continues generation after 55 seconds have elapsed', async () => {
              const payload = await getPayload({ config: {} as never })
              let now = 1_000_000
              const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -1143,16 +1147,17 @@ describe('AI Streaming APIs', () => {
                          sku: `LATE-${index + 1}`,
                          inventory: 0,
                          status: 'active',
+                         imageId: 700 + index,
                      })),
                      stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
                  })
 
                  const res = await responsePromise
-                 expect(res.status).toBe(500)
-                 expect(vi.mocked(payload.create).mock.calls.some(([arg]) => arg.collection === 'products')).toBe(false)
+                 expect(res.status).toBe(200)
+                 expect(vi.mocked(payload.create).mock.calls.filter(([arg]) => arg.collection === 'products')).toHaveLength(6)
                  expect(vi.mocked(payload.update).mock.calls.some(
                      ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'failed',
-                 )).toBe(true)
+                 )).toBe(false)
              } finally {
                  nowSpy.mockRestore()
              }
