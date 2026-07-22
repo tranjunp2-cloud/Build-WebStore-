@@ -46,7 +46,7 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | **TC-F23-03-01** | `owner-profile-view.test.tsx` | 0 `<input>`/`<textarea>` trong DOM — hoàn toàn read-only | ✓ |
 | **TC-F23-03-02** | `owner-profile-view.test.tsx` | Đúng 1 SSO CTA `target="_blank"`, href = `ssoUrl` prop | ✓ |
 | **TC-F23-03-03** | `owner-profile-view.test.tsx` | `ssoUrl=""` → CTA disabled-look span + `urlMissing` text, không phải `<a>` | ✓ |
-| **TC-F23-03-04** | `owner-profile-view.test.tsx` | Không có text/label nào liên quan 2FA (decision (b) — chưa có field) | ✓ |
+| **TC-F23-03-04** | `owner-profile-view.test.tsx` | Hiển thị trạng thái 2FA bắt buộc: nhãn + chấm xanh `Enabled` (email OTP) | ✓ |
 | **TC-F23-03-05** | `owner-profile-view.test.tsx` | Password hiển thị dạng dots (masked), email/phone hiển thị đúng giá trị | ✓ |
 | ~~TC-F23-03-02..05~~ | ~~`sso-guard-box.test.tsx`~~ | Xoá cùng component ở P5 (`SsoGuardBox` không còn importer) | — |
 

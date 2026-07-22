@@ -5005,7 +5005,9 @@
             "goToPortal": "Pergi ke Portal SSO"
         },
         "owner": {
-            "passwordLabel": "Kata Laluan"
+            "passwordLabel": "Kata Laluan",
+            "twoFactorLabel": "Pengesahan Dua Faktor (2FA)",
+            "twoFactorEnabled": "Diaktifkan"
         },
         "errors": {
             "invalidPhone": "Sila masukkan nombor telefon yang sah",
