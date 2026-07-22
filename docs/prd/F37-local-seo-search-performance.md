@@ -1,6 +1,6 @@
 # PRD: Local SEO Score & Storefront Discoverability (F37)
 
-> **Version:** 2.5 | **Status:** Phase 2 — issue-action UI approved 2026-07-22 | **Priority:** P0 | **Size:** L
+> **Version:** 2.6 | **Status:** Phase 2 — platform-managed discoverability + issue-action UI approved 2026-07-22 | **Priority:** P0 | **Size:** L
 > **Depends on:** F03 Dashboard Suite, F02 Auth, F05 Editor  
 > **Replaces:** F37 PRD v1.0 (target-state rewrite)
 
@@ -8,7 +8,7 @@
 
 ## 1. Problem
 
-SME sellers on PrimeCommerce storefronts are hard to discover in local search and AI assistants because structured local business data is incomplete, LocalBusiness JSON-LD is thin, and AI crawler access is not controlled as a first-class seller action. Sellers need a single Local SEO score (0–100) driven only by data they can fill or toggle on their tenant website, with clear next steps in the Editor and Dashboard.
+SME sellers on PrimeCommerce storefronts are hard to discover in local search and AI assistants because structured local business data is incomplete and LocalBusiness JSON-LD is thin. Sellers need a single Local SEO score (0–100) that separates seller-owned inputs from platform-managed discoverability, with clear next steps in the Editor and Dashboard.
 
 ## 2. Actors
 
@@ -30,7 +30,7 @@ SME sellers on PrimeCommerce storefronts are hard to discover in local search an
 
 - Minimal **Business Data** in Editor (name, structured address, phone)
 - **Schema completeness** signals that all affect score (LocalBusiness, subtype, hours, geo, telephone, url, priceRange, Organization)
-- **AI Discoverability:** AI crawlers toggle, sitemap when published, llms.txt
+- **AI Discoverability:** platform-managed AI crawler access, sitemap when published, llms.txt
 - **Technical Health:** metadata coverage + content quality + search verification + indexability
 - One unified SEO Health score 0–100 + actionable root-cause issues on **Dashboard > SEO**
 - Tenant storefront only: `/sites/[slug]/*`
@@ -73,7 +73,7 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 | Schema                      | `url` in schema             | 3    | Domain emitted as `url`                                                     | Human only               | `Sites.domain`                                                                                           | Site domain setup                              |
 | Schema                      | `priceRange`                | 3    | Explicit field or derived from category                                     | Human only               | `priceRange` / `priceRangeForLocalBusinessCategory`                                                      | Editor → Price range                           |
 | Schema                      | Organization                | 3    | Organization schema for site                                                | Platform auto            | `generateOrganizationSchema`                                                                             | Auto (brand/contact feed fields)               |
-| **AI Discoverability** (15) | AI crawlers allowed         | 9    | AI bots allowed in robots.txt                                               | Human toggle             | `api/seo/ai-crawlers-toggle` · `sites/[slug]/robots.txt/route.ts`                                        | Dashboard → SEO tools                          |
+| **AI Discoverability** (15) | AI crawlers allowed         | 9    | Platform always allows approved AI assistant crawlers in robots.txt         | Platform auto            | `sites/[slug]/robots.txt/route.ts`                                                                       | Hidden system behavior                         |
 | AI Discoverability          | Sitemap present             | 5    | Published site serves sitemap                                               | Human (publish)          | `sites/[slug]/sitemap.xml/route.ts`                                                                      | Editor → Publish                               |
 | AI Discoverability          | llms.txt reachable          | 1    | Dynamic `/llms.txt` for storefront                                          | Platform auto            | `sites/[slug]/llms.txt/route.ts`                                                                         | Auto                                           |
 | **Technical Health** (30)   | Meta title coverage         | 8    | Coverage across eligible pages, active products, and published blogs        | Human or F03 AI          | `src/lib/dashboard/seo-data.ts`                                                                          | Dashboard → SEO / Editor SEO                   |
@@ -88,8 +88,10 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 - Meta title and description each earn `floor(8 × completed / eligible)`; an empty eligible set earns 0.
 - Content Quality earns `floor(F03 contentQualityScore × 8 / 100)` after F03 loads real page layouts.
 - Technical SEO earns 3 points when Google verification is configured, plus `floor(3 × indexable / eligiblePages)`; an empty eligible page set earns 0.
+- AI crawler access is a platform invariant and always earns 9 points; there is no seller setting or issue row.
+- Sitemap earns 5 points and llms.txt earns 1 point only when the storefront is published and each route is reachable.
 
-**F03 reuse:** AI Fix All / page Auto SEO can raise title and description coverage. They do not change Local SEO Business Data or Schema fields above.
+**F03 reuse:** User-triggered AI Fix can raise title and description coverage. It does not change Local SEO Business Data, Schema, or platform-managed signals above.
 
 ### LocalBusiness JSON-LD contract
 
@@ -137,10 +139,8 @@ flowchart TB
   incomplete -->|name_or_address_missing| end_blocked([end_score_capped_no_localbusiness])
   incomplete -->|ok| enrich_schema[fill_hours_category_subtype_geo_price]
   enrich_schema --> emit_jsonld[system_emits_localbusiness_org]
-  emit_jsonld --> toggle_crawlers{ai_crawlers_on?}
-  toggle_crawlers -->|yes_default| publish_site[publish_site]
-  toggle_crawlers -->|seller_opts_out| crawlers_off[crawlers_disallow_minus_9]
-  crawlers_off --> publish_site
+  emit_jsonld --> platform_crawlers[platform_allows_ai_crawlers]
+  platform_crawlers --> publish_site[publish_site]
   publish_site --> sitemap_ok[sitemap_and_llms_available]
   sitemap_ok --> evaluate_health[evaluate_metadata_content_and_technical_health]
   evaluate_health --> calc_score[calc_local_seo_score_100]
@@ -148,7 +148,7 @@ flowchart TB
   show_dashboard --> fix_loop{score_below_target?}
   fix_loop -->|yes| edit_or_ai{issue_owner?}
   edit_or_ai -->|seller_input| human_edit[human_edit_at_destination]
-  edit_or_ai -->|seller_toggle_publish_setup| seller_action[seller_action_at_destination]
+  edit_or_ai -->|seller_publish_or_setup| seller_action[seller_action_at_destination]
   edit_or_ai -->|page_product_blog_metadata| ai_fix_all[ai_fix_all_meta_only]
   edit_or_ai -->|platform_managed| platform_auto[platform_maintains_signal]
   human_edit --> calc_score
@@ -173,13 +173,13 @@ flowchart TB
 | `end_score_capped_no_localbusiness`             | Score without full LocalBusiness schema points |
 | `fill_hours_category_subtype_geo_price`         | Remaining schema human inputs                  |
 | `system_emits_localbusiness_org`                | JSON-LD generation on storefront               |
-| `ai_crawlers_on?`                               | Default allow; opt-out −9                      |
+| `platform_allows_ai_crawlers`                   | Always allow approved AI assistant crawlers; +9 |
 | `publish_site` / `sitemap_and_llms_available`   | Publish unlocks sitemap +5, llms +1            |
 | `evaluate_metadata_content_and_technical_health` | F03 metadata, content, and technical signals   |
 | `calc_local_seo_score_100`                      | Pure score function                            |
 | `show_score_and_root_cause_issues`              | Dashboard > SEO card                           |
 | `human_edit_at_destination`                     | Open the exact Editor/settings destination     |
-| `seller_action_at_destination`                  | Enable, publish, or set up at the owning surface |
+| `seller_action_at_destination`                  | Publish or set up at the owning surface        |
 | `ai_fix_all_meta_only`                          | Existing F03 metadata fix flow                 |
 | `platform_maintains_signal`                     | No seller issue row or CTA                     |
 | `end_local_seo_ready`                           | Seller done for this cycle                     |
@@ -220,14 +220,14 @@ flowchart TB
 
 ### US-F37-03: Crawlers, publish, llms.txt
 
-**Path:** `ai_crawlers_on? → publish_site → sitemap_and_llms_available`  
-**Story:** As an SME seller, I want AI crawler access on by default, with opt-out, and publish to expose sitemap and llms.txt so that AI Discoverability points reflect real crawl access.
+**Path:** `platform_allows_ai_crawlers → publish_site → sitemap_and_llms_available`
+**Story:** As an SME seller, I want the platform to maintain AI crawler access automatically and publish to expose sitemap and llms.txt so that discoverability does not require technical settings.
 
 **AC**
 
-- **Happy — AC-01:** GIVEN a published site with AI crawlers enabled (default) WHEN robots.txt and sitemap.xml and llms.txt are requested for the storefront THEN AI bots are allowed, sitemap returns URLs, llms.txt returns markdown, AND full AI Discoverability points are available.
-- **Edge — AC-02:** GIVEN seller turns AI crawlers OFF WHEN robots.txt is fetched THEN configured AI user-agents are disallowed AND AI crawlers points are 0.
-- **Error — AC-03:** GIVEN site is not published WHEN sitemap is requested THEN sitemap is not available as a present signal AND Sitemap points are 0.
+- **Happy — AC-01:** GIVEN a published storefront WHEN robots.txt, sitemap.xml, and llms.txt are requested THEN approved AI assistant crawlers are allowed, sitemap returns current URLs, llms.txt returns markdown, AND all 15 AI Discoverability points are earned.
+- **Edge — AC-02:** GIVEN a storefront is not published WHEN score is calculated THEN platform crawler access still earns 9 points while sitemap and llms.txt earn 0.
+- **Error — AC-03:** GIVEN a published storefront cannot serve sitemap.xml or llms.txt WHEN score is calculated THEN only the unavailable route's points are withheld AND no seller-facing resubmit control is shown.
 
 
 
@@ -277,7 +277,7 @@ flowchart TB
 | FR-09 | System MUST emit `url` when domain present → 3 points                                                                                               | US-F37-02 | P0       |
 | FR-10 | System MUST emit `priceRange` when set or derived → 3 points                                                                                        | US-F37-02 | P0       |
 | FR-11 | System MUST emit Organization for valid site → 3 points                                                                                             | US-F37-02 | P0       |
-| FR-12 | AI crawlers default ALLOW; seller toggle OFF disallows AI bots → 9 or 0 points                                                                      | US-F37-03 | P0       |
+| FR-12 | Platform MUST always allow approved AI assistant crawlers with no seller setting or issue row → 9 points                                            | US-F37-03 | P0       |
 | FR-13 | Published site MUST expose sitemap → 5 points when present                                                                                          | US-F37-03 | P0       |
 | FR-14 | Storefront MUST expose dynamic llms.txt → 1 point when reachable                                                                                    | US-F37-03 | P0       |
 | FR-15 | Eligible metadata records MUST earn up to 8 points for meta title coverage using §5                                                                 | US-F37-04 | P0       |
@@ -313,7 +313,6 @@ flowchart TB
 | US / AC       | Method | Path                                                    | Success                         | Errors                                |
 | ------------- | ------ | ------------------------------------------------------- | ------------------------------- | ------------------------------------- |
 | US-04 / AC-01 | GET    | `/api/sites/[siteId]/local-seo-score`                   | `{ success, score, breakdown }` | 401, 403, 404, 429, 500               |
-| US-03 / AC-02 | POST   | `/api/seo/ai-crawlers-toggle`                           | `{ enabled }`                   | 401, 403, 400                         |
 | US-02 / AC-01 | GET    | storefront page HTML                                    | JSON-LD in page                 | N/A                                   |
 | US-03 / AC-01 | GET    | `/sites/[slug]/robots.txt` · `sitemap.xml` · `llms.txt` | 200 bodies                      | 404 when unpublished where applicable |
 | US-02 geo     | POST   | `/api/local-seo/resolve-maps-link`                      | `{ latitude, longitude }`       | 400 invalid link                      |
@@ -327,7 +326,7 @@ flowchart TB
 > `/editor/[siteId]` (`src/app/(editor)/editor/[siteId]/page.tsx`) → right **SettingsPanel**  
 > (`src/components/editor/SettingsPanel.tsx`, desktop width `SETTINGS_PANEL_WIDTH = 320`).  
 > Compact: same panel inside `EditorToolsSheet` / `CompactEditorLayout`.  
-> Dashboard reads score/issues and hosts existing `SeoTools` (AI crawlers).
+> Dashboard reads score/issues; platform-managed discoverability has no seller-facing settings card.
 > Wireframes: low-fi, no score chips inside form chrome, mobile noted where layout changes.
 
 
@@ -454,7 +453,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 |           |                                                                                                       |
 | --------- | ----------------------------------------------------------------------------------------------------- |
 | **Route** | `/editor/[siteId]` · Settings tab **SEO**                                                             |
-| **Code**  | `SettingsPanel.tsx` → `renderSeoContent()` · `OgImageEditor` · `POST .../pages/[pageId]/generate-seo` |
+| **Code**  | `SettingsPanel.tsx` → `renderSeoContent()` · `OgImageEditor`                                      |
 | **Scope** | **Active page** slug + meta; site-level OG image                                                      |
 
 
@@ -463,7 +462,6 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 - Slug / meta title / meta description: commit on blur (`handleSeoUpdate`).
 - Homepage slug fixed `/`; non-home slug disabled when `siteStatus === 'published'` (lock message).
 - OG: upload via `OgImageEditor` → `site.seo.ogImage`.
-- Auto SEO button: generate page meta only (confirm if overwriting).
 
 **Desktop 320px**
 
@@ -487,8 +485,6 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 │ └─────────────────────────────────────────────┘        │
 │ Social image (OG)                                      │
 │ [ OgImageEditor: preview | upload | change ]           │
-│                                                        │
-│ [ ✨ Auto SEO ]  ← page meta only                      │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -505,7 +501,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Route**         | `/dashboard` — existing SEO section                                                                                                          |
 | **Code (target)** | Replace the contents of existing `SeoHealth`; §5 score from `GET /api/sites/[siteId]/local-seo-score` is the only displayed SEO score       |
-| **Reuse**         | Keep existing `SeoHealth` route position, gauge primitives, card shell, and `SeoTools`; extend its data contract instead of adding a second card |
+| **Reuse**         | Keep existing `SeoHealth` route position, gauge primitives, and card shell; extend its data contract instead of adding a second card            |
 
 
 **Interactions**
@@ -516,7 +512,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 - Desktop issues use the existing two-column row pattern; mobile collapses to one column. Sort by score impact internally without showing point gain/loss.
 - Each row shows one owner badge: `AI` for metadata or `You` for seller-owned data/actions.
 - Metadata `Fix` opens the existing F03 AI Fix modal filtered to the affected field. Show `Fix all with AI` only when at least one AI-fixable metadata issue exists.
-- `Edit`, `Set up`, `Enable`, and `Publish` use the destination contract below. Platform-managed signals do not create seller issue rows.
+- `Edit`, `Set up`, and `Publish` use the destination contract below. Platform-managed signals do not create seller issue rows.
 - Retry on error. Never invent a score number.
 
 **Success**
@@ -530,14 +526,12 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 ├──────────────────────────────────────────────────────────────────────┤
 │ ✦ AI can fix 2 issues automatically              [ Fix all with AI ] │
 ├──────────────────────────────────────────────────────────────────────┤
-│ SEO issues                                                   6 open  │
+│ SEO issues                                                   5 open  │
 │ [AI]  3 meta descriptions missing [Fix] │ [YOU] Address incomplete [Edit] │
 │ [AI]  2 meta titles missing       [Fix] │ [YOU] Opening hours      [Edit] │
-│ [YOU] Map location missing       [Edit] │ [YOU] Crawlers off     [Enable] │
+│ [YOU] Map location missing       [Edit] │                               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
-
-`SeoTools` remains a separate existing card below this unified score card.
 
 #### Root-cause action contract
 
@@ -552,7 +546,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | URL | Primary domain missing | You | Set up | `/settings/domains` |
 | Price range | Price range missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=priceRange` |
 | Organization | No separate issue | System | — | Auto-emitted from valid Brand data; missing Brand remains the root issue |
-| AI crawlers | AI crawlers disabled | You | Enable | One-click enable; `#section-seo-tools` reflects the new state |
+| AI crawlers | No seller issue | System | — | Platform always allows approved AI assistant crawlers and awards 9 points |
 | Sitemap + llms.txt | Store unpublished | You | Publish | `/editor/[siteId]?publish=1`; do not create two derived issue rows |
 | Meta title | Meta titles missing | AI | Fix | Existing AI Fix modal filtered to title |
 | Meta description | Meta descriptions missing | AI | Fix | Existing AI Fix modal filtered to description |
@@ -569,38 +563,6 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 **Complete (100)** — four full bars + “All clear”; no AI strip or issue rows.
 **Mobile 375** — gauge → four bars → conditional AI strip → one-column issues; each CTA full width and ≥44px height.
 
----
-
-
-
-### 12.4 Dashboard — SEO tools (existing)
-
-
-|                       |                                                                  |
-| --------------------- | ---------------------------------------------------------------- |
-| **Route**             | `/dashboard` · rendered by `SeoTools` in `dashboard/page.tsx`    |
-| **Code**              | `src/components/dashboard/revamp/seo-tools.tsx`                  |
-| **Rows (live today)** | (1) Sitemap resubmit (2) Auto meta toggle (3) AI crawlers toggle |
-
-
-**Interactions (AI crawlers)**
-
-- Click switch → `POST /api/seo/ai-crawlers-toggle` · optimistic UI · revert + toast on failure.
-- Default ON (`aiCrawlersEnabled !== false` in data layer).
-
-```text
-┌ SeoTools card ─────────────────────────────────────────┐
-│ SEO automation                                         │
-│                                                        │
-│ Sitemap          [ Resubmit ]                          │
-│ Auto meta        [ switch ]                            │
-│ AI crawlers      [ switch ON ]  ← F37 score signal     │
-│   desc: allow AI bots in storefront robots.txt         │
-└────────────────────────────────────────────────────────┘
-```
-
-**States:** ON · OFF · saving (cursor wait) · error (toast + revert switch).
-
 ## 13. Risks & Open Questions
 
 | Item | Note |
@@ -612,7 +574,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | Dual-list confusion | Editor `CompletionChecklist` (address / hours / category only) ≠ Dashboard SEO Issues (unresolved score root causes). Copy and placement must stay distinct |
 | Deep-link targets | Issue CTA → the exact destination in §12.3. Extend the existing `requestedTab` pattern with stable section/focus targets; never land the seller at a generic Editor home |
 | Google verification destination | Add the approved seller field at Editor → Settings → SEO → Search verification; do not ship its issue row before the destination exists |
-| Platform-managed metrics | Organization and indexability never create seller tasks; monitor platform failures operationally |
+| Platform-managed metrics | Organization, indexability, and AI crawler access never create seller tasks; monitor platform failures operationally |
 | F22 events | Funnel metric for issue CTA→destination if event pipeline ready; else measure later |
 
 
@@ -659,6 +621,6 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | Business fields scored | name, address, phone only                                                          |
 | Schema                 | Every emitted property in §5 has points                                            |
 | Technical              | Meta title 8 · meta description 8 · Content Quality 8 · Technical SEO 6           |
-| Surfaces               | Editor for data; one Dashboard `SeoHealth` card for score/root-cause issues; `SeoTools` for toggles |
+| Surfaces               | Editor for data; one Dashboard `SeoHealth` card for score/root-cause issues; no SEO Action Tools card |
 | Engine files           | `local-seo-score.ts`, `seo-data.ts`, `content-score.ts`, `technical-score.ts`      |
 |                        |                                                                                    |

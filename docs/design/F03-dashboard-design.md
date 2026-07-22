@@ -132,11 +132,8 @@ Dashboard         [ Filter: 7 days v ]
 │ SEO issues                                                   6 open  │
 │ [AI]  3 meta descriptions missing [Fix] │ [YOU] Address incomplete [Edit] │
 │ [AI]  2 meta titles missing       [Fix] │ [YOU] Opening hours      [Edit] │
-│ [YOU] Map location missing       [Edit] │ [YOU] Crawlers off     [Enable] │
+│ [YOU] Map location missing       [Edit] │ [YOU] Price range missing [Edit] │
 └──────────────────────────────────────────────────────────────────────┘
-
-[ SEO Automation ]
-Sitemap [ Resubmit ]  Auto Meta [ ON ]  AI Crawlers [ ON ]
 
 [ Keyword Tracker (Max 5) ]   | [ + Thêm Từ Khóa ]
 | Keyword             | Rank on Google | Trend | Action   |
@@ -152,7 +149,7 @@ Sitemap [ Resubmit ]  Auto Meta [ ON ]  AI Crawlers [ ON ]
 
 - Remove the Score History placeholder; use the space for four compact 2×2 bucket bars without numeric bucket points.
 - Show unresolved root causes only, in the existing two-column issue grid; never duplicate downstream schema metrics that share one missing field.
-- `AI` rows use `Fix`; `You` rows use `Edit`, `Set up`, `Enable`, or `Publish` and open/perform the exact destination defined in F37 PRD §12.3.
+- `AI` rows use `Fix`; `You` rows use `Edit`, `Set up`, or `Publish` and open/perform the exact destination defined in F37 PRD §12.3.
 - Show `Fix all with AI` only while at least one title/description issue is AI-fixable. Mobile collapses issue rows to one column.
 
 ---
@@ -240,8 +237,6 @@ Sau khi hoàn tất:
 
 - Fetch data lỗi (API Failure): Toasts màu đỏ *"Không thể tải dữ liệu Analytics. [Thử lại]"*
 - SSE Timeout (Fix All > 15s): Toasts màu đỏ *"Không thể hoàn tất AI Fix All, vui lòng thử lại."*
-- Generate Sitemap thành công: Toasts màu xanh *"Sitemap đã được khởi tạo thành công."*
-- Auto Meta Gen lỗi nền (Publish Flow): Âm thầm retry (background error log) không cản trở flow bán hàng. 
 
 ---
 
@@ -271,8 +266,8 @@ Khi bỏ Tab, người dùng tiếp cận thông tin bằng **scroll**. Thứ t�
 │    [ Gauge 75/100 | 4 bucket bars 2×2 ] · SEO Issues 2 columns       │     → tối ưu định kỳ, ko cần
 │    Conditional AI strip · issue rows with AI/You + destination CTA   │     đập mắt mỗi lần vào
 ├─────────────────────────────────────────────────────────────────────┤
-│ ⑤ SEO ACTION TOOLS  (#section-seo-tools)                             │  ← hạ tầng kỹ thuật (ít đổi)
-│    Sitemap & Meta · AI Crawlers · Keyword Tracker (placeholder)      │
+│ ⑤ BASIC KEYWORD TRACKER (#section-keywords, P1)                      │  ← tác vụ SEO thủ công riêng
+│    Up to 5 tracked keywords; không có Sitemap/Auto Meta/crawler tools│
 ├─────────────────────────────────────────────────────────────────────┤
 │ ⑥ Pending Orders (OFF mặc định — F10, bật qua Customize)            │  ← cuối cùng
 └─────────────────────────────────────────────────────────────────────┘

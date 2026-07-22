@@ -182,16 +182,7 @@ THEN  Overall SEO Score (0-100) hiển thị rõ
   AND người dùng nhìn vào biết ngay cần cải thiện phần nào
 ```
 
-#### AC-2: Generate Sitemap
-
-```gherkin
-GIVEN click "Generate Sitemap"
-WHEN  click
-THEN  auto-generate sitemap.xml
-  AND toast "Sitemap đã tạo"
-```
-
-#### AC-3: Auto-scan Failure
+#### AC-2: Score loading failure
 
 ```gherkin
 GIVEN user ở /dashboard/seo
@@ -202,75 +193,11 @@ THEN  hiển thị state lỗi cho widget thay vì score
 
 ### Analytics / Tracking Notes
 - Track sự kiện `view_seo_dashboard`.
-- Track sự kiện `generate_sitemap_clicked`.
 - Track sự kiện `seo_category_breakdown_viewed`.
 
 ### Definition of Done
 
 - [ ] Score calculation works correctly
-
----
-
-## US-F03-04: Auto SEO Meta Generation
-
-**Wave 3** | **P0** | **M** | **Status:** Ready
-
-### Story
-
-```
-As a   store owner with no SEO knowledge
-I want store tự động có proper meta tags khi publish
-So that tôi xuất hiện trên Google không cần thuê SEO consultant
-```
-
-### Acceptance Criteria
-
-#### AC-1: Happy Path — Auto Meta on First Publish
-
-```gherkin
-GIVEN I publish my store for the first time và chưa manually set bất kỳ SEO meta nào
-WHEN  publish action completes
-THEN  all published pages have AI-generated:
-      meta title (≤ 60 chars, includes business name + primary keyword)
-  AND meta description (≤ 160 chars, compelling, includes a call-to-action)
-  AND AI sử dụng trackedKeywords từ cài đặt site để kết hợp từ khoá mục tiêu vào meta một cách tự nhiên (không nhồi nhét)
-```
-
-#### AC-2: Retry mechanism if generation fails
-
-```gherkin
-GIVEN AI service fail khi đang generate meta tags
-WHEN  tiến trình publish hoàn tất
-THEN  hệ thống lưu lại log lỗi và queue để tự động retry background
-```
-
-#### AC-3: AI đề xuất chỉnh sửa meta đã có sẵn
-
-```gherkin
-GIVEN một trang đã có meta title/description do người dùng nhập thủ công
-WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
-THEN  hiển thị so sánh bản cũ vs bản mới
-  AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
-  AND chỉ ghi đè khi người dùng đồng ý
-```
-
-### Analytics / Tracking Notes
-- Track sự kiện `auto_seo_meta_generated` (background).
-
-### Additional Criteria
-
-- [ ] Product pages: format = "{Product Name} | {Shop Name} | Buy Online Malaysia"
-- [ ] Homepage: format = "{Shop Name} | {Business Category} Online Malaysia"
-- [ ] JSON-LD Product schema auto-injected on every product page
-- [ ] Sitemap.xml auto-generated on publish
-- [ ] AI Generate sử dụng trackedKeywords từ site settings
-- [ ] Nếu meta đã có nội dung thủ công → hiển thị so sánh, chỉ ghi đè khi đồng ý
-
-### Definition of Done
-
-- [ ] Meta limits enforced.
-
----
 
 ## US-F03-05: AI Metadata Fix All
 

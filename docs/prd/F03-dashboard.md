@@ -20,7 +20,6 @@
 | US-F03-01 | Dashboard — Overview | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-02 | Analytics Details | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-03 | SEO Dashboard Overview ⭐ | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
-| US-F03-04 | Auto SEO Meta Generation | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-05 | AI Metadata Fix All | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-07 | Mobile Web UX — Responsive Dashboard Metrics & Charts | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 
@@ -55,7 +54,7 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 - **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget. Cấp số liệu từ **PostHog** + internal analytics fallback.
 - **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị. Trạng thái lọc được hỗ trợ bởi **Redis Cache** dự phòng lỗi Rate Limit.
 - **Analytics Details:** Visitors, Clicks, Orders, Sales, Daily bar chart, Top Pages, Top Products. Dùng PostHog + internal analytics fallback.
-- **SEO Health:** Một score 0–100 theo F37 với 4 bucket bars 2×2 và danh sách root-cause issues dạng 2 cột; mỗi row ghi rõ `AI`/`You`, CTA và destination. AI Fix chỉ áp dụng metadata. Basic Keyword Tracker, Auto Meta, Sitemap và SEO tools giữ riêng.
+- **SEO Health:** Một score 0–100 theo F37 với 4 bucket bars 2×2 và danh sách root-cause issues dạng 2 cột; mỗi row ghi rõ `AI`/`You`, CTA và destination. AI Fix chỉ áp dụng metadata. Basic Keyword Tracker giữ riêng; không hiển thị SEO Action Tools.
 - **Connectivity:** PostHog analytics integration cho website traffic/clicks/funnels. Không dùng GA4 hoặc Google Search Console vì phần lớn seller dùng platform subdomain.
 
 ### Out of Scope
@@ -102,7 +101,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 | FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, rank & trend) | US-F03-06 | P1 | Chỉ nhập từ khoá thủ công (manual input). Không tích hợp Google Search Console trong F03/F37 vì seller dùng platform subdomain. |
 | FR-11 | **SEO:** `Fix all with AI` xử lý batch meta title/description only; CTA chỉ hiện khi còn eligible metadata issue. | US-F03-05 | P0 | < 15s, tối ưu context; không ghi Local Business/schema/content/alt/crawler/publish/domain/verification. |
 | FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all qua DB Transaction) | US-F03-05 | P0 | |
-| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Description 150-160 + CTA) | US-F03-04 | P0 | AI Generate sử dụng trackedKeywords tự nhiên; áp dụng cho Fix All và Auto-generate khi publish. Alt text remains human-owned in the approved F37 issue contract. |
+| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Description 150-160 + CTA) | US-F03-05 | P0 | User-triggered AI Fix uses trackedKeywords naturally and shows preview before apply. Alt text remains human-owned in the approved F37 issue contract. |
 | FR-19 | **Connectivity:** Cài PostHog Next.js integration cho website analytics (`posthog-js`; `posthog-node` nếu cần server events) | US-F03-08 | P0 | Dùng PostHog thay GA4/GSC |
 | FR-20 | **Connectivity:** Giữ `/api/analytics/track` + `analytics` collection làm fallback/backward compatibility trong giai đoạn migrate PostHog | US-F03-08 | P0 | Không thêm Google token |
 | FR-21 | **Error:** Dashboard có empty/cache state khi analytics source lỗi hoặc chưa có data | US-F03-08 | P0 | |
@@ -118,10 +117,10 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 
 - **BR-01:** Chỉ hiển thị Data scope theo tenant của user hiện hành.
 - **BR-02:** Analytics IP hashed SHA-256 cho anonymization (No PII stored), events fail gracefully.
-- **BR-03:** Auto-generated SEO meta là overridable (user can edit manually), nhưng limits length được enforced.
+- **BR-03:** AI-generated SEO meta is previewed before apply, remains manually editable, and enforces length limits.
 - **BR-04:** Fix all with AI cho metadata thực thi dưới 15s và là một single batch cho mục đích Undo/Redo.
 - **BR-05:** MY market: Nếu locale='ms', target BM keywords; format address/JSON-LD theo MY.
-- **BR-06:** Khi AI sinh meta (lúc publish hoặc Fix All), nếu trường đang trống → tự động điền. Nếu trường đã có nội dung thủ công → AI đề xuất bản chỉnh sửa và hiển thị so sánh (bản cũ vs bản mới). Chỉ ghi đè khi người dùng đồng ý.
+- **BR-06:** AI metadata generation is user-triggered from SEO Issues. It shows old vs proposed values and writes only the rows the seller approves; no background generation runs on publish.
 
 ---
 
@@ -136,7 +135,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   │     └── Chọn biểu đồ, lọc theo 30 days
   └── SEO issue CTA
         ├── [AI] title/description → Fix hoặc Fix all with AI → preview → apply → recalculate
-        └── [You] → Edit / Set up / Enable / Publish tại destination của F37 §12.3
+        └── [You] → Edit / Set up / Publish tại destination của F37 §12.3
 ```
 
 ---
@@ -326,7 +325,7 @@ THEN  hệ thống tự động query hạng của website theo từng keyword
 
 ```gherkin
 GIVEN người dùng đã nhập từ khoá theo dõi (VD: "bakery KL", "bánh sinh nhật")
-WHEN  nhấn "Fix all with AI" hoặc "✨ Tự động tối ưu SEO" trên bất kỳ trang nào
+WHEN  nhấn "Fix all with AI" hoặc "Fix" trên metadata issue
 THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu một cách tự nhiên
   AND không nhồi nhét keyword (keyword density ≤ 2%)
   AND khi không có từ khoá theo dõi, AI hoạt động giống hệt hiện tại
@@ -338,7 +337,7 @@ THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu 
 
 ```gherkin
 GIVEN một trang đã có meta title/description do người dùng nhập thủ công
-WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
+WHEN  AI sinh meta mới qua user-triggered AI Fix
 THEN  hiển thị so sánh bản cũ vs bản mới
   AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
   AND chỉ ghi đè khi người dùng đồng ý
@@ -405,7 +404,7 @@ F03 dùng PostHog cho analytics vì seller chủ yếu chạy trên platform sub
 |-----------|--------|---------------|
 | F02 Auth | ✅ Done | |
 | F10 Orders | ⬜ Pending | Cần có API đếm số Pending Orders |
-| OpenAI API | ✅ Setup | Phục vụ Auto SEO & Fix All Streaming (Sử dụng SSE) |
+| OpenAI API | ✅ Setup | Phục vụ AI Metadata Fix streaming (Sử dụng SSE) |
 | PostHog Cloud | ⬜ Pending in repo | Primary analytics source for Overview & Analytics Detail |
 | Internal analytics collection | ✅ Exists | Fallback/backward compatibility during PostHog migration |
 

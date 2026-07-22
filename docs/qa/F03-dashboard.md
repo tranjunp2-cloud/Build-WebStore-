@@ -76,22 +76,7 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập Dashboard → SEO Health. | - Chỉ có một score /100.<br>- Không có Score History.<br>- Bốn bucket bars hiển thị dạng 2×2, không hiện điểm bucket.<br>- Root-cause issues dùng đúng badge AI/You, CTA và destination theo F37 §12.3.<br>- AI Fix All chỉ hiện khi còn metadata issue AI-fixable.<br>- Derived/platform metrics không tạo issue trùng. | Blocker | [ ] |
-| **TC-F03.30** | `US-03/AC-2` | `Func` | **[Sitemap]** Tạo Sitemap XML tự động | 1. Nhấn **Generate Sitemap**. | - File Sitemap được tạo trong thư mục static route của server.<br>- Toast thông báo xanh lá xuất hiện trong < 2 giây. | High | [x] |
-| **TC-F03.31** | `US-03/AC-3` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
-
----
-
-### US-04: Auto SEO Meta Generation (Integration F05/Localize)
-
-| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
-|:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **TC-F03.32** | `US-04/AC-1` | `Integrate` | **[First Publish]** Tự động sinh SEO khi publish trang trắng | 1. Trong F05 Editor, tạo trang mới không điền SEO Meta.<br>2. Nhấn **Publish**. | - Backend tự động sinh SEO title/description bằng AI.<br>- Trang output có meta tags đầy đủ trong `<head>`. | Blocker | [x] |
-| **TC-F03.33** | `US-04/AC-1` | `Format` | **[Title Rule Homepage]** Format title cho trang chủ | 1. Publish trang có gắn flag là trang chủ (Homepage). | - Title theo format: `{Tên Shop} \| {Ngành} Online Malaysia`. | High | [x] |
-| **TC-F03.34** | `US-04/AC-1` | `Format` | **[Title Rule Product]** Format title cho trang sản phẩm | 1. Publish trang sản phẩm đơn lẻ. | - Title theo format: `{Tên Sản Phẩm} \| {Tên Shop} \| Buy Online Malaysia`. | High | [x] |
-| **TC-F03.35** | `BR-05/F21` | `Locale` | **[Format Locale]** Target thị trường Malaysia (Bahasa Melayu) | 1. Cấu hình `locale=ms`.<br>2. Publish trang và kiểm tra meta sinh ra. | - Nội dung SEO được sinh bằng Bahasa Melayu thay vì tiếng Anh. | Blocker | [ ] |
-| **TC-F03.36** | `US-04/AC-1` | `Boundary` | **[Trim Length]** Cắt gọn title/description vượt giới hạn | 1. Tạo nội dung khiến AI sinh title > 100 ký tự. | - Title bị cắt tại tối đa 60 ký tự.<br>- Description bị cắt tại tối đa 160 ký tự. | High | [x] |
-| **TC-F03.37** | `US-04/AC-1` | `Schema` | **[JSON-LD Inject]** Kiểm tra structured data trong HTML | 1. Inspect HTML `<head>` của trang đã publish. | - Có thẻ `<script type="application/ld+json">` chứa schema sản phẩm đúng chuẩn. | High | [x] |
-| **TC-F03.38** | `US-04/AC-2` | `Queue` | **[Background Job]** Sinh SEO nền khi API gián đoạn | 1. Ngắt kết nối tới OpenAI (giả lập 504).<br>2. Nhấn Publish trang. | - UI không bị treo chờ response.<br>- Hiển thị toast "Publish thành công".<br>- Job SEO được đưa vào queue và retry khi mạng phục hồi. | Blocker | [x] |
+| **TC-F03.31** | `US-03/AC-2` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
 
 ---
 
@@ -107,7 +92,7 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 | **TC-F03.43** | `US-05/AC-2` | `Failover` | **[Timeout UI]** Xử lý SSE bị gián đoạn quá 15 giây | 1. Giả lập mạng bị đứt giữa chừng, SSE không nhận response > 15 giây. | - Hiển thị alert "Sự cố kết nối, vui lòng thử lại".<br>- Không treo UI hay vòng lặp vô hạn. | Blocker | [x] |
 | **TC-F03.44** | `US-05/AC-2` | `SQL/DB` | **[Rollback DB]** Hoàn tác transaction khi insert thất bại | 1. Gây sự cố ngắt kết nối giữa chừng khi transaction đang insert (từ TC-F03.43). | - Hệ thống rollback toàn bộ transaction.<br>- Không có dữ liệu dở dang hoặc lỗi nửa vời trong DB. | Blocker | [x] |
 | **TC-F03.45** | `US-05/AC-1` | `Func` | **[Batch Undo]** Hoàn tác toàn bộ thay đổi AI bằng 1 click | 1. Approve toàn bộ thay đổi AI.<br>2. Nhận thấy kết quả sai, nhấn nút **Hoàn Tác**. | - Toàn bộ nội dung khôi phục về trạng thái trước khi AI sửa.<br>- Hoạt động như Ctrl+Z cho 1 batch. | Blocker | [x] |
-| **TC-F03.45b** | `US-05/AC-1` | `Regression` | **[Metadata Boundary]** AI Fix không sửa seller-owned signals | 1. Lưu snapshot Local Business, schema, content, alt text, crawler, publish, domain, verification.<br>2. Chạy Fix all with AI cho metadata. | - Chỉ meta title/description thay đổi.<br>- Toàn bộ seller-owned snapshot giữ nguyên. | Blocker | [ ] |
+| **TC-F03.45b** | `US-05/AC-1` | `Regression` | **[Metadata Boundary]** AI Fix không sửa seller-owned signals | 1. Lưu snapshot Local Business, schema, content, alt text, publish, domain, verification.<br>2. Chạy Fix all with AI cho metadata. | - Chỉ meta title/description thay đổi.<br>- Toàn bộ seller-owned snapshot giữ nguyên. | Blocker | [ ] |
 
 ---
 

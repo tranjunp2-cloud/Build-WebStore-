@@ -186,7 +186,7 @@ Exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`
 |--------|-----|-------------|
 | Business Data | 20 | Name 7 + address 8 + phone 5 |
 | Schema | 35 | LocalBusiness 10 + subtype 4 + hours 5 + geo 4 + telephone 3 + url 3 + priceRange 3 + Organization 3 |
-| AI Discoverability | 15 | AI crawlers 9 + sitemap 5 + llms.txt 1 |
+| AI Discoverability | 15 | Platform-allowed AI crawlers 9 + published sitemap 5 + published llms.txt 1 |
 | Technical Health | 30 | Meta title 8 + meta description 8 + Content Quality 8 + Technical SEO 6 |
 | **Total** | **100** | |
 
@@ -210,7 +210,7 @@ The score engine must be rewired to this contract before the unified Dashboard s
 **Signal sourcing:**
 - **Business Data:** `site.name`, structured `site.localBusiness` address, and `site.contactInfo.phone`
 - **Schema:** emitted LocalBusiness fields and Organization schema defined by PRD §5
-- **AI Discoverability:** tenant crawler toggle, published sitemap, and reachable llms.txt
+- **AI Discoverability:** platform always allows approved AI assistant crawlers (+9); published sitemap and reachable llms.txt provide the remaining 6 points
 - **Technical Health:** eligible metadata coverage, F03 Content Quality, Google verification, and indexable eligible pages
 
 ### Dashboard issue derivation (target)
@@ -218,8 +218,8 @@ The score engine must be rewired to this contract before the unified Dashboard s
 - Extend the existing `SeoData.issues` contract; do not introduce a second checklist API or card.
 - Derive issues from missing **root fields**, then sort internally by score impact. Do not expose or render point gain/loss per row.
 - One root field produces one issue even when it affects multiple score metrics: address→Address + LocalBusiness, phone→Phone + schema telephone, unpublished→Sitemap + llms.txt.
-- Metadata title/description issues use owner `AI` and the existing filtered AI Fix modal. Seller-owned issues use owner `You` plus `Edit`, `Set up`, `Enable`, or `Publish` from PRD §12.3.
-- Organization and indexability are platform-managed and never enter the seller issue list.
+- Metadata title/description issues use owner `AI` and the existing filtered AI Fix modal. Seller-owned issues use owner `You` plus `Edit`, `Set up`, or `Publish` from PRD §12.3.
+- Organization, indexability, and AI crawler access are platform-managed and never enter the seller issue list.
 - `Fix all with AI` visibility is derived from `issues.some(issue => issue.owner === 'AI')`; it must not depend on total issue count.
 - Google verification may enter the issue list only after Editor → Settings → SEO exposes the approved Search verification destination.
 

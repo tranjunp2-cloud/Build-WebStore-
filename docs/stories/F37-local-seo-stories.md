@@ -158,38 +158,36 @@ THEN  KHÔNG có `aggregateRating` trong LocalBusiness type (policy Google 2025�
 
 ---
 
-## US-F37-03: AI Crawler Permissions & llms.txt
+## US-F37-03: Platform-managed AI Discoverability
 
 **Wave 4** | **P0 (crawler) / P1 (llms.txt)** | **M** | **Status:** Draft
-
-> **Reality note:** `robots.txt` đã là per-tenant tại `src/app/sites/[slug]/robots.txt/route.ts:53-69` và đang **chặn** AI crawler (CCBot, ClaudeBot, Google-Extended, GPTBot — lưu ý **PerplexityBot hiện CHƯA có trong list**). Story này lật từ block → allow + thêm toggle.
 
 ### Story
 
 ```
 As a   chủ shop SME muốn xuất hiện trên AI assistants
-I want website của tôi cho phép AI crawler index mặc định, nhưng vẫn tắt được nếu muốn
-So that ChatGPT, Perplexity, Gemini có thể gợi ý doanh nghiệp của tôi
+I want platform tự duy trì crawler access, sitemap và llms.txt
+So that ChatGPT, Perplexity, Gemini có thể tìm doanh nghiệp mà tôi không phải quản lý technical settings
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — AI crawlers mặc định mở
+#### AC-1: Happy Path — AI crawlers luôn mở
 
 ```gherkin
-GIVEN storefront của bất kỳ tenant nào (không phân biệt setting)
+GIVEN storefront của bất kỳ tenant nào
 WHEN  fetch https://{storefront-domain}/robots.txt
 THEN  robots.txt KHÔNG chứa "Disallow: /" cho GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot
-  AND mặc định allow cho các user-agent trên
+  AND platform luôn allow các user-agent trên
+  AND score luôn cộng 9 điểm crawler access
 ```
 
-#### AC-2: Seller opt-out per-site
+#### AC-2: No seller control
 
 ```gherkin
-GIVEN seller TẮT toggle "Cho phép AI crawlers index website" trong Site Settings
-WHEN  fetch https://{storefront-domain}/robots.txt
-THEN  robots.txt chứa Disallow: / cho các AI user-agent tương ứng của site đó
-  AND crawler thông thường (Googlebot, Bingbot) KHÔNG bị block
+GIVEN seller mở Dashboard hoặc Site Settings
+WHEN  UI render
+THEN  không hiển thị AI crawler toggle, Sitemap Resubmit, Auto Meta toggle, hoặc SEO Action Tools section
 ```
 
 #### AC-3: llms.txt — Nội dung đúng cấu trúc
@@ -203,17 +201,17 @@ THEN  response là text/plain, HTTP 200, format Markdown
 
 ### Additional Criteria
 
-- [ ] `ai_crawlers_enabled` boolean DEFAULT true trên Sites
 - [ ] `llms.txt` generate động runtime, không cache lâu (BR-09); route mới `src/app/sites/[slug]/llms.txt/route.ts`
 - [ ] llms.txt là tín hiệu experimental — không oversell impact
+- [ ] Sitemap tự sinh từ published content; không có manual resubmit control
 
 ### Market Notes
 
-- Quyết định "default allow" đã được stakeholder approve (BR-03).
+- AI crawler access là platform invariant, không phải seller preference.
 
 ### Analytics / Tracking Notes
 
-- Track `ai_crawler_toggle_changed` với property `enabled`.
+- Không track crawler-toggle event vì seller không có toggle.
 
 ### Definition of Done
 
@@ -248,20 +246,19 @@ THEN  một SEO Health Score hiển thị đúng tổng điểm đã earn
   AND unresolved root causes hiển thị trong SEO Issues, không lặp derived metrics
   AND mỗi issue có badge AI/You, CTA và destination đúng theo F37 PRD §12.3
 
-GIVEN seller hoàn thành địa chỉ cấu trúc + giờ mở cửa + bật AI crawlers (Phase 1)
+GIVEN seller hoàn thành địa chỉ cấu trúc + giờ mở cửa
 WHEN  hệ thống tính lại score
 THEN  SEO Health Score tăng tương ứng các hạng mục đã earn
   AND các root-cause issues tương ứng biến mất
 ```
 
-#### AC-2: One-click fix
+#### AC-2: Platform-managed crawler signal
 
 ```gherkin
-GIVEN seller thấy issue "AI crawlers disabled" với badge You
-WHEN  click nút "Enable"
-THEN  toggle "Cho phép AI crawlers" tự động bật
-  AND robots.txt của storefront cập nhật ngay
-  AND issue biến mất và Score tính lại
+GIVEN seller mở SEO Health
+WHEN  score và SEO Issues render
+THEN  AI crawler access đã earn 9 điểm mặc định
+  AND không có crawler issue, toggle, hoặc CTA
 ```
 
 ### Additional Criteria

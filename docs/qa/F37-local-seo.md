@@ -1,7 +1,7 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
 > **Version:** 3.0 | **Updated:** 2026-07-22 | **Owner:** QA Team
-> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.5
+> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
@@ -28,7 +28,7 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 |---|---|---|
 | **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | ✅ BUILT + tested (§3.1–3.4) |
 | **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | 🟡 PARTIAL — category→subtype dropdown not built (§3.5) |
-| **US-F37-03** | AI Crawler permissions + llms.txt | 🔴 NOT BUILT (§3.6) |
+| **US-F37-03** | Platform-managed AI Discoverability | 🔴 TARGET REWIRE — remove toggle UI/state, keep crawler allow + llms.txt (§3.6) |
 | **US-F37-04** | Unified SEO Health Score + Actions | 🔴 TARGET NOT BUILT — legacy engine/API require rewire (§3.7) |
 | **US-F37-09** | Malaysia opt (MY geo/state, Waze, Halal) | 🟡 PARTIAL — geo built; Waze/Halal chưa (§3.9) |
 
@@ -137,24 +137,21 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ---
 
-## 3.6 US-F37-03: AI Crawler Permissions & llms.txt **[NOT BUILT — spec-based]**
+## 3.6 US-F37-03: Platform-managed AI Discoverability **[TARGET REWIRE]**
 
-> **🔴 BLOCKER / SPEC CONFLICT** — TC section này **chưa chạy được**, code chưa build đúng spec:
-> - `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03 "default ALLOW" (BR-03).
-> - **KHÔNG có** route `llms.txt`. **KHÔNG có** field per-site toggle (`ai_crawlers_enabled`). Score engine hardcode `allowsSearchBots: false` "until US-F37-03 ships".
-> - TC spec-based, đánh dấu `[NOT-BUILT]` — dùng làm acceptance spec khi implement. **Xem §9 câu hỏi #2.**
+> Target contract: approved AI assistant crawlers are always allowed and always earn 9 points. The seller sees no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. Current toggle-based code must be removed or made non-authoritative during implementation.
 
 | ID | AC/FR | Type | Title | Status | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
-| **TC-F37-03-01** | AC-4 | Func | Default robots.txt **ALLOW** AI bot (no `Disallow: /` cho GPTBot/ClaudeBot/Google-Extended/CCBot) | `[NOT-BUILT]` | Tenant mới → robots.txt KHÔNG chặn AI bot chính. | BR-03 default open |
-| **TC-F37-03-02** | FR-07 | Func | Field `ai_crawlers_enabled` boolean default `true` trên Sites | `[NOT-BUILT]` | Schema default true; migration entry (NFR-9). | Toggle backend |
-| **TC-F37-03-03** | AC-5 | Func | Seller opt-out OFF → robots.txt inject `Disallow: /` cho AI UA | `[NOT-BUILT]` | Toggle off → Disallow xuất hiện cho GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot. | Opt-out hoạt động |
-| **TC-F37-03-04** | AC-5 | Func | Opt-out KHÔNG chặn Googlebot/Bingbot | `[NOT-BUILT]` | Search bot thường vẫn crawl bình thường. | SEO không vỡ |
+| **TC-F37-03-01** | AC-01 / FR-12 | Func | robots.txt always allows approved AI assistant bots | target `[NOT-BUILT]` | GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot are not blocked for any tenant. | Platform invariant |
+| **TC-F37-03-02** | AC-02 / FR-12 | UI | No seller-facing discoverability controls | target `[NOT-BUILT]` | Dashboard and Site Settings contain no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. | KISS UI |
+| **TC-F37-03-03** | AC-01 / FR-12 | Regression | Persisted legacy `false` cannot block approved AI bots | target `[NOT-BUILT]` | A legacy site record cannot change robots behavior or reduce the 9 crawler points. | Migration safety |
+| **TC-F37-03-04** | AC-01 | Func | Googlebot/Bingbot remain allowed | target `[NOT-BUILT]` | Normal search crawlers remain crawlable. | SEO safety |
 | **TC-F37-03-05** | AC-6 | Func | `GET /llms.txt` → 200 `text/plain` | `[NOT-BUILT]` | Route tồn tại, status 200, MIME text/plain. | AEO signal |
 | **TC-F37-03-06** | AC-6 | Func | llms.txt content: tên, mô tả, ≥5 URL, contact, giờ, markdown | `[NOT-BUILT]` | Đủ element cấu trúc markdown. | llms.txt hợp lệ |
 | **TC-F37-03-07** | BR-09 | Func | llms.txt runtime-generated, cache ngắn | `[NOT-BUILT]` | Không long-cache; phản ánh data mới. | Freshness |
-| **TC-F37-03-08** | NFR-3 | Sec | Toggle per-site isolated (site A opt-out ≠ site B) | `[NOT-BUILT]` | robots.txt site B không đổi khi site A toggle. | Cross-tenant isolation |
-| **TC-F37-03-09** | Conflict | Sec | **Current robots.txt chặn 9 AI bot (ngược spec)** — confirm interim vs bug | `robots.txt/route.ts` | Ghi nhận hành vi hiện tại; PM chốt default-allow vs block trước implement. | **Spec conflict flag** |
+| **TC-F37-03-08** | NFR-3 | Sec | Platform crawler invariant is tenant-safe | target `[NOT-BUILT]` | Every tenant receives the same approved allow policy without cross-tenant state. | Isolation |
+| **TC-F37-03-09** | §5 / FR-12 | Func | Score always awards crawler baseline | target engine `[NOT-BUILT]` | AI Discoverability always includes 9 crawler points; unpublished sites earn no sitemap/llms points. | Score integrity |
 
 ---
 
@@ -174,8 +171,8 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-04-08** | §5 | Func | Engine — Schema totals 35 | target engine `[NOT-BUILT]` | Eight approved schema signals total exactly 35. | Bucket đúng |
 | **TC-F37-04-09** | §5 | Func | Engine — four buckets sum exactly 100 | target engine `[NOT-BUILT]` | Business 20 + Schema 35 + AI 15 + Technical 30 = total. | No-drift rule |
 | **TC-F37-04-10** | AC-1 / FR-20 | Func | **[NOT-BUILT]** Unified KISS layout | pending unified widget | One gauge; no Score History; four bucket bars in a 2×2 desktop grid without bucket point values; SEO Issues uses the existing two-column row pattern. | US-04 core UI |
-| **TC-F37-04-11** | AC-2 | Func | **[NOT-BUILT]** One-click Enable AI crawler | pending (phụ thuộc US-03) | `You` issue + Enable CTA updates the toggle and robots.txt, removes the issue, and recalculates score. | US-04 core UI |
-| **TC-F37-04-12** | FR-20 / FR-21 | Func | **[NOT-BUILT]** Actor, CTA, and destination contract | pending unified widget | Every unresolved seller issue uses `AI` or `You` and the matching Fix/Edit/Set up/Enable/Publish behavior from PRD §12.3; completed issues are hidden. | Action clarity |
+| **TC-F37-04-11** | AC-2 / FR-12 | Func | **[NOT-BUILT]** AI crawler signal stays hidden | pending unified widget | Crawler access earns 9 points but never renders an issue, toggle, CTA, or Action Tools card. | KISS platform invariant |
+| **TC-F37-04-12** | FR-20 / FR-21 | Func | **[NOT-BUILT]** Actor, CTA, and destination contract | pending unified widget | Every unresolved seller issue uses `AI` or `You` and the matching Fix/Edit/Set up/Publish behavior from PRD §12.3; completed issues are hidden. | Action clarity |
 | **TC-F37-04-13** | FR-19 | Func | Score recalc khi seller thay đổi signal thuộc §5 | integration | Save → recompute; PostHog analytics không ảnh hưởng score. | Freshness |
 | **TC-F37-04-14** | AC-1 | Func | `completion-checklist.tsx` — addressDone cần đủ 4 field, hoursDone predicate | component `[UNTESTED]` | addressDone chỉ khi street+city+state+postcode; hoursDone khi có ≥1 ngày mở. | US-01 indicator đúng |
 | **TC-F37-04-16** | AC-05 / AC-07 | Func | **[NOT-BUILT]** Conditional AI Fix strip | pending unified widget | Strip and Fix All show only when at least one title/description issue is AI-fixable; Fix opens the existing modal filtered to the affected field; Local Business data is unchanged. | Prevents false AI capability |
@@ -477,8 +474,8 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 > Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
 
-1. **🔴 robots.txt spec conflict (US-03, BLOCKER):** `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03/BR-03 "default ALLOW". Score engine cũng hardcode `allowsSearchBots: false`. **PM chốt:** default-allow (theo spec) hay giữ block-list? → quyết TC-F37-03-01/09. Toàn US-03 (llms.txt + per-site toggle) chưa build.
-2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe chưa implement → TC-04-10..12/16..18 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
+1. **🔴 Platform crawler rewire (US-03, BLOCKER):** Code currently persists and honors a seller crawler toggle. Target behavior ignores/removes that setting, always allows approved AI assistant crawlers, always awards 9 points, and removes the entire SEO Action Tools UI.
+2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe chưa implement → TC-04-10..12/16..18 spec-based. TC-04-11 verifies the crawler signal stays platform-managed and hidden.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
 4. **Technical Health rewire (US-04):** Code còn placeholder CWV/mobile/HTTPS → phải thay bằng metadata coverage + F03 Content Quality + verification/indexability trước khi surface score cho seller.
 5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.
