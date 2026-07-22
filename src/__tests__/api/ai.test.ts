@@ -286,6 +286,62 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/blog', '/contact', '404'])
         })
 
+        it('accepts a valid generated site with six pages', async () => {
+             const page = (title: string, slug: string, blockType: string, isHomepage = false) => ({
+                 title,
+                 slug,
+                 isHomepage,
+                 blocks: [{
+                     blockType,
+                     variant: blockType === 'hero' ? 'centered' : undefined,
+                     headline: `${title} content`,
+                     subheadline: `${title} page for Bakery Relevance`,
+                 }],
+                 seo: { title, description: `${title} page` },
+             })
+             const pages = [
+                 page('Home', '/', 'hero', true),
+                 page('About', '/about', 'about'),
+                 page('Services', '/services', 'features'),
+                 page('Contact', '/contact', 'contact'),
+                 page('Blog', '/blog', 'blog-list'),
+                 page('Gallery', '/gallery', 'gallery'),
+             ]
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'Bakery Relevance',
+                     siteType: 'fnb',
+                     theme: { primaryColor: '#78350f' },
+                     seo: { title: 'Bakery Relevance', description: 'Fresh artisan bakery' },
+                     blocks: pages[0]!.blocks,
+                     pages,
+                 },
+                 events: [],
+             } as Awaited<ReturnType<typeof generateSiteWithAI>>)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Bakery Relevance',
+                         industry: 'fnb',
+                         products: 'Sourdough, croissants, and celebration cakes',
+                         shortDescription: 'A neighbourhood artisan bakery in Kuala Lumpur',
+                     },
+                 }),
+             })
+
+             const res = await GenerateSitePOST(req)
+             const result = await res.json()
+
+             expect(res.status).toBe(200)
+             expect(result.success).toBe(true)
+             expect(result.totalPages).toBe(6)
+             expect(mockPageDB.map((savedPage) => savedPage.slug)).toEqual([
+                 '/', '/about', '/services', '/contact', '/blog', '/gallery', '404',
+             ])
+        })
+
         it('removes generated CTA links whose target pages do not exist', async () => {
              vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
                  result: {
