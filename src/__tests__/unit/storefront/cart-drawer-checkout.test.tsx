@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import React from 'react'
 
 // ── Mutable state driving useCartStore mock ───────────────────────────────
@@ -12,6 +12,7 @@ let mockChanges: import('@/store/cartStore').CartChange[] = []
 let mockRequiresConfirmation = false
 const mockRefreshCart = vi.fn()
 const mockAcknowledgeChanges = vi.fn()
+const mockUpdateQuantity = vi.fn()
 
 // ── Mutable state driving usePathname mock ────────────────────────────────
 let mockPathname = '/sites/test-site'
@@ -27,7 +28,7 @@ vi.mock('@/store/cartStore', () => ({
         isOpen: mockIsOpen,
         closeCart: vi.fn(),
         removeItem: vi.fn(),
-        updateQuantity: vi.fn(),
+        updateQuantity: mockUpdateQuantity,
         subtotal: vi.fn(() => mockItems.reduce((s, i) => s + i.price * i.quantity, 0)),
         itemCount: vi.fn(() => mockItems.reduce((s, i) => s + i.quantity, 0)),
         siteId: mockSiteId,
@@ -167,6 +168,24 @@ describe('CartDrawer — checkout routing', () => {
         })
     })
 
+    // ── TC-F09.12: Drawer slides in from the right ──────────────────────
+    describe('TC-F09.12: Cart Drawer slide-in motion', () => {
+        it('starts off-screen to the right while the backdrop fades in', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('dialog', { name: /shopping cart/i }))
+                .toHaveStyle({ transform: 'translateX(100%)' })
+            expect(screen.getByTestId('cart-drawer-backdrop'))
+                .toHaveStyle({ opacity: '0' })
+        })
+    })
+
     // ── TC-F09.220: Items + siteSlug → checkout link ───────────────────────
     describe('TC-F09.220: Cart has items → checkout renders as link with correct href', () => {
         it('renders checkout as <a> when items exist and siteSlug provided', () => {
@@ -235,6 +254,25 @@ describe('CartDrawer — checkout routing', () => {
             // Assert — no checkout link; fallback button rendered
             expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
             expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F09.16: Decrementing one item removes it ────────────────────────
+    describe('TC-F09.16: Quantity 1 → decrement to 0', () => {
+        it('passes quantity 0 to the cart store so the last item is removed', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            render(<CartDrawer siteSlug="test-site" />)
+            const quantityStepper = screen.getByText('1').parentElement
+            expect(quantityStepper).not.toBeNull()
+
+            // Act
+            fireEvent.click(within(quantityStepper as HTMLElement).getAllByRole('button')[0])
+
+            // Assert
+            expect(mockUpdateQuantity).toHaveBeenCalledTimes(1)
+            expect(mockUpdateQuantity).toHaveBeenCalledWith('prod-1', 0, undefined)
         })
     })
 

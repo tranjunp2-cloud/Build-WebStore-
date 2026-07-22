@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useCartStore } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingCart, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,6 +21,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount, siteId: activeSiteId, siteSlug: activeSiteSlug, refreshStatus, refreshCart, changes } = useCartStore()
     const isOwner = useIsOwner()
     const { t } = useI18n()
+    const prefersReducedMotion = useReducedMotion()
     const pathname = usePathname()
     const shopBase = pathname.startsWith('/sites/') ? `/sites/${siteSlug}` : ''
     const hasCheckoutRoute = Boolean(siteSlug)
@@ -36,8 +38,6 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
         if (isOpen && activeSiteId && activeSiteSlug) void refreshCart()
     }, [activeSiteId, activeSiteSlug, isOpen, refreshCart])
 
-    if (!isOpen) return null
-
     const currency = items[0]?.currency || 'MYR'
     const ctaBtnStyle: React.CSSProperties = {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -50,21 +50,40 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
     }
 
     return (
-        <>
-            <div onClick={closeCart} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 998 }} />
+        <AnimatePresence>
+            {isOpen ? (
+                <>
+                    <motion.div
+                        data-testid="cart-drawer-backdrop"
+                        initial={prefersReducedMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.18, ease: 'easeOut' }}
+                        onClick={closeCart}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 998 }}
+                    />
 
-            <div style={{
-                position: 'fixed', top: 0, right: 0, bottom: 0, width: '410px', maxWidth: '100vw',
-                background: '#ffffff', zIndex: 999, display: 'flex', flexDirection: 'column',
-                padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-                fontFamily: CSS_VARS.fontBody, color: '#191c1d',
-            }}>
+                    <motion.aside
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="cart-drawer-title"
+                        initial={prefersReducedMotion ? false : { x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={prefersReducedMotion ? { x: 0 } : { x: '100%' }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        style={{
+                            position: 'fixed', top: 0, right: 0, bottom: 0, width: '410px', maxWidth: '100vw',
+                            background: '#ffffff', zIndex: 999, display: 'flex', flexDirection: 'column',
+                            padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                            fontFamily: CSS_VARS.fontBody, color: '#191c1d',
+                        }}
+                    >
                 {/* Header */}
                 <div style={{ paddingBottom: '40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ShoppingCart size={20} style={{ color: CSS_VARS.primary, flexShrink: 0 }} />
                         <div>
-                            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: CSS_VARS.primary, letterSpacing: '-0.5px', lineHeight: '28px', fontFamily: CSS_VARS.fontHeading }}>
+                            <h2 id="cart-drawer-title" style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: CSS_VARS.primary, letterSpacing: '-0.5px', lineHeight: '28px', fontFamily: CSS_VARS.fontHeading }}>
                                 {t.storefront.cart.drawerTitle} ({itemCount()})
                             </h2>
                             <p style={{ margin: 0, fontSize: '12px', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: '16px' }}>
@@ -131,8 +150,8 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                             }}>
                                                 <button
                                                     onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantName)}
-                                                    disabled={item.unavailable || item.quantity <= 1}
-                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.quantity <= 1 ? 0.3 : 1 }}>
+                                                    disabled={item.unavailable}
+                                                    style={{ background: 'none', border: 'none', cursor: item.unavailable ? 'not-allowed' : 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.unavailable ? 0.3 : 1 }}>
                                                     <Minus size={7} />
                                                 </button>
                                                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1d', padding: '4px 12px', lineHeight: '20px' }}>
@@ -190,7 +209,9 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                         )}
                     </div>
                 </div>
-            </div>
-        </>
+                    </motion.aside>
+                </>
+            ) : null}
+        </AnimatePresence>
     )
 }
