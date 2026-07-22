@@ -13,6 +13,8 @@ created: 2026-07-16
 
 # Product Creation Form 70/30 UI/UX Redesign
 
+> **Implementation status: Not started.** This plan and its linked HTML prototype define the approved contract only. Production code, localization, automated tests, and QA remain pending for subsequent phases/issues; no phase or implementation checklist is complete in this documentation PR.
+
 ## Overview
 
 Reorganize the shared Product form into an approximately 70/30 responsive layout. Keep all product input sections in the main column and reserve the compact sticky sidebar for Product Content Strength and Product Status only. Add four sticky anchor tabs for navigating the long form. Support both create and edit flows without changing the Payload product schema.
