@@ -235,9 +235,9 @@ describe('TC-F08-BS.08 — Tier A: searchPhotos called with AI imageKeyword; gal
 
         // searchPhotos called once per post (3 posts) with AI imageKeyword
         expect(searchPhotos).toHaveBeenCalledTimes(3)
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
 
         // uploadImageUrl called with photo.url directly (no Imgix transformation on Pixabay)
         expect(uploadImageUrl).toHaveBeenCalledWith(
@@ -411,9 +411,9 @@ describe('TC-F08-BS.16 — AI imageKeyword passed to searchPhotos (not category)
         const payload = makePayload(0)
         await seedBlogPosts(payload, 1, 2, 'restaurant', 'BakeryBiz', 3)
 
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, expect.objectContaining({ orientation: 'landscape', width: 1200, timeoutMs: 6_000 }))
     })
 })
 
@@ -451,8 +451,8 @@ describe('TC-F08-BS.18 — AI returns 3 items with same slug → suffix disambig
     })
 })
 
-describe('TC-F08-BS.19 — generateBlogPostContent failure → fallback to excerpt', () => {
-    it('creates post with <p>excerpt</p> when content generation throws', async () => {
+describe('TC-F08-BS.19 / TC-GENPERF-W3-08 — generateBlogPostContent failure → complete deterministic fallback', () => {
+    it('[TC-GENPERF-W3-08] creates structured HTML content when content generation throws', async () => {
         const generateBlogPostContent = await getGenerateBlogPostContent()
         vi.mocked(generateBlogPostContent).mockRejectedValue(new Error('content gen failed'))
 
@@ -462,7 +462,9 @@ describe('TC-F08-BS.19 — generateBlogPostContent failure → fallback to excer
         expect(result).toBe(3)
         const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
         for (const [arg] of calls) {
-            expect(arg.data.content).toMatch(/^<p>.*<\/p>$/)
+            expect(arg.data.content).toContain('<h2>')
+            expect(arg.data.content).toContain('<h3>Next steps</h3>')
+            expect(arg.data.content).toContain('<ul>')
         }
     })
 })
@@ -646,22 +648,33 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
 		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
+			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
 		})
 
 		expect(prepared).toBeNull()
 		warnSpy.mockRestore()
 	})
 
-	it('returns [] when tenant already has posts (regenerate) and persistBlogPosts inserts prepared rows', async () => {
+	it('returns [] only when the current site already has three complete posts', async () => {
 		const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 
 		// Prep skip case
 		const payloadWithPosts = makePayload(3)
 		const prepared = await prepareBlogPosts({
-			payload: payloadWithPosts, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
+			payload: payloadWithPosts, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
 		})
 		expect(prepared).toEqual([])
+		expect(payloadWithPosts.count).toHaveBeenCalledWith({
+			collection: 'blogs',
+			where: {
+				and: [
+					{ tenant: { equals: 42 } },
+					{ site: { equals: 99 } },
+					{ content: { exists: true } },
+					{ thumbnail: { exists: true } },
+				],
+			},
+		})
 
 		// Persist path inserts exactly the prepared rows (site-dependent phase)
 		const payload = makePayload(0)
@@ -677,5 +690,32 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		expect(first.data.thumbnail).toBe(5)
 		const second = (payload.create as ReturnType<typeof vi.fn>).mock.calls[1][0]
 		expect(second.data.thumbnail).toBeUndefined()
+	})
+
+	it('prepares only the deficit when the current site has one complete post', async () => {
+		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+		const payload = makePayload(1)
+
+		const prepared = await prepareBlogPosts({
+			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+		})
+
+		expect(prepared).toHaveLength(2)
+	})
+
+	it('propagates the write guard and stops before the next blog insert after abort', async () => {
+		const { persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+		const payload = makePayload(0)
+		const assertCanWrite = vi.fn(() => {
+			if (vi.mocked(payload.create).mock.calls.length > 0) {
+				throw new Error('GENERATION_DEADLINE_EXCEEDED')
+			}
+		})
+
+		await expect(persistBlogPosts(payload, [
+			{ title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 5 },
+			{ title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 6 },
+		], 42, 99, 7, assertCanWrite)).rejects.toThrow('GENERATION_DEADLINE_EXCEEDED')
+		expect(payload.create).toHaveBeenCalledTimes(1)
 	})
 })

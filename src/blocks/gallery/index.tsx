@@ -17,6 +17,7 @@ import { getGalleryImages } from '@/lib/images/industry-images'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
+import { resolveGalleryImages } from './resolve-images'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -161,18 +162,7 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
     // Per-slot fallback: slots with a real image show it; null slots show the Unsplash fallback
     // for that index. This way, replacing one stock image doesn't wipe fallbacks for other slots.
     const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
-    const slotCount = Math.max(rawImages.length, fallbackUrls.length)
-    const images = Array.from({ length: slotCount }, (_, i) => {
-        const item = rawImages[i] as Record<string, unknown> | undefined
-        const img = item?.image
-        if (img && typeof img === 'object' && (img as Record<string, unknown>)?.url) {
-            return item as GalleryConfig['images'][number]
-        }
-        return {
-            image: { url: fallbackUrls[i % fallbackUrls.length]!, alt: `Gallery image ${i + 1}` },
-            caption: (item?.caption as string) || '',
-        }
-    })
+    const images = resolveGalleryImages(rawImages, fallbackUrls)
 
     // ── Lightbox variant ──────────────────────────────────────────────────
     if (variant === 'lightbox') {

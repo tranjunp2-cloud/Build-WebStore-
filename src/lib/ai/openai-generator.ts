@@ -46,7 +46,7 @@ import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
-    return new OpenAI({ apiKey: key })
+    return new OpenAI({ apiKey: key, timeout: 40_000, maxRetries: 0 })
 }
 
 export type SSEEvent = {

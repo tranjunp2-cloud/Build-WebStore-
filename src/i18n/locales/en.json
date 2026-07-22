@@ -4806,7 +4806,14 @@
             "shippingNote": "Shipping fees are not included. Final total calculated at checkout.",
             "proceedToCheckout": "Proceed to Checkout",
             "checkoutUnavailable": "Checkout feature is coming soon",
-            "qty": "Qty:"
+            "qty": "Qty:",
+            "updating": "Updating cart…",
+            "changesUpdated": "Your cart has been updated with the latest product details.",
+            "priceChanged": "Price updated from {from} to {to}.",
+            "quantityAdjusted": "Quantity was adjusted to available stock.",
+            "itemUnavailable": "This item is no longer available.",
+            "refreshFailed": "We could not verify your cart. Please retry.",
+            "retry": "Retry"
         },
         "checkout": {
             "title": "Checkout",

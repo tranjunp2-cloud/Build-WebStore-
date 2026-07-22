@@ -1,7 +1,7 @@
 /**
  * Sample product generation — runs in parallel with site generation.
  * Two-tier fallback: AI (GPT-4.1-nano) → curated library.
- * Image per product: Unsplash search → Payload Media upload (skipped on failure).
+ * Image per product: Pixabay search → Payload Media upload with curated fallback.
  *
  * Called from generate-site/route.ts via Promise.allSettled.
  */
@@ -56,7 +56,24 @@ export interface GeneratedProductsResult {
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
-    return new OpenAI({ apiKey: key })
+    return new OpenAI({ apiKey: key, timeout: 12_000, maxRetries: 0 })
+}
+
+async function mapWithConcurrency<T, R>(
+    items: readonly T[],
+    concurrency: number,
+    worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+    const results = new Array<R>(items.length)
+    let nextIndex = 0
+    const run = async () => {
+        while (nextIndex < items.length) {
+            const index = nextIndex++
+            results[index] = await worker(items[index]!, index)
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run))
+    return results
 }
 
 /** Returns true when the OpenAI error is a hard quota/credit limit (no point retrying). */
@@ -176,11 +193,11 @@ function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProdu
     }))
 }
 
-// Categories too generic to improve an Unsplash image search
+// Categories too generic to improve a stock-image search
 const GENERIC_CATEGORIES = new Set(['ecommerce', 'business', 'retail', 'store', 'shop'])
 
 /**
- * Derive a product-specific Unsplash search keyword from product name + category.
+ * Derive a product-specific stock-image keyword from product name + category.
  * Uses last 2 words of the product name — English product names put the noun last
  * (e.g. "Colorful Rainbow Teddy" → "rainbow teddy", not "colorful rainbow").
  */
@@ -194,12 +211,10 @@ function deriveFallbackKeyword(productName: string, category: string): string {
 }
 
 /**
- * Fetch one Unsplash photo and upload to Payload Media.
+ * Fetch one Pixabay photo and upload to Payload Media.
  * Search flow:
  *   Tier A  — exact AI keyword
- *   Tier B  — progressively drop leading words (adjectives first, noun stays last)
- *             e.g. "rainbow teddy bear" → "teddy bear" → "bear"
- *   Tier B2 — name-derived keyword as final text-search attempt
+ *   Tier B  — one name-derived keyword as the final text-search attempt
  *   Tier C  — direct gallery URL (bypasses search API entirely)
  * Never throws — returns imageId (may be undefined) and optional failure reason.
  * skipSearch=true jumps directly to Tier C (used when quota is exhausted or PIXABAY_FALLBACK_ONLY=1).
@@ -214,8 +229,12 @@ async function fetchProductImage(
     tenantId: string,
     galleryFallbackUrl?: string,
     skipSearch = false,
+    assertCanWrite?: () => void,
 ): Promise<{ imageId: number | undefined; reason?: ImageFailReason }> {
     const filename = `sample-product-${siteKey}-${index}.jpg`
+    const upload = (url: string) => assertCanWrite
+        ? uploadImageUrl(url, filename, productName, tenantId, payload, assertCanWrite)
+        : uploadImageUrl(url, filename, productName, tenantId, payload)
     let wasRateLimited = false
     let tierAUploadFailed = false
 
@@ -224,31 +243,25 @@ async function fetchProductImage(
             // GH-1185: `category` here is already a resolved composer key —
             // Pixabay domain filter keeps loose matches on-topic.
             const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[category]
+            const searchOptions = { orientation: 'squarish' as const, width: 800, category: pixCategory, timeoutMs: 6_000 }
             // Tier A: exact AI keyword
-            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
+            let photos = await searchPhotos(keyword, 1, searchOptions)
 
-            // Tier B: drop leading adjectives one by one until we get results
-            if (!photos.length) {
-                const words = keyword.trim().split(/\s+/)
-                for (let drop = 1; drop < words.length && !photos.length; drop++) {
-                    const simplified = words.slice(drop).join(' ')
-                    console.warn(`[sample-products] "${keyword}" → 0, trying simplified "${simplified}"`)
-                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish', width: 800, category: pixCategory })
-                }
-            }
-
-            // Tier B2: keyword variants exhausted — derive fresh keyword from product name
+            // Tier B: one fresh keyword keeps the critical path bounded. The
+            // curated gallery is already a complete, on-topic fallback.
             if (!photos.length) {
                 const nameKeyword = deriveFallbackKeyword(productName, category)
-                console.warn(`[sample-products] all "${keyword}" variants → 0, trying name-derived "${nameKeyword}"`)
-                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
+                if (nameKeyword.toLowerCase() !== keyword.trim().toLowerCase()) {
+                    console.warn(`[sample-products] "${keyword}" → 0, trying name-derived "${nameKeyword}"`)
+                    photos = await searchPhotos(nameKeyword, 1, searchOptions)
+                }
             }
 
             if (photos.length) {
                 const photo = photos[0]!
                 // photo.url is already sized by the client (Pixabay fixed sizes).
                 try {
-                    const id = await uploadImageUrl(photo.url, filename, productName, tenantId, payload)
+                    const id = await upload(photo.url)
                     if (id != null) {
                         // Verify row still exists — orphan stripper may delete unreferenced media.
                         const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
@@ -272,9 +285,10 @@ async function fetchProductImage(
     }
 
     // Tier C: direct gallery URL (bypasses search API — works even when key is invalid/rate-limited)
+    assertCanWrite?.()
     if (galleryFallbackUrl) {
         try {
-            const id = await uploadImageUrl(galleryFallbackUrl, filename, productName, tenantId, payload)
+            const id = await upload(galleryFallbackUrl)
             if (id != null) {
                 const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
                 if (exists) return { imageId: id, ...(wasRateLimited ? { reason: 'rate_limited' as ImageFailReason } : {}) }
@@ -286,7 +300,11 @@ async function fetchProductImage(
     }
 
     // Tier D: static carton-box placeholder — last resort when all CDN-dependent tiers fail
-    const cartonResult = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
+    assertCanWrite?.()
+    const cartonResult = await (assertCanWrite
+        ? findOrCreateCartonMedia(payload, tenantId, undefined, assertCanWrite)
+        : findOrCreateCartonMedia(payload, tenantId)
+    ).catch(() => null)
     if (cartonResult) {
         console.warn(`[sample-products] Tier D carton fallback used for "${productName}"`)
         return { imageId: cartonResult.id, reason: wasRateLimited ? 'rate_limited' : tierAUploadFailed ? 'upload_failed' : 'no_results' }
@@ -306,7 +324,7 @@ async function fetchProductImage(
 
 /**
  * Generate 6 sample products for a newly created site.
- * Tier 1: AI. Tier 2: curated library. Images: Unsplash fetched sequentially to avoid rate limits.
+ * Tier 1: AI. Tier 2: curated library. Image network work uses bounded concurrency.
  * Never throws — returns whatever was successfully generated (may be []).
  * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
  */
@@ -316,8 +334,11 @@ export async function generateSampleProducts(
     tenantId: string,
     payload: BasePayload,
     siteId?: string | number,
+    assertCanWrite?: () => void,
 ): Promise<GeneratedProductsResult> {
-    const MAX_RETRIES = 3
+    // The OpenAI client has retries disabled. Curated products are a complete,
+    // deterministic fallback, so a second/third model attempt only extends p95.
+    const MAX_RETRIES = 1
     let rawProducts: Array<SampleProduct & { _imageKeyword: string }> = []
     let aiSucceeded = false
 
@@ -344,28 +365,26 @@ export async function generateSampleProducts(
         rawProducts = canUseEnglishCuratedFallback ? getFallbackProducts(businessInfo) : []
     } else if (rawProducts.length < 6) {
         const needed = 6 - rawProducts.length
-        try {
-            const topup = await generateSampleProductsAI(
-                businessInfo, language, needed,
-                rawProducts.map(p => p.name),
-            )
-            rawProducts = [...rawProducts, ...topup].slice(0, 6)
-        } catch (err) {
-            if (isQuotaExhausted(err)) {
-                console.warn('[sample-products] OpenAI quota exhausted on top-up, filling from curated')
-            } else {
-                console.warn('[sample-products] AI top-up failed, filling from curated:', (err as Error).message)
-            }
-            if (canUseEnglishCuratedFallback) {
-                const fallback = getFallbackProducts(businessInfo)
-                const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
-                const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
-                rawProducts = [...rawProducts, ...fills]
+        if (canUseEnglishCuratedFallback) {
+            const fallback = getFallbackProducts(businessInfo)
+            const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
+            const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
+            rawProducts = [...rawProducts, ...fills]
+        } else {
+            try {
+                const topup = await generateSampleProductsAI(
+                    businessInfo, language, needed,
+                    rawProducts.map(p => p.name),
+                )
+                rawProducts = [...rawProducts, ...topup].slice(0, 6)
+            } catch (err) {
+                const message = isQuotaExhausted(err) ? 'quota exhausted' : (err as Error).message
+                console.warn(`[sample-products] localized AI top-up failed: ${message}`)
             }
         }
     }
 
-    // Fetch images sequentially with delay to stay within Unsplash rate limits (demo: 50/hr)
+    // Resolve images with bounded network concurrency; media writes remain globally serialized.
     const siteKey = siteId ? String(siteId) : Date.now().toString(36)
     // GH-1611: form key wins (see getFallbackProducts) — this one drives the
     // product IMAGE search, so a wrong category is a wrong-industry photo.
@@ -381,20 +400,21 @@ export async function generateSampleProducts(
     // Derive SKU prefix from composer category (first 3 chars, uppercase)
     const skuPrefix = category.substring(0, 3).toUpperCase()
 
-    const withImages: SampleProduct[] = []
     const stats: ProductImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
     // Set to true after first 429 — no point searching for remaining products this gen
     let searchRateLimited = false
     const fallbackOnly = process.env.PIXABAY_FALLBACK_ONLY === '1'
 
-    for (let i = 0; i < rawProducts.length; i++) {
-        const p = rawProducts[i]!
-        if (i > 0) await new Promise(resolve => setTimeout(resolve, 500))
+    // Pixabay allows substantially more request concurrency than the retired
+    // Unsplash demo API. Network work is bounded at 3; uploadImageUrl still
+    // serializes Payload media creates through the global media-create lock.
+    const withImages = await mapWithConcurrency(rawProducts, 3, async (p, i): Promise<SampleProduct> => {
         const skipSearch = fallbackOnly || searchRateLimited
         const { imageId, reason } = await fetchProductImage(
             p._imageKeyword, i, siteKey, p.name, category, payload, tenantId,
             productUrls[i % productUrls.length],
             skipSearch,
+            assertCanWrite,
         )
         if (reason === 'rate_limited') {
             stats.rateLimited++
@@ -407,14 +427,14 @@ export async function generateSampleProducts(
         const reasonStr = reason ? ` reason=${reason}` : ''
         console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
         const { _imageKeyword: _, ...product } = p
-        withImages.push({
+        return {
             ...product,
             imageId,
             galleryUrl: productUrls[i % productUrls.length],
             sku: `${skuPrefix}-${String(i + 1).padStart(3, '0')}`,
             inventory: 0,
-        })
-    }
+        }
+    })
 
     return { products: withImages, stats }
 }

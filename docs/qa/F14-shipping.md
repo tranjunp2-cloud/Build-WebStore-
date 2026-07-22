@@ -164,13 +164,13 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 | **TC-F14.40** | API | Critical | PATCH — VALIDATION_ERROR cho rate out of range | PATCH `{westRate:-1}` hoặc `{westRate:100001}`. | HTTP 400 + `{code:'VALIDATION_ERROR', fields:{westRate:'out_of_range'}}`. DB không đổi. | Arch §6.2, §8 |
 | **TC-F14.41** | Sec | Critical | PATCH cross-tenant attack — FORBIDDEN | Login tenant A. PATCH siteId thuộc tenant B. | HTTP 403 + `{code:'FORBIDDEN', message:'Not a member of this site'}`. Tenant B's config UNCHANGED. | Arch §6.2, §11 |
 | **TC-F14.42** | Sec | High | PATCH unauthenticated | PATCH không có session cookie / token. | HTTP 401 hoặc 403. DB không đổi. | Arch §6.2 |
-| **TC-F14.43** | API | Critical | `POST /api/orders/calculate-shipping` happy | Body `{siteId, state:'Selangor', subtotal:5000}`. | HTTP 200 + body `{success:true, data:{fee:800, isFree:false, region:'west', hint:{tier, gap, message}}}`. | Arch §6.3 |
-| **TC-F14.44** | API | High | POST calc — region field correct cho East | Body `{state:'Sabah', subtotal:5000}`. | Response `data.region === 'east'`, `data.fee === 1500`. | Arch §6.3, §7 |
-| **TC-F14.45** | API | High | POST calc — INVALID_STATE | Body `{state:'Tokyo', subtotal:5000}`. | HTTP 400 + `{code:'INVALID_STATE', message:'Unknown Malaysian state'}`. | Arch §6.3, §9 |
-| **TC-F14.46** | API | High | POST calc — SITE_NOT_FOUND | Body `{siteId:'invalid', state:'Selangor', subtotal:5000}`. | HTTP 404 + `{code:'SITE_NOT_FOUND'}`. | Arch §6.3 |
-| **TC-F14.47** | Sec | Medium | POST calc — rate limit 60/min/IP | Spam 100 requests trong 1 phút từ cùng IP. | Sau request thứ 60 → HTTP 429. Retry-After header set. | Arch §6.3, §11 |
-| **TC-F14.48** | API | High | POST calc — hint object shape đúng | Body `{state:'Selangor', subtotal:7000}` (freeAbove=10000, gap=3000). | Response `data.hint = {tier:'highlight', gap:3000, message:'Add RM 30 more for FREE shipping'}` (gap ≤ 5000 → highlight tier). | Arch §6.3, §7 (HINT_HIGHLIGHT_THRESHOLD) |
-| **TC-F14.49** | API | Medium | POST calc — hint null khi đã free | Body subtotal ≥ freeAbove. | Response `data.isFree=true, hint=undefined` (hoặc null/không có). | Arch §6.3 |
+| **TC-F14.43** | API | Critical | `POST /api/orders/calculate-shipping` happy | Body `{siteId, state:'Selangor', subtotalSen:5000}`. | HTTP 200 + body `{success:true, data:{fee:800, rates:[{priceSen:800}], isFree:false, region:'west', hint:{tier, gap}}}`. | Arch §6.3 |
+| **TC-F14.44** | API | High | POST calc — region field correct cho East | Body `{siteId, state:'Sabah', subtotalSen:5000}`. | Response `data.region === 'east'`, flat legacy `data.fee === 1500`, `data.rates[0].priceSen === 1500`. | Arch §6.3, §7 |
+| **TC-F14.45** | API | High | POST calc — INVALID_STATE | Body `{siteId, state:'Tokyo', subtotalSen:5000}`. | HTTP 400 + `{code:'INVALID_STATE', message:'Invalid Malaysia state'}`. | Arch §6.3, §9 |
+| **TC-F14.46** | API | High | POST calc — NOT_FOUND | Body `{siteId:'invalid', state:'Selangor', subtotalSen:5000}`. | HTTP 404 + `{code:'NOT_FOUND'}`. | Arch §6.3 |
+| **TC-F14.47** | Sec | Medium | POST calc — rate limit 20/min/siteId | Gửi 21 requests trong 1 phút với cùng `siteId`. | Request thứ 21 → HTTP 429 với mã `RATE_LIMITED`. Requests của `siteId` khác không bị tính chung. | Arch §6.3, §11 |
+| **TC-F14.48** | API | High | POST calc — hint object shape đúng | Body `{siteId, state:'Selangor', subtotalSen:7000}` (freeAbove=10000, gap=3000). | Response `data.hint = {tier:'highlight', gap:3000}` (gap ≤ 5000 → highlight tier). | Arch §6.3, §7 (HINT_HIGHLIGHT_THRESHOLD) |
+| **TC-F14.49** | API | Medium | POST calc — hint null khi đã free | Body `subtotalSen >= freeAbove`. | Response `data.isFree=true, hint=undefined` (hoặc null/không có). | Arch §6.3 |
 
 ---
 
@@ -442,6 +442,7 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 | TC-ID | Type | Priority | Description | Input | Expected | Trace |
 |-------|------|----------|-------------|-------|----------|-------|
 | **TC-F14.158** | Unit | High | `productWeightToGrams`: kg→gram integer; unset/0/âm/NaN → 500g default; KHÔNG chia 1000 lần nữa (regression grams-era) | 0.5 / 1.5 / null / 0 / -1 / NaN | 500 / 1500 / 500 / 500 / 500 / 500; 0.5kg qua aggregateWeightKg ra đúng 0.5kg | F36, GH-1333, GH-1458 |
+| **TC-F14.159** | Unit/API | Critical | Flat-rate money unit: custom westRate 801 sen phải giữ nguyên qua quote và hiển thị checkout đúng RM | westRate=801; POST flat quote; checkout nhận rate | `data.fee=801` (legacy), `rates[0].priceSen=801`; checkout hiển thị và cộng RM 8.01 | F14 money-unit contract |
 
 ---
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
-import { POST as GenerateSitePOST, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
+import { POST as GenerateSitePOST, buildGeneratedPages, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
@@ -57,7 +57,10 @@ let mockPageDB: any[] = []
 let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
 let mockPageCreateFailure: { slug: string; error: Error } | null = null
 let mockMediaDB: Array<Record<string, unknown>> = []
+let mockProductDB: Array<Record<string, unknown>> = []
+let mockCompleteBlogCount = 3
 let mockFailedPageCreateData: Record<string, unknown> | null = null
+let mockIdCounter = 0
 
 type PersistedBlock = Record<string, unknown> & { blockType?: string }
 type PersistedPage = Record<string, unknown> & {
@@ -82,6 +85,11 @@ vi.mock('payload', () => {
                 if (collection === 'media') return { docs: mockMediaDB }
                 return { docs: [] }
             }),
+            count: vi.fn().mockImplementation(async ({ collection }) => {
+                if (collection === 'products') return { totalDocs: mockProductDB.length }
+                if (collection === 'blogs') return { totalDocs: mockCompleteBlogCount }
+                return { totalDocs: 3 }
+            }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
                 if (collection === 'pages' && mockPageCreateFailure && data.slug === mockPageCreateFailure.slug) {
                     mockFailedPageCreateData = structuredClone(data)
@@ -89,20 +97,46 @@ vi.mock('payload', () => {
                     mockPageCreateFailure = null
                     throw error
                 }
-                const doc = { id: `new-${collection}-123`, ...data }
+                if (collection === 'pages' && mockPageDB.some(
+                    page => page.site === data.site && page.slug === data.slug,
+                )) {
+                    throw new Error('duplicate page slug')
+                }
+                if (collection === 'products' && typeof data.sku === 'string' && mockProductDB.some(
+                    product => product.tenant === data.tenant
+                        && String(product.sku).toLowerCase() === data.sku.toLowerCase(),
+                )) {
+                    throw new Error('products_sku_tenant_uniq')
+                }
+                const doc = { id: `new-${collection}-${++mockIdCounter}`, ...data }
                 if (collection === 'sites') mockSiteDB.push(doc)
                 if (collection === 'pages') mockPageDB.push(doc)
+                if (collection === 'products') mockProductDB.push(doc)
                 return doc
             }),
             update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
+                if (collection === 'pages') {
+                    const pageIdx = mockPageDB.findIndex(page => page.id === id)
+                    if (pageIdx > -1) mockPageDB[pageIdx] = { ...mockPageDB[pageIdx], ...data }
+                    return mockPageDB[pageIdx]
+                }
                 const idx = mockSiteDB.findIndex(s => s.id === id)
                 if (idx > -1) mockSiteDB[idx] = { ...mockSiteDB[idx], ...data }
                 return mockSiteDB[idx]
             }),
-            delete: vi.fn().mockResolvedValue({})
+            delete: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'pages') mockPageDB = mockPageDB.filter(page => page.id !== id)
+                if (collection === 'products') mockProductDB = mockProductDB.filter(product => product.id !== id)
+                return {}
+            }),
         })
     }
 })
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    withTenantRowLock: vi.fn(async (_payload, _tenantId, operation) =>
+        operation({ transactionID: 'test-generation-swap' })),
+}))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -122,7 +156,18 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
-    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
+    generateSampleProducts: vi.fn().mockResolvedValue({
+        products: Array.from({ length: 6 }, (_, index) => ({
+            name: `Sample Product ${index + 1}`,
+            shortDescription: 'Sample product',
+            description: 'A complete sample product.',
+            price: 10 + index,
+            sku: `SAMPLE-${index + 1}`,
+            inventory: 0,
+            status: 'active',
+        })),
+        stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+    }),
 }))
 
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
@@ -137,11 +182,9 @@ vi.mock('next/server', async (importOriginal) => ({
 // Seeder boundaries — the route schedules these via after(); mocked so tests
 // observe scheduling without running GPT/Pixabay work.
 vi.mock('@/lib/ai/seed-blog-posts', () => ({
-    seedBlogPosts: vi.fn().mockResolvedValue(0),
-    // Default: prep "failed" (null) → route takes the legacy after() seeding
-    // path, which keeps the W1 blog tests meaningful. Inline-path tests
-    // (TC-GENPERF-BI-*) override per-case.
-    prepareBlogPosts: vi.fn().mockResolvedValue(null),
+    seedBlogPosts: vi.fn().mockResolvedValue(3),
+    // Default regeneration path: three persisted rows already exist.
+    prepareBlogPosts: vi.fn().mockResolvedValue([]),
     persistBlogPosts: vi.fn().mockResolvedValue(3),
 }))
 vi.mock('@/lib/images/image-library-seeder', () => ({
@@ -205,7 +248,10 @@ describe('AI Streaming APIs', () => {
         mockRateLimitAllowed = true
         mockPageCreateFailure = null
         mockMediaDB = []
+        mockProductDB = []
+        mockCompleteBlogCount = 3
         mockFailedPageCreateData = null
+        mockIdCounter = 0
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -235,9 +281,93 @@ describe('AI Streaming APIs', () => {
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
-             expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
-             expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
+             expect(mockPageDB.length).toBe(6) // Five generated pages + system 404
+             expect(result.totalPages).toBe(5)
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/blog', '/contact', '404'])
+        })
+
+        it('removes generated CTA links whose target pages do not exist', async () => {
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'Butter & Bloom Bakery',
+                     siteType: 'business',
+                     theme: { primaryColor: '#7c2d12' },
+                     seo: { title: 'Butter & Bloom Bakery', description: 'Fresh artisan bakery' },
+                     language: 'en',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Home',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'hero', variant: 'centered', headline: 'Fresh every morning', subheadline: 'Bread and pastries baked daily' },
+                                 {
+                                     blockType: 'cta',
+                                     variant: 'banner',
+                                     headline: 'Ready to order?',
+                                     ctaLabel: 'Order Now',
+                                     ctaUrl: '/order',
+                                     secondaryCtaLabel: 'View Menu',
+                                     secondaryCtaUrl: '/menu',
+                                 },
+                             ],
+                             seo: { title: 'Home', description: 'Bakery homepage' },
+                         },
+                         {
+                             title: 'About',
+                             slug: '/about',
+                             blocks: [{ blockType: 'about', headline: 'About us', body: 'Our bakery story' }],
+                             seo: { title: 'About', description: 'About the bakery' },
+                         },
+                         {
+                             title: 'Services',
+                             slug: '/services',
+                             blocks: [{ blockType: 'features', headline: 'Our services', items: [] }],
+                             seo: { title: 'Services', description: 'Bakery services' },
+                         },
+                         {
+                             title: 'Contact',
+                             slug: '/contact',
+                             blocks: [
+                                 { blockType: 'contact', variant: 'split', headline: 'Contact us', email: 'hello@butterandbloom.test' },
+                             ],
+                             seo: { title: 'Contact', description: 'Contact the bakery' },
+                         },
+                         {
+                             title: 'Blog',
+                             slug: '/blog',
+                             blocks: [{ blockType: 'blog-list', variant: 'grid', headline: 'Latest posts', limit: 3 }],
+                             seo: { title: 'Blog', description: 'Bakery articles' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } as any)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Butter & Bloom Bakery',
+                         industry: 'Food & Beverage',
+                         products: 'Artisan bread, pastries, and celebration cakes',
+                         shortDescription: 'A neighborhood bakery serving fresh handcrafted bakes every day',
+                     },
+                 }),
+             })
+
+             const res = await GenerateSitePOST(req)
+             expect(res.status).toBe(200)
+
+             const homepage = mockPageDB.find((page: any) => page.slug === '/')
+             const cta = homepage?.layout?.find((block: any) => block.blockType === 'cta')
+             expect(cta).toMatchObject({
+                 ctaLabel: 'Order Now',
+                 ctaUrl: '/contact',
+             })
+             expect(cta?.secondaryCtaLabel).toBeUndefined()
+             expect(cta?.secondaryCtaUrl).toBeUndefined()
         })
 
         // TC-F01.SLUG.01 — GH-820: AI multi-page path normalizes canonical slugs
@@ -368,6 +498,9 @@ describe('AI Streaming APIs', () => {
                              ],
                              seo: { title: 'Products', description: 'Products page' },
                          },
+                         { title: 'About', slug: '/about', isHomepage: false, blocks: [{ blockType: 'about', headline: 'About', body: 'About Grid Shop' }], seo: { title: 'About', description: 'About page' } },
+                         { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [{ blockType: 'blog-list', headline: 'Blog' }], seo: { title: 'Blog', description: 'Blog page' } },
+                         { title: 'Contact', slug: '/contact', isHomepage: false, blocks: [{ blockType: 'contact', headline: 'Contact', email: 'hello@grid.test' }], seo: { title: 'Contact', description: 'Contact page' } },
                      ],
                  },
                  events: [],
@@ -473,6 +606,9 @@ describe('AI Streaming APIs', () => {
                              }],
                              seo: { title: 'Products', description: 'Products page' },
                          },
+                         { title: 'About', slug: '/about', isHomepage: false, blocks: [{ blockType: 'about', headline: 'Tentang', body: 'Tentang Retry Shop' }], seo: { title: 'Tentang', description: 'Tentang kami' } },
+                         { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [{ blockType: 'blog-list', headline: 'Blog' }], seo: { title: 'Blog', description: 'Blog' } },
+                         { title: 'Contact', slug: '/contact', isHomepage: false, blocks: [{ blockType: 'contact', headline: 'Hubungi', email: 'hello@retry.test' }], seo: { title: 'Hubungi', description: 'Hubungi kami' } },
                      ],
                  },
                  events: [],
@@ -521,6 +657,7 @@ describe('AI Streaming APIs', () => {
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                  method: 'POST',
+                 headers: { 'X-Generation-Request-Id': 'test_generation_1190' },
                  body: JSON.stringify({ 
                      businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
                  })
@@ -535,16 +672,21 @@ describe('AI Streaming APIs', () => {
              const reader = res.body?.getReader()
              expect(reader).toBeDefined()
              
-             // Read the first chunk of stream (which should be "theme_generated" event we mocked)
+             // The acceptance boundary is always the first event. Generation
+             // events follow while the backend continues its pipeline.
              const { value } = await reader!.read()
              const text = new TextDecoder().decode(value)
-             expect(text).toContain('event: theme_generated')
+             expect(text).toContain('event: generation_accepted')
+             expect(text).toContain('"generationRequestId":"test_generation_1190"')
              
-             // Wait for stream to finish reading to prevent controller close error
+             let rest = ''
              while (true) {
-                 const { done } = await reader!.read()
+                 const { done, value: nextValue } = await reader!.read()
                  if (done) break
+                 rest += new TextDecoder().decode(nextValue)
              }
+             expect(rest).toContain('event: theme_generated')
+             expect(rest).toContain('event: done')
         })
 
         it('[TC-F34-06] returns 403 when website_builder feature is locked on current plan', async () => {
@@ -613,6 +755,407 @@ describe('AI Streaming APIs', () => {
                      c[0].collection === 'sites' && c[0].data?.generationStatus === 'completed'
              )
              expect(completedCall).toBeDefined()
+        })
+
+        it('[TC-GENPERF-W3-04] does not mark the site completed before required product work settles', async () => {
+             // Arrange
+             let resolveProducts: (value: { products: Array<Record<string, unknown>>; stats: { rateLimited: number; uploadFailed: number; noImage: number } }) => void = () => {}
+             vi.mocked(generateSampleProducts).mockReturnValueOnce(new Promise((resolve) => { resolveProducts = resolve }))
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+
+             // Act — let page/site creation reach the product completion barrier.
+             const responsePromise = GenerateSitePOST(req)
+             await vi.waitFor(() => expect(mockSiteDB.length).toBeGreaterThan(0))
+
+             // Assert — externally observable status remains generating.
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('generating')
+             resolveProducts({
+                 products: Array.from({ length: 6 }, (_, index) => ({
+                     name: `Pending Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `PENDING-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+             const response = await responsePromise
+             expect(response.status).toBe(200)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('completed')
+        })
+
+        it('[TC-GENPERF-W3-20] fails completion when fewer than six products persist', async () => {
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 5 }, (_, index) => ({
+                     name: `Short Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `SHORT-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+        })
+
+        it('[TC-GENPERF-W3-25] regeneration keeps the previous pages when a late barrier fails', async () => {
+             const payload = await getPayload({ config: {} as never })
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 5 }, (_, index) => ({
+                     name: `Short Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `REGEN-SHORT-${index + 1}`,
+                     inventory: 0,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             expect(mockPageDB.map(page => page.id)).toEqual([
+                 'old-home', 'old-about', 'old-products', 'old-blog', 'old-contact', 'old-404',
+             ])
+             const deletedIds = vi.mocked(payload.delete).mock.calls.map(([arg]) => arg.id)
+             expect(deletedIds).not.toContain('old-home')
+             expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
+        })
+
+        it('[TC-GENPERF-W3-26] regeneration swaps staged pages only after all barriers pass', async () => {
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             expect(mockSiteDB[0]?.name).toBe('AI Bakery')
+             expect(mockPageDB.map(page => page.slug).sort()).toEqual(
+                 ['/', '/about', '/blog', '/contact', '/products', '404'].sort(),
+             )
+             expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
+             expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
+             expect(mockPageDB.some(page => page.id === 'old-404')).toBe(true)
+        })
+
+        it('[TC-GENPERF-W3-29] regeneration preserves an existing catalog without recreating deterministic SKUs', async () => {
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             mockProductDB = Array.from({ length: 6 }, (_, index) => ({
+                 id: `existing-product-${index + 1}`,
+                 tenant: 'tenant-1',
+                 site: 'site-existing',
+                 sku: `BUS-${String(index + 1).padStart(3, '0')}`,
+             }))
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(vi.mocked(generateSampleProducts)).not.toHaveBeenCalled()
+             expect(mockProductDB).toHaveLength(6)
+             expect(mockProductDB.every(product => String(product.id).startsWith('existing-product-'))).toBe(true)
+        })
+
+        it('[TC-GENPERF-W3-30] regeneration accepts a two-post deficit when the final site count is three', async () => {
+             const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             mockPageDB = [
+                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
+                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
+                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
+                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
+                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
+                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
+             ]
+             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                 { title: 'Second', slug: 'second', content: '<p>second</p>', thumbnailId: 2 },
+                 { title: 'Third', slug: 'third', content: '<p>third</p>', thumbnailId: 3 },
+             ])
+             vi.mocked(persistBlogPosts).mockResolvedValueOnce(2)
+             mockCompleteBlogCount = 3
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(200)
+             expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledWith(
+                 expect.anything(),
+                 expect.arrayContaining([expect.objectContaining({ slug: 'second' }), expect.objectContaining({ slug: 'third' })]),
+                 'tenant-1',
+                 'site-existing',
+                 'user-xyz',
+                 expect.any(Function),
+                 expect.any(Function),
+             )
+        })
+
+        it('[TC-GENPERF-W3-31] restores the previous site status when the old-page read fails', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalFind = vi.mocked(payload.find).getMockImplementation()!
+             mockSiteDB = [{
+                 id: 'site-existing',
+                 tenant: 'tenant-1',
+                 name: 'Existing Bakery',
+                 generationStatus: 'completed',
+             }]
+             vi.mocked(payload.find).mockImplementation(async (args) => {
+                 if (args.collection === 'pages') throw new Error('old page read failed')
+                 return originalFind(args)
+             })
+
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+
+                 expect(res.status).toBe(500)
+                 expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+             } finally {
+                 vi.mocked(payload.find).mockImplementation(originalFind)
+             }
+        })
+
+        it('[TC-GENPERF-W3-32] does not run optional slug sync inside the fatal completion deadline', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalFindByID = vi.mocked(payload.findByID).getMockImplementation()!
+             let now = 1_000_000
+             const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+             vi.mocked(payload.findByID).mockImplementation(async (args) => {
+                 if (args.collection === 'tenants') {
+                     now += 55_000
+                     return mockTenant
+                 }
+                 return originalFindByID(args)
+             })
+
+             try {
+                 const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+
+                 expect(res.status).toBe(200)
+                 expect(vi.mocked(payload.findByID).mock.calls.some(([arg]) => arg.collection === 'tenants')).toBe(false)
+             } finally {
+                 nowSpy.mockRestore()
+                 vi.mocked(payload.findByID).mockImplementation(originalFindByID)
+             }
+        })
+
+        it('[TC-GENPERF-W3-21] fails completion when fewer than three complete blogs exist', async () => {
+             const payload = await getPayload({ config: {} as never })
+             vi.mocked(payload.count).mockResolvedValueOnce({ totalDocs: 2 } as never)
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+        })
+
+        it('[TC-GENPERF-W3-22] fails completion when a page persists only after media refs are stripped', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalCreate = vi.mocked(payload.create).getMockImplementation()!
+             let rejectedImageWrites = 0
+             vi.mocked(payload.create).mockImplementation(async (args) => {
+                 // Payload reports the nested image FK failure at insert time;
+                 // the persisted shape has already passed through media normalization.
+                 // Exhaust the transient retry wrapper so the strip-media
+                 // fallback is the write that finally persists the page.
+                 if (args.collection === 'pages' && args.data?.slug !== '404' && rejectedImageWrites < 3) {
+                     const hero = (args.data?.layout as Array<Record<string, unknown>> | undefined)
+                         ?.find(block => block.blockType === 'hero')
+                     if (hero) hero.image = 123
+                     rejectedImageWrites++
+                     throw new Error('pages_blocks_hero_image_id_media_id_fk violates foreign key constraint')
+                 }
+                 return originalCreate(args)
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(rejectedImageWrites).toBe(3)
+             expect(res.status).toBe(500)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+             const completedWrites = vi.mocked(payload.update).mock.calls.filter(
+                 ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'completed',
+             )
+             expect(completedWrites).toHaveLength(0)
+        })
+
+        it('[TC-GENPERF-W3-23] fails completion when stale product media falls back to image-less rows', async () => {
+             const payload = await getPayload({ config: {} as never })
+             const originalCreate = vi.mocked(payload.create).getMockImplementation()!
+             vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                 products: Array.from({ length: 6 }, (_, index) => ({
+                     name: `Image Product ${index + 1}`,
+                     shortDescription: 'Sample product',
+                     description: 'A complete sample product.',
+                     price: 10,
+                     sku: `IMAGE-${index + 1}`,
+                     inventory: 0,
+                     imageId: 700 + index,
+                 })),
+                 stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+             })
+             vi.mocked(payload.create).mockImplementation(async (args) => {
+                 if (args.collection === 'products' && Array.isArray(args.data?.images)) {
+                     const error = new Error('products_images_image_id_media_id_fk violates foreign key constraint') as Error & { code?: string }
+                     error.code = '23503'
+                     throw error
+                 }
+                 return originalCreate(args)
+             })
+
+             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             }))
+
+             expect(res.status).toBe(500)
+             const imageLessProducts = vi.mocked(payload.create).mock.calls.filter(
+                 ([arg]) => arg.collection === 'products' && !Array.isArray(arg.data?.images),
+             )
+             expect(imageLessProducts).toHaveLength(6)
+             expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
+        })
+
+        it('[TC-GENPERF-W3-24] starts no further writes after the route deadline aborts', async () => {
+             const payload = await getPayload({ config: {} as never })
+             let now = 1_000_000
+             const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+             let resolveProducts: (value: Awaited<ReturnType<typeof generateSampleProducts>>) => void = () => {}
+             vi.mocked(generateSampleProducts).mockReturnValueOnce(new Promise((resolve) => { resolveProducts = resolve }))
+
+             try {
+                 const responsePromise = GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                     method: 'POST',
+                     body: JSON.stringify({
+                         businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                     }),
+                 }))
+                 await vi.waitFor(() => expect(mockPageDB).toHaveLength(6))
+
+                 now += 55_000
+                 resolveProducts({
+                     products: Array.from({ length: 6 }, (_, index) => ({
+                         name: `Late Product ${index + 1}`,
+                         shortDescription: 'Sample product',
+                         description: 'A complete sample product.',
+                         price: 10,
+                         sku: `LATE-${index + 1}`,
+                         inventory: 0,
+                         status: 'active',
+                     })),
+                     stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+                 })
+
+                 const res = await responsePromise
+                 expect(res.status).toBe(500)
+                 expect(vi.mocked(payload.create).mock.calls.some(([arg]) => arg.collection === 'products')).toBe(false)
+                 expect(vi.mocked(payload.update).mock.calls.some(
+                     ([arg]) => arg.collection === 'sites' && arg.data?.generationStatus === 'failed',
+                 )).toBe(true)
+             } finally {
+                 nowSpy.mockRestore()
+             }
         })
 
         it('sets generationStatus to generating before creating pages', async () => {
@@ -1746,44 +2289,36 @@ describe('AI Streaming APIs', () => {
             )
         })
 
-        it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {
+        it('[TC-GENPERF-W1-02] fallback blog seeding completes in-request', async () => {
             // Arrange
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            const { prepareBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce(null)
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
             // Assert
             expect(res.status).toBe(200)
-            await drainEventLoop()
-            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
-            await runCapturedAfterTasks()
             expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
         })
 
-        it('[TC-GENPERF-W1-05] seeder rejection is non-fatal — no captured task ever rejects', async () => {
-            // Arrange — both seeders blow up
+        it('[TC-GENPERF-W1-05] optional image-library seeder rejection is non-fatal', async () => {
+            // Arrange
             const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(seedImageLibraryForSite).mockRejectedValueOnce(new Error('imglib boom'))
-            vi.mocked(seedBlogPosts).mockRejectedValueOnce(new Error('blog boom'))
             const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
-            // Assert — response unaffected; invoking tasks resolves (route wraps
-            // each in .catch), errors logged not propagated
+            // Assert — optional post-response work cannot invalidate completion.
             expect(res.status).toBe(200)
             await expect(runCapturedAfterTasks()).resolves.toBeUndefined()
             expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
-            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
             errorSpy.mockRestore()
-            warnSpy.mockRestore()
         })
 
-        it('[TC-GENPERF-W1-06] SSE done payload keys unchanged', async () => {
+        it('[TC-GENPERF-W1-06] SSE done payload includes completion evidence', async () => {
             // Arrange
             const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                 method: 'POST',
@@ -1806,7 +2341,7 @@ describe('AI Streaming APIs', () => {
             const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
             expect(m).toBeTruthy()
             expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
-                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+                ['blogsCount', 'imagesFailed', 'pageId', 'productsCount', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
             )
         })
 
@@ -1814,18 +2349,16 @@ describe('AI Streaming APIs', () => {
             // Arrange — simulate no-request-scope (after throws, e.g. Vitest/local)
             const { after } = await import('next/server')
             const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
-            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(after).mockImplementation(() => { throw new Error('after called outside request scope') })
 
             try {
                 // Act
                 const res = await GenerateSitePOST(genPerfReq())
 
-                // Assert — route falls back to `void task()`: seeders still invoked
+                // Assert — route falls back to `void task()` for optional work.
                 expect(res.status).toBe(200)
                 await vi.waitFor(() => {
                     expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
-                    expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
                 })
             } finally {
                 vi.mocked(after).mockImplementation(() => undefined)
@@ -1837,8 +2370,8 @@ describe('AI Streaming APIs', () => {
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
                 { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
-                { title: 'B', slug: 'b', content: '<p>b</p>' },
-                { title: 'C', slug: 'c', content: '<p>c</p>' },
+                { title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 2 },
+                { title: 'C', slug: 'c', content: '<p>c</p>', thumbnailId: 3 },
             ])
 
             // Act
@@ -1867,34 +2400,31 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 
-        it('[TC-GENPERF-BI-03] prep still running at persist site → done not blocked; posts persist post-response', async () => {
-            // Arrange — prep unresolved when the route reaches the grace race;
-            // tiny grace so the pending branch fires deterministically
+        it('[TC-GENPERF-BI-03] done waits until pending blog preparation is persisted', async () => {
+            // Arrange
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
             let resolvePrep: (v: Array<{ title: string; slug: string; content: string }>) => void = () => {}
             vi.mocked(prepareBlogPosts).mockReturnValueOnce(new Promise((r) => { resolvePrep = r }))
-            process.env.GEN_BLOG_PREP_GRACE_MS = '50'
 
-            try {
-                // Act — response returns without waiting for prep
-                const res = await GenerateSitePOST(genPerfReq())
+            // Act — response must remain pending until blog prep settles.
+            let responseSettled = false
+            const responsePromise = GenerateSitePOST(genPerfReq()).then((response) => {
+                responseSettled = true
+                return response
+            })
+            await drainEventLoop()
+            expect(responseSettled).toBe(false)
+            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
 
-                // Assert — nothing persisted in-request
-                expect(res.status).toBe(200)
-                expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
-
-                // Prep finishes after the response → captured after() task persists
-                resolvePrep([
-                    { title: 'A', slug: 'a', content: '<p>a</p>' },
-                    { title: 'B', slug: 'b', content: '<p>b</p>' },
-                    { title: 'C', slug: 'c', content: '<p>c</p>' },
-                ])
-                await runCapturedAfterTasks()
-                expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
-                expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
-            } finally {
-                delete process.env.GEN_BLOG_PREP_GRACE_MS
-            }
+            resolvePrep([
+                { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
+                { title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 2 },
+                { title: 'C', slug: 'c', content: '<p>c</p>', thumbnailId: 3 },
+            ])
+            const res = await responsePromise
+            expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
     })
 
@@ -1923,4 +2453,38 @@ describe('AI Streaming APIs', () => {
         })
     })
 
+    describe('buildGeneratedPages — fallback hero image allocation', () => {
+        it('[TC-GENPERF-W3-17] gives cloned subpage heroes their reserved Media IDs', () => {
+            const pages = buildGeneratedPages({
+                blocks: [{
+                    blockType: 'hero',
+                    variant: 'centered',
+                    headline: 'Home',
+                    image: 100,
+                    backgroundImage: 100,
+                }],
+                businessInfo: {
+                    businessName: 'Butter & Bloom',
+                    shortDescription: 'Neighborhood artisan bakery',
+                    products: 'Bread and pastries',
+                },
+                result: {
+                    seo: { title: 'Butter & Bloom', description: 'Fresh bakes' },
+                },
+                fallbackHeroMediaIds: [101, 102, 103, 104],
+            })
+
+            const heroMediaIds = pages.map(page => {
+                const hero = page.layout.find(block => block.blockType === 'hero')
+                return [hero?.image, hero?.backgroundImage]
+            })
+            expect(heroMediaIds).toEqual([
+                [100, 100],
+                [101, 101],
+                [102, 102],
+                [103, 103],
+                [104, 104],
+            ])
+        })
+    })
 })

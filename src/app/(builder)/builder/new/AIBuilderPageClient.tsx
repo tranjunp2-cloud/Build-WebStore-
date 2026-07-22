@@ -24,6 +24,7 @@ import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { useI18n } from '@/i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { shouldRetryGenerationStream } from '@/lib/ai/sse-retry-policy'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -192,8 +193,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
-    const sseRetryCountRef = useRef(0)
-    const sseRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
     const [showDraftDialog, setShowDraftDialog] = useState(false)
     const [showPaywall, setShowPaywall] = useState(false)
     // F26: pre-generation locale confirm modal state
@@ -541,7 +540,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         return () => {
             abortControllerRef.current?.abort()
             clearGenerationTimers()
-            if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
         }
     }, [clearGenerationTimers])
 
@@ -553,7 +551,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         // `info.language` collapses non en/ms/vi to 'auto' for the prompt, losing the real
         // code — this is persisted to Sites.generationLocale so the editor shows it as primary.
         generationLocale?: string,
+        previousGenerationRequestId?: string,
     ) => {
+        const generationRequestId = previousGenerationRequestId ?? crypto.randomUUID()
         const controller = new AbortController()
         abortControllerRef.current = controller
 
@@ -565,10 +565,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // 300s (5 min) hard timeout — auto-abort.
-        // v3 (2026-04-14): 120s → 300s. site-generation flipped to gpt-4.1-mini
-        // (commit 56adabe0) with p95 ~99s, p99 can exceed 120s. Bumped to 5 min
-        // to absorb long-tail OpenAI latency until phase-03b tuning ships.
+        // Route budget is 60s. Give the browser 15s extra to receive a final
+        // frame or surface a terminated network stream cleanly.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -577,15 +575,20 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 300_000)
+        }, 75_000)
         hardTimeoutRef.current = hardTimeout
+        let receivedAnyEvent = false
+        let receivedDone = false
 
         try {
             // Use briefSnapshot (captured before reset) if provided, fallback to store
             const brief = briefSnapshot ?? contentBrief
             const response = await fetch('/api/ai/generate-site?stream=true', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Generation-Request-Id': generationRequestId,
+                },
                 body: JSON.stringify({
                     businessInfo: info,
                     extraInstructions,
@@ -646,6 +649,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
                     try {
                         const data = JSON.parse(line.slice(6))
+                        receivedAnyEvent = true
+                        if (currentEvent === 'done') receivedDone = true
                         handleSSEEvent(currentEvent, data)
                     } catch {
                         console.warn('[SSE] malformed payload, skipping event:', currentEvent)
@@ -654,53 +659,40 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     currentEvent = ''
                 }
             }
+            if (!receivedDone) {
+                const disconnectError = new Error('SSE stream ended before done')
+                Object.assign(disconnectError, { receivedAnyEvent })
+                throw disconnectError
+            }
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') {
                 // User cancelled or hard timeout — already handled
                 return
             }
-            // SSE disconnect or network error — show banner, auto-retry up to 3x
+            // The POST may already be running server-side even when no SSE
+            // frame reached the browser. Never auto-submit a second generation.
             const genError = getGenerationError(0, 'SSE_DISCONNECT')
-            const retryIntervals = genError.retryIntervals || [2000, 5000, 10000]
-            const maxRetries = genError.maxRetries || 3
-            const currentRetry = sseRetryCountRef.current
-
-            if (currentRetry < maxRetries) {
-                const delay = retryIntervals[currentRetry] || retryIntervals[retryIntervals.length - 1]
-                sseRetryCountRef.current += 1
-                toast.warning('Lost connection. Retrying...', { duration: delay })
-                // Store timer ref to prevent duplicate streams on new generation start
-                if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
-                sseRetryTimerRef.current = setTimeout(() => {
-                    sseRetryTimerRef.current = null
-                    void startSSEGeneration(info, extraInstructions, briefSnapshot, generationLocale)
-                }, delay)
-                return
-            }
-
-            // All retries exhausted — show fatal error, redirect to dashboard
-            sseRetryCountRef.current = 0
-            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
-            setError({ code: genError.code, message, retryable: genError.retryable })
+            const mayRetry = shouldRetryGenerationStream({ requestSubmitted: true })
+            const message = receivedAnyEvent
+                ? 'Connection lost after generation started. Check the dashboard for its latest status.'
+                : 'Connection lost while the request may still be processing. Check the dashboard before trying again.'
+            setError({ code: genError.code, message, retryable: mayRetry })
             setStep('info')
-            toast.error('Cannot create website', {
-                description: 'Connection failed after multiple retries.',
+            toast.warning(message, {
                 duration: 10000,
                 action: {
                     label: 'Go to Dashboard',
-                    onClick: () => router.push('/dashboard?ai_status=failed'),
+                    onClick: () => router.push('/dashboard?ai_status=generating'),
                 },
             })
         } finally {
             clearGenerationTimers()
             abortControllerRef.current = null
         }
-    }, [clearGenerationTimers, handleSSEEvent, setError, setStep, contentBrief])
+    }, [clearGenerationTimers, handleSSEEvent, setError, setStep, contentBrief, router])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         const briefSnapshot = useBuilderStore.getState().contentBrief
-        sseRetryCountRef.current = 0
-        if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
 
         const decision = resolveGenerationLanguageDecision(
             info.language,
