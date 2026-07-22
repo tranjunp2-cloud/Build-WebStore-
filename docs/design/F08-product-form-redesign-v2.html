@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Add Product — Variants UI Prototype</title>
+  <style>html,body{margin:0;min-height:100%;background:#0b1120}</style>
+</head>
+<body>
+<div id="prime-product-form-v2">
+  <style>
+    #prime-product-form-v2 {
+      --pf-bg: light-dark(#f8fafc, #0b1120);
+      --pf-card: light-dark(#ffffff, #161e2e);
+      --pf-text: light-dark(#22313f, #ffffff);
+      --pf-muted: light-dark(#64748b, #9ca3af);
+      --pf-border: light-dark(#e2e8f0, #2a3645);
+      --pf-input-border: light-dark(#b3b8bd, #2a3645);
+      --pf-input-bg: light-dark(#ffffff, #161e2e);
+      --pf-soft: light-dark(#f1f5f9, #1f2937);
+      --pf-primary: light-dark(#00d3d4, #2dd4bf);
+      --pf-primary-text: #0b1120;
+      --pf-danger: light-dark(#dc2626, #ef4444);
+      --pf-warning: light-dark(#d97706, #f59e0b);
+      --pf-success: light-dark(#059669, #10b981);
+      color-scheme: light dark;
+      color: var(--pf-text);
+      background: var(--pf-bg);
+      padding: 1rem 1rem 5.5rem;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    #prime-product-form-v2 * { box-sizing: border-box; }
+    #prime-product-form-v2 .pf-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.25rem; }
+    #prime-product-form-v2 .pf-back { border:0; background:transparent; color:var(--pf-text); padding:.2rem; cursor:pointer; }
+    #prime-product-form-v2 .pf-title-wrap { display:flex; align-items:flex-start; gap:.75rem; }
+    #prime-product-form-v2 .pf-title { margin:0; font-size:1.5rem; line-height:1.3; font-weight:500; }
+    #prime-product-form-v2 .pf-subtitle { margin:.2rem 0 0; color:var(--pf-muted); font-size:.875rem; }
+    #prime-product-form-v2 .pf-layout { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.5rem; align-items:start; }
+    #prime-product-form-v2 .pf-column { display:grid; gap:1rem; min-width:0; }
+    #prime-product-form-v2 .pf-main { grid-column:span 2; }
+    #prime-product-form-v2 .pf-main::after { content:""; display:block; height:calc(100vh - 9rem); }
+    #prime-product-form-v2 .pf-anchor-nav { position:sticky; top:0; z-index:40; display:flex; width:100%; gap:.35rem; overflow-x:auto; padding:.75rem .15rem; background:var(--pf-bg); border-bottom:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-anchor-tab { flex:1 1 0; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--pf-muted); padding:.45rem .35rem .65rem; font:inherit; font-size:.82rem; font-weight:500; text-align:center; cursor:pointer; white-space:nowrap; }
+    #prime-product-form-v2 .pf-anchor-tab:hover { color:var(--pf-text); }
+    #prime-product-form-v2 .pf-anchor-tab.is-active { color:var(--pf-primary); border-bottom-color:var(--pf-primary); }
+    #prime-product-form-v2 [id^="section-"] { scroll-margin-top:4rem; }
+    #prime-product-form-v2 .pf-sidebar { grid-column:span 1; position:sticky; top:1.5rem; }
+    #prime-product-form-v2 .pf-panel { background:var(--pf-card); border:1px solid var(--pf-border); border-radius:1rem; padding:1.1rem; min-width:0; }
+    #prime-product-form-v2 .pf-panel h2 { margin:0 0 1rem; font-size:1.05rem; line-height:1.5; font-weight:500; }
+    #prime-product-form-v2 .pf-subsection { padding-bottom:1rem; margin-bottom:1rem; border-bottom:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-subsection h3 { margin:0; font-size:.88rem; font-weight:500; }
+    #prime-product-form-v2 .pf-stack { display:grid; gap:.9rem; min-width:0; }
+    #prime-product-form-v2 .pf-stack > * { min-width:0; }
+    #prime-product-form-v2 .pf-label { display:grid; gap:.4rem; color:var(--pf-text); font-size:.82rem; font-weight:500; }
+    #prime-product-form-v2 .pf-field { display:grid; gap:.4rem; }
+    #prime-product-form-v2 .pf-required { color:var(--pf-danger); }
+    #prime-product-form-v2 input, #prime-product-form-v2 textarea, #prime-product-form-v2 select {
+      width:100%; border:1px solid var(--pf-input-border); border-radius:.55rem; background:var(--pf-input-bg); color:var(--pf-text); padding:.7rem .8rem; font:inherit; outline:none;
+    }
+    #prime-product-form-v2 input:focus, #prime-product-form-v2 textarea:focus, #prime-product-form-v2 select:focus { border-color:var(--pf-primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--pf-primary) 22%, transparent); }
+    #prime-product-form-v2 textarea { resize:vertical; min-height:8rem; }
+    #prime-product-form-v2 .pf-textarea-wrap { position:relative; }
+    #prime-product-form-v2 .pf-textarea-wrap textarea { padding-bottom:2rem; }
+    #prime-product-form-v2 .pf-textarea-count { position:absolute; right:.7rem; bottom:.6rem; pointer-events:none; }
+    #prime-product-form-v2 .pf-url { color:var(--pf-muted); font-size:.72rem; overflow-wrap:anywhere; font-weight:400; }
+    #prime-product-form-v2 .pf-url-disclosure { position:relative; margin-top:-.35rem; min-width:0; max-width:100%; }
+    #prime-product-form-v2 .pf-url-trigger { width:100%; max-width:100%; min-width:0; min-height:2.75rem; border:0; border-radius:.45rem; background:transparent; color:var(--pf-muted); display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.45rem .55rem; text-align:left; font:inherit; cursor:pointer; overflow:hidden; }
+    #prime-product-form-v2 .pf-url-trigger:hover { background:var(--pf-soft); color:var(--pf-text); }
+    #prime-product-form-v2 .pf-url-trigger:focus-visible { outline:2px solid var(--pf-primary); outline-offset:2px; }
+    #prime-product-form-v2 .pf-url-trigger .pf-url { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #prime-product-form-v2 .pf-url-edit-icon { flex:0 0 auto; opacity:.65; color:var(--pf-muted); }
+    #prime-product-form-v2 .pf-url-trigger:hover .pf-url-edit-icon { opacity:1; color:var(--pf-text); }
+    #prime-product-form-v2 .pf-slug-popover { position:fixed; z-index:80; left:0; top:0; width:min(28rem,calc(100vw - 2rem)); max-height:calc(100dvh - 2rem); overflow:auto; border:1px solid var(--pf-border); border-radius:.8rem; background:var(--pf-card); color:var(--pf-text); padding:.85rem; box-shadow:0 12px 30px color-mix(in srgb,var(--pf-text) 20%,transparent); }
+    #prime-product-form-v2 .pf-slug-prefix-wrap { display:flex; align-items:center; min-width:0; border:1px solid var(--pf-input-border); border-radius:.55rem; background:var(--pf-input-bg); overflow:hidden; }
+    #prime-product-form-v2 .pf-slug-prefix { flex:0 0 auto; padding-left:.7rem; color:var(--pf-muted); font-size:.72rem; white-space:nowrap; }
+    #prime-product-form-v2 .pf-slug-prefix-wrap input { min-width:5rem; border:0; border-radius:0; padding-left:.15rem; box-shadow:none; }
+    #prime-product-form-v2 .pf-slug-prefix-wrap:focus-within { border-color:var(--pf-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--pf-primary) 22%,transparent); }
+    #prime-product-form-v2 .pf-slug-prefix-wrap input:focus { border:0; box-shadow:none; }
+    #prime-product-form-v2 .pf-slug-error { min-height:1rem; margin:.25rem 0 0; color:var(--pf-danger); font-size:.68rem; }
+    #prime-product-form-v2 .pf-slug-actions { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-top:.75rem; }
+    #prime-product-form-v2 .pf-slug-actions-main { display:flex; justify-content:flex-end; gap:.5rem; }
+    #prime-product-form-v2 .pf-row { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; }
+    #prime-product-form-v2 .pf-between { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
+    #prime-product-form-v2 .pf-btn { border:1px solid var(--pf-border); border-radius:.65rem; background:var(--pf-card); color:var(--pf-text); padding:.55rem .8rem; font:inherit; font-size:.78rem; font-weight:500; cursor:pointer; }
+    #prime-product-form-v2 .pf-btn:hover { background:var(--pf-soft); }
+    #prime-product-form-v2 .pf-btn:disabled { opacity:.45; cursor:not-allowed; background:var(--pf-soft); color:var(--pf-muted); }
+    #prime-product-form-v2 .pf-btn-primary { background:var(--pf-primary); color:var(--pf-primary-text); border-color:var(--pf-primary); }
+    #prime-product-form-v2 .pf-btn-ai { color:var(--pf-primary); background:color-mix(in srgb, var(--pf-primary) 10%, var(--pf-card)); border-color:transparent; }
+    #prime-product-form-v2 .pf-helper { color:var(--pf-muted); font-size:.72rem; font-weight:400; }
+    #prime-product-form-v2 .pf-media { display:grid; grid-template-columns:repeat(auto-fill,minmax(8rem,9rem)); gap:.75rem; justify-content:start; align-items:start; }
+    #prime-product-form-v2 .pf-media-item { min-width:0; position:relative; }
+    #prime-product-form-v2 .pf-thumb { aspect-ratio:1; border:1px solid var(--pf-border); border-radius:.8rem; background:linear-gradient(145deg,var(--pf-soft),color-mix(in srgb,var(--pf-primary) 20%,var(--pf-card))); display:grid; place-items:center; color:var(--pf-muted); position:relative; overflow:hidden; }
+    #prime-product-form-v2 .pf-thumb-index { font-size:1.25rem; opacity:.55; }
+    #prime-product-form-v2 .pf-remove { position:absolute; top:.35rem; right:.35rem; width:1.35rem; height:1.35rem; border:0; border-radius:50%; background:var(--pf-danger); color:white; cursor:pointer; }
+    #prime-product-form-v2 .pf-alt-trigger { width:100%; margin-top:.3rem; border:0; background:transparent; color:var(--pf-primary); display:flex; align-items:center; justify-content:space-between; gap:.35rem; text-align:left; padding:.25rem .2rem; border-radius:.35rem; font:inherit; font-size:.68rem; cursor:pointer; }
+    #prime-product-form-v2 .pf-alt-trigger.has-value { color:var(--pf-muted); }
+    #prime-product-form-v2 .pf-alt-trigger.has-value:hover { background:var(--pf-soft); color:var(--pf-text); }
+    #prime-product-form-v2 .pf-alt-value { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #prime-product-form-v2 .pf-alt-edit-icon { flex:0 0 auto; color:var(--pf-muted); opacity:.7; font-size:.78rem; }
+    #prime-product-form-v2 .pf-alt-trigger.has-value:hover .pf-alt-edit-icon { opacity:1; color:var(--pf-text); }
+    #prime-product-form-v2 .pf-alt-popover { position:fixed; z-index:80; left:0; top:0; width:min(16rem,calc(100vw - 2rem)); max-height:calc(100dvh - 2rem); overflow:auto; background:var(--pf-card); border:1px solid var(--pf-border); border-radius:.8rem; padding:.8rem; box-shadow:0 12px 30px color-mix(in srgb,var(--pf-text) 20%,transparent); }
+    #prime-product-form-v2 .pf-alt-popover-title { margin:0 0 .5rem; font-size:.75rem; font-weight:500; }
+    #prime-product-form-v2 .pf-alt-textarea-wrap { position:relative; }
+    #prime-product-form-v2 .pf-alt-textarea { min-height:4rem; resize:none; padding-bottom:1.35rem; font-size:.75rem; }
+    #prime-product-form-v2 .pf-alt-count { position:absolute; right:.5rem; bottom:.45rem; color:var(--pf-muted); font-size:.62rem; pointer-events:none; }
+    #prime-product-form-v2 .pf-alt-actions { display:flex; justify-content:flex-end; align-items:center; gap:.5rem; margin-top:.65rem; }
+    #prime-product-form-v2 .pf-upload { aspect-ratio:1; border:2px dashed var(--pf-border); border-radius:.8rem; background:var(--pf-card); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.45rem; text-align:center; color:var(--pf-muted); cursor:pointer; padding:.5rem; }
+    #prime-product-form-v2 .pf-upload:hover { border-color:var(--pf-primary); background:color-mix(in srgb,var(--pf-primary) 5%,var(--pf-card)); }
+    #prime-product-form-v2 .pf-upload-icon { position:relative; width:2rem; height:2rem; display:block; color:currentColor; }
+    #prime-product-form-v2 .pf-upload-arrow { position:absolute; left:50%; top:-.25rem; transform:translateX(-50%); font-size:1.7rem; line-height:1; }
+    #prime-product-form-v2 .pf-upload-tray { position:absolute; left:.25rem; right:.25rem; bottom:.05rem; height:.65rem; border-left:2px solid currentColor; border-right:2px solid currentColor; border-bottom:2px solid currentColor; border-radius:0 0 .3rem .3rem; }
+    #prime-product-form-v2 .pf-upload strong { font-size:.78rem; font-weight:500; }
+    #prime-product-form-v2 .pf-upload small { font-size:.62rem; color:var(--pf-muted); }
+    #prime-product-form-v2 .pf-grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.85rem; }
+    #prime-product-form-v2 .pf-grid-4 { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; }
+    #prime-product-form-v2 .pf-switch-row { background:color-mix(in srgb,var(--pf-soft) 55%,var(--pf-card)); border:1px solid var(--pf-border); border-radius:.8rem; padding:.8rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; }
+    #prime-product-form-v2 .pf-switch { position:relative; width:2.55rem; height:1.45rem; flex:0 0 auto; }
+    #prime-product-form-v2 .pf-switch input { position:absolute; opacity:0; pointer-events:none; }
+    #prime-product-form-v2 .pf-switch-track { position:absolute; inset:0; background:var(--pf-border); border-radius:999px; cursor:pointer; transition:.18s; }
+    #prime-product-form-v2 .pf-switch-track::after { content:""; position:absolute; width:1.05rem; height:1.05rem; left:.2rem; top:.2rem; border-radius:50%; background:var(--pf-card); transition:.18s; }
+    #prime-product-form-v2 .pf-switch input:checked + .pf-switch-track { background:var(--pf-primary); }
+    #prime-product-form-v2 .pf-switch input:checked + .pf-switch-track::after { transform:translateX(1.1rem); }
+    #prime-product-form-v2 .pf-switch input:focus-visible + .pf-switch-track { outline:2px solid var(--pf-primary); outline-offset:3px; }
+    #prime-product-form-v2 .pf-tier { border-top:1px solid var(--pf-border); padding-top:.9rem; }
+    #prime-product-form-v2 .pf-chip-row { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.5rem; }
+    #prime-product-form-v2 .pf-chip { position:relative; max-width:min(100%,14rem); display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; background:var(--pf-soft); color:var(--pf-text); padding:.3rem .4rem .3rem .55rem; font-size:.7rem; outline:none; }
+    #prime-product-form-v2 .pf-chip:focus-visible { box-shadow:0 0 0 2px var(--pf-primary); }
+    #prime-product-form-v2 .pf-chip-tooltip { position:fixed; z-index:100; width:max-content; padding:.45rem .55rem; border:1px solid var(--pf-border); border-radius:.45rem; background:var(--pf-card); color:var(--pf-text); box-shadow:0 8px 24px color-mix(in srgb,var(--pf-text) 16%,transparent); font-size:.68rem; line-height:1.35; overflow-wrap:anywhere; opacity:0; visibility:hidden; transform:translateY(.2rem); transition:opacity .15s ease,transform .15s ease,visibility .15s; pointer-events:none; }
+    #prime-product-form-v2 .pf-chip-tooltip.is-visible { opacity:1; visibility:visible; transform:translateY(0); }
+    #prime-product-form-v2 .pf-chip-label { min-width:0; max-width:12.5rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #prime-product-form-v2 .pf-chip-remove { flex:0 0 auto; width:1.2rem; height:1.2rem; display:grid; place-items:center; border:0; border-radius:50%; padding:0; background:transparent; color:var(--pf-muted); font:inherit; cursor:pointer; }
+    #prime-product-form-v2 .pf-chip-remove:hover { background:var(--pf-border); color:var(--pf-text); }
+    #prime-product-form-v2 .pf-option-list { display:grid; gap:.75rem; }
+    #prime-product-form-v2 .pf-option-card { border:1px solid var(--pf-border); border-radius:.75rem; background:color-mix(in srgb,var(--pf-soft) 42%,var(--pf-card)); padding:.85rem; }
+    #prime-product-form-v2 .pf-option-head { min-height:1.75rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.55rem; }
+    #prime-product-form-v2 .pf-option-index { color:var(--pf-muted); font-size:.72rem; line-height:1.5rem; font-weight:500; }
+    #prime-product-form-v2 .pf-option-remove { min-height:1.75rem; border:0; background:transparent; color:var(--pf-muted); padding:.15rem .35rem; border-radius:.35rem; font:inherit; font-size:.7rem; cursor:pointer; }
+    #prime-product-form-v2 .pf-option-remove:hover { color:var(--pf-text); background:var(--pf-soft); }
+    #prime-product-form-v2 .pf-option-card .pf-grid-2 { grid-template-columns:minmax(0,1fr); gap:.85rem; align-items:start; }
+    #prime-product-form-v2 .pf-option-card .pf-label { grid-template-rows:1.2rem auto; align-content:start; }
+    #prime-product-form-v2 .pf-option-card .pf-label > input { height:3rem; min-height:3rem; }
+    #prime-product-form-v2 .pf-tag-input-wrap { display:flex; align-items:center; align-content:center; flex-wrap:wrap; gap:.35rem; min-height:3rem; border:1px solid var(--pf-input-border); border-radius:.55rem; background:var(--pf-input-bg); padding:.35rem .45rem; }
+    #prime-product-form-v2 .pf-tag-input-wrap:focus-within { border-color:var(--pf-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--pf-primary) 22%,transparent); }
+    #prime-product-form-v2 .pf-tag-input-wrap input { flex:1 1 8rem; width:auto; min-width:7rem; border:0; padding:.35rem; box-shadow:none; }
+    #prime-product-form-v2 .pf-tag-input-wrap input:focus { border:0; box-shadow:none; }
+    #prime-product-form-v2 .pf-variant-region { display:grid; grid-template-rows:1fr; opacity:1; transition:grid-template-rows .24s ease,opacity .18s ease,margin .24s ease; margin-top:1rem; }
+    #prime-product-form-v2 .pf-variant-region.is-empty { opacity:.82; }
+    #prime-product-form-v2 .pf-variant-shell { min-height:0; overflow:hidden; border:1px solid var(--pf-border); border-radius:.8rem; background:color-mix(in srgb,var(--pf-soft) 34%,var(--pf-card)); }
+    #prime-product-form-v2 .pf-variant-empty { min-height:7.25rem; display:grid; place-items:center; padding:1.4rem; color:var(--pf-muted); text-align:center; }
+    #prime-product-form-v2 .pf-variant-empty strong { display:block; margin-bottom:.2rem; color:var(--pf-text); font-size:.82rem; }
+    #prime-product-form-v2 .pf-bulk-bar { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) auto; gap:.55rem; align-items:end; padding:.75rem; border-bottom:1px solid var(--pf-border); background:var(--pf-soft); }
+    #prime-product-form-v2 .pf-bulk-bar .pf-label { font-size:.68rem; }
+    #prime-product-form-v2 .pf-bulk-bar input { min-width:0; padding:.55rem .6rem; font-size:.75rem; }
+    #prime-product-form-v2 .pf-apply-all { min-height:2.4rem; white-space:nowrap; }
+    #prime-product-form-v2 .pf-table-wrap { overflow-x:auto; overscroll-behavior-inline:contain; }
+    #prime-product-form-v2 .pf-variant-table { width:100%; min-width:42rem; border-collapse:collapse; table-layout:fixed; }
+    #prime-product-form-v2 .pf-variant-table thead th { padding:.65rem .75rem; color:var(--pf-muted); font-size:.68rem; font-weight:500; text-align:left; border-bottom:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-variant-table tbody th, #prime-product-form-v2 .pf-variant-table tbody td { padding:.6rem .75rem; border-bottom:1px solid var(--pf-border); vertical-align:middle; text-align:left; color:var(--pf-text); }
+    #prime-product-form-v2 .pf-variant-table tbody tr:last-child > * { border-bottom:0; }
+    #prime-product-form-v2 .pf-variant-table .pf-variant-option { width:18%; }
+    #prime-product-form-v2 .pf-variant-table .pf-variant-option:first-child { width:24%; }
+    #prime-product-form-v2 .pf-variant-name { font-size:.75rem; font-weight:500; overflow-wrap:anywhere; }
+    #prime-product-form-v2 .pf-variant-group-cell { vertical-align:middle; text-align:center; background:color-mix(in srgb,var(--pf-soft) 55%,var(--pf-card)); border-right:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-variant-group-content { min-height:7.5rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.55rem; padding:.35rem; }
+    #prime-product-form-v2 .pf-variant-group-label { display:block; max-width:100%; color:var(--pf-text); overflow-wrap:anywhere; }
+    #prime-product-form-v2 .pf-option-image-picker { position:relative; width:5rem; height:5rem; flex:0 0 auto; border:1px dashed var(--pf-input-border); border-radius:.65rem; background:color-mix(in srgb,var(--pf-soft) 70%,var(--pf-card)); color:var(--pf-muted); padding:.35rem; display:grid; place-items:center; overflow:hidden; cursor:pointer; font:inherit; transition:border-color .18s ease,background .18s ease,color .18s ease; }
+    #prime-product-form-v2 .pf-option-image-picker:hover { border-color:var(--pf-primary); color:var(--pf-text); background:color-mix(in srgb,var(--pf-primary) 6%,var(--pf-card)); }
+    #prime-product-form-v2 .pf-option-image-picker:focus-visible { outline:2px solid var(--pf-primary); outline-offset:2px; }
+    #prime-product-form-v2 .pf-option-image-empty { display:grid; justify-items:center; gap:.25rem; font-size:.64rem; font-weight:500; }
+    #prime-product-form-v2 .pf-option-image-empty svg { width:1.35rem; height:1.35rem; }
+    #prime-product-form-v2 .pf-option-image-preview { width:100%; height:100%; border-radius:.4rem; object-fit:cover; }
+    #prime-product-form-v2 .pf-option-image-replace { position:absolute; inset:auto .35rem .35rem; padding:.22rem .35rem; border-radius:.35rem; background:color-mix(in srgb,var(--pf-card) 88%,transparent); color:var(--pf-text); font-size:.6rem; font-weight:600; }
+    #prime-product-form-v2 .pf-option-image-remove { min-height:2rem; border:0; border-radius:.4rem; background:transparent; color:var(--pf-muted); padding:.3rem .55rem; font:inherit; font-size:.64rem; cursor:pointer; }
+    #prime-product-form-v2 .pf-option-image-remove:hover { color:var(--pf-danger); background:color-mix(in srgb,var(--pf-danger) 8%,transparent); }
+    #prime-product-form-v2 .pf-option-image-error { max-width:8.5rem; color:var(--pf-danger); font-size:.6rem; line-height:1.35; font-weight:400; }
+    #prime-product-form-v2 .pf-variant-table input { padding:.55rem .6rem; font-size:.75rem; font-variant-numeric:tabular-nums; }
+    #prime-product-form-v2 .pf-variant-summary { padding:.55rem .75rem; color:var(--pf-muted); font-size:.68rem; border-top:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-option-hint { display:block; min-height:1rem; line-height:1rem; margin-top:.05rem; }
+    #prime-product-form-v2 .pf-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    #prime-product-form-v2 .pf-strength-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+    #prime-product-form-v2 .pf-score { font-size:1rem; font-weight:500; color:var(--pf-primary); }
+    #prime-product-form-v2 .pf-progress { height:.45rem; border-radius:999px; background:var(--pf-soft); overflow:hidden; margin:.8rem 0 1rem; }
+    #prime-product-form-v2 .pf-progress-fill { height:100%; width:0; background:var(--pf-primary); transition:width .2s ease; }
+    #prime-product-form-v2 .pf-checks { display:grid; gap:.65rem; list-style:none; margin:0; padding:0; }
+    #prime-product-form-v2 .pf-check { display:flex; align-items:flex-start; gap:.5rem; color:var(--pf-muted); font-size:.74rem; }
+    #prime-product-form-v2 .pf-check-icon { width:1rem; height:1rem; flex:0 0 auto; display:grid; place-items:center; border:1px solid var(--pf-border); border-radius:50%; font-size:.6rem; }
+    #prime-product-form-v2 .pf-check.is-done { color:var(--pf-text); }
+    #prime-product-form-v2 .pf-check.is-done .pf-check-icon { background:var(--pf-success); color:white; border-color:var(--pf-success); }
+    #prime-product-form-v2 .pf-category-trigger { width:100%; min-height:2.8rem; display:flex; justify-content:space-between; align-items:center; text-align:left; padding:.7rem .8rem; border-color:var(--pf-input-border); border-radius:.55rem; }
+    #prime-product-form-v2 .pf-category-dialog { width:min(52rem,calc(100% - 2rem)); max-width:none; border:1px solid var(--pf-border); border-radius:1rem; background:var(--pf-card); color:var(--pf-text); padding:0; box-shadow:0 20px 60px color-mix(in srgb,var(--pf-text) 28%,transparent); }
+    #prime-product-form-v2 .pf-category-dialog::backdrop { background:color-mix(in srgb,var(--pf-text) 42%,transparent); }
+    #prime-product-form-v2 .pf-dialog-head { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1rem 1.2rem; border-bottom:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-dialog-head h2 { margin:0; }
+    #prime-product-form-v2 .pf-dialog-close { border:0; background:transparent; color:var(--pf-muted); cursor:pointer; font-size:1.25rem; }
+    #prime-product-form-v2 .pf-dialog-body { padding:1rem; background:var(--pf-soft); }
+    #prime-product-form-v2 .pf-category-search-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:.85rem; }
+    #prime-product-form-v2 .pf-category-search-wrap { position:relative; flex:1 1 24rem; min-width:0; }
+    #prime-product-form-v2 .pf-category-search { max-width:none; padding-right:2.35rem; }
+    #prime-product-form-v2 .pf-category-search-icon { position:absolute; right:.8rem; top:50%; transform:translateY(-50%); color:var(--pf-muted); pointer-events:none; font-size:.9rem; }
+    #prime-product-form-v2 .pf-category-columns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); background:var(--pf-card); border-radius:.6rem; min-height:19rem; overflow:hidden; }
+    #prime-product-form-v2 .pf-category-column { padding:.6rem; border-right:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-category-column:last-child { border-right:0; }
+    #prime-product-form-v2 .pf-category-option { width:100%; border:0; background:transparent; color:var(--pf-text); display:flex; align-items:center; justify-content:space-between; gap:.5rem; text-align:left; padding:.55rem .6rem; border-radius:.35rem; font:inherit; font-size:.75rem; cursor:pointer; }
+    #prime-product-form-v2 .pf-category-option:hover { background:var(--pf-soft); }
+    #prime-product-form-v2 .pf-category-option.is-selected { color:var(--pf-primary); background:color-mix(in srgb,var(--pf-primary) 9%,var(--pf-card)); font-weight:500; }
+    #prime-product-form-v2 .pf-dialog-foot { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1rem 1.2rem; border-top:1px solid var(--pf-border); }
+    #prime-product-form-v2 .pf-selected-path { color:var(--pf-muted); font-size:.75rem; }
+    #prime-product-form-v2 .pf-selected-path strong { color:var(--pf-text); }
+    #prime-product-form-v2 .pf-status-note { margin:.5rem 0 0; color:var(--pf-muted); font-size:.7rem; }
+    #prime-product-form-v2 .pf-attribute-row { display:grid; grid-template-columns:1fr 1fr auto; gap:.4rem; align-items:center; }
+    #prime-product-form-v2 .pf-trash { border:0; background:transparent; color:var(--pf-muted); cursor:pointer; padding:.3rem; }
+    #prime-product-form-v2 .pf-savebar { position:fixed; left:50%; bottom:0; z-index:60; transform:translateX(-50%); width:calc(100% - 2rem); max-width:968px; margin:0; background:var(--pf-card); border:1px solid var(--pf-border); border-bottom:0; border-radius:.9rem .9rem 0 0; padding:.8rem 1rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; box-shadow:0 -8px 24px color-mix(in srgb,var(--pf-text) 10%,transparent); }
+    #prime-product-form-v2 .pf-unsaved { color:var(--pf-warning); font-size:.75rem; }
+    #prime-product-form-v2 .pf-hidden { display:none !important; }
+    @media (max-width: 820px) {
+      #prime-product-form-v2 .pf-layout { gap:.85rem; }
+      #prime-product-form-v2 .pf-grid-4 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      #prime-product-form-v2 .pf-grid-2 { grid-template-columns:1fr; }
+    }
+    @media (max-width: 620px) {
+      #prime-product-form-v2 { padding:.65rem .65rem 5.5rem; }
+      #prime-product-form-v2 .pf-layout { grid-template-columns:1fr; }
+      #prime-product-form-v2 .pf-main, #prime-product-form-v2 .pf-sidebar { grid-column:span 1; }
+      #prime-product-form-v2 .pf-sidebar { position:static; }
+      #prime-product-form-v2 .pf-grid-4 { grid-template-columns:1fr 1fr; }
+      #prime-product-form-v2 .pf-savebar { width:calc(100% - 1.3rem); align-items:flex-start; flex-direction:column; }
+      #prime-product-form-v2 .pf-category-columns { grid-template-columns:1fr; }
+      #prime-product-form-v2 .pf-category-column { border-right:0; border-bottom:1px solid var(--pf-border); min-height:auto; }
+      #prime-product-form-v2 .pf-category-search-row, #prime-product-form-v2 .pf-dialog-foot { align-items:stretch; flex-direction:column; }
+      #prime-product-form-v2 .pf-alt-popover { width:min(16rem,calc(100vw - 3rem)); }
+      #prime-product-form-v2 .pf-anchor-tab { flex:0 0 auto; padding-inline:.6rem; }
+      #prime-product-form-v2 .pf-bulk-bar { grid-template-columns:1fr 1fr; }
+      #prime-product-form-v2 .pf-apply-all { grid-column:1 / -1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #prime-product-form-v2 .pf-progress-fill, #prime-product-form-v2 .pf-switch-track, #prime-product-form-v2 .pf-switch-track::after, #prime-product-form-v2 .pf-variant-region { transition:none; }
+    }
+  </style>
+
+  <header class="pf-head">
+    <div class="pf-title-wrap">
+      <button class="pf-back" type="button" aria-label="Back to products">←</button>
+      <div>
+        <h1 class="pf-title">Add Product</h1>
+        <p class="pf-subtitle">Fill in the information below to add a new product.</p>
+      </div>
+    </div>
+  </header>
+
+  <form id="pf2-form" enctype="multipart/form-data">
+    <div class="pf-layout">
+      <main class="pf-column pf-main">
+        <nav class="pf-anchor-nav" aria-label="Product form sections">
+          <button class="pf-anchor-tab is-active" type="button" data-section="section-general" aria-current="true">Basic Info</button>
+          <button class="pf-anchor-tab" type="button" data-section="section-variants">Pricing &amp; Stock</button>
+          <button class="pf-anchor-tab" type="button" data-section="section-shipping">Shipping &amp; Delivery</button>
+          <button class="pf-anchor-tab" type="button" data-section="section-specifications">More Information</button>
+        </nav>
+        <section id="section-general" class="pf-panel">
+          <h2>Basic Info</h2>
+          <div id="section-media" class="pf-subsection">
+            <div class="pf-between">
+              <h3>Media / Images</h3>
+              <span id="pf2-image-count" class="pf-helper">0 / 5</span>
+            </div>
+            <div id="pf2-media" class="pf-media" style="margin-top:.75rem"></div>
+            <p id="pf2-alt-helper" class="pf-helper pf-hidden">Add descriptive Alt text below each image to improve SEO and accessibility.</p>
+          </div>
+          <div class="pf-stack">
+            <div id="section-basic-info" class="pf-stack">
+            <label class="pf-label"><span>Product Name <span class="pf-required">*</span></span>
+              <input id="pf2-name" type="text" placeholder="Enter product name" minlength="3" maxlength="120" required aria-describedby="pf2-check-name-label">
+            </label>
+            <div class="pf-url-disclosure">
+              <button id="pf2-slug-trigger" class="pf-url-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="pf2-slug-popover">
+                <span id="pf2-url" class="pf-url">yourstore.com/products/product-url</span>
+                <span class="pf-url-edit-icon" aria-hidden="true">✎</span>
+              </button>
+              <input id="pf2-slug" name="slug" type="hidden">
+              <div id="pf2-slug-popover" class="pf-slug-popover pf-hidden" role="dialog" aria-modal="false" aria-labelledby="pf2-slug-title">
+                <p id="pf2-slug-title" class="pf-alt-popover-title">Edit product URL</p>
+                <label class="pf-label" for="pf2-slug-editor">URL slug</label>
+                <div class="pf-slug-prefix-wrap">
+                  <span class="pf-slug-prefix">yourstore.com/products/</span>
+                  <input id="pf2-slug-editor" type="text" placeholder="product-url" aria-describedby="pf2-slug-helper pf2-slug-error">
+                </div>
+                <p id="pf2-slug-helper" class="pf-helper">Use lowercase letters, numbers, and hyphens.</p>
+                <p id="pf2-slug-error" class="pf-slug-error" role="alert"></p>
+                <div class="pf-slug-actions">
+                  <button id="pf2-slug-auto" class="pf-btn pf-btn-ai" type="button">Use product name</button>
+                  <div class="pf-slug-actions-main">
+                    <button id="pf2-slug-cancel" class="pf-btn" type="button">Cancel</button>
+                    <button id="pf2-slug-apply" class="pf-btn pf-btn-primary" type="button">Apply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pf-field">
+                <label class="pf-label"><span>Category <span class="pf-required">*</span></span></label>
+                <button id="pf2-category-trigger" class="pf-btn pf-category-trigger" type="button" aria-expanded="false"><span id="pf2-category-label">Select category...</span><span>⌄</span></button>
+                <dialog id="pf2-category-dialog" class="pf-category-dialog">
+                  <div class="pf-dialog-head">
+                    <h2>Select product category</h2>
+                    <button id="pf2-category-close" class="pf-dialog-close" type="button" aria-label="Close category picker">×</button>
+                  </div>
+                  <div class="pf-dialog-body">
+                    <div class="pf-category-search-row">
+                      <div class="pf-category-search-wrap">
+                        <input id="pf2-category-search" class="pf-category-search" type="search" placeholder="Search category...">
+                        <span class="pf-category-search-icon" aria-hidden="true">🔍</span>
+                      </div>
+                      <span class="pf-helper">Choose the most accurate product category</span>
+                    </div>
+                    <div class="pf-category-columns">
+                      <div class="pf-category-column" aria-label="Level 1 categories">
+                        <button class="pf-category-option is-selected" type="button" data-path="Fashion" data-target="clothing"><span>Fashion</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Beauty" data-target="beauty"><span>Beauty</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Health" data-target="health"><span>Health</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Fashion Accessories" data-target="accessories"><span>Fashion Accessories</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Home Appliances" data-target="home"><span>Home Appliances</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Travel & Luggage" data-target="travel"><span>Travel &amp; Luggage</span><span>›</span></button>
+                      </div>
+                      <div class="pf-category-column" aria-label="Level 2 categories">
+                        <button class="pf-category-option" type="button" data-path="Fashion / Jeans" data-target="jeans"><span>Jeans</span></button>
+                        <button class="pf-category-option is-selected" type="button" data-path="Fashion / Hoodies & Shirts" data-target="shirts"><span>Hoodies &amp; Shirts</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Fashion / Sweaters" data-target="sweaters"><span>Sweaters</span></button>
+                        <button class="pf-category-option" type="button" data-path="Fashion / Jackets" data-target="jackets"><span>Jackets</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Fashion / Dresses" data-target="dresses"><span>Dresses</span><span>›</span></button>
+                        <button class="pf-category-option" type="button" data-path="Fashion / Trousers" data-target="trousers"><span>Trousers</span></button>
+                      </div>
+                      <div class="pf-category-column" aria-label="Level 3 categories">
+                        <button class="pf-category-option" type="button" data-category="Fashion / Hoodies & Shirts / Hoodies" data-path="Fashion / Hoodies & Shirts / Hoodies"><span>Hoodies</span></button>
+                        <button class="pf-category-option is-selected" type="button" data-category="Fashion / Hoodies & Shirts / Shirts" data-path="Fashion / Hoodies & Shirts / Shirts"><span>Shirts</span></button>
+                        <button class="pf-category-option" type="button" data-category="Fashion / Hoodies & Shirts / Other" data-path="Fashion / Hoodies & Shirts / Other"><span>Other</span></button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pf-dialog-foot">
+                    <span class="pf-selected-path">Selected: <strong id="pf2-category-selected">Fashion / Hoodies &amp; Shirts / Shirts</strong></span>
+                    <div class="pf-row">
+                      <button id="pf2-category-cancel" class="pf-btn" type="button">Cancel</button>
+                      <button id="pf2-category-confirm" class="pf-btn pf-btn-primary" type="button">Confirm</button>
+                    </div>
+                  </div>
+                </dialog>
+            </div>
+            </div>
+            <div id="section-description" class="pf-stack">
+              <div class="pf-between">
+                <label class="pf-label" for="pf2-description">Product Description</label>
+                <button id="pf2-ai-description" class="pf-btn pf-btn-ai" type="button">✦ Write with AI</button>
+              </div>
+              <div class="pf-textarea-wrap">
+                <textarea id="pf2-description" placeholder="Enter detailed product description..."></textarea>
+                <span id="pf2-desc-count" class="pf-helper pf-textarea-count">0 characters</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-variants" class="pf-panel">
+          <h2>Pricing &amp; Stock</h2>
+          <div id="pf2-master" class="pf-stack">
+            <div class="pf-grid-2">
+              <label class="pf-label"><span>Price (RM) <span class="pf-required">*</span></span><input id="pf2-price" type="number" min="0" step="0.01" placeholder="0"></label>
+              <div class="pf-field">
+                <div class="pf-row">
+                  <label class="pf-label" for="pf2-compare-price">Compare price (RM)</label>
+                  <button class="pf-back" type="button" aria-label="About compare price" data-tooltip="The original price shown with a strikethrough next to the selling price. Use it to highlight a discount." data-tooltip-placement="top">ⓘ</button>
+                </div>
+                <input id="pf2-compare-price" type="number" min="0" step="0.01" placeholder="0">
+              </div>
+              <label class="pf-label"><span>SKU code <span class="pf-required">*</span></span><input id="pf2-sku" type="text" placeholder="SKU-001"></label>
+              <label class="pf-label"><span>Inventory <span class="pf-required">*</span></span><input id="pf2-stock" type="number" min="0" placeholder="0"></label>
+            </div>
+          </div>
+          <div class="pf-switch-row" style="margin-top:1rem">
+            <div><strong>Has Variants</strong><div class="pf-helper">Create options such as size or color.</div></div>
+            <label class="pf-switch" aria-label="Has Variants">
+              <input id="pf2-variants-toggle" name="hasVariants" type="checkbox" aria-label="Has Variants">
+              <span class="pf-switch-track"></span>
+            </label>
+          </div>
+          <div id="pf2-tiers" class="pf-stack pf-hidden" style="margin-top:1rem">
+            <p class="pf-helper">Add option values and the variant table will update automatically. Existing row data is preserved.</p>
+            <div id="pf2-option-list" class="pf-option-list"></div>
+            <button id="pf2-add-option" class="pf-btn" type="button">＋ Add another option</button>
+            <div id="pf2-variant-region" class="pf-variant-region is-empty">
+              <div class="pf-variant-shell">
+                <div id="pf2-variant-empty" class="pf-variant-empty" role="status" aria-live="polite">
+                  <div><strong>No variants yet</strong><span>Add an option name and press Enter after each value.</span></div>
+                </div>
+                <div id="pf2-variant-content" class="pf-hidden">
+                  <div class="pf-bulk-bar" aria-label="Bulk edit variants">
+                    <label class="pf-label">Price (RM)<input id="pf2-bulk-price" type="number" min="0" step="0.01" placeholder="0.00"></label>
+                    <label class="pf-label">Stock<input id="pf2-bulk-stock" type="number" min="0" step="1" placeholder="0"></label>
+                    <label class="pf-label">SKU<input id="pf2-bulk-sku" type="text" placeholder="SKU prefix"></label>
+                    <button id="pf2-apply-all" class="pf-btn pf-btn-primary pf-apply-all" type="button">Apply to all</button>
+                  </div>
+                  <div class="pf-table-wrap" role="region" aria-label="Variant pricing and inventory" tabindex="0">
+                    <table class="pf-variant-table">
+                      <caption class="pf-sr-only">Variant pricing and inventory matrix</caption>
+                      <thead><tr id="pf2-variant-head-row"></tr></thead>
+                      <tbody id="pf2-variant-rows"></tbody>
+                    </table>
+                  </div>
+                  <div id="pf2-variant-summary" class="pf-variant-summary" role="status" aria-live="polite" aria-atomic="true"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-shipping" class="pf-panel">
+          <h2>Shipping &amp; Delivery</h2>
+          <div class="pf-grid-4">
+            <label class="pf-label"><span>Weight (kg) <span class="pf-required">*</span></span><input id="pf2-weight" type="number" min="0.01" step="0.01"></label>
+            <label class="pf-label">Length (cm)<input id="pf2-length" type="number" min="0" step="0.01"></label>
+            <label class="pf-label">Height (cm)<input id="pf2-height" type="number" min="0" step="0.01"></label>
+            <label class="pf-label">Width (cm)<input id="pf2-width" type="number" min="0" step="0.01"></label>
+          </div>
+        </section>
+
+        <div class="pf-column">
+        <section id="section-specifications" class="pf-panel">
+          <div class="pf-between"><h2>Specifications</h2><span id="pf2-attr-count" class="pf-helper">1 / 20</span></div>
+          <div id="pf2-attributes" class="pf-stack">
+            <div class="pf-attribute-row"><input type="text" placeholder="Attribute name" value="Material"><input type="text" placeholder="Value" value="Cotton"><button class="pf-trash" type="button" aria-label="Remove attribute">⌫</button></div>
+          </div>
+          <button id="pf2-add-attribute" class="pf-btn pf-btn-ai" type="button" style="margin-top:.7rem">＋ Add information</button>
+        </section>
+
+        <section id="section-seo" class="pf-panel">
+          <div class="pf-between"><h2>SEO Settings</h2><button id="pf2-ai-seo" class="pf-btn pf-btn-ai" type="button">✦ AI Optimization</button></div>
+          <div class="pf-stack">
+            <label class="pf-label">Meta Title<input id="pf2-meta-title" type="text" maxlength="70" placeholder="Title for SEO"></label>
+            <label class="pf-label">Meta Description<textarea id="pf2-meta-description" rows="3" maxlength="160" placeholder="Brief description for search engines (max 160 chars)"></textarea></label>
+          </div>
+        </section>
+        </div>
+      </main>
+
+      <aside class="pf-column pf-sidebar">
+        <section class="pf-panel">
+          <div class="pf-strength-head"><h2 style="margin:0">Product Content Strength</h2><span id="pf2-score" class="pf-score">0%</span></div>
+          <div class="pf-progress" role="progressbar" aria-label="Product content strength" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="pf2-progress" class="pf-progress-fill"></div></div>
+          <ul class="pf-checks">
+            <li id="pf2-check-images" class="pf-check"><span class="pf-check-icon">✓</span><span>Add at least 3 product images</span></li>
+            <li id="pf2-check-name" class="pf-check"><span class="pf-check-icon" aria-hidden="true">✓</span><span id="pf2-check-name-label">Add a product name (25–100 characters)</span></li>
+            <li id="pf2-name-strength-status" class="pf-sr-only" role="status" aria-live="polite" aria-atomic="true"></li>
+            <li id="pf2-check-description" class="pf-check"><span class="pf-check-icon">✓</span><span>Add at least 100 characters in description</span></li>
+            <li id="pf2-check-category" class="pf-check"><span class="pf-check-icon">✓</span><span>Select a product category</span></li>
+            <li id="pf2-check-shipping" class="pf-check"><span class="pf-check-icon">✓</span><span>Configure weight &amp; dimensions</span></li>
+          </ul>
+        </section>
+
+        <section class="pf-panel">
+          <h2>Product Status</h2>
+          <label class="pf-label">Status<select id="pf2-status"><option value="draft">Draft</option><option value="active">Active</option></select></label>
+          <p id="pf2-status-note" class="pf-status-note">Draft products are hidden from the storefront.</p>
+        </section>
+
+      </aside>
+    </div>
+
+    <input id="pf2-variants-payload" name="variantsPayload" type="hidden" value="[]">
+    <input id="pf2-option-images-payload" name="optionImagesPayload" type="hidden" value="[]">
+    <div id="pf2-option-image-files" class="pf-sr-only" aria-hidden="true"></div>
+
+    <div class="pf-savebar">
+      <span class="pf-unsaved">● Unsaved changes</span>
+      <div class="pf-row"><button class="pf-btn" type="button">Cancel</button><button id="pf2-submit" class="pf-btn pf-btn-primary" type="submit">Save Draft</button></div>
+    </div>
+  </form>
+
+  <script>
+    (() => {
+      const root = document.getElementById('prime-product-form-v2');
+      const el = (id) => root.querySelector('#' + id);
+      const state = {
+        images: [], category: '', pendingCategory: 'Fashion / Hoodies & Shirts / Shirts', slugTouched: false, attributes: 1,
+        nextOptionId: 2, nextValueId: 1,
+        options: [{ id:'option-1', name:'', values:[] }], removedOptions: [],
+        variantData: new Map(), option1Images: new Map()
+      };
+      const name = el('pf2-name');
+      let lastNameStrengthState = '';
+      const slug = el('pf2-slug');
+      const slugEditor = el('pf2-slug-editor');
+      const description = el('pf2-description');
+      const nums = ['weight','length','width','height'].reduce((acc, key) => { acc[key] = el('pf2-' + key); return acc; }, {});
+      const slugify = (value) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+      const isPositive = (input) => Number.isFinite(Number(input.value)) && Number(input.value) > 0;
+      const slugTrigger = el('pf2-slug-trigger');
+      const slugPopover = el('pf2-slug-popover');
+      const slugError = el('pf2-slug-error');
+      const slugApply = el('pf2-slug-apply');
+      let slugDraftStart = '';
+      const updateSlugApplyState = () => { slugApply.disabled = !slugify(slugEditor.value); };
+      const positionSlugPopover = () => {
+        if (slugPopover.classList.contains('pf-hidden')) return;
+        const margin = 16;
+        const gap = 6;
+        const viewport = window.visualViewport;
+        const viewportLeft = viewport?.offsetLeft || 0;
+        const viewportTop = viewport?.offsetTop || 0;
+        const viewportWidth = viewport?.width || window.innerWidth;
+        const viewportHeight = viewport?.height || window.innerHeight;
+        slugPopover.style.width = `${Math.max(1, Math.min(448, viewportWidth - margin * 2))}px`;
+        slugPopover.style.maxHeight = `${Math.max(1, viewportHeight - margin * 2)}px`;
+        const triggerRect = slugTrigger.getBoundingClientRect();
+        const popoverRect = slugPopover.getBoundingClientRect();
+        const left = Math.min(Math.max(triggerRect.left, viewportLeft + margin), Math.max(viewportLeft + margin, viewportLeft + viewportWidth - popoverRect.width - margin));
+        let top = triggerRect.bottom + gap;
+        if (top + popoverRect.height > viewportTop + viewportHeight - margin) top = triggerRect.top - popoverRect.height - gap;
+        top = Math.min(Math.max(top, viewportTop + margin), Math.max(viewportTop + margin, viewportTop + viewportHeight - popoverRect.height - margin));
+        slugPopover.style.left = `${left}px`;
+        slugPopover.style.top = `${top}px`;
+      };
+      const closeSlugPopover = (restoreFocus = false, discardDraft = true) => {
+        if (slugPopover.classList.contains('pf-hidden')) return;
+        if (discardDraft) slugEditor.value = slugDraftStart;
+        slugPopover.classList.add('pf-hidden');
+        slugTrigger.setAttribute('aria-expanded','false');
+        slugError.textContent = '';
+        if (restoreFocus) slugTrigger.focus();
+      };
+      const openSlugPopover = () => {
+        hideActiveAltPopover(false);
+        slugDraftStart = slug.value || slugify(name.value);
+        slugEditor.value = slugDraftStart;
+        slugError.textContent = '';
+        updateSlugApplyState();
+        slugPopover.classList.remove('pf-hidden');
+        slugTrigger.setAttribute('aria-expanded','true');
+        window.requestAnimationFrame(() => { positionSlugPopover(); slugEditor.focus(); slugEditor.select(); });
+      };
+      const applySlugDraft = () => {
+        const normalized = slugify(slugEditor.value);
+        if (!normalized) {
+          slugError.textContent = 'Enter a URL slug.';
+          slugEditor.focus();
+          return false;
+        }
+        slug.value = normalized;
+        slugEditor.value = normalized;
+        state.slugTouched = true;
+        updateUrl();
+        closeSlugPopover(true, false);
+        return true;
+      };
+      const anchorTabs = [...root.querySelectorAll('.pf-anchor-tab')];
+      const anchorSections = anchorTabs.map((tab) => el(tab.dataset.section)).filter(Boolean);
+      const anchorNav = root.querySelector('.pf-anchor-nav');
+      const chipTooltip = document.createElement('div');
+      chipTooltip.id = 'pf2-chip-tooltip';
+      chipTooltip.className = 'pf-chip-tooltip';
+      chipTooltip.setAttribute('role', 'tooltip');
+      chipTooltip.setAttribute('aria-hidden', 'true');
+      root.appendChild(chipTooltip);
+      let tooltipAnchor = null;
+      const positionChipTooltip = (anchor) => {
+        const margin = 16;
+        const gap = 8;
+        chipTooltip.style.maxWidth = `${Math.max(160, Math.min(288, window.innerWidth - margin * 2))}px`;
+        chipTooltip.style.left = '0px';
+        chipTooltip.style.top = '0px';
+        const anchorRect = anchor.getBoundingClientRect();
+        const tooltipRect = chipTooltip.getBoundingClientRect();
+        const left = Math.min(
+          Math.max(anchorRect.left, margin),
+          Math.max(margin, window.innerWidth - tooltipRect.width - margin)
+        );
+        let top = anchorRect.top - tooltipRect.height - gap;
+        if (top < margin) top = Math.min(window.innerHeight - tooltipRect.height - margin, anchorRect.bottom + gap);
+        chipTooltip.style.left = `${left}px`;
+        chipTooltip.style.top = `${Math.max(margin, top)}px`;
+      };
+      const showChipTooltip = (anchor, value) => {
+        tooltipAnchor = anchor;
+        chipTooltip.textContent = value;
+        chipTooltip.classList.add('is-visible');
+        chipTooltip.setAttribute('aria-hidden', 'false');
+        window.requestAnimationFrame(() => { if (tooltipAnchor === anchor) positionChipTooltip(anchor); });
+      };
+      const hideChipTooltip = (anchor) => {
+        if (anchor && tooltipAnchor !== anchor) return;
+        tooltipAnchor = null;
+        chipTooltip.classList.remove('is-visible');
+        chipTooltip.setAttribute('aria-hidden', 'true');
+      };
+      let activeAltPopover = null;
+      let activeAltTrigger = null;
+      const hideActiveAltPopover = (restoreFocus = false) => {
+        if (!activeAltPopover) return;
+        const trigger = activeAltTrigger;
+        activeAltPopover.classList.add('pf-hidden');
+        trigger?.setAttribute('aria-expanded','false');
+        activeAltPopover = null;
+        activeAltTrigger = null;
+        if (restoreFocus && trigger?.isConnected) trigger.focus();
+      };
+      const positionActiveAltPopover = () => {
+        if (!activeAltPopover || !activeAltTrigger) return;
+        const margin = 16;
+        const gap = 6;
+        const viewport = window.visualViewport;
+        const viewportLeft = viewport?.offsetLeft || 0;
+        const viewportTop = viewport?.offsetTop || 0;
+        const viewportWidth = viewport?.width || window.innerWidth;
+        const viewportHeight = viewport?.height || window.innerHeight;
+        activeAltPopover.style.maxHeight = `${Math.max(1, viewportHeight - margin * 2)}px`;
+        const triggerRect = activeAltTrigger.getBoundingClientRect();
+        const popoverRect = activeAltPopover.getBoundingClientRect();
+        const left = Math.min(Math.max(triggerRect.left, viewportLeft + margin), Math.max(viewportLeft + margin, viewportLeft + viewportWidth - popoverRect.width - margin));
+        let top = triggerRect.bottom + gap;
+        if (top + popoverRect.height > viewportTop + viewportHeight - margin) top = triggerRect.top - popoverRect.height - gap;
+        top = Math.min(Math.max(top, viewportTop + margin), Math.max(viewportTop + margin, viewportTop + viewportHeight - popoverRect.height - margin));
+        activeAltPopover.style.left = `${left}px`;
+        activeAltPopover.style.top = `${top}px`;
+      };
+      window.addEventListener('scroll', () => hideChipTooltip(), { passive:true });
+      window.addEventListener('resize', () => hideChipTooltip());
+      window.addEventListener('scroll', () => hideActiveAltPopover(false), { passive:true });
+      window.addEventListener('resize', () => hideActiveAltPopover(false));
+      window.visualViewport?.addEventListener('scroll', () => window.requestAnimationFrame(positionActiveAltPopover), { passive:true });
+      window.visualViewport?.addEventListener('resize', () => window.requestAnimationFrame(positionActiveAltPopover));
+      document.addEventListener('pointerdown', (event) => {
+        if (tooltipAnchor && !tooltipAnchor.contains(event.target)) hideChipTooltip();
+        if (activeAltPopover && !activeAltPopover.contains(event.target) && !activeAltTrigger?.contains(event.target)) hideActiveAltPopover(false);
+        if (!slugPopover.classList.contains('pf-hidden') && !slugPopover.contains(event.target) && !slugTrigger.contains(event.target)) closeSlugPopover(false, true);
+      });
+      root.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && (tooltipAnchor || activeAltPopover || !slugPopover.classList.contains('pf-hidden'))) {
+          event.preventDefault();
+          hideChipTooltip();
+          hideActiveAltPopover(true);
+          closeSlugPopover(true, true);
+        }
+      });
+      let pendingSectionId = '';
+      let pendingSectionTimer;
+      let syncActiveSection = () => {};
+      const setActiveSection = (id) => {
+        anchorTabs.forEach((tab) => {
+          const active = tab.dataset.section === id;
+          tab.classList.toggle('is-active', active);
+          if (active) tab.setAttribute('aria-current','true'); else tab.removeAttribute('aria-current');
+        });
+      };
+      anchorTabs.forEach((tab) => tab.addEventListener('click', () => {
+        const section = el(tab.dataset.section);
+        if (!section) return;
+        pendingSectionId = tab.dataset.section;
+        window.clearTimeout(pendingSectionTimer);
+        setActiveSection(tab.dataset.section);
+        const navOffset = anchorNav.getBoundingClientRect().height + 8;
+        const targetTop = section.getBoundingClientRect().top + window.scrollY - navOffset;
+        window.scrollTo({ top:Math.max(0,targetTop), behavior:'smooth' });
+        pendingSectionTimer = window.setTimeout(() => {
+          pendingSectionId = '';
+          syncActiveSection();
+        }, 900);
+      }));
+      if ('IntersectionObserver' in window) {
+        syncActiveSection = () => {
+          const sectionBoundary = anchorNav.getBoundingClientRect().bottom + 12;
+          if (pendingSectionId) {
+            const pendingSection = el(pendingSectionId);
+            if (pendingSection && Math.abs(pendingSection.getBoundingClientRect().top - sectionBoundary) > 14) {
+              setActiveSection(pendingSectionId);
+              return;
+            }
+            pendingSectionId = '';
+            window.clearTimeout(pendingSectionTimer);
+          }
+          const current = anchorSections.find((section) => section.getBoundingClientRect().bottom > sectionBoundary) || anchorSections[anchorSections.length - 1];
+          if (current) setActiveSection(current.id);
+        };
+        const sectionObserver = new IntersectionObserver(syncActiveSection, {
+          root:null,
+          rootMargin:'-72px 0px -70% 0px',
+          threshold:0
+        });
+        anchorSections.forEach((section) => sectionObserver.observe(section));
+        window.addEventListener('scroll', syncActiveSection, { passive:true });
+        syncActiveSection();
+      }
+
+      function renderMedia() {
+        hideActiveAltPopover(false);
+        const media = el('pf2-media');
+        media.replaceChildren();
+        state.images.forEach((item, index) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'pf-media-item';
+          const thumb = document.createElement('div');
+          thumb.className = 'pf-thumb';
+          thumb.innerHTML = `<span class="pf-thumb-index">${index + 1}</span>`;
+          const remove = document.createElement('button');
+          remove.className = 'pf-remove'; remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label','Remove image');
+          remove.addEventListener('click', () => { state.images.splice(index,1); renderMedia(); updateStrength(); });
+          thumb.appendChild(remove);
+          const altTrigger = document.createElement('button');
+          altTrigger.className = 'pf-alt-trigger' + (item.alt ? ' has-value' : '');
+          altTrigger.type = 'button';
+          if (item.alt) {
+            const altValue = document.createElement('span');
+            altValue.className = 'pf-alt-value'; altValue.textContent = item.alt;
+            const editIcon = document.createElement('span');
+            editIcon.className = 'pf-alt-edit-icon'; editIcon.setAttribute('aria-hidden','true'); editIcon.textContent = '✎';
+            altTrigger.append(altValue, editIcon);
+            altTrigger.setAttribute('aria-label', `Edit Alt text: ${item.alt}`);
+          } else {
+            altTrigger.textContent = '+ Add Alt text';
+          }
+          const popover = document.createElement('div');
+          popover.className = 'pf-alt-popover pf-hidden';
+          popover.id = `pf2-alt-popover-${index}`;
+          popover.setAttribute('role','dialog');
+          popover.setAttribute('aria-modal','false');
+          const popoverTitle = document.createElement('p');
+          popoverTitle.id = `pf2-alt-popover-title-${index}`;
+          popoverTitle.className = 'pf-alt-popover-title'; popoverTitle.textContent = 'Alt text';
+          popover.setAttribute('aria-labelledby', popoverTitle.id);
+          altTrigger.setAttribute('aria-controls', popover.id);
+          altTrigger.setAttribute('aria-expanded','false');
+          const textareaWrap = document.createElement('div');
+          textareaWrap.className = 'pf-alt-textarea-wrap';
+          const altTextarea = document.createElement('textarea');
+          altTextarea.className = 'pf-alt-textarea'; altTextarea.maxLength = 125; altTextarea.placeholder = 'Briefly describe this image...'; altTextarea.value = item.alt;
+          const altCount = document.createElement('span');
+          altCount.className = 'pf-alt-count'; altCount.textContent = `${altTextarea.value.length}/125`;
+          altTextarea.addEventListener('input', () => { altCount.textContent = `${altTextarea.value.length}/125`; });
+          textareaWrap.append(altTextarea, altCount);
+          const helper = document.createElement('p');
+          helper.className = 'pf-helper'; helper.textContent = 'Briefly describe the image to improve your SEO score on Google.';
+          const actions = document.createElement('div');
+          actions.className = 'pf-alt-actions';
+          const cancel = document.createElement('button');
+          cancel.className = 'pf-btn'; cancel.type = 'button'; cancel.textContent = 'Cancel';
+          const save = document.createElement('button');
+          save.className = 'pf-btn pf-btn-primary'; save.type = 'button'; save.textContent = 'Save';
+          cancel.addEventListener('click', () => { altTextarea.value = item.alt; altCount.textContent = `${item.alt.length}/125`; hideActiveAltPopover(true); });
+          save.addEventListener('click', () => {
+            item.alt = altTextarea.value.trim().slice(0,125);
+            hideActiveAltPopover(false);
+            renderMedia();
+            window.requestAnimationFrame(() => el('pf2-media').querySelectorAll('.pf-alt-trigger')[index]?.focus());
+          });
+          actions.append(cancel, save);
+          popover.append(popoverTitle, textareaWrap, helper, actions);
+          altTrigger.addEventListener('click', () => {
+            hideActiveAltPopover(false);
+            activeAltPopover = popover;
+            activeAltTrigger = altTrigger;
+            altTrigger.setAttribute('aria-expanded','true');
+            popover.classList.remove('pf-hidden');
+            window.requestAnimationFrame(() => {
+              positionActiveAltPopover();
+              altTextarea.focus();
+            });
+          });
+          wrap.append(thumb, altTrigger, popover); media.appendChild(wrap);
+        });
+        if (state.images.length < 5) {
+          const add = document.createElement('button');
+          add.className = 'pf-upload'; add.type = 'button'; add.setAttribute('aria-label','Upload image');
+          add.innerHTML = '<span class="pf-upload-icon" aria-hidden="true"><span class="pf-upload-arrow">↑</span><span class="pf-upload-tray"></span></span><strong>Upload</strong><small>PNG, JPG · max 5MB</small>';
+          add.addEventListener('click', () => { state.images.push({alt:''}); renderMedia(); updateStrength(); });
+          media.appendChild(add);
+        }
+        el('pf2-image-count').textContent = `${state.images.length} / 5`;
+        el('pf2-alt-helper').classList.toggle('pf-hidden', state.images.length === 0);
+      }
+
+      function updateUrl() {
+        const fullUrl = `yourstore.com/products/${slug.value || 'product-url'}`;
+        el('pf2-url').textContent = fullUrl;
+        slugTrigger.setAttribute('aria-label', `Edit product URL: ${fullUrl}`);
+      }
+      function updateStrength() {
+        const productNameLength = name.value.trim().length;
+        const checks = {
+          images: state.images.length >= 3,
+          name: productNameLength >= 25 && productNameLength <= 100,
+          description: description.value.trim().length >= 100,
+          category: Boolean(state.category),
+          shipping: isPositive(nums.weight) && isPositive(nums.length) && isPositive(nums.width) && isPositive(nums.height)
+        };
+        let score = 0;
+        Object.entries(checks).forEach(([key, done]) => { if (done) score += 20; el('pf2-check-' + key).classList.toggle('is-done', done); });
+        const nameStrengthState = checks.name ? 'good' : productNameLength === 0 ? 'empty' : productNameLength < 25 ? 'short' : 'long';
+        const nameStrengthText = nameStrengthState === 'good'
+          ? 'Product name length looks good'
+          : nameStrengthState === 'empty'
+            ? 'Add a product name (25–100 characters)'
+            : nameStrengthState === 'short'
+              ? `Product name: ${productNameLength}/25 characters`
+              : `Shorten product name by ${productNameLength - 100} character${productNameLength - 100 === 1 ? '' : 's'}`;
+        el('pf2-check-name-label').textContent = nameStrengthText;
+        if (nameStrengthState !== lastNameStrengthState) {
+          el('pf2-name-strength-status').textContent = nameStrengthText;
+          lastNameStrengthState = nameStrengthState;
+        }
+        el('pf2-score').textContent = score + '%';
+        el('pf2-progress').style.width = score + '%';
+        const completedChecks = Object.values(checks).filter(Boolean).length;
+        const progressbar = root.querySelector('[role="progressbar"]');
+        progressbar.setAttribute('aria-valuenow', String(score));
+        progressbar.setAttribute('aria-valuetext', `${score}% — ${completedChecks} of 5 recommendations complete`);
+        el('pf2-desc-count').textContent = description.value.trim().length + ' characters';
+      }
+
+      function validateProductName() {
+        const length = name.value.trim().length;
+        const message = length === 0
+          ? 'Enter a product name.'
+          : length < 3
+            ? 'Product name must be at least 3 characters.'
+            : length > 120
+              ? 'Product name must be 120 characters or fewer.'
+              : '';
+        name.setCustomValidity(message);
+        return !message;
+      }
+
+      const MAX_OPTIONS = 2;
+      const MAX_VALUES_PER_OPTION = 20;
+      const MAX_VARIANTS = 100;
+      const normalizeTag = (value) => value.trim().replace(/\s+/g, ' ');
+      const optionNamesAreUnique = () => {
+        const names = state.options.map((option) => normalizeTag(option.name).toLowerCase()).filter(Boolean);
+        return new Set(names).size === names.length;
+      };
+      const optionsAreComplete = () => state.options.length > 0 && state.options.every((option) => normalizeTag(option.name) && option.values.length) && optionNamesAreUnique();
+      const validOptions = () => optionsAreComplete() ? state.options : [];
+      const renderableOptions = () => {
+        const options = [];
+        const names = new Set();
+        for (const option of state.options) {
+          const name = normalizeTag(option.name);
+          const normalizedName = name.toLowerCase();
+          if (!name || !option.values.length || names.has(normalizedName)) break;
+          names.add(normalizedName);
+          options.push(option);
+        }
+        return options;
+      };
+      const combinationCount = (options) => options.reduce((total, option) => total * option.values.length, 1);
+      const matrixOptions = () => {
+        const options = renderableOptions();
+        return options.length > 1 && combinationCount(options) > MAX_VARIANTS ? [options[0]] : options;
+      };
+      const cartesian = (groups) => groups.reduce((rows, group) => rows.flatMap((row) => group.map((item) => [...row, item])), [[]]);
+      const variantKey = (items) => items.map((item) => `${item.optionId}:${item.value.id}`).join('|');
+      const focusOptionInput = (optionId) => window.requestAnimationFrame(() => root.querySelector(`[data-option-id="${optionId}"] .pf-tag-entry`)?.focus());
+
+      function addOptionValue(option, rawValue, restoreFocus = false) {
+        const labels = rawValue.split(',').map(normalizeTag).filter(Boolean);
+        let changed = false;
+        labels.forEach((label) => {
+          if (option.values.length >= MAX_VALUES_PER_OPTION) return;
+          if (option.values.some((value) => value.label.toLowerCase() === label.toLowerCase())) return;
+          const removedIndex = option.removedValues?.findIndex((value) => value.label.toLowerCase() === label.toLowerCase()) ?? -1;
+          const cached = removedIndex >= 0 ? option.removedValues.splice(removedIndex, 1)[0] : null;
+          const nextValue = cached || { id:`value-${state.nextValueId++}`, label };
+          option.values.push(nextValue);
+          const restoredImage = state.option1Images.get(nextValue.id);
+          if (restoredImage?.fileInput) restoredImage.fileInput.disabled = false;
+          changed = true;
+        });
+        if (changed) { renderOptions(); renderVariants(); if (restoreFocus) focusOptionInput(option.id); }
+        return changed;
+      }
+
+      function removeOptionValue(option, valueId, restoreFocus = true) {
+        const value = option.values.find((item) => item.id === valueId);
+        if (!value) return;
+        option.removedValues ||= [];
+        option.removedValues.push(value);
+        const removedImage = state.option1Images.get(value.id);
+        if (removedImage?.fileInput) removedImage.fileInput.disabled = true;
+        while (option.removedValues.length > MAX_VALUES_PER_OPTION) {
+          const evictedValue = option.removedValues.shift();
+          const evictedImage = state.option1Images.get(evictedValue.id);
+          if (evictedImage?.previewUrl) URL.revokeObjectURL(evictedImage.previewUrl);
+          evictedImage?.fileInput?.remove();
+          state.option1Images.delete(evictedValue.id);
+        }
+        option.values = option.values.filter((item) => item.id !== valueId);
+        renderOptions();
+        renderVariants();
+        if (restoreFocus) focusOptionInput(option.id);
+      }
+
+      function renderOptions() {
+        hideChipTooltip();
+        const list = el('pf2-option-list');
+        list.replaceChildren();
+        state.options.forEach((option, optionIndex) => {
+          const card = document.createElement('div');
+          card.className = 'pf-option-card'; card.dataset.optionId = option.id;
+          const head = document.createElement('div');
+          head.className = 'pf-option-head';
+          const index = document.createElement('span');
+          index.className = 'pf-option-index';
+          index.textContent = `Option ${optionIndex + 1}`;
+          head.appendChild(index);
+          if (optionIndex > 0) {
+            const removeOption = document.createElement('button');
+            removeOption.className = 'pf-option-remove'; removeOption.type = 'button'; removeOption.textContent = 'Remove';
+            removeOption.setAttribute('aria-label', `Remove option ${optionIndex + 1}`);
+            removeOption.addEventListener('click', () => {
+              state.removedOptions.push(option);
+              state.options = state.options.filter((item) => item.id !== option.id);
+              renderOptions(); renderVariants();
+            });
+            head.appendChild(removeOption);
+          }
+          const grid = document.createElement('div');
+          grid.className = 'pf-grid-2';
+          const nameLabel = document.createElement('label');
+          nameLabel.className = 'pf-label'; nameLabel.textContent = 'Option name';
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text'; nameInput.placeholder = optionIndex === 1 ? 'e.g. Size' : 'e.g. Color'; nameInput.value = option.name; nameInput.maxLength = 40; nameInput.required = true;
+          nameInput.addEventListener('input', () => { option.name = nameInput.value; renderVariants(); });
+          nameLabel.appendChild(nameInput);
+          const valuesField = document.createElement('div');
+          valuesField.className = 'pf-field';
+          const valuesLabel = document.createElement('label');
+          valuesLabel.className = 'pf-label'; valuesLabel.textContent = 'Option values';
+          const tagWrap = document.createElement('div');
+          tagWrap.className = 'pf-tag-input-wrap'; tagWrap.setAttribute('role','group'); tagWrap.setAttribute('aria-label', `${option.name || `Option ${optionIndex + 1}`} values`);
+          option.values.forEach((value) => {
+            const chip = document.createElement('span'); chip.className = 'pf-chip'; chip.tabIndex = 0; chip.dataset.fullLabel = value.label; chip.setAttribute('aria-label', `Option value: ${value.label}`); chip.setAttribute('aria-describedby', chipTooltip.id);
+            chip.addEventListener('mouseenter', () => showChipTooltip(chip, value.label));
+            chip.addEventListener('mouseleave', () => hideChipTooltip(chip));
+            chip.addEventListener('focusin', () => showChipTooltip(chip, value.label));
+            chip.addEventListener('focusout', (event) => { if (!chip.contains(event.relatedTarget)) hideChipTooltip(chip); });
+            chip.addEventListener('click', (event) => { if (!event.target.closest('.pf-chip-remove')) showChipTooltip(chip, value.label); });
+            const label = document.createElement('span'); label.className = 'pf-chip-label'; label.textContent = value.label; label.title = value.label;
+            const remove = document.createElement('button'); remove.className = 'pf-chip-remove'; remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `Remove ${value.label}`);
+            remove.addEventListener('click', (event) => { event.stopPropagation(); removeOptionValue(option, value.id); });
+            chip.append(label, remove); tagWrap.appendChild(chip);
+          });
+          const tagInput = document.createElement('input');
+          tagInput.className = 'pf-tag-entry'; tagInput.type = 'text'; tagInput.maxLength = 40; tagInput.required = option.values.length === 0; tagInput.placeholder = option.values.length ? 'Add value' : 'Type a value, then press Enter'; tagInput.setAttribute('aria-label','Add option value');
+          const commitTag = (restoreFocus) => { if (addOptionValue(option, tagInput.value, restoreFocus)) tagInput.value = ''; };
+          tagInput.addEventListener('keydown', (event) => {
+            if ((event.key === 'Enter' || event.key === ',') && tagInput.value.trim()) { event.preventDefault(); commitTag(true); }
+            if (event.key === 'Backspace' && !tagInput.value && option.values.length) { event.preventDefault(); removeOptionValue(option, option.values[option.values.length - 1].id); }
+          });
+          tagInput.addEventListener('blur', () => commitTag(false));
+          tagWrap.appendChild(tagInput);
+          valuesLabel.appendChild(tagWrap);
+          const hint = document.createElement('span'); hint.className = 'pf-helper pf-option-hint'; hint.textContent = `Press Enter or comma after each value · ${option.values.length}/${MAX_VALUES_PER_OPTION}`;
+          valuesField.append(valuesLabel, hint);
+          grid.append(nameLabel, valuesField);
+          card.append(head, grid); list.appendChild(card);
+        });
+        const addOptionButton = el('pf2-add-option');
+        const atOptionLimit = state.options.length >= MAX_OPTIONS;
+        addOptionButton.hidden = atOptionLimit;
+        addOptionButton.disabled = atOptionLimit;
+        addOptionButton.textContent = '＋ Add another option';
+      }
+
+      function createOptionImageControl(option, value) {
+        const content = document.createElement('div');
+        content.className = 'pf-variant-group-content';
+        const groupLabel = document.createElement('span');
+        groupLabel.className = 'pf-variant-group-label'; groupLabel.textContent = value.label;
+        const picker = document.createElement('button');
+        picker.className = 'pf-option-image-picker'; picker.type = 'button';
+        const fileInput = document.createElement('input');
+        fileInput.className = 'pf-sr-only'; fileInput.type = 'file'; fileInput.accept = 'image/png,image/jpeg,image/webp'; fileInput.tabIndex = -1;
+        const imageState = state.option1Images.get(value.id);
+        const actionLabel = imageState?.previewUrl ? 'Replace' : 'Add';
+        picker.setAttribute('aria-label', `${actionLabel} image for ${normalizeTag(option.name) || 'Option 1'} ${value.label}`);
+        if (imageState?.previewUrl) {
+          const preview = document.createElement('img');
+          preview.className = 'pf-option-image-preview'; preview.src = imageState.previewUrl; preview.alt = '';
+          const replace = document.createElement('span');
+          replace.className = 'pf-option-image-replace'; replace.textContent = 'Replace';
+          picker.append(preview, replace);
+        } else {
+          const empty = document.createElement('span');
+          empty.className = 'pf-option-image-empty';
+          empty.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m4 16 4.5-4.5 3.5 3.5 2.5-2.5L20 18"></path><path d="M17 7v5M14.5 9.5h5"></path></svg><span>Add image</span>';
+          picker.appendChild(empty);
+        }
+        picker.title = 'PNG, JPG or WebP · 5 MB max';
+        picker.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+          const file = fileInput.files?.[0];
+          if (!file) return;
+          const validType = ['image/png','image/jpeg','image/webp'].includes(file.type);
+          if (!validType || file.size > 5 * 1024 * 1024) {
+            const current = state.option1Images.get(value.id) || {};
+            state.option1Images.set(value.id, { ...current, error:'Use a PNG, JPG or WebP image that is 5 MB or smaller.' });
+            renderVariants();
+            return;
+          }
+          const current = state.option1Images.get(value.id);
+          if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+          current?.fileInput?.remove();
+          fileInput.name = `optionImageFiles[${value.id}]`;
+          fileInput.dataset.optionId = option.id;
+          fileInput.dataset.valueId = value.id;
+          el('pf2-option-image-files').appendChild(fileInput);
+          state.option1Images.set(value.id, { file, fileInput, name:file.name, type:file.type, size:file.size, previewUrl:URL.createObjectURL(file), error:'' });
+          renderVariants();
+        });
+        content.append(groupLabel, picker, fileInput);
+        if (imageState?.previewUrl) {
+          const remove = document.createElement('button');
+          remove.className = 'pf-option-image-remove'; remove.type = 'button'; remove.textContent = 'Remove image';
+          remove.setAttribute('aria-label', `Remove image for ${normalizeTag(option.name) || 'Option 1'} ${value.label}`);
+          remove.addEventListener('click', () => {
+            const current = state.option1Images.get(value.id);
+            if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+            current?.fileInput?.remove();
+            state.option1Images.delete(value.id);
+            renderVariants();
+          });
+          content.appendChild(remove);
+        }
+        if (imageState?.error) {
+          const error = document.createElement('span');
+          error.className = 'pf-option-image-error'; error.setAttribute('role','alert'); error.textContent = imageState.error;
+          content.appendChild(error);
+        }
+        return content;
+      }
+
+      function renderVariants() {
+        const candidateOptions = renderableOptions();
+        const requestedTotal = candidateOptions.length ? combinationCount(candidateOptions) : 0;
+        const overLimit = requestedTotal > MAX_VARIANTS;
+        const options = matrixOptions();
+        syncOptionImageInputs(el('pf2-variants-toggle').checked && optionsAreComplete() && !overLimit);
+        const combinations = options.length ? cartesian(options.map((option) => option.values.map((value) => ({ optionId:option.id, optionName:normalizeTag(option.name), value })))) : [];
+        const empty = combinations.length === 0;
+        el('pf2-variant-region').classList.toggle('is-empty', empty);
+        el('pf2-variant-empty').classList.toggle('pf-hidden', !empty);
+        el('pf2-variant-content').classList.toggle('pf-hidden', empty);
+        if (empty) {
+          el('pf2-variant-empty').innerHTML = optionNamesAreUnique()
+              ? '<div><strong>No variants yet</strong><span>Complete every option name and add at least one value.</span></div>'
+              : '<div><strong>Option names must be unique</strong><span>Rename duplicate options before variants can be generated.</span></div>';
+          updateBulkButtonState();
+          return;
+        }
+        const head = el('pf2-variant-head-row');
+        head.replaceChildren();
+        options.forEach((option) => {
+          const header = document.createElement('th');
+          header.scope = 'col'; header.id = `pf2-col-${option.id}`; header.className = 'pf-variant-option'; header.textContent = normalizeTag(option.name) + (option === options[0] ? ' / Image' : '');
+          head.appendChild(header);
+        });
+        [['price','Price (RM)'], ['stock','Stock'], ['sku','SKU']].forEach(([field,label]) => {
+          const header = document.createElement('th'); header.scope = 'col'; header.id = `pf2-col-${field}`; header.textContent = label; head.appendChild(header);
+        });
+        const rows = el('pf2-variant-rows');
+        rows.replaceChildren();
+        const optionTwoGroupSize = options.length > 1 ? options[1].values.length : 1;
+        combinations.forEach((items, combinationIndex) => {
+          const key = variantKey(items);
+          if (!state.variantData.has(key)) {
+            const parentKey = items.length > 1 ? variantKey(items.slice(0,-1)) : '';
+            const parentData = parentKey ? state.variantData.get(parentKey) : null;
+            state.variantData.set(key, parentData ? { ...parentData } : { price:'', stock:'', sku:'' });
+          }
+          const data = state.variantData.get(key);
+          const row = document.createElement('tr');
+          const groupHeaderId = `pf2-group-${items[0].value.id}`;
+          const rowHeaderId = items.length > 1 ? `pf2-row-${combinationIndex}` : groupHeaderId;
+          items.forEach((item, itemIndex) => {
+            if (itemIndex === 0 && options.length > 1 && combinationIndex % optionTwoGroupSize !== 0) return;
+            const optionCell = document.createElement('th');
+            optionCell.className = 'pf-variant-name pf-variant-option';
+            if (itemIndex === 0 && options.length > 1) {
+              optionCell.classList.add('pf-variant-group-cell');
+              optionCell.id = groupHeaderId;
+              optionCell.scope = 'rowgroup';
+              optionCell.setAttribute('headers', `pf2-col-${item.optionId}`);
+              optionCell.rowSpan = optionTwoGroupSize;
+              optionCell.appendChild(createOptionImageControl(options[0], item.value));
+            } else {
+              optionCell.scope = 'row';
+              optionCell.id = rowHeaderId;
+              optionCell.setAttribute('headers', `${itemIndex > 0 ? groupHeaderId + ' ' : ''}pf2-col-${item.optionId}`);
+              if (itemIndex === 0) optionCell.appendChild(createOptionImageControl(options[0], item.value));
+              else optionCell.textContent = item.value.label;
+            }
+            row.appendChild(optionCell);
+          });
+          [['price','number','0.00'], ['stock','number','0'], ['sku','text','SKU-001']].forEach(([field,type,placeholder]) => {
+            const cell = document.createElement('td');
+            cell.setAttribute('headers', `${groupHeaderId}${items.length > 1 ? ' ' + rowHeaderId : ''} pf2-col-${field}`);
+            const input = document.createElement('input'); input.type = type; input.placeholder = placeholder; input.value = data[field]; input.required = true; input.setAttribute('aria-label', `${items.map((item) => item.value.label).join(' - ')} ${field}`);
+            if (type === 'number') { input.min = '0'; input.step = field === 'price' ? '0.01' : '1'; }
+            input.addEventListener('input', () => { data[field] = input.value; });
+            cell.appendChild(input); row.appendChild(cell);
+          });
+          rows.appendChild(row);
+        });
+        const incompleteNextOption = state.options.length > options.length;
+        const nextOption = incompleteNextOption ? state.options[options.length] : null;
+        const duplicateNextName = nextOption && normalizeTag(nextOption.name) && options.some((option) => normalizeTag(option.name).toLowerCase() === normalizeTag(nextOption.name).toLowerCase());
+        el('pf2-variant-summary').textContent = overLimit
+          ? `${combinations.length} current variants kept visible · Reduce ${requestedTotal} combinations to ${MAX_VARIANTS} or fewer`
+          : `${combinations.length} variant${combinations.length === 1 ? '' : 's'} generated automatically${duplicateNextName ? ` · Option ${options.length + 1} needs a unique name` : incompleteNextOption ? ` · Complete Option ${options.length + 1} to expand the matrix` : ''}`;
+        updateBulkButtonState();
+      }
+
+      function updateBulkButtonState() {
+        const inputs = [el('pf2-bulk-price'), el('pf2-bulk-stock'), el('pf2-bulk-sku')];
+        const requestedOptions = renderableOptions();
+        const matrixReady = requestedOptions.length > 0 && combinationCount(requestedOptions) <= MAX_VARIANTS;
+        const hasValue = inputs.some((input) => input.value.trim() !== '');
+        const valuesValid = inputs.every((input) => !input.value.trim() || input.checkValidity());
+        el('pf2-apply-all').disabled = !matrixReady || !hasValue || !valuesValid;
+      }
+
+      function applyBulkValues() {
+        const inputs = [el('pf2-bulk-price'), el('pf2-bulk-stock'), el('pf2-bulk-sku')];
+        const invalidInput = inputs.find((input) => input.value.trim() && !input.checkValidity());
+        if (invalidInput) { invalidInput.reportValidity(); return; }
+        const bulk = { price:inputs[0].value, stock:inputs[1].value, sku:inputs[2].value.trim() };
+        if (!bulk.price && !bulk.stock && !bulk.sku) return;
+        const requestedOptions = renderableOptions();
+        if (!requestedOptions.length || combinationCount(requestedOptions) > MAX_VARIANTS) { renderVariants(); return; }
+        const options = matrixOptions();
+        const combinations = cartesian(options.map((option) => option.values.map((value) => ({ optionId:option.id, optionName:normalizeTag(option.name), value }))));
+        combinations.forEach((items, index) => {
+          const key = variantKey(items);
+          if (!state.variantData.has(key)) state.variantData.set(key, { price:'', stock:'', sku:'' });
+          const data = state.variantData.get(key);
+          if (bulk.price) data.price = bulk.price;
+          if (bulk.stock) data.stock = bulk.stock;
+          if (bulk.sku) data.sku = combinations.length > 1 ? `${bulk.sku}-${String(index + 1).padStart(3,'0')}` : bulk.sku;
+        });
+        renderVariants();
+        el('pf2-variant-summary').textContent = `Bulk values applied to ${combinations.length} variants`;
+      }
+
+      function serializeVariants() {
+        if (!el('pf2-variants-toggle').checked) return [];
+        const options = validOptions();
+        if (!options.length || combinationCount(options) > MAX_VARIANTS) return [];
+        return cartesian(options.map((option) => option.values.map((value) => ({ optionId:option.id, optionName:normalizeTag(option.name), value })))).map((items) => {
+          const data = state.variantData.get(variantKey(items)) || { price:'', stock:'', sku:'' };
+          return { options:items.map((item) => ({ optionId:item.optionId, valueId:item.value.id, name:item.optionName, value:item.value.label })), ...data };
+        });
+      }
+
+      function serializeOptionImages() {
+        if (!el('pf2-variants-toggle').checked) return [];
+        const firstOption = validOptions()[0];
+        if (!firstOption) return [];
+        return firstOption.values.flatMap((value) => {
+          const image = state.option1Images.get(value.id);
+          return image?.name ? [{ optionId:firstOption.id, valueId:value.id, value:value.label, fieldName:`optionImageFiles[${value.id}]`, fileName:image.name, type:image.type, size:image.size }] : [];
+        });
+      }
+
+      function syncOptionImageInputs(enabled) {
+        const activeValueIds = new Set(enabled && state.options[0] ? state.options[0].values.map((value) => value.id) : []);
+        state.option1Images.forEach((image, valueId) => {
+          if (image.fileInput) image.fileInput.disabled = !activeValueIds.has(valueId);
+        });
+      }
+
+      function syncVariantFormControls(enabled) {
+        root.querySelectorAll('#pf2-tiers input').forEach((input) => { input.disabled = !enabled; });
+        syncOptionImageInputs(enabled && optionsAreComplete() && combinationCount(validOptions()) <= MAX_VARIANTS);
+        if (enabled) updateBulkButtonState();
+      }
+
+      name.addEventListener('input', () => { validateProductName(); if (!state.slugTouched) slug.value = slugify(name.value); updateUrl(); updateStrength(); });
+      slugTrigger.addEventListener('click', () => {
+        if (slugPopover.classList.contains('pf-hidden')) openSlugPopover();
+        else closeSlugPopover(true, true);
+      });
+      slugEditor.addEventListener('input', () => { slugEditor.value = slugify(slugEditor.value); slugError.textContent = ''; updateSlugApplyState(); });
+      slugEditor.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applySlugDraft(); } });
+      el('pf2-slug-cancel').addEventListener('click', () => closeSlugPopover(true, true));
+      slugApply.addEventListener('click', applySlugDraft);
+      el('pf2-slug-auto').addEventListener('click', () => {
+        const generatedSlug = slugify(name.value);
+        if (!generatedSlug) { slugError.textContent = 'Enter a product name first.'; name.focus(); return; }
+        slug.value = generatedSlug;
+        state.slugTouched = false;
+        slugEditor.value = slug.value;
+        updateUrl();
+        closeSlugPopover(true, false);
+      });
+      window.addEventListener('scroll', () => window.requestAnimationFrame(positionSlugPopover), { passive:true });
+      window.addEventListener('resize', () => window.requestAnimationFrame(positionSlugPopover));
+      window.visualViewport?.addEventListener('scroll', () => window.requestAnimationFrame(positionSlugPopover), { passive:true });
+      window.visualViewport?.addEventListener('resize', () => window.requestAnimationFrame(positionSlugPopover));
+      description.addEventListener('input', updateStrength);
+      Object.values(nums).forEach((input) => input.addEventListener('input', updateStrength));
+      el('pf2-ai-description').addEventListener('click', () => { description.value = 'Crafted for reliable everyday use, this product combines thoughtful details, durable materials, and a clean finish. Add sizing, care instructions, key benefits, and use cases to help customers make a confident purchase.'; updateStrength(); });
+      el('pf2-variants-toggle').addEventListener('change', (event) => {
+        el('pf2-master').classList.toggle('pf-hidden', event.target.checked);
+        el('pf2-tiers').classList.toggle('pf-hidden', !event.target.checked);
+        if (event.target.checked) { renderOptions(); renderVariants(); }
+        syncVariantFormControls(event.target.checked);
+      });
+      el('pf2-add-option').addEventListener('click', () => {
+        if (state.options.length >= MAX_OPTIONS) return;
+        state.options.push(state.removedOptions.pop() || { id:`option-${state.nextOptionId++}`, name:'', values:[] });
+        renderOptions(); renderVariants();
+        el('pf2-option-list').lastElementChild?.querySelector('input')?.focus();
+      });
+      el('pf2-apply-all').addEventListener('click', applyBulkValues);
+      [el('pf2-bulk-price'), el('pf2-bulk-stock'), el('pf2-bulk-sku')].forEach((input) => input.addEventListener('input', updateBulkButtonState));
+      const categoryDialog = el('pf2-category-dialog');
+      el('pf2-category-trigger').addEventListener('click', () => { el('pf2-category-trigger').setAttribute('aria-expanded','true'); categoryDialog.showModal(); });
+      const closeCategoryDialog = () => { categoryDialog.close(); el('pf2-category-trigger').setAttribute('aria-expanded','false'); };
+      el('pf2-category-close').addEventListener('click', closeCategoryDialog);
+      el('pf2-category-cancel').addEventListener('click', closeCategoryDialog);
+      root.querySelectorAll('.pf-category-option[data-path]').forEach((button) => button.addEventListener('click', () => {
+        const column = button.closest('.pf-category-column');
+        column.querySelectorAll('.pf-category-option').forEach((item) => item.classList.remove('is-selected'));
+        button.classList.add('is-selected');
+        state.pendingCategory = button.dataset.path;
+        el('pf2-category-selected').textContent = state.pendingCategory;
+      }));
+      el('pf2-category-confirm').addEventListener('click', () => {
+        state.category = state.pendingCategory;
+        el('pf2-category-label').textContent = state.category;
+        closeCategoryDialog();
+        updateStrength();
+      });
+      el('pf2-category-search').addEventListener('input', (event) => {
+        const query = event.target.value.trim().toLowerCase();
+        root.querySelectorAll('.pf-category-option[data-path]').forEach((button) => { button.hidden = Boolean(query) && !button.textContent.toLowerCase().includes(query); });
+      });
+      el('pf2-status').addEventListener('change', (event) => { const active = event.target.value === 'active'; el('pf2-status-note').textContent = active ? 'Active products publish to the storefront after validation.' : 'Draft products are hidden from the storefront.'; el('pf2-submit').textContent = active ? 'Publish Product' : 'Save Draft'; });
+      el('pf2-ai-seo').addEventListener('click', () => { el('pf2-meta-title').value = `${name.value || 'Product'} | Your Store`.slice(0,70); el('pf2-meta-description').value = `Discover ${name.value || 'this product'} with clear pricing, shipping details, and helpful product information.`.slice(0,160); });
+      el('pf2-add-attribute').addEventListener('click', () => { if (state.attributes >= 20) return; state.attributes += 1; const row = document.createElement('div'); row.className = 'pf-attribute-row'; row.innerHTML = '<input type="text" placeholder="Attribute name"><input type="text" placeholder="Value"><button class="pf-trash" type="button" aria-label="Remove attribute">⌫</button>'; row.querySelector('button').addEventListener('click', () => { row.remove(); state.attributes -= 1; el('pf2-attr-count').textContent = `${state.attributes} / 20`; }); el('pf2-attributes').appendChild(row); el('pf2-attr-count').textContent = `${state.attributes} / 20`; });
+      el('pf2-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!validateProductName()) {
+          name.reportValidity();
+          name.focus();
+          return;
+        }
+        if (!slug.value) {
+          if (slugPopover.classList.contains('pf-hidden')) openSlugPopover();
+          slugError.textContent = 'Enter a URL slug.';
+          slugEditor.focus();
+          return;
+        }
+        if (el('pf2-variants-toggle').checked) {
+          const options = validOptions();
+          const total = options.length ? combinationCount(options) : 0;
+          if (!options.length || total > MAX_VARIANTS) {
+            renderVariants();
+            root.querySelector('#pf2-option-list input:invalid, #pf2-option-list input')?.focus();
+            return;
+          }
+        }
+        el('pf2-variants-payload').value = JSON.stringify(serializeVariants());
+        el('pf2-option-images-payload').value = JSON.stringify(serializeOptionImages());
+      });
+      window.addEventListener('pagehide', (event) => {
+        if (event.persisted) return;
+        state.option1Images.forEach((image) => { if (image.previewUrl) URL.revokeObjectURL(image.previewUrl); });
+      });
+      renderMedia(); renderOptions(); renderVariants(); syncVariantFormControls(el('pf2-variants-toggle').checked); validateProductName(); updateUrl(); updateStrength();
+    })();
+  </script>
+</div>
+</body>
+</html>

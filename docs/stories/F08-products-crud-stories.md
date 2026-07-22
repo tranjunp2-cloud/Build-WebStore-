@@ -17,18 +17,6 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
-## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
-
-> **Áp dụng cho mọi User Story trong file này.**
-
-```gherkin
-GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
-THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
-  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
-```
-
----
-
 ## US-F08-01: Products CRUD + Trạng thái Sản phẩm (Active/Draft)
 
 **Wave 4** | **P0** | **L** | **Status:** Ready
@@ -43,15 +31,48 @@ So that sản phẩm có mô tả đẹp mà không mất thời gian tự viế
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Mở Form Thêm Sản Phẩm
+#### AC-1.1: Happy Path — Mở Form Thêm Sản Phẩm
 
 ```gherkin
 GIVEN user ở /products
 WHEN  click "Thêm sản phẩm"
-THEN  form hiện: tên, giá thực bán (Price), giá khuyến mãi (Compare at Price), category, thông số đóng gói (Cân nặng, DxCxh), mô tả, ảnh (max 5, chuẩn <=5MB), tồn kho (Stock) và SKU.
+THEN  desktop editor hiển thị layout 70/30 và mobile hiển thị một cột
+  AND có 4 sticky tabs: "Basic Info", "Pricing & Stock", "Shipping & Delivery", "More Information"
+  AND main content có Media trước, tên + compact editable slug preview, category, plain description textarea + counter/AI, pricing/stock, 4 shipping fields, specifications và SEO
+  AND sidebar chỉ có Content Strength (5 advisory rules) và Status
+  AND fixed bottom actions luôn truy cập được và không che field cuối
+  AND redesign giữ nguyên production caps hiện hành cho media/data, không tự đặt cap mới.
 ```
 
-#### AC-1.1: View Product List Empty State (Shared Component)
+#### AC-1.2: Slug Auto-until-manual, Media ALT và Content Strength
+
+```gherkin
+GIVEN user chưa từng sửa slug thủ công
+WHEN  user thay đổi Product Name
+THEN  compact slug preview tự cập nhật theo Product Name.
+GIVEN user đã sửa slug thủ công ít nhất một lần
+WHEN  user tiếp tục thay đổi Product Name
+THEN  slug thủ công không bị tự động overwrite
+  AND format/unique validation hiện hành vẫn áp dụng.
+GIVEN user mở chi tiết một ảnh trong Media
+THEN  ALT text hiển thị theo disclosure và giới hạn 125 ký tự.
+GIVEN Content Strength đánh giá đúng 5 rule bằng nhau: ít nhất 3 ảnh; Product Name sau trim dài 25–100 ký tự; Description sau trim dài ít nhất 100 ký tự; đã chọn Category; và Weight, Length, Width, Height đều là số hữu hạn lớn hơn 0
+THEN  cả 5 rule chỉ mang tính advisory
+  AND không rule nào tự chặn Save hoặc Publish ngoài validation/publish gate production hiện hành.
+```
+
+#### AC-1.3: Description, Shipping và More Information
+
+```gherkin
+GIVEN user nhập nội dung sản phẩm
+THEN  Description là plain textarea có character counter và AI action, không phải rich-text editor.
+WHEN  user mở tab "Shipping & Delivery"
+THEN  hiển thị đúng 4 field Weight, Length, Width, Height.
+WHEN  user mở tab "More Information"
+THEN  hiển thị Specifications và SEO.
+```
+
+#### AC-1.4: View Product List Empty State (Shared Component)
 
 ```gherkin
 GIVEN user ở /products
@@ -86,6 +107,7 @@ THEN  sản phẩm được tạo thành công vào Database
 GIVEN user điền tên sản phẩm
 WHEN  click "✨ AI Viết Description"
 THEN  AI generate description dựa trên tên + ngành
+  AND kết quả được chèn vào plain textarea có character counter
   AND user có thể Accept hoặc chỉnh sửa trước khi save
 ```
 
@@ -164,6 +186,19 @@ THEN  một bảng (Matrix) tự động sinh ra hiển thị 4 dòng liên đ�
   AND ở mỗi dòng con hiển thị các ô Input trống để nhập: [SKU Hàng hoá], [Giá Bán], [Tồn kho hiện tại].
 ```
 
+#### AC-2.1: Reactive Cartesian Matrix và Stable Row Retention
+
+```gherkin
+GIVEN product có tối đa 2 option groups và mỗi group có thể có nhiều hơn 2 values
+WHEN  user thêm, sửa hoặc xoá option value
+THEN  matrix phản ứng và sinh Cartesian product của các values hiện có
+  AND dữ liệu SKU/price/stock của row có identity còn tồn tại được giữ ổn định
+  AND chỉ row không còn combination tương ứng bị loại bỏ
+  AND rows được nhóm theo option 1
+  AND user có thể gán image cho từng option 1 và bulk apply các field được hỗ trợ
+  AND hệ thống không áp đặt max values hoặc max rows mới, mà giữ production caps hiện hành.
+```
+
 #### AC-3: Quản lý Out-Of-Stock cho riêng từng SKU
 ```gherkin
 GIVEN một sản phẩm có nhiều cấu hình (Variants) đang được mở bán ngoài Storefront
@@ -202,6 +237,17 @@ THEN  hệ thống chờ 1 chút (trạng thái Loading)
       - [Meta Title SEO]: "Váy công sở nữ mùa hè - Kiểu dáng Hàn Quốc hiện đại | (Tên Store)"
       - [Meta Description]: "Mua ngay Váy công sở nữ..." (khoảng 150 ký tự)
       - [Friendly URL Slug]: "vay-cong-so-nu-mua-he"
+```
+
+#### AC-1.1: Compact Slug Preview
+
+```gherkin
+GIVEN slug preview nằm ngay dưới Product Name
+WHEN  user chưa chỉnh slug thủ công
+THEN  slug tự đồng bộ từ Product Name.
+WHEN  user chỉnh slug thủ công
+THEN  các lần đổi Product Name sau không overwrite slug
+  AND AI chỉ thay slug khi user chủ động chạy lại SEO action và chấp nhận kết quả.
 ```
 
 #### AC-2: Tùy biến chỉnh sửa thủ công
@@ -297,8 +343,11 @@ THEN  hệ thống chấp nhận "Áo Sơ Mi" là Level 3.
 ```gherkin
 GIVEN user đang ở trang Thêm/Sửa Sản Phẩm
 WHEN  user mở phần Tổ chức (Organization)
-THEN  có dropdown Tree-select hiển thị cây danh mục
-  AND user phải chọn đúng 1 danh mục (single-select) cho sản phẩm đó.
+THEN  mở searchable picker với ba cột hierarchy hiển thị đồng thời L1 → L2 → L3
+  AND chỉ leaf node có thể được chọn
+  AND hiển thị selected breadcrumb cùng hai action Cancel và Confirm
+  AND user phải chọn đúng 1 leaf category (single-select) cho sản phẩm đó
+  AND wording chính xác cho parent disabled và trạng thái chưa có leaf đang pending explicit product/design approval; không tự suy diễn microcopy hoặc schema change.
 ```
 
 #### AC-3: Delete Category với Data Integrity Checks
@@ -408,7 +457,25 @@ THEN  it does NOT use a scrollable horizontal table
   AND Low Stock/Out of Stock alerts are displayed as a prominent red badge on the card
 ```
 
-#### AC-2: Variant Matrix Accordion
+#### AC-2: Responsive Product Editor Navigation
+
+```gherkin
+GIVEN user mở product editor trên desktop
+THEN  form dùng tỷ lệ main/sidebar 70/30
+  AND sidebar chỉ có Content Strength và Status.
+GIVEN user mở product editor trên màn hình nhỏ
+THEN  nội dung xếp một cột, không gây horizontal scrolling
+  AND 4 tab navigation giữ sticky, còn bottom actions được fixed ở đáy viewport với safe padding phù hợp
+  AND thứ tự nội dung vẫn là Basic Info, Pricing & Stock, Shipping & Delivery, More Information.
+```
+
+### Prototype/Data Contract Note
+
+- Các AC responsive/editor ở trên mô tả presentation và interaction redesign, không tự động thay đổi Payload schema, API contract, required fields hay publish gate hiện hành.
+- Content Strength là advisory-only; Status và quyền Publish tiếp tục theo production behavior.
+- Không đưa ra giới hạn mới cho số option values hay Cartesian rows; preserve production caps hiện hành.
+
+#### AC-3: Variant Matrix Accordion
 
 ```gherkin
 GIVEN the user is adding/editing variants on mobile
@@ -422,6 +489,3 @@ THEN  the wide matrix table is transformed into a vertical Accordion list
 
 - [ ] 9-Point Checklist pass.
 - [ ] Ensure that deeply nested inputs (like 3-level categories or variant inputs) do not cause horizontal scrolling on 320px screens.
-
-
-
