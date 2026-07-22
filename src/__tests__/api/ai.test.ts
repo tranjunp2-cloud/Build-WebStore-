@@ -11,7 +11,6 @@ import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
-import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -133,11 +132,6 @@ vi.mock('payload', () => {
         })
     }
 })
-
-vi.mock('@/lib/payload/tenant-row-lock', () => ({
-    withTenantRowLock: vi.fn(async (_payload, _tenantId, operation) =>
-        operation({ transactionID: 'test-generation-swap' })),
-}))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -871,7 +865,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.at(-1)?.generationStatus).toBe('failed')
         })
 
-        it('[TC-GENPERF-W3-25] regeneration keeps the previous pages when a late barrier fails', async () => {
+        it('[TC-GENPERF-W3-25] regeneration clears replacement pages and remains retryable when a late barrier fails', async () => {
              const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
@@ -907,16 +901,15 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(500)
-             expect(mockSiteDB[0]?.generationStatus).toBe('completed')
-             expect(mockPageDB.map(page => page.id)).toEqual([
-                 'old-home', 'old-about', 'old-products', 'old-blog', 'old-contact', 'old-404',
-             ])
+             expect(mockSiteDB[0]?.generationStatus).toBe('failed')
+             expect(mockPageDB).toHaveLength(0)
              const deletedIds = vi.mocked(payload.delete).mock.calls.map(([arg]) => arg.id)
-             expect(deletedIds).not.toContain('old-home')
+             expect(deletedIds).toContain('old-home')
+             expect(deletedIds).toContain('old-404')
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
         })
 
-        it('[TC-GENPERF-W3-26] regeneration swaps staged pages only after all barriers pass', async () => {
+        it('[TC-GENPERF-W3-26] regeneration replaces old pages directly with canonical pages', async () => {
              const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
@@ -948,16 +941,14 @@ describe('AI Streaming APIs', () => {
              )
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
              expect(mockPageDB.some(page => page.id === 'old-home')).toBe(false)
-             expect(mockPageDB.some(page => page.id === 'old-404')).toBe(true)
+             expect(mockPageDB.some(page => page.id === 'old-404')).toBe(false)
 
-             const promotionUpdates = vi.mocked(payload.update).mock.calls.filter(
-                 ([arg]) => arg.collection === 'pages' && typeof arg.data?.slug === 'string',
+             const generatedPageCreates = vi.mocked(payload.create).mock.calls.filter(
+                 ([arg]) => arg.collection === 'pages' && arg.data?.slug !== '404',
              )
-             expect(promotionUpdates).toHaveLength(5)
-             for (const [arg] of promotionUpdates) {
-                 expect(Array.isArray(arg.data?.layout)).toBe(true)
-                 expect(arg.data?.layout).toEqual(stripArrayItemIds(arg.data?.layout))
-             }
+             expect(generatedPageCreates).toHaveLength(5)
+             expect(generatedPageCreates.some(([arg]) => arg.data?.slug === '/' && arg.data?.isHomepage === true)).toBe(true)
+             expect(generatedPageCreates.every(([arg]) => !String(arg.data?.slug).startsWith('generation-'))).toBe(true)
         })
 
         it('[TC-GENPERF-W3-29] regeneration preserves an existing catalog without recreating deterministic SKUs', async () => {
@@ -1037,7 +1028,7 @@ describe('AI Streaming APIs', () => {
              )
         })
 
-        it('[TC-GENPERF-W3-31] restores the previous site status when the old-page read fails', async () => {
+        it('[TC-GENPERF-W3-31] marks regeneration failed when the old-page read fails', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalFind = vi.mocked(payload.find).getMockImplementation()!
              mockSiteDB = [{
@@ -1060,7 +1051,7 @@ describe('AI Streaming APIs', () => {
                  }))
 
                  expect(res.status).toBe(500)
-                 expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+                 expect(mockSiteDB[0]?.generationStatus).toBe('failed')
              } finally {
                  vi.mocked(payload.find).mockImplementation(originalFind)
              }

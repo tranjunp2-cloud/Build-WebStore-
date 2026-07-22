@@ -56,7 +56,6 @@ import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
-import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -124,7 +123,6 @@ export async function POST(req: NextRequest) {
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
     let _generationCommitted = false
-    let _previousGenerationStatus: string | null = null
     const _createdPageIds: Array<string | number> = []
     const _createdProductIds: Array<string | number> = []
     const _createdBlogIds: Array<string | number> = []
@@ -133,7 +131,7 @@ export async function POST(req: NextRequest) {
         if (_generationCommitted || !_payload || !_site?.id) return
 
         // These rows belong exclusively to this request, so failed generations
-        // must not leave staged pages or sample content attached to the live site.
+        // must not leave replacement pages or sample content attached to the site.
         for (const [collection, ids] of [
             ['pages', _createdPageIds],
             ['products', _createdProductIds],
@@ -147,7 +145,7 @@ export async function POST(req: NextRequest) {
         await _payload.update({
             collection: 'sites',
             id: _site.id as string | number,
-            data: { generationStatus: _previousGenerationStatus ?? 'failed' },
+            data: { generationStatus: 'failed' },
         }).catch((_e: unknown) => console.error('[AI Generate] Failed to recover generation status:', _e))
     }
 
@@ -958,16 +956,6 @@ export async function POST(req: NextRequest) {
         const existingSites = await existingSitesPromise
 
         let site: Record<string, unknown>
-        let stagedPageSwap: null | {
-            oldPageIds: Array<string | number>
-            pages: Array<{
-                id: string | number
-                slug: string
-                isHomepage: boolean
-                layout: Record<string, unknown>[]
-            }>
-        } = null
-
         // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
         const resolvedTheme = resolveTheme(result.theme)
 
@@ -1017,38 +1005,30 @@ export async function POST(req: NextRequest) {
 
         if (existingSites.docs.length > 0) {
             const previousSite = existingSites.docs[0] as Record<string, unknown>
-            _previousGenerationStatus = typeof previousSite.generationStatus === 'string'
-                ? previousSite.generationStatus
-                : 'completed'
-            // Recovery needs the stable existing ID before any status write or
-            // old-page read can fail.
             _site = previousSite
-            // Keep the current site metadata and pages live until all new
-            // content passes the completion barriers. Only status is exposed.
             site = await payload.update({
                 collection: 'sites',
                 id: previousSite.id as string | number,
-                data: { generationStatus: 'generating' },
+                data: {
+                    ...siteGenerationData,
+                    generationStatus: 'generating',
+                },
             })
             _site = site
 
-            // Keep old pages untouched while the replacement is built under
-            // temporary slugs. The final delete+rename is one short transaction.
+            // Regeneration replaces page content immediately. If a later phase
+            // fails, request-created rows are cleaned up and the site remains
+            // failed so the user can generate again from scratch.
             const oldPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: site.id } },
                 limit: 100,
                 depth: 0,
                 pagination: false,
-                select: { id: true, slug: true },
+                select: { id: true },
             })
-            stagedPageSwap = {
-                // Preserve the existing system 404 page; generated content pages
-                // are replaced exactly as before.
-                oldPageIds: oldPages.docs
-                    .filter((page) => String((page as { slug?: unknown }).slug ?? '') !== '404')
-                    .map((page) => page.id as string | number),
-                pages: [],
+            for (const oldPage of oldPages.docs) {
+                await payload.delete({ collection: 'pages', id: oldPage.id })
             }
         } else {
             // CREATE new site (first time)
@@ -1242,11 +1222,6 @@ export async function POST(req: NextRequest) {
                     businessInfo.businessName,
                   )
                 : sanitizedLayout
-            const persistenceSlug = stagedPageSwap
-                ? `generation-${generationRequestId.slice(0, 12)}-${slugify(String(pageDefinition.slug)) || 'home'}`
-                : pageDefinition.slug
-            const persistenceIsHomepage = stagedPageSwap ? false : pageDefinition.isHomepage
-
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
             // violation, block validation, stale _parent_id from drizzle
             // transaction race) does NOT abort the entire generation. If
@@ -1265,9 +1240,9 @@ export async function POST(req: NextRequest) {
                                 collection: 'pages',
                                 data: {
                                     title: pageDefinition.title,
-                                    slug: persistenceSlug,
+                                    slug: pageDefinition.slug,
                                     site: site.id,
-                                    isHomepage: persistenceIsHomepage,
+                                    isHomepage: pageDefinition.isHomepage,
                                     _status: 'published',
                                     layout: normalizedLayout,
                                     seo: pageDefinition.seo,
@@ -1325,9 +1300,9 @@ export async function POST(req: NextRequest) {
                         collection: 'pages',
                         data: {
                             title: pageDefinition.title,
-                            slug: persistenceSlug,
+                            slug: pageDefinition.slug,
                             site: site.id,
-                            isHomepage: persistenceIsHomepage,
+                            isHomepage: pageDefinition.isHomepage,
                             _status: 'published',
                             layout: normalizedLayout,
                             seo: pageDefinition.seo,
@@ -1338,23 +1313,6 @@ export async function POST(req: NextRequest) {
                     blockImageStats.failed += droppedImageRefs
                 }
                 _createdPageIds.push(createdPage.id as string | number)
-                if (stagedPageSwap) {
-                    stagedPageSwap.pages.push({
-                        id: createdPage.id as string | number,
-                        slug: pageDefinition.slug,
-                        isHomepage: pageDefinition.isHomepage,
-                        layout: Array.isArray(normalizedLayout)
-                            ? normalizedLayout as Record<string, unknown>[]
-                            : [],
-                    })
-                    // Downstream navigation/completion logic must reason about
-                    // canonical pages, not their temporary persistence slugs.
-                    createdPage = {
-                        ...createdPage,
-                        slug: pageDefinition.slug,
-                        isHomepage: pageDefinition.isHomepage,
-                    }
-                }
                 createdPages.push(createdPage)
                 _createdPagesCount++
             } catch (pageErr) {
@@ -1449,10 +1407,6 @@ export async function POST(req: NextRequest) {
                             id: createdPage.id as string | number,
                             data: { layout: cleanedPatchedLayout },
                         })
-                        const stagedPage = stagedPageSwap?.pages.find(
-                            page => page.id === createdPage.id,
-                        )
-                        if (stagedPage) stagedPage.layout = cleanedPatchedLayout
                     } catch (syncErr) {
                         console.warn(
                             '[generate-site] layout-sync patch failed page=%s: %s',
@@ -1784,53 +1738,18 @@ export async function POST(req: NextRequest) {
         }
 
         // Completion barrier: required pages, products, and inline-ready blogs
-        // have settled before the site becomes observable as completed. For a
-        // regeneration, delete old pages + promote staged pages + publish the
-        // new site metadata atomically so a failed swap leaves the old site live.
+        // have settled before the site becomes observable as completed.
         const completionData = {
             ...siteGenerationData,
             generationStatus: 'completed' as const,
             ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
             ...cartPatch,
         }
-        await trackPhase('site_complete', () => stagedPageSwap
-            ? withTenantRowLock(payload, resolvedTenantId, async (transactionReq) => {
-                for (const oldPageId of stagedPageSwap.oldPageIds) {
-                    await payload.delete({ collection: 'pages', id: oldPageId, req: transactionReq })
-                }
-                for (const stagedPage of stagedPageSwap.pages) {
-                    await payload.update({
-                        collection: 'pages',
-                        id: stagedPage.id,
-                        data: {
-                            slug: stagedPage.slug,
-                            isHomepage: stagedPage.isHomepage,
-                            // Payload 3.79 merges the stored document during a
-                            // partial update. Array-row IDs from that stored layout
-                            // are not valid input fields and trigger
-                            // "The following field is invalid: id". Supplying the
-                            // sanitized layout avoids merging those managed IDs.
-                            layout: normalizeBlocksForPersistence(
-                                stripArrayItemIds(stagedPage.layout) as Record<string, unknown>[],
-                            ),
-                        },
-                        req: transactionReq,
-                    })
-                }
-                await payload.update({
-                    collection: 'sites',
-                    id: site.id as string | number,
-                    data: completionData,
-                    req: transactionReq,
-                })
-            })
-            : (async () => {
-                await payload.update({
-                    collection: 'sites',
-                    id: site.id as string | number,
-                    data: completionData,
-                })
-            })())
+        await trackPhase('site_complete', () => payload.update({
+            collection: 'sites',
+            id: site.id as string | number,
+            data: completionData,
+        }))
         _generationCommitted = true
 
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
