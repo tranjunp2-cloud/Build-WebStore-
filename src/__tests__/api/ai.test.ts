@@ -1021,6 +1021,9 @@ describe('AI Streaming APIs', () => {
              }))
 
              expect(res.status).toBe(200)
+             expect(vi.mocked(prepareBlogPosts)).toHaveBeenCalledWith(
+                 expect.objectContaining({ tenantId: 'tenant-1', siteId: 'site-existing' }),
+             )
              expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledWith(
                  expect.anything(),
                  expect.arrayContaining([expect.objectContaining({ slug: 'second' }), expect.objectContaining({ slug: 'third' })]),

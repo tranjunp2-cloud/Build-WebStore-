@@ -126,8 +126,8 @@ export type PreparedBlogPost = {
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
  * insert all 3 posts BEFORE the `done` event; also reused by the fallback
  * `seedBlogPosts` path.
- * Returns [] when the tenant already has posts (regenerate — nothing to
- * seed), null when preparation failed entirely. Never throws.
+ * Returns [] when the current site already has three complete posts, null
+ * when preparation failed entirely. Never throws.
  */
 export async function prepareBlogPosts(opts: {
     payload: BasePayload
@@ -137,19 +137,32 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
+    /** Existing site being regenerated. Only complete posts for this site
+     *  count toward the three-post target. */
+    siteId?: number | string
     /** Settles when the request's other Pixabay consumers (image pool,
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
     pixabayGate?: Promise<unknown>
 }): Promise<PreparedBlogPost[] | null> {
-    const { payload, tenantId, category, businessName, products, industry, seed } = opts
+    const { payload, tenantId, category, businessName, products, industry, seed, siteId } = opts
     try {
-        const existing = await payload.count({
-            collection: 'blogs',
-            where: { tenant: { equals: tenantId } },
-        })
-        if (existing.totalDocs > 0) return []
-        const targetCount = 3
+        let targetCount = 3
+        if (siteId !== undefined) {
+            const existing = await payload.count({
+                collection: 'blogs',
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { site: { equals: siteId } },
+                        { content: { exists: true } },
+                        { thumbnail: { exists: true } },
+                    ],
+                },
+            })
+            targetCount = Math.max(0, 3 - existing.totalDocs)
+            if (targetCount === 0) return []
+        }
 
         let seeds: AnyBlogSeed[] = []
         try {
@@ -287,7 +300,7 @@ export async function seedBlogPosts(
     seed?: number,
 ): Promise<number> {
     const prepared = await prepareBlogPosts({
-        payload, tenantId, category, businessName, products, industry, seed,
+        payload, tenantId, siteId, category, businessName, products, industry, seed,
     })
     if (!prepared || prepared.length === 0) return 0
     return persistBlogPosts(payload, prepared, tenantId, siteId, userId)
