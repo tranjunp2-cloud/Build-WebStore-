@@ -1,6 +1,6 @@
 ---
 owner: QC
-last_updated: 2026-07-06
+last_updated: 2026-07-21
 ---
 
 # JMeter QC Test Environment
@@ -71,6 +71,35 @@ telemetry retain leaks longer than account lifetime.
 Tenants seeded: 5 tenants covering subscription-status variety
 `active / active / trialing / past_due / suspended` for state-transition
 tests.
+
+### Dashboard-ready seed invariant
+
+`qc-owner-*` accounts are load-test fixtures, so a fresh `qc:reset` +
+`qc:seed` must leave them ready to open `/dashboard` directly:
+
+| TC ID | Verification |
+|-------|--------------|
+| `TC-GH1432-QC-01` | Owner has `has_seen_ai_wizard=true`, tenant has `onboardingCompleted=true`, and its site has `generationStatus=completed`. |
+
+The seed command validates this invariant before reporting success. Fixtures
+intended for onboarding must use `dashboardReady=false`; the content phase skips
+their site creation so they do not enter the contradictory "incomplete flags but
+usable site exists" state.
+
+### Product-list performance invariants
+
+| TC ID | Verification |
+|-------|--------------|
+| `TC-GH1432-PERF-01` | Dashboard product list uses an explicit field allowlist, `depth=1`, and no pagination count query. |
+| `TC-GH1432-PERF-02` | Product list and product array tables have idempotent indexes matching tenant/newest filtering and `_parent_id`/`_order` hydration. |
+
+**Required JMeter update for GH-1432:** QC must change the Products sampler from
+`/api/products?limit=20` to `/api/products?limit=20&depth=1`. The bare endpoint
+falls back to Payload's global `defaultDepth=2`, performs relationship population
+that the dashboard list does not request, and therefore does not represent the
+real Products Dashboard query. Keep `depth=1` explicit in the `.jmx` file even if
+the application's global default changes later. Add a matching `select` allowlist
+when the test plan supports the dashboard response contract.
 
 ## JMeter setup
 

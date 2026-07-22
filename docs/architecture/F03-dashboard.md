@@ -15,19 +15,14 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
 ```
 (dashboard)/layout.tsx          ← Fixed sidebar + main area
     ├── Sidebar.tsx             ← Navigation (8 items, active state)
-    ├── dashboard/page.tsx      ← Server Component (Home: Metrics & Orders)
-    │       ├── DashboardGreeting.tsx
-    │       ├── DashboardStatsView.tsx   ← 4 Customizable stat cards
-    │       ├── DashboardActionList.tsx  ← Latest Pending Orders
-    │       └── SEOHealthWidget.tsx      ← SEO quick glance
-    ├── dashboard/analytics/page.tsx ← Client/Server Component (Analytics detail)
-    │       ├── PeriodSelector.tsx
-    │       ├── DailyBarChart.tsx
-    │       └── TopPerformanceLists.tsx  ← Pages, Products, Blogs
-    └── dashboard/seo/page.tsx   ← Client Component (SEO detail & AI Fix)
-            ├── SEOScoreBreakdown.tsx
-            ├── KeywordTracker.tsx       ← Tracks top 5 keywords
-            └── AIFixAllPanel.tsx        ← SSE Streaming handler
+    └── dashboard/page.tsx      ← Server Component (single-column stream)
+            ├── DashboardToolbarHeader.tsx
+            ├── PeriodSelector.tsx
+            ├── AtAGlance.tsx
+            ├── TrafficPerformance.tsx
+            ├── SeoHealth.tsx
+            ├── SeoTools.tsx
+            └── PendingOrders.tsx
 ```
 
 ## Data Flow
@@ -35,17 +30,18 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
 ```
 page.tsx (Server Component)
   │
-  ├── getSession() → get tenantId
+  ├── getCurrentTenantId()
   │
-  ├── fetch dashboard metrics (View, Leads, Orders, Revenue) via `/api/dashboard/summary`
+  ├── getGlanceData() ──► Payload/Drizzle
+  ├── getTrafficData() ─► Payload/Drizzle
+  ├── getSeoData() ─────► Payload/Drizzle
   │
-  └── render <DashboardStatsView /> + <DashboardActionList /> + <SEOHealthWidget />
+  └── render dashboard revamp blocks
 ```
 
 ## API Contract (Next.js Route Handlers)
 
 ```typescript
-// GET /api/dashboard/summary (Overview)
 // GET /api/analytics/summary (Detail Charts & Lists)
 // POST /api/seo/analyze (Trigger API scan)
 // POST /api/seo/fix (SSE Stream cho AI Fix)

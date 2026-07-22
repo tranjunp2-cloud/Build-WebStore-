@@ -9,6 +9,7 @@
  *     (active / trialing / past_due / cancelled / suspended)
  *   - Owner ↔ tenant linkage via Users.tenants[] membership array
  *   - Per-tenant lightweight content (site + one home page)
+ *   - Dashboard-ready onboarding state for every seeded merchant owner
  *
  * Idempotent: re-running skips existing users (matched by email) and
  * tenants (matched by name). Safe for repeat runs during handover.
@@ -29,6 +30,9 @@ import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
 import { seedTenantProducts, seedTenantExtraPages } from './qc-seed-products'
 import {
+  buildQcSiteData,
+  buildQcTenantData,
+  buildQcUserData,
   buildTenants,
   buildUsers,
   readMerchantCount,
@@ -59,32 +63,39 @@ async function seedUsers(payload: Payload, users: UserSpec[], password: string):
     limit: emails.length,
     overrideAccess: true,
   })
-  const existingByEmail = new Map<string, string | number>()
+  const existingByEmail = new Map<string, typeof existingResult.docs[0]>()
   for (const doc of existingResult.docs) {
-    existingByEmail.set(doc.email as string, doc.id)
+    existingByEmail.set(doc.email as string, doc)
   }
   console.log(`  ~ ${existingByEmail.size}/${users.length} users already exist, creating ${users.length - existingByEmail.size} new`)
 
   const idsByEmail: IdMap = {}
+  const staleDashboardUserIds: Array<string | number> = []
   for (const spec of users) {
-    const existingId = existingByEmail.get(spec.email)
-    if (existingId !== undefined) {
-      idsByEmail[spec.email] = existingId
+    const existing = existingByEmail.get(spec.email)
+    if (existing !== undefined) {
+      idsByEmail[spec.email] = existing.id
+      if (spec.dashboardReady && existing.has_seen_ai_wizard !== true) {
+        staleDashboardUserIds.push(existing.id)
+      }
       continue
     }
     const created = await payload.create({
       collection: 'users',
-      data: {
-        email: spec.email,
-        password,
-        firstName: spec.firstName,
-        lastName: spec.lastName,
-        roles: spec.roles,
-      },
+      data: buildQcUserData(spec, password),
       overrideAccess: true,
     })
     idsByEmail[spec.email] = created.id
     console.log(`  + user created: ${spec.email} [${spec.roles.join(',')}]`)
+  }
+  if (staleDashboardUserIds.length) {
+    await payload.update({
+      collection: 'users',
+      where: { id: { in: staleDashboardUserIds } },
+      data: { has_seen_ai_wizard: true },
+      overrideAccess: true,
+    })
+    console.log(`  ~ ${staleDashboardUserIds.length} existing dashboard users marked wizard-complete`)
   }
   return idsByEmail
 }
@@ -99,30 +110,39 @@ async function seedTenants(payload: Payload, tenants: TenantSpec[]): Promise<IdM
     limit: names.length,
     overrideAccess: true,
   })
-  const existingByName = new Map<string, string | number>()
+  const existingByName = new Map<string, typeof existingResult.docs[0]>()
   for (const doc of existingResult.docs) {
-    existingByName.set(doc.name as string, doc.id)
+    existingByName.set(doc.name as string, doc)
   }
   console.log(`  ~ ${existingByName.size}/${tenants.length} tenants already exist, creating ${tenants.length - existingByName.size} new`)
 
   const tenantIdsByName: IdMap = {}
+  const staleDashboardTenantIds: Array<string | number> = []
   for (const spec of tenants) {
-    const existingId = existingByName.get(spec.name)
-    if (existingId !== undefined) {
-      tenantIdsByName[spec.name] = existingId
+    const existing = existingByName.get(spec.name)
+    if (existing !== undefined) {
+      tenantIdsByName[spec.name] = existing.id
+      if (spec.dashboardReady && existing.onboardingCompleted !== true) {
+        staleDashboardTenantIds.push(existing.id)
+      }
       continue
     }
     const created = await payload.create({
       collection: 'tenants',
-      data: {
-        name: spec.name,
-        slug: spec.slug,
-        status: spec.status,
-      },
+      data: buildQcTenantData(spec),
       overrideAccess: true,
     })
     tenantIdsByName[spec.name] = created.id
     console.log(`  + tenant created: ${spec.name} (status=${spec.status})`)
+  }
+  if (staleDashboardTenantIds.length) {
+    await payload.update({
+      collection: 'tenants',
+      where: { id: { in: staleDashboardTenantIds } },
+      data: { onboardingCompleted: true },
+      overrideAccess: true,
+    })
+    console.log(`  ~ ${staleDashboardTenantIds.length} existing tenants marked onboarding-complete`)
   }
   return tenantIdsByName
 }
@@ -247,12 +267,21 @@ async function seedTenantContent(
   })
   let siteId: string | number
   if (existingSites.docs.length) {
-    siteId = existingSites.docs[0].id
+    const existingSite = existingSites.docs[0]
+    siteId = existingSite.id
+    if (existingSite.generationStatus !== 'completed') {
+      await payload.update({
+        collection: 'sites',
+        id: siteId,
+        data: { generationStatus: 'completed' },
+        overrideAccess: true,
+      })
+    }
     console.log(`  ~ site exists for ${tenantName}`)
   } else {
     const site = await payload.create({
       collection: 'sites',
-      data: { name: `${tenantName} Site`, tenant: tenantId },
+      data: buildQcSiteData(tenantId, tenantName),
       overrideAccess: true,
     })
     siteId = site.id
@@ -269,6 +298,71 @@ async function seedTenantContent(
   if (productsCreated) console.log(`  + ${productsCreated} products for ${tenantName}`)
   if (extraPagesCreated) console.log(`  + ${extraPagesCreated} extra pages for ${tenantName}`)
   return { productsCreated, extraPagesCreated }
+}
+
+async function assertDashboardReadyFixtures(
+  payload: Payload,
+  users: UserSpec[],
+  tenants: TenantSpec[],
+  userIds: IdMap,
+  tenantIds: IdMap,
+): Promise<void> {
+  const dashboardUserIds = users
+    .filter((spec) => spec.dashboardReady)
+    .map((spec) => userIds[spec.email])
+    .filter((id): id is string | number => id !== undefined)
+  const dashboardTenantIds = tenants
+    .filter((spec) => spec.dashboardReady)
+    .map((spec) => tenantIds[spec.name])
+    .filter((id): id is string | number => id !== undefined)
+
+  const [userResult, tenantResult, siteResult] = await Promise.all([
+    payload.find({
+      collection: 'users',
+      where: { id: { in: dashboardUserIds } },
+      limit: dashboardUserIds.length,
+      depth: 0,
+      overrideAccess: true,
+    }),
+    payload.find({
+      collection: 'tenants',
+      where: { id: { in: dashboardTenantIds } },
+      limit: dashboardTenantIds.length,
+      depth: 0,
+      overrideAccess: true,
+    }),
+    payload.find({
+      collection: 'sites',
+      where: { tenant: { in: dashboardTenantIds } },
+      limit: dashboardTenantIds.length,
+      depth: 0,
+      overrideAccess: true,
+    }),
+  ])
+
+  const readyUserIds = new Set(
+    userResult.docs.filter((user) => user.has_seen_ai_wizard === true).map((user) => String(user.id)),
+  )
+  const readyTenantIds = new Set(
+    tenantResult.docs.filter((tenant) => tenant.onboardingCompleted === true).map((tenant) => String(tenant.id)),
+  )
+  const tenantsWithReadySites = new Set(
+    siteResult.docs
+      .filter((site) => site.generationStatus === 'completed')
+      .map((site) => {
+        const tenant = site.tenant
+        return String(typeof tenant === 'object' && tenant !== null ? tenant.id : tenant)
+      }),
+  )
+
+  const staleUsers = dashboardUserIds.filter((id) => !readyUserIds.has(String(id)))
+  const staleTenants = dashboardTenantIds.filter((id) => !readyTenantIds.has(String(id)))
+  const tenantsWithoutReadySites = dashboardTenantIds.filter((id) => !tenantsWithReadySites.has(String(id)))
+  if (staleUsers.length || staleTenants.length || tenantsWithoutReadySites.length) {
+    throw new Error(
+      `Dashboard-ready fixture invariant failed: users=${staleUsers.length}, tenants=${staleTenants.length}, sites=${tenantsWithoutReadySites.length}`,
+    )
+  }
 }
 
 async function main(): Promise<void> {
@@ -308,7 +402,9 @@ async function main(): Promise<void> {
     const batchResults = await Promise.all(
       batch.map((spec) => {
         const tid = tenantIds[spec.name]
-        if (!tid) return Promise.resolve({ productsCreated: 0, extraPagesCreated: 0 })
+        if (!tid || !spec.dashboardReady) {
+          return Promise.resolve({ productsCreated: 0, extraPagesCreated: 0 })
+        }
         return seedTenantContent(payload, tid, spec.name)
       }),
     )
@@ -322,6 +418,10 @@ async function main(): Promise<void> {
       console.log(`    [progress] ${done}/${tenants.length} tenants (${elapsedSec}s elapsed)`)
     }
   }
+
+  console.log('  Dashboard-ready fixture validation:')
+  await assertDashboardReadyFixtures(payload, users, tenants, userIds, tenantIds)
+  console.log('    ✓ users, tenants, and sites have consistent onboarding state')
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
   console.log(

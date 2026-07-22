@@ -29,6 +29,7 @@ export interface UserSpec {
   firstName: string
   lastName: string
   roles: UserRole[]
+  dashboardReady?: boolean
 }
 
 export interface TenantSpec {
@@ -38,6 +39,7 @@ export interface TenantSpec {
   ownerEmail: string
   membershipRole: TenantRole
   plan: PlanCode
+  dashboardReady: boolean
 }
 
 // First 5 tenants keep the original status variety so functional tests
@@ -78,6 +80,7 @@ export function buildUsers(merchantCount: number): UserSpec[] {
     firstName: 'QC',
     lastName: `Owner${i + 1}`,
     roles: ['tenant-owner'],
+    dashboardReady: true,
   }))
   return [...ADMIN_USERS, ...owners, ...STAFF_USERS]
 }
@@ -95,8 +98,37 @@ export function buildTenants(merchantCount: number): TenantSpec[] {
       ownerEmail: `qc-owner-${idx}@primeweb.local`,
       membershipRole: 'owner',
       plan: SCALE_PLAN_CODES[i % SCALE_PLAN_CODES.length],
+      dashboardReady: true,
     }
   })
+}
+
+export function buildQcUserData(spec: UserSpec, password: string) {
+  return {
+    email: spec.email,
+    password,
+    firstName: spec.firstName,
+    lastName: spec.lastName,
+    roles: spec.roles,
+    has_seen_ai_wizard: spec.dashboardReady === true,
+  }
+}
+
+export function buildQcTenantData(spec: TenantSpec) {
+  return {
+    name: spec.name,
+    slug: spec.slug,
+    status: spec.status,
+    onboardingCompleted: spec.dashboardReady,
+  }
+}
+
+export function buildQcSiteData(tenantId: string | number, tenantName: string) {
+  return {
+    name: `${tenantName} Site`,
+    tenant: tenantId,
+    generationStatus: 'completed' as const,
+  }
 }
 
 /**

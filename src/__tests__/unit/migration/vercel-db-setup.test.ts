@@ -309,6 +309,23 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
         expect(createTableMatches).toBeNull()
     })
 
+    it('[TC-GH1432-PERF-02] adds idempotent indexes for product list and array hydration', () => {
+        const expectedIndexes = [
+            'products_active_tenant_created_idx',
+            'products_images_parent_order_idx',
+            'products_tags_parent_order_idx',
+            'products_variant_configs_parent_order_idx',
+            'products_variant_configs_options_parent_order_idx',
+            'products_variants_parent_order_idx',
+            'products_attributes_parent_order_idx',
+            'products_rels_parent_order_idx',
+        ]
+
+        for (const indexName of expectedIndexes) {
+            expect(scriptContent).toContain(`CREATE INDEX IF NOT EXISTS ${indexName}`)
+        }
+    })
+
     it('TC-MIG-DB: --migrate-only flag is present in main() function', () => {
         expect(scriptContent).toContain("process.argv.includes('--migrate-only')")
     })

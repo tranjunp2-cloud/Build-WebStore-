@@ -1,7 +1,6 @@
 /**
  * At-a-glance metrics for the revamp dashboard.
- * Extracted from OverviewView — same queries (pageview/click/checkout counts + revenue),
- * same tenant isolation, same daily series via SQL.
+ * Server-side source for pageview/click/checkout counts, revenue, and daily series.
  */
 import { getPayload } from 'payload'
 import config from '@payload-config'

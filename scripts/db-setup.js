@@ -478,6 +478,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_images.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_images_parent_order_idx ON products_images (_parent_id, _order);`,
+  },
+  {
     name: 'products_tags.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_tags (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -486,6 +490,10 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       tag varchar
     );`,
+  },
+  {
+    name: 'products_tags.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_tags_parent_order_idx ON products_tags (_parent_id, _order);`,
   },
   {
     name: 'products_variant_configs.create_table',
@@ -498,6 +506,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variant_configs.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variant_configs_parent_order_idx ON products_variant_configs (_parent_id, _order);`,
+  },
+  {
     name: 'products_variant_configs_options.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_variant_configs_options (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -506,6 +518,10 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       value varchar
     );`,
+  },
+  {
+    name: 'products_variant_configs_options.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variant_configs_options_parent_order_idx ON products_variant_configs_options (_parent_id, _order);`,
   },
   {
     name: 'products_variants.create_table',
@@ -522,6 +538,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variants.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variants_parent_order_idx ON products_variants (_parent_id, _order);`,
+  },
+  {
     name: 'products_attributes.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_attributes (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -531,6 +551,10 @@ const MIGRATIONS = [
       key varchar,
       value varchar
     );`,
+  },
+  {
+    name: 'products_attributes.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_attributes_parent_order_idx ON products_attributes (_parent_id, _order);`,
   },
   // ── Products: Rels table (hasMany relationship → category) ──
   {
@@ -546,6 +570,10 @@ const MIGRATIONS = [
   {
     name: 'products_rels.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_idx ON products_rels (parent_id);`,
+  },
+  {
+    name: 'products_rels.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_order_idx ON products_rels (parent_id, "order");`,
   },
   // ── Orders: Items array table ──
   {
@@ -4126,6 +4154,8 @@ const MIGRATIONS = [
   { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
   { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
   // ── F08-1032: DB-level SKU uniqueness (case-insensitive, per-tenant / per-product) ──
+  // GH-1432: dashboard product list filters active rows by tenant and sorts newest first.
+  { name: 'products.active_tenant_created_idx', sql: `CREATE INDEX IF NOT EXISTS products_active_tenant_created_idx ON products (tenant_id, created_at DESC) WHERE deleted_at IS NULL;` },
   // Closes concurrent-save gap in findConflictingSkus (application-layer check is NOT atomic).
   // Partial index excludes soft-deleted rows and null-tenant (super-admin) products.
   { name: 'products.sku_tenant_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_sku_tenant_uniq ON products (tenant_id, lower(sku)) WHERE sku IS NOT NULL AND deleted_at IS NULL AND tenant_id IS NOT NULL;` },
