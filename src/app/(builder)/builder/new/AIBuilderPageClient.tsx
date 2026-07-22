@@ -565,8 +565,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // Route budget is 60s. Give the browser 15s extra to receive a final
-        // frame or surface a terminated network stream cleanly.
+        // Restore the pre-#1658 five-minute client guard. This leaves enough
+        // headroom for long-tail generation while still cleaning up a hung request.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -575,8 +575,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 75_000)
+        }, 300_000)
         hardTimeoutRef.current = hardTimeout
+
         let receivedAnyEvent = false
         let receivedDone = false
 

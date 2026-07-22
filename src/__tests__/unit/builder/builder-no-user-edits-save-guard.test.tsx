@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import en from '@/i18n/locales/en.json'
 
@@ -42,7 +42,20 @@ vi.mock('framer-motion', () => ({
 }))
 
 vi.mock('@/components/builder/BusinessInfoForm', () => ({
-    default: () => <div data-testid="business-info-form" />,
+    default: ({ onSubmit }: { onSubmit?: (info: Record<string, string>) => void }) => (
+        <button
+            type="button"
+            onClick={() => onSubmit?.({
+                businessName: 'Long Running Bakery',
+                shortDescription: 'Fresh artisan bread and pastries',
+                industry: 'Food',
+                products: 'Bread and cakes',
+                language: 'en',
+            })}
+        >
+            Generate Website
+        </button>
+    ),
 }))
 
 vi.mock('@/components/builder/BuilderGenerationView', () => ({
@@ -264,5 +277,57 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         })
 
         expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/sites/site-123/publish'))).toBe(true)
+    })
+
+    it('TC-GENPERF-W3-33: keeps the generation stream open after 75 seconds', async () => {
+        // Arrange
+        vi.useFakeTimers()
+        useBuilderStore.setState({
+            step: 'info',
+            status: 'idle',
+            businessInfo: null,
+            blocks: [],
+            theme: null,
+            siteId: null,
+            siteName: '',
+        })
+        let streamController: ReadableStreamDefaultController<Uint8Array> | null = null
+        const encoder = new TextEncoder()
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                streamController = controller
+                controller.enqueue(encoder.encode(
+                    'event: generation_accepted\ndata: {"generationRequestId":"request-1"}\n\n',
+                ))
+            },
+        })
+        fetchMock.mockResolvedValue({ ok: true, body } as Response)
+        render(<AIBuilderPageClient userId="user-1" />)
+
+        // Act
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
+            await Promise.resolve()
+        })
+        const generationCall = fetchMock.mock.calls.find(
+            ([input]) => String(input).includes('/api/ai/generate-site?stream=true'),
+        )
+        expect(generationCall).toBeTruthy()
+        const signal = generationCall?.[1]?.signal
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(76_000)
+        })
+
+        // Assert
+        expect(signal?.aborted).toBe(false)
+
+        await act(async () => {
+            streamController?.enqueue(encoder.encode(
+                'event: done\ndata: {"siteId":"site-123","pageId":"page-1","siteName":"Long Running Bakery","totalBlocks":1,"totalPages":1,"timeMs":76000}\n\n',
+            ))
+            streamController?.close()
+            await Promise.resolve()
+        })
+        expect(useBuilderStore.getState().status).toBe('done')
     })
 })
