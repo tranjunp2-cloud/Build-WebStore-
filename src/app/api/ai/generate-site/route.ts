@@ -678,6 +678,7 @@ export async function POST(req: NextRequest) {
                     products: parseProductsString(businessInfo.products),
                     industry: businessInfo.industry,
                     seed: computeGenSeed(businessInfo),
+                    siteId: existingSites.docs[0]?.id,
                 }))
                 .catch((): null => null)
 
