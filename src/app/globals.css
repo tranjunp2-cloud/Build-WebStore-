@@ -156,8 +156,6 @@
   --ring: var(--p-teal-600);
   /* --radius: 0.5rem đã khai ở :root phía trên */
   --success: var(--p-emerald-600);    --success-foreground: 0 0% 100%;
-  /* Success as body text needs a darker shade than the fill token to meet AA on white. */
-  --success-text: 162.93 93.55% 24.31%; /* #047857 — 5.48:1 on --card */
   --warning: var(--p-amber-600);      --warning-foreground: 0 0% 100%;
   --destructive: var(--p-red-600);    --destructive-foreground: 0 0% 100%;
   --info: var(--p-blue-600);          --info-foreground: 0 0% 100%;
@@ -184,7 +182,6 @@
   --input-border: 213.33 24.32% 21.76%;             /* #2A3645 — dark giữ nguyên (viền input) */
   --ring: var(--p-teal-400);
   --success: var(--p-emerald-500);
-  --success-text: var(--p-emerald-500);
   --warning: var(--p-amber-500);
   --destructive: var(--p-red-500);
   --info: var(--p-blue-500);

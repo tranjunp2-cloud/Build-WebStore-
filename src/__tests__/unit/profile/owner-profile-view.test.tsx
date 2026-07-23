@@ -17,8 +17,6 @@ vi.mock('@/i18n', () => ({
                 },
                 owner: {
                     passwordLabel: 'Password',
-                    twoFactorLabel: 'Two-Factor (2FA)',
-                    twoFactorEnabled: 'Enabled',
                 },
                 sso: {
                     widgetTitle: 'SSO Protected Account',
@@ -81,8 +79,8 @@ describe('OwnerProfileView', () => {
         expect(screen.getByText('+60987654321')).toBeInTheDocument()
     })
 
-    // TC-F23-03-04: Password is masked and mandatory OTP 2FA status is visible
-    it('renders masked password dots and enabled two-factor authentication status', () => {
+    // TC-F23-03-04: Password is masked; 2FA stays hidden until SSO provides a real status
+    it('renders masked password dots without an unverified two-factor status', () => {
         // Arrange / Act
         const { container } = render(<OwnerProfileView user={mockUser} ssoUrl="https://sso.example.com" />)
 
@@ -92,9 +90,8 @@ describe('OwnerProfileView', () => {
         )
         expect(passwordField).toBeTruthy()
 
-        expect(screen.getByText('Two-Factor (2FA)')).toBeInTheDocument()
-        expect(screen.getByText('Enabled')).toBeInTheDocument()
-        expect(screen.getByTestId('owner-two-factor-status')).toHaveClass('text-[hsl(var(--success-text))]')
+        expect(screen.queryByText(/2FA|Two-Factor|2-factor/i)).not.toBeInTheDocument()
+        expect(screen.queryByTestId('owner-two-factor-status')).not.toBeInTheDocument()
     })
 
     // TC-F23-03-05: Role badge shows "Owner"

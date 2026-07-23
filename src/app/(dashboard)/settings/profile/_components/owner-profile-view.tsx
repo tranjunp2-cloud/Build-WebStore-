@@ -29,8 +29,7 @@ function Field({ label, value }: FieldProps) {
 
 // Owner read-only single page (F23 GH-1614 P4): 2-col grid = read-only Profile Card (2fr)
 // + unified SSO widget (1fr), equal height. Pure presentational — no API calls, no forms.
-// Email OTP verification is mandatory for every account before dashboard access, so its status
-// is shown as enabled rather than as a per-user, editable setting.
+// 2FA stays hidden until the SSO contract provides an authoritative per-owner status.
 export function OwnerProfileView({ user, ssoUrl }: Props) {
     const { t } = useI18n()
     const [imgFailed, setImgFailed] = useState(false)
@@ -84,18 +83,6 @@ export function OwnerProfileView({ user, ssoUrl }: Props) {
                         value={
                             <span className="tracking-[2px] text-[hsl(var(--muted-foreground))]">
                                 &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
-                            </span>
-                        }
-                    />
-                    <Field
-                        label={t.profile.owner.twoFactorLabel}
-                        value={
-                            <span
-                                data-testid="owner-two-factor-status"
-                                className="inline-flex items-center gap-2 text-[hsl(var(--success-text))]"
-                            >
-                                <span aria-hidden className="size-2 rounded-full bg-[hsl(var(--success-text))]" />
-                                {t.profile.owner.twoFactorEnabled}
                             </span>
                         }
                     />

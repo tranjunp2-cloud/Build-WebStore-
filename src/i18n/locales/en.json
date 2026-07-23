@@ -5005,9 +5005,7 @@
             "goToPortal": "Go to SSO Portal"
         },
         "owner": {
-            "passwordLabel": "Password",
-            "twoFactorLabel": "Two-Factor (2FA)",
-            "twoFactorEnabled": "Enabled"
+            "passwordLabel": "Password"
         },
         "errors": {
             "invalidPhone": "Please enter a valid phone number",
