@@ -29,6 +29,11 @@ export type ApplyTrackingResult = 'updated' | 'unchanged'
 // sync-tracking cron's order query can exclude the same set (single source of truth, DRY).
 export const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
 
+// Once the courier has possession of the parcel, the merchant lifecycle must leave the
+// ready-to-ship holding state. Code 3/11 map to picked_up and code 4 maps to in_transit;
+// legacy string payloads may also map directly to out_for_delivery.
+const AUTO_SHIP_TRACKING_STATUSES = new Set(['picked_up', 'in_transit', 'out_for_delivery'])
+
 // Order statuses from which an EP shipment cancel (tracking → 'cancelled') should reopen the
 // order back to 'confirmed'. Mirrors the manual "Mark shipment cancelled" flow: once EP cancels
 // the shipment (freight refunded to the merchant's EP wallet — no buyer-payment impact), the
@@ -68,7 +73,13 @@ export async function applyTrackingUpdate(
     // anomaly to Sentry before it reaches here.
     if (mapped.internal === 'unknown') return 'unchanged'
 
-    if (order.shippingTrackingStatus === mapped.internal) return 'unchanged'
+    if (order.shippingTrackingStatus === mapped.internal) {
+        const lifecycleNeedsReconciliation =
+            (order.status === 'ready_to_ship' && AUTO_SHIP_TRACKING_STATUSES.has(mapped.internal)) ||
+            (mapped.internal === 'delivered' && (order.status === 'shipped' || order.status === 'ready_to_ship')) ||
+            (mapped.internal === 'cancelled' && REOPEN_ON_CANCEL_FROM.has(order.status ?? ''))
+        if (!lifecycleNeedsReconciliation) return 'unchanged'
+    }
 
     // F7 (review #1434): a terminal status must never regress to a non-terminal one — e.g. a
     // late "In Transit" (code 4) webhook arriving after "Delivered" (code 5) already landed.
@@ -98,16 +109,10 @@ export async function applyTrackingUpdate(
     const freshStatus = fresh?.shippingTrackingStatus ?? order.shippingTrackingStatus
     const currentHistory: TrackingHistoryEntry[] = fresh?.shippingTrackingHistory ?? order.shippingTrackingHistory ?? []
 
-    // Re-verify idempotency + terminal-guard against the freshest read — closes most of the
-    // race window opened between the initial checks above and this re-read.
-    if (freshStatus === mapped.internal) return 'unchanged'
+    // Re-verify the terminal guard against the freshest read. Lifecycle reconciliation below
+    // intentionally still runs when the tracking status itself is unchanged, so orders that
+    // received an in-transit webhook before this behavior shipped can self-heal.
     if (freshStatus && TERMINAL.has(freshStatus) && !TERMINAL.has(mapped.internal)) return 'unchanged'
-
-    const newEntry: TrackingHistoryEntry = {
-        status: mapped.internal,
-        description: descriptionOverride?.trim() || mapped.buyerLabel,
-        eventTime: new Date().toISOString(),
-    }
 
     // F8 (review #1434): gate auto-complete on the FRESH order status, not the stale caller copy.
     // Otherwise a concurrent cancel (status→cancelled) racing a 'delivered' update would be
@@ -116,6 +121,9 @@ export async function applyTrackingUpdate(
     const autoComplete =
         mapped.internal === 'delivered' &&
         (freshOrderStatus === 'shipped' || freshOrderStatus === 'ready_to_ship')
+    const autoShip =
+        freshOrderStatus === 'ready_to_ship' &&
+        AUTO_SHIP_TRACKING_STATUSES.has(mapped.internal)
 
     // EP cancelled the shipment (code 0) — reopen the order to 'confirmed' and drop every EP
     // shipment field so the merchant can re-ship or cancel the order, mirroring the manual
@@ -124,14 +132,31 @@ export async function applyTrackingUpdate(
     // writer). create-label re-seeds shippingTrackingStatus to 'pending_pickup' on re-ship,
     // so leaving it 'cancelled' here does not freeze the next shipment's tracking.
     const reopenOnCancel = mapped.internal === 'cancelled' && REOPEN_ON_CANCEL_FROM.has(freshOrderStatus ?? '')
+    const trackingChanged = freshStatus !== mapped.internal
+
+    if (!trackingChanged && !autoShip && !autoComplete && !reopenOnCancel) return 'unchanged'
+
+    const trackingData = trackingChanged
+        ? {
+            shippingTrackingStatus: mapped.internal,
+            shippingTrackingLastUpdated: new Date().toISOString(),
+            shippingTrackingHistory: [
+                ...currentHistory,
+                {
+                    status: mapped.internal,
+                    description: descriptionOverride?.trim() || mapped.buyerLabel,
+                    eventTime: new Date().toISOString(),
+                },
+            ],
+        }
+        : {}
 
     await payload.update({
         collection: 'orders',
         id: order.id,
         data: {
-            shippingTrackingStatus: mapped.internal,
-            shippingTrackingLastUpdated: new Date().toISOString(),
-            shippingTrackingHistory: [...currentHistory, newEntry],
+            ...trackingData,
+            ...(autoShip ? { status: 'shipped' } : {}),
             ...(autoComplete ? { status: 'completed' } : {}),
             ...(reopenOnCancel ? {
                 status: 'confirmed',

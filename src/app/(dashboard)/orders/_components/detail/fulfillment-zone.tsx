@@ -22,7 +22,7 @@ import { PrintLabelModal } from './print-label-modal'
 import { SelfDeliveryZone } from './self-delivery-zone'
 import { CodRecovery } from './cod-recovery'
 import { MissingWeightForm } from './missing-weight-form'
-import { TrackingTimeline } from './tracking-timeline'
+import { TrackingTimeline, type TrackingEvent } from './tracking-timeline'
 
 // ── Order shape consumed by this component ────────────────────────────────────
 // Extends OrderDetail with EP + self-delivery fields via any-cast at the call site.
@@ -66,6 +66,34 @@ export interface FulfillmentOrder {
       selectedCourier?: string
     }
   } | string | number | null
+}
+
+export function optimisticShipmentCreatedEvent(
+  awbNo: string | null,
+  at: Date = new Date(),
+): TrackingEvent {
+  return {
+    status: 'pending_pickup',
+    description: awbNo ? `Shipment created — ${awbNo}` : 'Shipment created',
+    eventTime: at.toISOString(),
+  }
+}
+
+export function mergeOptimisticTrackingEvent(
+  events: TrackingEvent[] | null | undefined,
+  optimistic: TrackingEvent | null,
+): TrackingEvent[] {
+  const persisted = events ?? []
+  if (!optimistic) return persisted
+
+  const optimisticTime = optimistic.eventTime ? new Date(optimistic.eventTime).getTime() : NaN
+  const alreadyPersisted = persisted.some((event) => {
+    if (event.status !== optimistic.status || event.description !== optimistic.description) return false
+    const eventTime = event.eventTime ? new Date(event.eventTime).getTime() : NaN
+    return Number.isFinite(eventTime) && Number.isFinite(optimisticTime) && Math.abs(eventTime - optimisticTime) < 60_000
+  })
+
+  return alreadyPersisted ? persisted : [...persisted, optimistic]
 }
 
 // ── Design state derivation ───────────────────────────────────────────────────
@@ -176,6 +204,7 @@ export function FulfillmentZone({
   // Async-AWB case: create-label succeeded with awbNo null — flip to success immediately
   // (the refetched order carries easyParcelOrderNo, but don't wait a round-trip to show it)
   const [localCreated, setLocalCreated] = useState(false)
+  const [optimisticTrackingEvent, setOptimisticTrackingEvent] = useState<TrackingEvent | null>(null)
 
   // Mark-shipment-cancelled (merchant attest — EP sends no webhook for dashboard cancels):
   // two-step inline confirm, then clear EP fields server-side → zone falls back to 'ready'
@@ -189,6 +218,7 @@ export function FulfillmentZone({
       setLocalCreated(false)
       setLocalAwb(null)
       setLocalLabelUrl(null)
+      setOptimisticTrackingEvent(null)
     }
   }, [order.easyParcelOrderNo, order.awbNo])
 
@@ -366,6 +396,7 @@ export function FulfillmentZone({
             setLocalAwb(newAwb)
             setLocalLabelUrl(newLabel)
             setLocalCreated(true)
+            setOptimisticTrackingEvent(optimisticShipmentCreatedEvent(newAwb))
             setForceMissing(false)
             // Wallet was charged for the label — invalidate the cached balance (parity with
             // the main CreateLabelFlow success path).
@@ -420,6 +451,7 @@ export function FulfillmentZone({
             setLocalAwb(newAwb)
             setLocalLabelUrl(newLabel)
             setLocalCreated(true)
+            setOptimisticTrackingEvent(optimisticShipmentCreatedEvent(newAwb))
             // Wallet was charged for the label — refetch balance on next read
             invalidateEpShippingInfo(tenantId)
             // Silent reconcile (no page reload): the success card is already shown
@@ -445,6 +477,8 @@ export function FulfillmentZone({
 
   // ── Success: label created, ready to ship ─────────────────────────────────
   if (state === 'success') {
+    const events = mergeOptimisticTrackingEvent(order.shippingTrackingHistory, optimisticTrackingEvent)
+
     return (
       <>
         <div className="ship-result">
@@ -523,7 +557,10 @@ export function FulfillmentZone({
                   </div>
                 )}
               </div>
+
             </div>
+
+            <TrackingTimeline events={events} />
           </div>
 
           {/* The manual "Mark shipment cancelled" button was removed from the UI (2026-07-13):

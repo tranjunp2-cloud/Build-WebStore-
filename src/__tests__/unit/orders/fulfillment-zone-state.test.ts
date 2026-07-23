@@ -6,7 +6,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { deriveFulfillState, FulfillmentOrder } from '@/app/(dashboard)/orders/_components/detail/fulfillment-zone'
+import {
+  deriveFulfillState,
+  mergeOptimisticTrackingEvent,
+  optimisticShipmentCreatedEvent,
+  FulfillmentOrder,
+} from '@/app/(dashboard)/orders/_components/detail/fulfillment-zone'
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
@@ -316,5 +321,34 @@ describe('FulfillmentZone state derivation', () => {
       shippingCourier: null, // No courier set
     }
     expect(deriveFulfillState(order)).toBe('pending')
+  })
+})
+
+describe('FulfillmentZone label-created timeline', () => {
+  it('[TC-F36.F26] shows an optimistic pending-pickup event immediately after label creation', () => {
+    const optimistic = optimisticShipmentCreatedEvent(
+      'RMP011459353MY',
+      new Date('2026-07-22T03:18:45.000Z'),
+    )
+
+    expect(mergeOptimisticTrackingEvent([], optimistic)).toEqual([{
+      status: 'pending_pickup',
+      description: 'Shipment created — RMP011459353MY',
+      eventTime: '2026-07-22T03:18:45.000Z',
+    }])
+  })
+
+  it('[TC-F36.F27] replaces the optimistic event with the persisted create-label event', () => {
+    const optimistic = optimisticShipmentCreatedEvent(
+      null,
+      new Date('2026-07-22T03:18:45.000Z'),
+    )
+    const persisted = [{
+      status: 'pending_pickup',
+      description: 'Shipment created',
+      eventTime: '2026-07-22T03:18:46.000Z',
+    }]
+
+    expect(mergeOptimisticTrackingEvent(persisted, optimistic)).toEqual(persisted)
   })
 })

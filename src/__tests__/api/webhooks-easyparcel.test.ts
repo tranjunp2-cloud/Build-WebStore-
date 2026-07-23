@@ -176,6 +176,42 @@ describe('POST /api/webhooks/easyparcel', () => {
     expect(updateArg.data.status).toBe('completed')
   })
 
+  it('[TC-F36.OD.045a] real tracking-update code 4 promotes ready_to_ship to shipped', async () => {
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+    mockFind.mockResolvedValue({
+      docs: [
+        {
+          id: 'order-45a',
+          status: 'ready_to_ship',
+          shippingTrackingStatus: 'pending_pickup',
+          shippingTrackingHistory: [],
+        },
+      ],
+    })
+    mockUpdate.mockResolvedValue({ id: 'order-45a' })
+
+    const res = await callPost('my-secret', {
+      topic: 'shipment.tracking.update',
+      awb_number: 'RMP011459353MY',
+      event_date: '2026-07-22 11:18:45',
+      shipment_number: 'ES-2607-6V92R',
+      latest_tracking_status: 'Rider is Out for Delivery',
+      latest_shipment_status_code: 4,
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ matched: true, result: 'updated' })
+    const updateArg = mockUpdate.mock.calls[0][0]
+    expect(updateArg.data).toMatchObject({
+      shippingTrackingStatus: 'in_transit',
+      status: 'shipped',
+    })
+    expect(updateArg.data.shippingTrackingHistory.at(-1)).toMatchObject({
+      status: 'in_transit',
+      description: 'Rider is Out for Delivery',
+    })
+  })
+
   // ───────────────────────────────────────────────────────────────────
   // TC-F36.OD.046: REAL EP payload (topic shipment.status.update) numeric
   // shipment_status_code:0 (Cancel) → cancelled tracking + reopen order to
@@ -669,6 +705,7 @@ describe('applyTrackingUpdate (unit)', () => {
   it('[TC-F36.OD.045] unchanged status (already in_transit) → skips update, returns "unchanged"', async () => {
     // Arrange
     const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn(),
       logger: { debug: vi.fn() },
     }
@@ -685,6 +722,56 @@ describe('applyTrackingUpdate (unit)', () => {
     // Assert
     expect(result).toBe('unchanged')
     expect(mockPayload.update).not.toHaveBeenCalled()
+  })
+
+  it('[TC-F36.OD.045b] unchanged in_transit tracking self-heals ready_to_ship lifecycle', async () => {
+    const history = [{
+      status: 'in_transit',
+      description: 'Rider is Out for Delivery',
+      eventTime: '2026-07-22T03:18:45.000Z',
+    }]
+    const order = {
+      id: 'order-stale-lifecycle',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'in_transit',
+      shippingTrackingHistory: history,
+    }
+    const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    }
+
+    const result = await applyTrackingUpdate(mockPayload as any, order, 4, 'Rider is Out for Delivery')
+
+    expect(result).toBe('updated')
+    expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: 'shipped' },
+    }))
+  })
+
+  it('[TC-F36.OD.045c] collected tracking promotes ready_to_ship to shipped', async () => {
+    const order = {
+      id: 'order-collected',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [],
+    }
+    const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    }
+
+    const result = await applyTrackingUpdate(mockPayload as any, order, 3)
+
+    expect(result).toBe('updated')
+    expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'shipped',
+        shippingTrackingStatus: 'picked_up',
+      }),
+    }))
   })
 
   it('[TC-F36.OD.046] unknown EP status → skipped, never overwrites a valid status', async () => {
