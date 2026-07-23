@@ -229,12 +229,9 @@ async function fetchProductImage(
     tenantId: string,
     galleryFallbackUrl?: string,
     skipSearch = false,
-    assertCanWrite?: () => void,
 ): Promise<{ imageId: number | undefined; reason?: ImageFailReason }> {
     const filename = `sample-product-${siteKey}-${index}.jpg`
-    const upload = (url: string) => assertCanWrite
-        ? uploadImageUrl(url, filename, productName, tenantId, payload, assertCanWrite)
-        : uploadImageUrl(url, filename, productName, tenantId, payload)
+    const upload = (url: string) => uploadImageUrl(url, filename, productName, tenantId, payload)
     let wasRateLimited = false
     let tierAUploadFailed = false
 
@@ -285,7 +282,6 @@ async function fetchProductImage(
     }
 
     // Tier C: direct gallery URL (bypasses search API — works even when key is invalid/rate-limited)
-    assertCanWrite?.()
     if (galleryFallbackUrl) {
         try {
             const id = await upload(galleryFallbackUrl)
@@ -300,11 +296,7 @@ async function fetchProductImage(
     }
 
     // Tier D: static carton-box placeholder — last resort when all CDN-dependent tiers fail
-    assertCanWrite?.()
-    const cartonResult = await (assertCanWrite
-        ? findOrCreateCartonMedia(payload, tenantId, undefined, assertCanWrite)
-        : findOrCreateCartonMedia(payload, tenantId)
-    ).catch(() => null)
+    const cartonResult = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
     if (cartonResult) {
         console.warn(`[sample-products] Tier D carton fallback used for "${productName}"`)
         return { imageId: cartonResult.id, reason: wasRateLimited ? 'rate_limited' : tierAUploadFailed ? 'upload_failed' : 'no_results' }
@@ -334,7 +326,6 @@ export async function generateSampleProducts(
     tenantId: string,
     payload: BasePayload,
     siteId?: string | number,
-    assertCanWrite?: () => void,
 ): Promise<GeneratedProductsResult> {
     // The OpenAI client has retries disabled. Curated products are a complete,
     // deterministic fallback, so a second/third model attempt only extends p95.
@@ -414,7 +405,6 @@ export async function generateSampleProducts(
             p._imageKeyword, i, siteKey, p.name, category, payload, tenantId,
             productUrls[i % productUrls.length],
             skipSearch,
-            assertCanWrite,
         )
         if (reason === 'rate_limited') {
             stats.rateLimited++

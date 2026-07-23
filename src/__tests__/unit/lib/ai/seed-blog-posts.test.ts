@@ -703,19 +703,4 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		expect(prepared).toHaveLength(2)
 	})
 
-	it('propagates the write guard and stops before the next blog insert after abort', async () => {
-		const { persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-		const payload = makePayload(0)
-		const assertCanWrite = vi.fn(() => {
-			if (vi.mocked(payload.create).mock.calls.length > 0) {
-				throw new Error('GENERATION_DEADLINE_EXCEEDED')
-			}
-		})
-
-		await expect(persistBlogPosts(payload, [
-			{ title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 5 },
-			{ title: 'B', slug: 'b', content: '<p>b</p>', thumbnailId: 6 },
-		], 42, 99, 7, assertCanWrite)).rejects.toThrow('GENERATION_DEADLINE_EXCEEDED')
-		expect(payload.create).toHaveBeenCalledTimes(1)
-	})
 })

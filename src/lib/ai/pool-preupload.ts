@@ -60,7 +60,6 @@ export async function preUploadPool(
     tenantId: string,
     businessName: string,
     payload: Parameters<typeof uploadBufferToMedia>[0],
-    assertCanWrite?: () => void,
 ): Promise<Map<string, number>> {
     const result = new Map<string, number>()
     const photos = dedupePoolPhotos(pool)
@@ -101,11 +100,9 @@ export async function preUploadPool(
                             mimetype,
                             alt,
                             tenantId,
-                            assertCanWrite,
                         })
                         result.set(photo.id, id)
                     } catch (err) {
-                        assertCanWrite?.()
                         console.warn(
                             `[pool-preupload] upload failed for ${photo.id}: ${err instanceof Error ? err.message : String(err)}`,
                         )

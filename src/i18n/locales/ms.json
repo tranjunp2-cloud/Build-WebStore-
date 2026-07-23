@@ -2051,6 +2051,7 @@
                     "deleteError": "Gagal memadamkan kategori",
                     "maxDepthError": "Tidak boleh bersarang lebih dari 3 tahap",
                     "cycleError": "Tidak boleh menetapkan kategori sebagai anak kepada sub-kategorinya sendiri.",
+                    "parentInvalid": "Kategori induk yang dipilih tidak sah. Sila pilih semula.",
                     "parentTenantMismatch": "Tidak boleh memindahkan kategori ke hierarki penyewa lain",
                     "parentSoftDeleted": "Tidak boleh menyarangkan di bawah kategori yang dipadamkan"
                 }
