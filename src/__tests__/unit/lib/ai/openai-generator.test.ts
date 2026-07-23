@@ -344,6 +344,25 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 
 describe('sanitizeBlockData - Normalize AI outputs', () => {
+    it('TC-F01-PAS-11: adds the required secondary hero CTA in the structural locale', () => {
+        // Arrange
+        const input = {
+            blockType: 'hero',
+            ctaButtons: [
+                { label: '立即选购', url: '/contact', style: 'primary' },
+            ],
+        }
+
+        // Act
+        const output = sanitizeBlockData(input, undefined, 'en', undefined, 'zh-CN')
+
+        // Assert
+        expect(output.ctaButtons).toEqual([
+            { label: '立即选购', url: '/contact', style: 'primary' },
+            { label: '关于我们', url: '#about', style: 'secondary' },
+        ])
+    })
+
     it('normalizes invalid variant to a valid one from registry', () => {
         const input = { blockType: 'features', variant: 'grid-5' } // invalid
         const output = sanitizeBlockData(input)

@@ -13,7 +13,13 @@
 
 import type OpenAI from 'openai'
 import type { BlockStrings, SectionLabels } from './block-i18n'
-import { getBlockStrings, hasDedicatedStrings, injectBlockStrings, injectSectionLabels } from './block-i18n'
+import {
+    getBlockStrings,
+    hasDedicatedStrings,
+    injectBlockStrings,
+    injectNavLabels,
+    injectSectionLabels,
+} from './block-i18n'
 
 /** Flat string keys sent to GPT — function fields reconstructed from these. */
 interface RawTranslation {
@@ -310,19 +316,50 @@ async function callGptTranslation(
  * The next warm request will find translated strings in cache and apply them.
  */
 export function prefetchBlockStrings(gpLang: string, blockLang: string, openai: OpenAI): void {
-    if (hasDedicatedStrings(blockLang)) return
+    void ensureBlockStrings(gpLang, blockLang, openai)
+}
 
-    void callGptTranslation(gpLang, openai)
-        .then((result) => {
-            if (result) {
-                injectBlockStrings(blockLang, result.blockStrings)
-                injectSectionLabels(blockLang, result.sectionLabels)
-                console.log(`[block-strings-translator] cached block strings + section labels for ${blockLang} (${gpLang})`)
+const inFlightTranslations = new Map<string, Promise<boolean>>()
+
+/**
+ * Resolve block strings for the current request. Calls are deduplicated by
+ * locale, and one retry is attempted before reporting failure.
+ */
+export function ensureBlockStrings(
+    gpLang: string,
+    blockLang: string,
+    openai: OpenAI,
+): Promise<boolean> {
+    if (hasDedicatedStrings(blockLang)) return Promise.resolve(true)
+
+    const cached = inFlightTranslations.get(blockLang)
+    if (cached) return cached
+
+    const request = (async () => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const result = await callGptTranslation(gpLang, openai)
+                if (result) {
+                    injectBlockStrings(blockLang, result.blockStrings)
+                    injectNavLabels(blockLang, result.blockStrings.navigation)
+                    injectSectionLabels(blockLang, result.sectionLabels)
+                    console.log(`[block-strings-translator] cached block strings + section labels for ${blockLang} (${gpLang})`)
+                    return true
+                }
+            } catch (err) {
+                console.warn(
+                    `[block-strings-translator] translation attempt ${attempt} failed for ${gpLang}:`,
+                    err,
+                )
             }
-        })
-        .catch((err) => {
-            console.warn(`[block-strings-translator] prefetch failed for ${gpLang}:`, err)
-        })
+        }
+        return false
+    })().finally(() => {
+        inFlightTranslations.delete(blockLang)
+    })
+
+    inFlightTranslations.set(blockLang, request)
+    return request
 }
 
 /** Translate and return block strings synchronously (for server-side pre-generation). */
@@ -336,6 +373,7 @@ export async function translateBlockStrings(
     const result = await callGptTranslation(gpLang, openai)
     if (result) {
         injectBlockStrings(blockLang, result.blockStrings)
+        injectNavLabels(blockLang, result.blockStrings.navigation)
         injectSectionLabels(blockLang, result.sectionLabels)
         return result.blockStrings
     }

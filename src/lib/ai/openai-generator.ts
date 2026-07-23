@@ -16,7 +16,12 @@ import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBl
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
-import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
+import {
+    postAISwapStep,
+    isPostAISwapEnabled,
+    normalizeLocaleStructuralStrings,
+    type SwapTelemetry,
+} from './post-ai-swap'
 import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
@@ -38,9 +43,9 @@ import {
     type ContentLang,
 } from './content-rules'
 import { detectLanguage, resolveDetectedLanguage } from './lang-detect'
-import { getNavLabels, hasDedicatedStrings } from './block-i18n'
-import { prefetchNavLabels } from './nav-label-translator'
-import { prefetchBlockStrings } from './block-strings-translator'
+import { hasDedicatedStrings } from './block-i18n'
+import { ensureBlockStrings } from './block-strings-translator'
+import { resolveLocaleStructuralStrings } from './locale-structural-strings'
 import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
 function getOpenAI(): OpenAI | null {
@@ -189,18 +194,16 @@ export async function generateSiteWithAI(
     try {
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
-        // For non-English languages not yet in the nav label cache, fire a GPT
-        // micro-call (gpt-4.1-nano, ~50 tokens) to translate the 5 nav labels.
-        // Fire-and-forget: this request keeps GPT output; next warm request uses
-        // the cached translated labels. See nav-label-translator.ts for details.
-        if (gpLang && gpLang !== 'English' && !getNavLabels(blockLang)) {
-            prefetchNavLabels(gpLang, blockLang, openai)
-        }
-        // Same pattern for full block strings (structural labels, form labels, footer text).
-        // Covers long-tail languages not in the static STRINGS seed (en/ms/vi/ja/zh/ko/ar/th).
-        if (gpLang && gpLang !== 'English' && !hasDedicatedStrings(blockLang)) {
-            prefetchBlockStrings(gpLang, blockLang, openai)
-        }
+        // Start dynamic structural-string translation alongside the main generation.
+        // The result is only awaited after GPT returns, keeping it off the serial
+        // critical path in the normal case.
+        const needsDynamicStructuralStrings =
+            Boolean(gpLang && gpLang !== 'English' && !hasDedicatedStrings(blockLang))
+        const structuralStringsStartedAt = Date.now()
+        const structuralStringsPromise =
+            needsDynamicStructuralStrings && gpLang
+                ? ensureBlockStrings(gpLang, blockLang, openai)
+                : Promise.resolve(true)
 
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.
@@ -398,6 +401,17 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'theme_set', data: { theme } })
 
+        const structuralStringsWaitStartedAt = Date.now()
+        const structuralStringsReady = await structuralStringsPromise
+        if (needsDynamicStructuralStrings) {
+            console.log(
+                `[locale-strings] locale=${blockLang} ready=${structuralStringsReady} total=${Date.now() - structuralStringsStartedAt}ms wait=${Date.now() - structuralStringsWaitStartedAt}ms`,
+            )
+        }
+        if (blockLang !== 'en' && !structuralStringsReady && !hasDedicatedStrings(blockLang)) {
+            throw new Error(`LOCALE_STRUCTURAL_STRINGS_UNAVAILABLE:${blockLang}`)
+        }
+
         // Detect site category for weighted variant selection
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
 
@@ -411,7 +425,13 @@ export async function generateSiteWithAI(
         // between happy path (here) and fallback path (fallback-adapter).
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const sanitizedBlocks = rawBlocks.map((block) =>
-                sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
+                sanitizeBlockData(
+                    block as Record<string, unknown>,
+                    detectedCategory,
+                    contentLang,
+                    themeSeed,
+                    blockLang,
+                )
             )
             const filtered = filterUnsupportedBlocks(sanitizedBlocks, 'ai')
             const valid: Record<string, unknown>[] = []
@@ -533,6 +553,11 @@ export async function generateSiteWithAI(
                     enforcerCtx,
                 ) as typeof pageBlocks
                 enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                pageBlocks = normalizeLocaleStructuralStrings(
+                    pageBlocks as Record<string, unknown>[],
+                    blockLang,
+                    enforcerBizOverride.name ?? businessInfo.businessName,
+                ) as typeof pageBlocks
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
                 generatedPages.push({
@@ -657,6 +682,11 @@ export async function generateSiteWithAI(
                 ) as typeof validBlocks
                 enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
+            validBlocks = normalizeLocaleStructuralStrings(
+                validBlocks as Record<string, unknown>[],
+                blockLang,
+                enforcerBizOverride.name ?? businessInfo.businessName,
+            ) as typeof validBlocks
 
             // Phase 04 — page-level guards for single-page path
             const singleStats = checkPageBlockCount(validBlocks)
@@ -1356,6 +1386,7 @@ export function sanitizeBlockData(
     siteCategory?: string,
     language: 'en' | 'vi' | 'ms' = 'en',
     seed?: number,
+    structuralLocale: string = language,
 ): Record<string, unknown> {
     const s = { ...block }
 
@@ -1539,8 +1570,12 @@ export function sanitizeBlockData(
             // Enforce min 2 CTAs for visual richness — add secondary if only 1
             // Note: avoid "Learn More" — blocked by design-quality content rules
             if ((s.ctaButtons as unknown[]).length === 1) {
-                (s.ctaButtons as Array<{ label: string; url: string; style: string }>).push({
-                    label: 'About Us',
+                const localized = structuralLocale.split('-')[0] === 'en'
+                    ? null
+                    : resolveLocaleStructuralStrings(structuralLocale)
+                const ctaButtons = s.ctaButtons as Array<{ label: string; url: string; style: string }>
+                ctaButtons.push({
+                    label: localized?.navigation.about ?? 'About Us',
                     url: '#about',
                     style: 'secondary',
                 })

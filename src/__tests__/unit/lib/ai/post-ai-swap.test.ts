@@ -12,7 +12,12 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { postAISwapStep, SWAPPABLE_BLOCKS, isPostAISwapEnabled } from '@/lib/ai/post-ai-swap'
+import {
+    postAISwapStep,
+    SWAPPABLE_BLOCKS,
+    isPostAISwapEnabled,
+    normalizeLocaleStructuralStrings,
+} from '@/lib/ai/post-ai-swap'
 import * as composer from '@/lib/ai/template-composer'
 import type { BusinessSample } from '@/lib/ai/content'
 
@@ -243,6 +248,50 @@ describe('Phase 04 — postAISwapStep', () => {
             expect([...SWAPPABLE_BLOCKS].sort()).toEqual([
                 'about', 'cta', 'faq', 'features', 'hero', 'testimonials',
             ])
+        })
+    })
+
+    describe('TC-F01-PAS-08: locale-aware structural fallbacks', () => {
+        it('keeps every block and CTA while replacing English structural fallbacks', () => {
+            // Arrange
+            const blocks = [
+                {
+                    blockType: 'hero',
+                    ctaButtons: [
+                        { label: '立即选购', url: '/contact', style: 'primary' },
+                        { label: 'About Us', url: '#about', style: 'secondary' },
+                    ],
+                },
+                {
+                    blockType: 'gallery',
+                    sectionLabel: 'Gallery',
+                    headline: '作品展示',
+                    images: [],
+                },
+                {
+                    blockType: 'newsletter',
+                    sectionLabel: 'Newsletter',
+                    headline: '最新资讯',
+                    buttonLabel: 'Subscribe',
+                    placeholder: 'your@email.com',
+                },
+            ]
+
+            // Act
+            const result = normalizeLocaleStructuralStrings(blocks, 'zh-CN', '智慧生活家居')
+
+            // Assert
+            expect(result).toHaveLength(blocks.length)
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons.map((cta) => cta.label)).toEqual(['立即选购', '关于我们'])
+            expect(result[1]).toMatchObject({ sectionLabel: '图片展示', headline: '作品展示' })
+            expect(result[2]).toMatchObject({
+                sectionLabel: '订阅通讯',
+                headline: '最新资讯',
+                buttonLabel: '订阅',
+                placeholder: '邮箱',
+            })
         })
     })
 

@@ -19,6 +19,7 @@ import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
 import type { ThemeMood } from './theme-moods'
 import { getCategoryCTA } from './theme-moods'
+import { resolveLocaleStructuralStrings } from './locale-structural-strings'
 // Plan 2253 follow-up (260415-0900) — wire template composer builders into
 // gap-fill path. These builders have ~280 hand-curated Malaysia-specific
 // content entries (JAKIM halal, FPX payment, MBBS UM credentials, RM pricing)
@@ -85,7 +86,14 @@ function resolveLibraryCTA(
     mood: ThemeMood | undefined,
     category: string,
     role: 'primary' | 'secondary',
+    language?: string,
 ): string {
+    const localized = resolveLocaleStructuralStrings(language)
+    if (localized && language?.split('-')[0] !== 'en') {
+        return role === 'primary'
+            ? localized.navigation.getStarted
+            : localized.navigation.about
+    }
     if (mood) return getCategoryCTA(mood, category, role)
     return role === 'primary' ? 'Get Started' : 'Learn More'
 }
@@ -99,6 +107,7 @@ function threadHeroBiz(
     userBiz: Partial<BusinessSample> | undefined,
     mood: ThemeMood | undefined,
     category: string,
+    language?: string,
 ): { headline: string; subheadline: string; ctaPrimary: string; ctaSecondary: string } | null {
     if (!userBiz) return null
     const name = (userBiz.name ?? '').trim()
@@ -126,8 +135,8 @@ function threadHeroBiz(
     return {
         headline,
         subheadline,
-        ctaPrimary: resolveLibraryCTA(mood, category, 'primary'),
-        ctaSecondary: resolveLibraryCTA(mood, category, 'secondary'),
+        ctaPrimary: resolveLibraryCTA(mood, category, 'primary', language),
+        ctaSecondary: resolveLibraryCTA(mood, category, 'secondary', language),
     }
 }
 
@@ -262,10 +271,10 @@ export function buildBlockFromLibrary(
             const canDelegate = !!(mergedBiz.name && (mergedBiz.description || mergedBiz.tagline || (mergedBiz.products && mergedBiz.products.length > 0)))
             if (canDelegate) {
                 try {
-                    const composed = composerBuildHero(mergedBiz, category, bizSeed, ctx.mood) as Block
+                    const composed = composerBuildHero(mergedBiz, category, bizSeed, ctx.mood, ctx.language) as Block
                     // Ensure CTA buttons align with mood (composer emits generic labels).
-                    const primaryLabel = resolveLibraryCTA(ctx.mood, category, 'primary')
-                    const secondaryLabel = resolveLibraryCTA(ctx.mood, category, 'secondary')
+                    const primaryLabel = resolveLibraryCTA(ctx.mood, category, 'primary', ctx.language)
+                    const secondaryLabel = resolveLibraryCTA(ctx.mood, category, 'secondary', ctx.language)
                     return {
                         ...composed,
                         ctaButtons: [
@@ -279,7 +288,7 @@ export function buildBlockFromLibrary(
             }
 
             // Legacy fallback — Plan 07 user-thread path kept as defensive branch.
-            const userHero = threadHeroBiz(userBiz, ctx.mood, category)
+            const userHero = threadHeroBiz(userBiz, ctx.mood, category, ctx.language)
             const headline = userHero?.headline
                 ?? substituteBusinessName(biz?.heroHeadline ?? `Welcome to ${name}`, name)
             const subheadline = userHero?.subheadline
@@ -287,8 +296,8 @@ export function buildBlockFromLibrary(
                     biz?.heroSubheadline ?? biz?.description ?? 'Quality service for every customer.',
                     name,
                 )
-            const primaryLabel = userHero?.ctaPrimary ?? resolveLibraryCTA(ctx.mood, category, 'primary')
-            const secondaryLabel = userHero?.ctaSecondary ?? resolveLibraryCTA(ctx.mood, category, 'secondary')
+            const primaryLabel = userHero?.ctaPrimary ?? resolveLibraryCTA(ctx.mood, category, 'primary', ctx.language)
+            const secondaryLabel = userHero?.ctaSecondary ?? resolveLibraryCTA(ctx.mood, category, 'secondary', ctx.language)
             return {
                 blockType: 'hero',
                 variant: 'gradient',
@@ -341,7 +350,7 @@ export function buildBlockFromLibrary(
                     ?? biz?.tagline
                     ?? i18n.cta.subheadline,
                 ctaButton: {
-                    label: resolveLibraryCTA(ctx.mood, category, 'primary'),
+                    label: resolveLibraryCTA(ctx.mood, category, 'primary', ctx.language),
                     url: '/contact',
                     style: 'primary',
                 },
@@ -517,27 +526,37 @@ export function buildBlockFromLibrary(
             }
         }
 
-        case 'gallery':
+        case 'gallery': {
+            const localized = ctx.language?.split('-')[0] === 'en'
+                ? null
+                : resolveLocaleStructuralStrings(ctx.language)
             return {
                 blockType: 'gallery',
                 variant: 'grid',
+                sectionLabel: localized?.sections.gallery,
                 headline: i18n.gallery.headline,
                 // Empty images array — media-injector fills from Unsplash
                 images: Array.from({ length: 6 }, () => ({})),
             }
+        }
 
-        case 'newsletter':
+        case 'newsletter': {
+            const localized = ctx.language?.split('-')[0] === 'en'
+                ? null
+                : resolveLocaleStructuralStrings(ctx.language)
             return {
                 blockType: 'newsletter',
                 variant: 'banner',
+                sectionLabel: localized?.sections.newsletter,
                 headline: i18n.newsletter.headlineStayUpdated(name),
                 subheadline:
                     userTagline
                     ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
                     ?? i18n.newsletter.subheadlineFallback,
                 buttonLabel: i18n.newsletter.subscribeLabel,
-                placeholder: 'your@email.com',
+                placeholder: localized?.newsletter.emailPlaceholder ?? 'your@email.com',
             }
+        }
 
         case 'pricing': {
             // Plan 2253 follow-up (260415-0900) — delegate to template-composer

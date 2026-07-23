@@ -50,6 +50,7 @@ import {
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
 import { getBlockStrings, hasDedicatedStrings, getNavLabels, getSectionLabels } from './block-i18n'
+import { resolveLocaleStructuralStrings } from './locale-structural-strings'
 
 /**
  * Replace nav link labels for known URL slugs with i18n equivalents.
@@ -61,7 +62,9 @@ function normalizeNavLinks(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
-    const navLabels = getNavLabels(language)
+    const navLabels =
+        getNavLabels(language)
+        ?? resolveLocaleStructuralStrings(language)?.navigation
     if (!navLabels) return blocks
     const urlToLabel: Record<string, string> = {
         '/': navLabels.home,
@@ -237,6 +240,101 @@ function normalizeAboutHeadline(
     })
 }
 
+function normalizeHeroCTAs(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    if (language.split('-')[0] === 'en') return blocks
+    const localized = resolveLocaleStructuralStrings(language)
+    if (!localized) return blocks
+    const english = getBlockStrings('en')
+    const aboutFallbacks = new Set([
+        english.navigation.about,
+        english.footer.aboutUs,
+        english.pricing.learnMore,
+        'Button',
+    ])
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'hero' || !Array.isArray(block.ctaButtons)) return block
+
+        const ctaButtons = block.ctaButtons.map((button: unknown) => {
+            if (!button || typeof button !== 'object') return button
+            const cta = button as Record<string, unknown>
+            const url = typeof cta.url === 'string' ? cta.url.toLowerCase() : ''
+            const label = typeof cta.label === 'string' ? cta.label.trim() : ''
+
+            if (
+                (url === '/about' || url === '#about' || url === '/#about')
+                && (!label || aboutFallbacks.has(label))
+            ) {
+                return { ...cta, label: localized.navigation.about }
+            }
+            if (
+                (url === '/contact' || url === '#contact' || url === '/#contact')
+                && (!label || label === english.navigation.getStarted)
+            ) {
+                return { ...cta, label: localized.navigation.getStarted }
+            }
+            return cta
+        })
+
+        return { ...block, ctaButtons }
+    })
+}
+
+function normalizeNewsletterStrings(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    if (language.split('-')[0] === 'en') return blocks
+    const localized = resolveLocaleStructuralStrings(language)
+    if (!localized) return blocks
+    const english = getBlockStrings('en')
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'newsletter') return block
+        const buttonLabel = typeof block.buttonLabel === 'string' ? block.buttonLabel.trim() : ''
+        const placeholder = typeof block.placeholder === 'string' ? block.placeholder.trim() : ''
+        return {
+            ...block,
+            buttonLabel:
+                !buttonLabel || buttonLabel === english.newsletter.subscribeLabel
+                    ? localized.newsletter.buttonLabel
+                    : block.buttonLabel,
+            placeholder:
+                !placeholder || placeholder === 'your@email.com' || placeholder === english.contact.emailLabel
+                    ? localized.newsletter.emailPlaceholder
+                    : block.placeholder,
+        }
+    })
+}
+
+/**
+ * Normalize locale-dependent structural fields after any stage that may add
+ * blocks. Business content remains untouched.
+ */
+export function normalizeLocaleStructuralStrings(
+    blocks: Record<string, unknown>[],
+    language: string,
+    bizName: string,
+): Record<string, unknown>[] {
+    const nav = normalizeNavLinks(blocks, language)
+    const sectioned = normalizeSectionLabels(nav, language)
+    const aboutFixed = normalizeAboutHeadline(sectioned, language)
+    const hero = normalizeHeroCTAs(aboutFixed, language)
+    const newsletter = normalizeNewsletterStrings(hero, language)
+
+    if (!hasDedicatedStrings(language)) return newsletter
+
+    const contact = normalizeContactLabels(newsletter, language)
+    const logos = normalizeClientLogosHeadline(contact, language)
+    const features = normalizeFeaturesHeadline(logos, language, bizName)
+    const testimonials = normalizeTestimonialsSubheadline(features, language)
+    const about = normalizeAboutSectionLabel(testimonials, language)
+    return normalizeContactSectionLabel(about, language)
+}
+
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'hero',
@@ -286,7 +384,7 @@ function callComposerBuilder(
 ): Record<string, unknown> | null {
     switch (blockType) {
         case 'hero':
-            return composerBuildHero(biz, category, 0, mood)
+            return composerBuildHero(biz, category, 0, mood, language)
         case 'features':
             return composerBuildFeatures(biz, category, language)
         case 'testimonials':
@@ -402,32 +500,10 @@ export function postAISwapStep(
 
     if (!language) return { blocks: swapped, telemetry }
 
-    // Nav labels: always normalize using the focused NAV_LABELS lookup.
-    // GPT has an insurmountable training bias toward English nav labels — even
-    // explicit system-prompt instructions are ignored. NAV_LABELS covers
-    // en/ms/vi/ja/zh/ko/ar/th; for other languages normalizeNavLinks is a no-op.
-    const nav = normalizeNavLinks(swapped, language)
-    // Section labels: patch before hasDedicatedStrings guard so ja/zh/ko/ar/th
-    // get correct sectionLabels from the seed lookup. en/ms/vi are excluded from
-    // SECTION_LABELS_SEED and handled by the full STRINGS chain below.
-    const sectioned = normalizeSectionLabels(nav, language)
-    // About headline: replace GPT/composer "About XYZ" English prefix with
-    // the localized equivalent (e.g. "关于 重庆火锅" for Chinese).
-    const aboutFixed = normalizeAboutHeadline(sectioned, language)
-
-    // Full structural string chain (contact labels, logos, features headline, etc.)
-    // only runs for languages with dedicated BlockStrings (en/ms/vi). For other
-    // languages, GPT generates these strings correctly — trust its output rather
-    // than overwriting with English fallback strings.
-    if (!hasDedicatedStrings(language)) return { blocks: aboutFixed, telemetry }
-
-    const contact = normalizeContactLabels(aboutFixed, language)
-    const logos = normalizeClientLogosHeadline(contact, language)
-    const features = normalizeFeaturesHeadline(logos, language, biz.name)
-    const testimonials = normalizeTestimonialsSubheadline(features, language)
-    const about = normalizeAboutSectionLabel(testimonials, language)
-    const final = normalizeContactSectionLabel(about, language)
-    return { blocks: final, telemetry }
+    return {
+        blocks: normalizeLocaleStructuralStrings(swapped, language, biz.name),
+        telemetry,
+    }
 }
 
 /**

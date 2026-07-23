@@ -16,6 +16,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 import { getBlockStrings, getSectionLabels } from './block-i18n'
+import { resolveLocaleStructuralStrings } from './locale-structural-strings'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
 import { pickLogosByCategory } from './content/client-logos-library'
@@ -233,6 +234,7 @@ export function buildHero(
   category: string,
   variantIndex: number,
   mood?: ThemeMood,
+  language?: string,
 ): Record<string, unknown> {
   const variants = CATEGORY_HERO_VARIANTS[category] ?? ['centered']
   const variant = variants[variantIndex % variants.length]
@@ -264,6 +266,14 @@ export function buildHero(
   const subheadline = description
     ? truncateHeroText(description, 140)
     : biz.heroSubheadline
+  const localized = resolveLocaleStructuralStrings(language)
+  const useLocalizedCTA = localized && language?.split('-')[0] !== 'en'
+  const primaryLabel = useLocalizedCTA
+    ? localized.navigation.getStarted
+    : resolveCTA(mood, category, 'primary')
+  const secondaryLabel = useLocalizedCTA
+    ? localized.navigation.about
+    : resolveCTA(mood, category, 'secondary')
 
   return {
     blockType: 'hero',
@@ -271,8 +281,8 @@ export function buildHero(
     headline,
     subheadline,
     ctaButtons: [
-      { label: resolveCTA(mood, category, 'primary'), url: '/contact', style: 'primary' },
-      { label: resolveCTA(mood, category, 'secondary'), url: '/about', style: 'outline' },
+      { label: primaryLabel, url: '/contact', style: 'primary' },
+      { label: secondaryLabel, url: '/about', style: 'outline' },
     ],
     overlay: variant === 'fullscreen' || variant === 'parallax',
     overlayOpacity: 0.4,
@@ -2295,4 +2305,3 @@ export function composeTemplate(input: ComposerInput, disabledSet?: Set<string>)
     pages: validatedPages,
   }
 }
-
