@@ -14,6 +14,7 @@ import {
 	scopedUserPrompt,
 	safeParseJson,
 	mergeSplitParsed,
+	outputMatchesLocale,
 	runParallelPageSplit,
 	applyDeterministicChrome,
 	syncFooterAcrossPages,
@@ -209,6 +210,42 @@ describe('[TC-GENPERF-W2-03] safeParseJson — truncation repair', () => {
 
 		// Act & Assert
 		expect(() => safeParseJson(noBrace)).toThrow('Invalid JSON response from AI')
+	})
+})
+
+describe('outputMatchesLocale — final generation guard', () => {
+	it('rejects a German site containing substantial English page copy', () => {
+		expect(outputMatchesLocale({
+			pages: [{
+				slug: '/services',
+				blocks: [{
+					blockType: 'service-cards',
+					headline: 'Our Services',
+					subheadline: 'Discover what our professional consulting team can do for you.',
+					services: [
+						{ title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development for growing companies.' },
+						{ title: 'Market Entry', description: 'Comprehensive market research and entry planning for international markets.' },
+					],
+				}],
+			}],
+		}, 'de')).toBe(false)
+	})
+
+	it('accepts substantial German page copy', () => {
+		expect(outputMatchesLocale({
+			pages: [{
+				slug: '/leistungen',
+				blocks: [{
+					blockType: 'service-cards',
+					headline: 'Unsere Leistungen',
+					subheadline: 'Entdecken Sie unsere professionelle Beratung für nachhaltige und funktionale Innenarchitektur.',
+					services: [
+						{ title: 'Raumplanung', description: 'Durchdachte Konzepte für Familien, Wohnungen und wachsende Unternehmen.' },
+						{ title: 'Persönliche Beratung', description: 'Individuelle Begleitung von der ersten Idee bis zur verlässlichen Umsetzung.' },
+					],
+				}],
+			}],
+		}, 'de')).toBe(true)
 	})
 })
 
@@ -448,6 +485,142 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		const slugs = pages.map((p) => p.slug)
 		expect(new Set(slugs).size).toBe(slugs.length)
 		expect(pages.filter((p) => p.isHomepage === true)).toHaveLength(1)
+	})
+
+	it('rejects non-English generation instead of applying the English composer fallback', async () => {
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const germanHome = {
+			title: 'Startseite',
+			slug: '/',
+			isHomepage: true,
+			blocks: [{
+				blockType: 'hero',
+				headline: 'Nachhaltige Innenarchitektur für moderne Lebensräume',
+				subheadline: 'Wir gestalten funktionale und hochwertige Räume für Familien und Unternehmen in Berlin mit persönlicher Beratung und sorgfältiger Planung.',
+			}],
+		}
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return {
+								model: 'gpt-4o',
+								usage: { prompt_tokens: 100, completion_tokens: 200 },
+								choices: [{ message: { content: JSON.stringify({
+									siteName: 'GrünRaum',
+									category: 'business',
+									theme: {},
+									seo: {},
+									language: 'en',
+									pages: [germanHome],
+								}) } }],
+							}
+						}
+						throw new Error('API timeout')
+					}),
+				},
+			},
+		}
+
+		await expect(runParallelPageSplit({
+			openai: mockOpenai as any,
+			model: 'gpt-4o',
+			systemPrompt: 'System',
+			userPromptText: 'Website auf Deutsch erstellen',
+			promptText: 'GrünRaum Innenarchitektur',
+			businessInfo: { businessName: 'GrünRaum', siteType: 'service' },
+			seed: 42,
+			// Latin locales use the legacy content enum while blockLang carries
+			// the actual requested output locale.
+			language: 'en',
+			blockLang: 'de',
+		})).rejects.toThrow('NON_ENGLISH_PAGE_GENERATION_FAILED:de')
+
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(5)
+		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
+	})
+
+	it('retries substantial English page copy and accepts the locale-correct response', async () => {
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const response = (pages: Array<Record<string, unknown>>) => ({
+			model: 'gpt-4o',
+			usage: { prompt_tokens: 100, completion_tokens: 200 },
+			choices: [{ message: { content: JSON.stringify({
+				siteName: 'GrünRaum',
+				category: 'business',
+				theme: {},
+				seo: {},
+				language: 'en',
+				pages,
+			}) } }],
+		})
+		const germanPage = (title: string, slug: string) => ({
+			title,
+			slug,
+			isHomepage: slug === '/',
+			blocks: [{
+				blockType: slug === '/' ? 'hero' : 'about',
+				headline: `${title} für nachhaltige Innenarchitektur`,
+				body: 'Wir entwickeln durchdachte, funktionale und hochwertige Raumkonzepte für Familien und Unternehmen mit persönlicher Beratung, klarer Planung und verlässlicher Umsetzung.',
+			}],
+		})
+		const englishPage = (title: string, slug: string) => ({
+			title,
+			slug,
+			isHomepage: false,
+			blocks: [{
+				blockType: 'about',
+				headline: `Our ${title}`,
+				body: 'Discover professional strategy consulting, market entry planning, trusted advisory services and practical solutions for growing companies across every industry.',
+			}],
+		})
+		const attempts = new Map<string, number>()
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return response([germanPage('Startseite', '/')])
+						}
+						const contactBatch = sys.includes('Contact, Blog')
+						const scope = contactBatch ? 'contact-blog' : 'about-services'
+						const attempt = (attempts.get(scope) ?? 0) + 1
+						attempts.set(scope, attempt)
+						const pages = contactBatch
+							? [
+								(attempt === 1 ? englishPage : germanPage)('Kontakt', '/contact'),
+								(attempt === 1 ? englishPage : germanPage)('Magazin', '/blog'),
+							]
+							: [
+								(attempt === 1 ? englishPage : germanPage)('Über uns', '/about'),
+								(attempt === 1 ? englishPage : germanPage)('Leistungen', '/services'),
+							]
+						return response(pages)
+					}),
+				},
+			},
+		}
+
+		const result = await runParallelPageSplit({
+			openai: mockOpenai as any,
+			model: 'gpt-4o',
+			systemPrompt: 'System',
+			userPromptText: 'Website auf Deutsch erstellen',
+			promptText: 'GrünRaum Innenarchitektur',
+			businessInfo: { businessName: 'GrünRaum', siteType: 'service' },
+			seed: 42,
+			language: 'en',
+			blockLang: 'de',
+		})
+
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(5)
+		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
+		expect((result.pages as Array<{ slug: string }>).map((page) => page.slug)).toEqual([
+			'/', '/about', '/services', '/contact', '/blog',
+		])
 	})
 
 	it('TC-GENPERF-W2-04: home call failure triggers composer fallback', async () => {

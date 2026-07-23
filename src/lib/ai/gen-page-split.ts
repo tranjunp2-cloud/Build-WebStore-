@@ -23,6 +23,7 @@ import { composeTemplateResult } from './fallback-adapter'
 import type { BusinessInfoInput } from './system-prompt'
 import type { GenerationResult } from './generate-blocks'
 import { logAiUsage } from './log-usage'
+import { detectLanguageFromText } from '@/lib/language-detection'
 
 const HOME_MAX_TOKENS = 5000
 const SUBPAGE_BATCH_MAX_TOKENS = 9000
@@ -43,6 +44,74 @@ const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly
 /** '/About ' → 'about' — one comparison form for model-emitted slugs. */
 function canonicalSlug(s: unknown): string {
     return String(s ?? '').trim().toLowerCase().replace(/^\/+/, '')
+}
+
+const NON_CONTENT_KEYS = new Set([
+    'blockType',
+    'variant',
+    'url',
+    'href',
+    'slug',
+    'style',
+    'fieldType',
+    'layout',
+    'alignment',
+    'image',
+    'backgroundImage',
+    'videoUrl',
+    'icon',
+    'id',
+    '_uuid',
+])
+
+function collectHumanText(value: unknown, key = ''): string[] {
+    if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (
+            !trimmed
+            || NON_CONTENT_KEYS.has(key)
+            || /^https?:\/\//i.test(trimmed)
+            || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+            || /^#[0-9a-f]{3,8}$/i.test(trimmed)
+        ) {
+            return []
+        }
+        return [trimmed]
+    }
+    if (Array.isArray(value)) return value.flatMap((item) => collectHumanText(item, key))
+    if (!value || typeof value !== 'object') return []
+    return Object.entries(value as Record<string, unknown>)
+        .flatMap(([childKey, childValue]) => collectHumanText(childValue, childKey))
+}
+
+/**
+ * Reject substantial page copy that is still in another language. Short pages
+ * are left alone because language detection is noisy on one- or two-word labels.
+ */
+function pageMatchesLocale(page: Record<string, unknown>, targetLocale: string): boolean {
+    if (targetLocale.split('-')[0] === 'en') return true
+    const text = collectHumanText(page.blocks).join(' ')
+    if (text.replace(/[^\p{L}]/gu, '').length < 80) return true
+    const detected = detectLanguageFromText(text)
+    return detected.locale === targetLocale.split('-')[0] || detected.confidence < 0.7
+}
+
+/** Shared final guard for both parallel and legacy single-call generation. */
+export function outputMatchesLocale(
+    output: Record<string, unknown>,
+    targetLocale: string,
+): boolean {
+    if (targetLocale.split('-')[0] === 'en') return true
+    const pages = Array.isArray(output.pages)
+        ? output.pages.filter(
+            (page): page is Record<string, unknown> =>
+                Boolean(page) && typeof page === 'object',
+        )
+        : []
+    if (pages.length > 0) return pages.every((page) => pageMatchesLocale(page, targetLocale))
+
+    const blocks = Array.isArray(output.blocks) ? output.blocks : []
+    return pageMatchesLocale({ blocks }, targetLocale)
 }
 
 export type PageSplitBrief = { navLabels: NavLabels | null }
@@ -344,9 +413,25 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     )
 
     let homeParsed = homeOutcome.parsed
-    if (homeParsed && !extractHomePage(homeParsed)) {
-        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable homepage — composer fallback required')
+    const initialHomePage = homeParsed ? extractHomePage(homeParsed) : null
+    if (homeParsed && (!initialHomePage || !pageMatchesLocale(initialHomePage, input.blockLang))) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable locale-matching homepage')
         homeParsed = null
+    }
+    if (!homeParsed && input.blockLang !== 'en') {
+        console.warn(`[AI][GEN_PARALLEL_PAGES] retrying failed homepage in locale=${input.blockLang}`)
+        const retry = await runSplitCall(
+            input.openai,
+            input.model,
+            buildHomeSystemPrompt(input.systemPrompt, brief),
+            scopedUserPrompt(input.userPromptText, 'generate ONLY the Homepage page (pages array with exactly 1 entry).'),
+            HOME_MAX_TOKENS,
+        )
+        logOutcome(retry)
+        const retryPage = retry.parsed ? extractHomePage(retry.parsed) : null
+        homeParsed = retryPage && pageMatchesLocale(retryPage, input.blockLang)
+            ? retry.parsed
+            : null
     }
     // Scope enforcement in CODE, not just prompt: a scope-ignoring batch (the
     // measured failure mode) may emit a stray homepage or extra pages.
@@ -384,11 +469,21 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // templates use Book Now / Get in Touch instead) → user-visible "missing
     // contact page". One retry on the MAIN model rescues nearly all
     // intermittent nano/parse failures; composer stays as the last resort.
+    const batchMatchesLocale = (pages: Record<string, unknown>[]) =>
+        pages.every((page) => pageMatchesLocale(page, input.blockLang))
     const failedIdx = batchOutcomes
-        // Retry only a valid JSON response with the wrong page shape. Network,
-        // timeout, and parse failures already consumed their budget and go
-        // directly to deterministic composer fallback.
-        .map((o, i) => (o.parsed !== null && batchPages[i]!.length !== SUBPAGE_BATCHES[i]!.pages.length ? i : -1))
+        // English keeps the measured one-retry policy for structurally invalid
+        // JSON. Non-English also retries transport/parse/language failures:
+        // its deterministic composer fallback contains English content.
+        .map((o, i) => {
+            const pages = batchPages[i]!
+            const incomplete = pages.length !== SUBPAGE_BATCHES[i]!.pages.length
+            const wrongLocale = !batchMatchesLocale(pages)
+            const retryable = o.parsed !== null
+                ? incomplete || wrongLocale
+                : input.blockLang !== 'en'
+            return retryable ? i : -1
+        })
         .filter((i) => i >= 0)
     if (failedIdx.length > 0) {
         console.warn(`[AI][GEN_PARALLEL_PAGES] retrying ${failedIdx.length} failed batch(es) with main model`)
@@ -400,7 +495,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     SUBPAGE_BATCH_MAX_TOKENS,
-                    10_000,
+                    input.blockLang === 'en' ? 10_000 : 38_000,
                 )
             }),
         )
@@ -426,7 +521,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
         console.warn('[AI][GEN_PARALLEL_PAGES] duplicate/empty subpage slug detected — composer fallback for subpages')
     }
     const allBatchesOk = slugsOk && batchOutcomes.every(
-        (o, i) => o.parsed !== null && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length,
+        (o, i) =>
+            o.parsed !== null
+            && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length
+            && batchMatchesLocale(batchPages[i]!),
     )
     if (!allBatchesOk) {
         console.warn(
@@ -435,6 +533,10 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
         )
     }
     let subsParsed: Record<string, unknown> | null = allBatchesOk ? { pages: batchPages.flat() } : null
+
+    if ((!homeParsed || !subsParsed) && input.blockLang !== 'en') {
+        throw new Error(`NON_ENGLISH_PAGE_GENERATION_FAILED:${input.blockLang}`)
+    }
 
     if (!homeParsed || !subsParsed) {
         // Lazy, computed at most once — covers any scope failing. Seed matches

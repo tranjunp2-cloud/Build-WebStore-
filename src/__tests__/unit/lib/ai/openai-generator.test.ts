@@ -342,6 +342,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
 // ─── TC-F05.XX: Test sanitizeBlockData ───────────────────────────────
 import { sanitizeBlockData } from '@/lib/ai/openai-generator'
+import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
 
 describe('sanitizeBlockData - Normalize AI outputs', () => {
     it('TC-F01-PAS-11: adds the required secondary hero CTA in the structural locale', () => {
@@ -360,6 +361,37 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
         expect(output.ctaButtons).toEqual([
             { label: '立即选购', url: '/contact', style: 'primary' },
             { label: '关于我们', url: '#about', style: 'secondary' },
+        ])
+    })
+
+    it('uses request-scoped locale strings when adding the secondary hero CTA', () => {
+        const english = resolveLocaleStructuralStrings('en')!
+        const german = {
+            ...english,
+            navigation: {
+                ...english.navigation,
+                about: 'Über uns',
+            },
+        }
+        const input = {
+            blockType: 'hero',
+            ctaButtons: [
+                { label: 'Jetzt beraten lassen', url: '/contact', style: 'primary' },
+            ],
+        }
+
+        const output = sanitizeBlockData(
+            input,
+            undefined,
+            'en',
+            undefined,
+            'de-DE',
+            german,
+        )
+
+        expect(output.ctaButtons).toEqual([
+            { label: 'Jetzt beraten lassen', url: '/contact', style: 'primary' },
+            { label: 'Über uns', url: '#about', style: 'secondary' },
         ])
     })
 

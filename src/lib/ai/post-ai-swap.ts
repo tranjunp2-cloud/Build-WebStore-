@@ -50,7 +50,15 @@ import {
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
 import { getBlockStrings, hasDedicatedStrings, getNavLabels, getSectionLabels } from './block-i18n'
-import { resolveLocaleStructuralStrings } from './locale-structural-strings'
+import {
+    resolveLocaleStructuralStrings,
+    type LocaleStructuralStrings,
+} from './locale-structural-strings'
+import { detectLanguageFromText } from '@/lib/language-detection'
+
+function isEnglishFallbackText(value: string): boolean {
+    return Boolean(value.trim()) && detectLanguageFromText(value).locale === 'en'
+}
 
 /**
  * Replace nav link labels for known URL slugs with i18n equivalents.
@@ -61,9 +69,11 @@ import { resolveLocaleStructuralStrings } from './locale-structural-strings'
 function normalizeNavLinks(
     blocks: Record<string, unknown>[],
     language: string,
+    localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
     const navLabels =
         getNavLabels(language)
+        ?? localizedOverride?.navigation
         ?? resolveLocaleStructuralStrings(language)?.navigation
     if (!navLabels) return blocks
     const urlToLabel: Record<string, string> = {
@@ -81,7 +91,17 @@ function normalizeNavLinks(
             const translated = urlToLabel[url]
             return translated ? { ...l, label: translated } : l
         })
-        return { ...block, links: normalizedLinks }
+        const ctaButton = block.ctaButton && typeof block.ctaButton === 'object'
+            ? block.ctaButton as Record<string, unknown>
+            : null
+        const ctaUrl = typeof ctaButton?.url === 'string' ? ctaButton.url.toLowerCase() : ''
+        const ctaLabel = typeof ctaButton?.label === 'string' ? ctaButton.label : ''
+        const localizedCta = ctaButton
+            && (ctaUrl === '/contact' || ctaUrl === '#contact' || ctaUrl === '/#contact')
+            && (!ctaLabel || isEnglishFallbackText(ctaLabel))
+                ? { ...ctaButton, label: navLabels.getStarted }
+                : block.ctaButton
+        return { ...block, links: normalizedLinks, ctaButton: localizedCta }
     })
 }
 
@@ -243,16 +263,19 @@ function normalizeAboutHeadline(
 function normalizeHeroCTAs(
     blocks: Record<string, unknown>[],
     language: string,
+    localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
     if (language.split('-')[0] === 'en') return blocks
-    const localized = resolveLocaleStructuralStrings(language)
+    const localized = localizedOverride ?? resolveLocaleStructuralStrings(language)
     if (!localized) return blocks
     const english = getBlockStrings('en')
-    const aboutFallbacks = new Set([
-        english.navigation.about,
-        english.footer.aboutUs,
-        english.pricing.learnMore,
-        'Button',
+    const explicitAboutLabels = new Set([
+        english.navigation.about.toLowerCase(),
+        english.footer.aboutUs.toLowerCase(),
+    ])
+    const contextualAboutFallbacks = new Set([
+        english.pricing.learnMore.toLowerCase(),
+        'button',
     ])
 
     return blocks.map((block) => {
@@ -262,17 +285,25 @@ function normalizeHeroCTAs(
             if (!button || typeof button !== 'object') return button
             const cta = button as Record<string, unknown>
             const url = typeof cta.url === 'string' ? cta.url.toLowerCase() : ''
-            const label = typeof cta.label === 'string' ? cta.label.trim() : ''
+            const rawLabel = cta.label ?? cta.text ?? cta.title
+            const label = typeof rawLabel === 'string' ? rawLabel.trim() : ''
+            const normalizedLabel = label.toLowerCase()
 
             if (
-                (url === '/about' || url === '#about' || url === '/#about')
-                && (!label || aboutFallbacks.has(label))
+                explicitAboutLabels.has(normalizedLabel)
+                || (
+                    (url === '/about' || url === '#about' || url === '/#about')
+                    && (!label || contextualAboutFallbacks.has(normalizedLabel))
+                )
             ) {
                 return { ...cta, label: localized.navigation.about }
             }
             if (
-                (url === '/contact' || url === '#contact' || url === '/#contact')
-                && (!label || label === english.navigation.getStarted)
+                normalizedLabel === english.navigation.getStarted.toLowerCase()
+                || (
+                    (url === '/contact' || url === '#contact' || url === '/#contact')
+                    && (!label || isEnglishFallbackText(label))
+                )
             ) {
                 return { ...cta, label: localized.navigation.getStarted }
             }
@@ -286,9 +317,10 @@ function normalizeHeroCTAs(
 function normalizeNewsletterStrings(
     blocks: Record<string, unknown>[],
     language: string,
+    localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
     if (language.split('-')[0] === 'en') return blocks
-    const localized = resolveLocaleStructuralStrings(language)
+    const localized = localizedOverride ?? resolveLocaleStructuralStrings(language)
     if (!localized) return blocks
     const english = getBlockStrings('en')
 
@@ -310,6 +342,25 @@ function normalizeNewsletterStrings(
     })
 }
 
+function normalizeBlogListStrings(
+    blocks: Record<string, unknown>[],
+    language: string,
+    localizedOverride?: LocaleStructuralStrings | null,
+): Record<string, unknown>[] {
+    const localized = localizedOverride ?? resolveLocaleStructuralStrings(language)
+    if (!localized) return blocks
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'blog-list') return block
+        return {
+            ...block,
+            readArticleLabel: localized.blogList.readArticleLabel,
+            uncategorizedLabel: localized.blogList.uncategorizedLabel,
+            emptyStateLabel: localized.blogList.emptyStateLabel,
+        }
+    })
+}
+
 /**
  * Normalize locale-dependent structural fields after any stage that may add
  * blocks. Business content remains untouched.
@@ -318,21 +369,53 @@ export function normalizeLocaleStructuralStrings(
     blocks: Record<string, unknown>[],
     language: string,
     bizName: string,
+    localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
-    const nav = normalizeNavLinks(blocks, language)
+    const nav = normalizeNavLinks(blocks, language, localizedOverride)
     const sectioned = normalizeSectionLabels(nav, language)
     const aboutFixed = normalizeAboutHeadline(sectioned, language)
-    const hero = normalizeHeroCTAs(aboutFixed, language)
-    const newsletter = normalizeNewsletterStrings(hero, language)
+    const hero = normalizeHeroCTAs(aboutFixed, language, localizedOverride)
+    const newsletter = normalizeNewsletterStrings(hero, language, localizedOverride)
+    const blogList = normalizeBlogListStrings(newsletter, language, localizedOverride)
 
-    if (!hasDedicatedStrings(language)) return newsletter
+    if (!hasDedicatedStrings(language)) return blogList
 
-    const contact = normalizeContactLabels(newsletter, language)
+    const contact = normalizeContactLabels(blogList, language)
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, bizName)
     const testimonials = normalizeTestimonialsSubheadline(features, language)
     const about = normalizeAboutSectionLabel(testimonials, language)
     return normalizeContactSectionLabel(about, language)
+}
+
+export function normalizeGeneratedPageLocaleStrings<
+    T extends { layout?: unknown[] },
+>(
+    pages: T[],
+    language: string,
+    bizName: string,
+): T[] {
+    return pages.map((page) => {
+        if (!Array.isArray(page.layout)) return page
+        const blockEntries = page.layout.filter(
+            (block): block is Record<string, unknown> =>
+                Boolean(block) && typeof block === 'object',
+        )
+        const normalizedBlocks = normalizeLocaleStructuralStrings(
+            blockEntries,
+            language,
+            bizName,
+        )
+        let normalizedIndex = 0
+        return {
+            ...page,
+            layout: page.layout.map((block) =>
+                Boolean(block) && typeof block === 'object'
+                    ? normalizedBlocks[normalizedIndex++] ?? block
+                    : block,
+            ),
+        }
+    })
 }
 
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
@@ -346,10 +429,9 @@ export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Content-heavy blocks where item copy (testimonial quotes, feature
- * titles/descriptions, FAQ Q&A) should come from GPT for non-English sites.
- * The English-only library would discard GPT's language-specific output.
- * Structural strings are still patched by the i18n normalize chain.
+ * Kept as a public compatibility export for callers that classify the original
+ * content-heavy subset. postAISwapStep now preserves every swappable GPT block
+ * for non-English sites because all composer builders are English-first.
  */
 export const GPT_CONTENT_BLOCKS: ReadonlySet<string> = new Set([
     'testimonials',
@@ -433,14 +515,11 @@ export function postAISwapStep(
             return block
         }
 
-        // Guard 1b: dynamic language trust — for non-English generation, GPT
-        // already wrote content in the user's language. Swapping with an English
-        // library block would discard GPT's language-specific copy. Structural
-        // strings (headline, subheadline, sectionLabel) are patched by the i18n
-        // normalize chain below regardless.
-        // Covers content-heavy blocks where item copy (quotes, feature titles,
-        // FAQ Q&A) must come from GPT, not the English-only library.
-        if (language && language !== 'en' && GPT_CONTENT_BLOCKS.has(bt)) {
+        // Guard 1b: dynamic language trust — composer content is English-first.
+        // Preserve every GPT block for non-English generation; replacing even a
+        // hero/about/CTA can reintroduce English copy after GPT localized it.
+        // Structural fallback labels are normalized below.
+        if (language && language.split('-')[0] !== 'en') {
             telemetry.push({ blockType: bt, action: 'kept-lang-dynamic', reason: `lang:${language}` })
             return block
         }

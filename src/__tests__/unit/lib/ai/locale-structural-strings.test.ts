@@ -22,6 +22,7 @@ describe('TC-F01-PAS-09: dynamic structural locale resolver', () => {
         expect(result?.navigation.about).toBe('关于我们')
         expect(result?.sections.gallery).toBe('图片展示')
         expect(result?.newsletter.emailPlaceholder).toBe('邮箱')
+        expect(result?.blogList.readArticleLabel).toBe('阅读文章')
     })
 
     it('returns null instead of silently falling back to English before translation', () => {

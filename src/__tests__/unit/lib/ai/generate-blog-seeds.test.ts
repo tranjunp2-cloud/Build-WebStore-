@@ -279,3 +279,139 @@ describe('TC-F08-BG.19 — generateBlogSeedsAI: per-product string capped at 60 
         expect(userContent).not.toContain('P'.repeat(61))
     })
 })
+
+describe('TC-F08-BG.20 — blog prompts enforce the dynamic target locale', () => {
+    let mockCreate: ReturnType<typeof vi.fn>
+
+    beforeEach(async () => {
+        process.env.OPENAI_API_KEY = 'test-key'
+        mockCreate = makeCreate(JSON.stringify({
+            posts: [{
+                title: 'Mẹo chăm sóc răng',
+                excerpt: 'Hướng dẫn chăm sóc răng miệng.',
+                slug: 'meo-cham-soc-rang',
+                imageKeyword: 'dental care',
+            }],
+        }))
+        const OpenAI = await getOpenAIClass()
+        OpenAI.mockImplementation(() => mockOpenAI(mockCreate))
+    })
+
+    afterEach(() => {
+        delete process.env.OPENAI_API_KEY
+    })
+
+    it('requests Vietnamese titles and excerpts while keeping image keywords in English', async () => {
+        await generateBlogSeedsAI({
+            businessName: 'Nha Khoa Việt Smile',
+            industry: 'dental',
+            locale: 'vi-VN',
+        })
+
+        const systemContent: string = mockCreate.mock.calls[0][0].messages[0].content
+        const userContent: string = mockCreate.mock.calls[0][0].messages[1].content
+        expect(userContent).toContain('Vietnamese (vi)')
+        expect(systemContent).toContain('title and excerpt MUST be written in the requested target language')
+        expect(systemContent).toContain('imageKeyword MUST be 2-4 plain English words')
+    })
+
+    it('requests the complete article body in a Latin-script target locale', async () => {
+        mockCreate.mockResolvedValueOnce({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        content: '<p>Découvrez des conseils professionnels pour prendre soin de votre peau chaque jour. Nos traitements personnalisés vous aident à retrouver une peau saine, lumineuse et durable.</p>',
+                    }),
+                },
+            }],
+        })
+
+        await generateBlogPostContent('Conseils pratiques', 'Maison Claire', 'real estate', 'fr-FR')
+
+        const userContent: string = mockCreate.mock.calls[0][0].messages[1].content
+        expect(userContent).toContain('French (fr)')
+    })
+})
+
+describe('TC-F08-BG.21 — blog output must match the requested locale', () => {
+    beforeEach(() => {
+        process.env.OPENAI_API_KEY = 'test-key'
+    })
+
+    afterEach(() => {
+        delete process.env.OPENAI_API_KEY
+    })
+
+    it('rejects English seed content returned for a French request', async () => {
+        const OpenAI = await getOpenAIClass()
+        const mockCreate = makeCreate(JSON.stringify({
+            posts: [
+                {
+                    title: 'Effective Anti-Acne Treatments for Clearer Skin',
+                    excerpt: 'Learn how professional treatments can improve your skin and confidence.',
+                    slug: 'anti-acne-treatments',
+                    imageKeyword: 'acne skin treatment',
+                },
+            ],
+        }))
+        OpenAI.mockImplementation(() => mockOpenAI(mockCreate))
+
+        await expect(generateBlogSeedsAI({
+            businessName: 'Éclat Peau Studio',
+            industry: 'beauty',
+            locale: 'fr-FR',
+        })).rejects.toThrow('BLOG_LOCALE_MISMATCH source=seed-1 expected=fr actual=en')
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+
+    it('rejects an English article body returned for a French request', async () => {
+        const OpenAI = await getOpenAIClass()
+        const mockCreate = makeCreate(JSON.stringify({
+            content: '<h2>Clearer skin starts here</h2><p>Our professional team helps you choose the right treatment for healthy skin.</p>',
+        }))
+        OpenAI.mockImplementation(() => mockOpenAI(mockCreate))
+
+        await expect(generateBlogPostContent(
+            'Conseils pour une peau saine',
+            'Éclat Peau Studio',
+            'beauty',
+            'fr-FR',
+        )).rejects.toThrow('BLOG_LOCALE_MISMATCH source=article expected=fr actual=en')
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+
+    it('retries once and accepts corrected Spanish seed content', async () => {
+        const OpenAI = await getOpenAIClass()
+        const mockCreate = vi.fn()
+            .mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({
+                    posts: [{
+                        title: 'Fresh Bread Every Day',
+                        excerpt: 'Discover our artisan bread and pastries baked with care.',
+                        slug: 'fresh-bread',
+                        imageKeyword: 'artisan bread',
+                    }],
+                }) } }],
+            })
+            .mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({
+                    posts: [{
+                        title: 'Pan artesanal para cada día',
+                        excerpt: 'Descubre nuestras recetas tradicionales y productos frescos elaborados con dedicación.',
+                        slug: 'pan-artesanal',
+                        imageKeyword: 'artisan bread',
+                    }],
+                }) } }],
+            })
+        OpenAI.mockImplementation(() => mockOpenAI(mockCreate))
+
+        const posts = await generateBlogSeedsAI({
+            businessName: 'Panadería Sol',
+            industry: 'bakery',
+            locale: 'es',
+        })
+
+        expect(posts[0]?.title).toBe('Pan artesanal para cada día')
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+})

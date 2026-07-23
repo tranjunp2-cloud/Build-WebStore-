@@ -45,8 +45,11 @@ import {
 import { detectLanguage, resolveDetectedLanguage } from './lang-detect'
 import { hasDedicatedStrings } from './block-i18n'
 import { ensureBlockStrings } from './block-strings-translator'
-import { resolveLocaleStructuralStrings } from './locale-structural-strings'
-import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
+import {
+    resolveLocaleStructuralStrings,
+    type LocaleStructuralStrings,
+} from './locale-structural-strings'
+import { outputMatchesLocale, runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -378,6 +381,10 @@ export async function generateSiteWithAI(
             }
         }
 
+        if (blockLang !== 'en' && !outputMatchesLocale(parsed, blockLang)) {
+            throw new Error(`NON_ENGLISH_PAGE_GENERATION_FAILED:${blockLang}`)
+        }
+
         // Hard override AI theme with curated category preset.
         // Preserves content/SEO/blocks from AI but forces theme DNA (colors + fonts +
         // spacing + radius + shadow) from the 14×5 preset library so every generation
@@ -411,6 +418,13 @@ export async function generateSiteWithAI(
         if (blockLang !== 'en' && !structuralStringsReady && !hasDedicatedStrings(blockLang)) {
             throw new Error(`LOCALE_STRUCTURAL_STRINGS_UNAVAILABLE:${blockLang}`)
         }
+        const localeStructuralStrings =
+            blockLang.split('-')[0] === 'en'
+                ? null
+                : resolveLocaleStructuralStrings(blockLang)
+        if (blockLang.split('-')[0] !== 'en' && !localeStructuralStrings) {
+            throw new Error(`LOCALE_STRUCTURAL_STRINGS_UNAVAILABLE:${blockLang}`)
+        }
 
         // Detect site category for weighted variant selection
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
@@ -431,6 +445,7 @@ export async function generateSiteWithAI(
                     contentLang,
                     themeSeed,
                     blockLang,
+                    localeStructuralStrings,
                 )
             )
             const filtered = filterUnsupportedBlocks(sanitizedBlocks, 'ai')
@@ -557,6 +572,7 @@ export async function generateSiteWithAI(
                     pageBlocks as Record<string, unknown>[],
                     blockLang,
                     enforcerBizOverride.name ?? businessInfo.businessName,
+                    localeStructuralStrings,
                 ) as typeof pageBlocks
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
@@ -686,6 +702,7 @@ export async function generateSiteWithAI(
                 validBlocks as Record<string, unknown>[],
                 blockLang,
                 enforcerBizOverride.name ?? businessInfo.businessName,
+                localeStructuralStrings,
             ) as typeof validBlocks
 
             // Phase 04 — page-level guards for single-page path
@@ -771,7 +788,10 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
-        if (!['en', 'ms', 'vi'].includes(blockLang)) throw error
+        // Curated fallback templates contain English item-level copy. Returning
+        // them for any non-English locale creates a successfully persisted but
+        // mixed-language site, so only English may use this fallback.
+        if (blockLang !== 'en') throw error
         // Fallback succeeded — site will still be created via smart templates.
         // Don't emit 'error' event (would show error UI even though generation succeeds).
         // Keep warn log for ops visibility on fallback rate.
@@ -1387,6 +1407,7 @@ export function sanitizeBlockData(
     language: 'en' | 'vi' | 'ms' = 'en',
     seed?: number,
     structuralLocale: string = language,
+    localeStructuralStrings?: LocaleStructuralStrings | null,
 ): Record<string, unknown> {
     const s = { ...block }
 
@@ -1570,15 +1591,21 @@ export function sanitizeBlockData(
             // Enforce min 2 CTAs for visual richness — add secondary if only 1
             // Note: avoid "Learn More" — blocked by design-quality content rules
             if ((s.ctaButtons as unknown[]).length === 1) {
-                const localized = structuralLocale.split('-')[0] === 'en'
+                const isEnglishLocale = structuralLocale.split('-')[0] === 'en'
+                const localized = isEnglishLocale
                     ? null
-                    : resolveLocaleStructuralStrings(structuralLocale)
+                    : localeStructuralStrings ?? resolveLocaleStructuralStrings(structuralLocale)
+                const secondaryLabel = isEnglishLocale
+                    ? 'About Us'
+                    : localized?.navigation.about
                 const ctaButtons = s.ctaButtons as Array<{ label: string; url: string; style: string }>
-                ctaButtons.push({
-                    label: localized?.navigation.about ?? 'About Us',
-                    url: '#about',
-                    style: 'secondary',
-                })
+                if (secondaryLabel) {
+                    ctaButtons.push({
+                        label: secondaryLabel,
+                        url: '#about',
+                        style: 'secondary',
+                    })
+                }
             }
         }
         // Normalize badge

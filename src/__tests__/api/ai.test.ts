@@ -11,6 +11,7 @@ import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -1230,6 +1231,121 @@ describe('AI Streaming APIs', () => {
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
 
+        it('localizes an aliased About Us fallback in the persisted German Blog hero', async () => {
+             injectBlockStrings('de', {
+                 ...getBlockStrings('en'),
+                 navigation: {
+                     ...getBlockStrings('en').navigation,
+                     about: 'Über uns',
+                     getStarted: 'Kontakt aufnehmen',
+                 },
+             })
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'GrünRaum Innenarchitektur',
+                     siteType: 'business',
+                     theme: { primaryColor: '#24466f' },
+                     seo: {
+                         title: 'GrünRaum Innenarchitektur',
+                         description: 'Nachhaltige Innenarchitektur in Berlin.',
+                     },
+                     language: 'de',
+                     blockLang: 'de',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Startseite',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 {
+                                     blockType: 'hero',
+                                     variant: 'centered',
+                                     headline: 'Nachhaltige Räume',
+                                     subheadline: 'Innenarchitektur für moderne Unternehmen.',
+                                     ctaButtons: [
+                                         { label: 'Kontakt aufnehmen', url: '/contact', style: 'primary' },
+                                         { label: 'Über uns', url: '/about', style: 'secondary' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Startseite', description: 'Nachhaltige Räume.' },
+                         },
+                         {
+                             title: 'Blog',
+                             slug: '/blog',
+                             isHomepage: false,
+                             blocks: [
+                                 {
+                                     blockType: 'hero',
+                                     variant: 'split-left',
+                                     headline: 'Neuigkeiten und Inspirationen',
+                                     subheadline: 'Aktuelle Projekte und nachhaltige Gestaltung.',
+                                     ctaButtons: [
+                                         { label: 'Kontaktieren Sie uns', url: '/contact', style: 'primary' },
+                                         { text: 'About Us', url: '/about', style: 'secondary' },
+                                     ],
+                                 },
+                                 { blockType: 'blog-list', variant: 'grid', headline: 'Aktuelle Beiträge', limit: 3 },
+                             ],
+                             seo: { title: 'Blog', description: 'Aktuelle Beiträge.' },
+                         },
+                         {
+                             title: 'Über uns',
+                             slug: '/about',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'about',
+                                 variant: 'image-right',
+                                 headline: 'Über GrünRaum',
+                                 body: 'Nachhaltige Innenarchitektur aus Berlin.',
+                             }],
+                             seo: { title: 'Über uns', description: 'Über GrünRaum.' },
+                         },
+                         {
+                             title: 'Kontakt',
+                             slug: '/contact',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'contact',
+                                 variant: 'split',
+                                 headline: 'Kontakt',
+                                 email: 'kontakt@gruenraum.test',
+                             }],
+                             seo: { title: 'Kontakt', description: 'Kontaktieren Sie uns.' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } as Awaited<ReturnType<typeof generateSiteWithAI>>)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'GrünRaum Innenarchitektur',
+                         industry: 'Interior Design',
+                         products: 'Nachhaltige Innenarchitektur',
+                         shortDescription: 'Nachhaltige Innenarchitektur in Berlin.',
+                     },
+                     language: 'auto',
+                     generationLocale: 'de',
+                 }),
+             })
+
+             const res = await GenerateSitePOST(req)
+
+             expect(res.status).toBe(200)
+             const blogPage = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/blog')
+             const hero = blogPage?.layout?.find((block) => block.blockType === 'hero')
+             expect(hero?.ctaButtons).toEqual([
+                 expect.objectContaining({ label: 'Kontaktieren Sie uns' }),
+                 expect.objectContaining({ label: 'Über uns' }),
+             ])
+        })
+
         it('[TC-F26-11-04] resolves a missing Auto override once for AI, products, and persistence', async () => {
              // Arrange
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
@@ -1252,6 +1368,10 @@ describe('AI Streaming APIs', () => {
              const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
              expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
              expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
+             const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+             expect(vi.mocked(prepareBlogPosts).mock.calls.at(-1)?.[0]).toEqual(
+                 expect.objectContaining({ locale: 'it' }),
+             )
 
              const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
              const resolvedPayload = await mockPayload

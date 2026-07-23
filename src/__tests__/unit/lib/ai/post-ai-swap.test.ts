@@ -16,10 +16,13 @@ import {
     postAISwapStep,
     SWAPPABLE_BLOCKS,
     isPostAISwapEnabled,
+    normalizeGeneratedPageLocaleStrings,
     normalizeLocaleStructuralStrings,
 } from '@/lib/ai/post-ai-swap'
 import * as composer from '@/lib/ai/template-composer'
 import type { BusinessSample } from '@/lib/ai/content'
+import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
+import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
 
 const BIZ: BusinessSample = {
     name: 'Klinik Dr. Tan',
@@ -292,6 +295,227 @@ describe('Phase 04 — postAISwapStep', () => {
                 buttonLabel: '订阅',
                 placeholder: '邮箱',
             })
+        })
+
+        it('normalizes an English hero CTA even before its placeholder URL is resolved', () => {
+            const pages = [{
+                title: 'Blog',
+                layout: [{
+                    blockType: 'hero',
+                    headline: 'Kiến thức nha khoa nhẹ nhàng và sâu sắc',
+                    ctaButtons: [
+                        { label: 'Đặt lịch khám', url: '#contact', style: 'primary' },
+                        { label: 'About Us', url: '#', style: 'secondary' },
+                    ],
+                }],
+            }]
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                pages,
+                'vi',
+                'Nha Khoa An Tâm',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string; url: string }>
+            }
+            expect(hero.ctaButtons).toEqual([
+                { label: 'Đặt lịch khám', url: '#contact', style: 'primary' },
+                { label: 'Giới Thiệu', url: '#', style: 'secondary' },
+            ])
+        })
+
+        it('injects dynamically translated BlogList labels for a Latin-script locale', () => {
+            const locale = 'fr-blog-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                blogList: {
+                    readArticleLabel: 'Lire l’article',
+                    uncategorizedLabel: 'Sans catégorie',
+                    emptyStateLabel: 'Aucun article publié pour le moment.',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'blog-list',
+                        headline: 'Conseils beauté',
+                        limit: 3,
+                    }],
+                }],
+                locale,
+                'Éclat Peau Studio',
+            )
+
+            expect(result[0]!.layout![0]).toMatchObject({
+                blockType: 'blog-list',
+                headline: 'Conseils beauté',
+                limit: 3,
+                readArticleLabel: 'Lire l’article',
+                uncategorizedLabel: 'Sans catégorie',
+                emptyStateLabel: 'Aucun article publié pour le moment.',
+            })
+        })
+
+        it('replaces an English About Us CTA with dynamically translated Spanish', () => {
+            const locale = 'es-hero-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    about: 'Acerca de',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Historias y sabores de nuestra panadería',
+                        ctaButtons: [
+                            { label: 'Ver últimos posts', url: '/blog', style: 'primary' },
+                            { label: 'About Us', url: '#', style: 'secondary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'Panadería Sol',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string }>
+            }
+            expect(hero.ctaButtons.map((button) => button.label)).toEqual([
+                'Ver últimos posts',
+                'Acerca de',
+            ])
+        })
+
+        it('normalizes Blog hero CTA from request-scoped strings without a locale cache entry', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                navigation: {
+                    ...english.navigation,
+                    about: 'Über uns',
+                    getStarted: 'Jetzt beraten lassen',
+                },
+            }
+            const blocks = [{
+                blockType: 'hero',
+                headline: 'Neuigkeiten von GrünRaum Innenarchitektur',
+                ctaButtons: [
+                    { label: 'Jetzt beraten lassen', url: '/contact', style: 'primary' },
+                    { label: 'About Us', url: '#about', style: 'secondary' },
+                ],
+            }]
+
+            const result = normalizeLocaleStructuralStrings(
+                blocks,
+                'de-request-scoped-test',
+                'GrünRaum Innenarchitektur',
+                german,
+            )
+
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons.map((button) => button.label)).toEqual([
+                'Jetzt beraten lassen',
+                'Über uns',
+            ])
+        })
+
+        it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
+            const locale = 'de-hero-alias-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    about: 'Über uns',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Neuigkeiten und Inspirationen',
+                        ctaButtons: [
+                            { label: 'Kontaktieren Sie uns', url: '/contact', style: 'primary' },
+                            { text: 'About Us', url: '#', style: 'secondary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'GrünRaum Innenarchitektur',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label?: string; text?: string }>
+            }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons[1]).toMatchObject({
+                label: 'Über uns',
+                text: 'About Us',
+            })
+        })
+
+        it('replaces an English contact CTA with the dynamically translated German label', () => {
+            const locale = 'de-cta-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    getStarted: 'Gespräch beginnen',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Startseite',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Nachhaltige Räume für moderne Unternehmen',
+                        ctaButtons: [
+                            { label: 'Start a Conversation', url: '/contact', style: 'primary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'GrünRaum Innenarchitektur',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string }>
+            }
+            expect(hero.ctaButtons[0]!.label).toBe('Gespräch beginnen')
+        })
+
+        it('preserves generic GPT blocks for every non-English locale', () => {
+            const hero = {
+                blockType: 'hero',
+                headline: 'Willkommen auf unserer Website',
+                subheadline: 'Ihr zuverlässiger Partner für nachhaltige Innenarchitektur.',
+            }
+
+            const result = postAISwapStep(
+                [hero],
+                BIZ,
+                'business',
+                undefined,
+                0,
+                'de',
+            )
+
+            expect(result.blocks[0]).toMatchObject(hero)
+            expect(result.telemetry).toEqual([{
+                blockType: 'hero',
+                action: 'kept-lang-dynamic',
+                reason: 'lang:de',
+            }])
         })
     })
 

@@ -15,6 +15,11 @@ export interface LocaleStructuralStrings {
         buttonLabel: string
         emailPlaceholder: string
     }
+    blogList: {
+        readArticleLabel: string
+        uncategorizedLabel: string
+        emptyStateLabel: string
+    }
 }
 
 function sectionsFromBlockStrings(strings: BlockStrings): SectionLabels {
@@ -57,5 +62,6 @@ export function resolveLocaleStructuralStrings(locale?: string): LocaleStructura
             // another per-locale placeholder table.
             emailPlaceholder: strings.contact.emailLabel,
         },
+        blogList: strings.blogList,
     }
 }

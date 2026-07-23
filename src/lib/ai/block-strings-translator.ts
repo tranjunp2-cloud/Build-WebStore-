@@ -60,6 +60,9 @@ interface RawTranslation {
     service_cards_cta: string
     client_logos_headline: string
     gallery_headline: string
+    blog_read_article: string
+    blog_uncategorized: string
+    blog_empty_state: string
     newsletter_subheadline: string
     newsletter_subscribe: string
     pricing_headline: string
@@ -124,6 +127,9 @@ const ENGLISH_VALUES: RawTranslation = {
     service_cards_cta: 'Learn More',
     client_logos_headline: 'Trusted By',
     gallery_headline: 'Our Work',
+    blog_read_article: 'Read Article',
+    blog_uncategorized: 'Uncategorized',
+    blog_empty_state: 'No published posts yet. Check back soon!',
     newsletter_subheadline: 'Subscribe for exclusive news and offers.',
     newsletter_subscribe: 'Subscribe',
     pricing_headline: 'Our Pricing',
@@ -208,6 +214,11 @@ function buildBlockStrings(t: RawTranslation): BlockStrings {
         },
         clientLogos: { headline: t.client_logos_headline },
         gallery: { headline: t.gallery_headline },
+        blogList: {
+            readArticleLabel: t.blog_read_article,
+            uncategorizedLabel: t.blog_uncategorized,
+            emptyStateLabel: t.blog_empty_state,
+        },
         newsletter: {
             headlineStayUpdated: (name) => `${name}`,
             subheadlineFallback: t.newsletter_subheadline,
@@ -253,7 +264,17 @@ const REQUIRED_KEYS: ReadonlyArray<keyof RawTranslation> = [
     'contact_submit', 'contact_name', 'contact_email', 'contact_phone', 'contact_message',
     'footer_rights', 'footer_about_us',
     'testimonials_headline', 'team_headline', 'pricing_headline', 'stats_headline',
+    'blog_read_article', 'blog_uncategorized', 'blog_empty_state',
     'sl_gallery', 'sl_about', 'sl_contact', 'sl_features',
+]
+
+const MUST_TRANSLATE_KEYS: ReadonlyArray<keyof RawTranslation> = [
+    'nav_about',
+    'nav_get_started',
+    'footer_about_us',
+    'blog_read_article',
+    'blog_uncategorized',
+    'blog_empty_state',
 ]
 
 function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation {
@@ -263,12 +284,19 @@ function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation
     })
 }
 
+function hasUntranslatedCriticalValues(raw: RawTranslation, gpLang: string): boolean {
+    if (gpLang.trim().toLowerCase() === 'english') return false
+    return MUST_TRANSLATE_KEYS.some((key) =>
+        raw[key].trim().toLowerCase() === ENGLISH_VALUES[key].trim().toLowerCase(),
+    )
+}
+
 async function callGptTranslation(
     gpLang: string,
     openai: OpenAI,
 ): Promise<{ blockStrings: BlockStrings; sectionLabels: SectionLabels } | null> {
     const completion = await openai.chat.completions.create({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-mini',
         messages: [{
             role: 'user',
             content: `Translate all values in the JSON below to ${gpLang}. Return ONLY valid JSON with the exact same keys at the top level. Do not wrap in any parent key. Do not add or remove keys.\n\n${JSON.stringify(ENGLISH_VALUES)}`,
@@ -303,6 +331,15 @@ async function callGptTranslation(
     if (!isValidTranslation(parsed)) {
         const missing = REQUIRED_KEYS.filter((k) => !parsed[k]?.toString().trim())
         console.warn(`[block-strings-translator] invalid translation for ${gpLang} — missing/empty: ${missing.join(', ')}`)
+        return null
+    }
+    if (hasUntranslatedCriticalValues(parsed, gpLang)) {
+        const unchanged = MUST_TRANSLATE_KEYS.filter((key) =>
+            parsed[key].trim().toLowerCase() === ENGLISH_VALUES[key].trim().toLowerCase(),
+        )
+        console.warn(
+            `[block-strings-translator] untranslated values for ${gpLang}: ${unchanged.join(', ')}`,
+        )
         return null
     }
 
