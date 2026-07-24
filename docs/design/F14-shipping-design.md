@@ -6,7 +6,7 @@
 > - PRD: [`docs/prd/F14-shipping.md`](../prd/F14-shipping.md)
 > - Stories: [`docs/stories/F14-shipping-stories.md`](../stories/F14-shipping-stories.md)
 > - Architecture: [`docs/architecture/F14-shipping.md`](../architecture/F14-shipping.md)
-> - Approved Shipping Settings prototype: [`docs/design/prototypes/shipping-redesign.html`](./prototypes/shipping-redesign.html)
+> - Approved Shipping Settings prototype: [`docs/design/shipping-redesign.html`](./shipping-redesign.html)
 > - Delivery issue: [GitHub #1698](https://github.com/primeproduction/ech-prime-web-v2/issues/1698)
 > - Related: F09 Storefront Commerce, F18 CMS Global Layout, F19 Store Configuration
 
@@ -40,7 +40,7 @@ Shipping có ba surface chính:
 
 **Path:** `Dashboard > Settings > Shipping` (`/settings/shipping` trong dashboard shell).
 
-**Nguồn thiết kế hiện hành:** [`docs/design/prototypes/shipping-redesign.html`](./prototypes/shipping-redesign.html). Prototype và Issue #1698 supersede các hi-fi/tab/stepper cũ cho Screen A.
+**Nguồn thiết kế hiện hành:** [`docs/design/shipping-redesign.html`](./shipping-redesign.html). Prototype và Issue #1698 supersede các hi-fi/tab/stepper cũ cho Screen A.
 
 ```text
 Shipping
