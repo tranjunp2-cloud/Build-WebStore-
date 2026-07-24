@@ -7,7 +7,7 @@ effort: 5d
 issue: 1190
 branch: investigate/1190-gen-web-slow
 tags: [bugfix, backend, frontend, api, critical, performance]
-blockedBy: []
+blockedBy: [260724-1034-locale-safe-generation-performance]
 blocks: []
 created: 2026-07-17
 ---
@@ -19,6 +19,8 @@ created: 2026-07-17
 Optimize the existing SSE generation pipeline, preserving its current architecture and quality fallbacks. Target the remaining unbounded work in site AI, sample products, blog preparation, completion bookkeeping, and client retry behavior.
 
 The plan holds scope at the route/orchestrator level. It does not introduce a durable job queue, replace Pixabay, parallelize Payload media creates, or redesign page generation.
+
+> **2026-07-24 amendment:** Route-level generation deadlines, request abort controllers, client hard timeouts, and forced `maxDuration = 60` are rejected and must not be reintroduced. The plan is blocked before Phase 4 by [Locale-Safe Generation Without Latency Regression](../260724-1034-locale-safe-generation-performance/plan.md), which restores the PR #1658 critical path without these controls.
 
 ## Completion Contract
 
@@ -48,6 +50,7 @@ Allowed after `done`, only when their deadline expires:
 | Overlap only | [F38 Pixabay provider replacement](../260629-1450-F38-pixabay-replace-unsplash/plan.md) | No dependency; this plan does not change provider contracts |
 | Overlap only | [Pixabay multi-provider](../260623-1747-pixabay-unsplash-multi-provider/plan.md) | No dependency; keep media search ownership isolated |
 | Future integration | [Sentry integration](../260504-1146-sentry-integration/plan.md) | No dependency; structured timings can later become spans |
+| Blocked by | [Locale-Safe Generation Without Latency Regression](../260724-1034-locale-safe-generation-performance/plan.md) | Corrective locale work must preserve the measured PR #1658 call budget before benchmark/closure |
 
 ## Phases
 
@@ -60,7 +63,7 @@ Allowed after `done`, only when their deadline expires:
 
 ## Dependencies
 
-`Phase 1 -> Phase 2 -> Phase 3 -> Phase 4`. Do not tune from local single runs; Phase 1 baseline is the gate for behavioral changes. Do not set route `maxDuration = 60` until Phase 4 proves required work and every `after()` task are bounded within the platform limit.
+`Phase 1 -> Phase 2 -> Phase 3 -> corrective locale plan -> Phase 4`. Do not tune from local single runs; Phase 1 baseline is the gate for behavioral changes. Keep the existing route/client duration policy unchanged; latency is an observed release target, not a request abort condition.
 
 ## Evidence
 
