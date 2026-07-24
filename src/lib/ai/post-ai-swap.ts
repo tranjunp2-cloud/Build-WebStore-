@@ -163,8 +163,9 @@ function normalizeContactLabels(
     language: string,
     localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
-    const i18n = getBlockStrings(language)
     const localized = resolveLocaleStructuralStrings(language) ?? localizedOverride
+    if (!localized && !hasDedicatedStrings(language)) return blocks
+    const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
         const formFields = Array.isArray(block.formFields)
@@ -258,8 +259,9 @@ function normalizeClientLogosHeadline(
     language: string,
     localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
-    const i18n = getBlockStrings(language)
     const localized = resolveLocaleStructuralStrings(language) ?? localizedOverride
+    if (!localized && !hasDedicatedStrings(language)) return blocks
+    const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'client-logos' && block.blockType !== 'logo-cloud') return block
         return { ...block, headline: localized?.sections.clientLogos ?? i18n.clientLogos.headline }
@@ -275,8 +277,9 @@ function normalizeAboutSectionLabel(
     // Skip if normalizeSectionLabels already patched via SECTION_LABELS_SEED — its values
     // are the authoritative section labels; BlockStrings.footer.aboutUs can diverge.
     if (getSectionLabels(language)) return blocks
-    const i18n = getBlockStrings(language)
     const localized = localizedOverride ?? resolveLocaleStructuralStrings(language)
+    if (!localized && !hasDedicatedStrings(language)) return blocks
+    const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'about') return block
         return { ...block, sectionLabel: localized?.sections.about ?? i18n.footer.aboutUs }
@@ -292,8 +295,9 @@ function normalizeContactSectionLabel(
     // Skip if normalizeSectionLabels already patched — navigation.contact is the short nav form
     // and can differ from the section label (e.g. ms: 'Hubungi' nav vs 'Hubungi Kami' section).
     if (getSectionLabels(language)) return blocks
-    const i18n = getBlockStrings(language)
     const localized = localizedOverride ?? resolveLocaleStructuralStrings(language)
+    if (!localized && !hasDedicatedStrings(language)) return blocks
+    const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
         return { ...block, sectionLabel: localized?.sections.contact ?? i18n.navigation.contact }
@@ -311,8 +315,9 @@ function normalizeFeaturesHeadline(
     bizName: string,
     localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
-    const i18n = getBlockStrings(language)
     const localized = resolveLocaleStructuralStrings(language) ?? localizedOverride
+    if (!localized && !hasDedicatedStrings(language)) return blocks
+    const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'features') return block
         return {
@@ -515,29 +520,31 @@ export function normalizeLocaleStructuralStrings(
     bizName: string,
     localizedOverride?: LocaleStructuralStrings | null,
 ): Record<string, unknown>[] {
-    const effectiveOverride = language.split('-')[0] === 'en'
+    const baseLanguage = language.split('-')[0]
+    const localized = baseLanguage === 'en'
         ? localizedOverride
         : resolveLocaleStructuralStrings(language)
             ?? localizedOverride
-            ?? neutralLocaleFallback(bizName)
-    const nav = normalizeNavLinks(blocks, language, effectiveOverride)
-    const sectioned = normalizeSectionLabels(nav, language, effectiveOverride)
-    const aboutFixed = normalizeAboutHeadline(sectioned, language, effectiveOverride)
-    const hero = normalizeHeroCTAs(aboutFixed, language, effectiveOverride)
-    const newsletter = normalizeNewsletterStrings(hero, language, effectiveOverride)
-    const blogList = normalizeBlogListStrings(newsletter, language, effectiveOverride)
+    const conditionalFallback = localized
+        ?? (baseLanguage === 'en' ? null : neutralLocaleFallback(bizName))
+    const nav = normalizeNavLinks(blocks, language, localized)
+    const sectioned = normalizeSectionLabels(nav, language, localized)
+    const aboutFixed = normalizeAboutHeadline(sectioned, language, conditionalFallback)
+    const hero = normalizeHeroCTAs(aboutFixed, language, conditionalFallback)
+    const newsletter = normalizeNewsletterStrings(hero, language, conditionalFallback)
+    const blogList = normalizeBlogListStrings(newsletter, language, localized)
 
-    if (!hasDedicatedStrings(language) && language.split('-')[0] === 'en') return blogList
+    if (!hasDedicatedStrings(language) && baseLanguage === 'en') return blogList
 
-    const contact = normalizeContactLabels(blogList, language, effectiveOverride)
-    const footer = normalizeFooterStrings(contact, language, bizName, effectiveOverride)
-    const logos = normalizeClientLogosHeadline(footer, language, effectiveOverride)
-    const features = normalizeFeaturesHeadline(logos, language, bizName, effectiveOverride)
+    const contact = normalizeContactLabels(blogList, language, localized)
+    const footer = normalizeFooterStrings(contact, language, bizName, localized)
+    const logos = normalizeClientLogosHeadline(footer, language, localized)
+    const features = normalizeFeaturesHeadline(logos, language, bizName, localized)
     const testimonials = hasDedicatedStrings(language)
         ? normalizeTestimonialsSubheadline(features, language)
         : features
-    const about = normalizeAboutSectionLabel(testimonials, language, effectiveOverride)
-    return normalizeContactSectionLabel(about, language, effectiveOverride)
+    const about = normalizeAboutSectionLabel(testimonials, language, localized)
+    return normalizeContactSectionLabel(about, language, localized)
 }
 
 export function normalizeGeneratedPageLocaleStrings<

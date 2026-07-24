@@ -447,6 +447,42 @@ describe('Phase 04 — postAISwapStep', () => {
             expect(JSON.stringify(hero)).not.toContain('About Us')
         })
 
+        it('preserves localized structural copy when locale context is missing', () => {
+            const blocks = [
+                {
+                    blockType: 'features',
+                    sectionLabel: 'Leistungen',
+                    headline: 'Unsere Leistungen',
+                },
+                {
+                    blockType: 'contact',
+                    sectionLabel: 'Kontakt',
+                    headline: 'Kontakt aufnehmen',
+                    subheadline: 'Schreiben Sie uns',
+                    submitLabel: 'Nachricht senden',
+                    formFields: [{ fieldName: 'email', label: 'E-Mail' }],
+                },
+                {
+                    blockType: 'blog-list',
+                    sectionLabel: 'Blog',
+                    headline: 'Aktuelle Beiträge',
+                    readArticleLabel: 'Artikel lesen',
+                    uncategorizedLabel: 'Ohne Kategorie',
+                    emptyStateLabel: 'Noch keine Beiträge',
+                },
+            ]
+
+            const result = normalizeLocaleStructuralStrings(
+                blocks,
+                'de-no-context',
+                'GrünRaum',
+                null,
+            )
+
+            expect(result).toEqual(blocks)
+            expect(JSON.stringify(result)).not.toContain('"GrünRaum"')
+        })
+
         it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
             const locale = 'de-hero-alias-test'
             injectBlockStrings(locale, {
