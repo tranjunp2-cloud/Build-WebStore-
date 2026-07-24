@@ -427,6 +427,26 @@ describe('Phase 04 — postAISwapStep', () => {
             ])
         })
 
+        it('keeps both hero CTAs and removes English fallback copy when locale context is missing', () => {
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'hero',
+                    headline: 'Neuigkeiten von GrünRaum',
+                    ctaButtons: [
+                        { label: 'Kontaktieren', url: '/contact', style: 'primary' },
+                        { label: 'About Us', url: '#about', style: 'secondary' },
+                    ],
+                }],
+                'de-no-context',
+                'GrünRaum',
+            )
+
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons[1]?.label).toBe('GrünRaum')
+            expect(JSON.stringify(hero)).not.toContain('About Us')
+        })
+
         it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
             const locale = 'de-hero-alias-test'
             injectBlockStrings(locale, {

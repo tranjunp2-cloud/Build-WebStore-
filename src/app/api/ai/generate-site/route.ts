@@ -1128,6 +1128,7 @@ export async function POST(req: NextRequest) {
             ),
             generationLocale,
             businessInfo.businessName,
+            result.localeStructuralStrings,
         )
 
         const createdPages: Record<string, unknown>[] = []
@@ -1181,6 +1182,7 @@ export async function POST(req: NextRequest) {
                     productNormalizedLayout as Record<string, unknown>[],
                     generationLocale,
                     businessInfo.businessName,
+                    result.localeStructuralStrings,
                   ) as AIBlock[]
                 : productNormalizedLayout
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK

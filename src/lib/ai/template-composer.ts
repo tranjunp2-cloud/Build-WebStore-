@@ -16,7 +16,10 @@ import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 import { getBlockStrings, getSectionLabels } from './block-i18n'
-import { resolveLocaleStructuralStrings } from './locale-structural-strings'
+import {
+  resolveLocaleStructuralStrings,
+  type LocaleStructuralStrings,
+} from './locale-structural-strings'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
 import { pickLogosByCategory } from './content/client-logos-library'
@@ -181,17 +184,19 @@ export function buildNavigation(
   category: string = 'business',
   mood?: ThemeMood,
   language?: string,
+  localeStrings?: LocaleStructuralStrings | null,
 ): Record<string, unknown> {
   const i18n = getBlockStrings(language)
+  const navigation = localeStrings?.navigation ?? i18n.navigation
   const SLUG_LABELS: Record<string, string> = {
-    '/': i18n.navigation.home,
-    'about': i18n.navigation.about,
-    'services': i18n.navigation.services,
-    'contact': i18n.navigation.contact,
+    '/': navigation.home,
+    'about': navigation.about,
+    'services': navigation.services,
+    'contact': navigation.contact,
     // gen-perf phase-09: split path passes '/blog' — label it properly
     // instead of the capitalize fallback (which rendered a raw "/blog").
     // "Blog" is the label across every locale seed (vi/ms/en/ja all use it).
-    'blog': 'Blog',
+    'blog': localeStrings?.navigation.blog ?? 'Blog',
   }
   const links = pages.map((p) => {
     const slug = p === '/' ? '/' : p.replace(/^\/+/, '').toLowerCase()
@@ -203,9 +208,13 @@ export function buildNavigation(
     blockType: 'navigation',
     logoText: biz.name,
     links,
-    ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
-    ariaLabel: `${biz.name} main navigation`,
-    breadcrumbConfig: { showOnAllPages: true, homeLabel: i18n.navigation.home, separator: '/' },
+    ctaButton: {
+      show: true,
+      label: localeStrings?.navigation.getStarted ?? resolveCTA(mood, category, 'primary'),
+      url: resolveNavCtaUrl(pages),
+    },
+    ariaLabel: localeStrings ? biz.name : `${biz.name} main navigation`,
+    breadcrumbConfig: { showOnAllPages: true, homeLabel: navigation.home, separator: '/' },
   }
 }
 

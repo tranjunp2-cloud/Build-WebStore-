@@ -14,7 +14,7 @@
  */
 
 import type OpenAI from 'openai'
-import { getNavLabels, type NavLabels } from './block-i18n'
+import { getNavLabels, hasDedicatedStrings, type NavLabels } from './block-i18n'
 import { selectModel } from './config'
 import { buildNavigation } from './template-composer'
 import { normalizeComposerCategory } from './composer-category-resolver'
@@ -24,6 +24,10 @@ import type { BusinessInfoInput } from './system-prompt'
 import type { GenerationResult } from './generate-blocks'
 import { logAiUsage } from './log-usage'
 import { detectLanguageFromText } from '@/lib/language-detection'
+import {
+    resolveLocaleStructuralStrings,
+    type LocaleStructuralStrings,
+} from './locale-structural-strings'
 
 const HOME_MAX_TOKENS = 5000
 const SUBPAGE_BATCH_MAX_TOKENS = 9000
@@ -62,6 +66,12 @@ const NON_CONTENT_KEYS = new Set([
     'icon',
     'id',
     '_uuid',
+    'date',
+    'publishedAt',
+    'currency',
+    'price',
+    'amount',
+    'rating',
 ])
 
 function collectHumanText(value: unknown, key = ''): string[] {
@@ -114,19 +124,52 @@ export function outputMatchesLocale(
     return pageMatchesLocale({ blocks }, targetLocale)
 }
 
-export type PageSplitBrief = { navLabels: NavLabels | null }
+export type PageSplitBrief = {
+    navLabels: NavLabels | null
+    targetLocale: string
+    needsLocaleContext: boolean
+}
 
 /** Deterministic, no GPT round-trip. Page plan (5 fixed pages/slugs) is
  *  already baked into the system prompt's STRUCTURE RULES — this only
  *  resolves the one field (nav labels) that must be shared explicitly. */
 export function buildBrief(blockLang: string): PageSplitBrief {
-    return { navLabels: getNavLabels(blockLang) }
+    return {
+        navLabels: getNavLabels(blockLang),
+        targetLocale: blockLang,
+        needsLocaleContext: blockLang.split('-')[0] !== 'en' && !hasDedicatedStrings(blockLang),
+    }
 }
 
 function navLabelsHint(brief: PageSplitBrief): string {
     if (!brief.navLabels) return ''
     const { home, about, services, contact } = brief.navLabels
     return `\nFor brand consistency, use these EXACT navigation link labels on every page (already decided, do not re-translate): Home="${home}", About="${about}", Services="${services}", Contact="${contact}".`
+}
+
+function localeContextHint(brief: PageSplitBrief): string {
+    if (!brief.needsLocaleContext) return ''
+    return `
+
+## REQUIRED LOCALE CONTEXT
+Also return a top-level "localeStrings" object. Every value MUST be natural ${brief.targetLocale} text. This object is structural UI copy for the same website; never use English placeholders.
+Use EXACTLY this shape and include every key:
+{
+  "navigation": { "home": "", "about": "", "services": "", "contact": "", "getStarted": "", "blog": "" },
+  "sections": {
+    "about": "", "gallery": "", "contact": "", "features": "", "testimonials": "",
+    "faq": "", "team": "", "serviceCards": "", "stats": "", "pricing": "",
+    "newsletter": "", "clientLogos": "", "blogList": "", "contactSubmitLabel": "",
+    "aboutHeadlinePrefix": ""
+  },
+  "newsletter": { "buttonLabel": "", "emailPlaceholder": "" },
+  "blogList": { "readArticleLabel": "", "uncategorizedLabel": "", "emptyStateLabel": "" },
+  "contact": {
+    "headline": "", "subheadline": "", "nameLabel": "", "emailLabel": "",
+    "phoneLabel": "", "addressLabel": "", "messageLabel": "", "submitLabel": ""
+  },
+  "footer": { "exploreLabel": "", "allRightsReserved": "" }
+}`
 }
 
 // gen-perf phase-09 (token diet): navigation is injected deterministically
@@ -137,7 +180,7 @@ const CONCISE_RULE = '\nKeep copy tight: headlines <= 8 words, subheadlines <= 1
 const OMIT_NAV_RULE = '\nDo NOT include any "navigation" block on any page — navigation is injected automatically after generation.'
 
 export function buildHomeSystemPrompt(base: string, brief: PageSplitBrief): string {
-    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES THE HOMEPAGE ONLY\nReturn the "pages" array with EXACTLY ONE entry: the Homepage ("isHomepage": true, "slug": "/", 8-14 blocks per STRUCTURE RULES). Do NOT include About, Services, Contact, or Blog pages — they are generated in a separate parallel call.${OMIT_NAV_RULE} DO include the "footer" block on the Homepage.${CONCISE_RULE}${navLabelsHint(brief)}`
+    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES THE HOMEPAGE ONLY\nReturn the "pages" array with EXACTLY ONE entry: the Homepage ("isHomepage": true, "slug": "/", 8-14 blocks per STRUCTURE RULES). Do NOT include About, Services, Contact, or Blog pages — they are generated in a separate parallel call.${OMIT_NAV_RULE} DO include the "footer" block on the Homepage.${CONCISE_RULE}${navLabelsHint(brief)}${localeContextHint(brief)}`
 }
 
 export function buildSubpagesSystemPrompt(base: string, brief: PageSplitBrief, batch: readonly string[]): string {
@@ -268,6 +311,7 @@ export function mergeSplitParsed(homeParsed: Record<string, unknown>, subsParsed
         theme: homeParsed.theme,
         seo: homeParsed.seo,
         language: homeParsed.language,
+        localeStrings: homeParsed.localeStrings,
         pages: homePage ? [homePage, ...subPages] : subPages,
     }
 }
@@ -289,6 +333,7 @@ export function applyDeterministicChrome(
     if (pages.length === 0) return
 
     const slugs = pages.map((p) => (typeof p.slug === 'string' && p.slug ? p.slug : '/'))
+    const localeStrings = resolveLocaleStructuralStrings(blockLang, merged.localeStrings)
     const nav = buildNavigation(
         { name: businessInfo.businessName } as BusinessSample,
         slugs,
@@ -297,7 +342,25 @@ export function applyDeterministicChrome(
         normalizeComposerCategory(businessInfo.industry),
         undefined,
         blockLang,
+        localeStrings,
     )
+    if (blockLang.split('-')[0] !== 'en' && !localeStrings) {
+        const service = splitServices(businessInfo.products)[0] ?? businessInfo.businessName
+        const links = Array.isArray(nav.links) ? nav.links as Record<string, unknown>[] : []
+        nav.links = links.map((link) => ({
+            ...link,
+            label: link.url === '/services' ? service : businessInfo.businessName,
+        }))
+        nav.ctaButton = {
+            ...(nav.ctaButton as Record<string, unknown>),
+            label: service,
+        }
+        nav.ariaLabel = businessInfo.businessName
+        nav.breadcrumbConfig = {
+            ...(nav.breadcrumbConfig as Record<string, unknown>),
+            homeLabel: businessInfo.businessName,
+        }
+    }
 
     const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
     const homeFooter = homeBlocks.find((b) => b.blockType === 'footer') ?? null
@@ -368,6 +431,137 @@ function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Rec
     return { pages }
 }
 
+function splitServices(products: string): string[] {
+    const services = products
+        .split(/[\n,;|]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    return services.length > 0 ? services : []
+}
+
+function blockSectionLabel(
+    blockType: string,
+    strings: LocaleStructuralStrings | null,
+    businessName: string,
+): string {
+    if (!strings) return businessName
+    const labels: Record<string, string> = {
+        about: strings.sections.about,
+        gallery: strings.sections.gallery,
+        contact: strings.sections.contact,
+        features: strings.sections.features,
+        testimonials: strings.sections.testimonials,
+        faq: strings.sections.faq,
+        team: strings.sections.team,
+        'service-cards': strings.sections.serviceCards,
+        stats: strings.sections.stats,
+        pricing: strings.sections.pricing,
+        newsletter: strings.sections.newsletter,
+        'client-logos': strings.sections.clientLogos,
+        'blog-list': strings.sections.blogList,
+    }
+    return labels[blockType] ?? businessName
+}
+
+/**
+ * A locale mismatch must never add another network call. Replace the known
+ * English fallback payload locally with user-provided copy and the locale
+ * context returned by the homepage call. The block structure, URLs, media and
+ * CTA count stay intact.
+ */
+function materializeLocaleSafePage(
+    page: Record<string, unknown>,
+    businessInfo: BusinessInfoInput,
+    strings: LocaleStructuralStrings | null,
+    targetLocale: string,
+): Record<string, unknown> {
+    const businessName = businessInfo.businessName
+    const matchesTargetLocale = (text: string): boolean => {
+        if (!text.trim()) return false
+        const detected = detectLanguageFromText(text)
+        return detected.locale === targetLocale.split('-')[0]
+    }
+    const inputServices = splitServices(businessInfo.products)
+    const services = inputServices.filter(matchesTargetLocale)
+    if (services.length === 0) {
+        services.push(strings?.sections.serviceCards ?? businessName)
+    }
+    const inputDescription = businessInfo.shortDescription || businessInfo.tagline || ''
+    const description = matchesTargetLocale(inputDescription)
+        ? inputDescription
+        : strings?.contact.subheadline ?? businessName
+    let itemIndex = 0
+
+    const replacement = (
+        key: string,
+        blockType: string,
+        parent: Record<string, unknown> | null,
+    ): string => {
+        const service = services[itemIndex++ % Math.max(services.length, 1)] ?? businessName
+        const url = typeof parent?.url === 'string' ? parent.url : ''
+
+        if (key === 'email') return businessInfo.email || businessName
+        if (key === 'phone') return businessInfo.phone || businessName
+        if (key === 'address') return businessInfo.address || businessName
+        if (key === 'copyrightText') return `${new Date().getFullYear()} ${businessName}`
+        if (key.toLowerCase().includes('placeholder')) {
+            return strings?.newsletter.emailPlaceholder || businessInfo.email || businessName
+        }
+        if (key === 'ariaLabel') return businessName
+        if (key === 'label' || key.endsWith('Label')) {
+            if (url === '/') return strings?.navigation.home || businessName
+            if (url === '/about') return strings?.navigation.about || businessName
+            if (url === '/services') return strings?.navigation.services || service
+            if (url === '/contact') return strings?.navigation.contact || businessName
+            if (url === '/blog') return strings?.navigation.blog || businessName
+            return strings?.navigation.getStarted || service
+        }
+        if (
+            key === 'headline'
+            || key === 'title'
+            || key === 'sectionLabel'
+            || key === 'heading'
+            || key === 'question'
+        ) {
+            return blockSectionLabel(blockType, strings, service)
+        }
+        if (key === 'name' || key === 'role' || key === 'category') return service
+        return description
+    }
+
+    const visit = (
+        value: unknown,
+        key = '',
+        blockType = '',
+        parent: Record<string, unknown> | null = null,
+    ): unknown => {
+        if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (
+                !trimmed
+                || NON_CONTENT_KEYS.has(key)
+                || /^https?:\/\//i.test(trimmed)
+                || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+                || /^#[0-9a-f]{3,8}$/i.test(trimmed)
+            ) return value
+            return replacement(key, blockType, parent)
+        }
+        if (Array.isArray(value)) return value.map((item) => visit(item, key, blockType, parent))
+        if (!value || typeof value !== 'object') return value
+
+        const record = value as Record<string, unknown>
+        const nextBlockType = typeof record.blockType === 'string' ? record.blockType : blockType
+        return Object.fromEntries(
+            Object.entries(record).map(([childKey, childValue]) => [
+                childKey,
+                visit(childValue, childKey, nextBlockType, record),
+            ]),
+        )
+    }
+
+    return visit(page) as Record<string, unknown>
+}
+
 export type ParallelSplitInput = {
     openai: OpenAI
     model: string
@@ -414,24 +608,9 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
 
     let homeParsed = homeOutcome.parsed
     const initialHomePage = homeParsed ? extractHomePage(homeParsed) : null
-    if (homeParsed && (!initialHomePage || !pageMatchesLocale(initialHomePage, input.blockLang))) {
-        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable locale-matching homepage')
+    if (homeParsed && !initialHomePage) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable homepage')
         homeParsed = null
-    }
-    if (!homeParsed && input.blockLang !== 'en') {
-        console.warn(`[AI][GEN_PARALLEL_PAGES] retrying failed homepage in locale=${input.blockLang}`)
-        const retry = await runSplitCall(
-            input.openai,
-            input.model,
-            buildHomeSystemPrompt(input.systemPrompt, brief),
-            scopedUserPrompt(input.userPromptText, 'generate ONLY the Homepage page (pages array with exactly 1 entry).'),
-            HOME_MAX_TOKENS,
-        )
-        logOutcome(retry)
-        const retryPage = retry.parsed ? extractHomePage(retry.parsed) : null
-        homeParsed = retryPage && pageMatchesLocale(retryPage, input.blockLang)
-            ? retry.parsed
-            : null
     }
     // Scope enforcement in CODE, not just prompt: a scope-ignoring batch (the
     // measured failure mode) may emit a stray homepage or extra pages.
@@ -469,20 +648,14 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // templates use Book Now / Get in Touch instead) → user-visible "missing
     // contact page". One retry on the MAIN model rescues nearly all
     // intermittent nano/parse failures; composer stays as the last resort.
-    const batchMatchesLocale = (pages: Record<string, unknown>[]) =>
-        pages.every((page) => pageMatchesLocale(page, input.blockLang))
     const failedIdx = batchOutcomes
-        // English keeps the measured one-retry policy for structurally invalid
-        // JSON. Non-English also retries transport/parse/language failures:
-        // its deterministic composer fallback contains English content.
         .map((o, i) => {
             const pages = batchPages[i]!
             const incomplete = pages.length !== SUBPAGE_BATCHES[i]!.pages.length
-            const wrongLocale = !batchMatchesLocale(pages)
-            const retryable = o.parsed !== null
-                ? incomplete || wrongLocale
-                : input.blockLang !== 'en'
-            return retryable ? i : -1
+            // Preserve the measured optimization contract: only a parsed but
+            // structurally incomplete batch gets one bounded retry. Transport,
+            // parse and locale failures fall back locally without another call.
+            return o.parsed !== null && incomplete ? i : -1
         })
         .filter((i) => i >= 0)
     if (failedIdx.length > 0) {
@@ -495,7 +668,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     SUBPAGE_BATCH_MAX_TOKENS,
-                    input.blockLang === 'en' ? 10_000 : 38_000,
+                    10_000,
                 )
             }),
         )
@@ -523,8 +696,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     const allBatchesOk = slugsOk && batchOutcomes.every(
         (o, i) =>
             o.parsed !== null
-            && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length
-            && batchMatchesLocale(batchPages[i]!),
+            && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length,
     )
     if (!allBatchesOk) {
         console.warn(
@@ -534,21 +706,21 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     }
     let subsParsed: Record<string, unknown> | null = allBatchesOk ? { pages: batchPages.flat() } : null
 
-    if ((!homeParsed || !subsParsed) && input.blockLang !== 'en') {
-        throw new Error(`NON_ENGLISH_PAGE_GENERATION_FAILED:${input.blockLang}`)
-    }
-
+    let usedComposerHomeFallback = false
+    let usedComposerSubpagesFallback = false
     if (!homeParsed || !subsParsed) {
         // Lazy, computed at most once — covers any scope failing. Seed matches
         // the deterministic theme/category choice already made in
         // generateSiteWithAI so the fallback page set stays on-brand.
         const composerResult = composeTemplateResult(input.promptText, input.seed, input.language, input.businessInfo)
         if (!homeParsed) {
+            usedComposerHomeFallback = true
             homeParsed = (composerResult && composerFallback(composerResult, 'home')) ??
                 { siteName: input.businessInfo.businessName, category: 'business', theme: {}, seo: {}, language: input.language, pages: [] }
             console.warn(`[AI][GEN_PARALLEL_PAGES] home call failed (${homeOutcome.errorMessage ?? 'unknown'}) — composer fallback applied`)
         }
         if (!subsParsed) {
+            usedComposerSubpagesFallback = true
             const failed = batchOutcomes.filter((o) => !o.parsed).map((o) => o.errorMessage ?? 'unknown').join('; ')
             subsParsed = (composerResult && composerFallback(composerResult, 'subpages')) ?? { pages: [] }
             console.warn(`[AI][GEN_PARALLEL_PAGES] subpage batch(es) failed (${failed}) — composer fallback applied for ALL subpages`)
@@ -556,6 +728,31 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     }
 
     const merged = mergeSplitParsed(homeParsed, subsParsed)
+    if (input.blockLang.split('-')[0] !== 'en') {
+        const localeStrings = resolveLocaleStructuralStrings(input.blockLang, merged.localeStrings)
+        const pages = Array.isArray(merged.pages) ? merged.pages as Record<string, unknown>[] : []
+        let repairedLocaleMismatch = false
+        merged.pages = pages.map((page) => {
+            const isHomepage = page.isHomepage === true || canonicalSlug(page.slug) === ''
+            const usedComposerForPage = isHomepage
+                ? usedComposerHomeFallback
+                : usedComposerSubpagesFallback
+            if (!usedComposerForPage && pageMatchesLocale(page, input.blockLang)) return page
+            repairedLocaleMismatch = true
+            console.warn(
+                `[AI][GEN_PARALLEL_PAGES] locale mismatch slug=${String(page.slug ?? '')} ` +
+                `locale=${input.blockLang} — applying local locale-safe copy`,
+            )
+            return materializeLocaleSafePage(page, input.businessInfo, localeStrings, input.blockLang)
+        })
+        if (repairedLocaleMismatch) {
+            merged.siteName = input.businessInfo.businessName
+            merged.seo = {
+                title: input.businessInfo.businessName,
+                description: localeStrings?.contact.subheadline ?? input.businessInfo.businessName,
+            }
+        }
+    }
     applyDeterministicChrome(merged, input.businessInfo, input.blockLang)
     return merged
 }

@@ -5,7 +5,61 @@ import {
     injectBlockStrings,
     injectSectionLabels,
 } from '@/lib/ai/block-i18n'
-import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
+import {
+    parseLocaleStructuralStrings,
+    resolveLocaleStructuralStrings,
+} from '@/lib/ai/locale-structural-strings'
+
+const germanLocaleContext = {
+    navigation: {
+        home: 'Startseite',
+        about: 'Über uns',
+        services: 'Leistungen',
+        contact: 'Kontakt',
+        getStarted: 'Jetzt starten',
+        blog: 'Magazin',
+    },
+    sections: {
+        about: 'Über uns',
+        gallery: 'Galerie',
+        contact: 'Kontakt',
+        features: 'Vorteile',
+        testimonials: 'Kundenstimmen',
+        faq: 'Häufige Fragen',
+        team: 'Unser Team',
+        serviceCards: 'Leistungen',
+        stats: 'Unsere Zahlen',
+        pricing: 'Preise',
+        newsletter: 'Newsletter',
+        clientLogos: 'Partner',
+        blogList: 'Magazin',
+        contactSubmitLabel: 'Nachricht senden',
+        aboutHeadlinePrefix: 'Über',
+    },
+    newsletter: {
+        buttonLabel: 'Abonnieren',
+        emailPlaceholder: 'Ihre E-Mail-Adresse',
+    },
+    blogList: {
+        readArticleLabel: 'Artikel lesen',
+        uncategorizedLabel: 'Ohne Kategorie',
+        emptyStateLabel: 'Noch keine Beiträge veröffentlicht.',
+    },
+    contact: {
+        headline: 'Kontakt aufnehmen',
+        subheadline: 'Wir freuen uns auf Ihre Nachricht.',
+        nameLabel: 'Name',
+        emailLabel: 'E-Mail',
+        phoneLabel: 'Telefon',
+        addressLabel: 'Adresse',
+        messageLabel: 'Nachricht',
+        submitLabel: 'Nachricht senden',
+    },
+    footer: {
+        exploreLabel: 'Entdecken',
+        allRightsReserved: 'Alle Rechte vorbehalten.',
+    },
+}
 
 describe('TC-F01-PAS-09: dynamic structural locale resolver', () => {
     it('resolves a locale populated at runtime without a locale-specific branch', () => {
@@ -34,5 +88,19 @@ describe('TC-F01-PAS-09: dynamic structural locale resolver', () => {
 
         // Assert
         expect(result).toBeNull()
+    })
+
+    it('TC-F01-LOCALE-PERF-03: resolves a complete in-band locale context without warming a cache', () => {
+        expect(parseLocaleStructuralStrings(germanLocaleContext)?.navigation.blog).toBe('Magazin')
+        expect(
+            resolveLocaleStructuralStrings('de-contract-test', germanLocaleContext)?.blogList.readArticleLabel,
+        ).toBe('Artikel lesen')
+    })
+
+    it('TC-F01-LOCALE-PERF-04: ignores incomplete in-band locale context', () => {
+        expect(parseLocaleStructuralStrings({
+            ...germanLocaleContext,
+            navigation: { home: 'Startseite' },
+        })).toBeNull()
     })
 })

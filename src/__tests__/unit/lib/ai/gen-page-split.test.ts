@@ -117,6 +117,14 @@ describe('[TC-GENPERF-W2-02] buildHomeSystemPrompt — home-only scope', () => {
 		expect(result).toContain('About="Giới thiệu"')
 		expect(result).toContain('Services="Dịch vụ"')
 	})
+
+	it('TC-F01-LOCALE-PERF-05: requests locale context inside the existing homepage call', () => {
+		const result = buildHomeSystemPrompt('Base', buildBrief('de-contract'))
+
+		expect(result).toContain('REQUIRED LOCALE CONTEXT')
+		expect(result).toContain('"readArticleLabel"')
+		expect(result).toContain('"allRightsReserved"')
+	})
 })
 
 describe('[TC-GENPERF-W2-02] buildSubpagesSystemPrompt — batch scope', () => {
@@ -487,7 +495,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(pages.filter((p) => p.isHomepage === true)).toHaveLength(1)
 	})
 
-	it('rejects non-English generation instead of applying the English composer fallback', async () => {
+	it('TC-F01-LOCALE-PERF-01: uses a locale-safe composer fallback without extra calls', async () => {
 		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
 		const germanHome = {
 			title: 'Startseite',
@@ -524,25 +532,40 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			},
 		}
 
-		await expect(runParallelPageSplit({
+		const result = await runParallelPageSplit({
 			openai: mockOpenai as any,
 			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'Website auf Deutsch erstellen',
 			promptText: 'GrünRaum Innenarchitektur',
-			businessInfo: { businessName: 'GrünRaum', siteType: 'service' },
+			businessInfo: {
+				businessName: 'GrünRaum',
+				industry: 'interior-design',
+				products: 'Innenarchitektur, Raumplanung',
+				shortDescription: 'Nachhaltige Raumgestaltung für Familien und Unternehmen in Berlin.',
+			},
 			seed: 42,
 			// Latin locales use the legacy content enum while blockLang carries
 			// the actual requested output locale.
 			language: 'en',
 			blockLang: 'de',
-		})).rejects.toThrow('NON_ENGLISH_PAGE_GENERATION_FAILED:de')
+		})
 
-		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(5)
-		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(3)
+		expect(vi.mocked(composeTemplateResult)).toHaveBeenCalledTimes(1)
+		expect((result.pages as Array<{ slug: string }>).map((page) => page.slug)).toEqual([
+			'/', '/about', '/services', '/contact', '/blog',
+		])
+		const homepage = (result.pages as Array<{
+			slug: string
+			blocks: Array<Record<string, unknown>>
+		}>).find((page) => page.slug === '/')
+		expect(homepage?.blocks[1]?.headline).toBe(
+			'Nachhaltige Innenarchitektur für moderne Lebensräume',
+		)
 	})
 
-	it('retries substantial English page copy and accepts the locale-correct response', async () => {
+	it('TC-F01-LOCALE-PERF-02: repairs wrong-locale page copy locally without retrying', async () => {
 		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
 		const response = (pages: Array<Record<string, unknown>>) => ({
 			model: 'gpt-4o',
@@ -576,7 +599,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 				body: 'Discover professional strategy consulting, market entry planning, trusted advisory services and practical solutions for growing companies across every industry.',
 			}],
 		})
-		const attempts = new Map<string, number>()
 		const mockOpenai = {
 			chat: {
 				completions: {
@@ -586,17 +608,14 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 							return response([germanPage('Startseite', '/')])
 						}
 						const contactBatch = sys.includes('Contact, Blog')
-						const scope = contactBatch ? 'contact-blog' : 'about-services'
-						const attempt = (attempts.get(scope) ?? 0) + 1
-						attempts.set(scope, attempt)
 						const pages = contactBatch
 							? [
-								(attempt === 1 ? englishPage : germanPage)('Kontakt', '/contact'),
-								(attempt === 1 ? englishPage : germanPage)('Magazin', '/blog'),
+								englishPage('Kontakt', '/contact'),
+								englishPage('Magazin', '/blog'),
 							]
 							: [
-								(attempt === 1 ? englishPage : germanPage)('Über uns', '/about'),
-								(attempt === 1 ? englishPage : germanPage)('Leistungen', '/services'),
+								englishPage('Über uns', '/about'),
+								englishPage('Leistungen', '/services'),
 							]
 						return response(pages)
 					}),
@@ -610,17 +629,24 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			systemPrompt: 'System',
 			userPromptText: 'Website auf Deutsch erstellen',
 			promptText: 'GrünRaum Innenarchitektur',
-			businessInfo: { businessName: 'GrünRaum', siteType: 'service' },
+			businessInfo: {
+				businessName: 'GrünRaum',
+				industry: 'interior-design',
+				products: 'Innenarchitektur, Raumplanung',
+				shortDescription: 'Wir gestalten nachhaltige und funktionale Räume in Berlin.',
+			},
 			seed: 42,
 			language: 'en',
 			blockLang: 'de',
 		})
 
-		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(5)
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(3)
 		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
 		expect((result.pages as Array<{ slug: string }>).map((page) => page.slug)).toEqual([
 			'/', '/about', '/services', '/contact', '/blog',
 		])
+		expect(JSON.stringify(result)).not.toContain('Discover professional strategy consulting')
+		expect(JSON.stringify(result)).toContain('Wir gestalten nachhaltige')
 	})
 
 	it('TC-GENPERF-W2-04: home call failure triggers composer fallback', async () => {

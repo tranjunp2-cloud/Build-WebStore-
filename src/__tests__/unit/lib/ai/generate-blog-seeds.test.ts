@@ -361,7 +361,7 @@ describe('TC-F08-BG.21 — blog output must match the requested locale', () => {
             industry: 'beauty',
             locale: 'fr-FR',
         })).rejects.toThrow('BLOG_LOCALE_MISMATCH source=seed-1 expected=fr actual=en')
-        expect(mockCreate).toHaveBeenCalledTimes(2)
+        expect(mockCreate).toHaveBeenCalledTimes(1)
     })
 
     it('rejects an English article body returned for a French request', async () => {
@@ -377,10 +377,10 @@ describe('TC-F08-BG.21 — blog output must match the requested locale', () => {
             'beauty',
             'fr-FR',
         )).rejects.toThrow('BLOG_LOCALE_MISMATCH source=article expected=fr actual=en')
-        expect(mockCreate).toHaveBeenCalledTimes(2)
+        expect(mockCreate).toHaveBeenCalledTimes(1)
     })
 
-    it('retries once and accepts corrected Spanish seed content', async () => {
+    it('does not add a second model call after a Spanish locale mismatch', async () => {
         const OpenAI = await getOpenAIClass()
         const mockCreate = vi.fn()
             .mockResolvedValueOnce({
@@ -405,13 +405,12 @@ describe('TC-F08-BG.21 — blog output must match the requested locale', () => {
             })
         OpenAI.mockImplementation(() => mockOpenAI(mockCreate))
 
-        const posts = await generateBlogSeedsAI({
+        await expect(generateBlogSeedsAI({
             businessName: 'Panadería Sol',
             industry: 'bakery',
             locale: 'es',
-        })
+        })).rejects.toThrow('BLOG_LOCALE_MISMATCH')
 
-        expect(posts[0]?.title).toBe('Pan artesanal para cada día')
-        expect(mockCreate).toHaveBeenCalledTimes(2)
+        expect(mockCreate).toHaveBeenCalledTimes(1)
     })
 })

@@ -49,10 +49,6 @@ function assertTargetLanguage(text: string, locale: string, source: string): voi
     }
 }
 
-function isLocaleMismatch(error: unknown): boolean {
-    return error instanceof Error && error.message.startsWith('BLOG_LOCALE_MISMATCH')
-}
-
 export async function generateBlogSeedsAI(input: {
     businessName: string
     industry: string
@@ -77,63 +73,50 @@ Return JSON: {"posts":[
 ]}
 JSON only.`
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        const response = await openai.chat.completions.create({
-            model: selectModel('blog-seed'),
-            response_format: { type: 'json_object' },
-            max_tokens: 600,
-            temperature: 0.4,
-            messages: [
-                {
-                    role: 'system',
-                    content: `You generate 3 blog post seeds for a small-business website.
+    const response = await openai.chat.completions.create({
+        model: selectModel('blog-seed'),
+        response_format: { type: 'json_object' },
+        max_tokens: 600,
+        temperature: 0.4,
+        messages: [
+            {
+                role: 'system',
+                content: `You generate 3 blog post seeds for a small-business website.
 Posts MUST be specific to the business — never generic placeholders.
 Every human-facing title and excerpt MUST be written in the requested target language.
 Preserve business and product names exactly as provided.
 Slugs MUST be kebab-case, lowercase, no business name embedded.
 imageKeyword MUST be 2-4 plain English words describing a stock photo that fits the post (e.g. "fresh croissants pastry", "yoga studio mat").
 Output strictly JSON. No markdown.`,
-                },
-                {
-                    role: 'user',
-                    content: attempt === 1
-                        ? userPrompt
-                        : `${userPrompt}\nCorrection: the previous response used the wrong language. Do not use English in title or excerpt.`,
-                },
-            ],
-        }, { timeout: 12_000 })
+            },
+            { role: 'user', content: userPrompt },
+        ],
+    }, { timeout: 12_000 })
 
-        const content = response.choices[0]?.message?.content ?? ''
-        const parsed = JSON.parse(content) as { posts?: unknown }
+    const content = response.choices[0]?.message?.content ?? ''
+    const parsed = JSON.parse(content) as { posts?: unknown }
 
-        if (!Array.isArray(parsed.posts) || parsed.posts.length === 0) {
-            throw new Error('AI returned empty or invalid posts array')
-        }
-
-        const posts = (parsed.posts as Array<Record<string, unknown>>)
-            .slice(0, 3)
-            .map((p) => ({
-                title: String(p.title ?? '').slice(0, 70),
-                excerpt: String(p.excerpt ?? '').slice(0, 160),
-                slug: slugify(String(p.slug ?? p.title ?? 'post')),
-                imageKeyword: String(p.imageKeyword ?? ''),
-            }))
-
-        try {
-            posts.forEach((post, index) => {
-                assertTargetLanguage(
-                    `${post.title}. ${post.excerpt}`,
-                    targetLanguage.code,
-                    `seed-${index + 1}`,
-                )
-            })
-            return posts
-        } catch (error) {
-            if (attempt === 2 || !isLocaleMismatch(error)) throw error
-        }
+    if (!Array.isArray(parsed.posts) || parsed.posts.length === 0) {
+        throw new Error('AI returned empty or invalid posts array')
     }
 
-    throw new Error(`BLOG_LOCALE_MISMATCH source=seeds expected=${targetLanguage.code}`)
+    const posts = (parsed.posts as Array<Record<string, unknown>>)
+        .slice(0, 3)
+        .map((p, index) => ({
+            title: String(p.title ?? '').slice(0, 70),
+            excerpt: String(p.excerpt ?? '').slice(0, 160),
+            slug: slugify(String(p.slug ?? p.title ?? '')) || `post-${index + 1}`,
+            imageKeyword: String(p.imageKeyword ?? ''),
+        }))
+
+    posts.forEach((post, index) => {
+        assertTargetLanguage(
+            `${post.title}. ${post.excerpt}`,
+            targetLanguage.code,
+            `seed-${index + 1}`,
+        )
+    })
+    return posts
 }
 
 /**
@@ -153,41 +136,32 @@ export async function generateBlogPostContent(
     const safeIndustry = industry.slice(0, 50)
     const targetLanguage = resolveBlogLanguage(locale)
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        const response = await openai.chat.completions.create({
-            model: selectModel('blog-seed'),
-            response_format: { type: 'json_object' },
-            max_tokens: 2000,
-            temperature: 0.7,
-            messages: [
-                {
-                    role: 'system',
-                    content: `You write blog post content for small business websites.
+    const response = await openai.chat.completions.create({
+        model: selectModel('blog-seed'),
+        response_format: { type: 'json_object' },
+        max_tokens: 2000,
+        temperature: 0.7,
+        messages: [
+            {
+                role: 'system',
+                content: `You write blog post content for small business websites.
 Use rich HTML: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>. Target 400-600 words.
 Write every human-facing word strictly in the requested target language.
 Preserve business and product names exactly as provided.
 Be specific and practical. No markdown. JSON only.`,
-                },
-                {
-                    role: 'user',
-                    content: `Write blog post "${title}" for "${safeName}", a ${safeIndustry} business.
+            },
+            {
+                role: 'user',
+                content: `Write blog post "${title}" for "${safeName}", a ${safeIndustry} business.
 The complete article must be written strictly in ${targetLanguage.name} (${targetLanguage.code}).
-${attempt === 2 ? 'Correction: the previous response used the wrong language. Rewrite every paragraph in the requested language.' : ''}
 Return JSON: {"content":"<h2>...</h2><p>...</p>..."}`,
-                },
-            ],
-        }, { timeout: 12_000 })
+            },
+        ],
+    }, { timeout: 12_000 })
 
-        const raw = response.choices[0]?.message?.content ?? ''
-        const parsed = JSON.parse(raw) as { content?: string }
-        if (!parsed.content) throw new Error('No content in response')
-        try {
-            assertTargetLanguage(parsed.content, targetLanguage.code, 'article')
-            return parsed.content
-        } catch (error) {
-            if (attempt === 2 || !isLocaleMismatch(error)) throw error
-        }
-    }
-
-    throw new Error(`BLOG_LOCALE_MISMATCH source=article expected=${targetLanguage.code}`)
+    const raw = response.choices[0]?.message?.content ?? ''
+    const parsed = JSON.parse(raw) as { content?: string }
+    if (!parsed.content) throw new Error('No content in response')
+    assertTargetLanguage(parsed.content, targetLanguage.code, 'article')
+    return parsed.content
 }
