@@ -35,39 +35,111 @@ const PRODUCT_TEMPLATES: ProductSpec[] = [
   { name: 'QC Barista Course Voucher',   slug: 'qc-barista-voucher',  price: 320, inventory: 25 },
 ]
 
+export const QC_PRODUCTS_PER_TENANT = PRODUCT_TEMPLATES.length
+
+interface QcProductRecord {
+  id?: string | number
+  slug?: string | null
+  tenant?: unknown
+  deletedAt?: string | null
+}
+
+interface QcProductTenant {
+  id: string | number
+  slug: string
+}
+
 const EXTRA_PAGES = [
   { title: 'About',    slug: 'about' },
   { title: 'Products', slug: 'products' },
 ]
 
+function relationId(value: unknown): string | undefined {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (typeof value !== 'object' || value === null || !('id' in value)) return undefined
+
+  const id = (value as { id?: unknown }).id
+  return typeof id === 'string' || typeof id === 'number' ? String(id) : undefined
+}
+
+export function buildQcProductSlug(productSlug: string, tenantSlug: string): string {
+  return `${tenantSlug}-${productSlug}`
+}
+
+export function getQcProductSlugs(tenantSlug: string): string[] {
+  return PRODUCT_TEMPLATES.map((product) => buildQcProductSlug(product.slug, tenantSlug))
+}
+
+export function findMissingQcProducts(
+  products: QcProductRecord[],
+  tenants: QcProductTenant[],
+): string[] {
+  const seededProducts = new Set(
+    products.flatMap((product) => {
+      const tenantId = relationId(product.tenant)
+      return product.slug && tenantId && !product.deletedAt
+        ? [`${tenantId}:${product.slug}`]
+        : []
+    }),
+  )
+
+  return tenants.flatMap((tenant) =>
+    getQcProductSlugs(tenant.slug)
+      .filter((productSlug) => !seededProducts.has(`${tenant.id}:${productSlug}`))
+      .map((productSlug) => `${tenant.slug}/${productSlug}`),
+  )
+}
+
 export async function seedTenantProducts(
   payload: Payload,
   tenantId: string | number,
+  tenantSlug: string,
   siteId: string | number,
   tenantName: string,
 ): Promise<number> {
   let created = 0
   for (const spec of PRODUCT_TEMPLATES) {
-    // Tenant-scoped slug — same slug repeats across tenants, so scope the
-    // idempotency check with the tenant relation.
+    const productSlug = buildQcProductSlug(spec.slug, tenantSlug)
     const existing = await payload.find({
       collection: 'products',
-      where: {
-        and: [
-          { slug: { equals: spec.slug } },
-          { tenant: { equals: tenantId } },
-        ],
-      },
+      where: { slug: { equals: productSlug } },
       limit: 1,
       overrideAccess: true,
     })
-    if (existing.docs.length) continue
+    if (existing.docs.length) {
+      const existingProduct = existing.docs[0] as QcProductRecord
+      const existingTenantId = relationId(existingProduct.tenant)
+      if (existingTenantId !== String(tenantId)) {
+        throw new Error(
+          `QC product slug collision for ${productSlug}: expected tenant ${tenantId}, found ${existingTenantId ?? 'unknown'}`,
+        )
+      }
+      if (existingProduct.deletedAt) {
+        if (existingProduct.id == null) {
+          throw new Error(`QC product ${productSlug} is soft-deleted but has no id to restore`)
+        }
+        await payload.update({
+          collection: 'products',
+          id: existingProduct.id,
+          data: {
+            deletedAt: null,
+            name: spec.name,
+            price: spec.price,
+            inventory: spec.inventory,
+            site: siteId,
+          },
+          overrideAccess: true,
+        })
+      }
+      continue
+    }
+
     try {
       await payload.create({
         collection: 'products',
         data: {
           name: spec.name,
-          slug: spec.slug,
+          slug: productSlug,
           price: spec.price,
           inventory: spec.inventory,
           tenant: tenantId,
@@ -77,11 +149,8 @@ export async function seedTenantProducts(
       })
       created++
     } catch (err) {
-      // Some products may fail validation on tenants with restricted status
-      // (past_due / suspended). Log + continue rather than abort the whole
-      // seed.
       const msg = err instanceof Error ? err.message.slice(0, 120) : 'unknown'
-      console.warn(`    ! product create failed for ${tenantName} / ${spec.slug}: ${msg}`)
+      throw new Error(`Product seed failed for ${tenantName} / ${productSlug}: ${msg}`)
     }
   }
   return created

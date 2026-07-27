@@ -38,7 +38,7 @@ vi.mock('@/app/(dashboard)/actions/media', () => ({
     uploadMediaAction: vi.fn(),
 }))
 
-import { saveProductAction, updateProductFieldAction, getProductAction } from '@/app/(dashboard)/products/actions'
+import { saveProductAction, updateProductFieldAction, getProductAction, getProductsAction } from '@/app/(dashboard)/products/actions'
 import { getCurrentUser, extractTenantId, tenantIdForQuery } from '@/lib/auth'
 
 const VALID_PRODUCT = { name: 'Test Product', price: 100 }
@@ -46,6 +46,53 @@ const PRODUCT_WITH_IMAGES = {
     name: 'Test Product',
     images: [{ image: 10, alt: 'some image' }],
 }
+
+describe('getProductsAction [TC-GH1432-PERF-01]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
+        vi.mocked(tenantIdForQuery).mockReturnValue(68)
+        mockFind.mockResolvedValue({ docs: [{ id: 42, name: 'Test Product' }] })
+    })
+
+    it('loads only list/quick-view fields without a pagination count query', async () => {
+        const result = await getProductsAction()
+
+        expect(result).toEqual([{ id: 42, name: 'Test Product' }])
+        expect(mockFind).toHaveBeenCalledOnce()
+
+        const query = mockFind.mock.calls[0][0]
+        expect(query).toMatchObject({
+            collection: 'products',
+            overrideAccess: false,
+            limit: 100,
+            pagination: false,
+            sort: '-createdAt',
+            depth: 1,
+            where: {
+                and: [
+                    { deletedAt: { exists: false } },
+                    { tenant: { equals: 68 } },
+                ],
+            },
+        })
+        expect(query.select).toMatchObject({
+            name: true,
+            description: true,
+            category: true,
+            images: { image: true, alt: true },
+            variants: { name: true, sku: true, price: true, stock: true },
+            attributes: { key: true, value: true },
+        })
+        expect(query.select).not.toHaveProperty('seo')
+        expect(query.select).not.toHaveProperty('variantConfigs')
+        expect(query.select).not.toHaveProperty('descriptionBM')
+        expect(query.populate).toEqual({
+            media: { url: true, thumbnailURL: true },
+            categories: { name: true, breadcrumbs: true },
+        })
+    })
+})
 
 describe('saveProductAction', () => {
     beforeEach(() => {

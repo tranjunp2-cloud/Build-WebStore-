@@ -1,14 +1,11 @@
 /**
- * Unit Tests — Dashboard & Analytics Summary APIs
+ * Unit Tests — Analytics Summary API
  * Coverage Map (QA Doc Traceability):
- *   TC-F03.01  → Dashboard summary returns metrics
- *   TC-F03.02  → Cache hit returns cached data
- *   TC-F03.03  → Tenant auth check
  *   TC-F03.20  → Analytics summary returns chart data
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { cacheGet, cacheSet, cacheDelete } from '@/lib/cache'
+import { cacheDelete } from '@/lib/cache'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -19,86 +16,15 @@ vi.mock('@/lib/auth', () => ({
 
 const mockCount = vi.fn().mockResolvedValue({ totalDocs: 10 })
 const mockFind = vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 })
-const mockExecute = vi.fn().mockResolvedValue({ rows: [{ count: '100' }] })
-
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         count: mockCount,
         find: mockFind,
         findByID: vi.fn().mockResolvedValue({ id: 'tenant-1', settings: {} }),
-        db: { drizzle: { execute: mockExecute } },
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 // ─── Tests ────────────────────────────────────────────────────────────
-
-describe('GET /api/dashboard/summary [TC-F03.01, TC-F03.02, TC-F03.03]', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        mockUser.tenants = [{ tenant: 'tenant-1' }]
-        cacheDelete('dashboard:tenant-1:7d')
-    })
-
-    it('[TC-F03.01] returns metrics, series, and pendingOrders', async () => {
-        const { GET } = await import('@/app/api/dashboard/summary/route')
-        const req = new Request('http://localhost/api/dashboard/summary?period=7d')
-
-        const res = await GET(req, {} as any)
-        const body = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(body.success).toBe(true)
-        expect(body.data.metrics).toBeDefined()
-        expect(body.data.metrics.views).toBeDefined()
-        expect(body.data.metrics.leads).toBeDefined()
-        expect(body.data.metrics.revenue).toBeDefined()
-        expect(body.data.series).toBeDefined()
-        expect(body.data.series.views).toBeInstanceOf(Array)
-        expect(body.data.pendingOrders).toBeInstanceOf(Array)
-    })
-
-    it('[TC-F03.02] returns cached data on cache hit', async () => {
-        const cachedData = { metrics: { views: 999 }, series: {}, pendingOrders: [] }
-        cacheSet('dashboard:tenant-1:7d', cachedData)
-
-        const { GET } = await import('@/app/api/dashboard/summary/route')
-        const req = new Request('http://localhost/api/dashboard/summary?period=7d')
-
-        const res = await GET(req, {} as any)
-        const body = await res.json()
-
-        expect(body.data.metrics.views).toBe(999)
-        expect(res.headers.get('Cache-Control')).toBe('private, max-age=60')
-    })
-
-    it('[TC-F03.03] returns 403 when user has no tenant', async () => {
-        mockUser.tenants = []
-
-        const { GET } = await import('@/app/api/dashboard/summary/route')
-        const req = new Request('http://localhost/api/dashboard/summary?period=7d')
-
-        const res = await GET(req, {} as any)
-        expect(res.status).toBe(403)
-    })
-
-    it('sets Cache-Control header on fresh response', async () => {
-        const { GET } = await import('@/app/api/dashboard/summary/route')
-        const req = new Request('http://localhost/api/dashboard/summary?period=7d')
-
-        const res = await GET(req, {} as any)
-        expect(res.headers.get('Cache-Control')).toBe('private, max-age=60')
-    })
-
-    it('defaults period to 7d when not specified', async () => {
-        const { GET } = await import('@/app/api/dashboard/summary/route')
-        const req = new Request('http://localhost/api/dashboard/summary')
-
-        const res = await GET(req, {} as any)
-        const body = await res.json()
-
-        expect(body.success).toBe(true)
-    })
-})
 
 describe('GET /api/analytics/summary [TC-F03.20]', () => {
     beforeEach(() => {

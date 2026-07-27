@@ -19,7 +19,7 @@ export async function AnalyticsView({ searchParams }: Props) {
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
     const days = period === 'today' ? 1 : period === '30d' ? 30 : 7
     
-    // Current period — match OverviewView date range pattern
+    // Current period — match the dashboard date range pattern
     const since = period === 'today' ? startOfDay(new Date()) : subDays(startOfDay(new Date()), days)
 
     // Previous period (for comparison)
