@@ -4,7 +4,7 @@
  * into 3 parallel calls: home ∥ subpages batch 1 (About+Services) ∥ batch 2
  * (Contact+Blog). Wall-clock drops to ~max of the three. Started as a 2-call
  * split, escalated per plan after measurement showed the 4-subpage call was
- * both the long pole AND truncating at max_tokens. Behind env flag
+ * the long pole and could produce incomplete output. Behind env flag
  * GEN_PARALLEL_PAGES — default ON; setting it to false restores the single-call path.
  *
  * Brand consistency (palette/tone/CTA labels) is already shared automatically
@@ -29,17 +29,12 @@ import {
     type LocaleStructuralStrings,
 } from './locale-structural-strings'
 
-const HOME_MAX_TOKENS = 5000
-const SUBPAGE_BATCH_MAX_TOKENS = 9000
 // 3-call split (home ∥ batch1 ∥ batch2). Measured 2026-07-03: a single
-// 4-subpage call produced ~6000+ output tokens for vi content — it truncated
-// at max_tokens AND was the long pole (~80s ≈ no win over the mega-call,
-// since home is only ~2k of the ~7.5k total tokens). Two 2-page batches
-// halve the long pole and keep per-call output well under the token cap.
-// gen-perf phase-08: batch 2 (Contact + Blog) is the most formulaic content
-// → runs on the cheaper/faster 'site-generation-subpages-light' model (nano
-// by default; revert per-env via AI_MODEL_SITEGEN_SUB_LIGHT=gpt-4.1-mini).
-// Home + About/Services (brand-voice-heavy) stay on the main model.
+// 4-subpage call produced ~6000+ output tokens for vi content and was the
+// long pole (~80s ≈ no win over the mega-call, since home is only ~2k of the
+// ~7.5k total tokens). Two 2-page batches halve the long pole.
+// Batch 2 keeps its own model route so it can be tuned independently via
+// AI_MODEL_SITEGEN_SUB_LIGHT. Both routes default to GPT-5.4 mini.
 const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly string[]; light: boolean }> = [
     { pages: ['About', 'Services/Products'], slugs: ['/about', '/services'], light: false },
     { pages: ['Contact', 'Blog'], slugs: ['/contact', '/blog'], light: true },
@@ -190,7 +185,7 @@ export function buildSubpagesSystemPrompt(base: string, brief: PageSplitBrief, b
 
 /** Scope repeated at the END of the user message — measured 2026-07-03 that
  *  a system-prompt-only override loses to the base STRUCTURE RULES: both
- *  subpage calls wrote the whole 5-page site and truncated at max_tokens. */
+ *  subpage calls wrote the whole 5-page site and returned incomplete output. */
 export function scopedUserPrompt(baseUser: string, scopeLine: string): string {
     return `${baseUser}\n\nIMPORTANT — OUTPUT SCOPE FOR THIS RESPONSE: ${scopeLine} Any additional page in the output is an error and will be discarded.`
 }
@@ -238,7 +233,6 @@ async function runSplitCall(
     model: string,
     systemPrompt: string,
     userPrompt: string,
-    maxTokens: number,
     timeoutMs = 38_000,
 ): Promise<SplitCallOutcome> {
     const start = Date.now()
@@ -250,7 +244,6 @@ async function runSplitCall(
                 { role: 'user', content: userPrompt },
             ],
             temperature: 0.7,
-            max_tokens: maxTokens,
             response_format: { type: 'json_object' },
         }, { timeout: timeoutMs })
         const choice = completion.choices[0]
@@ -586,7 +579,6 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
             input.openai, input.model,
             buildHomeSystemPrompt(input.systemPrompt, brief),
             scopedUserPrompt(input.userPromptText, 'generate ONLY the Homepage page (pages array with exactly 1 entry).'),
-            HOME_MAX_TOKENS,
         ),
         ...SUBPAGE_BATCHES.map((batch) =>
             runSplitCall(
@@ -594,7 +586,6 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                 batch.light ? selectModel('site-generation-subpages-light') : input.model,
                 buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                 scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
-                SUBPAGE_BATCH_MAX_TOKENS,
             ),
         ),
     ])
@@ -667,7 +658,6 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                     input.openai, input.model,
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
-                    SUBPAGE_BATCH_MAX_TOKENS,
                     10_000,
                 )
             }),
