@@ -2564,18 +2564,23 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 
-        it('[TC-GENPERF-BI-02] tenant already has posts (prep []) → no persist, no legacy seeding', async () => {
-            // Arrange — regenerate case
+        it('[TC-GENPERF-BI-02] regeneration persists 3 prepared posts so defaults are replaced', async () => {
+            // Arrange — prepareBlogPosts no longer skips when a default post exists.
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([])
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                { title: 'A2', slug: 'a2', content: '<p>a2</p>', thumbnailId: 1 },
+                { title: 'B2', slug: 'b2', content: '<p>b2</p>', thumbnailId: 2 },
+                { title: 'C2', slug: 'c2', content: '<p>c2</p>', thumbnailId: 3 },
+            ])
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
             // Assert
             expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(persistBlogPosts).mock.calls[0]![1]).toHaveLength(3)
             await runCapturedAfterTasks()
-            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 

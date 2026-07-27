@@ -286,12 +286,6 @@ export async function generateSiteWithAI(
                         { role: 'user', content: userPromptText },
                     ],
                     temperature: 0.7,
-                    // Plan 260416: 6000 was too tight — 5-page sites need
-                    // ~6500-7500 tokens, so JSON was truncated on every gen
-                    // causing 100% fallback to legacy composer. 12000 gives
-                    // safe headroom. Cost unchanged (GPT charges actual output,
-                    // not the cap — typical output stays ~5200-7000 tokens).
-                    max_tokens: 12000,
                     response_format: { type: 'json_object' },
                 })
             } catch (err) {
@@ -350,7 +344,7 @@ export async function generateSiteWithAI(
                 throw new Error('Empty AI response')
             }
             if (choice?.finish_reason === 'length') {
-                console.warn(`[AI] WARNING: AI response was truncated due to max_tokens limit (${completion.usage?.completion_tokens} tokens used).`)
+                console.warn(`[AI] WARNING: AI response ended at the model output limit (${completion.usage?.completion_tokens} tokens used).`)
             }
 
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })

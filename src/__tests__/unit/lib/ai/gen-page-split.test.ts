@@ -880,7 +880,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 		const input: ParallelSplitInput = {
 			openai: mockOpenai as any,
-			model: 'gpt-4.1-mini',
+			model: 'gpt-5.4-mini',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -893,12 +893,12 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		// Act
 		await runParallelPageSplit(input)
 
-		// Assert — light batch on mini (default of site-generation-subpages-light),
+		// Assert — both routes default to GPT-5.4 mini,
 		// home + About/Services batch on the caller's main model
 		const light = seenModels.find((m) => m.scope === 'light-batch')
-		expect(light?.model).toBe('gpt-4.1-mini')
-		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-4.1-mini')
-		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-4.1-mini')
+		expect(light?.model).toBe('gpt-5.4-mini')
+		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-5.4-mini')
+		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-5.4-mini')
 	})
 
 	it('[TC-GENPERF-W2-11] applyDeterministicChrome — nav on every page, home footer cloned, GPT chrome stripped', () => {
