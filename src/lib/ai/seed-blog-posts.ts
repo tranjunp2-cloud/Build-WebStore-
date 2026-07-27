@@ -151,8 +151,9 @@ export type PreparedBlogPost = {
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
  * insert all 3 posts BEFORE the `done` event; also reused by the fallback
  * `seedBlogPosts` path.
- * Returns [] when the tenant already has posts (regenerate — nothing to
- * seed), null when preparation failed entirely. Never throws.
+ * Always prepares exactly three posts. Existing/default tenant posts are
+ * replaced only after preparation succeeds, inside `persistBlogPosts`.
+ * Returns null when preparation failed entirely. Never throws.
  */
 export async function prepareBlogPosts(opts: {
     payload: BasePayload
@@ -170,12 +171,6 @@ export async function prepareBlogPosts(opts: {
 }): Promise<PreparedBlogPost[] | null> {
     const { payload, tenantId, category, businessName, products, industry, seed, locale = 'en' } = opts
     try {
-        const existing = await payload.count({
-            collection: 'blogs',
-            where: { tenant: { equals: tenantId } },
-        })
-        if (existing.totalDocs > 0) return []
-
         let seeds: AnyBlogSeed[] = []
         try {
             const aiSeeds = await generateBlogSeedsAI({
@@ -268,6 +263,19 @@ export async function persistBlogPosts(
     siteId: number | string,
     userId: number | string,
 ): Promise<number> {
+    if (prepared.length === 0) return 0
+
+    try {
+        await payload.delete({
+            collection: 'blogs',
+            where: { tenant: { equals: tenantId } },
+            overrideAccess: true,
+        })
+    } catch (err) {
+        console.warn('[seed-blog-posts] failed to replace existing posts:', (err as Error).message)
+        return 0
+    }
+
     let count = 0
     for (const post of prepared) {
         // Guard against re-seed slug collision (tenant deleted all posts and regenerated)

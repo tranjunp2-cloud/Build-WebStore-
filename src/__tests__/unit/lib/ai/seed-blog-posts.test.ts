@@ -92,6 +92,7 @@ const makePayload = (countDocs = 0) => ({
     count: vi.fn().mockResolvedValue({ totalDocs: countDocs }),
     find: vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 }),
     create: vi.fn().mockResolvedValue({ id: 1 }),
+    delete: vi.fn().mockResolvedValue({ docs: [], totalDocs: countDocs }),
     findByID: vi.fn().mockResolvedValue(validMediaStub),
 }) as unknown as BasePayload
 
@@ -125,13 +126,30 @@ describe('TC-F08-BS.01 — seeds 3 published posts for new tenant', () => {
     })
 })
 
-describe('TC-F08-BS.02 — skips seeding when tenant already has blogs', () => {
-    it('returns 0 and never calls create when count > 0', async () => {
-        const payload = makePayload(3)
+describe('TC-F08-BS.02 — replaces default blogs with generated posts', () => {
+    it('deletes existing tenant blogs and creates exactly 3 generated posts', async () => {
+        const payload = makePayload(1)
+        const result = await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
+
+        expect(result).toBe(3)
+        expect(payload.delete).toHaveBeenCalledWith({
+            collection: 'blogs',
+            where: { tenant: { equals: 42 } },
+            overrideAccess: true,
+        })
+        expect(payload.create).toHaveBeenCalledTimes(3)
+    })
+
+    it('does not append generated posts when replacing existing blogs fails', async () => {
+        const payload = makePayload(1)
+        ;(payload.delete as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('delete failed'))
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
         const result = await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
 
         expect(result).toBe(0)
         expect(payload.create).not.toHaveBeenCalled()
+        warnSpy.mockRestore()
     })
 })
 
@@ -578,30 +596,33 @@ describe('TC-F08-BS.21 — all tiers fail: Tier A/B uploads reject + carton null
 })
 
 /**
- * TC-GENPERF-W1-04 — blog seeder regeneration skip in Wave 1 context
+ * TC-GENPERF-W1-04 — blog seeder regeneration replacement in Wave 1 context
  * Thin addition verifying integration point: gen-perf-wave1.test.ts has full coverage.
- * This verifies the seeder skip logic when tenant already has blogs.
+ * This verifies regeneration replaces stale/default posts with three new posts.
  */
-describe('TC-GENPERF-W1-04 — blog seeder skip on regeneration (Wave 1 integration)', () => {
+describe('TC-GENPERF-W1-04 — blog seeder replacement on regeneration (Wave 1 integration)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('TC-GENPERF-W1-04: second regeneration when tenant.blogs > 0 → skips seeding', async () => {
+    it('TC-GENPERF-W1-04: second regeneration replaces existing posts with 3 generated posts', async () => {
         // First regeneration: tenant has no blogs yet, create 3
         const payload1 = makePayload(0)
         const result1 = await seedBlogPosts(payload1, 42, 99, 'restaurant', 'FoodBiz', 7)
         expect(result1).toBe(3)
         expect(payload1.create).toHaveBeenCalledTimes(3)
 
-        // Second regeneration: tenant now has blogs, should skip
-        const payload2 = makePayload(3) // Return count=3 (tenant has 3 blogs already)
+        // Second regeneration: replace the existing set rather than retaining defaults.
+        const payload2 = makePayload(3)
         const result2 = await seedBlogPosts(payload2, 42, 99, 'restaurant', 'FoodBiz', 7)
 
-        // Assert: Skipped seeding when count > 0
-        expect(result2).toBe(0)
-        expect(payload2.create).not.toHaveBeenCalled()
-        expect(payload2.count).toHaveBeenCalled()
+        expect(result2).toBe(3)
+        expect(payload2.delete).toHaveBeenCalledWith({
+            collection: 'blogs',
+            where: { tenant: { equals: 42 } },
+            overrideAccess: true,
+        })
+        expect(payload2.create).toHaveBeenCalledTimes(3)
     })
 })
 
@@ -641,10 +662,13 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		vi.clearAllMocks()
 	})
 
-	it('returns null on hard failure (payload.count throws) so caller can fall back to legacy seeding', async () => {
+	it('returns null on hard failure so caller can fall back to legacy seeding', async () => {
 		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 		const payload = makePayload(0)
-		;(payload.count as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('db down'))
+		const getBlogThumbnails = await getBlogThumbnailsMock()
+		vi.mocked(getBlogThumbnails).mockImplementationOnce(() => {
+			throw new Error('thumbnail source unavailable')
+		})
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
 		const prepared = await prepareBlogPosts({
@@ -655,27 +679,27 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		warnSpy.mockRestore()
 	})
 
-	it('returns [] when the tenant already has posts', async () => {
+	it('prepares exactly 3 posts even when the tenant already has a default post', async () => {
 		const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 
-		// Prep skip case
-		const payloadWithPosts = makePayload(3)
+		const payloadWithPosts = makePayload(1)
 		const prepared = await prepareBlogPosts({
 			payload: payloadWithPosts, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
 		})
-		expect(prepared).toEqual([])
-		expect(payloadWithPosts.count).toHaveBeenCalledWith({
-			collection: 'blogs',
-			where: { tenant: { equals: 42 } },
-		})
+		expect(prepared).toHaveLength(3)
 
-		// Persist path inserts exactly the prepared rows (site-dependent phase)
+		// Persist replaces the old/default set before inserting prepared rows.
 		const payload = makePayload(0)
 		const count = await persistBlogPosts(payload, [
 			{ title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 5 },
 			{ title: 'B', slug: 'b', content: '<p>b</p>' },
 		], 42, 99, 7)
 		expect(count).toBe(2)
+		expect(payload.delete).toHaveBeenCalledWith({
+			collection: 'blogs',
+			where: { tenant: { equals: 42 } },
+			overrideAccess: true,
+		})
 		expect(payload.create).toHaveBeenCalledTimes(2)
 		const first = (payload.create as ReturnType<typeof vi.fn>).mock.calls[0][0]
 		expect(first.data.slug).toBe('42-a')
