@@ -5123,7 +5123,7 @@ async function verifyCriticalIndexes(pool) {
   // runMigrations() intentionally warns and continues for general migrations, so
   // explicitly fail the build if any performance-critical index was not created.
   const gh1432ProductIndexes = [
-    { name: 'products_active_tenant_created_idx', table: 'products', keys: ['tenant_id', 'created_at DESC'], predicate: 'deleted_at IS NULL' },
+    { name: 'products_active_tenant_created_idx', table: 'products', keys: ['tenant_id', 'created_at'], descending: [false, true], predicate: 'deleted_at IS NULL' },
     { name: 'products_images_parent_order_idx', table: 'products_images', keys: ['_parent_id', '_order'] },
     { name: 'products_tags_parent_order_idx', table: 'products_tags', keys: ['_parent_id', '_order'] },
     { name: 'products_variant_configs_parent_order_idx', table: 'products_variant_configs', keys: ['_parent_id', '_order'] },
@@ -5142,6 +5142,11 @@ async function verifyCriticalIndexes(pool) {
          FROM generate_series(1, index_metadata.indnkeyatts) AS key_position
          ORDER BY key_position
        ) AS indexkeys,
+       ARRAY(
+         SELECT (index_metadata.indoption[key_position - 1] & 1) = 1
+         FROM generate_series(1, index_metadata.indnkeyatts) AS key_position
+         ORDER BY key_position
+       ) AS descending,
        pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
      FROM pg_index AS index_metadata
      JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
@@ -5163,15 +5168,20 @@ async function verifyCriticalIndexes(pool) {
       ? actual.indexkeys.map(normalizeIndexExpression)
       : [];
     const expectedKeys = expected.keys.map(normalizeIndexExpression);
+    const actualDescending = Array.isArray(actual.descending) ? actual.descending : [];
+    const expectedDescending = expected.descending ?? expected.keys.map(() => false);
     const tableMatches = actual.tablename === expected.table;
     const keysMatch =
       actualKeys.length === expectedKeys.length &&
       actualKeys.every((key, index) => key === expectedKeys[index]);
+    const directionsMatch =
+      actualDescending.length === expectedDescending.length &&
+      actualDescending.every((descending, index) => descending === expectedDescending[index]);
     const predicateMatches =
       expected.predicate == null ||
       normalizeIndexExpression(actual.predicate) === normalizeIndexExpression(expected.predicate);
 
-    return actual.indisvalid && tableMatches && keysMatch && predicateMatches
+    return actual.indisvalid && tableMatches && keysMatch && directionsMatch && predicateMatches
       ? []
       : [`${expected.name} (invalid definition)`];
   });
