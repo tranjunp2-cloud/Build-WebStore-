@@ -137,7 +137,15 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     accordion: ['variant', 'headline', 'description', 'items'],
     'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
     'custom-html': ['html'],
-    'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
+    'blog-list': [
+        'variant',
+        'headline',
+        'subheadline',
+        'limit',
+        'readArticleLabel',
+        'uncategorizedLabel',
+        'emptyStateLabel',
+    ],
     breadcrumb: ['variant', 'items'],
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile': ['variant', 'headline', 'subheadline', 'doctors'],

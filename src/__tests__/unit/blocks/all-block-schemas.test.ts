@@ -257,6 +257,20 @@ describe('BlogListConfigSchema — limit', () => {
         const r = BlogListConfigSchema.safeParse({ blockType: 'blog-list', limit: 25 })
         expect(r.success).toBe(false)
     })
+    it('preserves localized display labels', () => {
+        const r = BlogListConfigSchema.safeParse({
+            blockType: 'blog-list',
+            readArticleLabel: 'Lire l’article',
+            uncategorizedLabel: 'Sans catégorie',
+            emptyStateLabel: 'Aucun article publié pour le moment.',
+        })
+        expect(r.success).toBe(true)
+        if (r.success) {
+            expect(r.data.readArticleLabel).toBe('Lire l’article')
+            expect(r.data.uncategorizedLabel).toBe('Sans catégorie')
+            expect(r.data.emptyStateLabel).toBe('Aucun article publié pour le moment.')
+        }
+    })
 })
 
 // ─── Custom HTML ──────────────────────────────────────────────────────
