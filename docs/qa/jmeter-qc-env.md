@@ -104,9 +104,13 @@ usable site exists" state.
 2. Change the Products sampler from `/api/products?limit=20` to
    `/api/dashboard/products`. This authenticated endpoint calls the same query helper as
    the Products UI, so field selection, relationship depth, sorting, tenant access, and
-   pagination behavior cannot drift between the application and the load test.
+   pagination behavior cannot drift between the application and the load test. Do not add
+   a `depth` query parameter; the endpoint fixes the canonical workload at `depth=1`.
 3. Exclude `qc-owner-5@primeweb.local` from VU credentials because its tenant is
    intentionally suspended for state-transition testing and login correctly returns 403.
+4. Before the smoke run, confirm the deployment log contains the GH-1432 index verification,
+   then run `npm run db:reset-qc && npm run db:seed-qc`. Stop the test if either command
+   exits non-zero; a partial reset or missing visible product fixture invalidates the baseline.
 
 The source repository does not contain the original `.jmx` referenced by GH-1432. QC
 owns these test-plan edits; Dev owns the endpoint and fixture contract above.

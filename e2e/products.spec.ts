@@ -37,6 +37,20 @@ test.describe('Products Management', () => {
         expect(Array.isArray(body.data)).toBe(true)
     })
 
+    test('[TC-GH1432-PERF-03] canonical dashboard products endpoint rejects unauthenticated requests', async ({ playwright }) => {
+        // Arrange
+        const unauthenticatedRequest = await playwright.request.newContext({
+            baseURL: process.env.BASE_URL || 'http://localhost:3000',
+        })
+
+        // Act
+        const response = await unauthenticatedRequest.get('/api/dashboard/products')
+
+        // Assert
+        expect(response.status()).toBe(401)
+        await unauthenticatedRequest.dispose()
+    })
+
     test('[TC-F08.01] products page loads with list or empty state', async ({ page }) => {
         await navigateTo(page, '/products')
         await expectPageLoaded(page)

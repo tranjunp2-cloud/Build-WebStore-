@@ -350,7 +350,12 @@ async function assertDashboardReadyFixtures(
     }),
     payload.find({
       collection: 'products',
-      where: { tenant: { in: loadTestTenants.map((tenant) => tenant.id) } },
+      where: {
+        and: [
+          { tenant: { in: loadTestTenants.map((tenant) => tenant.id) } },
+          { deletedAt: { exists: false } },
+        ],
+      },
       pagination: false,
       depth: 0,
       overrideAccess: true,

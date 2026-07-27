@@ -38,8 +38,10 @@ const PRODUCT_TEMPLATES: ProductSpec[] = [
 export const QC_PRODUCTS_PER_TENANT = PRODUCT_TEMPLATES.length
 
 interface QcProductRecord {
+  id?: string | number
   slug?: string | null
   tenant?: unknown
+  deletedAt?: string | null
 }
 
 interface QcProductTenant {
@@ -75,7 +77,9 @@ export function findMissingQcProducts(
   const seededProducts = new Set(
     products.flatMap((product) => {
       const tenantId = relationId(product.tenant)
-      return product.slug && tenantId ? [`${tenantId}:${product.slug}`] : []
+      return product.slug && tenantId && !product.deletedAt
+        ? [`${tenantId}:${product.slug}`]
+        : []
     }),
   )
 
@@ -103,11 +107,29 @@ export async function seedTenantProducts(
       overrideAccess: true,
     })
     if (existing.docs.length) {
-      const existingTenantId = relationId(existing.docs[0].tenant)
+      const existingProduct = existing.docs[0] as QcProductRecord
+      const existingTenantId = relationId(existingProduct.tenant)
       if (existingTenantId !== String(tenantId)) {
         throw new Error(
           `QC product slug collision for ${productSlug}: expected tenant ${tenantId}, found ${existingTenantId ?? 'unknown'}`,
         )
+      }
+      if (existingProduct.deletedAt) {
+        if (existingProduct.id == null) {
+          throw new Error(`QC product ${productSlug} is soft-deleted but has no id to restore`)
+        }
+        await payload.update({
+          collection: 'products',
+          id: existingProduct.id,
+          data: {
+            deletedAt: null,
+            name: spec.name,
+            price: spec.price,
+            inventory: spec.inventory,
+            site: siteId,
+          },
+          overrideAccess: true,
+        })
       }
       continue
     }

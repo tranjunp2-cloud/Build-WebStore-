@@ -324,6 +324,17 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
         for (const indexName of expectedIndexes) {
             expect(scriptContent).toContain(`CREATE INDEX IF NOT EXISTS ${indexName}`)
         }
+
+        const verifyStart = scriptContent.indexOf('async function verifyCriticalIndexes')
+        const verifyEnd = scriptContent.indexOf('/**\n * All collection slugs', verifyStart)
+        const verifyBlock = scriptContent.slice(verifyStart, verifyEnd)
+        for (const indexName of expectedIndexes) {
+            expect(verifyBlock).toContain(`'${indexName}'`)
+        }
+        expect(verifyBlock).toContain('index_metadata.indisvalid')
+        expect(verifyBlock).toContain('pg_get_indexdef')
+        expect(verifyBlock).toContain('pg_get_expr')
+        expect(verifyBlock).toContain('GH-1432 product performance indexes missing or invalid after migrations')
     })
 
     it('TC-MIG-DB: --migrate-only flag is present in main() function', () => {

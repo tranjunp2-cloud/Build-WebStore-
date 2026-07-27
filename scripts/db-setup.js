@@ -5114,6 +5114,69 @@ async function verifyCriticalIndexes(pool) {
     );
   }
   console.log('[db-setup] ✅ verified categories_tenant_slug_uniq exists');
+
+  // GH-1432: these indexes are part of the product-list performance contract.
+  // runMigrations() intentionally warns and continues for general migrations, so
+  // explicitly fail the build if any performance-critical index was not created.
+  const gh1432ProductIndexes = [
+    { name: 'products_active_tenant_created_idx', table: 'products', keys: ['tenant_id', 'created_at DESC'], predicate: 'deleted_at IS NULL' },
+    { name: 'products_images_parent_order_idx', table: 'products_images', keys: ['_parent_id', '_order'] },
+    { name: 'products_tags_parent_order_idx', table: 'products_tags', keys: ['_parent_id', '_order'] },
+    { name: 'products_variant_configs_parent_order_idx', table: 'products_variant_configs', keys: ['_parent_id', '_order'] },
+    { name: 'products_variant_configs_options_parent_order_idx', table: 'products_variant_configs_options', keys: ['_parent_id', '_order'] },
+    { name: 'products_variants_parent_order_idx', table: 'products_variants', keys: ['_parent_id', '_order'] },
+    { name: 'products_attributes_parent_order_idx', table: 'products_attributes', keys: ['_parent_id', '_order'] },
+    { name: 'products_rels_parent_order_idx', table: 'products_rels', keys: ['parent_id', 'order'] },
+  ];
+  const productIndexRows = await pool.query(
+    `SELECT
+       index_class.relname AS indexname,
+       table_class.relname AS tablename,
+       index_metadata.indisvalid,
+       ARRAY(
+         SELECT pg_get_indexdef(index_metadata.indexrelid, key_position, true)
+         FROM generate_series(1, index_metadata.indnkeyatts) AS key_position
+         ORDER BY key_position
+       ) AS indexkeys,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     WHERE table_namespace.nspname = 'public'
+       AND index_class.relname = ANY($1::text[])`,
+    [gh1432ProductIndexes.map((index) => index.name)]
+  );
+
+  const normalizeIndexExpression = (value) =>
+    String(value ?? '').replaceAll('"', '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const productIndexMetadata = new Map(productIndexRows.rows.map((row) => [row.indexname, row]));
+  const invalidProductIndexes = gh1432ProductIndexes.flatMap((expected) => {
+    const actual = productIndexMetadata.get(expected.name);
+    if (!actual) return [`${expected.name} (missing)`];
+
+    const actualKeys = Array.isArray(actual.indexkeys)
+      ? actual.indexkeys.map(normalizeIndexExpression)
+      : [];
+    const expectedKeys = expected.keys.map(normalizeIndexExpression);
+    const tableMatches = actual.tablename === expected.table;
+    const keysMatch =
+      actualKeys.length === expectedKeys.length &&
+      actualKeys.every((key, index) => key === expectedKeys[index]);
+    const predicateMatches =
+      expected.predicate == null ||
+      normalizeIndexExpression(actual.predicate) === normalizeIndexExpression(expected.predicate);
+
+    return actual.indisvalid && tableMatches && keysMatch && predicateMatches
+      ? []
+      : [`${expected.name} (invalid definition)`];
+  });
+  if (invalidProductIndexes.length > 0) {
+    throw new Error(
+      `GH-1432 product performance indexes missing or invalid after migrations: ${invalidProductIndexes.join(', ')}`
+    );
+  }
+  console.log(`[db-setup] ✅ verified ${gh1432ProductIndexes.length} GH-1432 product performance indexes`);
 }
 
 /**

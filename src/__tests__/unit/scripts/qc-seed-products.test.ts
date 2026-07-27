@@ -15,6 +15,7 @@ function mockPayload(findDocs: unknown[] = []) {
   return {
     find: vi.fn().mockResolvedValue({ docs: findDocs }),
     create: vi.fn().mockResolvedValue({ id: 1 }),
+    update: vi.fn().mockResolvedValue({ id: 1 }),
   }
 }
 
@@ -73,6 +74,32 @@ describe('[TC-GH1432-QC-02] deterministic QC product fixtures', () => {
     expect(created).toBe(0)
     expect(payload.find).toHaveBeenCalledTimes(QC_PRODUCTS_PER_TENANT)
     expect(payload.create).not.toHaveBeenCalled()
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('restores a soft-deleted canonical product instead of accepting an invisible fixture', async () => {
+    // Arrange
+    const payload = mockPayload([{ id: 10, tenant: 1, deletedAt: '2026-07-01T00:00:00.000Z' }])
+
+    // Act
+    const created = await seedTenantProducts(
+      payload as unknown as Payload,
+      1,
+      'qc-shop-1',
+      11,
+      'QC Tenant 1',
+    )
+
+    // Assert
+    expect(created).toBe(0)
+    expect(payload.create).not.toHaveBeenCalled()
+    expect(payload.update).toHaveBeenCalledTimes(QC_PRODUCTS_PER_TENANT)
+    expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
+      collection: 'products',
+      id: 10,
+      data: expect.objectContaining({ deletedAt: null, site: 11 }),
+      overrideAccess: true,
+    }))
   })
 
   it('fails immediately instead of swallowing product creation errors', async () => {
@@ -109,5 +136,20 @@ describe('[TC-GH1432-QC-02] deterministic QC product fixtures', () => {
     expect(missing).toEqual([
       'qc-shop-1/qc-shop-1-qc-signature-coffee',
     ])
+  })
+
+  it('does not count soft-deleted canonical products as load-test fixtures', () => {
+    // Arrange
+    const products = getQcProductSlugs('qc-shop-1').map((slug) => ({
+      slug,
+      tenant: 1,
+      deletedAt: '2026-07-01T00:00:00.000Z',
+    }))
+
+    // Act
+    const missing = findMissingQcProducts(products, [{ id: 1, slug: 'qc-shop-1' }])
+
+    // Assert
+    expect(missing).toHaveLength(QC_PRODUCTS_PER_TENANT)
   })
 })

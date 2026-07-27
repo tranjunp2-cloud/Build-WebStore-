@@ -41,11 +41,18 @@ describe('GET /api/dashboard/products [TC-GH1432-PERF-03]', () => {
         expect(body).toEqual({ success: true, data: [{ id: 1, name: 'Product A' }] })
         expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'products',
+            user: mockUser,
             overrideAccess: false,
             pagination: false,
             limit: 100,
             depth: 1,
             sort: '-createdAt',
+            where: {
+                and: [
+                    { deletedAt: { exists: false } },
+                    { tenant: { equals: 68 } },
+                ],
+            },
         }))
     })
 
