@@ -1,5 +1,7 @@
 # Phase 04 - Regression QA, Staging Benchmark, and Rollout
 
+> **Release amendment (2026-07-24):** Benchmark latency without adding a generation deadline, request abort, client hard timeout, or forced `maxDuration = 60`. Missing the p95 target keeps GH-1190 open; it does not justify terminating otherwise valid generation.
+
 ## Context Links
 
 - [Plan](./plan.md)

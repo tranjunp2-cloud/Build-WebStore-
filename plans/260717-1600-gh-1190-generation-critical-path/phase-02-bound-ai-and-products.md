@@ -1,5 +1,7 @@
 # Phase 02 - Bound Site AI and Product Critical Path
 
+> **Superseded constraint (2026-07-24):** Do not implement the route-level deadline, route abort controller, client hard timeout, or forced `maxDuration = 60` described below. Those controls were rejected after causing staging failures. Use [the corrective locale/performance plan](../260724-1034-locale-safe-generation-performance/plan.md) for current page-call and fallback policy.
+
 ## Context Links
 
 - [Plan](./plan.md)

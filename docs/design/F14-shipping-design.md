@@ -6,247 +6,217 @@
 > - PRD: [`docs/prd/F14-shipping.md`](../prd/F14-shipping.md)
 > - Stories: [`docs/stories/F14-shipping-stories.md`](../stories/F14-shipping-stories.md)
 > - Architecture: [`docs/architecture/F14-shipping.md`](../architecture/F14-shipping.md)
-> - **🎨 Claude Design (hi-fi reference):** https://api.anthropic.com/v1/design/h/cE8aBwHcJ-LiTp2MI8EGUQ?open_file=Shipping+Settings.html
->   - Open file: `Shipping Settings.html` — visual reference cho Screen A
->   - **Dev action:** Fetch design, đọc README, implement theo `Shipping Settings.html`
+> - Approved Shipping Settings prototype: [`docs/design/shipping-redesign.html`](./shipping-redesign.html)
+> - Delivery issue: [GitHub #1698](https://github.com/primeproduction/ech-prime-web-v2/issues/1698)
 > - Related: F09 Storefront Commerce, F18 CMS Global Layout, F19 Store Configuration
 
-Tài liệu này cung cấp wireframe & UI spec low-fi cho tính năng Shipping Malaysia (Wave 6 — flat-rate only). Settings UI tuân thủ **F18 CMS Global Layout** (Sidebar + Topbar). Checkout UI thuộc Storefront F09 (không có Sidebar Admin).
+Tài liệu này cung cấp wireframe và UI spec cho Shipping Malaysia gồm Flat Rate, EasyParcel và global Free Shipping rule. Settings UI tuân thủ **F18 CMS Global Layout** (Sidebar + Topbar). Checkout UI thuộc Storefront F09 (không có Sidebar Admin).
 
 ---
 
 ## 1. Feature Summary
 
-> **🚚 Delivery Model:** SELF-DELIVERY — seller tự lo giao hàng. UI không có carrier picker, không có "Print Label", không có tracking URL field. `trackingNumber` chỉ là free-text input trong Order detail (F10), không thuộc F14 scope.
->
-> **[F36 update — EasyParcel]** Wave 7+ thêm **EasyParcel** (courier aggregator) làm **tab thứ 2** cạnh Flat Rate trong Shipping Settings (§2.1b). Khi tenant bật EasyParcel: checkout dùng **giá courier thật** (1 courier/shop, buyer không chọn); chưa bật / lỗi / timeout → **fallback flat-rate** này (không vỡ). Tab Flat Rate giữ nguyên 100%. Nguồn: PRD `docs/prd/F36-easyparcel-delivery.md`.
+Shipping có ba surface chính:
 
-Wave 6 Shipping bao gồm 3 surface chính:
+- **Shipping Settings (CMS Dashboard):** một trang phẳng gồm `Shipping Providers` và `Global Shipping Rules`. EasyParcel nằm trên Flat Rate; không còn tab hay setup stepper.
+- **Checkout Shipping (Storefront):** ưu tiên EasyParcel Live Rates khi integration đã bật và sẵn sàng; nếu chưa sẵn sàng, bị tắt hoặc live-rate lỗi thì dùng Flat Rate. Free Shipping Threshold áp dụng cho cả hai provider.
+- **Mobile Optimization (375px):** card, form và action stack dọc; input/action có hit area tối thiểu 44px.
 
-- **Shipping Settings (CMS Dashboard):** Seller cấu hình `westRate` / `eastRate` / `freeAbove` cho cửa hàng. UI dạng card form, validate real-time, persist vào `site.shippingConfig`.
-- **Checkout Shipping (Storefront):** Buyer chọn state từ dropdown 16 MY states → auto-classify West/East → fetch `POST /api/orders/calculate-shipping` → render fee inline trong Order Summary. Free shipping badge khi đạt threshold.
-- **Mobile Optimization (375px):** Form fields stack vertical full-width, postcode dùng `inputmode="numeric"`, tap target ≥ 44px (US-F14-03).
+> **Superseded:** mô hình hai tab **Flat Rate / EasyParcel**, wizard nhiều bước, form API/Auth key, edit/re-test credentials và courier picker trong Settings không còn thuộc thiết kế hiện hành. Kết nối dùng OAuth qua **Setup Connection**; courier được chọn tự động ở rate flow, không cấu hình tại màn này.
 
 ### Design Principles
-- **KISS:** Flat-rate Wave 6 — không animation phức tạp, không carrier picker, không async tracking
-- **Reuse F19/F09 pattern:** Card layout giống F19 Payment Configuration, Order Summary giống F09 Checkout
-- **shadcn/ui only:** `Card`, `Input`, `Switch`, `Select`, `Button`, `Badge` — không custom component
-- **Mobile-first variants:** Mỗi screen có note responsive 375px
+
+- **Một trang, một mental model:** provider và global rule nhìn thấy trong cùng luồng cuộn.
+- **Progressive disclosure:** chỉ hiện pickup management sau khi account được link; chỉ hiện wallet và Disconnect khi cấu hình sẵn sàng.
+- **Safe fallback:** Flat Rate luôn có cấu hình khả dụng khi EasyParcel không hoạt động.
+- **Derived readiness:** không lưu một cờ `isReady` độc lập; suy ra từ trạng thái link và địa chỉ lấy hàng mặc định hợp lệ.
+- **Mobile-first:** control 44px, text không tràn, action chuyển full-width khi hẹp.
 
 ---
 
 ## 2. Wireframes & UI Layouts
 
-### 2.1. Screen A — Shipping Settings <a id="screen-a-shipping-settings"></a>
+### 2.1. Screen A — Unified Shipping Settings <a id="screen-a-shipping-settings"></a>
 
-> **🎨 Hi-fi reference:** [Claude Design — `Shipping Settings.html`](https://api.anthropic.com/v1/design/h/cE8aBwHcJ-LiTp2MI8EGUQ?open_file=Shipping+Settings.html)
->
-> **Dev implementation steps:**
-> 1. Fetch design file qua link trên
-> 2. Đọc README (nếu có) trong design package
-> 3. Implement `Shipping Settings.html` làm UI source-of-truth cho Screen A
-> 4. Wireframe ASCII bên dưới chỉ là sketch low-fi — UI cuối phải khớp Claude Design hi-fi
-> 5. Nếu Claude Design conflict với decisions §8 (Reset behavior, postcode validation, hint logic) → ưu tiên §8 (đã chốt với PM)
+**Path:** `Dashboard > Settings > Shipping` (`/settings/shipping` trong dashboard shell).
 
-**Path:** `Dashboard > Settings > Shipping` (`/dashboard/settings/shipping`)
-**Trạng thái:** Seller đã đăng nhập, đã cấu hình ban đầu (West RM 8, East RM 15, free toggle off).
-
-> **[F36] Tab wrapper:** Màn Shipping giờ là 2 tab — **Flat Rate** (mặc định, wireframe dưới) + **EasyParcel** (§2.1b). Footer `[Reset] [Save]` dùng chung. Nội dung Flat Rate bên dưới **giữ nguyên** Wave 6.
+**Nguồn thiết kế hiện hành:** [`docs/design/shipping-redesign.html`](./shipping-redesign.html). Prototype và Issue #1698 supersede các hi-fi/tab/stepper cũ cho Screen A.
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ [≡ Logo]  Search...                           [👤 Admin]│ ◄── Global Header
-│              │ ┌────────────┬─────────────┐             │
-│              │ │ Flat Rate ●│ EasyParcel  │ ◄── Tabs (F36)
-│              │ └────────────┴─────────────┘             │
-├──────────────┬──────────────────────────────────────────┤
-│ 🏠 Dashboard │ Store Settings > Shipping                │
-│ 📦 Products  │                                          │
-│ 🛒 Orders    │ ┌──────────────────────────────────────┐ │
-│ ⚙️ Settings  │ │ 🚚 Shipping Rates by Region          │ │
-│  ↳ Domains   │ │ Set flat rates for Malaysian regions │ │
-│  ↳ Payments  │ │                                      │ │
-│  ↳ Shipping ●│ │  West Malaysia (Semenanjung)         │ │
-│  ↳ Staff     │ │  ┌──────────────────────────────┐    │ │
-│              │ │  │ RM   8.00                    │    │ │
-│              │ │  └──────────────────────────────┘    │ │
-│              │ │  13 states: Johor, KL, Penang...     │ │
-│              │ │                                      │ │
-│              │ │  East Malaysia (Sabah/Sarawak)       │ │
-│              │ │  ┌──────────────────────────────┐    │ │
-│              │ │  │ RM  15.00                    │    │ │
-│              │ │  └──────────────────────────────┘    │ │
-│              │ │  3 states: Sabah, Sarawak, Labuan    │ │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │ ┌──────────────────────────────────────┐ │
-│              │ │ 🎁 Free Shipping Threshold     [○━ ]│ │
-│              │ │                                      │ │
-│              │ │ Offer free shipping when buyer's     │ │
-│              │ │ subtotal reaches or exceeds:         │ │
-│              │ │  ┌──────────────────────────────┐    │ │
-│              │ │  │ RM 100.00            (disabled)│  │ │
-│              │ │  └──────────────────────────────┘    │ │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │           [ Reset to Defaults ]  [ Save ]│
-└──────────────┴──────────────────────────────────────────┘
+Shipping
+Configure delivery methods, rates, and free shipping rules.
+
+Shipping Providers
+┌────────────────────────────────────────────────────┐
+│ EasyParcel Integration                   [OFF ▢]   │
+│ [disconnected / partial / ready content]           │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│ Flat Rate (Regional)                [Live Rates]   │
+│ Used as your primary shipping rate at checkout.   │
+│ West Malaysia [RM 8.00]  East Malaysia [RM 15.00]│
+│ Live Preview                                       │
+└────────────────────────────────────────────────────┘
+
+Global Shipping Rules
+┌────────────────────────────────────────────────────┐
+│ Free Shipping Threshold                    [ON ▣]  │
+│ Minimum subtotal for free shipping [RM 100.00]    │
+└────────────────────────────────────────────────────┘
 ```
 
-**Components (shadcn/ui mapping):**
-- Outer cards: `<Card>` + `<CardHeader>` + `<CardContent>`
-- Rate inputs: `<Input type="number">` with `prefix="RM"` adornment
-- Free toggle: `<Switch>` + conditional `<Input>` (disabled when off)
-- Footer buttons: `<Button variant="ghost">` (Reset) + `<Button>` (Save, disabled until dirty)
+#### 2.1.1 Layout and provider order
 
-**States:**
-| State | UI |
-|-------|-----|
-| Loading | Card skeleton (3 rows shimmer) khi fetch initial config |
-| Dirty | Save button enabled, breadcrumb dot ●︎ next to "Shipping" |
-| Saving | Save button → spinner + label "Saving..." |
-| Success | `<Toast>` "Shipping settings updated" (3s auto-dismiss) |
-| Validation Error | Input border red + helper text "Rate must be 0 – RM 1,000" |
+- `Shipping Providers` không có tab, section description trùng lặp hoặc stepper.
+- `EasyParcel Integration` render trước `Flat Rate (Regional)` với khoảng cách card rõ ràng.
+- `Free Shipping Threshold` nằm ngoài provider cards trong `Global Shipping Rules`; rule này áp dụng cho Flat Rate và EasyParcel.
+- Flat Rate giữ West/East inputs, state chips và `LivePreviewPanel`.
+- Footer Flat Rate chỉ xuất hiện khi rate/free-shipping state dirty; EasyParcel có save action riêng trong card khi pickup/toggle dirty.
 
-**[F36] Dynamic state của tab Flat Rate (phụ thuộc trạng thái EasyParcel):**
+#### 2.1.2 EasyParcel derived state
 
-| EasyParcel | Hiển thị thêm ở tab Flat Rate |
-|---|---|
-| **OFF** (chưa kết nối) | `<Badge>` **Active** (xanh dương) cạnh tiêu đề "Shipping Rates by Region" → báo "cụm cấu hình đang chạy thật ở checkout". + **Upsell** helper/alert-link dưới mô tả: *"Tip: Connect EasyParcel để tự lấy live rates từ J&T, Pos Laju, Ninja Van tại checkout. → Sang tab EasyParcel"* |
-| **ON + Connected** | Amber `<Alert>` đầu thẻ: *"⚠️ Fallback Mode Active — flat rate chỉ dùng khi EasyParcel API timeout/lỗi ở checkout."* (badge Active ẩn) |
+Thiết kế phân biệt “đã xác thực account” và “đã sẵn sàng quote”:
+
+```ts
+const isLinked = Boolean(accountId || authToken)
+const isReady =
+  isLinked &&
+  addresses.some(
+    (address) => address.isDefault && isValidPickupAddress(address),
+  )
+```
+
+Một pickup hợp lệ cần `label | name`, Malaysian phone dùng được, `address1`, `state`, `city` và `postcode`; readiness phải có ít nhất một pickup hợp lệ. Token/account identifier vẫn là dữ liệu server-side; client chỉ nhận metadata không bí mật để render.
+
+| Derived state | Điều kiện | Live Rates toggle | Nội dung chính |
+|---|---|---|---|
+| Disconnected | `isLinked = false` | Ẩn | Card nhẹ hơn, badge `OFF`/`DISCONNECTED`, 4 benefit tiles, **Setup Connection** |
+| Partial | `isLinked = true`, `isReady = false` | OFF + disabled | Warning yêu cầu pickup, Import/Add và inline form; chưa có account/wallet/Disconnect |
+| Ready + enabled | `isReady = true`, `enabled = true` | ON | Active copy, address list, account, wallet, Top up, Disconnect |
+| Ready + disabled | `isReady = true`, `enabled = false` | OFF nhưng enabled control | Warning copy; checkout và Flat Rate chuyển sang primary |
+
+#### 2.1.3 Disconnected
 
 ```text
-┌──────────────────────────────────────┐
-│ 🚚 Shipping Rates by Region  [Active] │ ◄── badge xanh khi EP OFF
-│ Set flat rates for Malaysian regions │
-│ 💡 Tip: Connect EasyParcel → live    │ ◄── upsell link khi chưa connect
-│    rates · Sang tab EasyParcel ↗     │
-│ ───── HOẶC khi EP ON + Connected: ── │
-│ ⚠️ Fallback Mode Active — flat rate  │ ◄── amber banner (thay badge)
-│   chỉ chạy khi EasyParcel lỗi/timeout │
-└──────────────────────────────────────┘
+┌ EasyParcel Integration                    [OFF] ┐
+│ Each store uses its own EasyParcel account.    │
+│ [Live courier rates] [No platform markup]      │
+│ [One-click AWB labels] [Flat-rate safety net]  │
+│ [🔌 Setup Connection]                           │
+│ While EasyParcel is off, checkout uses Flat    │
+│ Rate shipping.                                 │
+└────────────────────────────────────────────────┘
 ```
 
-> **Live Preview sync:** Khi EasyParcel ON + Connected, bảng Live Preview (khối Free Shipping) đổi dòng `Shipping (Flat Rate – West) RM 8.00` → giả lập cước EasyParcel `Shipping (EasyParcel – J&T Express) RM 5.42`, **tổng (Buyer pays) cập nhật theo**. (1 courier shop đã chọn — không phải multi.)
+- **Setup Connection** điều hướng đến `/api/tenant/{tenantId}/easyparcel-oauth-start`.
+- Chưa hiển thị toggle, pickup addresses, account row, wallet, Top up hoặc Disconnect.
+- Không thu API Key/Auth Key trong UI.
 
----
+#### 2.1.4 Linked but incomplete (partial)
 
-### 2.1.b Screen A — EasyParcel tab (F36) <a id="screen-a-easyparcel"></a>
+- Card mở rộng inline ngay tại Shipping Providers.
+- Toggle hiển thị OFF và disabled.
+- Warning copy chính xác: `Account linked successfully! Please add a pickup address to enable EasyParcel Live Rates.`
+- Hiển thị **Import addresses from EasyParcel** và **Add address**; khi chưa có address, form Add mở inline mặc định.
+- **Add address** disabled trong lúc form Add/Edit đang mở.
+- Warning thay thế account row; không hiển thị account identity, wallet, Top up hoặc Disconnect trước khi `isReady`.
+- Import gọi sync flow hiện có; nếu đã có local warehouse thì yêu cầu xác nhận trước khi thay thế.
 
-> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html
-> - Open file: `F36 EasyParcel Delivery.html` (project **PW2-Design**) — visual reference hi-fi cho Screen A (Settings) + các screen F36 khác.
-> - **Dev action:** import qua `claude_design` MCP (cần `/design-login` nếu chưa cấp scope) → đọc README → implement theo `F36 EasyParcel Delivery.html`. Wireframe ASCII bên dưới là low-fi; UI cuối phải khớp hi-fi.
->
-> **Nguồn:** F36 PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier) + **Progressive Disclosure** (chỉ hiện thứ cần ở đúng thời điểm). Connect UI **mirror F34 `XenditConnectBlock`**.
+#### 2.1.5 Ready, disabled and enabled
 
-**Path:** `Dashboard > Settings > Shipping > tab "EasyParcel"`
+Khi lần đầu thêm/import được default pickup hợp lệ, UI tính lại `isReady`, enable toggle và tự bật `enabled` trong draft. Merchant vẫn phải lưu EasyParcel settings để state checkout thay đổi.
 
-Tab theo **4 trạng thái** rõ rệt:
+| EasyParcel toggle | EasyParcel description | Flat Rate status | Flat Rate description |
+|---|---|---|---|
+| ON | `Live courier rates and pickup address management.` | `Backup Rate` | `Used as a safety net if live courier rates are unavailable.` |
+| OFF | `⚠️ Currently disabled. Checkout is using your Flat Rate shipping.` | `Live Rates` | `Used as your primary shipping rate at checkout.` |
 
-**(1) Disconnected — Empty State (Switch OFF):** ẩn toàn bộ form, chỉ 1 banner lớn.
+Ready state hiển thị:
+
+- Một wallet frame chứa `EasyParcel account: {accountName}`, `Wallet balance: {currency} {balance}` và link **Top up**.
+- Wallet banner tải balance động; implementation có thể bổ sung ước lượng số label còn lại khi có cheapest rate và cảnh báo thấp dưới MYR 10.
+- Link ngoài **Top up** mở `https://app.easyparcel.com`.
+- **Disconnect** destructive nằm cùng row với wallet nhưng ngoài wallet banner.
+- Pickup list giữ Default badge, action Edit/Delete bằng icon và Add/Import.
+- Xóa pickup cuối khi EasyParcel active dùng confirmation copy rằng lưu thay đổi sẽ tắt EasyParcel và trả checkout về Flat Rate.
+
+#### 2.1.6 Inline pickup-address form
+
+| Field | Control / copy | Validation and dependency |
+|---|---|---|
+| Label | Input; `e.g. HQ Warehouse` | Required |
+| Sender phone | Numeric/tel input; `e.g. 0123456789` | Required Malaysian phone; normalize thành `60...` khi lưu |
+| Address line 1 | Input | Required |
+| State | Select | Required; options từ `/api/geo/states` |
+| City | Select | Disabled trước khi có State; options từ `/api/geo/districts?stateId=...` |
+| Postcode | Select | Disabled trước khi có City; options từ `/api/geo/postcodes?districtId=...`; phải là 5 chữ số |
+| Set as default pickup address | Checkbox | Quy tắc default bên dưới |
+
+Phone validation chấp nhận format số Malaysia hợp lệ, loại ký tự/độ dài không dùng được và chuẩn hóa trước khi gửi. Form chỉ commit khi toàn bộ field bắt buộc hợp lệ; lỗi hiển thị inline.
+
+**Default-address rules:**
+
+1. Address đầu tiên tự chọn Default và checkbox disabled.
+2. Address thứ hai trở đi mở với checkbox enabled, mặc định không chọn.
+3. Chọn address mới làm Default phải gỡ Default khỏi address cũ; list luôn được normalize để có đúng một Default.
+4. Khi edit Default và cố bỏ chọn, không bỏ Default; hiển thị popup English:
+   - Title: `Cannot remove the default pickup address`
+   - Body: `To remove this address, please select another address as the new default first.`
+   - Button: `Got it`
+5. Xóa address dùng confirmation modal; nếu xóa address cuối đang active, copy phải nói rõ EasyParcel sẽ tắt sau Save.
+
+#### 2.1.7 Disconnect modal
+
+- Title: `Remove EasyParcel connection?`
+- Body: `Your store will switch back to the Flat Rate setup. You can reconnect EasyParcel anytime. Your saved addresses won't be deleted.`
+- Actions: **Cancel** và destructive **Disconnect** với unlink icon.
+- Confirm gọi disconnect, reload trạng thái về Disconnected và checkout dùng Flat Rate.
+- Disconnect chỉ xóa liên kết/account authorization; các pickup addresses đã lưu được giữ lại để tái kết nối.
+
+#### User Flow — EasyParcel onboarding and management
 
 ```text
-┌──────────────────────────────────────────┐
-│ ┌ Flat Rate ┬ EasyParcel ● ┐             │
-│                  🔌                       │
-│      Connect your EasyParcel Account      │
-│  Offer live, real-time shipping rates     │
-│  from top Malaysian couriers to buyers    │
-│  directly at checkout.                    │
-│         [ Setup Connection ]              │ ◄── bấm = bật Switch → (2)
-└──────────────────────────────────────────┘
+1. Open Shipping
+   → EasyParcel disconnected card + Setup Connection
+   → Flat Rate = Live Rates / primary
+
+2. Setup Connection
+   → OAuth provider flow
+   → return with ep=connected notification
+   → server-side account/token metadata confirms isLinked
+
+3. Linked, no valid default pickup
+   → partial warning
+   → toggle OFF + disabled
+   → Add inline or Import from EasyParcel
+
+4. Save/import valid default pickup
+   → isReady = true
+   → warning hides; toggle becomes enabled and draft turns ON
+   → account + wallet + Top up + Disconnect appear
+
+5. Save EasyParcel settings
+   → checkout uses live rates
+   → Flat Rate becomes Backup Rate
+
+6a. Toggle OFF + Save
+    → addresses/account remain; checkout uses Flat Rate
+
+6b. Disconnect + confirm
+    → authorization removed; saved addresses preserved
+    → disconnected card; checkout uses Flat Rate
 ```
 
-**(2) Setup / Editing (Switch ON, chưa test OK):** form hiện. **"Test connection" = Primary button cuối thẻ**; phải test OK mới mở khóa Save tổng.
+#### 2.1.8 Superseded design
 
-```text
-│ 🔌 Connect EasyParcel               [●ON] │
-│ API Key (api)      [•••••••••• 👁]        │
-│ Auth Key (auth)    [•••••••••• 👁]        │ ◄── 2 key (KHÔNG env selector — auto-detect)
-│ 🏭 Warehouse (origin)                     │
-│ Address line 1  [______________________] │
-│ State ▼  City/District ▼  Postcode ▼      │ ◄── geo cascade /api/geo/*
-│        [ 🔍 Test connection ]   (Primary) │ ◄── gate Save
-│ ⓘ Chọn courier mở khóa sau khi test OK    │
-└──────────────────────────────────────────┘
-   Footer: [Cancel]  [Save] (disabled tới khi test OK)
-```
+The following must not be reintroduced without a new approved design:
 
-**(3) Connected (test OK):** credentials **khóa read-only** (chống gõ đè làm rớt kết nối); Test → đổi thành **[Edit Credentials]** + **[Disconnect]** (destructive). Lộ chọn **1 courier** (grid 2-col, single-select, no price).
-
-```text
-│ ✅ Connected — Production (tự nhận env)    │
-│ API / Auth / Warehouse   🔒 (read-only)    │
-│         [ Edit Credentials ] [ Disconnect ]│ ◄── thay nút Test
-│ 🚚 Courier (chọn 1 cho shop)               │
-│ ┌(•) J&T [Phổ biến]┐ ┌( ) Pos Laju [Phổ biến]┐ │ ◄── grid 2-col radio
-│ ┌( ) Flash [Phổ biến]┐ ┌ ＋ Xem thêm (3)     ┐ │
-│ (không show giá — giá thật ở checkout)     │
-│                           [Cancel] [Save]  │
-```
-
-**(4) Edit Mode — Temporary Validation Lock (sửa key/kho khi đã connected):** kết nối cũ không còn chắc → **bắt buộc re-test**.
-- Ẩn **[Disconnect]**, thay bằng **[🔍 Re-test Connection]** (Primary).
-- **Blur/disable** phần chọn courier + overlay *"Please re-test your connection to unlock configurations"*.
-- **Khóa Save** footer (không cho lưu cấu hình lỗi ra storefront).
-- Re-test **OK** → restore [Disconnect] + mở khóa courier + Save sáng lại. **FAIL** → giữ khóa + báo lỗi.
-
-**Components (shadcn/ui):**
-- Tabs: `<Tabs>` Flat Rate / EasyParcel
-- Empty state (1): `<Card>` icon + copy + `<Button>` "Setup Connection" (toggle `<Switch>`)
-- Connect: `<Switch>` + 2× `<Input type="password">` (api + authentication) + eye reveal — **mirror `XenditConnectBlock`** (F34)
-- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse `/api/geo/{states,districts,postcodes}`. Warehouse = **Prime source of truth**; postcode force-validate ở Test connection
-- Test/Re-test: `<Button>` **Primary** — auto-detect env (production → demo). **Gate Save**. KHÔNG có RadioGroup environment
-- Disconnect: `<Button variant="destructive">` (chỉ ở state Connected, không Edit-mode)
-- Courier: `<RadioGroup>` **single-select** (`selectedCourier` = 1 `courier_id`) render **grid 2-col** (tiết kiệm chiều cao), default **J&T**; top-3 + `<Badge>` "Phổ biến SME"; còn lại `<Collapsible>` "＋ Xem thêm". **KHÔNG show giá**
-- Footer `[Cancel] [Save]` — dùng chung tab Flat Rate; khóa khi chưa test OK / Edit-mode
-
-**Khác tab Flat Rate (KISS — đã bỏ):** KHÔNG default-parcel (lấy từ `Products.*`), KHÔNG auto/manual label (luôn manual ở F10), KHÔNG hiển thị số dư ví.
-
-**States:**
-| State | UI |
-|-------|-----|
-| Disconnected | Empty-state banner + `[Setup Connection]`; form ẩn |
-| Setup/Editing | Form; Test = Primary; Save disabled tới khi test OK; courier ẩn |
-| Testing | Spinner "Đang kiểm tra…"; form disabled |
-| Invalid | Red `<Alert>` `EASYPARCEL_INVALID_KEY` / `EASYPARCEL_INVALID_WAREHOUSE` — **KHÔNG lưu** |
-| Connected | Credentials 🔒 read-only; `[Edit][Disconnect]`; courier grid; Save enabled |
-| Edit-mode lock | `[Re-test]` Primary; courier blur + overlay; Save khóa tới khi re-test OK |
-| Saving | Save → spinner; success Toast "Đã lưu cấu hình EasyParcel" |
-
-> ✅ **DECISION (chốt 2026-06-18) — giữ KISS single-courier, KHÔNG thêm 4 mục đề xuất sau** (chúng đảo ngược fidelity-fix PRD #1232; đã cân nhắc & loại):
-> 1. **Courier hiển thị giá "From RM 5.40" + checkbox multi-select** → **bỏ.** Giữ single-select radio, **không show giá** (settings chưa có origin/dest/weight → "from" dễ sai).
-> 2. **Default Parcel Weight/Dimensions form** → **bỏ.** Weight/dims lấy từ `Products.*` + hằng số `DEFAULT_PARCEL`.
-> 3. **Fulfillment Mode (auto/manual)** → **bỏ.** Luôn manual qua nút "Ready to Ship" (F10).
-> 4. **Environment selector / "Secret Key"** → **bỏ.** Auto-detect env; key = `api` + `authentication` (không gọi "secret").
-> → Nếu sau này cần rich-settings (đa courier + parcel + fulfilment): phải mở rộng scope + cập nhật PRD #1232 trước khi vẽ.
-
-#### User Flow — Kết nối EasyParcel (Phase A)
-
-```text
-Actor: Merchant (seller)
-
-1. Merchant → Settings › Shipping › tab "EasyParcel"
-   System   → Switch OFF: empty-state "Connect your EasyParcel Account" + [Setup Connection]
-
-2. Merchant → bấm [Setup Connection] (hoặc gạt Switch ON)
-   System   → hiện form: API Key + Auth Key + Warehouse (State→City→Postcode cascade)
-              Save KHÓA; [🔍 Test connection] = Primary
-
-3. Merchant → nhập 2 key + địa chỉ kho → bấm [Test connection]
-   System   → EPRateCheckingBulk (auto-detect env: prod→demo) bằng key + warehouse postcode
-              ├─ OK            → ✅ "Connected — Production"; lộ phần chọn courier
-              ├─ key sai       → ❌ EASYPARCEL_INVALID_KEY — KHÔNG lưu
-              └─ postcode sai  → ❌ EASYPARCEL_INVALID_WAREHOUSE — KHÔNG lưu
-
-4. Merchant → chọn 1 courier (radio, default J&T) → [Save]
-   System   → lưu tenant.easyParcelIntegration (key masked, selectedCourier); Toast "Đã lưu"
-              → Phase B (checkout) mở khoá cho site
-
-   [Edit sau khi connected] Merchant sửa key/kho
-   System   → khóa courier (overlay) + đổi nút → [Re-test Connection] + khóa Save
-              re-test OK → mở khoá lại; FAIL → giữ khóa
-```
+- Flat Rate/EasyParcel tabs and `ShippingTab`.
+- `EpSetupStepper`, separate Connect/Pickup/Review screens or forward/back wizard navigation.
+- API Key/Auth Key password fields, environment selector, edit-credentials or re-test gate.
+- Manual single/multi-courier selection, courier price cards or default courier.
+- Default parcel dimensions/weight and fulfillment-mode controls on Shipping Settings.
 
 ---
 
@@ -339,11 +309,18 @@ Actor: Merchant (seller)
 
 ```text
 ┌──────────────────────┐
-│ ☰  Shipping     [×]  │ ◄── Mobile header (drawer nav)
+│ ☰  Shipping          │ ◄── Mobile header (drawer nav)
 ├──────────────────────┤
+│ Shipping Providers   │
+│ ┌──────────────────┐ │
+│ │ EasyParcel  [OFF]│ │
+│ │ benefits / setup │ │
+│ │ [Setup Connection]││
+│ └──────────────────┘ │
 │                      │
-│ 🚚 Rates by Region   │
-│                      │
+│ ┌──────────────────┐ │
+│ │ Flat Rate        │ │
+│ │     [Live Rates] │ │
 │ West Malaysia        │
 │ ┌──────────────────┐ │
 │ │ RM  8.00         │ │ ◄── input height 44px
@@ -355,23 +332,21 @@ Actor: Merchant (seller)
 │ │ RM 15.00         │ │
 │ └──────────────────┘ │
 │ 3 states             │
-│                      │
-│ ─────────────────── │
-│                      │
-│ 🎁 Free Shipping     │
-│ [○━ ] Enabled        │ ◄── 44px tap target
-│                      │
-│ Threshold            │
-│ ┌──────────────────┐ │
-│ │ RM 100.00        │ │
+│ │ Live Preview     │ │
 │ └──────────────────┘ │
 │                      │
+│ Global Shipping Rules│
 │ ┌──────────────────┐ │
-│ │      Save        │ │ ◄── full-width primary
+│ │ Free Shipping [●]│ │ ◄── 44px tap target
+│ │ Threshold        │ │
+│ │ [RM 100.00]      │ │
 │ └──────────────────┘ │
-│ [Reset to Defaults]  │
+│                      │
+│ [Reset]       [Save] │ ◄── fixed dirty-state bar
 └──────────────────────┘
 ```
+
+Khi EasyParcel đã link, pickup form stack theo thứ tự Label → Phone → Address lines → State → City → Postcode → Default. Import/Add, Save/Cancel, wallet/Top up và Disconnect chuyển full-width hoặc stack dọc; không tạo horizontal overflow.
 
 **Checkout (Mobile):**
 
@@ -423,34 +398,48 @@ Actor: Merchant (seller)
 - Min input height: **44px** (Apple HIG tap target)
 - Postcode field: `<Input inputmode="numeric" pattern="[0-9]*" maxlength={5}>` → triggers Numpad
 - Switch tap target: 44x44px minimum hit area
-- Save / Place Order: full-width primary button, sticky bottom on long forms
+- Pickup edit/delete icon buttons: 44x44px
+- Settings dirty footer remains fixed above viewport edge; form has bottom padding so footer không che field
+- Save / Place Order: full-width primary button on narrow layouts
 
 ---
 
 ## 3. UI States Matrix
 
-| Screen | Loading | Empty | Error | Success | Validation |
-|--------|---------|-------|-------|---------|-----------|
-| Settings | Skeleton card 3 rows | N/A (defaults always present) | Toast `Failed to save` + retry | Toast `Settings updated` + breadcrumb dot clear | Red border + helper `Rate must be 0 – RM 1,000` |
-| Checkout shipping row | Inline spinner cạnh fee, debounced 300ms | Dash `— —` placeholder | Toast `Failed to calculate` + inline retry | Fee number / green FREE badge | Postcode red border + `5 digits required` |
-| Mobile both | Same as desktop | Same as desktop | Same as desktop | Same as desktop | Same + larger error text (≥14px) |
+| Screen | State | UI / transition |
+|---|---|---|
+| EasyParcel | Disconnected | `OFF`/`DISCONNECTED`, benefits + Setup Connection; management controls hidden |
+| EasyParcel | Partial | Linked warning; toggle OFF/disabled; inline pickup controls; wallet/Disconnect hidden |
+| EasyParcel | Ready + ON | Active copy; account, wallet, Top up, Disconnect and pickup list; Flat Rate = Backup Rate |
+| EasyParcel | Ready + OFF | Disabled warning; saved addresses remain; Flat Rate = Live Rates |
+| EasyParcel | Sync/test/save | Disable conflicting actions; spinner/toast; network/API errors use localized error feedback |
+| Pickup form | Invalid | Required/phone/postcode errors inline; no commit |
+| Pickup form | Editing | Add disabled; save controls inside inline form; changing default normalizes list |
+| Flat Rate / global rule | Dirty | Fixed Reset/Save footer; save success toast; validation errors inline |
+| Checkout shipping row | Empty/loading | Dash placeholder hoặc inline spinner cạnh fee |
+| Checkout shipping row | Success/error | Fee number/green FREE badge; lỗi dùng toast + inline retry |
+| Checkout form | Validation | Postcode red border + `5 digits required` |
+| Mobile | Same business states | Cards/forms/actions stack; 44px controls; no horizontal overflow |
 
 ---
 
 ## 4. Component Inventory
 
-| Component | shadcn/ui | Usage |
-|-----------|-----------|-------|
-| Card group | `Card`, `CardHeader`, `CardContent`, `CardFooter` | Settings sections |
-| Number input | `Input type="number"` + custom `RM` prefix span | Rate inputs |
-| Toggle | `Switch` | Free shipping enable |
-| Dropdown | `Select`, `SelectTrigger`, `SelectContent`, `SelectItem` | State picker |
-| Action buttons | `Button` (variants: default, ghost) | Save, Reset, Place Order |
-| Toast | `Toast` / `Sonner` | Settings save feedback |
-| Badge | `Badge variant="success"` | FREE shipping label |
-| Info hint | `Alert variant="default"` | "Add RM X more for FREE" |
-| Skeleton | `Skeleton` | Loading state cards |
-| Spinner | `Loader2` from lucide-react | Inline calc loading |
+| Production component / primitive | Responsibility |
+|---|---|
+| `ShippingSettingsClient` | Page composition; EasyParcel → Flat Rate order; global Free Shipping section; propagates saved EP enabled state |
+| `EasyParcelSettingsTab` | Despite legacy filename, renders the inline provider card (not a tab); OAuth, derived state, toggle, sync/save/disconnect |
+| `PickupAddresses` | Address list, inline Add/Edit form, default selection, delete confirmations, geo cascade |
+| `EpWalletBanner` | Fetch/display wallet, low-balance/label estimate and external Top up |
+| `ShippingRatesCard` | `Flat Rate (Regional)`, West/East inputs, state chips, dynamic status/copy and Live Preview |
+| `FreeShippingCard` | Global Free Shipping toggle and threshold |
+| `SettingsFooter` | Fixed dirty-state Reset/Save bar for Flat Rate/global rule changes |
+| `Switch` | EasyParcel enable and Free Shipping enable |
+| `Select` | Pickup State → City → Postcode and checkout state |
+| `Input` / native input | Rate, threshold and pickup text/phone fields |
+| `Button` | Setup, Add/Import, form actions, save, disconnect |
+| `ConfirmModal` | Disconnect, sync-replace and pickup deletion confirmations |
+| Sonner toast / `Loader2` | Async success, failure and loading feedback |
 
 ---
 
@@ -474,15 +463,39 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 | Breakpoint | Width | Behavior |
 |-----------|-------|----------|
-| Mobile | 375-639px | Vertical stack, full-width buttons, Numpad postcode, 44px tap targets |
-| Tablet | 640-1023px | Hybrid: settings 1-col, checkout 2-col stacked |
-| Desktop | ≥1024px | Settings 1-col centered (max-width 720px), checkout 2-col side-by-side |
+| Mobile | 375-639px | Provider cards stay in one column; benefit tiles, pickup fields, wallet/account and actions stack; full-width actions; 44px targets |
+| Tablet | 640-1023px | Benefits 2 columns; pickup Label/Phone 2 columns and geo fields 3 columns when space permits; cards remain vertically ordered |
+| Desktop | ≥1024px | Unified settings column in dashboard content; EasyParcel above Flat Rate; global rule below; checkout remains 2 columns |
 
 ---
 
-## 7. Out of Scope (Wave 7+)
+## 7. Acceptance & Design Notes
 
-- ✅ ~~Carrier picker dropdown (J&T, Pos Laju, Ninja Van)~~ → **đã vào scope qua F36 EasyParcel** (1 courier/shop, §2.1b)
+| Acceptance area | Design verification |
+|---|---|
+| Unified layout | No Tabs/stepper; EasyParcel precedes Flat Rate; Free Shipping is a separate global section |
+| Disconnected onboarding | Setup Connection + four benefits only; no account/address/wallet/toggle/Disconnect controls |
+| Linked vs ready | `isLinked` and valid default pickup independently determine partial vs ready state |
+| Inline address | Add/Edit remains inside EasyParcel card; Add disabled while editor is open |
+| Readiness transition | First valid default pickup enables and drafts toggle ON; wallet/account actions appear only when ready |
+| Geo + validation | State gates City, City gates Postcode; required fields, 5-digit postcode and Malaysian phone gate commit |
+| Default address | Exactly one default; first forced default; changing default clears the former; English protection popup prevents unsetting the only default |
+| Dynamic provider copy | EasyParcel ON ↔ Flat Rate Backup Rate; EasyParcel OFF ↔ Flat Rate Live Rates |
+| Disconnect | Destructive confirmation; fallback to Flat Rate; stored pickup addresses preserved |
+| Responsive | One-column provider order, stacked form/actions and minimum 44px interactive targets on mobile |
+
+**Implementation note:** `EasyParcelSettingsTab` is retained as a filename/export for compatibility but no longer represents a visual tab. `ep-setup-stepper.tsx` and `shipping-tab.ts` are superseded and must have no runtime/documentation dependency.
+
+**Persistence note:** Flat Rate/global rule changes and EasyParcel changes have separate save paths. Automatic toggle-on after the first valid pickup is draft behavior until the EasyParcel save succeeds.
+
+---
+
+## 8. Out of Scope (Wave 7+)
+
+- ❌ Provider tabs or setup wizard
+- ❌ API/Auth key entry or credential editing in Settings (OAuth owns authorization)
+- ❌ Manual courier picker or courier allowlist in Settings (quote flow selects automatically)
+- ❌ Default parcel dimensions/weight and fulfillment-mode controls in Settings
 - ✅ ~~Tracking number input + tracking link in order detail~~ → **F36**: AWB tự đổ vào `trackingNumber` + tracking status (F10 drawer)
 - ❌ Estimated delivery days field (per-region days)
 - ❌ Per-product shipping override (ShippingDimensionsSection trong product form sẽ scoped riêng cho carrier integration)
@@ -490,11 +503,11 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 ---
 
-## 8. Decisions Log (Resolved Open Questions)
+## 9. Decisions Log (Resolved Open Questions)
 
 > Chốt 2026-05-12 theo PM direction.
 
-### 8.1. Reset to Defaults — `freeAbove` behavior
+### 9.1. Reset to Defaults — `freeAbove` behavior
 
 **Quyết định:** KHÔNG clear về `null`. Reset trả về **giá trị mặc định hệ thống**.
 
@@ -520,9 +533,11 @@ THEN  westRate input shows "8.00", eastRate "15.00", freeAbove "100.00"
 
 ---
 
-### 8.2. Postcode Validation — Regex vs State mapping
+### 9.2. Checkout Postcode Validation — Regex vs State mapping
 
-**Quyết định:** **Wave 6 chỉ dùng regex `^\d{5}$`**. State-based postcode validation defer Wave 7+.
+**Phạm vi:** quyết định này chỉ áp dụng cho postcode trong **checkout shipping address**. Pickup address trong EasyParcel Settings sử dụng State → City → Postcode geo cascade như §2.1.6.
+
+**Quyết định:** Checkout Wave 6 chỉ dùng regex `^\d{5}$`. State-based postcode validation tại checkout defer Wave 7+.
 
 **Lý do:**
 - **Regex (fast-track):** Đảm bảo đúng format bưu điện Malaysia (5 chữ số). Code đơn giản, ít edge case, không cần DB postcode mapping.
@@ -549,7 +564,7 @@ THEN  KHÔNG báo lỗi (Wave 6 không cross-check postcode-state)
 
 ---
 
-### 8.3. "Add RM X more for FREE" hint — Display logic
+### 9.3. "Add RM X more for FREE" hint — Display logic
 
 **Quyết định:** **Luôn hiển thị khi `subtotal < threshold`**. Style thay đổi theo gap distance để upsell hiệu quả.
 
@@ -600,8 +615,8 @@ THEN  hint hidden, replaced by Badge "🎉 FREE SHIPPING APPLIED"
 
 ---
 
-> **Note Phase 03:** Các decision §8.1–8.3 cần phản ánh trong:
-> - US-F14-04 (validate boundaries) — thêm AC reset behavior §8.1
-> - US-F14-02 (seller settings) — clarify default values §8.1
-> - PRD §7 FR-05 — update "Add RM X more" với 3-tier logic §8.3
-> - PRD §7 thêm FR-11: Postcode format validate `^\d{5}$` §8.2
+> **Note Phase 03:** Các decision §9.1–9.3 cần phản ánh trong:
+> - US-F14-04 (validate boundaries) — thêm AC reset behavior §9.1
+> - US-F14-02 (seller settings) — clarify default values §9.1
+> - PRD §7 FR-05 — update "Add RM X more" với 3-tier logic §9.3
+> - PRD §7 thêm FR-11: Postcode format validate `^\d{5}$` §9.2

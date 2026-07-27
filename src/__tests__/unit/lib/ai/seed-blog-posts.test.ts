@@ -648,32 +648,25 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
 		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+			payload, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
 		})
 
 		expect(prepared).toBeNull()
 		warnSpy.mockRestore()
 	})
 
-	it('returns [] only when the current site already has three complete posts', async () => {
+	it('returns [] when the tenant already has posts', async () => {
 		const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
 
 		// Prep skip case
 		const payloadWithPosts = makePayload(3)
 		const prepared = await prepareBlogPosts({
-			payload: payloadWithPosts, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
+			payload: payloadWithPosts, tenantId: 42, category: 'restaurant', businessName: 'TestBiz',
 		})
 		expect(prepared).toEqual([])
 		expect(payloadWithPosts.count).toHaveBeenCalledWith({
 			collection: 'blogs',
-			where: {
-				and: [
-					{ tenant: { equals: 42 } },
-					{ site: { equals: 99 } },
-					{ content: { exists: true } },
-					{ thumbnail: { exists: true } },
-				],
-			},
+			where: { tenant: { equals: 42 } },
 		})
 
 		// Persist path inserts exactly the prepared rows (site-dependent phase)
@@ -692,15 +685,65 @@ describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {
 		expect(second.data.thumbnail).toBeUndefined()
 	})
 
-	it('prepares only the deficit when the current site has one complete post', async () => {
-		const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-		const payload = makePayload(1)
+})
 
-		const prepared = await prepareBlogPosts({
-			payload, tenantId: 42, siteId: 99, category: 'restaurant', businessName: 'TestBiz',
-		})
+describe('TC-F08-BS.26 — generated website blogs preserve the target locale', () => {
+    it('threads locale through seed and article generation', async () => {
+        const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+        const generateBlogSeedsAI = await getGenerateBlogSeedsAI()
+        const generateBlogPostContent = await getGenerateBlogPostContent()
+        const payload = makePayload(0)
 
-		expect(prepared).toHaveLength(2)
-	})
+        await prepareBlogPosts({
+            payload,
+            tenantId: 42,
+            category: 'health',
+            businessName: 'Nha Khoa Việt Smile',
+            products: ['Niềng răng', 'Trồng răng implant', 'Tẩy trắng răng'],
+            industry: 'Health / Dental / Clinic',
+            locale: 'vi-VN',
+        })
 
+        expect(generateBlogSeedsAI).toHaveBeenCalledWith(expect.objectContaining({ locale: 'vi-VN' }))
+        expect(generateBlogPostContent).toHaveBeenCalledWith(
+            expect.any(String),
+            'Nha Khoa Việt Smile',
+            'Health / Dental / Clinic',
+            'vi-VN',
+        )
+    })
+
+    it('keeps three locale-safe posts without English headings when AI fails', async () => {
+        const generateBlogSeedsAI = await getGenerateBlogSeedsAI()
+        const generateBlogPostContent = await getGenerateBlogPostContent()
+        vi.mocked(generateBlogSeedsAI).mockRejectedValueOnce(new Error('seed generation failed'))
+        vi.mocked(generateBlogPostContent).mockRejectedValue(new Error('content generation failed'))
+
+        const payload = makePayload(0)
+        const result = await seedBlogPosts(
+            payload,
+            42,
+            99,
+            'health',
+            'Nha Khoa Việt Smile',
+            7,
+            ['Niềng răng', 'Trồng răng implant', 'Tẩy trắng răng'],
+            'Health / Dental / Clinic',
+            123,
+            'vi-VN',
+        )
+
+        expect(result).toBe(3)
+        const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        expect(calls.map(([arg]) => arg.data.title)).toEqual([
+            'Niềng răng',
+            'Trồng răng implant',
+            'Tẩy trắng răng',
+        ])
+        for (const [arg] of calls) {
+            expect(arg.data.content).not.toContain('Why it matters')
+            expect(arg.data.content).not.toContain('What to consider')
+            expect(arg.data.content).not.toContain('Next steps')
+        }
+    })
 })

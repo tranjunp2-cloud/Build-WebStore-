@@ -7,6 +7,10 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import {
+    normalizeGeneratedPageLocaleStrings,
+    normalizeLocaleStructuralStrings,
+} from '@/lib/ai/post-ai-swap'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
 import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
@@ -669,17 +673,16 @@ export async function POST(req: NextRequest) {
             // Thumbnail search is intentionally independent from sample-product
             // completion so a slow product upload cannot hold the blog tail.
             // Never rejects: null = prep failed → synchronous fallback seeding.
-            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = existingSitesPromise
-                .then((existingSites) => prepareBlogPosts({
-                    payload,
-                    tenantId: resolvedTenantId,
-                    category: normalizeComposerCategory(businessInfo.industry),
-                    businessName: businessInfo.businessName,
-                    products: parseProductsString(businessInfo.products),
-                    industry: businessInfo.industry,
-                    seed: computeGenSeed(businessInfo),
-                    siteId: existingSites.docs[0]?.id,
-                }))
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+                payload,
+                tenantId: resolvedTenantId,
+                category: normalizeComposerCategory(businessInfo.industry),
+                businessName: businessInfo.businessName,
+                products: parseProductsString(businessInfo.products),
+                industry: businessInfo.industry,
+                seed: computeGenSeed(businessInfo),
+                locale: effectiveGenerationLocale,
+            })
                 .catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -1115,12 +1118,17 @@ export async function POST(req: NextRequest) {
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
         // GH-817: pass page links so injected/hollow nav reflects actual generated pages
-        const pageDefinitions = enforcePageVariety(
-            ensureNavigationBlocks(
-                rawPageDefinitions as unknown as PageShape[],
-                businessInfo.businessName,
-                normalizedPageLinks,
+        const pageDefinitions = normalizeGeneratedPageLocaleStrings(
+            enforcePageVariety(
+                ensureNavigationBlocks(
+                    rawPageDefinitions as unknown as PageShape[],
+                    businessInfo.businessName,
+                    normalizedPageLinks,
+                ),
             ),
+            generationLocale,
+            businessInfo.businessName,
+            result.localeStructuralStrings,
         )
 
         const createdPages: Record<string, unknown>[] = []
@@ -1157,7 +1165,7 @@ export async function POST(req: NextRequest) {
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
-            const normalizedLayout = Array.isArray(sanitizedLayout)
+            const productNormalizedLayout = Array.isArray(sanitizedLayout)
                 ? normalizeGeneratedProductsGridBlocks(
                     sanitizedLayout,
                     pageDefinition.slug,
@@ -1165,6 +1173,18 @@ export async function POST(req: NextRequest) {
                     businessInfo.businessName,
                   )
                 : sanitizedLayout
+            // Run locale normalization at the final persistence boundary. Some
+            // Payload sanitizers materialize aliases such as CTA `text`/`title`
+            // into `label`, so an English fallback can otherwise appear after
+            // the earlier page-definition normalization pass.
+            const normalizedLayout = Array.isArray(productNormalizedLayout)
+                ? normalizeLocaleStructuralStrings(
+                    productNormalizedLayout as Record<string, unknown>[],
+                    generationLocale,
+                    businessInfo.businessName,
+                    result.localeStructuralStrings,
+                  ) as AIBlock[]
+                : productNormalizedLayout
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
             // violation, block validation, stale _parent_id from drizzle
             // transaction race) does NOT abort the entire generation. If
@@ -1495,6 +1515,10 @@ export async function POST(req: NextRequest) {
                     tenant: resolvedTenantId,
                     site: site.id,
                     name,
+                    // Products' collection hook uses ASCII-only slugification. Supplying the
+                    // shared CJK-aware slug here prevents pure CJK names from being rejected
+                    // while the hook still handles uniqueness suffixes.
+                    slug: slugify(name),
                     shortDescription: product.shortDescription,
                     description: product.description,
                     ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
@@ -1647,6 +1671,7 @@ export async function POST(req: NextRequest) {
                                 parseProductsString(businessInfo.products),
                                 businessInfo.industry,
                                 computeGenSeed(businessInfo),
+                                effectiveGenerationLocale,
                             )
                         }
                         return 0

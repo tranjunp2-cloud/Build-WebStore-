@@ -1844,7 +1844,8 @@ const MIGRATIONS = [
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
-      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6
+      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6,
+      read_article_label varchar, uncategorized_label varchar, empty_state_label varchar
     );`,
   },
   {
@@ -2173,7 +2174,8 @@ const MIGRATIONS = [
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_blog_list" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
-      variant varchar, headline varchar, subheadline varchar, "limit" integer
+      variant varchar, headline varchar, subheadline varchar, "limit" integer,
+      read_article_label varchar, uncategorized_label varchar, empty_state_label varchar
     );`,
   },
   {
@@ -4064,6 +4066,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_newsletter.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: 'pages_blocks_blog_list.add_section_label', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_blog_list.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_blog_list.add_locale_labels', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS read_article_label varchar, ADD COLUMN IF NOT EXISTS uncategorized_label varchar, ADD COLUMN IF NOT EXISTS empty_state_label varchar;` },
+  { name: '_pages_v_blocks_blog_list.add_locale_labels', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS read_article_label varchar, ADD COLUMN IF NOT EXISTS uncategorized_label varchar, ADD COLUMN IF NOT EXISTS empty_state_label varchar;` },
   { name: 'pages_blocks_service_cards.add_section_label', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_service_cards.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: 'pages_blocks_client_logos.add_section_label', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
