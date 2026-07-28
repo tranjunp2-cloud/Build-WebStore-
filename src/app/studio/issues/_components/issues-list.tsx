@@ -10,6 +10,7 @@ import { Search } from 'lucide-react'
 import { SeverityPill } from './severity-pill'
 import { IssueStatusBadge } from './issue-status-badge'
 import { IssueDetailDrawer } from './issue-detail-drawer'
+import { LiveErrorsView } from './live-errors-view'
 import type { IssueRecord, IssueSeverity, IssueStatus } from './issue-types'
 
 // ── Filter types ──────────────────────────────────────────────────────────────
@@ -254,6 +255,7 @@ type Props = {
 }
 
 export function IssuesList({ initialIssues, initialTotal, initialPages }: Props) {
+    const [activeView, setActiveView] = useState<'tracked' | 'live'>('tracked')
     const [issues, setIssues]       = useState<IssueRecord[]>(initialIssues)
     const [total, setTotal]         = useState(initialTotal)
     const [pages, setPages]         = useState(initialPages)
@@ -314,6 +316,19 @@ export function IssuesList({ initialIssues, initialTotal, initialPages }: Props)
         setDrawer(updated)
     }
 
+    function handleRuntimePromoted(issue: IssueRecord, created: boolean) {
+        const alreadyLoaded = issues.some((current) => current.id === issue.id)
+        setIssues((prev) => (
+            prev.some((current) => current.id === issue.id)
+                ? prev.map((current) => current.id === issue.id ? issue : current)
+                : [issue, ...prev]
+        ))
+        if (created && !alreadyLoaded) setTotal((current) => current + 1)
+        setSelId(issue.id)
+        setDrawer(issue)
+        setActiveView('tracked')
+    }
+
     const selectedIss = useMemo(() => issues.find((i) => i.id === selectedId) ?? null, [issues, selectedId])
 
     // Sort: critical first, then by createdAt desc
@@ -331,16 +346,59 @@ export function IssuesList({ initialIssues, initialTotal, initialPages }: Props)
             <div className="page-head">
                 <div>
                     <h1 className="page-title">Issues & Feedback</h1>
-                    <p className="page-sub">Vấn đề tổng hợp từ user generations, grouped theo root cause — block, template, AI pattern, hoặc user feedback.</p>
+                    <p className="page-sub">
+                        {activeView === 'tracked'
+                            ? 'Vấn đề tổng hợp từ user generations, grouped theo root cause — block, template, AI pattern, hoặc user feedback.'
+                            : 'Read-on-demand production errors from Sentry and Vercel. Evidence remains temporary until promotion.'}
+                    </p>
                 </div>
-                <div className="page-actions">
-                    <button className="btn btn-sm" onClick={() => fetchIssues(filters, page)} disabled={loading}>
-                        {loading ? 'Loading…' : 'Refresh'}
-                    </button>
-                    <button className="btn btn-sm btn-primary">+ New issue</button>
-                </div>
+                {activeView === 'tracked' && (
+                    <div className="page-actions">
+                        <button className="btn btn-sm" onClick={() => fetchIssues(filters, page)} disabled={loading}>
+                            {loading ? 'Loading…' : 'Refresh'}
+                        </button>
+                        <button className="btn btn-sm btn-primary">+ New issue</button>
+                    </div>
+                )}
             </div>
 
+            <div
+                className="inline-flex w-fit rounded-lg border border-[var(--border-strong)] bg-[var(--bg-elev)] p-1"
+                role="group"
+                aria-label="Issues views"
+            >
+                <button
+                    type="button"
+                    className={[
+                        'min-h-11 rounded-md px-4 text-sm font-semibold transition-colors duration-200',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+                        activeView === 'tracked'
+                            ? 'bg-[var(--bg-sunk)] text-[var(--text)] shadow-[inset_0_0_0_1px_var(--border)]'
+                            : 'text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]',
+                    ].join(' ')}
+                    aria-pressed={activeView === 'tracked'}
+                    onClick={() => setActiveView('tracked')}
+                >
+                    Tracked issues
+                </button>
+                <button
+                    type="button"
+                    className={[
+                        'min-h-11 rounded-md px-4 text-sm font-semibold transition-colors duration-200',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+                        activeView === 'live'
+                            ? 'bg-[var(--bg-sunk)] text-[var(--text)] shadow-[inset_0_0_0_1px_var(--border)]'
+                            : 'text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]',
+                    ].join(' ')}
+                    aria-pressed={activeView === 'live'}
+                    onClick={() => setActiveView('live')}
+                >
+                    Live errors
+                </button>
+            </div>
+
+            {activeView === 'tracked' ? (
+                <>
             {/* Summary strip */}
             <IssueSummary issues={issues} />
 
@@ -474,6 +532,10 @@ export function IssuesList({ initialIssues, initialTotal, initialPages }: Props)
                 onClose={() => setDrawer(null)}
                 onUpdated={handleIssueUpdated}
             />
+                </>
+            ) : (
+                <LiveErrorsView onPromoted={handleRuntimePromoted} />
+            )}
         </div>
     )
 }
