@@ -58,7 +58,7 @@ Return only deterministic `day_key` and `amount`, split rows at `currentStart`, 
 1. Export exactly one shared code constant: `DASHBOARD_TIME_ZONE = 'UTC' as const`. Do not read `process.env.TZ` or add environment files.
 2. Add shared pure helpers for UTC current/previous bounds, UTC range labels, and 1/7/30 UTC day keys. Results must not depend on the Node host timezone.
 3. Apply the same UTC bounds to Payload counts for Views, Leads, and Engagement, and use `DASHBOARD_TIME_ZONE` as the parameter for every SQL daily grouping. Preserve their existing event semantics.
-4. Keep authentication and tenant derivation server-side. `getGlanceData` accepts no tenant ID; anonymous/missing tenant returns `emptyGlanceData`; any authenticated tenant user, including one without Orders permission, may receive Revenue.
+4. Keep authentication and tenant derivation server-side. `getGlanceData(period, { user })` accepts the authenticated user rather than a caller-supplied tenant ID; anonymous/missing tenant returns `emptyGlanceData`. Reuse the existing Orders permission gate before executing Revenue SQL, and return zero/empty Revenue when access is denied.
 5. Remove the two Revenue `payload.find(... limit: 2000)` calls and replace them with the single aggregate. Filter current `completed` status and MYR/null currency; do not filter payment method or payment status.
 6. Normalize finite aggregate values without `any` or `NaN`; compute Revenue total, comparison, and series from the same rows.
 7. Add AAA tests mapped to F03 QA IDs:
@@ -84,7 +84,7 @@ git diff --check
 - Revenue is current-status completed-only, MYR-only, tenant-scoped, and grouped by order creation day.
 - Current total, comparison delta, and sparkline use identical predicates with no pagination cap.
 - All four metrics use exact 1/7/30 UTC0 windows and matching UTC SQL day keys regardless of runtime or database session timezone.
-- All tenant users retain aggregate visibility without exposing order/customer data.
+- Only tenant users with Orders access receive the aggregate; denied users trigger no Revenue Orders query and receive zero/empty Revenue without exposing order/customer data.
 - No schema, migration, route, or unrelated metric behavior changes.
 
 ## Todo

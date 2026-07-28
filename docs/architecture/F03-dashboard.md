@@ -32,7 +32,7 @@ page.tsx (Server Component)
   │
   ├── getCurrentUser() + tenantIdForQuery() → tenant scope
   │
-  ├── getGlanceData(period) ──► Payload/Drizzle
+  ├── getGlanceData(period, { user }) ──► Payload/Drizzle
   ├── getTrafficData(period) ─► Payload/Drizzle
   ├── getSeoData() ───────────► Payload/Drizzle
   │
@@ -52,9 +52,8 @@ page.tsx (Server Component)
 
 ### Active At-a-glance metrics
 
-`getGlanceData(period)` derives the tenant on the server and returns empty data when
-there is no tenant. All tenant users may receive the aggregate metrics; Revenue does
-not reuse the Orders permission gate from the Pending Orders widget.
+`getGlanceData(period, { user })` derives the tenant from the authenticated user and returns empty data when there is no usable tenant. Views, Leads, and Engagement remain tenant-scoped analytics metrics.
+Revenue reuses the Orders permission gate: users without Orders access receive zero/empty Revenue and no Orders SQL is executed.
 
 Views, Leads, Engagement, and Revenue share the single
 `DASHBOARD_TIME_ZONE = 'UTC'` contract. Current/comparison boundaries are half-open,

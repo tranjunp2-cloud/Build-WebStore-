@@ -17,11 +17,11 @@ created: 2026-07-22
 
 Activate the dashboard Revenue card using orders whose **current** status is `completed`. Revenue is assigned to the UTC calendar day of the order's existing `createdAt`; no completion timestamp, schema field, hook, or database migration is added.
 
-This is a successor to the completed Pending Orders work, not another phase of GH-1627, and currently has no Revenue-specific GitHub issue number.
+This is an intentional extension of GH-1627 and PR #1706. Revenue-specific acceptance criteria AC-R01 through AC-R08 are recorded in the issue scope clarification.
 
 ## Scope Challenge
 
-- **Reuse:** keep `DashboardRoot -> getGlanceData(period) -> GlanceData -> AtAGlance`, existing tenant resolution, Drizzle access, stat/delta/sparkline DTO, and card UI.
+- **Reuse:** keep `DashboardRoot -> getGlanceData(period, { user }) -> GlanceData -> AtAGlance`, authenticated-user tenant resolution, Drizzle access, stat/delta/sparkline DTO, and card UI.
 - **Minimum change:** add one shared dashboard timezone constant, normalize all four At-a-glance blocks to UTC0, replace active Revenue reads with one aggregate query, remove Coming Soon, and add focused tests/docs.
 - **Selected mode:** scope reduction. The new `completedAt` field, lifecycle hook, migration, backfill, and generated type work have been removed by product decision.
 - **Complexity:** two sequential phases; query correctness precedes UI activation.
@@ -33,7 +33,7 @@ This is a successor to the completed Pending Orders work, not another phase of G
 - A currently refunded or otherwise non-completed order is excluded, even if it was completed before. This can remove historical Revenue retroactively.
 - COD has no special handling; payment method and payment status do not affect inclusion.
 - Revenue supports MYR only. Include `currency = 'MYR'`; treat legacy `NULL` currency as MYR; exclude USD, SGD, and unknown non-null values.
-- Every authenticated user in the current tenant may view the aggregate. Do not apply the Pending Orders/Orders permission gate. Tenant isolation remains mandatory.
+- Only users with Orders access may view the aggregate. Reuse the existing Pending Orders/Orders permission gate; denied users trigger no Revenue Orders query and receive zero/empty Revenue. Tenant isolation remains mandatory.
 - Export one code constant, `DASHBOARD_TIME_ZONE = 'UTC' as const`, and use it across Views, Leads, Engagement, and Revenue. Do not introduce an environment variable.
 - Use UTC0 half-open boundaries: today is `00:00 UTC` through tomorrow `00:00 UTC`; 7d includes today plus six prior UTC days; 30d includes today plus 29 prior UTC days; comparison windows are equal and non-overlapping.
 
@@ -41,7 +41,7 @@ This is a successor to the completed Pending Orders work, not another phase of G
 
 ```text
 Dashboard Server Component
-  -> getGlanceData(period)
+  -> getGlanceData(period, { user })
   -> import DASHBOARD_TIME_ZONE = 'UTC'
   -> derive current tenant from server auth
   -> calculate shared UTC current + previous boundaries
@@ -61,7 +61,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 
 | Relationship | Plan | Status | Decision |
 |---|---|---|---|
-| Predecessor, complete | [GH-1627 Pending Orders widget](../260721-1759-gh-1627-pending-orders-widget/plan.md) | completed | Preserve its permission-gated Pending Orders behavior; Revenue intentionally has broader tenant-user visibility. |
+| Predecessor, complete | [GH-1627 Pending Orders widget](../260721-1759-gh-1627-pending-orders-widget/plan.md) | completed | Preserve its permission-gated Pending Orders behavior and reuse the same Orders access boundary for Revenue. |
 | Related, not blocking | [US-F10-02 Customer Checkout](../260518-1321-GH-109-customer-checkout/plan.md) | pending | Revenue depends only on current completed status and existing creation time. |
 | Related, not blocking | [F10 Bank Transfer Verification](../260518-1642-F10-bank-transfer-verification/plan.md) | pending | Bank-transfer approval alone does not create Revenue until status becomes completed. |
 | Related, not blocking | [GH-1099 Reliable Payment](../260602-1754-GH-1099-reliable-payment/plan.md) | pending | Payment reconciliation remains separate from the locked completed-status rule. |
@@ -80,7 +80,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 | REV-01 | Current/comparison totals include only current-status completed, MYR/legacy-null orders in the authenticated tenant, grouped by `createdAt`. | Phase 1 |
 | REV-02 | COD is neither specially included nor excluded; refunded/non-completed and USD/SGD orders do not contribute. | Phase 1 |
 | REV-03 | All four At-a-glance blocks use `DASHBOARD_TIME_ZONE = 'UTC'`, exact UTC today/7d/30d windows, and deterministic 1/7/30 day keys. | Phase 1 |
-| REV-04 | Every tenant user can receive the aggregate; missing tenant returns empty data and cross-tenant rows cannot contribute. | Phase 1 |
+| REV-04 | Only users with Orders access can receive the aggregate; denied users trigger no Revenue Orders query and receive zero/empty data. Missing tenant returns empty data and cross-tenant rows cannot contribute. | Phase 1 |
 | REV-05 | Revenue no longer shows Coming Soon and renders RM with exactly two decimals, delta/note, and sparkline in EN/MS. | Phase 2 |
 | REV-06 | Focused tests, dashboard regression, typecheck, lint/diff checks, and credentialed/manual QA are recorded before release. | Phase 2 |
 
@@ -89,7 +89,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 - Adding `completedAt`, status history, hook, schema/index migration, or reconstructing completion dates.
 - Refactoring dormant `OverviewView.tsx` or legacy `/api/dashboard/summary`; record their duplicate Revenue logic as follow-up debt.
 - Multi-currency conversion, exchange rates, partial refunds, net/gross accounting, or tenant currency settings.
-- Orders RBAC changes, new route/API, caching, individual card customization, or non-timezone event semantics.
+- A new permission model, new route/API, caching, individual card customization, or non-timezone event semantics. Revenue reuses the existing Orders access gate.
 
 ## Risks and Rollback
 
@@ -109,7 +109,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 - Shared UTC constant/boundary/day-key, aggregation, formatter/component, and dashboard regression tests pass.
 - `npm run typecheck`, lint, build, and `git diff --check` pass or any environment-only build blocker is recorded honestly.
 - Credentialed/manual fixtures confirm created-date attribution, completed/COD inclusion, refund exclusion, tenant isolation, MYR/null behavior, decimals, and today/7d/30d behavior.
-- If an issue is created, the PR uses `Relates to #N`, never `Closes #N`; do not reuse #1627 for this separate scope.
+- PR #1706 uses `Relates to #1627`, never `Closes #1627`; Revenue AC-R01 through AC-R08 live in the issue scope clarification.
 
 ## Progress
 
@@ -120,7 +120,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 
 - Revenue is active, no longer shows Coming Soon, and formats MYR with exactly two decimals while preserving delta, note, and sparkline behavior.
 - Component coverage renders through the real EN/MS locale provider rather than a private translation fixture.
-- A PostgreSQL-backed regression calls the production `getGlanceData` SQL against session-local TEMP tables and covers the exact placeholder/runtime failure class; CI provisions PostgreSQL 16 and runs this test separately on pull requests.
+- A PostgreSQL-backed regression calls production `getGlanceData(period, { user })` against session-local TEMP tables and exercises the real Orders permission gate while covering the exact placeholder/runtime failure class; CI provisions PostgreSQL 16 and runs this test separately on pull requests.
 - Focused Revenue tests, the dashboard regression suite, TypeScript, lint, and diff integrity passed.
 - An isolated Docker BuildKit builder exited 0, compiled successfully, and generated **113/113** pages; a local PostgreSQL `ECONNREFUSED` log during page generation was non-fatal.
 - Remaining operational gates: credentialed browser/responsive QA and `EXPLAIN ANALYZE` on representative staging-like data.
