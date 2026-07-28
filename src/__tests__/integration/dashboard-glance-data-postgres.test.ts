@@ -14,7 +14,7 @@ import { Pool } from 'pg'
 
 const mocks = vi.hoisted(() => ({
     count: vi.fn(),
-    getCurrentTenantId: vi.fn(),
+    tenantIdForQuery: vi.fn(),
 }))
 
 let testDatabase: ReturnType<typeof drizzle> | null = null
@@ -32,13 +32,22 @@ vi.mock('payload', () => ({
 }))
 
 vi.mock('@/lib/auth', () => ({
-    getCurrentTenantId: mocks.getCurrentTenantId,
+    tenantIdForQuery: mocks.tenantIdForQuery,
 }))
 
 import { getGlanceData } from '@/lib/dashboard/glance-data'
 
 const connectionString = process.env.DATABASE_URI
 const RUN_TEST = Boolean(connectionString)
+const authorizedUser = {
+    roles: [],
+    tenants: [{
+        tenant: 65,
+        status: 'active',
+        role: 'owner',
+        permissions: [],
+    }],
+}
 
 describe.skipIf(!RUN_TEST)('[TC-F03.05 / TC-F03.77] At-a-glance PostgreSQL query regression', () => {
     let pool: Pool
@@ -109,7 +118,7 @@ describe.skipIf(!RUN_TEST)('[TC-F03.05 / TC-F03.77] At-a-glance PostgreSQL query
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
         vi.clearAllMocks()
-        mocks.getCurrentTenantId.mockResolvedValue('65')
+        mocks.tenantIdForQuery.mockReturnValue(65)
         mocks.count.mockResolvedValue({ totalDocs: 0 })
 
         await pool.query('TRUNCATE analytics, orders')
@@ -175,7 +184,7 @@ describe.skipIf(!RUN_TEST)('[TC-F03.05 / TC-F03.77] At-a-glance PostgreSQL query
         `)
 
         // Act
-        const result = await getGlanceData('7d')
+        const result = await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
         expect(result.stats.revenue.value).toBeCloseTo(150.25)
@@ -184,5 +193,31 @@ describe.skipIf(!RUN_TEST)('[TC-F03.05 / TC-F03.77] At-a-glance PostgreSQL query
         expect(result.sparks.views).toEqual([0, 0, 0, 0, 0, 0, 0])
         expect(result.sparks.leads).toEqual([0, 0, 0, 0, 0, 0, 0])
         expect(result.sparks.engage).toEqual([0, 0, 0, 0, 0, 0, 0])
+    })
+
+    it('does not expose Revenue when the real Orders permission gate denies access', async () => {
+        // Arrange
+        const unauthorizedUser = {
+            roles: [],
+            tenants: [{
+                tenant: 65,
+                status: 'active',
+                role: 'custom',
+                permissions: [],
+            }],
+        }
+        await pool.query(`
+            INSERT INTO orders
+                (tenant_id, status, currency, total, payment_method, payment_status, created_at)
+            VALUES
+                (65, 'completed', 'MYR', 123.45, 'card', 'paid', '2026-07-27T12:00:00.000Z');
+        `)
+
+        // Act
+        const result = await getGlanceData('7d', { user: unauthorizedUser })
+
+        // Assert
+        expect(result.stats.revenue).toEqual({ value: 0, delta: 0, currency: true })
+        expect(result.sparks.revenue).toEqual([0, 0, 0, 0, 0, 0, 0])
     })
 })

@@ -215,6 +215,7 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         // Assert
         expect(mocks.getPendingOrdersData).toHaveBeenCalledTimes(1)
         expect(mocks.getPendingOrdersData).toHaveBeenCalledWith({ user: authorizedUser })
+        expect(mocks.getGlanceData).toHaveBeenCalledWith(expect.anything(), { user: authorizedUser })
         expect(screen.getByTestId('pending-orders-block')).toHaveTextContent('ready')
     })
 

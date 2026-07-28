@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
     count: vi.fn(),
     execute: vi.fn(),
     getCurrentTenantId: vi.fn(),
+    tenantIdForQuery: vi.fn(),
+    canReadPendingOrders: vi.fn(),
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -21,7 +23,10 @@ vi.mock('payload', () => ({
 
 vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: mocks.getCurrentTenantId,
+    tenantIdForQuery: mocks.tenantIdForQuery,
 }))
+
+vi.mock('@/lib/dashboard/pending-orders-data', () => ({ canReadPendingOrders: mocks.canReadPendingOrders }))
 
 import { getPayload } from 'payload'
 import { emptyGlanceData, getGlanceData } from '@/lib/dashboard/glance-data'
@@ -33,11 +38,23 @@ interface CapturedSql {
 
 const sqlText = (query: CapturedSql) => query.strings.join('?')
 
+const authorizedUser = {
+    roles: [],
+    tenants: [{
+        tenant: 'tenant-a',
+        status: 'active',
+        role: 'owner',
+        permissions: [],
+    }],
+}
+
 beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-27T12:00:00.000Z'))
     vi.clearAllMocks()
+    mocks.canReadPendingOrders.mockReturnValue(true)
     mocks.getCurrentTenantId.mockResolvedValue('tenant-a')
+    mocks.tenantIdForQuery.mockReturnValue('tenant-a')
     mocks.count.mockResolvedValue({ totalDocs: 0 })
     mocks.execute.mockResolvedValue({ rows: [] })
 })
@@ -50,9 +67,10 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
     it('returns empty data before Payload initializes when tenant context is absent', async () => {
         // Arrange
         mocks.getCurrentTenantId.mockResolvedValue(null)
+        mocks.tenantIdForQuery.mockReturnValue(null)
 
         // Act
-        const result = await getGlanceData('today')
+        const result = await getGlanceData('today', { user: { tenants: [] } })
 
         // Assert
         expect(result).toEqual(emptyGlanceData())
@@ -65,7 +83,7 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         // Arrange — default empty query responses
 
         // Act
-        await getGlanceData('7d')
+        await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
         expect(mocks.count).toHaveBeenCalledTimes(6)
@@ -99,7 +117,7 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         // Arrange — default empty query responses
 
         // Act
-        await getGlanceData('7d')
+        await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
         expect(mocks.execute).toHaveBeenCalledTimes(4)
@@ -124,17 +142,22 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         expect(revenueQuery.values).toContain('2026-07-28T00:00:00.000Z')
     })
 
-    it('loads tenant aggregate without consulting an Orders permission gate', async () => {
-        // Arrange — server auth has resolved a tenant for a dashboard user
-        mocks.getCurrentTenantId.mockResolvedValue('tenant-with-view-only-user')
+    it('does not query or serialize Revenue for users without Orders permission', async () => {
+        // Arrange
+        const unauthorizedUser = {
+            roles: [],
+            tenants: [{ tenant: 'tenant-a', status: 'active', role: 'custom', permissions: [] }],
+        }
+        mocks.canReadPendingOrders.mockReturnValue(false)
 
         // Act
-        await getGlanceData('today')
+        const result = await getGlanceData('today', { user: unauthorizedUser })
 
         // Assert
-        expect(getPayload).toHaveBeenCalledTimes(1)
-        const revenueQuery = mocks.execute.mock.calls[3][0] as CapturedSql
-        expect(revenueQuery.values).toContain('tenant-with-view-only-user')
+        expect(mocks.execute).toHaveBeenCalledTimes(3)
+        expect(mocks.execute.mock.calls.map(call => sqlText(call[0] as CapturedSql)).join(' ')).not.toContain('FROM orders')
+        expect(result.stats.revenue).toEqual({ value: 0, delta: 0, currency: true })
+        expect(result.sparks.revenue).toEqual([0])
     })
     it('derives current total, comparison, and zero-filled series from one Revenue aggregate', async () => {
         // Arrange
@@ -159,7 +182,7 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
             })
 
         // Act
-        const result = await getGlanceData('7d')
+        const result = await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
         expect(result.rangeLabel).toBe('21 – 27 Jul 2026')

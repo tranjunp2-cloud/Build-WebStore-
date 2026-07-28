@@ -153,7 +153,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
     // Fetch independent block data in parallel only when the store has a usable site.
     const [glance, traffic, seo, pendingOrders] = hasUsableSites
         ? await Promise.all([
-            getGlanceData(period),
+            getGlanceData(period, { user }),
             getTrafficData(period),
             getSeoData(),
             pendingOrdersPromise,

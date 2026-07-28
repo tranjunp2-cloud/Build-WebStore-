@@ -6,10 +6,11 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { sql } from 'drizzle-orm'
-import { getCurrentTenantId } from '@/lib/auth'
+import { tenantIdForQuery } from '@/lib/auth'
 import type { DashboardPeriodKey, GlanceData } from './dashboard-types'
 import { dashboardDayKey, getDashboardPeriodRange } from './dashboard-period'
 import { DASHBOARD_TIME_ZONE } from './timezone'
+import { canReadPendingOrders } from './pending-orders-data'
 
 interface MetricRow {
     date_str: string
@@ -53,8 +54,8 @@ export function emptyGlanceData(): GlanceData {
     }
 }
 
-export async function getGlanceData(period: DashboardPeriodKey): Promise<GlanceData> {
-    const tenantId = await getCurrentTenantId()
+export async function getGlanceData(period: DashboardPeriodKey, { user }: { user: unknown }): Promise<GlanceData> {
+    const tenantId = tenantIdForQuery(user)
     if (!tenantId) return emptyGlanceData()
 
     const {
@@ -78,6 +79,10 @@ export async function getGlanceData(period: DashboardPeriodKey): Promise<GlanceD
     const previousStartISO = previousStart.toISOString()
     const currentStartKey = dashboardDayKey(currentStart)
 
+    const revenueSeriesPromise = () => canReadPendingOrders(user)
+        ? payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, SUM(total) as count FROM orders WHERE tenant_id = ${tenantId} AND status = 'completed' AND COALESCE(currency, 'MYR') = 'MYR' AND created_at >= ${previousStartISO} AND created_at < ${currentEndISO} GROUP BY 1`)
+        : Promise.resolve({ rows: [] })
+
     const [
         viewsRes, prevViewsRes, leadsRes, prevLeadsRes, engageRes, prevEngageRes,
         viewsSeriesRes, leadsSeriesRes, engageSeriesRes, revenueSeriesRes,
@@ -91,7 +96,7 @@ export async function getGlanceData(period: DashboardPeriodKey): Promise<GlanceD
         payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
         payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'click' AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
         payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event IN ('add_to_cart', 'checkout') AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
-        payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, SUM(total) as count FROM orders WHERE tenant_id = ${tenantId} AND status = 'completed' AND COALESCE(currency, 'MYR') = 'MYR' AND created_at >= ${previousStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
+        revenueSeriesPromise(),
     ])
 
     const views = viewsRes.totalDocs
