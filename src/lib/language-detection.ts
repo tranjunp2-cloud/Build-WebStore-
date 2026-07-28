@@ -298,6 +298,7 @@ function detectLatinStatistically(
     normalized: string,
     tokens: string[],
     hasNonAscii: boolean,
+    marginReferenceLocale?: string,
 ): LanguageDetectionResult | null {
     const candidates = francAll(normalized, { minLength: 10, only: FRANC_CANDIDATES })
     const scoresByLocale = new Map<string, number>()
@@ -309,7 +310,10 @@ function detectLatinStatistically(
     if (!winner) return null
 
     const [locale, score] = winner
-    const margin = score - (runnerUp?.[1] ?? 0)
+    const referenceScore = marginReferenceLocale
+        ? scoresByLocale.get(marginReferenceLocale) ?? 0
+        : runnerUp?.[1] ?? 0
+    const margin = score - referenceScore
     const isShortAscii = !hasNonAscii && (tokens.length < 8 || normalized.length < 60)
     const minimumMargin = isShortAscii ? 0.25 : 0.08
     if (margin < minimumMargin) return null
@@ -342,9 +346,10 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
         // Controlled industry labels and loanwords can make a long non-English
         // business brief look English lexically. Let franc override only a
         // lexical English result when the full prose has a strong, clearly
-        // separated non-English winner.
+        // separated non-English winner compared with English. Ambiguity between
+        // two non-English languages should still open the confirmation dialog.
         if (lexical.locale === 'en' && tokens.length >= 12 && normalized.length >= 80) {
-            const statistical = detectLatinStatistically(normalized, tokens, hasNonAscii)
+            const statistical = detectLatinStatistically(normalized, tokens, hasNonAscii, 'en')
             if (
                 statistical
                 && statistical.locale !== 'en'
