@@ -294,6 +294,29 @@ function detectLatinByLexicon(tokens: string[]): LanguageDetectionResult | null 
     return null
 }
 
+function detectLatinStatistically(
+    normalized: string,
+    tokens: string[],
+    hasNonAscii: boolean,
+): LanguageDetectionResult | null {
+    const candidates = francAll(normalized, { minLength: 10, only: FRANC_CANDIDATES })
+    const scoresByLocale = new Map<string, number>()
+    for (const [iso, score] of candidates) {
+        const locale = FRANC_ISO_TO_LOCALE[iso]
+        if (locale) scoresByLocale.set(locale, Math.max(score, scoresByLocale.get(locale) ?? 0))
+    }
+    const [winner, runnerUp] = [...scoresByLocale.entries()].sort((a, b) => b[1] - a[1])
+    if (!winner) return null
+
+    const [locale, score] = winner
+    const margin = score - (runnerUp?.[1] ?? 0)
+    const isShortAscii = !hasNonAscii && (tokens.length < 8 || normalized.length < 60)
+    const minimumMargin = isShortAscii ? 0.25 : 0.08
+    if (margin < minimumMargin) return null
+
+    return { locale, confidence: score, source: 'statistical' }
+}
+
 export function detectLanguageFromText(text: string): LanguageDetectionResult {
     const normalized = normalizeLanguageDetectionText(text).slice(0, 4000)
     if (!normalized) return { locale: 'en', confidence: 0, source: 'empty' }
@@ -313,29 +336,31 @@ export function detectLanguageFromText(text: string): LanguageDetectionResult {
         return { locale: 'vi', confidence: 0.9, source: 'lexical' }
     }
 
+    const hasNonAscii = /[^\u0000-\u007F]/.test(normalized)
     const lexical = detectLatinByLexicon(tokens)
-    if (lexical) return lexical
+    if (lexical) {
+        // Controlled industry labels and loanwords can make a long non-English
+        // business brief look English lexically. Let franc override only a
+        // lexical English result when the full prose has a strong, clearly
+        // separated non-English winner.
+        if (lexical.locale === 'en' && tokens.length >= 12 && normalized.length >= 80) {
+            const statistical = detectLatinStatistically(normalized, tokens, hasNonAscii)
+            if (
+                statistical
+                && statistical.locale !== 'en'
+                && statistical.confidence >= 0.9
+            ) {
+                return statistical
+            }
+        }
+        return lexical
+    }
 
     // A lone mark without Vietnamese lexical evidence is usually a typo or a person's name.
     if (vietnameseMatches === 1) return { locale: 'en', confidence: 0.65, source: 'fallback' }
 
-    const hasNonAscii = /[^\u0000-\u007F]/.test(normalized)
     if (!hasNonAscii && tokens.length < 2) return { locale: 'en', confidence: 0.7, source: 'fallback' }
 
-    const candidates = francAll(normalized, { minLength: 10, only: FRANC_CANDIDATES })
-    const scoresByLocale = new Map<string, number>()
-    for (const [iso, score] of candidates) {
-        const locale = FRANC_ISO_TO_LOCALE[iso]
-        if (locale) scoresByLocale.set(locale, Math.max(score, scoresByLocale.get(locale) ?? 0))
-    }
-    const [winner, runnerUp] = [...scoresByLocale.entries()].sort((a, b) => b[1] - a[1])
-    if (!winner) return { locale: 'en', confidence: 0.5, source: 'fallback' }
-
-    const [locale, score] = winner
-    const margin = score - (runnerUp?.[1] ?? 0)
-    const isShortAscii = !hasNonAscii && (tokens.length < 8 || normalized.length < 60)
-    const minimumMargin = isShortAscii ? 0.25 : 0.08
-    if (margin < minimumMargin) return { locale: 'en', confidence: 0.5, source: 'fallback' }
-
-    return { locale, confidence: score, source: 'statistical' }
+    return detectLatinStatistically(normalized, tokens, hasNonAscii)
+        ?? { locale: 'en', confidence: 0.5, source: 'fallback' }
 }
