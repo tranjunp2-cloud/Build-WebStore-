@@ -168,19 +168,47 @@ function normalizeContactLabels(
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
+        const usedFieldNames = new Set<string>()
         const formFields = Array.isArray(block.formFields)
-            ? block.formFields.map((field: unknown) => {
+            ? block.formFields.map((field: unknown, index: number) => {
                 if (!field || typeof field !== 'object') return field
                 const record = field as Record<string, unknown>
                 const fieldName = String(record.fieldName ?? '').toLowerCase()
-                const label = fieldName.includes('email')
+                const fieldType = String(record.fieldType ?? record.type ?? '').toLowerCase()
+                const isGenericName = !fieldName || /^field(?:[-_\s]*\d+)?$/.test(fieldName)
+                let semanticName = fieldName.includes('email') || fieldType === 'email'
+                    ? 'email'
+                    : fieldName.includes('phone') || fieldType === 'phone' || fieldType === 'tel'
+                        ? 'phone'
+                        : fieldName.includes('message') || fieldType === 'textarea'
+                            ? 'message'
+                            : fieldName.includes('name')
+                                ? 'name'
+                                : null
+
+                if (!semanticName && isGenericName && fieldType === 'text') {
+                    semanticName = usedFieldNames.has('name') ? 'subject' : 'name'
+                }
+
+                if (!semanticName || usedFieldNames.has(semanticName)) {
+                    const preservedName = fieldName || `field-${index + 1}`
+                    usedFieldNames.add(preservedName)
+                    return { ...record, fieldName: preservedName }
+                }
+                usedFieldNames.add(semanticName)
+
+                if (semanticName === 'subject') {
+                    return { ...record, fieldName: semanticName }
+                }
+
+                const label = semanticName === 'email'
                     ? localized?.contact.emailLabel ?? i18n.contact.emailLabel
-                    : fieldName.includes('phone')
+                    : semanticName === 'phone'
                         ? localized?.contact.phoneLabel ?? i18n.contact.phoneLabel
-                        : fieldName.includes('message')
+                        : semanticName === 'message'
                             ? localized?.contact.messageLabel ?? i18n.contact.messageLabel
                             : localized?.contact.nameLabel ?? i18n.contact.nameLabel
-                return { ...record, label }
+                return { ...record, fieldName: semanticName, label }
             })
             : block.formFields
         return {

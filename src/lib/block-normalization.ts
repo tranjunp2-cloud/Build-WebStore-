@@ -169,6 +169,22 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.headline = ''
         }
 
+        // announcement-bar.paddingY is optional but Payload casts it to a
+        // number before persistence. Drop non-finite input so the block uses
+        // its 12px default instead of sending NaN to PostgreSQL.
+        if (b.blockType === 'announcement-bar' && b.paddingY !== undefined) {
+            const paddingY = typeof b.paddingY === 'number'
+                ? b.paddingY
+                : typeof b.paddingY === 'string' && b.paddingY.trim() !== ''
+                    ? Number(b.paddingY)
+                    : Number.NaN
+            if (Number.isFinite(paddingY)) {
+                b.paddingY = Math.min(32, Math.max(4, Math.round(paddingY)))
+            } else {
+                delete b.paddingY
+            }
+        }
+
         // Contact block: an invalid email fails Payload's email-format validation and makes
         // payload.create/update reject the ENTIRE page (e.g. AI gen emits "info@brand" with no
         // TLD, or canned content with a non-ASCII domain). The field is optional, so null out
