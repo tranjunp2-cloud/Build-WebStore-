@@ -9,10 +9,18 @@ import { z } from 'zod'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin } from '@/lib/admin/api-utils'
+import {
+    LiveErrorProviderError,
+    type LiveError,
+} from '@/lib/admin/live-errors/contracts'
+import { fetchProviderEvidence } from '@/lib/admin/live-errors/fetch-provider-evidence'
+import {
+    getRuntimeRelatedId,
+} from '@/lib/admin/live-errors/provider-key'
 
 const LIMIT = 50
 
-const CreateIssueSchema = z.object({
+const StandardIssueSchema = z.object({
     title: z.string().min(1).max(300),
     description: z.string().max(10000).optional(),
     severity: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
@@ -22,6 +30,91 @@ const CreateIssueSchema = z.object({
     assignedTo: z.union([z.string(), z.number()]).optional(),
     reportedBy: z.union([z.string(), z.number()]).optional(),
 })
+
+const RuntimeIssueSchema = z.object({
+    relatedType: z.literal('runtime'),
+    // Vercel Runtime Logs is a transient stream and cannot yet re-identify a
+    // selected row. Keep promotion fail-closed until the live spike proves a
+    // server-authoritative refetch contract.
+    source: z.literal('sentry'),
+    providerId: z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9._:-]+$/),
+    title: z.string().trim().min(1).max(300).optional(),
+    severity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+})
+
+const CreateIssueSchema = z.discriminatedUnion('relatedType', [
+    StandardIssueSchema,
+    RuntimeIssueSchema,
+])
+
+function formatRuntimeDescription(error: LiveError, related: LiveError | null): string {
+    const evidence = [
+        `Source: ${error.source}`,
+        `Occurred: ${error.occurredAt}`,
+        `Tenant: ${error.tenantMatch?.name ?? error.tenantMatch?.slug ?? 'Unknown'}`,
+        `Host: ${error.host ?? 'Unknown'}`,
+        `Route: ${[error.method, error.route].filter(Boolean).join(' ') || 'Unknown'}`,
+        `Status: ${error.statusCode ?? 'Unknown'}`,
+        `Release: ${error.release ?? 'Unknown'}`,
+        `Deployment: ${error.deploymentId ?? 'Unknown'}`,
+        `Request ID: ${error.requestId ?? 'Unknown'}`,
+        `Trace ID: ${error.traceId ?? 'Unknown'}`,
+    ]
+    const guidance = [
+        `Investigation area: ${error.guidance.investigationArea}`,
+        ...error.guidance.checks.map((check, index) => `Check ${index + 1}: ${check}`),
+        `Escalation condition: ${error.guidance.escalationCondition}`,
+    ]
+    const relatedEvidence = related
+        ? [
+            '',
+            `Related ${related.source} evidence:`,
+            `Message: ${related.message}`,
+            `Occurred: ${related.occurredAt}`,
+            `Provider: ${related.providerUrl ?? 'Unavailable'}`,
+        ]
+        : []
+
+    return [
+        error.message,
+        '',
+        'Runtime evidence:',
+        ...evidence,
+        '',
+        error.guidance.label + ':',
+        ...guidance,
+        ...(error.providerUrl ? ['', `Provider: ${error.providerUrl}`] : []),
+        ...relatedEvidence,
+    ].join('\n').slice(0, 10000)
+}
+
+function isUniqueViolation(error: unknown): boolean {
+    let current = error
+    for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth += 1) {
+        const record = current as Record<string, unknown>
+        if (record.code === '23505') return true
+        current = record.cause
+    }
+    return false
+}
+
+async function findRuntimeIssue(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    relatedId: string,
+) {
+    const result = await payload.find({
+        collection: 'template-issues',
+        where: {
+            and: [
+                { relatedType: { equals: 'runtime' } },
+                { relatedId: { equals: relatedId } },
+            ],
+        },
+        limit: 1,
+        depth: 1,
+    })
+    return result.docs[0] ?? null
+}
 
 async function validateRelatedId(
     payload: Awaited<ReturnType<typeof getPayload>>,
@@ -90,6 +183,53 @@ export const POST = withSuperAdmin(async (req) => {
     }
 
     const payload = await getPayload({ config })
+
+    if (parsed.data.relatedType === 'runtime') {
+        let primaryResult
+        try {
+            primaryResult = await fetchProviderEvidence(
+                parsed.data.source,
+                parsed.data.providerId,
+            )
+        } catch (error) {
+            if (!(error instanceof LiveErrorProviderError)) throw error
+            return NextResponse.json(
+                {
+                    error: 'Provider unavailable',
+                    source: error.source,
+                    code: error.code,
+                },
+                { status: error.status },
+            )
+        }
+        const primary = primaryResult.data as LiveError
+        const runtimeRelatedId = getRuntimeRelatedId(primary)
+        const existing = await findRuntimeIssue(payload, runtimeRelatedId)
+        if (existing) {
+            return NextResponse.json({ data: existing, created: false })
+        }
+
+        try {
+            const doc = await payload.create({
+                collection: 'template-issues',
+                data: {
+                    title: parsed.data.title ?? `${primary.source}: ${primary.message}`.slice(0, 300),
+                    description: formatRuntimeDescription(primary, null),
+                    severity: parsed.data.severity ?? primary.severity,
+                    category: 'other',
+                    status: 'open',
+                    relatedType: 'runtime',
+                    relatedId: runtimeRelatedId,
+                },
+            })
+            return NextResponse.json({ data: doc, created: true }, { status: 201 })
+        } catch (error) {
+            if (!isUniqueViolation(error)) throw error
+            const concurrent = await findRuntimeIssue(payload, runtimeRelatedId)
+            if (!concurrent) throw error
+            return NextResponse.json({ data: concurrent, created: false })
+        }
+    }
 
     // Soft-validate relatedId exists
     const valid = await validateRelatedId(payload, parsed.data.relatedType, parsed.data.relatedId)

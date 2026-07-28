@@ -106,11 +106,36 @@ function escapeHtml(value: string): string {
         .replaceAll("'", '&#39;')
 }
 
-export function buildFallbackBlogContent(seed: Pick<AnyBlogSeed, 'title' | 'excerpt'>, businessName: string): string {
+export function buildFallbackBlogContent(
+    seed: Pick<AnyBlogSeed, 'title' | 'excerpt'>,
+    businessName: string,
+    locale: string = 'en',
+): string {
     const title = escapeHtml(seed.title)
     const excerpt = escapeHtml(seed.excerpt)
     const name = escapeHtml(businessName)
+    if (locale.split('-')[0].toLowerCase() !== 'en') {
+        return `<h2>${title}</h2><p>${excerpt}</p>`
+    }
     return `<h2>${title}</h2><p>${excerpt}</p><h3>Why it matters</h3><p>${name} focuses on practical choices, clear expectations, and dependable results. Use this guide as a starting point, then choose the option that best matches your needs.</p><h3>What to consider</h3><ul><li>Define the outcome you need before comparing options.</li><li>Ask questions about quality, timing, and ongoing support.</li><li>Choose a solution that remains useful as your needs change.</li></ul><h3>Next steps</h3><p>Contact ${name} for advice tailored to your situation and a clear path forward.</p>`
+}
+
+function buildLocaleSafeFallbackSeeds(
+    businessName: string,
+    products: string[] | undefined,
+    category: string,
+    count: number,
+): BlogSeedAI[] {
+    const topics = products?.map((product) => product.trim()).filter(Boolean) ?? []
+    return Array.from({ length: count }, (_, index) => {
+        const topic = topics[index % Math.max(topics.length, 1)] || businessName
+        return {
+            title: topic,
+            excerpt: topic === businessName ? businessName : `${businessName} — ${topic}`,
+            slug: `post-${index + 1}`,
+            imageKeyword: `${category} service`,
+        }
+    })
 }
 
 export type PreparedBlogPost = {
@@ -126,8 +151,9 @@ export type PreparedBlogPost = {
  * the route kicks this DURING the site GPT window so `persistBlogPosts` can
  * insert all 3 posts BEFORE the `done` event; also reused by the fallback
  * `seedBlogPosts` path.
- * Returns [] when the current site already has three complete posts, null
- * when preparation failed entirely. Never throws.
+ * Always prepares exactly three posts. Existing/default tenant posts are
+ * replaced only after preparation succeeds, inside `persistBlogPosts`.
+ * Returns null when preparation failed entirely. Never throws.
  */
 export async function prepareBlogPosts(opts: {
     payload: BasePayload
@@ -137,62 +163,49 @@ export async function prepareBlogPosts(opts: {
     products?: string[]
     industry?: string
     seed?: number
-    /** Existing site being regenerated. Only complete posts for this site
-     *  count toward the three-post target. */
-    siteId?: number | string
+    locale?: string
     /** Settles when the request's other Pixabay consumers (image pool,
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
     pixabayGate?: Promise<unknown>
 }): Promise<PreparedBlogPost[] | null> {
-    const { payload, tenantId, category, businessName, products, industry, seed, siteId } = opts
+    const { payload, tenantId, category, businessName, products, industry, seed, locale = 'en' } = opts
     try {
-        let targetCount = 3
-        if (siteId !== undefined) {
-            const existing = await payload.count({
-                collection: 'blogs',
-                where: {
-                    and: [
-                        { tenant: { equals: tenantId } },
-                        { site: { equals: siteId } },
-                        { content: { exists: true } },
-                        { thumbnail: { exists: true } },
-                    ],
-                },
-            })
-            targetCount = Math.max(0, 3 - existing.totalDocs)
-            if (targetCount === 0) return []
-        }
-
         let seeds: AnyBlogSeed[] = []
         try {
             const aiSeeds = await generateBlogSeedsAI({
                 businessName,
                 industry: industry ?? category,
                 products,
+                locale,
             })
-            seeds = aiSeeds.slice(0, targetCount)
+            seeds = aiSeeds.slice(0, 3)
         } catch (err) {
+            const fallbackKind = locale.split('-')[0].toLowerCase() === 'en'
+                ? 'static seeds'
+                : 'locale-safe seeds'
             if (isQuotaExhausted(err)) {
-                console.warn('[seed-blog-posts] OpenAI quota exhausted, using static seeds')
+                console.warn(`[seed-blog-posts] OpenAI quota exhausted, using ${fallbackKind}`)
             } else {
-                console.warn('[seed-blog-posts] AI gen failed, using static seeds:', (err as Error).message)
+                console.warn(`[seed-blog-posts] AI gen failed, using ${fallbackKind}:`, (err as Error).message)
             }
         }
 
-        if (seeds.length < targetCount) {
-            const need = targetCount - seeds.length
+        if (seeds.length < 3) {
+            const need = 3 - seeds.length
             const usedSlugs = new Set(seeds.map((s) => s.slug.toLowerCase()))
-            const fill = getBlogSeeds(
-                category,
-                {
-                    name: businessName,
-                    ...(products?.length ? { products } : {}),
-                },
-                seed,
-            )
-                .filter((s) => !usedSlugs.has(s.slug.toLowerCase()))
-                .slice(0, need)
+            const fill = locale.split('-')[0].toLowerCase() === 'en'
+                ? getBlogSeeds(
+                    category,
+                    {
+                        name: businessName,
+                        ...(products?.length ? { products } : {}),
+                    },
+                    seed,
+                )
+                    .filter((s) => !usedSlugs.has(s.slug.toLowerCase()))
+                    .slice(0, need)
+                : buildLocaleSafeFallbackSeeds(businessName, products, category, need)
             seeds = [...seeds, ...fill]
         }
 
@@ -201,7 +214,7 @@ export async function prepareBlogPosts(opts: {
         // Article bodies are independent of Pixabay — start all 3 GPT calls
         // now so they overlap the thumbnail phase below.
         const contentPromises = seeds.map((s) =>
-            generateBlogPostContent(s.title, businessName, industry ?? category).catch(() => undefined),
+            generateBlogPostContent(s.title, businessName, industry ?? category, locale).catch(() => undefined),
         )
 
         // Thumbnails keep the legacy sequencing (one at a time, 500ms apart,
@@ -229,7 +242,7 @@ export async function prepareBlogPosts(opts: {
         return seeds.map((s, i) => ({
             title: s.title,
             slug: s.slug,
-            content: contents[i] ?? buildFallbackBlogContent(s, businessName),
+            content: contents[i] ?? buildFallbackBlogContent(s, businessName, locale),
             ...(thumbnailIds[i] !== undefined ? { thumbnailId: thumbnailIds[i] } : {}),
         }))
     } catch (err) {
@@ -250,6 +263,19 @@ export async function persistBlogPosts(
     siteId: number | string,
     userId: number | string,
 ): Promise<number> {
+    if (prepared.length === 0) return 0
+
+    try {
+        await payload.delete({
+            collection: 'blogs',
+            where: { tenant: { equals: tenantId } },
+            overrideAccess: true,
+        })
+    } catch (err) {
+        console.warn('[seed-blog-posts] failed to replace existing posts:', (err as Error).message)
+        return 0
+    }
+
     let count = 0
     for (const post of prepared) {
         // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
@@ -298,9 +324,10 @@ export async function seedBlogPosts(
     products?: string[],
     industry?: string,
     seed?: number,
+    locale?: string,
 ): Promise<number> {
     const prepared = await prepareBlogPosts({
-        payload, tenantId, siteId, category, businessName, products, industry, seed,
+        payload, tenantId, category, businessName, products, industry, seed, locale,
     })
     if (!prepared || prepared.length === 0) return 0
     return persistBlogPosts(payload, prepared, tenantId, siteId, userId)

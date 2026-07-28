@@ -46,7 +46,22 @@ export default defineConfig({
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
-            testIgnore: ['e2e/smoke.spec.ts', 'tests/smoke.spec.ts'],
+            testIgnore: [
+                'e2e/smoke.spec.ts',
+                'tests/smoke.spec.ts',
+                'tests/cart-drawer.spec.ts',
+            ],
+        },
+        // Public storefront regressions required by repo review rules live in
+        // tests/*.spec.ts and do not need the authenticated E2E setup project.
+        {
+            name: 'storefront-regression',
+            testDir: './tests',
+            testMatch: /cart-drawer\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: undefined,
+            },
         },
     ],
 })

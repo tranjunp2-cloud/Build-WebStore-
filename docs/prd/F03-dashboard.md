@@ -365,22 +365,23 @@ Khi truy cập màn hình `<768px`, 4 Stat Cards ở Overview tự động quy h
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `DashboardPage` | `app/(dashboard)/dashboard/page.tsx` | Overview |
-| `AnalyticsPage` | `app/(dashboard)/dashboard/analytics/page.tsx` | Analytics Details |
-| `SEODashboardPage` | `app/(dashboard)/dashboard/seo/page.tsx` | SEO Details |
-| `StatCardsView` | `components/dashboard/StatCardsView.tsx` | Shared |
-| `DailyChart` | `components/analytics/DailyChart.tsx` | Bar chart |
-| `SEOScoreWidget` | `components/seo/SEOScoreWidget.tsx` | Circle chart + CTA |
+| `DashboardRoot` | `app/(dashboard)/dashboard/page.tsx` | Server-rendered dashboard stream |
+| `AtAGlance` | `components/dashboard/revamp/at-a-glance.tsx` | Overview metrics |
+| `TrafficPerformance` | `components/dashboard/revamp/traffic-performance.tsx` | Traffic chart and rankings |
+| `SeoHealth` | `components/dashboard/revamp/seo-health.tsx` | SEO score, issues, and fixes |
 
 ### 13.2 API Endpoints
 
 ```text
-GET /api/dashboard/summary?tenantId=X      → Phục vụ overview
 GET /api/analytics/summary?tenantId=X&period=7d
 POST /api/analytics/track                  → Public tracking
 POST /api/seo/analyze                      → Trigger SEO scan
 POST /api/seo/fix                          → AI fix (SSE stream)
 ```
+
+Dashboard overview is rendered by a Server Component and reads through
+`getGlanceData()`, `getTrafficData()`, and `getSeoData()` directly. It does not
+use an internal REST summary endpoint.
 
 ### 13.3 Hướng dẫn Tích hợp PostHog Analytics (Dành cho Development)
 
@@ -414,11 +415,7 @@ F03 dùng PostHog cho analytics vì seller chủ yếu chạy trên platform sub
 
 > Full details in SPEC.md §8 or AI_BUILDER_SPEC.md §14
 
-```json
-GET /api/dashboard/summary
-Request: ?tenantId={string}&period={today|7d|30d}
-Response: { success: boolean, data: { metrics: Array<{id: string, value: number, label: string, change: number}>, pendingOrders: Array<object> } }
-
+```text
 POST /api/dashboard/preferences
 Request: { tenantId: string, widgetOrder: Array<string>, hiddenWidgets: Array<string> }
 Response: { success: boolean }

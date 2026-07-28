@@ -579,13 +579,21 @@ function AIChatPanelInner({
                         </div>
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between px-0.5">
-                        <p className="flex items-center gap-1 text-[11px] text-slate-500">
-                            <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
-                            <span>{ac.send}</span>
-                            <kbd className="ml-1 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Shift+Enter</kbd>
-                            <span>{ac.newLine}</span>
-                        </p>
+                    <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-slate-400 select-none">
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center gap-1.5">
+                                <kbd className="rounded border border-white/15 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-300 shadow-xs">
+                                    Enter
+                                </kbd>
+                                <span className="text-slate-400">{ac.send}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <kbd className="rounded border border-white/15 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-300 shadow-xs">
+                                    Shift+Enter
+                                </kbd>
+                                <span className="text-slate-400">{ac.newLine}</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

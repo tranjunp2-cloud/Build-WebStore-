@@ -13,6 +13,7 @@
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation } from './content-rules'
 import { dedupSectionLabel } from './dedup-section-label'
+import type { LocaleStructuralStrings } from './locale-structural-strings'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export type GenerationResult = {
     seo: { title: string; description: string }
     language?: 'en' | 'ms' | 'vi'
     blockLang?: string
+    localeStructuralStrings?: LocaleStructuralStrings | null
     theme: {
         primaryColor: string
         secondaryColor: string

@@ -126,7 +126,8 @@ jobs:
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
             f23-profile-regression.spec.ts \
-            --project=smoke --project=setup --project=chromium 2>&1 | tee e2e-output.log
+            tests/cart-drawer.spec.ts \
+            --project=smoke --project=setup --project=chromium --project=storefront-regression 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
           PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")

@@ -11,6 +11,7 @@ import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -990,49 +991,6 @@ describe('AI Streaming APIs', () => {
              expect(mockProductDB.filter(product => String(product.id).startsWith('existing-product-'))).toHaveLength(6)
         })
 
-        it('[TC-GENPERF-W3-30] regeneration accepts a two-post deficit when the final site count is three', async () => {
-             const { prepareBlogPosts, persistBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-             mockSiteDB = [{
-                 id: 'site-existing',
-                 tenant: 'tenant-1',
-                 name: 'Existing Bakery',
-                 generationStatus: 'completed',
-             }]
-             mockPageDB = [
-                 { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
-                 { id: 'old-about', site: 'site-existing', title: 'Old About', slug: '/about', isHomepage: false, layout: [] },
-                 { id: 'old-products', site: 'site-existing', title: 'Old Products', slug: '/products', isHomepage: false, layout: [] },
-                 { id: 'old-blog', site: 'site-existing', title: 'Old Blog', slug: '/blog', isHomepage: false, layout: [] },
-                 { id: 'old-contact', site: 'site-existing', title: 'Old Contact', slug: '/contact', isHomepage: false, layout: [] },
-                 { id: 'old-404', site: 'site-existing', title: '404', slug: '404', isHomepage: false, layout: [] },
-             ]
-             vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
-                 { title: 'Second', slug: 'second', content: '<p>second</p>', thumbnailId: 2 },
-                 { title: 'Third', slug: 'third', content: '<p>third</p>', thumbnailId: 3 },
-             ])
-             vi.mocked(persistBlogPosts).mockResolvedValueOnce(2)
-             mockCompleteBlogCount = 3
-
-             const res = await GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: { businessName: 'New Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
-                 }),
-             }))
-
-             expect(res.status).toBe(200)
-             expect(vi.mocked(prepareBlogPosts)).toHaveBeenCalledWith(
-                 expect.objectContaining({ tenantId: 'tenant-1', siteId: 'site-existing' }),
-             )
-             expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledWith(
-                 expect.anything(),
-                 expect.arrayContaining([expect.objectContaining({ slug: 'second' }), expect.objectContaining({ slug: 'third' })]),
-                 'tenant-1',
-                 'site-existing',
-                 'user-xyz',
-             )
-        })
-
         it('[TC-GENPERF-W3-31] marks regeneration failed when the old-page read fails', async () => {
              const payload = await getPayload({ config: {} as never })
              const originalFind = vi.mocked(payload.find).getMockImplementation()!
@@ -1273,6 +1231,121 @@ describe('AI Streaming APIs', () => {
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
         })
 
+        it('localizes an aliased About Us fallback in the persisted German Blog hero', async () => {
+             injectBlockStrings('de', {
+                 ...getBlockStrings('en'),
+                 navigation: {
+                     ...getBlockStrings('en').navigation,
+                     about: 'Über uns',
+                     getStarted: 'Kontakt aufnehmen',
+                 },
+             })
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'GrünRaum Innenarchitektur',
+                     siteType: 'business',
+                     theme: { primaryColor: '#24466f' },
+                     seo: {
+                         title: 'GrünRaum Innenarchitektur',
+                         description: 'Nachhaltige Innenarchitektur in Berlin.',
+                     },
+                     language: 'de',
+                     blockLang: 'de',
+                     blocks: [],
+                     pages: [
+                         {
+                             title: 'Startseite',
+                             slug: '/',
+                             isHomepage: true,
+                             blocks: [
+                                 { blockType: 'navigation', variant: 'simple', links: [] },
+                                 {
+                                     blockType: 'hero',
+                                     variant: 'centered',
+                                     headline: 'Nachhaltige Räume',
+                                     subheadline: 'Innenarchitektur für moderne Unternehmen.',
+                                     ctaButtons: [
+                                         { label: 'Kontakt aufnehmen', url: '/contact', style: 'primary' },
+                                         { label: 'Über uns', url: '/about', style: 'secondary' },
+                                     ],
+                                 },
+                                 { blockType: 'footer', variant: 'simple', columns: [] },
+                             ],
+                             seo: { title: 'Startseite', description: 'Nachhaltige Räume.' },
+                         },
+                         {
+                             title: 'Blog',
+                             slug: '/blog',
+                             isHomepage: false,
+                             blocks: [
+                                 {
+                                     blockType: 'hero',
+                                     variant: 'split-left',
+                                     headline: 'Neuigkeiten und Inspirationen',
+                                     subheadline: 'Aktuelle Projekte und nachhaltige Gestaltung.',
+                                     ctaButtons: [
+                                         { label: 'Kontaktieren Sie uns', url: '/contact', style: 'primary' },
+                                         { text: 'About Us', url: '/about', style: 'secondary' },
+                                     ],
+                                 },
+                                 { blockType: 'blog-list', variant: 'grid', headline: 'Aktuelle Beiträge', limit: 3 },
+                             ],
+                             seo: { title: 'Blog', description: 'Aktuelle Beiträge.' },
+                         },
+                         {
+                             title: 'Über uns',
+                             slug: '/about',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'about',
+                                 variant: 'image-right',
+                                 headline: 'Über GrünRaum',
+                                 body: 'Nachhaltige Innenarchitektur aus Berlin.',
+                             }],
+                             seo: { title: 'Über uns', description: 'Über GrünRaum.' },
+                         },
+                         {
+                             title: 'Kontakt',
+                             slug: '/contact',
+                             isHomepage: false,
+                             blocks: [{
+                                 blockType: 'contact',
+                                 variant: 'split',
+                                 headline: 'Kontakt',
+                                 email: 'kontakt@gruenraum.test',
+                             }],
+                             seo: { title: 'Kontakt', description: 'Kontaktieren Sie uns.' },
+                         },
+                     ],
+                 },
+                 events: [],
+             } as Awaited<ReturnType<typeof generateSiteWithAI>>)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'GrünRaum Innenarchitektur',
+                         industry: 'Interior Design',
+                         products: 'Nachhaltige Innenarchitektur',
+                         shortDescription: 'Nachhaltige Innenarchitektur in Berlin.',
+                     },
+                     language: 'auto',
+                     generationLocale: 'de',
+                 }),
+             })
+
+             const res = await GenerateSitePOST(req)
+
+             expect(res.status).toBe(200)
+             const blogPage = (mockPageDB as PersistedPage[]).find((page) => page.slug === '/blog')
+             const hero = blogPage?.layout?.find((block) => block.blockType === 'hero')
+             expect(hero?.ctaButtons).toEqual([
+                 expect.objectContaining({ label: 'Kontaktieren Sie uns' }),
+                 expect.objectContaining({ label: 'Über uns' }),
+             ])
+        })
+
         it('[TC-F26-11-04] resolves a missing Auto override once for AI, products, and persistence', async () => {
              // Arrange
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
@@ -1295,6 +1368,10 @@ describe('AI Streaming APIs', () => {
              const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
              expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
              expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
+             const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+             expect(vi.mocked(prepareBlogPosts).mock.calls.at(-1)?.[0]).toEqual(
+                 expect.objectContaining({ locale: 'it' }),
+             )
 
              const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
              const resolvedPayload = await mockPayload
@@ -1452,6 +1529,38 @@ describe('AI Streaming APIs', () => {
             expect(productCreateCall).toBeDefined()
             // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
             expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread')
+        })
+
+        it('[TC-F08.164] sample product create persists a valid slug for a CJK-only name', async () => {
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: '节能吊灯',
+                    shortDescription: '节能照明产品',
+                    description: '适合现代家居的节能吊灯。',
+                    price: 799,
+                    sku: 'ECO-001',
+                    inventory: 0,
+                    status: 'active',
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: '智能家居', industry: 'Home', products: '灯具', shortDescription: '现代家居产品' },
+                    generationLocale: 'zh-CN',
+                }),
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const productCreateCall = vi.mocked(resolvedPayload.create).mock.calls.find(
+                (call: [{ collection: string; data?: { slug?: string } }]) => call[0].collection === 'products',
+            )
+            expect(productCreateCall?.[0].data?.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+            expect(productCreateCall?.[0].data?.slug.length).toBeGreaterThanOrEqual(3)
         })
 
         it('[TC-09.49] persisted alt-text fallback is capped at 500 chars, matching saveProductAction (code-review fix)', async () => {
@@ -2455,18 +2564,23 @@ describe('AI Streaming APIs', () => {
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 
-        it('[TC-GENPERF-BI-02] tenant already has posts (prep []) → no persist, no legacy seeding', async () => {
-            // Arrange — regenerate case
+        it('[TC-GENPERF-BI-02] regeneration persists 3 prepared posts so defaults are replaced', async () => {
+            // Arrange — prepareBlogPosts no longer skips when a default post exists.
             const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
-            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([])
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                { title: 'A2', slug: 'a2', content: '<p>a2</p>', thumbnailId: 1 },
+                { title: 'B2', slug: 'b2', content: '<p>b2</p>', thumbnailId: 2 },
+                { title: 'C2', slug: 'c2', content: '<p>c2</p>', thumbnailId: 3 },
+            ])
 
             // Act
             const res = await GenerateSitePOST(genPerfReq())
 
             // Assert
             expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(persistBlogPosts).mock.calls[0]![1]).toHaveLength(3)
             await runCapturedAfterTasks()
-            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
             expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
         })
 

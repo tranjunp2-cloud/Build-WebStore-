@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shipping Settings</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07101f;--surface:#1d2939;--surface2:#101827;--line:#2b3a4e;--text:#f8fafc;--muted:#98a2b3;--teal:#2dd4bf;--green:#22c55e;--amber:#f59e0b;--blue:#3b82f6;--pink:#f72585;--danger:#ef4444}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input,select{font:inherit}.page{max-width:1480px;margin:auto;padding:38px 28px 120px}.page-title{margin:0;font-size:44px;line-height:1.1;letter-spacing:-1.7px}.page-copy{margin:13px 0 34px;color:var(--muted);font-size:17px}
+    .section{margin-top:28px}.section-head{margin-bottom:15px}.section-head h2{margin:0 0 5px;font-size:22px}.section-head p{margin:0;color:var(--muted)}
+    .provider-title{display:none}.status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font-weight:700;font-size:12px;text-transform:uppercase}.status.live{background:#123c31;color:#34d399}.status.backup{background:#44341e;color:#f59e0b}.status.off{background:#202a3b;color:#98a2b3}.status.connected{background:#123c31;color:#34d399}
+    .card{border:1px solid var(--line);border-radius:20px;background:var(--surface);padding:28px}.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.heading{display:flex;align-items:center;gap:18px}.icon-box{width:52px;height:52px;display:grid;place-items:center;flex:none;border-radius:14px;background:#173746;color:var(--teal)}.icon-box.amber{background:#413925;color:var(--amber)}.icon-box.brand{background:var(--pink);padding:10px}.icon-box.brand img{display:block;width:100%;height:100%;object-fit:contain}.heading h3{margin:0 0 4px;font-size:22px}.heading p{margin:0;color:var(--muted)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}.field label{display:block;margin-bottom:9px;font-weight:650}.input-wrap{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--surface2);overflow:hidden}.prefix{padding-left:14px;color:var(--muted)}input,select{width:100%;border:0;outline:0;background:transparent;color:var(--text);padding:14px}.hint{margin:9px 0;color:var(--muted);font-size:14px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{padding:4px 11px;border-radius:999px;background:#283548;color:#aab3c2;font-size:13px}
+    .preview{margin-top:25px;border:1px solid var(--line);border-radius:15px;background:#091222;overflow:hidden}.preview-head{display:flex;justify-content:space-between;padding:13px 19px;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}.preview-row{display:flex;justify-content:space-between;padding:8px 19px;color:var(--muted)}.preview-row.total{padding-bottom:16px;color:var(--text);font-weight:750}
+    .easy-card{margin-top:10px}#ep-disconnected{background:#162131;border-color:#263548}#ep-disconnected .benefits{opacity:.8}#flat-provider-card{margin-top:24px}.benefits{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:28px 0}.benefit{display:flex;align-items:center;gap:15px;padding:17px;background:#111a2a;border-radius:12px}.benefit .mini{width:42px;height:42px;display:grid;place-items:center;flex:none;border-radius:11px;background:#123643;color:var(--teal)}.benefit strong{display:block;margin-bottom:3px}.benefit span{color:var(--muted);font-size:14px}.actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;padding:12px 17px;font-weight:700;cursor:pointer;color:white;background:#263449}.btn svg{flex:none}.btn.primary{background:linear-gradient(90deg,#3b82f6,#2dd4bf)}.btn.secondary{border:1px solid var(--line);background:#111a2a}.btn.danger{background:#4a2028;color:#fecaca}.btn.disconnect-action{border:1px solid #64313b;background:#342735;color:#f87171}.btn.disconnect-action:hover{background:#462b38}.btn:disabled{opacity:.45;cursor:not-allowed}.setup-note{color:var(--muted)}
+    .connected-banner{display:flex;align-items:center;gap:15px;margin:24px 0;padding:15px 17px;border:1px solid #1f5b49;border-radius:12px;background:#102d29}.connected-banner.partial{border-color:#73551d;background:#332916}.success{display:flex;align-items:center;gap:11px;color:#34d399;font-weight:750}.account{color:var(--muted);font-size:14px}.account-actions-row{display:flex;align-items:center;gap:14px;margin:28px 0}.wallet-banner{display:flex;min-width:0;flex:1;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border:1px solid #6b511d;border-radius:10px;background:#302b23;color:#d69a21;font-size:14px;font-weight:700}.wallet-details{display:flex;min-width:0;align-items:center;gap:14px}.account-identity,.wallet-info,.wallet-topup{display:flex;align-items:center;gap:8px}.account-identity{min-width:0;color:#d5dbe5}.account-identity span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.account-divider{width:1px;height:20px;flex:none;background:#665327}.wallet-topup{border:0;background:none;color:#d69a21;font-weight:700;cursor:pointer;text-decoration:none}.wallet-banner svg{width:17px;height:17px;flex:none}
+    .address-section{margin-top:25px;padding-top:24px;border-top:1px solid var(--line)}.address-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:16px}.address-head h4{margin:0 0 5px;font-size:18px}.address-head p{margin:0;color:var(--muted)}.address-list{display:grid;gap:10px}.address{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#111a2a}.address p{margin:4px 0 0;color:var(--muted);font-size:14px}.default{margin-left:8px;border-radius:999px;background:#173a32;color:#34d399;padding:3px 8px;font-size:11px}.address-actions{display:flex;align-items:center;gap:6px}.link{width:36px;height:36px;display:inline-grid;place-items:center;border:0;border-radius:8px;background:none;color:#98a2b3;cursor:pointer}.link:hover{background:#263449;color:#f8fafc}.link svg{width:18px;height:18px}.empty{padding:22px;text-align:center;border:1px dashed #3a4759;border-radius:12px;color:var(--muted)}
+    .inline-form{margin:0 0 17px;padding:20px;border:1px solid #31695f;border-radius:14px;background:#111c2c}.inline-form h4{display:flex;align-items:center;gap:7px;margin:0 0 17px;color:#aab4c5;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.inline-form h4 svg{width:14px;height:14px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form-grid .wide{grid-column:1/-1}.form-grid .thirds{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}.inline-form label{display:block;margin-bottom:6px;color:#d6dce6;font-size:13px;font-weight:650}.required{color:#fb5b62}.inline-form input,.inline-form select{min-height:44px;border:1px solid var(--line);border-radius:9px;background:#162131;padding:11px;color:var(--text)}.inline-form input::placeholder{color:#7e8999}.inline-form select:disabled{opacity:.48;cursor:not-allowed}.default-check{display:flex!important;width:max-content;align-items:center;gap:9px;margin:14px 0 0!important;color:#98a2b3!important;font-weight:500!important;cursor:pointer}.default-check:has(input:disabled){opacity:.62;cursor:not-allowed}.default-check input{width:16px;min-height:16px;height:16px;margin:0;padding:0;accent-color:var(--teal)}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+    .switch{position:relative;width:45px;height:25px;flex:none}.switch input{display:none}.switch span{position:absolute;inset:0;border-radius:999px;background:#334155;cursor:pointer;transition:opacity .2s,background .2s}.switch span:after{content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;border-radius:50%;background:white;transition:.2s}.switch input:checked+span{background:var(--teal)}.switch input:checked+span:after{transform:translateX(20px)}.switch input:disabled+span{background:#273244;opacity:.42;cursor:not-allowed}.switch input:disabled+span:after{background:#cbd5e1}.disabled-area{margin-top:24px}.disabled-area.disabled{opacity:.38;pointer-events:none}
+    .savebar{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:flex-end;gap:12px;padding:15px max(28px,calc((100vw - 1480px)/2 + 28px));border-top:1px solid var(--line);background:#0b1423eF;backdrop-filter:blur(10px)}.savebar.show{display:flex}.toast{position:fixed;right:24px;bottom:84px;display:none;padding:13px 17px;border-radius:10px;background:#173c32;color:#86efac}.toast.show{display:block}
+    dialog{width:min(540px,calc(100% - 32px));border:1px solid #202c3e;border-radius:18px;background:#161f30;color:var(--text);padding:34px 38px 32px;text-align:center;box-shadow:0 24px 80px #0009}dialog::backdrop{background:#02050bd9;backdrop-filter:blur(2px)}dialog h3{margin:25px 0 12px;font-size:25px;letter-spacing:-.4px}dialog p{max-width:430px;margin:0 auto;color:var(--muted);font-size:16px;line-height:1.55}.dialog-icon{width:78px;height:78px;display:grid;place-items:center;margin:0 auto;border-radius:22px;background:#3a2638;color:#f0525d}.dialog-icon svg{width:38px;height:38px}.dialog-actions{display:flex;justify-content:center;gap:14px;margin-top:30px}.dialog-actions .btn{min-width:125px;padding:13px 20px}.dialog-confirm{min-width:190px!important;border:1px solid #fb5961!important;background:#f0444c!important;color:#fff!important}.dialog-confirm:hover{background:#dc353e!important}.default-address-dialog .dialog-icon{background:#172f4c;color:#60a5fa}.default-address-dialog .dialog-confirm{min-width:140px!important;border-color:#3195de!important;background:#268bd2!important}.default-address-dialog .dialog-confirm:hover{background:#1f78b7!important}
+    [hidden]{display:none!important}@media(max-width:800px){.page{padding:28px 18px 110px}.page-title{font-size:36px}.grid2,.benefits,.form-grid,.form-grid .thirds{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.card{padding:20px}.card-head,.address-head{flex-direction:column}.address-head .actions{width:100%}.address-head .btn{flex:1}.heading{align-items:flex-start}.account-actions-row,.wallet-banner,.wallet-details{align-items:stretch;flex-direction:column}.account-divider{width:100%;height:1px}.wallet-topup{align-self:flex-start}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <h1 class="page-title">Shipping</h1>
+  <p class="page-copy">Configure shipping providers for Malaysian buyers. Free shipping kicks in when buyer subtotal hits your threshold.</p>
+
+  <section class="section" aria-labelledby="providers-title">
+    <div class="section-head">
+      <h2 id="providers-title">Shipping Providers</h2>
+    </div>
+
+    <div id="flat-provider-title" class="provider-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2"/></svg>
+      <strong>Flat Rate</strong><span id="flat-status" class="status live">Live Rates</span>
+    </div>
+
+    <article id="flat-provider-card" class="card">
+      <div class="card-head"><div class="heading"><div class="icon-box"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17h4V5H2v12h3"/><path d="M14 8h4l4 4v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></div><div><h3>Flat Rate (Regional)</h3><p id="flat-card-subtext">Used as your primary shipping rate at checkout.</p></div></div><span id="flat-card-status" class="status live">Live Rates</span></div>
+      <div class="grid2" style="margin-top:25px">
+        <div class="field"><label>West Malaysia <span class="status" style="background:#213c68;color:#60a5fa">Semenanjung</span></label><div class="input-wrap"><span class="prefix">RM</span><input id="west-rate" type="number" min="0" max="1000" step=".01" value="8.00"></div><p class="hint">Range: RM 0.00 – RM 1,000.00 (default RM 8.00)</p><div class="chips"><span class="chip">Johor</span><span class="chip">Kedah</span><span class="chip">Kelantan</span><span class="chip">Melaka</span><span class="chip">Negeri Sembilan</span><span class="chip">+8 more</span></div></div>
+        <div class="field"><label>East Malaysia <span class="status" style="background:#16474d;color:#2dd4bf">Sabah / Sarawak</span></label><div class="input-wrap"><span class="prefix">RM</span><input id="east-rate" type="number" min="0" max="1000" step=".01" value="15.00"></div><p class="hint">Range: RM 0.00 – RM 1,000.00 (default RM 8.00)</p><div class="chips"><span class="chip">Sabah</span><span class="chip">Sarawak</span><span class="chip">Labuan</span></div></div>
+      </div>
+      <div class="preview"><div class="preview-head"><strong>Live preview</strong><span>Selangor · MYR 80 cart</span></div><div class="preview-row"><span>Subtotal</span><span>RM 80.00</span></div><div class="preview-row"><span>Shipping (West Malaysia)</span><span id="preview-rate">RM 8.00</span></div><div class="preview-row total"><span>Buyer pays</span><span id="preview-total">RM 88.00</span></div></div>
+    </article>
+
+    <div id="ep-provider-title" class="provider-title">
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17h4V5H2v12h3"/><path d="M14 8h4l4 4v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>
+      <strong>EasyParcel</strong><span id="ep-status" class="status off">Off</span>
+    </div>
+
+    <article id="ep-disconnected" class="card easy-card">
+      <div class="card-head"><div class="heading"><div class="icon-box brand"><img src="../../../public/integrations/easyparcel-box.png" alt="EasyParcel"></div><div><h3>EasyParcel Integration</h3><p>Each store uses its own EasyParcel account. Charges are deducted directly from your wallet with no platform markup.</p></div></div><span class="status off">Disconnected</span></div>
+      <div class="benefits">
+        <div class="benefit"><span class="mini"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4.5 7.5v9L12 21l7.5-4.5v-9L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></span><div><strong>Live courier rates</strong><span>Quote J&amp;T, Pos Laju, Ninja Van and more in real time at checkout.</span></div></div>
+        <div class="benefit"><span class="mini"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v10H5a3 3 0 0 1-3-3V7"/><path d="M16 14h2"/></svg></span><div><strong>No platform markup</strong><span>Shipping is deducted directly from your own EasyParcel wallet.</span></div></div>
+        <div class="benefit"><span class="mini"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg></span><div><strong>One-click AWB labels</strong><span>Generate air waybills and book pickups without leaving an order.</span></div></div>
+        <div class="benefit"><span class="mini"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z"/><path d="m9 12 2 2 4-4"/></svg></span><div><strong>Flat-rate safety net</strong><span>Your flat rates remain available if the EasyParcel API fails.</span></div></div>
+      </div>
+      <div class="actions"><button id="setup-btn" class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m2 22 3-3"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m18 3-4 4h6l-4 4"/></svg><span>Setup Connection</span></button><span class="setup-note">While EasyParcel is off, checkout uses your Flat Rate shipping.</span></div>
+    </article>
+
+    <article id="ep-connected" class="card easy-card" hidden>
+      <div class="card-head"><div class="heading"><div class="icon-box brand"><img src="../../../public/integrations/easyparcel-box.png" alt="EasyParcel"></div><div><h3>EasyParcel Integration</h3><p id="ep-card-description">⚠️ Currently disabled. Checkout is using your Flat Rate shipping.</p></div></div><label class="switch" title="Enable EasyParcel live rates"><input id="ep-enabled" type="checkbox" disabled><span></span></label></div>
+      <div id="connection-state-banner" class="connected-banner partial"><div id="setup-banner" role="alert" style="display:flex;align-items:flex-start;gap:9px;color:#fbbf24"><strong>ⓘ</strong><span>Account linked successfully! Please add a pickup address to enable EasyParcel Live Rates.</span></div></div>
+      <div id="account-actions-row" class="account-actions-row" hidden>
+        <div class="wallet-banner"><div class="wallet-details"><div class="account-identity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>EasyParcel account: <strong id="ep-account-name">merchant@example.com</strong></span></div><span class="account-divider" aria-hidden="true"></span><div class="wallet-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v10H5a3 3 0 0 1-3-3V7"/><path d="M16 14h2"/></svg><span>Wallet balance: MYR 22.38</span></div></div><a class="wallet-topup" href="https://app.easyparcel.com" target="_blank" rel="noopener noreferrer">Top up <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a></div>
+        <button id="disconnect-btn" class="btn disconnect-action"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"/><path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"/><line x1="8" x2="8" y1="2" y2="5"/><line x1="2" x2="5" y1="8" y2="8"/><line x1="16" x2="16" y1="19" y2="22"/><line x1="19" x2="22" y1="16" y2="16"/></svg><span>Disconnect</span></button>
+      </div>
+      <section class="address-section">
+        <div class="address-head"><div><h4>Pickup addresses</h4><p>Choose where couriers collect your parcels.</p></div><div class="actions"><button id="import-btn" class="btn secondary">Import addresses from EasyParcel</button><button id="add-btn" class="btn primary">+ Add address</button></div></div>
+        <form id="address-form" class="inline-form" hidden>
+          <h4 id="form-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Add pickup address</span></h4>
+          <div class="form-grid">
+            <div><label for="address-name">Label</label><input id="address-name" required autocomplete="organization" placeholder="e.g. HQ Warehouse"></div>
+            <div><label for="address-phone">Sender phone <span class="required">*</span></label><input id="address-phone" type="tel" required inputmode="tel" autocomplete="tel" pattern="01[0-9]{8,9}" title="Enter a valid Malaysian mobile number, e.g. 0123456789" placeholder="e.g. 0123456789"></div>
+            <div class="wide"><label for="address-line">Address line 1</label><input id="address-line" required autocomplete="address-line1" placeholder="Address line 1"></div>
+            <div class="thirds">
+              <div><label for="address-state">State</label><select id="address-state" required autocomplete="address-level1"><option value="">— Select State —</option></select></div>
+              <div><label for="address-city">City</label><select id="address-city" required autocomplete="address-level2" disabled><option value="">— Select City —</option></select></div>
+              <div><label for="address-postcode">Postcode</label><select id="address-postcode" required autocomplete="postal-code" disabled><option value="">— Select —</option></select></div>
+            </div>
+          </div>
+          <label class="default-check" for="address-default"><input id="address-default" type="checkbox" checked><span>Set as default pickup address</span></label>
+          <div class="form-actions"><button id="cancel-address" type="button" class="btn secondary">Cancel</button><button type="submit" class="btn primary">Save address</button></div>
+        </form>
+        <div id="address-list" class="address-list"></div>
+      </section>
+    </article>
+  </section>
+
+  <section class="section" aria-labelledby="global-title">
+    <div class="section-head"><h2 id="global-title">Global Shipping Rules</h2></div>
+    <article class="card">
+      <div class="card-head"><div class="heading"><div class="icon-box amber"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="14" x="3" y="8" rx="2"/><path d="M12 8v14M3 13h18M7.5 8C4 8 4 3 7.5 3 10 3 12 8 12 8s2-5 4.5-5C20 3 20 8 16.5 8"/></svg></div><div><h3>Free Shipping Threshold</h3><p>Offer free shipping when subtotal reaches a minimum value. Powerful upsell trigger.</p></div></div><label class="switch"><input id="free-toggle" type="checkbox"><span></span></label></div>
+      <div id="free-fields" class="disabled-area disabled"><div class="field"><label>Minimum subtotal for free shipping</label><div class="input-wrap"><span class="prefix">RM</span><input id="free-threshold" type="number" min="0" value="100.00"></div><p class="hint">This global rule applies to both Flat Rate and EasyParcel.</p></div></div>
+    </article>
+  </section>
+</main>
+
+<div id="savebar" class="savebar"><button id="discard-btn" class="btn secondary">Discard changes</button><button id="save-btn" class="btn primary">Save settings</button></div>
+<div id="toast" class="toast">Settings saved successfully.</div>
+
+<dialog id="disconnect-dialog">
+  <div class="dialog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"/><path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"/><line x1="8" x2="8" y1="2" y2="5"/><line x1="2" x2="5" y1="8" y2="8"/><line x1="16" x2="16" y1="19" y2="22"/><line x1="19" x2="22" y1="16" y2="16"/></svg></div>
+  <h3>Remove EasyParcel connection?</h3>
+  <p>Your store will switch back to the Flat Rate setup. You can reconnect EasyParcel anytime. Your saved addresses won't be deleted.</p>
+  <div class="dialog-actions"><button id="cancel-disconnect" class="btn secondary">Cancel</button><button id="confirm-disconnect" class="btn dialog-confirm"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg><span>Disconnect</span></button></div>
+</dialog>
+
+<dialog id="default-address-dialog" class="default-address-dialog">
+  <div class="dialog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+  <h3>Cannot remove the default pickup address</h3>
+  <p>To remove this address, please select another address as the new default first.</p>
+  <div class="dialog-actions"><button id="acknowledge-default-address" class="btn dialog-confirm">Got it</button></div>
+</dialog>
+
+<script>
+  const $ = (selector) => document.querySelector(selector);
+  const providerSection = $("#providers-title").closest("section");
+  const flatProviderTitle = $("#flat-provider-title");
+  providerSection.insertBefore($("#ep-provider-title"), flatProviderTitle);
+  providerSection.insertBefore($("#ep-disconnected"), flatProviderTitle);
+  providerSection.insertBefore($("#ep-connected"), flatProviderTitle);
+  let connected = false;
+  let easyParcelAccount = "";
+  let addresses = [];
+  let editingIndex = -1;
+  let initialState = "";
+  const malaysiaLocations = {
+    Johor: {"Johor Bahru":["80000","80100","80200"],"Batu Pahat":["83000"],Muar:["84000"]},
+    Kedah: {"Alor Setar":["05000","05100"],"Sungai Petani":["08000"],Kulim:["09000"]},
+    Kelantan: {"Kota Bharu":["15000","15100"],"Pasir Mas":["17000"]},
+    Melaka: {Melaka:["75000","75100","75200"],"Alor Gajah":["78000"]},
+    "Negeri Sembilan": {Seremban:["70000","70100"],"Port Dickson":["71000"]},
+    Pahang: {Kuantan:["25000","25100"],Bentong:["28700"]},
+    Penang: {"George Town":["10000","10100"],"Bayan Lepas":["11900"],"Bukit Mertajam":["14000"]},
+    Perak: {Ipoh:["30000","30100"],Taiping:["34000"]},
+    Perlis: {Kangar:["01000"]},
+    Sabah: {"Kota Kinabalu":["88000","88100"],Sandakan:["90000"]},
+    Sarawak: {Kuching:["93000","93100"],Miri:["98000"]},
+    Selangor: {"Petaling Jaya":["46000","47300","47810"],"Shah Alam":["40000","40100"],"Subang Jaya":["47500"],Klang:["41000"]},
+    Terengganu: {"Kuala Terengganu":["20000","20100"],Kemaman:["24000"]},
+    "Kuala Lumpur": {"Kuala Lumpur":["50000","50100","50450"]},
+    Labuan: {Labuan:["87000"]},
+    Putrajaya: {Putrajaya:["62000","62100"]}
+  };
+
+  function setSelectOptions(select, placeholder, options, selected = "") {
+    select.innerHTML = `<option value="">${placeholder}</option>${options.map(option =>
+      `<option value="${option}"${option === selected ? " selected" : ""}>${option}</option>`
+    ).join("")}`;
+  }
+
+  function updateCityOptions(selectedCity = "", selectedPostcode = "") {
+    const state = $("#address-state").value;
+    const cities = state ? Object.keys(malaysiaLocations[state] || {}) : [];
+    setSelectOptions($("#address-city"), "— Select City —", cities, selectedCity);
+    $("#address-city").disabled = !state;
+    updatePostcodeOptions(selectedPostcode);
+  }
+
+  function updatePostcodeOptions(selectedPostcode = "") {
+    const state = $("#address-state").value;
+    const city = $("#address-city").value;
+    const postcodes = state && city ? malaysiaLocations[state]?.[city] || [] : [];
+    setSelectOptions($("#address-postcode"), "— Select —", postcodes, selectedPostcode);
+    $("#address-postcode").disabled = !city;
+  }
+
+  setSelectOptions($("#address-state"), "— Select State —", Object.keys(malaysiaLocations));
+
+  function snapshot() {
+    return JSON.stringify({
+      west: $("#west-rate").value,
+      east: $("#east-rate").value,
+      free: $("#free-toggle").checked,
+      threshold: $("#free-threshold").value,
+      connected,
+      enabled: $("#ep-enabled").checked,
+      addresses
+    });
+  }
+
+  function updateDirty() {
+    $("#savebar").classList.toggle("show", snapshot() !== initialState);
+  }
+
+  function updatePreview() {
+    const rate = Math.max(0, Number($("#west-rate").value) || 0);
+    $("#preview-rate").textContent = `RM ${rate.toFixed(2)}`;
+    $("#preview-total").textContent = `RM ${(80 + rate).toFixed(2)}`;
+  }
+
+  function renderProviderState() {
+    $("#ep-disconnected").hidden = connected;
+    $("#ep-connected").hidden = !connected;
+    const enabled = connected && $("#ep-enabled").checked;
+    $("#ep-status").className = `status ${enabled ? "connected" : "off"}`;
+    $("#ep-status").textContent = enabled ? "Connected" : "Off";
+    $("#flat-status").className = `status ${enabled ? "backup" : "live"}`;
+    $("#flat-status").textContent = enabled ? "Backup Rate" : "Live Rates";
+    $("#flat-card-status").className = `status ${enabled ? "backup" : "live"}`;
+    $("#flat-card-status").textContent = enabled ? "Backup Rate" : "Live Rates";
+    $("#flat-card-subtext").textContent = enabled
+      ? "Used as a safety net if live courier rates are unavailable."
+      : "Used as your primary shipping rate at checkout.";
+    $("#ep-card-description").textContent = enabled
+      ? "Live courier rates and pickup address management."
+      : "⚠️ Currently disabled. Checkout is using your Flat Rate shipping.";
+    $("#ep-card-description").style.color = enabled ? "var(--muted)" : "var(--amber)";
+  }
+
+  function renderAddresses() {
+    const isLinked = connected;
+    const hasValidPickupAddress = addresses.some(address =>
+      address.name && address.phone && address.line && address.city && address.state && /^\d{5}$/.test(address.postcode)
+    );
+    const isReady = isLinked && hasValidPickupAddress;
+    $("#ep-enabled").disabled = !isReady;
+    if (!isReady) $("#ep-enabled").checked = false;
+    $("#setup-banner").hidden = isReady;
+    $("#connection-state-banner").hidden = isReady;
+    $("#connection-state-banner").classList.toggle("partial", !isReady);
+    $("#account-actions-row").hidden = !isReady;
+    renderProviderState();
+    const list = $("#address-list");
+    if (!addresses.length) {
+      list.innerHTML = '<div class="empty">No pickup addresses yet. Add one manually or import addresses from EasyParcel.</div>';
+      return;
+    }
+    list.innerHTML = addresses.map((address, index) => `
+      <div class="address">
+        <div><strong>${address.name}${address.isDefault ? '<span class="default">Default</span>' : ""}</strong><p>${address.line}, ${address.postcode} ${address.city}, ${address.state} · ${address.phone}</p></div>
+        <div class="address-actions">
+          <button class="link edit-address" data-index="${index}" aria-label="Edit address" title="Edit address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
+          <button class="link delete-address" data-index="${index}" aria-label="Delete address" title="Delete address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button>
+        </div>
+      </div>`).join("");
+    document.querySelectorAll(".edit-address").forEach(button => button.onclick = () => openAddressForm(Number(button.dataset.index)));
+    document.querySelectorAll(".delete-address").forEach(button => button.onclick = () => {
+      const deletedAddress = addresses.splice(Number(button.dataset.index), 1)[0];
+      if (deletedAddress?.isDefault && addresses.length) addresses[0].isDefault = true;
+      renderAddresses();
+      updateDirty();
+    });
+  }
+
+  function openAddressForm(index = -1) {
+    editingIndex = index;
+    $("#add-btn").disabled = true;
+    const address = addresses[index];
+    $("#form-title span").textContent = address ? "Edit pickup address" : "Add pickup address";
+    $("#address-name").value = address?.name || "";
+    $("#address-phone").value = address?.phone || "";
+    $("#address-line").value = address?.line || "";
+    $("#address-state").value = address?.state || "";
+    updateCityOptions(address?.city || "", address?.postcode || "");
+    const isFirstAddress = !address && addresses.length === 0;
+    $("#address-default").checked = address ? Boolean(address.isDefault) : isFirstAddress;
+    $("#address-default").disabled = isFirstAddress;
+    $("#address-form").hidden = false;
+    $("#address-name").focus();
+  }
+
+  $("#west-rate").addEventListener("input", () => { updatePreview(); updateDirty(); });
+  $("#east-rate").addEventListener("input", updateDirty);
+  $("#free-threshold").addEventListener("input", updateDirty);
+  $("#free-toggle").addEventListener("change", () => {
+    $("#free-fields").classList.toggle("disabled", !$("#free-toggle").checked);
+    updateDirty();
+  });
+  $("#ep-enabled").addEventListener("change", () => { renderProviderState(); updateDirty(); });
+  $("#address-state").addEventListener("change", () => updateCityOptions());
+  $("#address-city").addEventListener("change", () => updatePostcodeOptions());
+  $("#address-default").addEventListener("change", () => {
+    const currentAddress = addresses[editingIndex];
+    if (currentAddress?.isDefault && !$("#address-default").checked) {
+      $("#address-default").checked = true;
+      $("#default-address-dialog").showModal();
+    }
+  });
+  $("#acknowledge-default-address").onclick = () => $("#default-address-dialog").close();
+
+  $("#setup-btn").onclick = () => {
+    connected = true;
+    easyParcelAccount = "merchant@example.com";
+    $("#ep-account-name").textContent = easyParcelAccount;
+    $("#ep-enabled").checked = false;
+    renderProviderState();
+    renderAddresses();
+    if (!addresses.length) openAddressForm();
+    updateDirty();
+  };
+
+  $("#add-btn").onclick = () => openAddressForm();
+  $("#cancel-address").onclick = () => { $("#address-form").hidden = true; $("#add-btn").disabled = false; editingIndex = -1; };
+  $("#address-form").onsubmit = event => {
+    event.preventDefault();
+    const wasReady = connected && addresses.some(address =>
+      address.name && address.phone && address.line && address.city && address.state && /^\d{5}$/.test(address.postcode)
+    );
+    const address = {
+      name: $("#address-name").value.trim(),
+      phone: $("#address-phone").value.trim(),
+      line: $("#address-line").value.trim(),
+      city: $("#address-city").value.trim(),
+      state: $("#address-state").value,
+      postcode: $("#address-postcode").value.trim(),
+      isDefault: $("#address-default").checked
+    };
+    if (address.isDefault) addresses.forEach(item => { item.isDefault = false; });
+    if (editingIndex >= 0) addresses[editingIndex] = address;
+    else {
+      if (!addresses.length) address.isDefault = true;
+      addresses.push(address);
+    }
+    if (!wasReady) $("#ep-enabled").checked = true;
+    $("#address-form").hidden = true;
+    $("#add-btn").disabled = false;
+    editingIndex = -1;
+    renderAddresses();
+    updateDirty();
+  };
+
+  $("#import-btn").onclick = () => {
+    const wasReady = connected && addresses.some(address =>
+      address.name && address.phone && address.line && address.city && address.state && /^\d{5}$/.test(address.postcode)
+    );
+    $("#import-btn").disabled = true;
+    $("#import-btn").textContent = "Importing…";
+    setTimeout(() => {
+      const imported = {name:"EasyParcel Warehouse",phone:"+60 12-345 6789",line:"12 Jalan Teknologi 3/6",city:"Petaling Jaya",state:"Selangor",postcode:"47810",isDefault:!addresses.length};
+      if (!addresses.some(address => address.line === imported.line)) addresses.push(imported);
+      if (!wasReady) $("#ep-enabled").checked = true;
+      $("#address-form").hidden = true;
+      $("#add-btn").disabled = false;
+      renderAddresses();
+      $("#import-btn").disabled = false;
+      $("#import-btn").textContent = "Import addresses from EasyParcel";
+      updateDirty();
+    }, 650);
+  };
+
+  $("#disconnect-btn").onclick = () => $("#disconnect-dialog").showModal();
+  $("#cancel-disconnect").onclick = () => $("#disconnect-dialog").close();
+  $("#confirm-disconnect").onclick = () => {
+    connected = false;
+    easyParcelAccount = "";
+    $("#ep-enabled").checked = false;
+    $("#disconnect-dialog").close();
+    renderProviderState();
+    updateDirty();
+  };
+
+  $("#save-btn").onclick = () => {
+    initialState = snapshot();
+    updateDirty();
+    $("#toast").classList.add("show");
+    setTimeout(() => $("#toast").classList.remove("show"), 1800);
+  };
+  $("#discard-btn").onclick = () => location.reload();
+
+  renderProviderState();
+  renderAddresses();
+  updatePreview();
+  initialState = snapshot();
+</script>
+</body>
+</html>

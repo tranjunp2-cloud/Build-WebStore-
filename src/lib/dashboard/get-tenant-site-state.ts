@@ -3,8 +3,7 @@ import type { Payload } from 'payload'
 /**
  * A site is "usable" when it isn't mid/failed AI generation — i.e. it has no
  * generationStatus, or its status is 'none' or 'completed'. This single
- * predicate is the source of truth (previously inlined in OverviewView and
- * sites/page.tsx).
+ * predicate is the source of truth for dashboard and site availability checks.
  */
 export function isUsableSite(site: unknown): boolean {
     const gs = (site as Record<string, unknown>)?.generationStatus

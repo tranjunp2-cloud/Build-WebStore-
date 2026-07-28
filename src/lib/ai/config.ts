@@ -56,22 +56,15 @@ export type AITask =
 /**
  * Default model per task.
  *
- * Phase-03a (2026-04-14): site-generation flipped gpt-4o → gpt-4.1-mini.
- * Validated by plans/260414-0914-ai-model-optimization/reports/eval-2026-04-14.md
- * — 30 runs x 3 inputs, 100% valid, 22.8 avg blocks (vs 22.9 for gpt-4o),
- * 9.9x cheaper ($0.004 vs $0.043 per call). p95 latency is worse
- * (~99s vs ~45s) but acceptable tradeoff — deferred tuning to phase-03b.
+ * Site generation uses GPT-5.4 mini for all three parallel page calls.
+ * Rollback both site-generation env overrides to gpt-4.1-mini when a
+ * lower-cost non-reasoning model is preferred.
  *
  * Other tasks (chat-edit etc.) still on gpt-4o-mini — phase-04 flips those.
- * Rollback: set env var AI_MODEL_SITEGEN=gpt-4o at environment scope
- * to instantly revert without redeploy.
  */
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
-    // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
-    'site-generation':    'gpt-4.1-mini',
-    // gen-perf phase-08: Contact+Blog batch is formulaic → mini is better than nano
-    // to avoid truncation and improve content depth.
-    'site-generation-subpages-light': 'gpt-4.1-mini',
+    'site-generation':    'gpt-5.4-mini',
+    'site-generation-subpages-light': 'gpt-5.4-mini',
     // Template-first: GPT only personalizes 4 fields (hero headline/sub, SEO).
     // nano is cheapest + fastest (~2-3s for ~200 tokens).
     'personalize':        'gpt-4.1-nano',
@@ -248,8 +241,8 @@ Output: product description (plain text).`,
  * Used for internal tracking and billing decisions
  */
 export const ESTIMATED_COSTS: Record<AITask, number> = {
-    'site-generation': 0.004,     // gpt-4.1-mini, ~3.8K in + 7K out
-    'site-generation-subpages-light': 0.0005, // gpt-4.1-nano, ~3.8K in + ~2K out
+    'site-generation': 0.04,      // gpt-5.4-mini, full 3-call split estimate
+    'site-generation-subpages-light': 0.012, // gpt-5.4-mini, ~3.8K in + ~2K out
     'personalize':     0.0001,    // gpt-4.1-nano, ~200 in + 80 out
     'chat-edit': 0.0005,          // GPT-4o-mini, ~1.5K in + 500 out
     'inline-edit': 0.0002,        // GPT-4o-mini, ~500 in + 200 out
