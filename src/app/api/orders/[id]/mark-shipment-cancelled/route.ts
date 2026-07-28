@@ -103,31 +103,6 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // Audit trail: the cleared shipment/AWB numbers live on in the tracking timeline.
-        // Best-effort (separate array-table write) — a failure here leaves the fields
-        // cleared and the flow usable, just without the history line.
-        const history = ((order as any).shippingTrackingHistory ?? []) as Array<Record<string, unknown>>
-        await payload.update({
-            collection: 'orders',
-            id: orderId,
-            data: {
-                shippingTrackingHistory: [
-                    ...history,
-                    {
-                        status: 'cancelled',
-                        description: `Shipment ${shipmentNo}${awbNo ? ` (AWB ${awbNo})` : ''} cancelled by merchant on EasyParcel`,
-                        eventTime: new Date().toISOString(),
-                    },
-                ],
-            } as Record<string, unknown>,
-            overrideAccess: true,
-        }).catch((err: unknown) => {
-            payload.logger.warn(
-                { orderId, err: err instanceof Error ? err.message : String(err) },
-                '[mark-shipment-cancelled] history append failed (fields already cleared)',
-            )
-        })
-
         payload.logger.info({ orderId, shipmentNo, awbNo }, '[mark-shipment-cancelled] EP fields cleared by merchant attest')
 
         return NextResponse.json({ success: true, data: { clearedShipmentNo: shipmentNo, status: 'confirmed' } })
