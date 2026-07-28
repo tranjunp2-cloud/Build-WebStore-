@@ -17,9 +17,13 @@ interface MetricRow {
     count: string | number
 }
 
+const finiteNumber = (value: number): number => Number.isFinite(value) ? value : 0
+
 const pctChange = (curr: number, prev: number) => {
-    if (prev === 0) return curr === 0 ? 0 : 100
-    return ((curr - prev) / prev) * 100
+    const change = prev === 0
+        ? (curr === 0 ? 0 : 100)
+        : ((curr - prev) / prev) * 100
+    return finiteNumber(change)
 }
 
 const isMetricRow = (row: unknown): row is MetricRow => {
@@ -35,8 +39,7 @@ const metricRows = (result: unknown): MetricRow[] => {
 }
 
 const metricValue = (value: string | number): number => {
-    const normalized = Number(value)
-    return Number.isFinite(normalized) ? normalized : 0
+    return finiteNumber(Number(value))
 }
 
 /** Empty-state glance payload (zeroed) — used when there is no tenant/usable site. */
@@ -103,12 +106,12 @@ export async function getGlanceData(period: DashboardPeriodKey, { user }: { user
     const leads = leadsRes.totalDocs
     const engage = engageRes.totalDocs
     const revenueRows = metricRows(revenueSeriesRes)
-    const revenue = revenueRows
+    const revenue = finiteNumber(revenueRows
         .filter(row => row.date_str >= currentStartKey)
-        .reduce((total, row) => total + metricValue(row.count), 0)
-    const prevRevenue = revenueRows
+        .reduce((total, row) => total + metricValue(row.count), 0))
+    const prevRevenue = finiteNumber(revenueRows
         .filter(row => row.date_str < currentStartKey)
-        .reduce((total, row) => total + metricValue(row.count), 0)
+        .reduce((total, row) => total + metricValue(row.count), 0))
 
     const seriesValues = (result: unknown): number[] => {
         const map = new Map<string, number>()
