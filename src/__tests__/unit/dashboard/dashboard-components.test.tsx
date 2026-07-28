@@ -247,13 +247,13 @@ describe('DashboardActionList', () => {
         status: 'pending',
     })
 
-    it('[TC-F03.09] renders up to 5 pending orders', () => {
+    it('[TC-F03.03] renders up to 5 pending orders', () => {
         const orders = Array.from({ length: 5 }, (_, i) => makeOrder(i + 1))
         render(<DashboardActionList pendingOrders={orders} />)
         expect(screen.getAllByText(/ORD-/)).toHaveLength(5)
     })
 
-    it('[TC-F03.10] each order row has a link to /orders/:id', () => {
+    it('[TC-F03.04] each order row has a link to /orders/:id', () => {
         const orders = [makeOrder(1)]
         render(<DashboardActionList pendingOrders={orders} />)
         const rowLink = screen.getAllByRole('link')[0]

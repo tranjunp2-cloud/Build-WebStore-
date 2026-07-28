@@ -18,7 +18,7 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
     ├── dashboard/page.tsx      ← Server Component (Home: Metrics & Orders)
     │       ├── DashboardGreeting.tsx
     │       ├── DashboardStatsView.tsx   ← 4 Customizable stat cards
-    │       ├── DashboardActionList.tsx  ← Latest Pending Orders
+    │       ├── revamp/pending-orders.tsx ← Latest Pending Orders (gated)
     │       └── SEOHealthWidget.tsx      ← SEO quick glance
     ├── dashboard/analytics/page.tsx ← Client/Server Component (Analytics detail)
     │       ├── PeriodSelector.tsx
@@ -35,22 +35,62 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
 ```
 page.tsx (Server Component)
   │
-  ├── getSession() → get tenantId
+  ├── getCurrentUser() + tenantIdForQuery() → tenant scope
   │
-  ├── fetch dashboard metrics (View, Leads, Orders, Revenue) via `/api/dashboard/summary`
+  ├── getGlanceData(period) → active tenant-scoped At-a-glance metrics
   │
-  └── render <DashboardStatsView /> + <DashboardActionList /> + <SEOHealthWidget />
+  ├── load independent dashboard blocks
+  └── load Pending Orders via secure local loader when tenant/site/block/permission gates pass
 ```
 
 ## API Contract (Next.js Route Handlers)
 
 ```typescript
-// GET /api/dashboard/summary (Overview)
+// GET /api/dashboard/summary (legacy Overview path; active revamp uses getGlanceData)
 // GET /api/analytics/summary (Detail Charts & Lists)
 // POST /api/seo/analyze (Trigger API scan)
 // POST /api/seo/fix (SSE Stream cho AI Fix)
 // GET/POST/DELETE /api/seo/keywords (Keyword Tracker)
 ```
+
+### Active At-a-glance metrics
+
+`getGlanceData(period)` derives the tenant on the server and returns empty data when
+there is no tenant. All tenant users may receive the aggregate metrics; Revenue does
+not reuse the Orders permission gate from the Pending Orders widget.
+
+Views, Leads, Engagement, and Revenue share the single
+`DASHBOARD_TIME_ZONE = 'UTC'` contract. Current/comparison boundaries are half-open,
+equal, non-overlapping UTC windows, and `today`, `7d`, and `30d` produce exactly
+1, 7, and 30 UTC day keys. Payload count filters, range labels, zero-filled series,
+and SQL `created_at` grouping therefore do not depend on the Node host or PostgreSQL
+session timezone.
+
+The active Revenue loader uses one tenant-scoped SQL aggregate over the previous and
+current windows. It includes only orders whose current status is `completed`, includes
+`currency = 'MYR'` and legacy null currency via `COALESCE(currency, 'MYR')`, and
+attributes the amount to the order's UTC `created_at` day. Payment method and payment
+status do not alter inclusion, so COD follows the same rule and refunded/non-completed
+orders are excluded. No `completedAt` field is used. The active Revenue card renders the
+same aggregate total, delta, comparison note, and daily sparkline as `RM` with exactly
+two fraction digits; it is visible in both English and Bahasa Melayu.
+
+The aggregate's `EXPLAIN ANALYZE` on representative local/disposable data is still
+outstanding. Add an index only through a separately reviewed schema/migration change if
+the measured query plan requires one.
+
+### Pending Orders widget (GH-1627)
+
+The server loader queries tenant-scoped pending orders with `overrideAccess: false`,
+selects only dashboard DTO fields, sorts newest first, and limits the result to five
+rows. DTO mapping counts only positive safe-integer quantities and ignores malformed
+values or additions that would make the cumulative count unsafe. Access requires a primary
+tenant membership. Tenant-scoped super-admins bypass membership status and role checks;
+otherwise the membership must be active, with owner/admin/editor/viewer receiving full
+access and custom roles requiring explicit Orders permission. Missing tenant, usable site,
+enabled Orders block, or authorization skips the query. Loader
+failures render a distinct `unavailable` state; zero results render the localized
+empty state through the shared `.empty-block` pattern.
 
 ## Data Model
 

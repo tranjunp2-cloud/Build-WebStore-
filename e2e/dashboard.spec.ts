@@ -7,7 +7,6 @@ import { navigateTo } from './helpers/navigation'
  *
  * TC-F03.01: Dashboard greeting + content
  * TC-F03.02: Site cards / empty state
- * TC-F03.03: Dashboard tab navigation
  * TC-F18.30: Sidebar label renamed from "Store Config" to "Settings" (BUG-985)
  */
 
@@ -47,26 +46,6 @@ test.describe('Dashboard', () => {
 
         // At least one of these must be present
         expect(hasSites + hasEmpty + hasStats).toBeGreaterThan(0)
-    })
-
-    test('[TC-F03.03] dashboard tab navigation works', async ({ page }) => {
-        await expectPageLoaded(page)
-
-        // Look for tab-like navigation (Overview, Analytics, SEO)
-        const tabs = page.locator('[role="tab"], button:has-text("Analytics"), button:has-text("SEO"), [data-state]')
-        const tabCount = await tabs.count()
-
-        if (tabCount > 1) {
-            // Click second tab
-            await tabs.nth(1).click()
-            await page.waitForLoadState('networkidle')
-            await expectNoServerError(page)
-
-            // Click back to first tab
-            await tabs.first().click()
-            await page.waitForLoadState('networkidle')
-            await expectNoServerError(page)
-        }
     })
 
     test('[TC-F18.30] sidebar shows "Settings" label — not "Store Config" (regression BUG-985)', async ({ page }) => {

@@ -3,7 +3,7 @@
  * Coverage Map (QA Doc Traceability):
  *   TC-F03.01  → Dashboard summary returns metrics
  *   TC-F03.02  → Cache hit returns cached data
- *   TC-F03.03  → Tenant auth check
+ *   TC-F03.17  → Tenant auth check
  *   TC-F03.20  → Analytics summary returns chart data
  */
 
@@ -32,7 +32,7 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 // ─── Tests ────────────────────────────────────────────────────────────
 
-describe('GET /api/dashboard/summary [TC-F03.01, TC-F03.02, TC-F03.03]', () => {
+describe('GET /api/dashboard/summary [TC-F03.01, TC-F03.02, TC-F03.17]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockUser.tenants = [{ tenant: 'tenant-1' }]
@@ -71,7 +71,7 @@ describe('GET /api/dashboard/summary [TC-F03.01, TC-F03.02, TC-F03.03]', () => {
         expect(res.headers.get('Cache-Control')).toBe('private, max-age=60')
     })
 
-    it('[TC-F03.03] returns 403 when user has no tenant', async () => {
+    it('[TC-F03.17] returns 403 when user has no tenant', async () => {
         mockUser.tenants = []
 
         const { GET } = await import('@/app/api/dashboard/summary/route')

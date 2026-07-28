@@ -3057,7 +3057,6 @@
                 "viewsTip": "Jumlah lawatan pelanggan ke semua halaman di laman web anda.",
                 "leadsTip": "Bakal pelanggan yang meninggalkan maklumat hubungan (e-mel, telefon) melalui borang pendaftaran di laman web anda.",
                 "engagementTip": "Tindakan pelanggan bernilai tinggi — seperti klik Beli Sekarang, Tambah ke Troli, atau pautan media sosial.",
-                "revenueSoonTip": "Penjejakan hasil akan datang. Kad ini akan mengira metrik daripada pesanan yang telah dibayar dan selesai.",
                 "noteToday": "vs semalam",
                 "note7d": "vs 7h lepas",
                 "note30d": "vs 30h lepas"
@@ -3176,8 +3175,18 @@
                 "title": "Pesanan belum selesai",
                 "subtitle": "Pesanan menunggu pemenuhan",
                 "awaiting": "Menunggu",
-                "mockOrder": "Pesanan pelanggan · {count} item",
-                "soonTip": "Baris gilir pemenuhan pesanan sedang dibangunkan — akan datang."
+                "emptyTitle": "Tiada pesanan belum selesai",
+                "emptyDesc": "Pesanan baharu yang menunggu pemenuhan akan dipaparkan di sini.",
+                "unavailableTitle": "Pesanan belum selesai tidak tersedia",
+                "unavailableDesc": "Kami tidak dapat memuatkan pesanan belum selesai buat masa ini. Sila cuba lagi kemudian.",
+                "count": {
+                    "one": "{count} pesanan belum selesai",
+                    "other": "{count} pesanan belum selesai"
+                },
+                "items": {
+                    "one": "{count} item",
+                    "other": "{count} item"
+                }
             },
             "customize": {
                 "button": "Sesuaikan",

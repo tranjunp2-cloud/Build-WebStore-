@@ -124,6 +124,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dashboard_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dashboard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -136,6 +150,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --include=optional
+
+      - name: PostgreSQL dashboard query regression
+        env:
+          DATABASE_URI: postgresql://postgres:postgres@127.0.0.1:5432/dashboard_test
+        run: npm run test -- src/__tests__/integration/dashboard-glance-data-postgres.test.ts
 
       - name: Test
         id: test
