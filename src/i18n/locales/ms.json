@@ -1427,6 +1427,7 @@
                 "printLabel": "Cetak label (PDF)",
                 "schedulePickup": "Jadualkan pengambilan",
                 "pickupLocked": "Pengambilan · {label}",
+                "dropoffLocked": "Drop-off · {label}",
                 "inTransit": "Bungkusan dalam perjalanan",
                 "delivered": "Dihantar — pesanan selesai",
                 "deliveredBody": "Pesanan ini kini selesai.",

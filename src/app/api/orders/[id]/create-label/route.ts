@@ -66,6 +66,8 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const existingShipmentNo = (order as any).easyParcelOrderNo as string | null | undefined
         const existingAwbNo = (order as any).awbNo as string | null | undefined
         const existingLabelUrl = (order as any).labelUrl as string | null | undefined
+        const existingCollectionMethod = (order as any).collectionMethod as CollectionMethod | null | undefined
+        const existingCollectionDate = (order as any).pickupScheduledAt as string | null | undefined
         // A "CLAIM:" sentinel is an in-progress claim (see the CAS below), NOT a created
         // shipment — treat it as not-yet-created so it falls through to the CAS (which returns
         // 409 for an active claim, or reclaims a stale one). Only a real shipment_number counts.
@@ -90,7 +92,16 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     )
                 })
             }
-            return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
+            return NextResponse.json({
+                success: true,
+                data: {
+                    alreadyCreated: true,
+                    awbNo: existingAwbNo,
+                    labelUrl: existingLabelUrl,
+                    collectionMethod: existingCollectionMethod ?? null,
+                    collectionDate: existingCollectionDate ?? null,
+                },
+            })
         }
 
         // Fetch tenant with secrets (overrideAccess for token fields)
@@ -430,8 +441,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 // ordering includes this order instead of parking it at NULLS-LAST and starving it.
                 shippingTrackingLastUpdated: new Date().toISOString(),
                 // Collection date the label was actually bought with (post-clamp) —
-                // shown as the locked "Pickup · DD/MM" line on the order detail.
+                // shown with the selected pickup/drop-off method on the order detail.
                 pickupScheduledAt: collection.date,
+                ...(method ? { collectionMethod: method } : {}),
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
                 // Method resolution booked a different service variant — keep the order's
                 // service in sync with what EP actually charged/booked.
@@ -453,6 +465,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 trackingNumber: awbNo,
                 labelUrl,
                 collectionDate: collection.date,
+                collectionMethod: method ?? null,
                 collectionDateShifted: collection.shifted,
                 // Non-null when the stored service couldn't do the requested method and a
                 // same-courier variant was booked instead (wallet charged that variant's price)

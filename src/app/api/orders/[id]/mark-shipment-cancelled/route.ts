@@ -82,6 +82,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 label_url = NULL,
                 label_urls = NULL,
                 pickup_scheduled_at = NULL,
+                collection_method = NULL,
                 cod_status = NULL,
                 shipping_tracking_status = 'cancelled',
                 shipping_tracking_last_updated = NOW(),

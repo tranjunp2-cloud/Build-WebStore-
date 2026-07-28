@@ -1,6 +1,6 @@
 /**
  * Component tests for TrackingTimeline — F36 (GH-1333)
- * Tests sorting by eventTime DESC, status label mapping, empty state rendering.
+ * Tests sorting, verbatim courier descriptions, status fallback, and empty state rendering.
  *
  * TC-F36.C01–F36.C07: Tracking timeline rendering + internationalization.
  */
@@ -49,8 +49,8 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('Awaiting Update')).toBeInTheDocument()
   })
 
-  // TC-F36.C03: Single event renders with status label
-  it('[TC-F36.C03] Single event renders with friendly status label', () => {
+  // TC-F36.C03: Courier description is the timeline title, without rewriting
+  it('[TC-F36.C03] Single event renders the courier description verbatim', () => {
     const events: TrackingEvent[] = [
       {
         status: 'delivered',
@@ -59,8 +59,8 @@ describe('TrackingTimeline', () => {
       },
     ]
     render(<TrackingTimeline events={events} />)
-    expect(screen.getByText('Delivered')).toBeInTheDocument()
     expect(screen.getByText('Package delivered')).toBeInTheDocument()
+    expect(screen.queryByText('Delivered')).not.toBeInTheDocument()
   })
 
   // TC-F36.C04: Multiple events sorted DESC by eventTime (newest first)
@@ -148,8 +148,8 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('CustomUnknownStatus')).toBeInTheDocument()
   })
 
-  // TC-F36.C07: Event without status → defaults to "Processing"
-  it('[TC-F36.C07] Missing status → defaults to "Processing"', () => {
+  // TC-F36.C07: Description still wins when the internal status is absent
+  it('[TC-F36.C07] Missing status → renders the courier description', () => {
     const events: TrackingEvent[] = [
       {
         eventTime: '2026-07-01T10:30:00Z',
@@ -157,7 +157,8 @@ describe('TrackingTimeline', () => {
       },
     ]
     render(<TrackingTimeline events={events} />)
-    expect(screen.getByText('Processing')).toBeInTheDocument()
+    expect(screen.getByText('In progress')).toBeInTheDocument()
+    expect(screen.queryByText('Processing')).not.toBeInTheDocument()
   })
 
   // TC-F36.C08: Event time formatting — day/month/year · HH:mm
@@ -183,7 +184,7 @@ describe('TrackingTimeline', () => {
       },
     ]
     render(<TrackingTimeline events={events} />)
-    expect(screen.getByText('Processing')).toBeInTheDocument()
+    expect(screen.getByText('Order processing')).toBeInTheDocument()
     // Should render without crash, empty time string
     expect(screen.queryByText(/\d{1,2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/)).not.toBeInTheDocument()
   })
@@ -199,6 +200,18 @@ describe('TrackingTimeline', () => {
     ]
     render(<TrackingTimeline events={events} />)
     expect(screen.getByText('Left distribution center')).toBeInTheDocument()
+    expect(screen.queryByText('In Transit')).not.toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10b] EP Schedule In Arrangement is not rewritten as Waiting for Pickup', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+      eventTime: '2026-07-28T03:23:50.000Z',
+    }]} />)
+
+    expect(screen.getByText('Schedule In Arrangement')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
   })
 
   // TC-F36.C11: Description field skipped when missing

@@ -44,6 +44,7 @@ export interface FulfillmentOrder {
   shippingServiceId?: string | null
   parcelWeight?: number | null
   pickupScheduledAt?: string | null
+  collectionMethod?: 'pickup' | 'dropoff' | null
   pickupSlot?: string | null
   labelPrintedAt?: string | null
   shippingTrackingHistory?: Array<{
@@ -240,9 +241,8 @@ export function FulfillmentZone({
   const courierLogoUrl = courierId ? courierLogos?.get(courierId) ?? null : null
   const epWallet = useEpWallet(tenantId)
 
-  // Collection date is chosen in the Ready-to-Ship step (US-F36-07) and persisted by
-  // create-label as pickupScheduledAt — display-only here, locked once the label exists.
-  const pickupDisplay = (() => {
+  // Collection date and method are persisted by create-label and locked once the label exists.
+  const collectionDisplay = (() => {
     if (!order.pickupScheduledAt) return null
     const d = new Date(order.pickupScheduledAt)
     const dm = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -544,9 +544,12 @@ export function FulfillmentZone({
 
                 {/* US-F36-07: collection date is chosen before buying the label —
                     once the label exists it is locked (no post-label re-scheduling). */}
-                {pickupDisplay && (
+                {collectionDisplay && (
                   <div className="sched-locked">
-                    <CalendarClock style={{ width: 15, height: 15 }} /> {ti(f.pickupLocked, { label: pickupDisplay })}
+                    <CalendarClock style={{ width: 15, height: 15 }} />{' '}
+                    {ti(order.collectionMethod === 'dropoff' ? f.dropoffLocked : f.pickupLocked, {
+                      label: collectionDisplay,
+                    })}
                   </div>
                 )}
 

@@ -2,8 +2,8 @@
 
 // Tracking event timeline for EP shipped/completed orders.
 // Renders order.shippingTrackingHistory sorted DESC (newest first).
-// Status raw strings → friendly labels via inline map (client-safe;
-// status-map.ts is server-only).
+// Courier descriptions are rendered verbatim. Internal status labels are only
+// used as a fallback for legacy history entries that have no description.
 
 import { useI18n } from '@/i18n'
 
@@ -70,6 +70,7 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
     <div className="track-timeline">
       {sorted.map((ev, i) => {
         const isFirst = i === 0 // newest = "live" marker
+        const displayText = ev.description || friendlyStatus(ev.status)
         return (
           <div
             key={`${ev.status}-${ev.eventTime}-${i}`}
@@ -78,12 +79,9 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
             <span className="tl-dot" />
             <div className="tl-body">
               <div className="tl-head">
-                <span className="tl-t">{friendlyStatus(ev.status)}</span>
+                <span className="tl-t">{displayText}</span>
                 <span className="tl-d">{fmtEventTime(ev.eventTime)}</span>
               </div>
-              {ev.description && (
-                <div className="tl-note">{ev.description}</div>
-              )}
             </div>
           </div>
         )

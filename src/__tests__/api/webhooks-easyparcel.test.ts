@@ -255,6 +255,7 @@ describe('POST /api/webhooks/easyparcel', () => {
     expect(updateArg.data.trackingNumber).toBeNull()
     expect(updateArg.data.labelUrl).toBeNull()
     expect(updateArg.data.pickupScheduledAt).toBeNull()
+    expect(updateArg.data.collectionMethod).toBeNull()
     expect(updateArg.data.codStatus).toBeNull()
   })
 
@@ -748,6 +749,52 @@ describe('applyTrackingUpdate (unit)', () => {
     expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
       data: { status: 'shipped' },
     }))
+  })
+
+  it('[TC-F36.OD.045d] same internal status appends a new raw courier message once', async () => {
+    const order = {
+      id: 'order-schedule',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [{
+        status: 'pending_pickup',
+        description: 'Shipment created — RMC002235128MY',
+        eventTime: '2026-07-28T03:20:00.000Z',
+      }],
+    }
+    const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    }
+
+    const firstResult = await applyTrackingUpdate(
+      mockPayload as any,
+      order,
+      7,
+      'Schedule In Arrangement',
+    )
+
+    expect(firstResult).toBe('updated')
+    const updatedHistory = mockPayload.update.mock.calls[0][0].data.shippingTrackingHistory
+    expect(updatedHistory.at(-1)).toMatchObject({
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+    })
+
+    const updatedOrder = { ...order, shippingTrackingHistory: updatedHistory }
+    mockPayload.find.mockResolvedValue({ docs: [updatedOrder] })
+    mockPayload.update.mockClear()
+
+    const retryResult = await applyTrackingUpdate(
+      mockPayload as any,
+      updatedOrder,
+      7,
+      'Schedule In Arrangement',
+    )
+
+    expect(retryResult).toBe('unchanged')
+    expect(mockPayload.update).not.toHaveBeenCalled()
   })
 
   it('[TC-F36.OD.045c] collected tracking promotes ready_to_ship to shipped', async () => {

@@ -50,7 +50,7 @@ const REOPEN_ON_CANCEL_FROM = new Set(['ready_to_ship', 'shipped', 'processing',
  * - `descriptionOverride` — optional courier free-text (e.g. EP's latest_tracking_status)
  *   to show as the history entry description instead of the generic buyerLabel. Never
  *   used for status mapping — courier free text is display-only.
- * - Skips the write when the mapped status equals the current one (idempotent).
+ * - Same mapped status can still append a new courier message; exact retries stay idempotent.
  * - Appends a history entry `{status: internal, description, eventTime}`.
  * - Auto-completes the order on 'delivered' when it is in an in-fulfillment status
  *   (design: "Completed — automatically marked after successful delivery").
@@ -72,14 +72,6 @@ export async function applyTrackingUpdate(
     // SHARED writer — covers BOTH callers (webhook + cron); the webhook additionally reports the
     // anomaly to Sentry before it reaches here.
     if (mapped.internal === 'unknown') return 'unchanged'
-
-    if (order.shippingTrackingStatus === mapped.internal) {
-        const lifecycleNeedsReconciliation =
-            (order.status === 'ready_to_ship' && AUTO_SHIP_TRACKING_STATUSES.has(mapped.internal)) ||
-            (mapped.internal === 'delivered' && (order.status === 'shipped' || order.status === 'ready_to_ship')) ||
-            (mapped.internal === 'cancelled' && REOPEN_ON_CANCEL_FROM.has(order.status ?? ''))
-        if (!lifecycleNeedsReconciliation) return 'unchanged'
-    }
 
     // F7 (review #1434): a terminal status must never regress to a non-terminal one — e.g. a
     // late "In Transit" (code 4) webhook arriving after "Delivered" (code 5) already landed.
@@ -133,19 +125,28 @@ export async function applyTrackingUpdate(
     // so leaving it 'cancelled' here does not freeze the next shipment's tracking.
     const reopenOnCancel = mapped.internal === 'cancelled' && REOPEN_ON_CANCEL_FROM.has(freshOrderStatus ?? '')
     const trackingChanged = freshStatus !== mapped.internal
+    const rawDescription = descriptionOverride?.trim()
+    const eventDescription = rawDescription || mapped.buyerLabel
+    const latestHistoryEntry = currentHistory.at(-1)
+    const rawDescriptionChanged = Boolean(rawDescription) && (
+        latestHistoryEntry?.status !== mapped.internal ||
+        latestHistoryEntry?.description !== eventDescription
+    )
+    const historyNeedsAppend = trackingChanged || rawDescriptionChanged
 
-    if (!trackingChanged && !autoShip && !autoComplete && !reopenOnCancel) return 'unchanged'
+    if (!historyNeedsAppend && !autoShip && !autoComplete && !reopenOnCancel) return 'unchanged'
 
-    const trackingData = trackingChanged
+    const eventTime = new Date().toISOString()
+    const trackingData = historyNeedsAppend
         ? {
-            shippingTrackingStatus: mapped.internal,
-            shippingTrackingLastUpdated: new Date().toISOString(),
+            ...(trackingChanged ? { shippingTrackingStatus: mapped.internal } : {}),
+            shippingTrackingLastUpdated: eventTime,
             shippingTrackingHistory: [
                 ...currentHistory,
                 {
                     status: mapped.internal,
-                    description: descriptionOverride?.trim() || mapped.buyerLabel,
-                    eventTime: new Date().toISOString(),
+                    description: eventDescription,
+                    eventTime,
                 },
             ],
         }
@@ -166,6 +167,7 @@ export async function applyTrackingUpdate(
                 labelUrl: null,
                 labelUrls: null,
                 pickupScheduledAt: null,
+                collectionMethod: null,
                 codStatus: null,
             } : {}),
         } as Record<string, unknown>,

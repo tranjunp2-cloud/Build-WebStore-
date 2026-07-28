@@ -1427,6 +1427,7 @@
                 "printLabel": "Print label (PDF)",
                 "schedulePickup": "Schedule pickup",
                 "pickupLocked": "Pickup · {label}",
+                "dropoffLocked": "Drop-off · {label}",
                 "inTransit": "Parcel in transit",
                 "delivered": "Delivered — order completed",
                 "deliveredBody": "This order is now complete.",
