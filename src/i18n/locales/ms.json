@@ -1573,6 +1573,7 @@
                 "awaitingUpdate": "Menunggu kemaskini penjejakan pertama.",
                 "statusOrderCreated": "Pesanan Dicipta",
                 "statusPendingPickup": "Menunggu Pengambilan",
+                "statusPendingDropoff": "Menunggu Drop-off",
                 "statusPickedUp": "Bungkusan Diambil",
                 "statusInTransit": "Dalam Perjalanan",
                 "statusOutForDelivery": "Dalam Penghantaran",

@@ -563,7 +563,7 @@ export function FulfillmentZone({
 
             </div>
 
-            <TrackingTimeline events={events} />
+            <TrackingTimeline events={events} collectionMethod={order.collectionMethod} />
           </div>
 
           {/* The manual "Mark shipment cancelled" button was removed from the UI (2026-07-13):
@@ -649,7 +649,7 @@ export function FulfillmentZone({
             </div>
 
             {/* Tracking timeline */}
-            <TrackingTimeline events={events} />
+            <TrackingTimeline events={events} collectionMethod={order.collectionMethod} />
           </div>
         </div>
 

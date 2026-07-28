@@ -23,7 +23,12 @@ export interface TrackingEvent {
   eventTime?: string | null
 }
 
-export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
+interface TrackingTimelineProps {
+  events: TrackingEvent[]
+  collectionMethod?: 'pickup' | 'dropoff' | null
+}
+
+export function TrackingTimeline({ events, collectionMethod }: TrackingTimelineProps) {
   const { t } = useI18n()
   const tk = t.dashboard.orders.tracking
 
@@ -31,7 +36,9 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
   // (sync-tracking.ts writes mapped.internal, not the human label).
   const FRIENDLY: Record<string, string> = {
     'order_created':      tk.statusOrderCreated,
-    'pending_pickup':     tk.statusPendingPickup,
+    'pending_pickup':     collectionMethod === 'dropoff'
+      ? tk.statusPendingDropoff
+      : tk.statusPendingPickup,
     'picked_up':          tk.statusPickedUp,
     'in_transit':         tk.statusInTransit,
     'out_for_delivery':   tk.statusOutForDelivery,

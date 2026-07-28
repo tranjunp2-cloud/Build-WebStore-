@@ -1573,6 +1573,7 @@
                 "awaitingUpdate": "Awaiting first tracking update.",
                 "statusOrderCreated": "Order Created",
                 "statusPendingPickup": "Waiting for Pickup",
+                "statusPendingDropoff": "Waiting for Drop-off",
                 "statusPickedUp": "Parcel Picked Up",
                 "statusInTransit": "In Transit",
                 "statusOutForDelivery": "Out for Delivery",

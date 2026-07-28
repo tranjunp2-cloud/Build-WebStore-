@@ -18,6 +18,7 @@ vi.mock('@/i18n', () => ({
           tracking: {
             statusOrderCreated: 'Order Created',
             statusPendingPickup: 'Pending Pickup',
+            statusPendingDropoff: 'Waiting for Drop-off',
             statusPickedUp: 'Picked Up',
             statusInTransit: 'In Transit',
             statusOutForDelivery: 'Out for Delivery',
@@ -204,18 +205,30 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('Left distribution center')).toBeInTheDocument()
   })
 
-  it('[TC-F36.C10b] EP Schedule In Arrangement remains verbatim under its status title', () => {
+  it('[TC-F36.C10b] Drop-off shipment uses a matching pending status title', () => {
     render(<TrackingTimeline events={[{
       status: 'pending_pickup',
       description: 'Schedule In Arrangement',
       eventTime: '2026-07-28T03:23:50.000Z',
-    }]} />)
+    }]} collectionMethod="dropoff" />)
 
     expect(screen.getByText('Schedule In Arrangement')).toBeInTheDocument()
-    expect(screen.getByText('Pending Pickup')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for Drop-off')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
   })
 
-  it('[TC-F36.C10c] CMS shipment-created event stays single-line', () => {
+  it('[TC-F36.C10c] Pickup shipment retains the pickup pending status title', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Order Successfully Created or received',
+      eventTime: '2026-07-28T03:23:50.000Z',
+    }]} collectionMethod="pickup" />)
+
+    expect(screen.getByText('Pending Pickup')).toBeInTheDocument()
+    expect(screen.getByText('Order Successfully Created or received')).toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10d] CMS shipment-created event stays single-line', () => {
     render(<TrackingTimeline events={[{
       status: 'pending_pickup',
       description: 'Shipment created — RMC002343785MY',
