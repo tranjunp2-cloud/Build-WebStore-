@@ -592,39 +592,52 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                     </div>
                                 ) : products.map((p) => {
                                     const hasVariants = Boolean(p.variants?.length)
+                                    const nameInputId = `bulk-draft-name-${p._id}`
+                                    const priceInputId = `bulk-draft-price-${p._id}`
+                                    const stockInputId = `bulk-draft-stock-${p._id}`
 
                                     return (
-                                        <div key={p._id} className="flex gap-3 items-start rounded-xl border border-solid border-[hsl(var(--border))] p-3">
-                                            <div className="shrink-0 w-[52px] h-[52px] rounded-[10px] bg-[hsl(var(--muted))] flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+                                        <div key={p._id} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
+                                            <div className="col-start-1 row-start-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
                                                 <ImageIcon className="w-5 h-5" />
                                             </div>
-                                            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                                <div className="flex gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                    <span className="flex-1">{t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}</span>
-                                                    <span className="w-[72px] md:w-[100px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}</span>
-                                                    <span className="w-[64px] md:w-[72px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}</span>
-                                                    <span className="hidden md:block w-[110px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}</span>
-                                                </div>
-                                                <div className="flex gap-2 items-start">
+                                            <div className="col-span-2 row-start-2 grid min-w-0 grid-cols-2 gap-x-2 gap-y-3 md:col-span-1 md:col-start-2 md:row-start-1 md:grid-cols-[minmax(0,1fr)_100px_72px_110px] md:gap-y-0">
+                                                <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                    <label htmlFor={nameInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}
+                                                    </label>
                                                     {/* Single-line input, matching the design reference (ai-bulk-create.html
                                                         uses <input class="f-name">, not a textarea) — guarantees this field
                                                         is always the same fixed height as Price/Stock/Variants next to it;
                                                         a long name scrolls horizontally within the box rather than
                                                         wrapping/growing the row. */}
                                                     <Input
+                                                        id={nameInputId}
                                                         type="text"
                                                         value={p.name}
                                                         onChange={(e) => updateProduct(p._id!, 'name', e.target.value)}
-                                                        className="flex-1 min-w-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
                                                     />
+                                                </div>
+                                                <div className="flex min-w-0 flex-col gap-1.5">
+                                                    <label htmlFor={priceInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}
+                                                    </label>
                                                     <Input
+                                                        id={priceInputId}
                                                         type="number"
                                                         min="0"
                                                         value={p.price}
                                                         onChange={(e) => updateProduct(p._id!, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
-                                                        className="w-[72px] md:w-[100px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
                                                     />
+                                                </div>
+                                                <div className="flex min-w-0 flex-col gap-1.5">
+                                                    <label htmlFor={stockInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}
+                                                    </label>
                                                     <Input
+                                                        id={stockInputId}
                                                         type="number"
                                                         min="0"
                                                         // For a variant product this drawer has no per-variant matrix (that's
@@ -642,9 +655,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                             else updateProduct(p._id!, 'stock', next)
                                                         }}
                                                         title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
-                                                        className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
                                                     />
-                                                    <div className="hidden md:block min-w-[110px] w-[110px] shrink-0 self-start pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))] whitespace-normal break-words">
+                                                </div>
+                                                <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}
+                                                    </span>
+                                                    <div className="min-h-8 min-w-0 whitespace-normal break-words pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))]">
                                                         {hasVariants ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
                                                     </div>
                                                 </div>
@@ -652,7 +670,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                             <button
                                                 type="button"
                                                 onClick={() => removeProduct(p._id!)}
-                                                className="shrink-0 p-1.5 rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                                className="col-start-2 row-start-1 flex h-11 w-11 shrink-0 items-center justify-center justify-self-end rounded-lg text-[hsl(var(--muted-foreground))] transition-colors hover:bg-red-500/10 hover:text-red-400 md:col-start-3 md:h-7 md:w-7"
                                                 aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
                                             >
                                                 <X className="w-4 h-4" />
