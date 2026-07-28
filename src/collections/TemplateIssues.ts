@@ -128,6 +128,7 @@ export const TemplateIssues: CollectionConfig = {
                 { label: 'Template', value: 'template' },
                 { label: 'Generation', value: 'generation' },
                 { label: 'Block', value: 'block' },
+                { label: 'Runtime', value: 'runtime' },
             ],
         },
         {
@@ -135,7 +136,7 @@ export const TemplateIssues: CollectionConfig = {
             type: 'text',
             required: true,
             index: true,
-            admin: { description: 'Template id / Generation id / Block slug (polymorphic soft FK).' },
+            admin: { description: 'Template id / Generation id / Block slug / Runtime provider key (polymorphic soft FK).' },
         },
         {
             name: 'reportedBy',

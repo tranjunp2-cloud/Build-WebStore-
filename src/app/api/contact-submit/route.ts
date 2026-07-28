@@ -28,6 +28,7 @@ const contactSchema = z.object({
     name: z.string().min(1, 'Name is required').max(200),
     email: z.string().email('Invalid email address').max(254),
     phone: z.string().max(30).optional().or(z.literal('')),
+    subject: z.string().max(300).optional().or(z.literal('')),
     message: z.string().min(5, 'Message too short').max(5000),
     siteId: z.string().regex(/^\d+$/, 'Invalid site ID').max(64, 'Invalid site ID'),
     // Honeypot field — bot thường fill mọi field ẩn. Reject nếu có value.
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
         )
     }
 
-    const { name, email, phone, message, siteId, website } = parsed.data
+    const { name, email, phone, subject, message, siteId, website } = parsed.data
 
     // Canonicalize siteId to its numeric value — the regex above only constrains character
     // class, so '1', '01', '001' all pass but are DIFFERENT strings. Using the raw string in
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
                 name,
                 email,
                 phone: phone || undefined,
+                subject: subject || undefined,
                 message,
                 site: siteIdNum,
                 status: 'new',
@@ -148,7 +150,7 @@ export async function POST(req: NextRequest) {
                 .sendEmail({
                     to: ownerEmail,
                     subject: `New contact form submission on ${siteName}`,
-                    text: `You received a new message from ${name} <${email}>${phone ? ` (${phone})` : ''}:\n\n${message}\n\n--\nView in admin: /admin/collections/contact-submissions/${submission.id}`,
+                    text: `You received a new message from ${name} <${email}>${phone ? ` (${phone})` : ''}:${subject ? `\nSubject: ${subject}` : ''}\n\n${message}\n\n--\nView in admin: /admin/collections/contact-submissions/${submission.id}`,
                 })
                 .catch((err) => {
                     console.error('[Contact Submit] email notify failed:', err instanceof Error ? err.message : String(err))

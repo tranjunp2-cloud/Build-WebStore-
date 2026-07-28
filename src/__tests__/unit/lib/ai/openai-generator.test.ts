@@ -345,6 +345,49 @@ import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
 
 describe('sanitizeBlockData - Normalize AI outputs', () => {
+    it('sanitizes announcement-bar padding before Payload persistence', () => {
+        expect(sanitizeBlockData({
+            blockType: 'announcement-bar',
+            message: 'Holiday delivery available',
+            paddingY: Number.NaN,
+        })).not.toHaveProperty('paddingY')
+
+        expect(sanitizeBlockData({
+            blockType: 'announcement-bar',
+            message: 'Holiday delivery available',
+            paddingY: '18',
+        }).paddingY).toBe(18)
+
+        expect(sanitizeBlockData({
+            blockType: 'announcement-bar',
+            message: 'Holiday delivery available',
+            paddingY: 100,
+        }).paddingY).toBe(32)
+    })
+
+    it('normalizes contact fields without fieldName while preserving localized copy', () => {
+        const input = {
+            blockType: 'contact',
+            formFields: [
+                { label: 'Name', type: 'text', placeholder: 'Ihr Name', required: true },
+                { label: 'E-Mail', type: 'email', placeholder: 'ihre@email.de', required: true },
+                { label: 'Telefon', type: 'tel', placeholder: '+49 30 12345678' },
+                { label: 'Betreff', type: 'text', placeholder: 'Worum geht es?' },
+                { label: 'Nachricht', type: 'textarea', placeholder: 'Ihre Nachricht' },
+            ],
+        }
+
+        const output = sanitizeBlockData(input, undefined, 'en', undefined, 'de')
+
+        expect(output.formFields).toEqual([
+            { fieldName: 'name', label: 'Name', fieldType: 'text', required: true, placeholder: 'Ihr Name' },
+            { fieldName: 'email', label: 'E-Mail', fieldType: 'email', required: true, placeholder: 'ihre@email.de' },
+            { fieldName: 'phone', label: 'Telefon', fieldType: 'phone', required: true, placeholder: '+49 30 12345678' },
+            { fieldName: 'subject', label: 'Betreff', fieldType: 'text', required: true, placeholder: 'Worum geht es?' },
+            { fieldName: 'message', label: 'Nachricht', fieldType: 'textarea', required: true, placeholder: 'Ihre Nachricht' },
+        ])
+    })
+
     it('TC-F01-PAS-11: adds the required secondary hero CTA in the structural locale', () => {
         // Arrange
         const input = {

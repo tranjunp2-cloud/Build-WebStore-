@@ -168,19 +168,71 @@ function normalizeContactLabels(
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
+        const usedFieldNames = new Set<string>()
+        const claimUniqueFieldName = (preferredName: string, index: number): string => {
+            if (!usedFieldNames.has(preferredName)) {
+                usedFieldNames.add(preferredName)
+                return preferredName
+            }
+
+            let fallbackName = `field-${index + 1}`
+            let suffix = index + 1
+            while (usedFieldNames.has(fallbackName)) {
+                suffix += 1
+                fallbackName = `field-${suffix}`
+            }
+            usedFieldNames.add(fallbackName)
+            return fallbackName
+        }
         const formFields = Array.isArray(block.formFields)
-            ? block.formFields.map((field: unknown) => {
+            ? block.formFields.map((field: unknown, index: number) => {
                 if (!field || typeof field !== 'object') return field
                 const record = field as Record<string, unknown>
-                const fieldName = String(record.fieldName ?? '').toLowerCase()
-                const label = fieldName.includes('email')
+                const suppliedFieldName = String(record.fieldName ?? '').trim()
+                const fieldName = suppliedFieldName.toLowerCase()
+                const fieldAlias = fieldName.replace(/[-_\s]/g, '')
+                const fieldType = String(record.fieldType ?? record.type ?? '').toLowerCase()
+                const isGenericName = !fieldName || /^field(?:[-_\s]*\d+)?$/.test(fieldName)
+                let semanticName = ['email', 'emailaddress'].includes(fieldAlias) || fieldType === 'email'
+                    ? 'email'
+                    : ['phone', 'phonenumber', 'telephone', 'tel'].includes(fieldAlias)
+                        || fieldType === 'phone'
+                        || fieldType === 'tel'
+                        ? 'phone'
+                        : ['message', 'yourmessage'].includes(fieldAlias) || fieldType === 'textarea'
+                            ? 'message'
+                            : ['name', 'fullname', 'contactname', 'yourname'].includes(fieldAlias)
+                                ? 'name'
+                                : ['subject', 'topic'].includes(fieldAlias)
+                                    ? 'subject'
+                                : null
+
+                if (!semanticName && isGenericName && fieldType === 'text') {
+                    semanticName = usedFieldNames.has('name') ? 'subject' : 'name'
+                }
+
+                if (!semanticName) {
+                    const preservedName = suppliedFieldName || `field-${index + 1}`
+                    return { ...record, fieldName: claimUniqueFieldName(preservedName, index) }
+                }
+
+                const uniqueSemanticName = claimUniqueFieldName(semanticName, index)
+                if (uniqueSemanticName !== semanticName) {
+                    return { ...record, fieldName: uniqueSemanticName }
+                }
+
+                if (semanticName === 'subject') {
+                    return { ...record, fieldName: semanticName }
+                }
+
+                const label = semanticName === 'email'
                     ? localized?.contact.emailLabel ?? i18n.contact.emailLabel
-                    : fieldName.includes('phone')
+                    : semanticName === 'phone'
                         ? localized?.contact.phoneLabel ?? i18n.contact.phoneLabel
-                        : fieldName.includes('message')
+                        : semanticName === 'message'
                             ? localized?.contact.messageLabel ?? i18n.contact.messageLabel
                             : localized?.contact.nameLabel ?? i18n.contact.nameLabel
-                return { ...record, label }
+                return { ...record, fieldName: semanticName, label }
             })
             : block.formFields
         return {

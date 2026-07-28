@@ -108,6 +108,34 @@ describe('[TC-F26-11-01] shared language detection', () => {
         expect(detectLanguageFromText(text).locale).toBe('it')
     })
 
+    it('does not let English industry labels override a long French business brief', () => {
+        const text = buildLanguageDetectionText({
+            businessName: 'Éclat Peau Studio',
+            industry: 'Beauty / Spa / Wellness',
+            shortDescription: 'Studio de soins de la peau à Paris proposant des traitements personnalisés pour une peau saine, lumineuse et équilibrée.',
+            products: 'Diagnostic de peau, soin hydratant, traitement anti-acné, soin pour peau sensible, thérapie éclaircissante et consultation skincare.',
+        })
+
+        expect(resolveGenerationLanguageDecision('auto', text)).toEqual({
+            locale: 'fr',
+            requiresConfirmation: true,
+        })
+    })
+
+    it('does not let Romance-language ambiguity fall back to English', () => {
+        const text = buildLanguageDetectionText({
+            businessName: 'Luce Pelle Beauty Studio',
+            industry: 'Beauty / Spa / Wellness',
+            shortDescription: 'Centro per la cura della pelle a Milano che offre trattamenti personalizzati per una pelle sana, luminosa ed equilibrata.',
+            products: 'Analisi della pelle, trattamento idratante, trattamento anti acne, cura della pelle sensibile, terapia illuminante e consulenza skincare.',
+        })
+
+        expect(resolveGenerationLanguageDecision('auto', text)).toEqual({
+            locale: 'it',
+            requiresConfirmation: true,
+        })
+    })
+
     it('normalizes pasted zero-width and non-breaking whitespace', () => {
         // Arrange / Act
         const text = buildLanguageDetectionText({ businessName: 'Ottimi\u200B\u00A0dolci', products: 'e birra' })
