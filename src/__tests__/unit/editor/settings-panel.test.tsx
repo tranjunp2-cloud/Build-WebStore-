@@ -65,6 +65,288 @@ describe('SettingsPanel', () => {
         expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
     })
 
+    it('[TC-F37-01-27] backfills MY when an address edit starts with whitespace-only legacy country', async () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn(() => false)
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Legacy Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Legacy Site',
+                        status: 'draft',
+                        localBusiness: {
+                            streetAddress: '12 Old Road',
+                            city: 'Kuala Lumpur',
+                            state: 'Kuala Lumpur',
+                            postcode: '50450',
+                            country: '   ',
+                        },
+                    }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+        const streetAddress = screen.getByTestId('settings-local-business-street-address')
+
+        // Act
+        fireEvent.blur(streetAddress, { target: { value: '34 New Road' } })
+
+        // Assert
+        await waitFor(() => {
+            expect(onSiteSettingsChange).toHaveBeenCalledWith({
+                localBusiness: expect.objectContaining({
+                    streetAddress: '34 New Road',
+                    country: 'MY',
+                }),
+            })
+        })
+    })
+
+    it('[TC-F37-01-26] restores the confirmed phone when a valid phone save fails', async () => {
+        // Arrange
+        let resolveSave: ((saved: boolean) => void) | undefined
+        const saveResult = new Promise<boolean>((resolve) => {
+            resolveSave = resolve
+        })
+        const onSiteSettingsChange = vi.fn(() => saveResult)
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Phone Test Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Phone Test Site',
+                        status: 'draft',
+                        contactInfo: { phone: '+60 12-111 1111' },
+                    }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+        const phoneInput = screen.getByTestId('settings-contact-phone')
+        const emailInput = screen.getByTestId('settings-contact-email')
+        const addressInput = screen.getByTestId('settings-contact-address')
+
+        // Act
+        fireEvent.change(phoneInput, { target: { value: '  +60 12-222 2222  ' } })
+        fireEvent.blur(phoneInput)
+
+        // Assert
+        await waitFor(() => {
+            expect(onSiteSettingsChange).toHaveBeenCalledTimes(1)
+            expect(phoneInput).toBeDisabled()
+            expect(emailInput).toBeDisabled()
+            expect(addressInput).toBeDisabled()
+        })
+        expect(onSiteSettingsChange).toHaveBeenCalledWith({
+            contactInfo: { phone: '+60 12-222 2222' },
+        })
+        fireEvent.blur(phoneInput)
+        fireEvent.blur(emailInput, { target: { value: 'queued@example.com' } })
+        fireEvent.blur(addressInput, { target: { value: 'Queued address' } })
+        expect(onSiteSettingsChange).toHaveBeenCalledTimes(1)
+        resolveSave?.(false)
+        await waitFor(() => {
+            expect(phoneInput).toHaveValue('+60 12-111 1111')
+            expect(phoneInput).not.toBeDisabled()
+            expect(emailInput).not.toBeDisabled()
+            expect(addressInput).not.toBeDisabled()
+        })
+    })
+
+    it.each([
+        {
+            field: 'email',
+            testId: 'settings-contact-email',
+            confirmedValue: 'confirmed@example.com',
+            failedValue: 'failed@example.com',
+        },
+        {
+            field: 'address',
+            testId: 'settings-contact-address',
+            confirmedValue: 'Confirmed address',
+            failedValue: 'Failed address',
+        },
+    ] as const)('[TC-F37-01-26] restores confirmed $field and sends only that field when its save fails', async ({
+        field,
+        testId,
+        confirmedValue,
+        failedValue,
+    }) => {
+        // Arrange
+        let resolveSave: ((saved: boolean) => void) | undefined
+        const saveResult = new Promise<boolean>((resolve) => {
+            resolveSave = resolve
+        })
+        const onSiteSettingsChange = vi.fn(() => saveResult)
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Contact Test Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Contact Test Site',
+                        status: 'draft',
+                        contactInfo: {
+                            phone: '+60 12\t345 6789',
+                            email: field === 'email' ? confirmedValue : 'confirmed@example.com',
+                            address: field === 'address' ? confirmedValue : 'Confirmed address',
+                        },
+                    }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+        const input = screen.getByTestId(testId)
+        const phoneInput = screen.getByTestId('settings-contact-phone')
+        const emailInput = screen.getByTestId('settings-contact-email')
+        const addressInput = screen.getByTestId('settings-contact-address')
+
+        // Act
+        fireEvent.change(input, { target: { value: failedValue } })
+        fireEvent.blur(input)
+
+        // Assert
+        await waitFor(() => {
+            expect(onSiteSettingsChange).toHaveBeenCalledTimes(1)
+            expect(phoneInput).toBeDisabled()
+            expect(emailInput).toBeDisabled()
+            expect(addressInput).toBeDisabled()
+        })
+        expect(onSiteSettingsChange).toHaveBeenCalledWith({
+            contactInfo: { [field]: failedValue },
+        })
+        resolveSave?.(false)
+        await waitFor(() => {
+            expect(input).toHaveValue(confirmedValue)
+            expect(phoneInput).not.toBeDisabled()
+            expect(emailInput).not.toBeDisabled()
+            expect(addressInput).not.toBeDisabled()
+        })
+    })
+
+    it('[TC-F37-01-26] canonicalizes the address before a successful save', async () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn(() => true)
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Address Test Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Address Test Site',
+                        status: 'draft',
+                        contactInfo: { address: 'Old address' },
+                    }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+        const addressInput = screen.getByTestId('settings-contact-address')
+
+        // Act
+        fireEvent.change(addressInput, { target: { value: '  <b>123 Main St</b>  ' } })
+        fireEvent.blur(addressInput)
+
+        // Assert
+        await waitFor(() => {
+            expect(onSiteSettingsChange).toHaveBeenCalledWith({
+                contactInfo: { address: '123 Main St' },
+            })
+        })
+        expect(addressInput).toHaveValue('123 Main St')
+    })
+
+    it('[TC-F37-01-26] canonicalizes the email before a successful save', async () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn(() => true)
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Email Test Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Email Test Site',
+                        status: 'draft',
+                        contactInfo: { email: 'old@example.com' },
+                    }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+        const emailInput = screen.getByTestId('settings-contact-email')
+
+        // Act
+        fireEvent.change(emailInput, { target: { value: '  <b>a@b.com</b>  ' } })
+        fireEvent.blur(emailInput)
+
+        // Assert
+        await waitFor(() => {
+            expect(onSiteSettingsChange).toHaveBeenCalledWith({
+                contactInfo: { email: 'a@b.com' },
+            })
+        })
+        expect(emailInput).toHaveValue('a@b.com')
+    })
+
+    it('[TC-F37-01-26] keeps contact fields locked when the panel remounts during a parent save', () => {
+        // Arrange
+        const panel = (
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Pending Contact Site"
+                    siteStatus="draft"
+                    site={{
+                        id: 'site-1',
+                        name: 'Pending Contact Site',
+                        status: 'draft',
+                        contactInfo: {
+                            phone: '+60 12-111 1111',
+                            email: 'confirmed@example.com',
+                            address: 'Confirmed address',
+                        },
+                    }}
+                    isContactSavePending
+                />
+            </I18nProvider>
+        )
+        const firstMount = render(panel)
+
+        // Act
+        firstMount.unmount()
+        render(panel)
+
+        // Assert
+        expect(screen.getByTestId('settings-contact-phone')).toBeDisabled()
+        expect(screen.getByTestId('settings-contact-email')).toBeDisabled()
+        expect(screen.getByTestId('settings-contact-address')).toBeDisabled()
+    })
+
     // ── Block info header ────────────────────────────────────────────────
 
     it('renders block name and index in header', () => {

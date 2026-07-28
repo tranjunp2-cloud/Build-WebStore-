@@ -5,6 +5,21 @@ import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
 
+type SettingsPanelHarnessProps = {
+    isContactSavePending?: boolean
+    site?: {
+        contactInfo?: { phone?: string; email?: string; address?: string }
+    } | null
+    onSiteSettingsChange?: (changes: {
+        name?: string
+        contactInfo?: { phone?: string; email?: string; address?: string }
+    }) => void | boolean | Promise<void | boolean>
+}
+
+const settingsPanelHarness = vi.hoisted(() => ({
+    latestProps: null as SettingsPanelHarnessProps | null,
+}))
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
     useParams: () => ({ siteId: 'test-site-id' }),
@@ -99,7 +114,12 @@ vi.mock('@/components/editor/EditorTemplateModal', () => ({
     EditorTemplateModal: () => null,
 }))
 vi.mock('@/components/editor/PageManagerPanel', () => ({ PageManagerPanel: () => <div /> }))
-vi.mock('@/components/editor/SettingsPanel', () => ({ SettingsPanel: () => <div /> }))
+vi.mock('@/components/editor/SettingsPanel', () => ({
+    SettingsPanel: (props: SettingsPanelHarnessProps) => {
+        settingsPanelHarness.latestProps = props
+        return <div data-testid="settings-panel-phone">{props.site?.contactInfo?.phone || ''}</div>
+    },
+}))
 vi.mock('@/components/editor/BlockLibraryPanel', () => ({ BlockLibraryPanel: () => <div /> }))
 vi.mock('@/components/editor/AIChatPanel', () => ({ AIChatPanel: () => <div /> }))
 vi.mock('@/components/editor/EditorMenuDrawer', () => ({ EditorMenuDrawer: () => <div /> }))
@@ -115,6 +135,7 @@ vi.mock('sonner', () => ({
 // We need to inject initial state into useEditorStore so handleSave has something to save
 beforeEach(() => {
     vi.clearAllMocks()
+    settingsPanelHarness.latestProps = null
     
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -168,6 +189,357 @@ beforeEach(() => {
 })
 
 describe('Publish and Save Flows (TC-F05)', () => {
+
+    it('[TC-F37-01-26] keeps failed phone changes out of parent state and later contact saves', async () => {
+        // Arrange
+        const confirmedPhone = '+60 12-111 1111'
+        const failedPhone = '+60 12-222 2222'
+        const saveBodies: Array<{ contactInfo?: { phone?: string; email?: string; address?: string } }> = []
+        let resolveFailedSave: ((response: {
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }) => void) | undefined
+        const failedSaveResponse = new Promise<{
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }>((resolve) => {
+            resolveFailedSave = resolve
+        })
+
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            contactInfo: { phone: confirmedPhone, email: 'old@example.com' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveBodies.push(JSON.parse(String(init?.body)))
+                if (saveBodies.length === 1) return failedSaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(confirmedPhone)
+        })
+
+        // Act
+        let failedSave: Promise<void | boolean> | undefined
+        act(() => {
+            failedSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { phone: failedPhone },
+            }))
+        })
+
+        // Assert
+        await waitFor(() => expect(saveBodies).toHaveLength(1))
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(confirmedPhone)
+
+        await act(async () => {
+            resolveFailedSave?.({
+                ok: false,
+                status: 500,
+                json: async () => ({ error: 'Phone save failed' }),
+            })
+            expect(await failedSave).toBe(false)
+        })
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(confirmedPhone)
+
+        await act(async () => {
+            const result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { email: 'new@example.com' },
+            })
+            expect(result).toBe(true)
+        })
+        expect(saveBodies[1]?.contactInfo).toEqual({
+            email: 'new@example.com',
+        })
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo).toEqual({
+            phone: confirmedPhone,
+            email: 'new@example.com',
+        })
+    })
+
+    it('[TC-F37-01-26] rolls back failed email before a later phone save', async () => {
+        // Arrange
+        const confirmedEmail = 'confirmed@example.com'
+        const failedEmail = 'failed@example.com'
+        const confirmedPhone = '+60 12-111 1111'
+        const nextPhone = '+60 12-222 2222'
+        const saveBodies: Array<{ contactInfo?: { phone?: string; email?: string; address?: string } }> = []
+
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            contactInfo: { phone: confirmedPhone, email: confirmedEmail },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveBodies.push(JSON.parse(String(init?.body)))
+                if (saveBodies.length === 1) {
+                    return Promise.resolve({
+                        ok: false,
+                        status: 500,
+                        json: async () => ({ error: 'Email save failed' }),
+                    })
+                }
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.contactInfo?.email).toBe(confirmedEmail)
+        })
+
+        // Act
+        await act(async () => {
+            const result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { email: failedEmail },
+            })
+            expect(result).toBe(false)
+        })
+
+        // Assert
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo?.email).toBe(confirmedEmail)
+        await act(async () => {
+            const result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { phone: nextPhone },
+            })
+            expect(result).toBe(true)
+        })
+        expect(saveBodies).toEqual([
+            { contactInfo: { email: failedEmail } },
+            { contactInfo: { phone: nextPhone } },
+        ])
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo).toEqual({
+            phone: nextPhone,
+            email: confirmedEmail,
+        })
+    })
+
+    it('[TC-F37-01-26] serializes contact saves across SettingsPanel rerenders', async () => {
+        // Arrange
+        const saveBodies: Array<{ contactInfo?: { phone?: string; email?: string; address?: string } }> = []
+        let resolveFirstSave: ((response: {
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }) => void) | undefined
+        const firstSaveResponse = new Promise<{
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }>((resolve) => {
+            resolveFirstSave = resolve
+        })
+
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            contactInfo: { phone: '+60 12-111 1111', email: 'old@example.com' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveBodies.push(JSON.parse(String(init?.body)))
+                if (saveBodies.length === 1) return firstSaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.contactInfo?.email).toBe('old@example.com')
+        })
+
+        // Act
+        let firstSave: Promise<void | boolean> | undefined
+        act(() => {
+            firstSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { email: 'first@example.com' },
+            }))
+        })
+        await waitFor(() => {
+            expect(saveBodies).toHaveLength(1)
+            expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(true)
+        })
+        const callbackAfterRerender = settingsPanelHarness.latestProps?.onSiteSettingsChange
+        let overlappingResult: void | boolean | undefined
+        await act(async () => {
+            overlappingResult = await callbackAfterRerender?.({
+                contactInfo: { phone: '+60 12-222 2222' },
+            })
+        })
+
+        // Assert
+        expect(overlappingResult).toBe(false)
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(true)
+        expect(saveBodies).toHaveLength(1)
+        await act(async () => {
+            resolveFirstSave?.({
+                ok: true,
+                json: async () => ({ success: true }),
+            })
+            expect(await firstSave).toBe(true)
+        })
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(false)
+        await act(async () => {
+            const result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { phone: '+60 12-222 2222' },
+            })
+            expect(result).toBe(true)
+        })
+        expect(saveBodies).toEqual([
+            { contactInfo: { email: 'first@example.com' } },
+            { contactInfo: { phone: '+60 12-222 2222' } },
+        ])
+    })
+
+    it('[TC-F37-01-26] rejects mixed contact patches before optimistic side effects', async () => {
+        // Arrange
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.onSiteSettingsChange).toBeTypeOf('function')
+        })
+        const saveRequestsBefore = vi.mocked(global.fetch).mock.calls.filter(([input]) => (
+            input.toString().includes('/save')
+        )).length
+
+        // Act
+        let result: void | boolean | undefined
+        await act(async () => {
+            result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                name: 'Must Not Apply',
+                contactInfo: { email: 'mixed@example.com' },
+            })
+        })
+
+        // Assert
+        expect(result).toBe(false)
+        expect(useEditorStore.getState().siteName).not.toBe('Must Not Apply')
+        const saveRequestsAfter = vi.mocked(global.fetch).mock.calls.filter(([input]) => (
+            input.toString().includes('/save')
+        )).length
+        expect(saveRequestsAfter).toBe(saveRequestsBefore)
+    })
+
+    it('[TC-F37-01-26] releases the contact mutex when fetch setup throws synchronously', async () => {
+        // Arrange
+        const saveBodies: Array<{ contactInfo?: { phone?: string; email?: string; address?: string } }> = []
+        let saveAttempts = 0
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            contactInfo: { email: 'old@example.com' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveAttempts += 1
+                if (saveAttempts === 1) throw new Error('Synchronous fetch setup failed')
+                saveBodies.push(JSON.parse(String(init?.body)))
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.contactInfo?.email).toBe('old@example.com')
+        })
+
+        // Act
+        let failedResult: void | boolean | undefined
+        await act(async () => {
+            failedResult = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { email: 'first@example.com' },
+            })
+        })
+        let retryResult: void | boolean | undefined
+        await act(async () => {
+            retryResult = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { email: 'second@example.com' },
+            })
+        })
+
+        // Assert
+        expect(failedResult).toBe(false)
+        expect(retryResult).toBe(true)
+        expect(saveBodies).toEqual([
+            { contactInfo: { email: 'second@example.com' } },
+        ])
+    })
 
     it('TC-F05.24 & TC-F05.25: HTTP Emit Publish Check and Unpublish Maintenance Mode', async () => {
         render(<EditorPage />)
