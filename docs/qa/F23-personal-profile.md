@@ -1,6 +1,6 @@
 # Test Cases — F23 Personal Profile (Team & Account)
 
-> **Status:** Automated (unit) — backfilled 2026-07-14; tests existed before this doc
+> **Status:** Automated (unit + Playwright) — browser regression added for GH-1614 review findings
 > **Screen:** Settings → Team & Account (`src/app/(dashboard)/settings/profile/`)
 > **Refs:** PRD `docs/prd/F23-personal-profile.md` · Stories `docs/stories/F23-personal-profile-stories.md` (US-F23-01..04) · GH #1604
 > ⚠️ **Số F23 bị trùng** với `F23-custom-subdomain-slug` (feature khác, PRD/QA riêng). TC-ID của doc này luôn có ngữ cảnh profile.
@@ -26,7 +26,7 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 |-------|------|-------------|------|
 | TC-F23-02-01 ♻ | `general-info-tab.test.tsx` | Staff thấy inputs editable; inline action bar chỉ hiện khi dirty (Cancel resets) | ✓ |
 | TC-F23-02-01 ♻ | `api-users-me.test.ts` | PATCH — unauthorized khi chưa login | ✓ |
-| TC-F23-02-02 ♻ | `general-info-tab.test.tsx` | Email luôn readonly | ✓ |
+| TC-F23-02-02 ♻ | `general-info-tab.test.tsx` + `tests/f23-profile-regression.spec.ts` | Email luôn readonly; browser xác nhận icon lock không bị clip trên desktop/mobile | ✓ |
 | TC-F23-02-02 ♻ | `api-users-me.test.ts` | PATCH — forbidden với owner (SSO managed) | ✓ |
 | TC-F23-02-03 ♻ | `general-info-tab.test.tsx` | Submit hợp lệ → onUserUpdate + success toast | ✓ |
 | TC-F23-02-03 ♻ | `api-users-me.test.ts` | PATCH — bad request khi phone sai | ✓ |
@@ -46,7 +46,7 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | **TC-F23-03-01** | `owner-profile-view.test.tsx` | 0 `<input>`/`<textarea>` trong DOM — hoàn toàn read-only | ✓ |
 | **TC-F23-03-02** | `owner-profile-view.test.tsx` | Đúng 1 SSO CTA `target="_blank"`, href = `ssoUrl` prop | ✓ |
 | **TC-F23-03-03** | `owner-profile-view.test.tsx` | `ssoUrl=""` → CTA disabled-look span + `urlMissing` text, không phải `<a>` | ✓ |
-| **TC-F23-03-04** | `owner-profile-view.test.tsx` | Không hiển thị nhãn/status 2FA khi SSO chưa cung cấp trạng thái xác thực | ✓ |
+| **TC-F23-03-04** | `owner-profile-view.test.tsx` + `tests/f23-profile-regression.spec.ts` | Không hiển thị nhãn/status 2FA khi SSO chưa cung cấp trạng thái xác thực, trên desktop/mobile | ✓ |
 | **TC-F23-03-05** | `owner-profile-view.test.tsx` | Password hiển thị dạng dots (masked), email/phone hiển thị đúng giá trị | ✓ |
 | ~~TC-F23-03-02..05~~ | ~~`sso-guard-box.test.tsx`~~ | Xoá cùng component ở P5 (`SsoGuardBox` không còn importer) | — |
 
@@ -76,6 +76,8 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | TC-ID | File | Description | AUTO |
 |-------|------|-------------|------|
 | TC-F23-05-01..09 | `role-guard.test.ts` | Owner detection qua tenant role (incl. GH-905 regression), 403 owner, null staff | ✓ |
+| **TC-F23-05-10** | `e2e-profile-bypass.test.ts` + `e2e-ensure-test-user.test.ts` | E2E Profile chỉ cho phép Owner/Staff identity chuyên dụng; Staff fixture không mang Owner role | ✓ |
+| **TC-F23-05-11** | `e2e-ensure-test-user.test.ts` | E2E provisioning từ chối identity fields sai kiểu trước khi gọi Payload | ✓ |
 
 ---
 
