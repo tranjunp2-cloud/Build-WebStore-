@@ -14,13 +14,12 @@
 - Priority: P1
 - Effort: 4h
 - Implementation status: Completed
-- Review status: Approved — code/spec/docs 9.7/10; fresh browser verification pending
+- Review status: Completed — final PR re-review found no issues
 - Goal: add deterministic real-browser coverage for the exact 375–430px regression and register
   its TC IDs.
 
-Phase 01 implementation and non-browser validation are complete. This phase supplied historical
-real-browser responsive evidence and current QA registry coverage; the strengthened TC-94 oracle
-still requires a fresh authenticated browser run.
+Phase 01 implementation and QA registry coverage are complete. The strengthened responsive oracles
+passed a fresh authenticated Chromium run on 2026-07-28.
 
 ## Key Insights
 
@@ -73,7 +72,8 @@ outside this issue's change scope.
 - `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/qa/F08-product-crud.md`
   — add GH-1663 responsive TC rows marked AUTO.
 - `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/.github/workflows/e2e-staging.yml`
-  — include the GH-1663 spec in the existing explicit E2E filename allow-list.
+  — include the GH-1663 spec in the explicit allow-list and trigger it when
+  `BulkCreateModal.tsx` changes.
 
 ### Create
 
@@ -92,7 +92,7 @@ outside this issue's change scope.
    - `TC-F08-04-95`: 430px layout with visible, wrapping read-only variants.
    - `TC-F08-04-96`: short-height reachability plus Name/Price/Stock edit and remove regression.
 2. Create the spec under `e2e/` with top-level fixtures/helpers and AAA sections.
-3. Add its filename to the staging workflow's existing E2E allow-list.
+3. Add its filename and the affected source component to the staging workflow trigger/allow-list.
 4. Run `npx playwright test --list`; confirm the spec maps to authenticated Chromium.
 5. Reuse the existing `/products` entry flow and accessible selectors from `e2e/products.spec.ts`.
    Route-fulfill only `/api/ai/products-bulk-parse` with at least two products:
@@ -117,30 +117,26 @@ outside this issue's change scope.
 - [x] Candidate IDs checked repo-wide and against history; TC-F08-04-94..96 reserved without collision
 - [x] Existing e2e-only Playwright discovery remains unchanged
 - [x] GH-1663 Chromium project assignment verified with `--list`
-- [x] Staging E2E workflow explicitly selects `gh-1663-ai-drafts-mobile.spec.ts`
-- [x] Workflow-equivalent discovery selects 41 tests across 12 files, including TC-F08-04-94..96
+- [x] Staging E2E explicitly selects the GH-1663 spec and triggers when `BulkCreateModal.tsx` changes
+- [x] Workflow-equivalent discovery selects 43 tests across 13 files, including TC-F08-04-94..96
 - [x] Deterministic mobile E2E created
-- [x] 375×812 and 430×932 passed before the latest TC-F08-04-94 oracle strengthening
-- [x] 375×568 short-height passed before the latest TC-F08-04-94 oracle strengthening, including full control containment, Name/Price/Stock and draft-count
-  retention after Cancel → Stay, then panel/dialog unmount plus body-overflow restoration after
-  Discard → Exit; Approve All is not invoked and zero POST server-action requests are observed
-- [ ] Fresh TC-F08-04-94..96 browser rerun with working local auth
+- [x] Fresh 375×812 and 430×932 usable-width, containment, wrapping, and desktop-order checks pass
+- [x] Fresh 375×568 short-height flow passes, including edit retention, remove, Stay, Exit,
+  panel/dialog unmount, body-overflow restoration, and zero observed server-action POSTs
+- [x] Fresh authenticated TC-F08-04-94..96 browser rerun passes (setup + cases: 4/4)
 - [x] Existing BulkCreateModal unit tests pass (56/56)
 - [x] TypeScript and `git diff --check` pass
-- [ ] PR description uses `Relates to #1663` and discloses the intentional read-only variant
-  decision against the issue AC's literal editability wording (required when the PR is opened)
+- [x] PR #1710 uses `Relates to #1663` and discloses the intentional read-only variant decision
+- [x] Issue comment records the defined contract: Product Name editable; Variants visible/read-only
+  ([clarification](https://github.com/primeproduction/ech-prime-web-v2/issues/1663#issuecomment-5102689051))
 
 ## Completion Evidence
 
-- Before the latest TC-F08-04-94 oracle strengthening, the GH-1663 browser regression passed 3/3,
-  including the expanded TC-F08-04-96 Cancel → Stay and Discard → Exit flow.
-- A fresh TC-F08-04-94..96 browser rerun is pending because the unchanged local auth setup rejects
-  the currently configured test credentials before the GH tests start; no auth change is included
-  in this issue.
-- Staging E2E workflow explicitly selects `gh-1663-ai-drafts-mobile.spec.ts`; its existing
-  `e2e/**` path filter already covers the file.
-- Workflow-equivalent discovery reports 41 tests across 12 files and includes
-  TC-F08-04-94..96.
+- Fresh authenticated Chromium run: setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28.
+- Strengthened oracles cover usable mobile widths and complete desktop horizontal geometry.
+- Staging E2E explicitly selects the GH-1663 spec and triggers for its E2E file or
+  `src/components/dashboard/BulkCreateModal.tsx`.
+- Workflow-equivalent discovery reports 43 tests across 13 files, including TC-F08-04-94..96.
 - Targeted BulkCreateModal unit suites: 56/56 passed.
 - TypeScript, `git diff --check`, and Playwright discovery passed.
 - No responsive screenshots were retained. Geometry, overflow, wrapping, editing, removal, and
@@ -159,8 +155,8 @@ npm run typecheck
 ## Success Criteria
 
 - New spec appears in `--list` and passes in Chromium.
-- Staging CI triggers when the e2e GH-1663 spec changes, explicitly selects that spec, and its
-  workflow-equivalent discovery includes TC-F08-04-94..96.
+- Staging CI triggers when the GH-1663 spec or `BulkCreateModal.tsx` changes, explicitly selects
+  that spec, and its workflow-equivalent discovery includes TC-F08-04-94..96.
 - No horizontal overflow or input overlap at required viewports.
 - Variant information is visible; Name/Price/Stock editing and remove still work.
 - Header Cancel, footer Discard, and Approve All are fully contained and reachable with a short
@@ -175,7 +171,7 @@ npm run typecheck
 
 | Risk | Level | Mitigation |
 |---|---|---|
-| Spec is omitted from the staging allow-list | High | Explicitly select the GH-1663 filename and audit `--list` |
+| Regression is omitted from staging E2E | High | Trigger on the spec/component, select the filename, and audit `--list` |
 | AI/network flakiness | High | Route-fulfill bulk-parse only; keep real browser/component flow |
 | Pixel assertions become brittle | Medium | Assert bounds/overlap/overflow, not screenshots alone |
 | E2E invokes a product-saving server action | Medium | Never click Approve All and assert zero POST requests to Next.js server actions |
@@ -189,6 +185,5 @@ npm run typecheck
 
 ## Next Steps
 
-Open one P1 bugfix PR to `staging` with `Relates to #1663`. The PR description must disclose that
-variants are visible and wrapping but intentionally read-only, which differs from the issue AC's
-literal editability wording.
+Commit and push the verified fixes to existing PR #1710. Preserve `Relates to #1663`, the read-only
+Variants disclosure, and the linked issue clarification.

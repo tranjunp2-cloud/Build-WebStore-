@@ -1,5 +1,5 @@
 # E2E Tests on Staging — runs after staging push
-# Triggers: push to staging (when E2E files change), or manual dispatch
+# Triggers: push to staging (when relevant E2E or BulkCreateModal files change), or manual dispatch
 #
 # Note: workflow_dispatch and workflow_run require file on default branch (main).
 # Until this workflow lands on main, we trigger via `push` on staging.
@@ -13,6 +13,7 @@ on:
     paths:
       - 'e2e/**'
       - 'tests/**'
+      - 'src/components/dashboard/BulkCreateModal.tsx'
       - 'playwright.config.ts'
       - '.github/workflows/e2e-staging.yml'
   workflow_dispatch:

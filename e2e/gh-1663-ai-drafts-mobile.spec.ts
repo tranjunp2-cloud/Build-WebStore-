@@ -114,11 +114,12 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         const card = draftCardFor(nameInput)
 
         // Act
-        const [nameBox, priceBox, stockBox, removeBox] = await Promise.all([
+        const [nameBox, priceBox, stockBox, removeBox, cardBox] = await Promise.all([
             nameInput.boundingBox(),
             priceInput.boundingBox(),
             stockInput.boundingBox(),
             removeButton.boundingBox(),
+            card.boundingBox(),
         ])
 
         // Assert
@@ -126,8 +127,14 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         expect(priceBox).not.toBeNull()
         expect(stockBox).not.toBeNull()
         expect(removeBox).not.toBeNull()
-        if (!nameBox || !priceBox || !stockBox || !removeBox) return
+        expect(cardBox).not.toBeNull()
+        if (!nameBox || !priceBox || !stockBox || !removeBox || !cardBox) return
 
+        expect(nameBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.6)
+        expect(priceBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.25)
+        expect(stockBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.25)
+        expect(Math.abs(nameBox.x - priceBox.x)).toBeLessThanOrEqual(1)
+        expect(Math.abs(nameBox.x + nameBox.width - (stockBox.x + stockBox.width))).toBeLessThanOrEqual(1)
         expect(nameBox.width).toBeGreaterThan(priceBox.width * 1.8)
         expect(Math.abs(priceBox.width - stockBox.width)).toBeLessThanOrEqual(2)
         expect(Math.abs(priceBox.y - stockBox.y)).toBeLessThanOrEqual(2)
@@ -141,6 +148,10 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         await expectNoIntersection(priceInput, stockInput)
         await expectNoIntersection(priceInput, removeButton)
         await expectNoIntersection(stockInput, removeButton)
+        await expectFullyContained(nameInput, card)
+        await expectFullyContained(priceInput, card)
+        await expectFullyContained(stockInput, card)
+        await expectFullyContained(removeButton, card)
         await expectNoHorizontalOverflow(card)
         await expectNoHorizontalOverflow(panel)
         expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden')
@@ -169,11 +180,12 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         await page.setViewportSize({ width: 768, height: 932 })
         const priceInput = page.getByLabel('Price (RM)').first()
         const stockInput = page.getByLabel('Stock').first()
-        const [desktopNameBox, desktopPriceBox, desktopStockBox, desktopVariantBox] = await Promise.all([
+        const [desktopNameBox, desktopPriceBox, desktopStockBox, desktopVariantBox, desktopCardBox] = await Promise.all([
             nameInput.boundingBox(),
             priceInput.boundingBox(),
             stockInput.boundingBox(),
             variantsField.boundingBox(),
+            card.boundingBox(),
         ])
 
         // Assert — desktop controls return to one aligned field row.
@@ -181,10 +193,28 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         expect(desktopPriceBox).not.toBeNull()
         expect(desktopStockBox).not.toBeNull()
         expect(desktopVariantBox).not.toBeNull()
-        if (!desktopNameBox || !desktopPriceBox || !desktopStockBox || !desktopVariantBox) return
+        expect(desktopCardBox).not.toBeNull()
+        if (!desktopNameBox || !desktopPriceBox || !desktopStockBox || !desktopVariantBox || !desktopCardBox) return
+        expect(desktopNameBox.width).toBeGreaterThanOrEqual(desktopCardBox.width * 0.2)
+        expect(desktopPriceBox.width).toBeGreaterThanOrEqual(96)
+        expect(desktopStockBox.width).toBeGreaterThanOrEqual(68)
+        expect(desktopVariantBox.width).toBeGreaterThanOrEqual(106)
         expect(Math.abs(desktopNameBox.y - desktopPriceBox.y)).toBeLessThanOrEqual(2)
         expect(Math.abs(desktopPriceBox.y - desktopStockBox.y)).toBeLessThanOrEqual(2)
         expect(Math.abs(desktopStockBox.y - desktopVariantBox.y)).toBeLessThanOrEqual(2)
+        expect(desktopNameBox.x + desktopNameBox.width).toBeLessThanOrEqual(desktopPriceBox.x + 1)
+        expect(desktopPriceBox.x + desktopPriceBox.width).toBeLessThanOrEqual(desktopStockBox.x + 1)
+        expect(desktopStockBox.x + desktopStockBox.width).toBeLessThanOrEqual(desktopVariantBox.x + 1)
+        await expectNoIntersection(nameInput, priceInput)
+        await expectNoIntersection(nameInput, stockInput)
+        await expectNoIntersection(nameInput, variantsField)
+        await expectNoIntersection(priceInput, stockInput)
+        await expectNoIntersection(priceInput, variantsField)
+        await expectNoIntersection(stockInput, variantsField)
+        await expectFullyContained(nameInput, card)
+        await expectFullyContained(priceInput, card)
+        await expectFullyContained(stockInput, card)
+        await expectFullyContained(variantsField, card)
         await expectNoHorizontalOverflow(card)
         await expectNoHorizontalOverflow(panel)
     })

@@ -1,7 +1,7 @@
 ---
 date: 2026-07-27
 session: gh-1663-mobile-layout-plan
-status: verification_pending
+status: completed
 ---
 
 # Journal: 2026-07-27 — GH-1663 Mobile Layout Plan
@@ -9,9 +9,9 @@ status: verification_pending
 ## Context
 
 Issue #1663 addresses AI product draft cards breaking at mobile widths because the desktop
-review-row layout compresses the product name and hides variants. Implementation is complete, but
-fresh browser verification of the latest TC-F08-04-94 oracle and final approval remain pending; no
-commit or PR has been created yet.
+review-row layout compresses the product name and hides variants. Implementation and fresh browser
+verification are complete on branch `fix/f08-1663-ai-drafts-mobile-layout`; PR #1710 is open and
+final re-review found no issues.
 
 ## What Happened
 
@@ -35,8 +35,8 @@ commit or PR has been created yet.
   in TC-F08-04-96. The workflow now selects `gh-1663-ai-drafts-mobile.spec.ts`; TC-F08-04-96 now
   verifies full containment of the panel and controls, Cancel → Stay state retention, and
   Discard → Exit modal closure.
-- Prevention evidence: the workflow-equivalent suite increased from 38 tests/11 files to 41
-  tests/12 files and includes TC-F08-04-94 through TC-F08-04-96. GH-1663 browser tests pass 3/3,
+- Prevention evidence: the current workflow-equivalent suite selects 43 tests/13 files and includes
+  TC-F08-04-94 through TC-F08-04-96. GH-1663 browser tests pass 3/3,
   targeted unit tests pass 56/56, and TypeScript
   typecheck plus `git diff --check` pass.
 - Generated auth state and test/report artifacts were cleaned after verification. The test
@@ -76,14 +76,24 @@ commit or PR has been created yet.
   94 through 96 have no committed historical owner.
 - TC-F08-04-94 now requires Price and Stock to share a row, Name to finish above both controls,
   and all six pairs among Name, Price, Stock, and Remove to have zero intersection.
-- Parent-plan and journal status remain `verification_pending`. All historical browser `3/3`
-  evidence is explicitly qualified as predating the strengthened TC-F08-04-94 oracle.
-- Fresh non-browser verification passed: TypeScript, 56/56 targeted unit tests, lint with only
-  pre-existing warnings, production build with 113/113 pages, `git diff --check`, targeted
-  Playwright discovery, and exact staging-workflow discovery with 41 tests across 12 files.
-- Final holistic review approved code/spec/docs at 9.7/10; adversarial and documentation reviews
-  returned no actionable findings. Fresh TC-F08-04-94 through TC-F08-04-96 browser execution is
-  still pending because the unchanged local auth setup rejects the configured test credentials.
+- At that point, browser evidence still predated the TC-F08-04-94 strengthening.
+- Non-browser verification passed TypeScript, 56/56 targeted unit tests, lint, build, diff check,
+  and Playwright discovery; a subsequent PR review reopened the browser and oracle gates.
+
+## Fourth Review Fix Cycle
+
+- PR #1710 review found a source-trigger gap, weak TC-F08-04-94/95 geometry oracles, stale evidence,
+  and a formal wording mismatch between the issue AC and the defined read-only Variants contract.
+- Staging E2E now triggers for `BulkCreateModal.tsx` as well as the regression spec.
+- TC-F08-04-94 now requires usable card-relative Name/Price/Stock widths and full containment.
+- TC-F08-04-95 now requires desktop left-to-right order, all pairwise non-intersections, and full
+  containment for Name, Price, Stock, and Variants.
+- Fresh authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28 using the
+  designated dev test account; credentials were not added to source.
+- Workflow-equivalent discovery selects 43 tests across 13 files.
+- Issue comment #5102689051 records the original contract: Product Name is editable; Variants is
+  visible, wrapping, and read-only. PR #1710 already discloses this scope.
+- Final verification passed and the last fix-diff re-review returned no findings.
 
 ## Reflection
 
@@ -100,7 +110,5 @@ proof.
 
 ## Next
 
-- Refresh the local Playwright test credentials, then require a fresh 3/3 pass for
-  TC-F08-04-94 through TC-F08-04-96 before marking the work PR-ready.
-- After that gate passes, create the conventional commit and PR to `staging`; record
-  `Relates to #1663` and preserve the approved read-only variant scope in the PR description.
+- Commit and push the verified fixes to existing PR #1710 while preserving `Relates to #1663`,
+  the read-only Variants disclosure, and the linked issue clarification.

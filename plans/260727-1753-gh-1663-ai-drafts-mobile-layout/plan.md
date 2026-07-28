@@ -1,7 +1,7 @@
 ---
 title: "GH-1663 — Responsive Review AI Drafts modal"
 description: "Fix the mobile AI-draft review cards so product names and variants remain readable without changing bulk-create business behavior."
-status: verification_pending
+status: completed
 priority: P1
 effort: 6h
 issue: 1663
@@ -30,8 +30,10 @@ the current local `staging` base before any source changes.
   and the issue's layout-only Suggested Technical Fix.
 - Inline variant editing is explicitly rejected for GH-1663; it is neither an implementation
   requirement nor a deferred TODO from this plan.
-- The PR description must explicitly disclose that this read-only decision differs from the
-  issue AC's literal variant-editability wording.
+- PR #1710 discloses that this read-only decision differs from the issue AC's literal
+  variant-editability wording.
+- The issue clarification records the intended contract: Product Name is editable; Variants is
+  visible, wrapping, and read-only.
 - No API, schema, migration, environment variable, category mapping, or save-flow change.
 
 ## Acceptance Mapping
@@ -57,11 +59,10 @@ No logical blocker in either direction; `blockedBy` and `blocks` stay empty.
 | Phase | Name | Status |
 |---|---|---|
 | 1 | [Implement responsive draft-card layout](./phase-01-responsive-draft-card-layout.md) | Completed |
-| 2 | [Add browser regression coverage and QA registry](./phase-02-e2e-regression-and-qa.md) | Verification pending |
+| 2 | [Add browser regression coverage and QA registry](./phase-02-e2e-regression-and-qa.md) | Completed |
 
-Both phases are implemented. The browser regression passed all three GH-1663 cases before the
-latest TC-F08-04-94 oracle strengthening; a fresh browser run and final approval remain pending
-because the unchanged local auth setup rejects the currently configured test credentials.
+Both phases are implemented. On 2026-07-28, authenticated Chromium setup plus all three strengthened
+GH-1663 cases passed 4/4 using the designated dev test account. Final PR re-review found no issues.
 
 ## Dependencies
 

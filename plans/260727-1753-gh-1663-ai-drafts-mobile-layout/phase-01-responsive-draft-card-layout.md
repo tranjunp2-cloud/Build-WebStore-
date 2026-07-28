@@ -14,7 +14,7 @@
 - Priority: P1
 - Effort: 2h
 - Implementation status: Completed
-- Review status: Approved — implementation review 9.7/10, 0 critical findings
+- Review status: Completed — final PR re-review found no issues
 - Goal: replace the compressed mobile row with a single-DOM responsive field grid while
   preserving all data and desktop behavior.
 
@@ -118,10 +118,9 @@ track. The regression is caused by the fixed siblings in the current horizontal 
   behavior is unchanged.
 - Targeted validation passed: 56/56 Vitest tests, `npm run typecheck`, and `git diff --check`.
 - Focused implementation review approved the change at 9.7/10 with no critical findings.
-- Before the latest TC-F08-04-94 oracle strengthening, Phase 02 browser coverage passed 3/3
-  GH-1663 cases, including 375px/430px mobile geometry, 375×568 reachability, and the responsive
-  `md` row at 768px. A fresh browser run remains pending because unchanged local auth rejects the
-  configured test credentials. No comparison screenshot was retained.
+- On 2026-07-28, authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 with the strengthened
+  usable-width, containment, horizontal-order, and non-intersection assertions. No comparison
+  screenshot was retained.
 
 ## Success Criteria
 
