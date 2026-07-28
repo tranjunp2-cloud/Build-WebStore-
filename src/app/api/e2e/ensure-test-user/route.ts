@@ -3,11 +3,18 @@
  *
  * POST /api/e2e/ensure-test-user
  *   headers: Authorization: Bearer {E2E_SETUP_SECRET}
- *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string }
+ *   body: {
+ *     email: string,
+ *     password: string,
+ *     tenantSlug?: `e2e-${string}`,
+ *     tenantName?: string,
+ *     role?: 'owner' | 'staff'
+ *   }
  *
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
- * - If not: creates with tenant-owner role + active E2E tenant
+ * - Owner is the default for backward compatibility
+ * - Staff uses a deterministic alias of TEST_EMAIL with an active editor membership
  *
  * Guarded by E2E_SETUP_SECRET env var. Disabled if secret not set.
  * NEVER enable this in production — staging only.
@@ -15,11 +22,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { deriveE2EProfileStaffEmail } from '@/lib/otp/e2e-profile-bypass'
 
 export const dynamic = 'force-dynamic'
 
 const E2E_TENANT_NAME = 'E2E Test Workspace'
 const E2E_TENANT_SLUG = 'e2e-test'
+type E2EProfileRole = 'owner' | 'staff'
+
+type TenantLink = {
+    tenant: unknown
+    role?: string
+    status?: string
+    permissions?: unknown[]
+}
+
+function getTenantId(link: TenantLink): unknown {
+    return typeof link.tenant === 'object' && link.tenant !== null
+        ? (link.tenant as { id?: unknown }).id
+        : link.tenant
+}
 
 export async function POST(req: NextRequest) {
     // Guard 1: endpoint must be explicitly enabled via env var
@@ -47,26 +69,78 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse body
-    let body: { email?: string; password?: string; tenantSlug?: string; tenantName?: string }
+    let body: Record<string, unknown>
     try {
-        body = await req.json()
+        const parsedBody: unknown = await req.json()
+        if (
+            typeof parsedBody !== 'object'
+            || parsedBody === null
+            || Array.isArray(parsedBody)
+        ) {
+            return NextResponse.json({ error: 'JSON body must be an object' }, { status: 400 })
+        }
+        body = parsedBody as Record<string, unknown>
     } catch {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    const { email, password } = body
-    if (!email || !password) {
+    const requestedEmail = body.email
+    const password = body.password
+    if (
+        typeof requestedEmail !== 'string'
+        || typeof password !== 'string'
+        || !requestedEmail.trim()
+        || !password
+    ) {
         return NextResponse.json(
-            { error: 'email and password are required' },
+            { error: 'email and password must be non-empty strings' },
             { status: 400 },
         )
     }
 
-    if (password.length < 8) {
+    if (password.length < 8 || password.length > 128) {
         return NextResponse.json(
-            { error: 'password must be at least 8 characters' },
+            { error: 'password must be between 8 and 128 characters' },
             { status: 400 },
         )
+    }
+
+    const role = body.role ?? 'owner'
+    if (role !== 'owner' && role !== 'staff') {
+        return NextResponse.json(
+            { error: 'role must be owner or staff' },
+            { status: 400 },
+        )
+    }
+    const profileRole: E2EProfileRole = role
+
+    let email = requestedEmail.trim().toLowerCase()
+    if (
+        email.length > 254
+        || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+    ) {
+        return NextResponse.json({ error: 'email must be valid' }, { status: 400 })
+    }
+
+    if (profileRole === 'staff') {
+        try {
+            email = deriveE2EProfileStaffEmail(email)
+        } catch (error: unknown) {
+            return NextResponse.json(
+                { error: error instanceof Error ? error.message : 'Invalid email' },
+                { status: 400 },
+            )
+        }
+    }
+
+    const membershipRole = profileRole === 'owner' ? 'owner' : 'editor'
+    const platformRole = profileRole === 'owner' ? 'tenant-owner' : 'editor'
+
+    if (body.tenantSlug !== undefined && typeof body.tenantSlug !== 'string') {
+        return NextResponse.json({ error: 'tenantSlug must be a string' }, { status: 400 })
+    }
+    if (body.tenantName !== undefined && typeof body.tenantName !== 'string') {
+        return NextResponse.json({ error: 'tenantName must be a string' }, { status: 400 })
     }
 
     const requestedTenantSlug = body.tenantSlug?.trim().toLowerCase()
@@ -153,20 +227,19 @@ export async function POST(req: NextRequest) {
         })
 
         if (usersResult.docs.length > 0) {
-            // User exists — sync password and ensure tenant association
+            // User exists — sync password and ensure deterministic role/tenant association.
             const existingUser = usersResult.docs[0]
-            const existingTenantLink = (existingUser.tenants || []).find((t: { tenant: unknown }) => {
-                const tid = typeof t.tenant === 'object' && t.tenant !== null
-                    ? (t.tenant as { id: string | number }).id
-                    : t.tenant
-                return tid === tenantId
-            })
-
-            const tenantsUpdate = existingTenantLink
-                ? existingUser.tenants // keep as-is
+            const existingTenants = (existingUser.tenants || []) as TenantLink[]
+            const hasTenantLink = existingTenants.some((link) => getTenantId(link) === tenantId)
+            const tenantsUpdate = hasTenantLink
+                ? existingTenants.map((link) => (
+                    getTenantId(link) === tenantId
+                        ? { ...link, role: membershipRole, status: 'active', permissions: link.permissions ?? [] }
+                        : link
+                ))
                 : [
-                    ...(existingUser.tenants || []),
-                    { tenant: tenantId, role: 'owner' as const, status: 'active' as const, permissions: [] },
+                    ...existingTenants,
+                    { tenant: tenantId, role: membershipRole, status: 'active', permissions: [] },
                 ]
 
             await payload.update({
@@ -176,9 +249,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     password,
                     tenants: tenantsUpdate,
-                    roles: existingUser.roles?.includes('tenant-owner')
-                        ? existingUser.roles
-                        : [...(existingUser.roles || []), 'tenant-owner'],
+                    roles: [platformRole],
                 },
             })
 
@@ -186,7 +257,9 @@ export async function POST(req: NextRequest) {
                 status: 'updated',
                 userId: existingUser.id,
                 tenantId,
-                action: 'password synced + tenant ensured',
+                email,
+                role: profileRole,
+                action: 'password + profile role + tenant synced',
             })
         }
 
@@ -198,12 +271,12 @@ export async function POST(req: NextRequest) {
                 email,
                 password,
                 firstName: 'E2E',
-                lastName: 'Bot',
-                roles: ['tenant-owner'],
+                lastName: profileRole === 'owner' ? 'Owner' : 'Staff',
+                roles: [platformRole],
                 tenants: [
                     {
                         tenant: tenantId,
-                        role: 'owner',
+                        role: membershipRole,
                         status: 'active',
                         permissions: [],
                     },
@@ -215,6 +288,8 @@ export async function POST(req: NextRequest) {
             status: 'created',
             userId: newUser.id,
             tenantId,
+            email,
+            role: profileRole,
         })
     } catch (error: unknown) {
         console.error('[E2E Setup] Error:', error)

@@ -40,7 +40,10 @@ export function OwnerProfileView({ user, ssoUrl }: Props) {
     const initial = getInitial(user.firstName, user.email)
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-stretch">
+        <div
+            data-testid="owner-profile-view"
+            className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-stretch"
+        >
             {/* Profile Card (2fr) — read-only identity + info grid */}
             <div className="bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-2xl p-6 flex flex-col gap-6">
                 {/* Identity row */}

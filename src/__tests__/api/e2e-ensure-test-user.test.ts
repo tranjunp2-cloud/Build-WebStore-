@@ -55,4 +55,78 @@ describe('POST /api/e2e/ensure-test-user', () => {
             }),
         }))
     })
+
+    it('[TC-F23-05-10] provisions a dedicated active Staff identity without Owner roles', async () => {
+        // Arrange
+        const payload = {
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 42 }] }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 77 }] }
+                if (collection === 'users') return { docs: [] }
+                return { docs: [] }
+            }),
+            create: vi.fn().mockImplementation(async ({ collection, data }: { collection: string; data: Record<string, unknown> }) => ({
+                id: collection === 'users' ? 84 : 21,
+                ...data,
+            })),
+            update: vi.fn(),
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+        const request = new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'owner@example.com',
+                password: 'password123',
+                role: 'staff',
+            }),
+        })
+
+        // Act
+        const response = await POST(request)
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body).toMatchObject({
+            email: 'owner+profile-staff@example.com',
+            role: 'staff',
+        })
+        expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'users',
+            overrideAccess: true,
+            data: expect.objectContaining({
+                email: 'owner+profile-staff@example.com',
+                roles: ['editor'],
+                tenants: [
+                    expect.objectContaining({
+                        tenant: 42,
+                        role: 'editor',
+                        status: 'active',
+                    }),
+                ],
+            }),
+        }))
+    })
+
+    it('[TC-F23-05-11] returns 400 for non-string identity fields without touching Payload', async () => {
+        // Arrange
+        const request = new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 42,
+                password: { raw: 'password123' },
+            }),
+        })
+
+        // Act
+        const response = await POST(request)
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(400)
+        expect(body).toEqual({ error: 'email and password must be non-empty strings' })
+        expect(getPayload).not.toHaveBeenCalled()
+    })
 })

@@ -1,9 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
+import { loadEnvConfig } from '@next/env'
+
+loadEnvConfig(process.cwd())
 
 const isStaging = process.env.BASE_URL?.includes('dev.ecommercehub')
 
 export default defineConfig({
-    testDir: './e2e',
+    // Keep legacy e2e/ specs and review-required tests/*.spec.ts in one runner.
+    // Project-level matchers below prevent duplicate smoke/auth execution.
+    testDir: '.',
     fullyParallel: false, // Run sequentially — tests share auth state
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
@@ -25,22 +30,23 @@ export default defineConfig({
         {
             name: 'smoke',
             use: { ...devices['Desktop Chrome'] },
-            testMatch: /smoke\.spec\.ts/,
+            testMatch: 'e2e/smoke.spec.ts',
         },
         // Auth setup — runs first, saves auth state
         {
             name: 'setup',
-            testMatch: /.*\.setup\.ts/,
+            testMatch: 'e2e/*.setup.ts',
         },
         // Authenticated tests — reuse auth state from setup
         {
             name: 'chromium',
+            testMatch: ['e2e/*.spec.ts', 'tests/*.spec.ts'],
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
-            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
+            testIgnore: ['e2e/smoke.spec.ts', 'tests/smoke.spec.ts'],
         },
     ],
 })
