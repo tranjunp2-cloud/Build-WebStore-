@@ -492,7 +492,7 @@
 
 /* ── Tracking timeline ───────────────────────────────────────────────────── */
 .track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding-top: 8px; margin-top: 0; }
-.tl-row { display: flex; gap: 10px; position: relative; padding-bottom: 6px; }
+.tl-row { display: flex; gap: 10px; position: relative; padding-bottom: 12px; }
 .tl-row:not(:last-child)::before {
   content: ''; position: absolute; left: 5px; top: 11px; bottom: -1px;
   width: 2px; background: hsl(var(--border));
