@@ -38,6 +38,12 @@ export const ContactSubmissions: CollectionConfig = {
             required: false,
         },
         {
+            name: 'subject',
+            type: 'text',
+            required: false,
+            maxLength: 300,
+        },
+        {
             name: 'message',
             type: 'textarea',
             required: true,

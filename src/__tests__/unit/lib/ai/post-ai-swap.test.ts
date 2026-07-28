@@ -483,6 +483,82 @@ describe('Phase 04 — postAISwapStep', () => {
             expect(JSON.stringify(result)).not.toContain('"GrünRaum"')
         })
 
+        it('uses field type for contact labels and preserves custom fields', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                contact: {
+                    ...english.contact,
+                    nameLabel: 'Name',
+                    emailLabel: 'E-Mail',
+                    phoneLabel: 'Telefon',
+                    messageLabel: 'Nachricht',
+                },
+            }
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'contact',
+                    formFields: [
+                        { fieldName: 'field', fieldType: 'text', label: 'Name' },
+                        { fieldName: 'field-2', fieldType: 'email', label: 'Email' },
+                        { fieldName: 'field-3', fieldType: 'phone', label: 'Phone' },
+                        { fieldName: 'subject', fieldType: 'text', label: 'Betreff' },
+                        { fieldName: 'field-5', fieldType: 'textarea', label: 'Message' },
+                    ],
+                }],
+                'de',
+                'GrünRaum',
+                german,
+            )
+
+            const contact = result[0] as {
+                formFields: Array<{ fieldName: string; label: string }>
+            }
+            expect(contact.formFields).toEqual([
+                { fieldName: 'name', fieldType: 'text', label: 'Name' },
+                { fieldName: 'email', fieldType: 'email', label: 'E-Mail' },
+                { fieldName: 'phone', fieldType: 'phone', label: 'Telefon' },
+                { fieldName: 'subject', fieldType: 'text', label: 'Betreff' },
+                { fieldName: 'message', fieldType: 'textarea', label: 'Nachricht' },
+            ])
+        })
+
+        it('preserves custom companyName fields and prevents duplicate canonical name fields', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                contact: {
+                    ...english.contact,
+                    nameLabel: 'Name',
+                    emailLabel: 'E-Mail',
+                },
+            }
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'contact',
+                    formFields: [
+                        { fieldName: 'companyName', fieldType: 'text', label: 'Company name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Contact name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Assistant name' },
+                        { fieldName: 'email', fieldType: 'email', label: 'Email' },
+                    ],
+                }],
+                'de',
+                'GrünRaum',
+                german,
+            )
+
+            const contact = result[0] as {
+                formFields: Array<{ fieldName: string; label: string }>
+            }
+            expect(contact.formFields.map((field) => field.fieldName)).toEqual([
+                'companyName',
+                'name',
+                'field-3',
+                'email',
+            ])
+        })
+
         it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
             const locale = 'de-hero-alias-test'
             injectBlockStrings(locale, {
