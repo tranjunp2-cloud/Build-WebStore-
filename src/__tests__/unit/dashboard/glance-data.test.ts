@@ -195,4 +195,40 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         expect(result.sparks.leads).toEqual([0, 4, 0, 0, 0, 0, 0])
         expect(result.sparks.revenue).toEqual([100.1, 0, 0, 0, 0, 0, 50.15])
     })
+
+    it('keeps aggregated values and percentage deltas finite for extreme finite inputs', async () => {
+        // Arrange — each operand is finite, but IEEE-754 arithmetic overflows.
+        mocks.count
+            .mockResolvedValueOnce({ totalDocs: 1e308 })
+            .mockResolvedValueOnce({ totalDocs: 1e-308 })
+            .mockResolvedValueOnce({ totalDocs: 0 })
+            .mockResolvedValueOnce({ totalDocs: 0 })
+            .mockResolvedValueOnce({ totalDocs: 0 })
+            .mockResolvedValueOnce({ totalDocs: 0 })
+        mocks.execute
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { date_str: '2026-07-20', count: 1e-308 },
+                    { date_str: '2026-07-21', count: 1e308 },
+                    { date_str: '2026-07-22', count: 1e308 },
+                ],
+            })
+
+        // Act
+        const result = await getGlanceData('7d', { user: authorizedUser })
+
+        // Assert — AC-R05 forbids NaN/Infinity in the serialized contract.
+        expect(result.stats.views.delta).toBe(0)
+        expect(result.stats.revenue.value).toBe(0)
+        Object.values(result.stats).forEach(({ value, delta }) => {
+            expect(Number.isFinite(value)).toBe(true)
+            expect(Number.isFinite(delta)).toBe(true)
+        })
+        Object.values(result.sparks).flat().forEach((value) => {
+            expect(Number.isFinite(value)).toBe(true)
+        })
+    })
 })
