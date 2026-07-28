@@ -2502,6 +2502,7 @@ const MIGRATIONS = [
       name varchar NOT NULL,
       email varchar NOT NULL,
       phone varchar,
+      subject varchar(300),
       message text NOT NULL,
       site_id integer NOT NULL,
       status varchar DEFAULT 'new',
@@ -2510,6 +2511,10 @@ const MIGRATIONS = [
       updated_at timestamptz DEFAULT now() NOT NULL,
       created_at timestamptz DEFAULT now() NOT NULL
     );`,
+  },
+  {
+    name: 'contact_submissions.subject',
+    sql: `ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS subject varchar(300);`,
   },
   {
     name: 'contact_submissions.site_created_index',

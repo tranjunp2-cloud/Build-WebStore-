@@ -169,33 +169,57 @@ function normalizeContactLabels(
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
         const usedFieldNames = new Set<string>()
+        const claimUniqueFieldName = (preferredName: string, index: number): string => {
+            if (!usedFieldNames.has(preferredName)) {
+                usedFieldNames.add(preferredName)
+                return preferredName
+            }
+
+            let fallbackName = `field-${index + 1}`
+            let suffix = index + 1
+            while (usedFieldNames.has(fallbackName)) {
+                suffix += 1
+                fallbackName = `field-${suffix}`
+            }
+            usedFieldNames.add(fallbackName)
+            return fallbackName
+        }
         const formFields = Array.isArray(block.formFields)
             ? block.formFields.map((field: unknown, index: number) => {
                 if (!field || typeof field !== 'object') return field
                 const record = field as Record<string, unknown>
-                const fieldName = String(record.fieldName ?? '').toLowerCase()
+                const suppliedFieldName = String(record.fieldName ?? '').trim()
+                const fieldName = suppliedFieldName.toLowerCase()
+                const fieldAlias = fieldName.replace(/[-_\s]/g, '')
                 const fieldType = String(record.fieldType ?? record.type ?? '').toLowerCase()
                 const isGenericName = !fieldName || /^field(?:[-_\s]*\d+)?$/.test(fieldName)
-                let semanticName = fieldName.includes('email') || fieldType === 'email'
+                let semanticName = ['email', 'emailaddress'].includes(fieldAlias) || fieldType === 'email'
                     ? 'email'
-                    : fieldName.includes('phone') || fieldType === 'phone' || fieldType === 'tel'
+                    : ['phone', 'phonenumber', 'telephone', 'tel'].includes(fieldAlias)
+                        || fieldType === 'phone'
+                        || fieldType === 'tel'
                         ? 'phone'
-                        : fieldName.includes('message') || fieldType === 'textarea'
+                        : ['message', 'yourmessage'].includes(fieldAlias) || fieldType === 'textarea'
                             ? 'message'
-                            : fieldName.includes('name')
+                            : ['name', 'fullname', 'contactname', 'yourname'].includes(fieldAlias)
                                 ? 'name'
+                                : ['subject', 'topic'].includes(fieldAlias)
+                                    ? 'subject'
                                 : null
 
                 if (!semanticName && isGenericName && fieldType === 'text') {
                     semanticName = usedFieldNames.has('name') ? 'subject' : 'name'
                 }
 
-                if (!semanticName || usedFieldNames.has(semanticName)) {
-                    const preservedName = fieldName || `field-${index + 1}`
-                    usedFieldNames.add(preservedName)
-                    return { ...record, fieldName: preservedName }
+                if (!semanticName) {
+                    const preservedName = suppliedFieldName || `field-${index + 1}`
+                    return { ...record, fieldName: claimUniqueFieldName(preservedName, index) }
                 }
-                usedFieldNames.add(semanticName)
+
+                const uniqueSemanticName = claimUniqueFieldName(semanticName, index)
+                if (uniqueSemanticName !== semanticName) {
+                    return { ...record, fieldName: uniqueSemanticName }
+                }
 
                 if (semanticName === 'subject') {
                     return { ...record, fieldName: semanticName }

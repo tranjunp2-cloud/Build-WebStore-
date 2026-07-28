@@ -523,6 +523,42 @@ describe('Phase 04 — postAISwapStep', () => {
             ])
         })
 
+        it('preserves custom companyName fields and prevents duplicate canonical name fields', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                contact: {
+                    ...english.contact,
+                    nameLabel: 'Name',
+                    emailLabel: 'E-Mail',
+                },
+            }
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'contact',
+                    formFields: [
+                        { fieldName: 'companyName', fieldType: 'text', label: 'Company name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Contact name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Assistant name' },
+                        { fieldName: 'email', fieldType: 'email', label: 'Email' },
+                    ],
+                }],
+                'de',
+                'GrünRaum',
+                german,
+            )
+
+            const contact = result[0] as {
+                formFields: Array<{ fieldName: string; label: string }>
+            }
+            expect(contact.formFields.map((field) => field.fieldName)).toEqual([
+                'companyName',
+                'name',
+                'field-3',
+                'email',
+            ])
+        })
+
         it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
             const locale = 'de-hero-alias-test'
             injectBlockStrings(locale, {
