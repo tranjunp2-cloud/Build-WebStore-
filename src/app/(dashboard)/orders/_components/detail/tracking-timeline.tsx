@@ -2,8 +2,8 @@
 
 // Tracking event timeline for EP shipped/completed orders.
 // Renders order.shippingTrackingHistory sorted DESC (newest first).
-// Courier descriptions are rendered verbatim. Internal status labels are only
-// used as a fallback for legacy history entries that have no description.
+// Courier descriptions are rendered verbatim beneath the mapped status title,
+// matching the Figma timeline. CMS-created shipment events stay single-line.
 
 import { useI18n } from '@/i18n'
 
@@ -70,7 +70,16 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
     <div className="track-timeline">
       {sorted.map((ev, i) => {
         const isFirst = i === 0 // newest = "live" marker
-        const displayText = ev.description || friendlyStatus(ev.status)
+        const statusTitle = friendlyStatus(ev.status)
+        const description = ev.description || ''
+        const isShipmentCreated = /^Shipment created(?:\s+—|$)/.test(description)
+        const displayTitle = isShipmentCreated ? description : statusTitle
+        const displayNote =
+          !isShipmentCreated &&
+          description &&
+          description.toLocaleLowerCase() !== statusTitle.toLocaleLowerCase()
+            ? description
+            : null
         return (
           <div
             key={`${ev.status}-${ev.eventTime}-${i}`}
@@ -79,9 +88,10 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
             <span className="tl-dot" />
             <div className="tl-body">
               <div className="tl-head">
-                <span className="tl-t">{displayText}</span>
+                <span className="tl-t">{displayTitle}</span>
                 <span className="tl-d">{fmtEventTime(ev.eventTime)}</span>
               </div>
+              {displayNote && <div className="tl-note">{displayNote}</div>}
             </div>
           </div>
         )

@@ -491,30 +491,30 @@
 .plabel-foot .btn-ghost { margin-right: auto; }
 
 /* ── Tracking timeline ───────────────────────────────────────────────────── */
-.track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding: 18px 0; margin-top: 0; }
-.tl-row { display: flex; gap: 10px; position: relative; padding-bottom: 18px; }
+.track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding: 8px 0 0; margin-top: 0; }
+.tl-row { display: flex; gap: 10px; position: relative; min-height: 75px; padding-bottom: 6px; box-sizing: border-box; }
 .tl-row:not(:last-child)::before {
-  content: ''; position: absolute; left: 5px; top: 11px; bottom: -1px;
+  content: ''; position: absolute; left: 5px; top: 11px; bottom: 1px;
   width: 2px; background: hsl(var(--border));
 }
 .tl-row.done:not(:last-child)::before { background: hsl(var(--success)); }
 .tl-dot {
-  width: 12px; height: 12px; border-radius: 50%; margin-top: 2px; flex-shrink: 0;
+  width: 12px; height: 12px; border-radius: 50%; margin-top: 2px; flex-shrink: 0; box-sizing: border-box;
   background: hsl(var(--border)); border: 2px solid var(--dash-secondary-bg);
-  box-shadow: 0 0 0 2px hsl(var(--border)); z-index: 1;
+  z-index: 1;
 }
 .tl-row.done .tl-dot, .tl-row:first-child .tl-dot {
-  background: hsl(var(--success)); box-shadow: 0 0 0 2px hsl(var(--success));
+  background: hsl(var(--success));
 }
 .tl-row.live .tl-dot {
-  background: hsl(var(--info)); box-shadow: 0 0 0 2px hsl(var(--info)), 0 0 0 5px hsl(var(--info) / 0.2);
+  background: hsl(var(--info));
 }
-.tl-row:last-child { padding-bottom: 0; }
-.tl-body { flex: 1; min-width: 0; }
+.tl-row:last-child { min-height: 69px; padding-bottom: 0; }
+.tl-body { flex: 1; min-width: 0; padding: 2px 0 26px; }
 .tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .tl-t { font-size: 13.5px; font-weight: 600; color: var(--dash-text); }
 .tl-d { font-size: 12px; color: var(--dash-text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); }
-.tl-note { font-size: 12px; color: var(--dash-text-muted); margin-top: 1px; }
+.tl-note { font-size: 12px; line-height: 18px; color: var(--dash-text-muted); margin-top: 1px; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
