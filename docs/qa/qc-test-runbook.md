@@ -209,7 +209,13 @@ Admins: `qc-admin-1..2@primeweb.local`. Staff: `qc-staff-1..3@primeweb.local`.
    - Test discount code `QC{N}PCT10` (10% off), `QC{N}FIX50` (RM 50 off) với N = 1..10
 
 2. 300 VU load (JMeter):
-   - Round-robin login `qc-owner-1..300` với `QC_SEED_PASSWORD`
+   - Round-robin login `qc-owner-1..300` với `QC_SEED_PASSWORD`, loại
+     `qc-owner-5` khỏi VU pool vì account này dành cho suspended-state testing
+   - Products sampler dùng `GET /api/dashboard/products`; không dùng Payload native
+     `/api/products` vì response/query contract khác Products Dashboard; không truyền
+     `depth` vì endpoint canonical đã cố định `depth=1`
+   - Dừng batch nếu QC reset/seed trả exit code khác 0 hoặc deployment log không xác nhận
+     đủ 8 GH-1432 product indexes
    - Mix workload: 40% list / 30% detail read / 20% create / 10% update
    - 5 min soak per run, xuất report capacity
 

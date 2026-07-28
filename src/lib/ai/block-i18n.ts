@@ -79,6 +79,11 @@ export interface BlockStrings {
     gallery: {
         headline: string
     }
+    blogList: {
+        readArticleLabel: string
+        uncategorizedLabel: string
+        emptyStateLabel: string
+    }
     newsletter: {
         headlineStayUpdated: (name: string) => string
         subheadlineFallback: string
@@ -152,6 +157,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'Our Services', subheadline: (name) => `Discover what ${name} can do for you.`, ctaLabel: 'Learn More' },
         clientLogos: { headline: 'Trusted By' },
         gallery: { headline: 'Our Work' },
+        blogList: {
+            readArticleLabel: 'Read Article',
+            uncategorizedLabel: 'Uncategorized',
+            emptyStateLabel: 'No published posts yet. Check back soon!',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `Stay Updated with ${name}`,
             subheadlineFallback: 'Subscribe for exclusive news and offers.',
@@ -224,6 +234,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'Perkhidmatan Kami', subheadline: (name) => `Temui apa yang ${name} boleh lakukan untuk anda.`, ctaLabel: 'Ketahui Lebih Lanjut' },
         clientLogos: { headline: 'Dipercayai Oleh Pemimpin Industri' },
         gallery: { headline: 'Kerja-kerja Kami' },
+        blogList: {
+            readArticleLabel: 'Baca Artikel',
+            uncategorizedLabel: 'Tiada Kategori',
+            emptyStateLabel: 'Belum ada artikel diterbitkan. Sila kembali lagi.',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `Ikuti Perkembangan Terbaru ${name}`,
             subheadlineFallback: 'Langgan untuk berita dan tawaran eksklusif.',
@@ -296,6 +311,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'Dịch Vụ Của Chúng Tôi', subheadline: (name) => `Khám phá những gì ${name} có thể làm cho bạn.`, ctaLabel: 'Tìm Hiểu Thêm' },
         clientLogos: { headline: 'Được Tin Tưởng Bởi Các Lãnh Đạo Ngành' },
         gallery: { headline: 'Tác Phẩm Của Chúng Tôi' },
+        blogList: {
+            readArticleLabel: 'Đọc Bài Viết',
+            uncategorizedLabel: 'Chưa Phân Loại',
+            emptyStateLabel: 'Chưa có bài viết được xuất bản. Vui lòng quay lại sau.',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `Cập Nhật Mới Nhất Từ ${name}`,
             subheadlineFallback: 'Đăng ký để nhận tin tức và ưu đãi độc quyền.',
@@ -344,6 +364,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'サービス内容', subheadline: (name) => `${name}のサービスをご覧ください。`, ctaLabel: '詳細を見る' },
         clientLogos: { headline: 'お客様・パートナー' },
         gallery: { headline: 'ギャラリー' },
+        blogList: {
+            readArticleLabel: '記事を読む',
+            uncategorizedLabel: '未分類',
+            emptyStateLabel: '公開された記事はまだありません。また後でご覧ください。',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `${name}の最新情報`,
             subheadlineFallback: 'ニュースレターに登録して最新情報をお届けします。',
@@ -383,6 +408,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: '我们的服务', subheadline: (name) => `探索${name}能为您做什么。`, ctaLabel: '了解更多' },
         clientLogos: { headline: '合作客户' },
         gallery: { headline: '作品展示' },
+        blogList: {
+            readArticleLabel: '阅读文章',
+            uncategorizedLabel: '未分类',
+            emptyStateLabel: '暂无已发布的文章，请稍后再来。',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `${name}最新资讯`,
             subheadlineFallback: '订阅获取独家新闻和优惠。',
@@ -422,6 +452,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: '서비스 안내', subheadline: (name) => `${name}가 할 수 있는 것을 알아보세요.`, ctaLabel: '자세히 보기' },
         clientLogos: { headline: '파트너 & 고객사' },
         gallery: { headline: '갤러리' },
+        blogList: {
+            readArticleLabel: '글 읽기',
+            uncategorizedLabel: '미분류',
+            emptyStateLabel: '아직 게시된 글이 없습니다. 나중에 다시 확인해 주세요.',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `${name} 최신 소식`,
             subheadlineFallback: '뉴스레터를 구독하고 소식을 받아보세요.',
@@ -461,6 +496,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'خدماتنا', subheadline: (name) => `اكتشف ما يمكن لـ${name} تقديمه لك.`, ctaLabel: 'اعرف المزيد' },
         clientLogos: { headline: 'شركاؤنا وعملاؤنا' },
         gallery: { headline: 'معرض أعمالنا' },
+        blogList: {
+            readArticleLabel: 'اقرأ المقال',
+            uncategorizedLabel: 'غير مصنف',
+            emptyStateLabel: 'لا توجد مقالات منشورة بعد. تحقق مرة أخرى قريبًا.',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `ابق على اطلاع مع ${name}`,
             subheadlineFallback: 'اشترك للحصول على أخبار وعروض حصرية.',
@@ -500,6 +540,11 @@ const STRINGS: Record<string, BlockStrings> = {
         serviceCards: { headline: 'บริการของเรา', subheadline: (name) => `ค้นพบสิ่งที่ ${name} ทำได้เพื่อคุณ`, ctaLabel: 'เรียนรู้เพิ่มเติม' },
         clientLogos: { headline: 'ลูกค้าและพันธมิตรที่ไว้วางใจ' },
         gallery: { headline: 'ผลงานของเรา' },
+        blogList: {
+            readArticleLabel: 'อ่านบทความ',
+            uncategorizedLabel: 'ไม่มีหมวดหมู่',
+            emptyStateLabel: 'ยังไม่มีบทความที่เผยแพร่ โปรดกลับมาตรวจสอบอีกครั้ง',
+        },
         newsletter: {
             headlineStayUpdated: (name) => `ติดตามข่าวสารจาก ${name}`,
             subheadlineFallback: 'สมัครรับข่าวสารและข้อเสนอพิเศษ',

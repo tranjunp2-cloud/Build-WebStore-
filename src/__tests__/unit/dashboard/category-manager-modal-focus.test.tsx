@@ -67,6 +67,7 @@ vi.mock('@/i18n', () => ({
                             cycleError: 'Cycle error',
                             maxDepthError: 'Max depth error',
                             parentTenantMismatch: 'Parent tenant mismatch',
+                            parentInvalid: 'The selected parent category is invalid. Please choose it again.',
                             parentSoftDeleted: 'Parent soft deleted',
                             deleted: 'Deleted {name}',
                         },
@@ -147,13 +148,14 @@ vi.mock('@/app/(dashboard)/products/categories/actions', () => ({
 
 import CategoryManager from '@/app/(dashboard)/products/categories/components/CategoryManager'
 import * as actions from '@/app/(dashboard)/products/categories/actions'
+import { toast } from 'sonner'
 
 describe('CategoryManager modal focus regression', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(actions.getCategoriesAction).mockResolvedValue([])
         vi.mocked(actions.checkCategoryNameAvailable).mockResolvedValue(true)
-        vi.mocked(actions.saveCategoryAction).mockResolvedValue(undefined)
+        vi.mocked(actions.saveCategoryAction).mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
     })
 
     it('keeps focus on the category name input while typing multiple characters', async () => {
@@ -217,5 +219,27 @@ describe('CategoryManager modal focus regression', () => {
                 parent: null,
             }, undefined)
         })
+    })
+
+    it('TC-F08-05-18: maps an invalid parent sentinel to a localized error', async () => {
+        // Arrange
+        vi.mocked(actions.saveCategoryAction).mockResolvedValueOnce({ success: false, error: 'CATEGORY_PARENT_ID_INVALID' })
+        render(<CategoryManager />)
+        fireEvent.click(screen.getByRole('button', { name: 'Add Category' }))
+
+        const nameInput = screen.getByPlaceholderText('Type a category name')
+        fireEvent.change(nameInput, { target: { value: 'Invalid Child' } })
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+        // Assert
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith(
+                'The selected parent category is invalid. Please choose it again.',
+            )
+        })
+        expect(toast.error).not.toHaveBeenCalledWith('CATEGORY_PARENT_ID_INVALID')
+        expect(screen.getByRole('dialog')).toBeVisible()
     })
 })

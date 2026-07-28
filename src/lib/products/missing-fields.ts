@@ -1,7 +1,7 @@
 /**
  * Pure helper for the Product List "missing information" soft-warning (GH-1457).
  * Kept dependency-free (no `Product` type import) so it can be reused by
- * SEOView/OverviewView's `productMissingAltCount` concept later without a
+ * SEO reporting's `productMissingAltCount` concept later without a
  * circular import from `page.tsx`.
  */
 

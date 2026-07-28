@@ -1,6 +1,7 @@
 /**
  * At-a-glance metrics for the revamp dashboard.
  * All date boundaries and daily series use the shared UTC dashboard contract.
+ * Server-side source for pageview/click/checkout counts, revenue, and daily series.
  */
 import { getPayload } from 'payload'
 import config from '@payload-config'

@@ -15,19 +15,14 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
 ```
 (dashboard)/layout.tsx          ← Fixed sidebar + main area
     ├── Sidebar.tsx             ← Navigation (8 items, active state)
-    ├── dashboard/page.tsx      ← Server Component (Home: Metrics & Orders)
-    │       ├── DashboardGreeting.tsx
-    │       ├── DashboardStatsView.tsx   ← 4 Customizable stat cards
-    │       ├── revamp/pending-orders.tsx ← Latest Pending Orders (gated)
-    │       └── SEOHealthWidget.tsx      ← SEO quick glance
-    ├── dashboard/analytics/page.tsx ← Client/Server Component (Analytics detail)
-    │       ├── PeriodSelector.tsx
-    │       ├── DailyBarChart.tsx
-    │       └── TopPerformanceLists.tsx  ← Pages, Products, Blogs
-    └── dashboard/seo/page.tsx   ← Client Component (SEO detail & AI Fix)
-            ├── SEOScoreBreakdown.tsx
-            ├── KeywordTracker.tsx       ← Tracks top 5 keywords
-            └── AIFixAllPanel.tsx        ← SSE Streaming handler
+    └── dashboard/page.tsx      ← Server Component (single-column stream)
+            ├── DashboardToolbarHeader.tsx
+            ├── PeriodSelector.tsx
+            ├── AtAGlance.tsx
+            ├── TrafficPerformance.tsx
+            ├── SeoHealth.tsx
+            ├── SeoTools.tsx
+            └── PendingOrders.tsx        ← Latest Pending Orders (gated)
 ```
 
 ## Data Flow
@@ -37,7 +32,9 @@ page.tsx (Server Component)
   │
   ├── getCurrentUser() + tenantIdForQuery() → tenant scope
   │
-  ├── getGlanceData(period) → active tenant-scoped At-a-glance metrics
+  ├── getGlanceData(period) ──► Payload/Drizzle
+  ├── getTrafficData(period) ─► Payload/Drizzle
+  ├── getSeoData() ───────────► Payload/Drizzle
   │
   ├── load independent dashboard blocks
   └── load Pending Orders via secure local loader when tenant/site/block/permission gates pass
@@ -46,8 +43,8 @@ page.tsx (Server Component)
 ## API Contract (Next.js Route Handlers)
 
 ```typescript
-// GET /api/dashboard/summary (legacy Overview path; active revamp uses getGlanceData)
 // GET /api/analytics/summary (Detail Charts & Lists)
+// GET /api/dashboard/products (canonical Products Dashboard query for HTTP/load clients)
 // POST /api/seo/analyze (Trigger API scan)
 // POST /api/seo/fix (SSE Stream cho AI Fix)
 // GET/POST/DELETE /api/seo/keywords (Keyword Tracker)

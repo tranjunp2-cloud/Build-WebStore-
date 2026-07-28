@@ -565,8 +565,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // Route budget is 60s. Give the browser 15s extra to receive a final
-        // frame or surface a terminated network stream cleanly.
+        // Restore the pre-#1658 five-minute client guard. This leaves enough
+        // headroom for long-tail generation while still cleaning up a hung request.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -575,10 +575,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 75_000)
+        }, 300_000)
         hardTimeoutRef.current = hardTimeout
+
         let receivedAnyEvent = false
         let receivedDone = false
+        let receivedServerError = false
 
         try {
             // Use briefSnapshot (captured before reset) if provided, fallback to store
@@ -651,6 +653,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         const data = JSON.parse(line.slice(6))
                         receivedAnyEvent = true
                         if (currentEvent === 'done') receivedDone = true
+                        if (currentEvent === 'error') receivedServerError = true
                         handleSSEEvent(currentEvent, data)
                     } catch {
                         console.warn('[SSE] malformed payload, skipping event:', currentEvent)
@@ -659,7 +662,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     currentEvent = ''
                 }
             }
-            if (!receivedDone) {
+            // An explicit server error is already terminal and handleSSEEvent
+            // has stored its real message. Do not mask it as a disconnect just
+            // because error streams close without a trailing done event.
+            if (!receivedDone && !receivedServerError) {
                 const disconnectError = new Error('SSE stream ended before done')
                 Object.assign(disconnectError, { receivedAnyEvent })
                 throw disconnectError

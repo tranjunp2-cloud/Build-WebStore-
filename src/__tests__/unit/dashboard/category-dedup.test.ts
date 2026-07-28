@@ -68,7 +68,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [{ id: 'existing-123' }] })
 
             // Act
-            const available = await checkCategoryNameAvailable('Shirts', 'parent-456')
+            const available = await checkCategoryNameAvailable('Shirts', '456')
 
             // Assert
             expect(available).toBe(false)
@@ -79,7 +79,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [{ id: 'existing-123' }] })
 
             // Act
-            const available = await checkCategoryNameAvailable('shirts', 'parent-456')
+            const available = await checkCategoryNameAvailable('shirts', '456')
 
             // Assert: mocked query returns a match for the differently-cased input, so the function
             // correctly propagates that as "unavailable". The actual `lower(trim())` SQL comparison
@@ -95,7 +95,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [{ id: 'existing-123' }] })
 
             // Act
-            const available = await checkCategoryNameAvailable('  Shirts  ', 'parent-456')
+            const available = await checkCategoryNameAvailable('  Shirts  ', '456')
 
             // Assert
             expect(available).toBe(false)
@@ -106,7 +106,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [] })
 
             // Act
-            const available = await checkCategoryNameAvailable('Shirts', 'different-parent-789')
+            const available = await checkCategoryNameAvailable('Shirts', '789')
 
             // Assert: verify scoping — query must include parent_id in WHERE clause
             expect(available).toBe(true)
@@ -142,7 +142,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [] })
 
             // Act
-            const available = await checkCategoryNameAvailable('Shirts', 'parent-456', 'shirt-123')
+            const available = await checkCategoryNameAvailable('Shirts', '456', '123')
 
             // Assert: should allow (editing own record)
             expect(available).toBe(true)
@@ -183,9 +183,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [{ id: 'existing-123' }] })
 
             // Act & Assert
-            await expect(saveCategoryAction({ name: 'Shirts', parent: 'parent-456' })).rejects.toThrow(
-                'CATEGORY_NAME_DUPLICATE'
-            )
+            await expect(saveCategoryAction({ name: 'Shirts', parent: '456' })).resolves.toEqual({ success: false, error: 'CATEGORY_NAME_DUPLICATE' })
             // Should not proceed to payload.create
             expect(mockCreate).not.toHaveBeenCalled()
         })
@@ -195,9 +193,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockExecute.mockResolvedValue({ rows: [{ id: 'different-id' }] })
 
             // Act & Assert
-            await expect(saveCategoryAction({ name: 'Shirts', parent: 'parent-456' }, 'shirt-123')).rejects.toThrow(
-                'CATEGORY_NAME_DUPLICATE'
-            )
+            await expect(saveCategoryAction({ name: 'Shirts', parent: '456' }, '123')).resolves.toEqual({ success: false, error: 'CATEGORY_NAME_DUPLICATE' })
             // Should not proceed to payload.update
             expect(mockUpdate).not.toHaveBeenCalled()
         })
@@ -208,14 +204,14 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockCreate.mockResolvedValue({ id: 'new-cat-123', name: 'Shirts' })
 
             // Act
-            const result = await saveCategoryAction({ name: 'Shirts', parent: 'parent-456' })
+            const result = await saveCategoryAction({ name: 'Shirts', parent: '456' })
 
             // Assert: `tenant` is always server-forced to the caller's own tenant (security fix —
             // see saveCategoryAction's tenant/site stripping, prevents a client from smuggling an
             // arbitrary `tenant`/`site` value through the `.passthrough()` schema).
             expect(mockCreate).toHaveBeenCalledWith({
                 collection: 'categories',
-                data: { name: 'Shirts', parent: 'parent-456', tenant: 'tenant-456' },
+                data: { name: 'Shirts', parent: 456, tenant: 'tenant-456' },
                 user: mockCurrentUser,
                 overrideAccess: false,
             })
@@ -230,7 +226,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             // Act
             await saveCategoryAction({
                 name: 'Shirts',
-                parent: 'parent-456',
+                parent: '456',
                 tenant: 'attacker-controlled-tenant-999',
                 site: 'attacker-controlled-site-999',
             } as any)
@@ -276,9 +272,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockCreate.mockRejectedValue(payloadError)
 
             // Act & Assert
-            await expect(saveCategoryAction({ name: 'Fashion', slug: 'fashion' })).rejects.toThrow(
-                'CATEGORY_SLUG_DUPLICATE'
-            )
+            await expect(saveCategoryAction({ name: 'Fashion', slug: 'fashion' })).resolves.toEqual({ success: false, error: 'CATEGORY_SLUG_DUPLICATE' })
         })
 
         it('TC-F08-05-05: Maps Payload ValidationError to CATEGORY_SLUG_DUPLICATE on update', async () => {
@@ -294,9 +288,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockUpdate.mockRejectedValue(payloadError)
 
             // Act & Assert
-            await expect(saveCategoryAction({ name: 'Fashion' }, 'cat-123')).rejects.toThrow(
-                'CATEGORY_SLUG_DUPLICATE'
-            )
+            await expect(saveCategoryAction({ name: 'Fashion' }, 'cat-123')).resolves.toEqual({ success: false, error: 'CATEGORY_SLUG_DUPLICATE' })
         })
 
         it('TC-F08-05-05: Non-slug ValidationError passes through unchanged (e.g. slug field error)', async () => {
@@ -332,7 +324,7 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
             mockCreate.mockRejectedValue(payloadError)
 
             // Act & Assert: should still recognize as slug conflict despite path: null
-            await expect(saveCategoryAction({ name: 'Fashion' })).rejects.toThrow('CATEGORY_SLUG_DUPLICATE')
+            await expect(saveCategoryAction({ name: 'Fashion' })).resolves.toEqual({ success: false, error: 'CATEGORY_SLUG_DUPLICATE' })
         })
 
         it('TC-F08-05-05: Does NOT match ValidationError from different collection', async () => {

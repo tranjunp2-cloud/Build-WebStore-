@@ -6,8 +6,6 @@
  *   TC-F03.01c → SitesPageClient empty state renders CTA to /onboarding
  *   TC-F03.01d → SitesPageClient failed site shows "Incomplete" badge + 2 actions
  *   TC-F03.07  → DashboardStats renders 4 default stat cards
- *   TC-F03.09  → DashboardActionList shows up to 5 pending orders
- *   TC-F03.10  → DashboardActionList links each order to /orders/:id
  *   TC-F03.11/12 → SEOHealthWidget shows score + "AI Fix All Issues" button
  *   TC-F03.18  → DashboardStats hides card when excluded from preferences
  *   TC-F03.19  → DashboardStats shows extra card when added to preferences
@@ -165,7 +163,7 @@ vi.mock('@dnd-kit/utilities', () => ({
     CSS: { Transform: { toString: vi.fn(() => '') } },
 }))
 
-// ── Mock next/navigation (used by PeriodSelector / DashboardActionList) ──────
+// ── Mock next/navigation (used by PeriodSelector) ────────────────────────────
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: vi.fn() })),
     useSearchParams: vi.fn(() => ({ get: vi.fn(() => null), toString: vi.fn(() => '') })),
@@ -190,7 +188,6 @@ vi.mock('@/app/(dashboard)/actions', () => ({
 // Imports after mocks
 // ─────────────────────────────────────────────────────────────────────────────
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardActionList } from '@/components/dashboard/DashboardActionList'
 import { SEOHealthWidget } from '@/components/dashboard/SEOHealthWidget'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { TopPerformingList } from '@/components/dashboard/TopPerformingList'
@@ -233,46 +230,6 @@ describe('DashboardStats', () => {
     })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DashboardActionList
-// ─────────────────────────────────────────────────────────────────────────────
-describe('DashboardActionList', () => {
-    const makeOrder = (i: number) => ({
-        id: `order-${i}`,
-        orderNumber: `ORD-${1000 + i}`,
-        customerName: `Customer ${i}`,
-        currency: 'MYR',
-        total: 100 * i,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-    })
-
-    it('[TC-F03.03] renders up to 5 pending orders', () => {
-        const orders = Array.from({ length: 5 }, (_, i) => makeOrder(i + 1))
-        render(<DashboardActionList pendingOrders={orders} />)
-        expect(screen.getAllByText(/ORD-/)).toHaveLength(5)
-    })
-
-    it('[TC-F03.04] each order row has a link to /orders/:id', () => {
-        const orders = [makeOrder(1)]
-        render(<DashboardActionList pendingOrders={orders} />)
-        const rowLink = screen.getAllByRole('link')[0]
-        expect(rowLink).toHaveAttribute('href', '/orders/order-1')
-    })
-
-    it('shows empty state message when no pending orders', () => {
-        render(<DashboardActionList pendingOrders={[]} />)
-        expect(screen.getByText('No pending orders')).toBeInTheDocument()
-    })
-
-    it('renders order number and customer name', () => {
-        render(<DashboardActionList pendingOrders={[makeOrder(1)]} />)
-        expect(screen.getByText(/ORD-1001/)).toBeInTheDocument()
-        expect(screen.getByText(/Customer 1/)).toBeInTheDocument()
-    })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SEOHealthWidget
 // ─────────────────────────────────────────────────────────────────────────────
 describe('SEOHealthWidget', () => {

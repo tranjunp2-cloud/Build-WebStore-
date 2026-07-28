@@ -88,5 +88,25 @@ describe('Phase 03 — hero gap-fill delegation', () => {
             expect(block.ctaButtons[0]!.url).toBe('/contact')
             expect(block.ctaButtons[1]!.url).toBe('/about')
         })
+
+        it('keeps both CTA buttons and resolves their labels from the target locale', () => {
+            // Arrange
+            const context = {
+                language: 'zh-CN',
+                userBiz: {
+                    name: '智慧生活家居',
+                    description: '提供节能又美观的智能家居产品。',
+                },
+            }
+
+            // Act
+            const block = buildBlockFromLibrary('hero', 'ecommerce', context) as {
+                ctaButtons: Array<{ label: string }>
+            }
+
+            // Assert
+            expect(block.ctaButtons).toHaveLength(2)
+            expect(block.ctaButtons.map((cta) => cta.label)).toEqual(['开始', '关于我们'])
+        })
     })
 })

@@ -440,14 +440,16 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ## 5. Known Limitations & PM Review Items
 
-### Technical Health Signals (Hardcoded Placeholders)
+### Technical Health Signals (Decision A — Reuse F03)
 
-**Status:** Phase 05 implementation used assume-passing values for 3 Technical Health signals:
-- `coreWebVitals` → hardcoded 80 (no real Lighthouse measurement)
-- `mobileResponsive` → hardcoded true (no real mobile audit)
-- `httpsEnabled` → hardcoded true (no real verification)
+**Status (PM 2026-07-21):** Technical Health **must** reuse F03 `calculateTechnicalSeoScore()`:
+- Missing OG image → −15 (on F03 0–100 scale)
+- Missing Google verification token → −10
+- Bad slugs → −5 each, max −15
+- noIndex pages → −5 each, max −10
+- Local SEO bucket: `floor(f03Technical × 15 / 100)`
 
-**Impact:** Score calculation is correct per PRD §13.8 formula, but accuracy is overstated (every site gets +15 free Technical Health points). 
+**Legacy (remove when wiring US-F37-04):** Phase 05 still may hardcode CWV=80 / mobile=true / https=true → every site +15 free. Treat as **implementation debt**, not product decision. 
 
 **Flagged for:** Before US-F37-04 dashboard surfaces this score to sellers, PM should decide:
 1. Keep assume-passing (current; no infrastructure cost, but overstates accuracy)
@@ -519,7 +521,7 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 1. **🔴 robots.txt spec conflict (US-03, BLOCKER):** `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03/BR-03 "default ALLOW". Score engine cũng hardcode `allowsSearchBots: false`. **PM chốt:** default-allow (theo spec) hay giữ block-list? → quyết TC-F37-03-01/09. Toàn US-03 (llms.txt + per-site toggle) chưa build.
 2. **US-04 checklist widget chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng widget checklist one-click-fix (US-04 core, AC-1/AC-2) chưa implement → TC-04-10/11/12 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
-4. **Technical Health hardcoded (US-04):** `coreWebVitals=80`, `mobileResponsive=true`, `httpsEnabled=true` là placeholder assume-pass (chưa đo Lighthouse thật) → mọi site được +15 free. PM chốt: giữ, đo thật, hay normalize "earned/applicable" (§13.8) trước khi surface score cho seller.
+4. **Technical Health rewire (US-04):** PM đã chốt **Decision A** — reuse F03 `technical-score.ts` scale ×15/100. Code còn placeholder CWV/mobile/HTTPS → phải thay trước khi surface score cho seller.
 5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.
 6. **hreflang (AC-20/FR-26) DEFERRED P2:** blocked bởi i18n client-side, chờ F21 URL-based locale routing. KHÔNG viết TC.
 

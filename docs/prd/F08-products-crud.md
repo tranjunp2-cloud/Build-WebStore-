@@ -1,5 +1,5 @@
 # PRD: Products CRUD (F08)
-> **Version:** 2.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
+> **Version:** 2.2 | **Updated:** 2026-07-21 | **Agent:** `project-planner`
 > **Priority:** P0 | **Sprint:** Wave 4 | **Size:** L
 > **Depends on:** Dashboard ✅, Payload CMS Products collection ✅
 > **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 Halal
@@ -52,15 +52,16 @@ Trang `/products` hỗ trợ người bán quản lý catalog trọn vẹn chu�
 - Product list với Tabs (All, Active, Draft, Archived). (US-F08-01)
 - Lọc (Filtering) & Sắp xếp (Sorting) nâng cao: Theo Category, Trạng thái Khuyến mãi, Giá (Tăng/giảm), Cũ/Mới nhất. Có Cảnh báo Tồn kho thấp (Low Stock/Out of Stock). (US-F08-01)
 - Thanh Tìm kiếm (Search Bar) độc lập: Tìm nhanh sản phẩm theo Tên (Name) hoặc Mã vạch/Mã định danh (SKU ID). (US-F08-01)
-- Add/Edit form quy định chặt validation. Các block: Tên, Hình ảnh (Max 5, <=5MB chuẩn toàn hệ thống), Giá bán thực, **Giá Khuyến Mãi (Compare at Price)**, Tồn kho & SKU ID, Tối thiểu 1 Category, **Kích thước đóng gói & Cân nặng (Dimensions & Weight)**, Mô tả. Status tạo mới mặc định **Draft**. (US-F08-01)
+- Add/Edit form responsive theo prototype: desktop chia **70/30** (main/sidebar), mobile xếp một cột; 4 sticky tabs **Basic Info / Pricing & Stock / Shipping & Delivery / More Information** và fixed bottom actions. Main chứa toàn bộ nội dung chỉnh sửa; sidebar chỉ có **Content Strength** (5 advisory rules, không phải publish gate) và **Status**. (US-F08-01, US-F08-07)
+- Add/Edit form quy định chặt validation. Các block: Tên + compact editable slug preview, Media, Giá bán thực, **Giá Khuyến Mãi (Compare at Price)**, Tồn kho & SKU ID, Category, **Weight / Length / Width / Height**, mô tả plain textarea, Specifications và SEO. Status tạo mới mặc định **Draft**. Các giới hạn media/data tiếp tục dùng cap production hiện hành; redesign không tự đặt cap mới. (US-F08-01)
 - Category Management: Menu quản lý Danh mục riêng biệt, hỗ trợ lồng nhau tối đa 3-levels (Cha - Con - Cháu). Gán SP vào các danh mục này. (US-F08-05)
 - Product Attributes (Thuộc tính Mở rộng): Bảng Key-Value động (Ví dụ: Thương hiệu, Chất liệu, Xuất xứ) nằm dưới đáy mỗi sản phẩm để tối ưu thông tin SEO. (US-F08-06)
 - Cấu hình Dữ liệu Storefront: Đảm bảo format dữ liệu của F08 tương thích hiển thị ngoài F09. (US-F08-06)
 - Tạo sản phẩm Hàng loạt qua AI Chat: User nhập danh sách mô tả, AI parse ra nhiều sản phẩm cùng lúc. Hiển thị Bảng Preview để người dùng Confirm trước khi Save (Trạng thái mặc định Draft). **KHÔNG bao gồm sinh ảnh tự động.** (US-F08-04)
 - Placehoder mặc định: Nếu sản phẩm không có ảnh, hệ thống render "thùng hàng carton dễ thương". (US-F08-04)
-- Phân loại hàng (Product Variants): Tối đa 2 tầng tuỳ biến tên (VD: Màu, Size), sinh thành Bảng ma trận quản lý. (US-F08-02)
+- Phân loại hàng (Product Variants): Tối đa **2 option groups** tuỳ biến tên (VD: Màu, Size), không giới hạn mỗi group ở 2 values. Ma trận là Cartesian product phản ứng theo option; giữ ổn định dữ liệu các row còn tồn tại khi option thay đổi, nhóm theo option 1, hỗ trợ ảnh cho từng option 1 và bulk apply. Tổng số values/rows giữ nguyên production caps hiện hành, không phát minh giới hạn mới trong redesign. (US-F08-02)
 - Quản lý theo SKU: Nhập Giá bán, Tồn kho, Mã SKU riêng cho cấu hình từng biến thể. (US-F08-02)
-- Tự động Gợi ý SEO Thông minh: AI tự suy luận viết Tiêu đề chuẩn SEO, mô tả Metadata, và URL Slug thân thiện dựa trên Tên Sản Phẩm. (US-F08-03)
+- Gợi ý SEO thông minh: AI đề xuất Tiêu đề chuẩn SEO, mô tả Metadata và URL Slug thân thiện dựa trên Tên Sản Phẩm. User phải chủ động chấp nhận đề xuất slug; AI không tự ghi đè slug đã chỉnh thủ công. (US-F08-03)
 - AI Description generator dựa trên ngành nghề. (US-F08-01)
 - Halal certification toggle + cert image upload (thị trường MY).
 
@@ -86,7 +87,7 @@ I WANT thêm, sửa, xóa sản phẩm và AI viết description
 SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 ```
 
-> Source: [US-F08-01](../stories/F08-products-crud-stories.md#us-f09-01)
+> Source: [US-F08-01](../stories/F08-products-crud-stories.md#us-f08-01-products-crud--trạng-thái-sản-phẩm-activedraft)
 
 ---
 
@@ -97,12 +98,12 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-01 | Product list: Status Tabs (Active, Draft, Archived). Cột: Thumbnail, Name, SKU, Category, Price (RM), Total Stock, Cân nặng, Trạng thái (Toggle). Bổ sung thao tác Edit/Delete trên mỗi hàng. | US-F08-01 | P0 | Detailed Grid |
 | FR-02 | Search Bar & Advanced List Actions: Ô Search độc lập (theo Name, SKU). Sắp xếp theo Tên, Giá, Mới nhất, Stock. Lọc theo Category, Trạng thái Sale. | US-F08-01 | P1 | Power User UX |
 | FR-02.1| Low/Out of Stock Alerts: Đánh dấu (Badge/Đổi màu đỏ) cột Stock nếu = 0. Có nút filter "Hiển thị sản phẩm Hết/Sắp hết hàng". | US-F08-01 | P0 | |
-| FR-03 | Product Status Toggle: Chuyển đổi Active/Draft/Archived. **Mặc định khi tạo mới luôn là Draft.** Cần user manual gạt sang Active để hiện lên web. | US-F08-01 | P0 | Draft by Default |
+| FR-03 | Product list/filter tiếp tục nhận diện Active/Draft/Archived. Trong Add/Edit redesign, Status selector chỉ cho chọn Draft/Active và sản phẩm mới mặc định Draft. Trước implementation phải xác minh safe handling cho record Archived theo một trong hai hướng: giữ nguyên khi status untouched hoặc chặn edit/transition với hướng dẫn rõ; tuyệt đối không silent-coerce sang Draft/Active. | US-F08-01 | P0 | Archived preserve-or-block spike |
 | FR-04 | Product Variants (2 Tầng): Nút "Thêm biến thể". User điền Tên Phân Loại 1 (VD: Màu sắc) -> Điền các Option (Đỏ, Xanh). User điền Tên Phân Loại 2 (VD: Kích cỡ) -> Option (S, M, L). | US-F08-02 | P0 | Max 2 tiers |
 | FR-05 | SKU Matrix Generator: Bảng tự sinh các dòng kết hợp. Mỗi dòng có ô nhập bắt buộc [SKU ID], [Bán], [Compare at Price (Tuỳ chọn)], [Stock]. | US-F08-02 | P0 | Required if variants exist |
-| FR-06 | AI SEO Optimization: Nút "✨ Tối ưu Tìm kiếm". Tự động điền Title thân thiện, Meta Description, và URL Slug dựa vào Ngành và Tên SP. Không dùng từ kỹ thuật phức tạp. | US-F08-03 | P0 | |
+| FR-06 | AI SEO Optimization: Nút "✨ Tối ưu Tìm kiếm" đề xuất Title, Meta Description và URL Slug dựa vào Ngành và Tên SP. Title/Description có thể điền vào trường tương ứng; slug proposal chỉ được áp dụng sau hành động chấp nhận rõ ràng và không ghi đè slug manual. | US-F08-03 | P0 | Explicit slug acceptance |
 | FR-07 | Form Validation Rules: Bắt buộc điền Name (>3 ký tự), Description (AI/Manual), Category (>=1), Giá gốc (>0), Cân nặng (Weight >0 để tính phí Ship), SKU ID, Stock (>=0). Nếu thiếu báo Text đỏ. | US-F08-01 | P0 | Strict save barrier |
-| FR-08 | AI Description: Nút "✨ AI Viết Description" chèn rich text mô tả chi tiết sản phẩm. | US-F08-01 | P0 | BM hoặc EN |
+| FR-08 | AI Description: Nút "✨ AI Viết Description" chèn nội dung vào plain textarea có character counter; user vẫn có thể chỉnh sửa trước khi lưu. | US-F08-01 | P0 | BM hoặc EN |
 | FR-09 | Product Image Upload: Kéo thả, max 5 ảnh. Khối lượng <= 5MB/ảnh tuân thủ chuẩn Editor. Format JPG/PNG/WEBP. AI auto scale/compress. | US-F08-01 | P0 | |
 | FR-10 | Bulk AI Create (Tạo hàng loạt): Nhập 1 list item -> AI parse ra Name, Price, Category, Variants. Hiển thị Bảng Preview để Edit ngang hàng (Data Grid). Khi duyệt xong lưu thành Draft, bỏ qua hình ảnh. | US-F08-04 | P0 | NLP Array parser |
 | FR-11 | Default product image: Khi không có ảnh, hiển thị placeholder hình "Thùng hàng carton dễ thương". | US-F08-04 | P1 | Fallback UI |
@@ -112,8 +113,24 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-15 | Storefront PDP Layout: Breadcrumbs (L1 > L2), Gallery ảnh (Trái), Thông tin (Phải). Khối Attributes Table ở nửa dưới trang. | US-F08-06 | P0 | F09 Dependency |
 | FR-16 | **[Mobile]** Danh sách quản lý sản phẩm trên màn hình < 768px chuyển từ cấu trúc Bảng (Data Table) sang dạng Thẻ Card xổ dọc (Stacked Cards Layout). | US-F08-07 | P1 | Chống scroll ngang |
 | FR-17 | **[Mobile]** Bảng cấu hình SKU Matrix (Variants) trên điện thoại chuyển thành nhóm Accordion xếp dọc. | US-F08-07 | P1 | Tối ưu touch target |
+| FR-18 | Product editor dùng responsive 70/30 trên desktop và một cột trên mobile; 4 sticky tabs: Basic Info, Pricing & Stock, Shipping & Delivery, More Information; fixed bottom actions luôn truy cập được và không che field cuối. | US-F08-01, US-F08-07 | P0 | Presentation redesign |
+| FR-19 | Sidebar desktop chỉ gồm Content Strength và Status. Content Strength đánh giá 5 advisory rules, không chặn Save/Publish và không thay thế validation/publish gate hiện hành. | US-F08-01 | P0 | Advisory only |
+| FR-20 | Dưới Product Name có compact editable slug preview. Slug tự đồng bộ theo tên cho đến lần đầu user sửa thủ công; sau đó không tự overwrite. Unique/format validation hiện hành vẫn áp dụng. | US-F08-03 | P0 | Auto-until-manual |
+| FR-21 | Basic Info đặt Media trước các field nội dung. ALT text nằm trong disclosure theo từng ảnh, tối đa 125 ký tự. Giới hạn số lượng/kích thước ảnh giữ production caps hiện hành. | US-F08-01 | P0 | Progressive disclosure |
+| FR-22 | Category mở searchable picker với ba cột hierarchy hiển thị đồng thời (L1 → L2 → L3), selected breadcrumb, Cancel và Confirm; chỉ leaf node được chọn. Microcopy chính xác cho leaf-only/pending state phải được product/design xác nhận trước implementation; không tự suy diễn thay đổi schema. | US-F08-05 | P0 | Wording pending explicit approval |
+| FR-23 | Description dùng plain textarea với character counter và AI action; không yêu cầu rich-text editor trong presentation redesign. | US-F08-01 | P0 | Preserve stored schema contract |
+| FR-24 | Variant matrix sinh reactive Cartesian product từ tối đa 2 option groups; giữ dữ liệu row có identity còn hợp lệ, nhóm row theo option 1, hỗ trợ image per option 1 và bulk apply các field phù hợp. Không áp đặt max values/rows mới; giữ production caps. | US-F08-02 | P0 | Stable row retention |
+| FR-25 | Shipping & Delivery có đúng 4 field trình bày: Weight, Length, Width, Height. More Information chứa Specifications và SEO. | US-F08-01, US-F08-06 | P0 | Presentation grouping |
 
-### 7.5. Data Validation Rules (Quy tắc Xác thực Dữ liệu)
+### 7.5. Prototype Redesign vs Data Contract
+
+- Đây là **presentation/interaction redesign** của product editor; không mặc định thay đổi Payload schema, API contract, validation server-side hay publish gate hiện hành.
+- Content Strength có đúng 5 advisory checks, mỗi check đóng góp 20 điểm: ít nhất 3 ảnh; Product Name dài 25–100 ký tự sau khi trim; Description dài ít nhất 100 ký tự sau khi trim; đã chọn Category; và cả Weight, Length, Width, Height đều là số hữu hạn lớn hơn 0. Checklist chỉ hướng dẫn và không được dùng làm điều kiện Publish.
+- Các required field và điều kiện Active/Draft tiếp tục theo production behavior cho đến khi có quyết định schema/publish riêng được approve.
+- Với category leaf-only, wording cho trạng thái parent không thể chọn và trạng thái chưa có leaf đang **pending explicit wording**; implementation không tự viết microcopy mang tính policy.
+- Không quy định mới max option values hay max Cartesian rows. Hệ thống phải preserve production caps hiện hành và hiển thị lỗi/cảnh báo hiện hành khi vượt cap.
+
+### 7.6. Data Validation Rules (Quy tắc Xác thực Dữ liệu)
 
 Để đảm bảo tính toàn vẹn dữ liệu cho F08, hệ thống áp dụng bộ Validation Rules cụ thể sau tại Form Tạo/Sửa Sản Phẩm:
 
@@ -167,24 +184,23 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
   ↓ [Xác nhận Lưu 2 Products] → Vào thẳng DB danh sách Draft, chờ User Click sửa để Up Hình.
   
 (Hoặc Lên Form Chi tiết cho 1 Sản Phẩm)
-[Section 1: Basic Info]
-Name, Hierarchy Category (Dropdown tree 3-level), Images (Crate Carton), Default Price/Stock.
+[Sticky Tab 1: Basic Info]
+Media first (ALT disclosure <=125), Name + compact editable slug preview, searchable Category tree 3-level (leaf-only), plain Description textarea + counter/AI.
   ↓
-[Section 2: Variants & SKU (Optional)]
+[Sticky Tab 2: Pricing & Stock]
 Turn on Variants:
 ├── Setup Tier 1: Màu sắc (Đỏ, Xanh)
 ├── Setup Tier 2: Kích cỡ (S, M, L)
-└── Bảng Matrix tự sinh → User điền [Mã SKU], [Giá bán], [Kho] cho từng mục.
+└── Reactive Cartesian matrix → stable rows, group theo option 1, image per option 1, bulk apply.
   ↓
-[Section 2.5: Shipping Dimensions]
-Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để chuẩn bị tính Shipping Rate F14.
+[Sticky Tab 3: Shipping & Delivery]
+Weight, Length, Width, Height -> Để chuẩn bị tính Shipping Rate F14.
   ↓
-[Section 3: Content & Attributes SEO]
-├── Click "✨ AI Viết Description" → HTML Rich text
-├── Dynamic Attributes: [+ Add Field] -> (Key: Origin, Value: VN)
-└── Click "✨ Tối ưu Tìm Kiếm" → generate SEO (Title, Description, Link)
+[Sticky Tab 4: More Information]
+├── Specifications: [+ Add Field] -> (Key: Origin, Value: VN)
+└── SEO (Title, Description, Link)
   ↓
-[ Save (Trạng thái Mặc định: MỚI TẠO LÀ DRAFT) ] 
+[Fixed Bottom Actions: Save Draft / Publish theo production gate hiện hành]
   ↓ (User Manual Toggle)
 [ Publish Active lên Storefront ]
 ```
@@ -213,12 +229,14 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 ### 10.2. Màn hình Chi tiết (Create / Edit Product Form)
 - **Mô tả:** Trang Form nhập đa lớp để khởi tạo 1 sản phẩm mới.
 - **Components chính:**
-  - Hình ảnh: Khu vực Dropzone đa tệp (Max 5 items).
-  - General Info: Tên (Required), Ngành hàng (Dropdown parent-child trees).
-  - Pricing & Variants: Tổ hợp Checkbox "Biến Thể", nếu Tích sẽ nổ ra Bảng Data Grid điền SKU, Giá Bán, Stock Cho Từng SKU.
-  - Vận chuyển: Các NumberInputs nhập khối lượng và chu vi.
-  - Content & SEO: Hộp soạn thảo Rich Text + Nút gọi API AI Viết Mô Tả; Khối chỉnh tùy biến JSON KV Custom Attributes.
-  - Header Navbar Actions: Nút "Save as Draft", Nút "Publish/Active", Nút Delete.
+  - Responsive shell: desktop 70% main content / 30% sidebar; mobile stack một cột.
+  - Sticky tab navigation: Basic Info / Pricing & Stock / Shipping & Delivery / More Information.
+  - Basic Info: Media nằm đầu tiên; mỗi ảnh có ALT disclosure (counter tối đa 125). Product Name có compact editable slug preview ngay bên dưới; category searchable tree 3 level, leaf-only; description là plain textarea có counter và AI action.
+  - Pricing & Stock: Default price/SKU/stock hoặc variant matrix reactive Cartesian. Tối đa 2 option groups, không đồng nghĩa tối đa 2 values; row còn hợp lệ giữ dữ liệu khi matrix đổi; row được group theo option 1, có image per option 1 và bulk apply.
+  - Shipping & Delivery: đúng 4 input Weight, Length, Width, Height.
+  - More Information: Specifications key-value và SEO metadata.
+  - Sidebar: chỉ Content Strength (5 advisory rules) và Status.
+  - Fixed bottom actions: Save draft / Publish-Active theo production permissions và publish gate hiện hành; Delete khi edit; content có bottom padding để action bar không che field cuối.
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]
 
@@ -244,7 +262,7 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
     - **Category Image Field:** REMOVED (unused, never rendered anywhere). Modal chỉ còn 4 fields: Name*, Parent, Description, URL Slug.
 
 ---
-### 10.4. Giao diện Hiển thị Storefront (PLP & PDP)
+### 10.5. Giao diện Hiển thị Storefront (PLP & PDP)
 
 > 📌 **Lưu ý:** Giao diện hiển thị phía End-user (Storefront) đã được chuyển giao cho **PRD: F09-storefront-commerce.md**. Vui lòng sang tài liệu F09 để xem mockups chi tiết cho màn hình Danh sách Sản phẩm (Shop) và Chi tiết Sản phẩm (Product View).
 
@@ -270,9 +288,9 @@ THEN  form hiện: tên, giá (RM), category (single-select, đúng 1), mô tả
 ```gherkin
 GIVEN user điền tên sản phẩm (VD: "Trà Đào Cam Sả") và chọn ngành F&B
 WHEN  click "✨ Tối ưu Tìm Kiếm"
-THEN  AI sinh ra Tiêu đề bán hàng (SEO Title), Mô tả cho MXH (SEO Description) và tạo tự động Link thân thiện `tra-dao-cam-sa`.
+THEN  AI sinh ra Tiêu đề bán hàng (SEO Title), Mô tả cho MXH (SEO Description) và đề xuất Link thân thiện `tra-dao-cam-sa`.
 WHEN  click "✨ AI Viết Description"
-THEN  sinh ra văn bản mô tả giàu cảm xúc, chèn vào ô Rich Text.
+THEN  sinh ra văn bản mô tả giàu cảm xúc, chèn vào plain textarea có character counter.
 ```
 
 ### AC-3: Variant & SKU Matrix Generation
@@ -306,9 +324,9 @@ THEN  một bảng tự sinh xuất hiện bên dưới gồm 4 dòng (Trắng-M
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `ProductsPage` | `app/(dashboard)/products/page.tsx` | List + filter |
-| `ProductForm` | `components/dashboard/ProductForm.tsx` | Add/Edit form |
-| `AIDescriptionButton` | `components/dashboard/AIDescriptionButton.tsx` | AI description generator |
+| `ProductsPage` | `src/app/(dashboard)/products/page.tsx` | List + filter |
+| `ProductForm` | `src/components/dashboard/product-form/ProductForm.tsx` | Shared Add/Edit form orchestration |
+| `DescriptionSeoSection` | `src/components/dashboard/product-form/DescriptionSeoSection.tsx` | Current Description and SEO AI actions; ownership will be split only during implementation |
 
 ### 13.2 API Endpoints
 
@@ -327,13 +345,13 @@ Auth: required, tenant-scoped
 
 | Dependency | Status | Action Needed |
 |-----------|--------|---------------|
-| Payload CMS products collection | ✅ Exists | Add halal + weight fields |
+| Payload CMS products collection | ✅ Exists | Reuse current schema; redesign adds no field or migration by default |
 | OpenAI API | ⬜ | For AI description |
 | Payload media | ✅ Exists | — |
 
 ---
 
-## 17. 9-Point Done Checklist
+## 15. 9-Point Done Checklist
 
 - [ ] Loading State — Table skeleton during fetch
 - [ ] Empty State — "No products yet" + CTA
@@ -347,15 +365,15 @@ Auth: required, tenant-scoped
 
 ---
 
-## 18. Definition of Ready
+## 16. Definition of Ready
 
 - [ ] User Stories approved và linked ở Section 0
-- [ ] Payload products collection has halal + weight fields
+- [ ] Current Products schema and form serialization verified; any persistence gap is scoped and approved separately from the UI redesign
 - [ ] OpenAI API configured
 
 ---
 
-## 19. Definition of Done
+## 17. Definition of Done
 
 - [ ] All FR implemented
 - [ ] All AC pass

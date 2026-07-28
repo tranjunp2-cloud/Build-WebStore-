@@ -4,6 +4,8 @@
 > **Feature Code:** F08
 > **Figma Design:** [Link](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30882-5801&t=nJsYvzayVPDFNauW-1)
 > **Figma Prototype:** [Link](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=H2flt0KzPPelcSG7-1&preview-route=%2Fproducts)
+> **HTML Prototype:** [F08 Add/Edit Product redesign v2](./F08-product-form-redesign-v2.html)
+> **Implementation Status:** Documentation and interactive prototype only. No production code is implemented in this change. Development, localization, automated tests, and QA will be delivered in subsequent phases/issues.
 
 Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng Quản lý Sản phẩm (F08), bám sát các luồng đã định nghĩa trong PRD và User Stories. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái và Topbar giữ nguyên).
 
@@ -73,71 +75,48 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 
 ## 3. Form Thêm/Sửa Sản Phẩm (Create / Edit Product)
 
-*Form phức hợp kéo dài dọc xuống, chia làm nhiều Section. Mặc định trạng thái lưu là Draft. Hình ảnh Fallback (Thùng carton) luôn hiện nếu trống.*
+*Create và Edit dùng chung một page form (không dùng modal/slide-over). Desktop bố cục khoảng 70/30: nội dung chính bên trái, sidebar kiểm tra và trạng thái bên phải; dưới breakpoint tablet chuyển thành một cột. Mặc định sản phẩm mới là Draft.*
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ [≡ Logo]  Search...                           [👤 Admin]│
-├──────────────┬──────────────────────────────────────────┤
-│ 🏠 Dashboard │ < Trở về List          [Draft] [Publish] │
-│ 📦 Products  │ ──────────────────────────────────────── │
-│ 🛒 Orders    │                                          │
-│ ⚙️ Settings  │ ┌─ 1. THÔNG TIN CHUNG ─────────────────┐ │
-│              │ │ Tên Sản Phẩm (*)                     │ │
-│              │ │ [ Nhập tên...                      ] │ │
-│              │ │                                      │ │
-│              │ │ Danh Mục (Category)                  │ │
-│              │ │ [ Chọn Ngành Hàng ▼ ]                  │ │
-│              │ │                                      │ │
-│              │ │ 🖼️ Hình Ảnh (Max 5, Dưới 5MB)         │ │
-│              │ │ ┌─────┐ ┌───┐ ┌───┐                  │ │
-│              │ │ │ 📦  │ │ + │ │ + │                  │ │
-│              │ │ └─────┘ └───┘ └───┘                  │ │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │ ┌─ 2. BIẾN THỂ & TỒN KHO ──────────────┐ │
-│              │ │ 🔲 Sản phẩm có nhiều Tuỳ chọn/Biến thể│ │
-│              │ │                                      │ │
-│              │ │ (Nếu KHÔNG Tích checkbox trên)       │ │
-│              │ │ Giá bán  : [ RM 0.00 ]               │ │
-│              │ │ Tồn Kho  : [ 0       ]               │ │
-│              │ │ SKU Code : [         ]               │ │
-│              │ │                                      │ │
-│              │ │ (Nếu CÓ Tích checkbox)               │ │
-│              │ │ Tầng 1 (VD: Màu sắc): [ Đỏ, Xanh ]   │ │
-│              │ │ Tầng 2 (VD: Size)   : [ M, L     ]   │ │
-│              │ │                                      │ │
-│              │ │ ↳ Bảng SKU Matrix tự sinh:           │ │
-│              │ │ | Variant  | SKU Code | Price | Stock| │
-│              │ │ | Đỏ - M   | [      ] | [   ] | [  ] | │
-│              │ │ | Đỏ - L   | [      ] | [   ] | [  ] | │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │ ┌─ 3. VẬN CHUYỂN & HALAL (SHIPPING) ───┐ │
-│              │ │ Khối lượng (Weight) (*): [ 0.5 ] kg  │ │
-│              │ │ Chiều Dài (L) : [ 10 ] cm            │ │
-│              │ │ Chiều Rộng (W): [ 10 ] cm            │ │
-│              │ │ Chiều Cao (H) : [  5 ] cm            │ │
-│              │ │                                      │ │
-│              │ │ 🔲 Đạt chứng nhận Halal              │ │
-│              │ │    ↳ [📤 Tải lên Chứng nhận]          │ │
-│              │ └──────────────────────────────────────┘ │
-│              │                                          │
-│              │ ┌─ 4. MÔ TẢ & THUỘC TÍNH MỞ RỘNG (SEO) ┐ │
-│              │ │ [ ✨ Viết Mô Tả bằng AI ]              │ │
-│              │ │ [ B I U Ξ ]                          │ │
-│              │ │ [ Rich text description box...     ] │ │
-│              │ │                                      │ │
-│              │ │ Thuộc Tính (Attributes): [+ Thêm]    │ │
-│              │ │ [ Thương hiệu ] : [ OEM            ] │ │
-│              │ │ [ Xuất xứ     ] : [ MY             ] │ │
-│              │ │                                      │ │
-│              │ │ [ ✨ Tối ưu Tìm Kiếm Tự Động (SEO) ]     │ │
-│              │ │ Meta Title: [ AI Generated Title ]   │ │
-│              │ │ Slug      : [ my-product-slug    ]   │ │
-│              │ └──────────────────────────────────────┘ │
-└──────────────┴──────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ ← Products   Add/Edit product                         [Preview] [Save] │
+│ [Basic Info] [Pricing & Stock] [Shipping & Delivery] [More Information]│
+├──────────────────────────────────────────────┬─────────────────────────┤
+│ MAIN (~70%)                                  │ SIDEBAR (~30%, sticky)  │
+│ Media / Images (max 5, compact upload)       │ Content Strength  60%   │
+│ [img] + Add Alt text  [img] ✎ saved ALT      │ ✓ 3 images  ! Shipping  │
+│ Product name *                               │ Status [Draft       ▼] │
+│ [________________________________________]    │ Visibility summary      │
+│ ▸ yourstore.com/products/product-slug [Edit]  │                         │
+│ Category [Select category… ▼]                │                         │
+│ Description                                  │                         │
+│ [ Multi-line textarea; plain editable copy ] │                         │
+│                                              │                         │
+│ Variants [on] — max 2 option groups          │                         │
+│ Option 1 Color [Red] [Blue]                  │                         │
+│ Option 2 Size  [S] [M]                      │                         │
+│ [Apply price/stock/SKU prefix to all]         │                         │
+│ Matrix: Red/S · Red/M · Blue/S · Blue/M       │                         │
+│ Option 1 image mapping: Red→[img], Blue→[img] │                         │
+│                                              │                         │
+│ Shipping & Delivery: Weight, Length, Width, Height                      │
+│ More Information: Specifications card + SEO Settings card              │
+├──────────────────────────────────────────────┴─────────────────────────┤
+│ Fixed bottom actions                  [Cancel] [Save draft] [Publish] │
+└────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 3.1 Interaction contract
+
+- **Bốn tab sticky:** `Basic Info`, `Pricing & Stock`, `Shipping & Delivery`, `More Information`. Tab click cuộn tới section; active tab cập nhật theo vị trí cuộn. `More Information` active xuyên suốt hai card Specifications và SEO Settings.
+- **Slug disclosure gọn:** mặc định chỉ hiện URL preview cạnh tên. Nút **Edit** mới mở input slug; create auto-slug theo tên, edit không tự ghi đè slug đã lưu.
+- **Media/ALT gọn:** mỗi thumbnail có `+ Add Alt text` hoặc summary + edit icon. Click affordance mới mở popover textarea 125 ký tự với counter, helper, Cancel và Save; đóng mặc định, không render persistent selected-image editor. ALT là khuyến nghị accessibility/SEO, không chặn Save/Publish.
+- **Category picker dialog:** click `Select category...` mở dialog tìm kiếm và duyệt cây ba cột L1 → L2 → L3. User chọn một leaf node, xem breadcrumb rồi Confirm; Cancel giữ nguyên Category hiện tại. Đây không phải dialog tạo/sửa category.
+- **Description:** prototype dùng textarea nhiều dòng, không giả định rich-text toolbar.
+- **Variants phản ứng, tối đa 2 option groups:** matrix là tích Descartes của option values. Khi đổi tên/thứ tự hoặc thêm/bớt value, giữ ổn định dữ liệu SKU/price/stock của tổ hợp còn khớp bằng identity ổn định; chỉ tạo mặc định cho tổ hợp mới, không âm thầm xóa dữ liệu còn dùng được. Bulk apply chỉ cập nhật trường user chọn trên các row hiện có. Ảnh biến thể map theo **Option 1** và dùng chung cho mọi tổ hợp có cùng Option 1.
+- **Sidebar:** Content Strength có 5 checklist bằng nhau (ít nhất 3 ảnh; tên 25–100 ký tự; mô tả ≥100 ký tự; đã chọn category; cả bốn shipping values đều là số hữu hạn >0), chỉ là tư vấn. Status là điều khiển workflow riêng. Điểm thấp không tự chặn Publish—publish gate hiện hành mới là nguồn quyết định.
+- **Archived:** selector redesign chỉ expose Draft/Active. Trước implementation phải trace hydration/submit để khóa một safe behavior cho record `archived`: preserve khi status untouched hoặc block edit/transition có hướng dẫn rõ. Không tự downgrade sang Draft hoặc ghi đè khi Save.
+- **Responsive:** desktop 70/30; tablet/mobile một cột, sidebar chuyển thành card trong flow. Bốn tab vẫn sticky; bottom actions fixed ở đáy viewport và form có safe bottom padding để không che nội dung. Variant matrix chuyển accordion/card để không tràn ngang.
 
 ---
 
