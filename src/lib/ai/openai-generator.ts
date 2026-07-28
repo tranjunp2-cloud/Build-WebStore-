@@ -1515,6 +1515,21 @@ export function sanitizeBlockData(
         }
     }
 
+    // Payload casts number fields before inserting. A model value such as
+    // "compact" becomes NaN and makes the entire page insert fail.
+    if (s.blockType === 'announcement-bar' && s.paddingY !== undefined) {
+        const paddingY = typeof s.paddingY === 'number'
+            ? s.paddingY
+            : typeof s.paddingY === 'string' && s.paddingY.trim() !== ''
+                ? Number(s.paddingY)
+                : Number.NaN
+        if (Number.isFinite(paddingY)) {
+            s.paddingY = Math.min(32, Math.max(4, Math.round(paddingY)))
+        } else {
+            delete s.paddingY
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // NAVIGATION BLOCK
     // ═══════════════════════════════════════════════════════════════════════
@@ -1631,14 +1646,25 @@ export function sanitizeBlockData(
     // ═══════════════════════════════════════════════════════════════════════
     const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
     if (Array.isArray(s.formFields)) {
-        s.formFields = s.formFields.map((field: unknown) => {
+        const usedFieldNames = new Set<string>()
+        s.formFields = s.formFields.map((field: unknown, index: number) => {
             if (typeof field === 'string') {
                 const name = field.toLowerCase()
                 let fieldType = 'text'
                 if (name.includes('email')) fieldType = 'email'
                 else if (name.includes('phone') || name.includes('tel') || name.includes('telefon')) fieldType = 'phone'
                 else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
-                return { fieldName: field, label: field, fieldType, required: true }
+                const fieldName = fieldType === 'email'
+                    ? 'email'
+                    : fieldType === 'phone'
+                        ? 'phone'
+                        : fieldType === 'textarea'
+                            ? 'message'
+                            : usedFieldNames.has('name')
+                                ? `field-${index + 1}`
+                                : 'name'
+                usedFieldNames.add(fieldName)
+                return { fieldName, label: field, fieldType, required: true }
             }
             const fObj = (typeof field === 'object' && field !== null ? field : {}) as Record<string, unknown>
             let ft = String(fObj.fieldType || fObj.type || 'text')
@@ -1646,8 +1672,25 @@ export function sanitizeBlockData(
             if (ft === 'number') ft = 'text'
             if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
 
-            return {
-                fieldName: String(fObj.fieldName || fObj.name || 'field'),
+            const suppliedName = String(fObj.fieldName || fObj.name || '').trim()
+            const normalizedName = suppliedName.toLowerCase()
+            const isGenericName = !normalizedName || /^field(?:[-_\s]*\d+)?$/.test(normalizedName)
+            let fieldName = suppliedName
+
+            if (isGenericName) {
+                if (ft === 'email') fieldName = 'email'
+                else if (ft === 'phone') fieldName = 'phone'
+                else if (ft === 'textarea') fieldName = 'message'
+                else if (!usedFieldNames.has('name')) fieldName = 'name'
+                else if (!usedFieldNames.has('subject')) fieldName = 'subject'
+                else fieldName = `field-${index + 1}`
+            }
+
+            if (usedFieldNames.has(fieldName)) fieldName = `field-${index + 1}`
+            usedFieldNames.add(fieldName)
+
+            const normalizedField = {
+                fieldName,
                 label: String(
                     fObj.label
                     || fObj.fieldName
@@ -1659,6 +1702,9 @@ export function sanitizeBlockData(
                 fieldType: ft,
                 required: typeof fObj.required === 'boolean' ? fObj.required : true,
             }
+            return typeof fObj.placeholder === 'string'
+                ? { ...normalizedField, placeholder: fObj.placeholder }
+                : normalizedField
         })
     }
 
