@@ -12,6 +12,11 @@ on:
     branches: [staging]
     paths:
       - 'e2e/**'
+      - 'tests/**'
+      - 'src/app/(dashboard)/settings/profile/**'
+      - 'src/app/api/e2e/ensure-test-user/**'
+      - 'src/lib/otp/e2e-profile-bypass.ts'
+      - 'src/collections/Users.ts'
       - 'playwright.config.ts'
       - '.github/workflows/e2e-staging.yml'
   workflow_dispatch:
@@ -120,6 +125,7 @@ jobs:
             products.spec.ts \
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
+            f23-profile-regression.spec.ts \
             --project=smoke --project=setup --project=chromium 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
@@ -140,6 +146,7 @@ jobs:
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
+          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
 
