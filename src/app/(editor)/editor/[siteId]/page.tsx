@@ -241,6 +241,8 @@ export default function EditorPage() {
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
     const pendingSaveRef = useRef<SaveOptions | null>(null)
+    const contactSavePendingRef = useRef(false)
+    const [isContactSavePending, setIsContactSavePending] = useState(false)
     // F26-04: AbortController for the currently in-flight locale switch.
     // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
     const localeSwitchAbortRef = useRef<AbortController | null>(null)
@@ -729,41 +731,60 @@ export default function EditorPage() {
         // Business name is required — silently ignore blank submissions
         if ('name' in changes && !changes.name) return
 
-        if (changes.name) {
-            updateSiteName(changes.name)
-            // Sync business name into navigation logoText so the nav header
-            // reflects the new name without a separate block edit.
-            updateHeaderBlock({ logoText: changes.name })
+        const isContactSave = changes.contactInfo !== undefined
+        const hasNonContactChanges = Object.entries(changes).some(
+            ([key, value]) => key !== 'contactInfo' && value !== undefined,
+        )
+        if (isContactSave && hasNonContactChanges) return false
+        let ownsContactSave = false
+
+        try {
+            if (isContactSave) {
+                if (contactSavePendingRef.current) return false
+                contactSavePendingRef.current = true
+                ownsContactSave = true
+                setIsContactSavePending(true)
+            }
+
+            if (changes.name) {
+                updateSiteName(changes.name)
+                // Sync business name into navigation logoText so the nav header
+                // reflects the new name without a separate block edit.
+                updateHeaderBlock({ logoText: changes.name })
+            }
+
+        const commitChangesToSite = () => {
+            setSite(prev => {
+                if (!prev) return prev
+
+                return {
+                    ...prev,
+                    ...changes,
+                    contactInfo: {
+                        ...(prev.contactInfo || {}),
+                        ...(changes.contactInfo || {}),
+                    },
+                    localBusiness: {
+                        ...(prev.localBusiness || {}),
+                        ...(changes.localBusiness || {}),
+                    },
+                    socialLinks: {
+                        ...(prev.socialLinks || {}),
+                        ...(changes.socialLinks || {}),
+                    },
+                    seo: {
+                        ...(prev.seo || {}),
+                        ...(changes.seo || {}),
+                    },
+                    branding: {
+                        ...(prev.branding || {}),
+                        ...(changes.branding || {}),
+                    },
+                }
+            })
         }
 
-        setSite(prev => {
-            if (!prev) return prev
-
-            return {
-                ...prev,
-                ...changes,
-                contactInfo: {
-                    ...(prev.contactInfo || {}),
-                    ...(changes.contactInfo || {}),
-                },
-                localBusiness: {
-                    ...(prev.localBusiness || {}),
-                    ...(changes.localBusiness || {}),
-                },
-                socialLinks: {
-                    ...(prev.socialLinks || {}),
-                    ...(changes.socialLinks || {}),
-                },
-                seo: {
-                    ...(prev.seo || {}),
-                    ...(changes.seo || {}),
-                },
-                branding: {
-                    ...(prev.branding || {}),
-                    ...(changes.branding || {}),
-                },
-            }
-        })
+        if (!isContactSave) commitChangesToSite()
 
         // If logo is changing (value differs from current store), silently sync header/footer block logos.
         // This avoids handleContentChange (no "Changes Pending") — branding saves go live immediately.
@@ -795,7 +816,6 @@ export default function EditorPage() {
             }
         }
 
-        try {
             const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
             if (currentPageId) {
                 saveUrl.searchParams.set('pageId', currentPageId)
@@ -826,6 +846,8 @@ export default function EditorPage() {
                 throw new Error(resolveApiError(body, `Server returned ${response.status}`, sub))
             }
 
+            if (isContactSave) commitChangesToSite()
+
             setSaveSuccess(true)
             // header/footer update in-place; branding (CSS vars) still needs full reload
             if (changes.headerBlock || changes.name) {
@@ -846,6 +868,11 @@ export default function EditorPage() {
             const errMsg = error instanceof Error ? error.message : null
             toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
             return false
+        } finally {
+            if (ownsContactSave) {
+                contactSavePendingRef.current = false
+                setIsContactSavePending(false)
+            }
         }
     }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
@@ -2293,6 +2320,7 @@ export default function EditorPage() {
             site,
             siteName: siteName || site?.name || '',
             siteStatus: site?.status || 'draft',
+            isContactSavePending,
             headerBlock,
             footerBlock,
             pages,
@@ -2509,6 +2537,7 @@ export default function EditorPage() {
                     theme={theme}
                     site={site}
                     siteName={siteName}
+                    isContactSavePending={isContactSavePending}
                     headerBlock={headerBlock}
                     footerBlock={footerBlock}
                     pages={pages}
@@ -2577,6 +2606,7 @@ export default function EditorPage() {
                             theme={theme}
                             site={site}
                             siteName={siteName || site?.name || ''}
+                            isContactSavePending={isContactSavePending}
                             siteStatus={site?.status || 'draft'}
                             headerBlock={headerBlock}
                             footerBlock={footerBlock}

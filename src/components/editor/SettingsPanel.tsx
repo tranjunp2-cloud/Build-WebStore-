@@ -42,7 +42,7 @@ import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-
 import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
+import { BUSINESS_CATEGORY_OPTIONS, isValidBusinessPhone, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
 import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
 import { OpeningHoursEditor } from './local-business/opening-hours-editor'
@@ -297,6 +297,8 @@ interface SettingsPanelProps {
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
     }) => void | boolean | Promise<void | boolean>
+    /** Parent-owned contact mutex state so every SettingsPanel mount stays locked. */
+    isContactSavePending?: boolean
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
@@ -334,6 +336,7 @@ function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
+    isContactSavePending = false,
     requestedTab,
     siteLocale = 'en',
     generationLocale, primaryLocale, secondaryLocale, pendingLocale,
@@ -483,13 +486,52 @@ function SettingsPanelInner({
     const siteSocialLinks = site?.socialLinks || {}
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
+    const contactSavePendingRef = useRef(false)
+    const [isContactSaving, setIsContactSaving] = useState(false)
+    const isContactBusy = isContactSavePending || isContactSaving
+
+    const handleContactInfoChange = async (
+        field: keyof NonNullable<NonNullable<SettingsPanelProps['site']>['contactInfo']>,
+        input: HTMLInputElement | HTMLTextAreaElement,
+        value: string,
+        confirmedValue: string,
+    ) => {
+        if (isContactSavePending || contactSavePendingRef.current) {
+            input.value = confirmedValue
+            return
+        }
+
+        input.value = value
+        contactSavePendingRef.current = true
+        setIsContactSaving(true)
+        try {
+            const saved = await onSiteSettingsChange?.({ contactInfo: { [field]: value } })
+            if (saved !== true && input.isConnected) input.value = confirmedValue
+        } catch (error) {
+            console.error('[SettingsPanel] contact info save failed', error)
+            if (input.isConnected) input.value = confirmedValue
+        } finally {
+            contactSavePendingRef.current = false
+            setIsContactSaving(false)
+        }
+    }
 
     // F37 US-01: merge a localBusiness patch into current state, save, then fire
     // the completion analytics event on success (architecture: "on successful
     // save: trackEvent(...)"). Shared by every field in the accordion below so
     // the merge-then-track sequence lives in exactly one place (DRY).
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
-        const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
+        const updatesStructuredAddress = (
+            'streetAddress' in patch ||
+            'state' in patch ||
+            'city' in patch ||
+            'postcode' in patch
+        )
+        const merged: LocalBusinessData = {
+            ...siteLocalBusiness,
+            ...patch,
+            ...(updatesStructuredAddress ? { country: siteLocalBusiness.country?.trim() || 'MY' } : {}),
+        }
         // Every save re-sends the full openingHours array (full-object merge
         // above). A row saved before AC-3's strict validation could have
         // isClosed=false with missing opens/closes, or no dayOfWeek at all —
@@ -610,6 +652,7 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessName}</label>
                         <Input
+                            data-testid="settings-business-name"
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
                             onBlur={(e: FieldBlurEvent) => {
@@ -672,15 +715,20 @@ function SettingsPanelInner({
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
                             <Input
+                                data-testid="settings-contact-phone"
                                 defaultValue={siteContactInfo.phone || ''}
                                 key={`contact-phone-${siteContactInfo.phone || ''}`}
-                                onBlur={(e: FieldBlurEvent) => {
-                                    const v = e.target.value.trim()
-                                    if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
-                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
-                                    } else {
+                                disabled={isContactBusy}
+                                onBlur={async (e: FieldBlurEvent) => {
+                                    const input = e.currentTarget
+                                    const confirmedPhone = siteContactInfo.phone || ''
+                                    const phone = input.value.trim()
+                                    if (!isValidBusinessPhone(phone)) {
                                         toast.error(t.editor.settingsValidation.invalidPhone)
+                                        input.value = confirmedPhone
+                                        return
                                     }
+                                    await handleContactInfoChange('phone', input, phone, confirmedPhone)
                                 }}
                                 variant="editor"
                                 className={editorInputClassName}
@@ -690,14 +738,20 @@ function SettingsPanelInner({
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
                             <Input
+                                data-testid="settings-contact-email"
                                 type="email"
                                 defaultValue={siteContactInfo.email || ''}
                                 key={`contact-email-${siteContactInfo.email || ''}`}
-                                onBlur={(e: FieldBlurEvent) => {
-                                    if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
+                                disabled={isContactBusy}
+                                onBlur={async (e: FieldBlurEvent) => {
+                                    const input = e.currentTarget
+                                    const confirmedEmail = siteContactInfo.email || ''
+                                    const email = sanitizeInput(input.value)
+                                    if (!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                        await handleContactInfoChange('email', input, email, confirmedEmail)
                                     } else {
                                         toast.error(s.invalidEmail)
+                                        input.value = confirmedEmail
                                     }
                                 }}
                                 variant="editor"
@@ -709,9 +763,19 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
                         <Textarea
+                            data-testid="settings-contact-address"
                             defaultValue={siteContactInfo.address || ''}
                             key={`contact-address-${siteContactInfo.address || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, address: e.target.value } })}
+                            disabled={isContactBusy}
+                            onBlur={async (e: FieldBlurEvent) => {
+                                const input = e.currentTarget
+                                await handleContactInfoChange(
+                                    'address',
+                                    input,
+                                    sanitizeInput(input.value),
+                                    siteContactInfo.address || '',
+                                )
+                            }}
                             variant="editor"
                             className={editorTextareaClassName}
                             placeholder={s.addressPlaceholder}
@@ -725,11 +789,12 @@ function SettingsPanelInner({
                 §2): address → coordinates (+ map preview) → category/offer → opening hours → checklist. */}
             {renderGlobalAccordion('localBusiness', s.localBusinessInfo, (
                 <div className="space-y-5">
-                    <div className="space-y-4">
+                    <div className="space-y-4" data-testid="settings-local-business-address">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.streetAddress}</label>
                             <Input
+                                data-testid="settings-local-business-street-address"
                                 defaultValue={siteLocalBusiness.streetAddress || ''}
                                 key={`lb-street-${siteLocalBusiness.streetAddress || ''}`}
                                 onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ streetAddress: sanitizeInput(e.target.value) })}
@@ -744,25 +809,28 @@ function SettingsPanelInner({
                             forces a remount once `site` finishes loading (site starts `null` at
                             first paint), so the reverse-resolve pre-fill effect re-runs against
                             real saved data instead of permanently resolving against an empty value. */}
-                        <GeoCascadeFields
-                            key={site?.id ?? 'lb-geo-pending'}
-                            value={{ state: siteLocalBusiness.state, city: siteLocalBusiness.city, postcode: siteLocalBusiness.postcode }}
-                            onChange={patch => void handleLocalBusinessChange(patch)}
-                            fullWidth={fullWidth}
-                            labels={{
-                                state: s.state,
-                                city: s.city,
-                                postcode: s.postcode,
-                                selectState: s.selectState,
-                                selectCity: s.selectCity,
-                                selectPostcode: s.selectPostcode,
-                                loadingOption: s.loadingOption,
-                                legacyValueHint: s.legacyValueHint,
-                            }}
-                        />
+                        <div data-testid="settings-local-business-geo-fields">
+                            <GeoCascadeFields
+                                key={site?.id ?? 'lb-geo-pending'}
+                                value={{ state: siteLocalBusiness.state, city: siteLocalBusiness.city, postcode: siteLocalBusiness.postcode }}
+                                onChange={patch => void handleLocalBusinessChange(patch)}
+                                fullWidth={fullWidth}
+                                labels={{
+                                    state: s.state,
+                                    city: s.city,
+                                    postcode: s.postcode,
+                                    selectState: s.selectState,
+                                    selectCity: s.selectCity,
+                                    selectPostcode: s.selectPostcode,
+                                    loadingOption: s.loadingOption,
+                                    legacyValueHint: s.legacyValueHint,
+                                }}
+                            />
+                        </div>
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
                             <Input
+                                data-testid="settings-local-business-country"
                                 value={s.countryMalaysia}
                                 disabled
                                 readOnly

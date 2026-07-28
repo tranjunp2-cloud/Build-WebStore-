@@ -1,8 +1,11 @@
 /**
- * Local SEO Score — F37 US-01. Points-subtraction model (start 100, deduct
- * for missing signals), mirroring `technical-score.ts`. Phase 1 buckets sum
- * to 100: Business Data 35 / Structured Data 30 / AI Discoverability 20 /
- * Technical Health 15 (per PRD §13.8).
+ * Local SEO Score — F37.
+ *
+ * `calculateBusinessDataScore` locks the US-F37-01 v2 Business Data contract
+ * (Name 7 / complete structured Address 8 / Phone 5). The legacy runtime
+ * engine below intentionally remains on 35/30/20/15 until US-F37-04 (#1312)
+ * can activate every 20/40/20/20 bucket atomically; wiring only the Business
+ * helper now would cap the full score at 85.
  *
  * AI Discoverability = allowsSearchBots (12) + sitemapPresent (8) — matches
  * PRD §13.8 EXACTLY. There is deliberately NO "blocks suspicious bots"
@@ -12,11 +15,42 @@
  * (researcher-02-json-ld-and-scoring.md Part 4/5 proposed a 3-signal
  * 10/5/5 split including that forbidden sub-signal — that research doc
  * diverges from the canonical PRD and was NOT followed here.)
- *
- * Saving address + hours + category raises the score by ≥20pts vs. a bare
- * site (AC-1): LocalBusiness schema present (+10) + hours (+5) + industry
- * subtype (+5) = +20.
  */
+
+export interface BusinessDataScoreInput {
+    businessName: string | null | undefined
+    streetAddress: string | null | undefined
+    city: string | null | undefined
+    postcode: string | null | undefined
+    country: string | null | undefined
+    phone: string | null | undefined
+}
+
+export interface BusinessDataScoreResult {
+    score: number
+    breakdown: {
+        name: number
+        address: number
+        phone: number
+    }
+}
+
+/**
+ * Pure US-F37-01 v2 Business Data score. Presence checks trim strings, while
+ * address credit is all-or-nothing across the four required structured parts.
+ */
+export function calculateBusinessDataScore(input: BusinessDataScoreInput): BusinessDataScoreResult {
+    const isPresent = (value: string | null | undefined) => Boolean(value?.trim())
+
+    const name = isPresent(input.businessName) ? 7 : 0
+    const address = [input.streetAddress, input.city, input.postcode, input.country].every(isPresent) ? 8 : 0
+    const phone = isPresent(input.phone) ? 5 : 0
+
+    return {
+        score: name + address + phone,
+        breakdown: { name, address, phone },
+    }
+}
 
 export interface LocalSeoScoreInput {
     // Business Data (35pts = 7 signals x 5pts)

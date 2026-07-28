@@ -42,6 +42,7 @@ export interface CompactEditorLayoutProps {
     theme: ThemeData
     site: SiteData | null
     siteName: string
+    isContactSavePending: boolean
     headerBlock: BlockData | null
     footerBlock: BlockData | null
     pages: PageData[]
@@ -118,6 +119,7 @@ export function CompactEditorLayout({
     theme,
     site,
     siteName,
+    isContactSavePending,
     headerBlock,
     footerBlock,
     pages,
@@ -376,6 +378,7 @@ export function CompactEditorLayout({
                                 theme={theme}
                                 site={site}
                                 siteName={siteName || site?.name || ''}
+                                isContactSavePending={isContactSavePending}
                                 siteStatus={site?.status || 'draft'}
                                 headerBlock={headerBlock}
                                 footerBlock={footerBlock}
