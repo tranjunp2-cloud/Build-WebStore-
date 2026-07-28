@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import OrderTrackingClient from '@/app/sites/[slug]/orders/[orderNumber]/OrderTrackingClient'
 
 vi.mock('next/navigation', () => ({
@@ -22,15 +22,21 @@ vi.mock('sonner', () => ({
 }))
 
 // The page opens an SSE channel on mount — jsdom has no EventSource.
+let latestEventSource: FakeEventSource | null = null
+
 class FakeEventSource {
     onmessage: ((e: MessageEvent) => void) | null = null
     onerror: (() => void) | null = null
     close = vi.fn()
+
+    constructor() {
+        latestEventSource = this
+    }
 }
 
 const HISTORY = [
-    { description: 'Waiting for Pickup', eventTime: '2026-07-13T02:24:53.000Z' },
-    { description: 'Order was Canceled', eventTime: '2026-07-13T10:25:27.000Z' },
+    { status: 'pending_pickup', description: 'Waiting for Pickup', eventTime: '2026-07-13T02:24:53.000Z' },
+    { status: 'cancelled', description: 'Order was Canceled', eventTime: '2026-07-13T10:25:27.000Z' },
 ]
 
 // EP cancelled the shipment → order reopened to 'confirmed', awbNo/trackingNumber wiped,
@@ -52,6 +58,7 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
         trackingNumber: null,
         awbNo: null,
         shippingCourier: 'J&T Express',
+        collectionMethod: 'pickup',
         shippingTrackingStatus: 'cancelled',
         shippingTrackingHistory: HISTORY,
         createdAt: '2026-07-13T01:00:00.000Z',
@@ -73,6 +80,7 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
     })
 
     afterEach(() => {
+        latestEventSource = null
         vi.unstubAllGlobals()
         vi.clearAllMocks()
     })
@@ -93,6 +101,76 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
         // otherwise this test passes no matter which card renders it.
         expect(within(activityCard()).getByText('Waiting for Pickup')).toBeInTheDocument()
         expect(within(activityCard()).getByText('Order was Canceled')).toBeInTheDocument()
+    })
+
+    it('[TC-F36.200] renders courier events with the same title and raw note as CMS', () => {
+        render(
+            <OrderTrackingClient
+                order={makeOrder({
+                    status: 'shipped',
+                    collectionMethod: 'dropoff',
+                    shippingTrackingHistory: [
+                        {
+                            status: 'pending_pickup',
+                            description: 'Order Successfully Created or received',
+                            eventTime: '2026-07-28T06:26:00.000Z',
+                        },
+                        {
+                            status: 'pending_pickup',
+                            description: 'Shipment created — RMC002353646MY',
+                            eventTime: '2026-07-28T06:42:00.000Z',
+                        },
+                    ],
+                })}
+                slug="demo"
+            />,
+        )
+
+        const timeline = within(activityCard())
+        expect(timeline.getByText('Waiting for Drop-off')).toBeInTheDocument()
+        expect(timeline.getByText('Order Successfully Created or received')).toBeInTheDocument()
+        expect(timeline.getByText('Shipment created — RMC002353646MY')).toBeInTheDocument()
+        expect(timeline.queryByText('Courier update')).not.toBeInTheDocument()
+        expect(timeline.queryByText('Waiting for Pickup')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F36.201] applies new courier events received while storefront tracking is open', () => {
+        render(
+            <OrderTrackingClient
+                order={makeOrder({
+                    status: 'shipped',
+                    collectionMethod: 'dropoff',
+                    shippingTrackingHistory: [],
+                })}
+                slug="demo"
+            />,
+        )
+
+        act(() => {
+            latestEventSource?.onmessage?.({
+                data: JSON.stringify({
+                    status: 'shipped',
+                    paymentStatus: 'paid',
+                    trackingNumber: 'RMC002353646MY',
+                    awbNo: 'RMC002353646MY',
+                    shippingCourier: 'EP-CR0DW',
+                    shippingCourierName: 'Pos Malaysia Berhad (Melplus)',
+                    shippingCourierLogo: null,
+                    collectionMethod: 'dropoff',
+                    shippingTrackingStatus: 'pending_pickup',
+                    shippingTrackingHistory: [{
+                        status: 'pending_pickup',
+                        description: 'Order Successfully Created or received',
+                        eventTime: '2026-07-28T06:26:00.000Z',
+                    }],
+                    terminal: false,
+                }),
+            } as MessageEvent)
+        })
+
+        const timeline = within(activityCard())
+        expect(timeline.getByText('Waiting for Drop-off')).toBeInTheDocument()
+        expect(timeline.getByText('Order Successfully Created or received')).toBeInTheDocument()
     })
 
     // NOTE: match the shipment card's own sentence, not just "being prepared" — the separate

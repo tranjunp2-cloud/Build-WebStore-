@@ -10,6 +10,7 @@ import {
     CalendarClock, Navigation, ChevronDown,
     RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw, ScanBarcode,
 } from 'lucide-react'
+import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
 
 type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
 
@@ -31,6 +32,7 @@ type ShippingAddress = {
 }
 
 type EpTrackingHistoryEntry = {
+    status?: string | null
     description: string
     eventTime: string
 }
@@ -57,6 +59,7 @@ type OrderData = {
     shippingCourierName?: string | null
     /** EP courier_logo URL captured at label creation — absent on old orders / failed lookups. */
     shippingCourierLogo?: string | null
+    collectionMethod?: 'pickup' | 'dropoff' | null
     shippingTrackingStatus?: string | null
     shippingTrackingHistory?: EpTrackingHistoryEntry[]
     createdAt: string
@@ -365,11 +368,12 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     // events above. Kept even when awbNo is null: an EP cancel wipes the AWB, and dropping the
     // history with it would erase every update the buyer had already seen.
     for (const h of history) {
+        const display = formatTrackingEventDisplay(h, order.collectionMethod)
         entries.push({
             state: 'completed',
             Icon: Package,
-            title: h.description,
-            meta: 'Courier update',
+            title: display.title,
+            meta: display.note ?? undefined,
             date: h.eventTime ? formatDate(h.eventTime) : '',
             time: h.eventTime ? formatTime(h.eventTime) : '',
         })
@@ -559,16 +563,21 @@ export default function OrderTrackingClient({ order, slug }: Props) {
             errorCount = 0
             try {
                 const data = JSON.parse(e.data)
-                if (data.status !== statusRef.current) {
-                    statusRef.current = data.status
-                    setLiveOrder(prev => ({
-                        ...prev,
-                        status: data.status,
-                        paymentStatus: data.paymentStatus,
-                        trackingNumber: data.trackingNumber,
-                    }))
-                    if (data.terminal) es.close()
-                }
+                statusRef.current = data.status
+                setLiveOrder(prev => ({
+                    ...prev,
+                    status: data.status,
+                    paymentStatus: data.paymentStatus,
+                    trackingNumber: data.trackingNumber,
+                    awbNo: data.awbNo,
+                    shippingCourier: data.shippingCourier,
+                    shippingCourierName: data.shippingCourierName,
+                    shippingCourierLogo: data.shippingCourierLogo,
+                    collectionMethod: data.collectionMethod,
+                    shippingTrackingStatus: data.shippingTrackingStatus,
+                    shippingTrackingHistory: data.shippingTrackingHistory,
+                }))
+                if (data.terminal) es.close()
             } catch {
                 // ignore malformed events
             }

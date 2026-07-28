@@ -6,6 +6,7 @@
 // matching the Figma timeline. CMS-created shipment events stay single-line.
 
 import { useI18n } from '@/i18n'
+import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
 
 function fmtEventTime(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -32,30 +33,6 @@ export function TrackingTimeline({ events, collectionMethod }: TrackingTimelineP
   const { t } = useI18n()
   const tk = t.dashboard.orders.tracking
 
-  // Keyed by the INTERNAL enum values stored in shippingTrackingHistory[].status
-  // (sync-tracking.ts writes mapped.internal, not the human label).
-  const FRIENDLY: Record<string, string> = {
-    'order_created':      tk.statusOrderCreated,
-    'pending_pickup':     collectionMethod === 'dropoff'
-      ? tk.statusPendingDropoff
-      : tk.statusPendingPickup,
-    'picked_up':          tk.statusPickedUp,
-    'in_transit':         tk.statusInTransit,
-    'out_for_delivery':   tk.statusOutForDelivery,
-    'delivered':          tk.statusDelivered,
-    'failed_delivery':    tk.statusFailedDelivery,
-    'returned_to_sender': tk.statusReturnedToSender,
-    'lost':               tk.statusLost,
-    'cancelled':          tk.statusCancelled,
-    'exception':          tk.statusException,
-    'processing':         tk.statusProcessing,
-  }
-
-  function friendlyStatus(raw: string | null | undefined): string {
-    if (!raw) return tk.statusProcessing
-    return FRIENDLY[raw] ?? raw
-  }
-
   if (!events || events.length === 0) {
     return (
       <div className="track-timeline">
@@ -77,16 +54,7 @@ export function TrackingTimeline({ events, collectionMethod }: TrackingTimelineP
     <div className="track-timeline">
       {sorted.map((ev, i) => {
         const isFirst = i === 0 // newest = "live" marker
-        const statusTitle = friendlyStatus(ev.status)
-        const description = ev.description || ''
-        const isShipmentCreated = /^Shipment created(?:\s+—|$)/.test(description)
-        const displayTitle = isShipmentCreated ? description : statusTitle
-        const displayNote =
-          !isShipmentCreated &&
-          description &&
-          description.toLocaleLowerCase() !== statusTitle.toLocaleLowerCase()
-            ? description
-            : null
+        const display = formatTrackingEventDisplay(ev, collectionMethod, tk)
         return (
           <div
             key={`${ev.status}-${ev.eventTime}-${i}`}
@@ -95,10 +63,10 @@ export function TrackingTimeline({ events, collectionMethod }: TrackingTimelineP
             <span className="tl-dot" />
             <div className="tl-body">
               <div className="tl-head">
-                <span className="tl-t">{displayTitle}</span>
+                <span className="tl-t">{display.title}</span>
                 <span className="tl-d">{fmtEventTime(ev.eventTime)}</span>
               </div>
-              {displayNote && <div className="tl-note">{displayNote}</div>}
+              {display.note && <div className="tl-note">{display.note}</div>}
             </div>
           </div>
         )

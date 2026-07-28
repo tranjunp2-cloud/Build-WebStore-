@@ -147,8 +147,10 @@ export default async function OrderTrackingPage({
         // Without this the buyer's courier row rendered the raw EP code ("EP-CR0DW").
         shippingCourierName: order.shippingCourierName ?? null,
         shippingCourierLogo: order.shippingCourierLogo ?? null,
+        collectionMethod: order.collectionMethod ?? null,
         shippingTrackingStatus: order.shippingTrackingStatus ?? null,
         shippingTrackingHistory: (order.shippingTrackingHistory ?? []).map((h: any) => ({
+            status: h.status ?? null,
             description: h.description ?? '',
             eventTime: h.eventTime ?? '',
         })),
