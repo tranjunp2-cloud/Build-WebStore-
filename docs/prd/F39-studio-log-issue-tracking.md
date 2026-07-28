@@ -1,58 +1,60 @@
-# PRD: Studio AI-Assisted Issue Tracking (F39)
-> **Version:** 3.0 | **Status:** Phase 2 — flow approved 2026-07-27 | **Priority:** P1
-> **Existing surfaces:** `/studio/issues`, `/studio/generations`
+# PRD: Studio Live Error Inbox (F39)
+> **Version:** 4.0 | **Status:** Phase 2 — flow approved 2026-07-28 | **Priority:** P1 | **Delivery:** One-day baseline
+> **Existing surface:** `/studio/issues`
 > **Depends on:** F02 Auth, Sentry integration, Vercel Runtime Logs, Prime Studio
 
 ## 1. Problem
 
-Production errors are split between Sentry and Vercel, so a super-admin must manually correlate events, determine the likely cause, and turn the finding into work for the technical team.
+Production errors are split between Sentry and Vercel. Developers must open both providers, identify the affected tenant or subdomain, understand the failure, and manually turn the finding into tracked work.
 
-Prime Studio already has an internal issue tracker at `/studio/issues` and an LLM usage-session monitor at `/studio/generations`. F39 enhances these existing surfaces instead of creating a separate logs page or business tracking system.
+F39 enhances the existing `/studio/issues` page with a read-on-demand Live Errors inbox. It gives the technical team safe evidence and deterministic investigation guidance, then lets a super-admin promote a selected provider error into the existing issue workflow.
 
-## 2. Actors
+## 2. Actor
 
 | Actor | Goal |
 |---|---|
-| Super-admin | Review production incidents, inspect evidence and AI suggestions, then assign and track resolution |
-| Technical assignee | Investigate an assigned issue, update its status, and record the resolution |
+| Technical operator with `super-admin` access | Review live provider errors, identify the affected tenant, inspect safe evidence, and promote actionable errors into tracked issues |
 
-Both surfaces remain internal, English-only, and restricted by the existing `super-admin` guard.
+The existing Studio authorization boundary remains unchanged. F39 does not introduce another developer role or a seller-facing view.
 
 ## 3. Scope
 
 ### In scope
 
-- Enhance `/studio/issues` as the single incident-triage and issue-lifecycle surface.
-- Read errors from Sentry and Vercel Runtime Logs without mutating either provider.
-- Normalize, sanitize, correlate, and deduplicate provider evidence.
-- Use an LLM to produce a concise symptom summary, likely causes, supporting evidence, and suggested next actions.
-- Clearly distinguish evidence-backed facts from hypotheses.
-- Let a super-admin review the suggestion before creating or assigning technical work.
-- Reuse the existing issue statuses, assignee, comments, and timeline.
-- Record F39 LLM calls as ordinary usage sessions visible in `/studio/generations`.
-- Show source freshness and partial-provider failures without making the whole Issues page unavailable.
+- Enhance `/studio/issues` with `Tracked issues` and `Live errors` views.
+- Read unresolved Sentry issues and current-production-deployment Vercel Runtime Logs on demand.
+- Fetch Sentry and Vercel independently so one provider failure does not block the other.
+- Normalize both sources into one safe UI contract.
+- Show source, severity, occurrence time, hostname, matched tenant when available, route, status, error summary, release or deployment, and provider link.
+- Display deterministic `Suggested next checks` based on observable evidence.
+- Let a super-admin manually create a tracked runtime issue with sanitized evidence prefilled.
+- Reuse the existing status, assignee, comments, and timeline workflow.
+- Prevent exact duplicate promotion of the same provider error.
 
 ### Out of scope
 
-- Any external business-team issue intake or tracking system.
+- Cron, scheduled polling, provider webhooks, Vercel Log Drains, queues, or background synchronization.
+- Automatic issue creation or automatic assignment.
+- LLM analysis, Sentry Seer, AI root-cause claims, or AI usage auditing.
+- New telemetry tables or persistent raw-log storage.
+- Fuzzy deduplication or inferred cross-provider correlation.
+- Changes to `/studio/generations`.
 - A new `/studio/logs` route or separate incident dashboard.
-- Replacing `/studio/generations` with an incident-analysis page.
-- Sentry Seer.
-- Automatic code changes, repository access, shell access, pull requests, deployments, or automatic fixes.
-- Automatic acceptance of an LLM conclusion.
 - Mutating, resolving, or suppressing records in Sentry or Vercel.
-- Seller-facing monitoring or access to raw telemetry.
+- Automatic code changes, repository access, pull requests, deployments, or fixes.
 
 ## 4. Success Metrics
 
 | Metric | Target | Guardrail |
 |---|---:|---|
-| New provider incident visible in `/studio/issues` | p95 ≤ 5 minutes | No duplicate issue for the same provider fingerprint |
-| Initial triage time | Median ≤ 5 minutes | Measured from issue creation to first super-admin review |
-| AI claim traceability | 100% | Every factual claim links to sanitized evidence; unsupported causes remain hypotheses |
-| Sensitive-data leakage | 0 confirmed cases | Secrets, auth headers, cookies, prompts, request bodies, payment data, and unnecessary PII are excluded |
-| Partial-source availability | 100% | One provider failure does not cause a full-page failure |
-| Unauthorized access | 0 | Existing super-admin authorization applies to page and APIs |
+| Provider result availability after manual refresh | p95 ≤ 10 seconds per available source | Each provider has an independent timeout and error state |
+| Tenant attribution honesty | 100% | Show `Unknown` when the provider evidence cannot identify a hostname; never guess |
+| Exact promotion deduplication | 100% | Re-promoting the same provider key returns the existing tracked issue |
+| Investigation guidance coverage | 100% of displayed errors | Guidance is labeled as suggested checks, never as a confirmed root cause |
+| Sensitive-data leakage | 0 confirmed cases | Only allowlisted normalized fields reach the browser or tracked issue |
+| Unauthorized access | 0 | Existing super-admin authorization applies to page and API |
+
+This baseline has no background freshness SLA. The UI must show the provider timestamp and the time of the latest manual fetch.
 
 ## 5. Approved Process Flow
 
@@ -60,161 +62,207 @@ This Mermaid diagram is the product source of truth.
 
 ```mermaid
 flowchart LR
-    source_logs["Sentry + Vercel Logs"] --> studio_issues["/studio/issues"]
-    studio_issues --> llm_analysis["LLM analyzes evidence"]
-    llm_analysis --> suggested_resolution["Hypotheses + suggested solution"]
-    suggested_resolution --> superadmin_review["Super-admin review"]
-    superadmin_review --> assign_ticket["Create or assign issue"]
-    assign_ticket --> track_resolution["Track resolution status"]
-    llm_analysis -. "Record LLM usage session" .-> studio_generations["/studio/generations"]
+    provider_sources["Sentry issues + Vercel runtime logs"] --> fetch_live_errors["Fetch sources independently on demand"]
+    fetch_live_errors --> normalize_evidence["Normalize and sanitize evidence"]
+    fetch_live_errors -. "One source fails" .-> degraded_source["Show unavailable source state"]
+    degraded_source --> live_error_list["Live errors list"]
+    normalize_evidence --> live_error_list
+    live_error_list --> review_error["Review safe error details"]
+    review_error --> resolve_tenant["Resolve hostname to tenant when possible"]
+    resolve_tenant --> suggested_checks["Show suggested next checks"]
+    suggested_checks --> promotion_decision{"Create tracked issue?"}
+    promotion_decision -- "Yes" --> create_runtime_issue["Create or open exact runtime issue"]
+    create_runtime_issue --> tracked_issue_workflow["Existing issue lifecycle"]
+    promotion_decision -- "No" --> end_reviewed["Keep provider error untracked"]
 ```
 
 ### Product interpretation
 
-- `/studio/issues` owns incident evidence, AI-assisted triage, assignment, discussion, and resolution.
-- `/studio/generations` continues to show LLM usage sessions. It does not own incident analysis or resolution.
-- An LLM suggestion is advisory. A super-admin remains the decision-maker.
+- `Live errors` is a temporary provider inbox, not another issue database.
+- Provider data is fetched only when the operator opens or refreshes the view.
+- A provider error becomes durable Prime work only after manual promotion.
+- `Suggested next checks` helps investigation but does not claim a proven root cause.
 
 ## 6. User Stories and Acceptance Criteria
 
-### US-F39-01 — Consolidate provider incidents
+### US-F39-01 — Review live provider errors
 
-**Path:** `source_logs → studio_issues`
+**Path:** `provider_sources → fetch_live_errors → normalize_evidence → live_error_list`
 
-**Story:** As a super-admin, I want Sentry and Vercel incidents available in the existing Issues page so that I can start triage from one place.
-
-**AC**
-
-- **Happy — AC-01:** GIVEN valid Sentry and Vercel credentials WHEN synchronization runs THEN new sanitized incidents appear in `/studio/issues` with source, severity, occurrence time, fingerprint, and available tenant or request context.
-- **Edge — AC-02:** GIVEN matching evidence from both providers WHEN correlation uses an exact shared request or trace identifier THEN the evidence is attached to one issue rather than creating two issues.
-- **Edge — AC-03:** GIVEN a repeated provider fingerprint WHEN synchronization runs again THEN the existing issue receives updated occurrence metadata without losing its assignee, comments, status, or timeline.
-- **Error — AC-04:** GIVEN one provider is unavailable or rate-limited WHEN synchronization runs THEN available provider data remains usable and the failed source displays its last successful sync and error state.
-- **Error — AC-05:** GIVEN evidence contains disallowed sensitive data WHEN it is processed THEN the data is removed before storage, display, or LLM submission.
-
-### US-F39-02 — Generate evidence-bound triage guidance
-
-**Path:** `studio_issues → llm_analysis → suggested_resolution`
-
-**Story:** As a super-admin, I want the LLM to analyze sanitized incident evidence so that I receive useful hypotheses and next actions without treating speculation as fact.
+**Story:** As a technical operator, I want recent Sentry and Vercel errors in the existing Issues page so that I can review production failures from one place.
 
 **AC**
 
-- **Happy — AC-06:** GIVEN sufficient sanitized evidence WHEN analysis completes THEN the issue shows a symptom summary, likely cause, cited evidence, and suggested next action.
-- **Edge — AC-07:** GIVEN evidence supports multiple plausible causes WHEN analysis completes THEN the causes are ranked as hypotheses and each cites the evidence that supports it.
-- **Edge — AC-08:** GIVEN only occurrence count or last-seen time changed WHEN the issue synchronizes THEN the existing analysis is reused rather than starting another LLM session.
-- **Error — AC-09:** GIVEN evidence is insufficient WHEN analysis completes THEN the issue states `Needs investigation`, lists the missing evidence, and does not assert a root cause.
-- **Error — AC-10:** GIVEN the LLM request fails or returns an invalid result WHEN the issue loads THEN raw sanitized evidence remains reviewable and analysis can be retried by a super-admin.
+- **Happy — AC-01:** GIVEN both provider credentials are valid WHEN the operator opens or refreshes Live Errors THEN available Sentry and Vercel errors appear with source, severity, occurrence time, summary, and any hostname, route, or status already supplied by that source.
+- **Edge — AC-02:** GIVEN Sentry and Vercel evidence share the same exact request or trace identifier WHEN the list is normalized THEN the UI may show them as related evidence; otherwise they remain separate.
+- **Edge — AC-03:** GIVEN no qualifying errors are returned WHEN a source finishes loading THEN that source displays an empty state and its fetch time.
+- **Error — AC-04:** GIVEN one provider is unavailable, rate-limited, unauthorized, or times out WHEN Live Errors loads THEN the failed source displays an unavailable state while the other source remains usable.
+- **Error — AC-05:** GIVEN both providers fail WHEN Live Errors loads THEN Tracked Issues remains usable and the operator can retry each provider independently.
 
-### US-F39-03 — Review, assign, and resolve
+### US-F39-02 — Identify tenant and investigation steps
 
-**Path:** `suggested_resolution → superadmin_review → assign_ticket → track_resolution`
+**Path:** `live_error_list → review_error → resolve_tenant → suggested_checks`
 
-**Story:** As a super-admin, I want to review the proposed diagnosis before assigning the issue so that technical work begins from a human-approved decision.
-
-**AC**
-
-- **Happy — AC-11:** GIVEN an analyzed issue WHEN a super-admin accepts or edits the triage notes and selects an assignee THEN the issue enters the existing tracked workflow with the decision recorded in its timeline.
-- **Edge — AC-12:** GIVEN the super-admin rejects the suggestion WHEN the issue is assigned THEN the rejected suggestion remains auditable and is not presented as the approved resolution.
-- **Edge — AC-13:** GIVEN an existing unresolved issue receives new evidence WHEN it is reviewed THEN its current owner and status are preserved unless the super-admin changes them.
-- **Error — AC-14:** GIVEN no assignee is selected WHEN the super-admin saves triage notes THEN the issue remains unassigned and visibly open rather than being silently treated as assigned.
-- **Error — AC-15:** GIVEN the issue update fails WHEN the super-admin submits a change THEN the previous issue state remains intact and the failure is visible for retry.
-
-### US-F39-04 — Audit LLM usage sessions
-
-**Path:** `llm_analysis → studio_generations`
-
-**Story:** As a super-admin, I want F39 analysis calls recorded as LLM usage sessions so that usage, cost, latency, and failures remain auditable in the existing Generations page.
+**Story:** As a technical operator, I want safe evidence, tenant context, and suggested checks so that I know where to investigate without treating speculation as fact.
 
 **AC**
 
-- **Happy — AC-16:** GIVEN F39 starts an LLM analysis WHEN the call completes or fails THEN one corresponding usage session is visible in `/studio/generations` with endpoint/category, status, duration, cost when available, and timestamps.
-- **Edge — AC-17:** GIVEN a super-admin opens an F39 usage session WHEN its detail is displayed THEN it links back to the related issue without turning Generations into an incident-analysis surface.
-- **Error — AC-18:** GIVEN usage-session recording fails WHEN incident analysis finishes THEN the issue displays the analysis result and an observable usage-audit warning; the issue workflow is not lost.
+- **Happy — AC-06:** GIVEN an error contains a hostname WHEN its details open THEN F39 displays the hostname and the matching tenant when the existing domain resolver finds one.
+- **Edge — AC-07:** GIVEN the hostname is a platform subdomain WHEN it is resolved THEN F39 displays the corresponding tenant slug.
+- **Edge — AC-08:** GIVEN the hostname is missing or cannot be mapped WHEN details open THEN tenant is displayed as `Unknown` without an inferred value.
+- **Happy — AC-09:** GIVEN a supported error category WHEN details open THEN F39 displays a likely investigation area, the next two checks, and an escalation condition derived from deterministic rules.
+- **Error — AC-10:** GIVEN no guidance rule matches WHEN details open THEN F39 displays a generic provider-first investigation checklist and does not assert a root cause.
+- **Error — AC-11:** GIVEN provider evidence contains disallowed sensitive data WHEN it is normalized THEN the data is excluded before browser display or issue promotion.
 
-## 7. Functional Requirements
+### US-F39-03 — Promote an error into tracked work
+
+**Path:** `suggested_checks → promotion_decision → create_runtime_issue → tracked_issue_workflow`
+
+**Story:** As a technical operator, I want to promote an actionable provider error into the existing issue workflow so that the team can assign and track its resolution.
+
+**AC**
+
+- **Happy — AC-12:** GIVEN an untracked provider error WHEN the operator creates an issue THEN title, severity, safe evidence, tenant context, provider link, and suggested checks are prefilled and the issue enters the existing workflow.
+- **Edge — AC-13:** GIVEN the same provider key already belongs to an issue WHEN the operator promotes it again THEN F39 opens or identifies the existing issue instead of creating a duplicate.
+- **Edge — AC-14:** GIVEN related Sentry and Vercel evidence have an exact shared request or trace identifier WHEN one is promoted THEN both safe evidence references may be included in the tracked issue.
+- **Error — AC-15:** GIVEN issue creation fails WHEN the operator submits the promotion THEN no partial issue is treated as created, the provider error remains reviewable, and retry is available.
+- **Error — AC-16:** GIVEN the operator chooses not to promote an error WHEN review ends THEN no provider telemetry is persisted by F39.
+
+## 7. Traceability
+
+| User story | Flow path | AC | Functional requirements |
+|---|---|---:|---|
+| US-F39-01 | Provider fetch through Live Errors list, including degraded source | 5 | FR-01–FR-06 |
+| US-F39-02 | Error review through tenant attribution and guidance | 6 | FR-07–FR-10 |
+| US-F39-03 | Promotion decision through existing tracked workflow | 5 | FR-11–FR-14 |
+
+## 8. Functional Requirements
 
 | ID | Requirement | Traces to |
 |---|---|---|
-| FR-01 | Extend the existing `/studio/issues` route; do not create `/studio/logs` | US-F39-01 |
+| FR-01 | Extend `/studio/issues`; do not introduce another Studio route | All |
 | FR-02 | Preserve the existing `requireSuperAdmin()` and API authorization boundary | All |
-| FR-03 | Fetch Sentry and Vercel independently using server-side credentials | US-F39-01 |
-| FR-04 | Normalize provider events into one sanitized evidence contract | US-F39-01 |
-| FR-05 | Deduplicate by stable provider fingerprint and correlate sources only through exact shared identifiers | US-F39-01 |
-| FR-06 | Preserve manually managed issue lifecycle fields during automated recurrence updates | US-F39-01, US-F39-03 |
-| FR-07 | Exclude secrets and unnecessary personal or product-prompt data before storage or LLM processing | US-F39-01, US-F39-02 |
-| FR-08 | Produce structured analysis containing summary, hypotheses, evidence references, missing evidence, and suggested next action | US-F39-02 |
-| FR-09 | Label unsupported causes as hypotheses or `Needs investigation` | US-F39-02 |
-| FR-10 | Trigger analysis for a new issue, materially changed causal evidence, or explicit super-admin retry | US-F39-02 |
-| FR-11 | Require super-admin review before an AI suggestion becomes approved triage guidance | US-F39-03 |
-| FR-12 | Reuse existing assignee, status, comments, and timeline behavior for issue resolution | US-F39-03 |
-| FR-13 | Record every attempted F39 LLM analysis as a usage session in the existing generation-monitoring system | US-F39-04 |
-| FR-14 | Keep `/studio/generations` focused on LLM session telemetry and link back to the related issue | US-F39-04 |
-| FR-15 | Expose per-source freshness and recoverable degraded states on `/studio/issues` | US-F39-01 |
+| FR-03 | Fetch Sentry and Vercel independently with server-only credentials and bounded timeouts | US-F39-01 |
+| FR-04 | Read unresolved Sentry production issues sorted by latest activity; fetch the latest event only when details are requested | US-F39-01 |
+| FR-05 | Read error, fatal, and HTTP 5xx logs from the current production Vercel deployment only after the delivery gate passes | US-F39-01 |
+| FR-06 | Keep Tracked Issues available when either or both providers fail | US-F39-01 |
+| FR-07 | Return only the normalized evidence allowlist defined in Section 10 | US-F39-01, US-F39-02 |
+| FR-08 | Resolve Vercel `domain` or Sentry request hostname through the existing tenant/domain resolver; otherwise return `Unknown` | US-F39-02 |
+| FR-09 | Generate deterministic guidance for 5xx, timeout, auth, not-found, rate-limit, and application-exception categories | US-F39-02 |
+| FR-10 | Label guidance as suggested checks and never as confirmed root cause | US-F39-02 |
+| FR-11 | Persist provider evidence only after explicit issue promotion | US-F39-03 |
+| FR-12 | Use `relatedType=runtime` and a stable provider key for exact promotion deduplication | US-F39-03 |
+| FR-13 | Reuse existing issue title, severity, assignee, status, comments, description, and timeline behavior | US-F39-03 |
+| FR-14 | Correlate sources only through an exact shared request or trace identifier | US-F39-01, US-F39-03 |
 
-## 8. UI Contract
+## 9. UI Contract
 
-| Surface | Existing source | F39 enhancement | Required states |
+| View | Existing route | Purpose | Required states |
 |---|---|---|---|
-| Issues list and detail | `src/app/studio/issues` | Provider/source context, sync freshness, evidence, AI analysis, review decision, and linkable issue lifecycle | Loading, empty, success, partial-source failure, analysis failure, update failure |
-| Generations list and detail | `src/app/studio/generations` | Identify F39 analysis sessions and link to their related issue | Loading, empty, success, failed session |
+| Tracked issues | `/studio/issues` | Preserve the current internal issue tracker | Loading, empty, success, update failure |
+| Live errors | `/studio/issues` | Read Sentry and Vercel errors with `All`, `Sentry`, and `Vercel` filters | Loading, empty, success, partial-source failure, total-source failure |
+| Live error detail | Existing Issues detail drawer | Show safe evidence, tenant attribution, suggested checks, provider link, and promotion action | Loading, success, unknown tenant, unavailable detail, promotion failure |
 
-No new Studio route is introduced.
+No new Studio page is introduced.
 
-## 9. Data and Integration Contract
+## 10. Provider, API, and Data Contract
 
-The existing `template-issues` model remains the issue-lifecycle owner. Any new fields required for provider fingerprints, sanitized evidence, AI analysis, review decisions, or related generation-session identifiers must extend that model and follow the repository migration rules.
+### Provider behavior
 
-The existing `ai-generation-records` capture path remains the usage-session audit mechanism. F39 records must use a distinct endpoint or category and carry a safe relation back to the issue; raw provider logs and secrets must never be stored in prompts or snapshots.
+- **Sentry:** read unresolved production issues, sorted by latest activity, with a bounded result count. Request the latest event only when the operator opens an error.
+- **Vercel:** resolve the current production deployment, open its Runtime Logs stream, keep at most 50 qualifying rows, and abort the read after 5 seconds.
+- Vercel is not promised a one-hour historical window because its official Runtime Logs contract does not expose documented `since`, `until`, `level`, or `limit` parameters.
 
-Sentry and Vercel are read-only evidence providers. Provider credentials are server-only and must be represented in both staging and production environment templates.
+### Studio API
 
-## 10. Non-Functional Requirements
+| Method | Path | Request | Success | Errors |
+|---|---|---|---|---|
+| `GET` | `/api/admin/issues/providers` | `source=sentry\|vercel`, optional provider item ID | Sanitized provider list or detail | `400`, `401`, `403`, provider-specific `502/504` |
+| `POST` | Existing `/api/admin/issues` | Existing issue payload with `relatedType=runtime` and stable provider key | Created issue or exact existing match | Existing validation, authorization, and write errors |
+
+The UI calls each provider independently. A source error must not be represented as an empty successful result.
+
+### Normalized evidence allowlist
+
+`source`, `providerId`, `occurredAt`, `severity`, `message` capped at 1,000 characters, `host`, `tenantMatch`, route without query string, request method, status code, release or deployment ID, request or trace ID, top five in-application frames, and provider URL.
+
+F39 excludes cookies, authorization headers, query parameters, request and response bodies, prompts, user email or IP, breadcrumbs, stack locals, frame variables, and raw provider JSON.
+
+### Persistence and exact identity
+
+- Sentry provider key: stable Sentry issue/group ID.
+- Vercel provider key: deterministic hash of domain, method, path, status, and the exact sanitized message.
+- Tracked relation: `relatedType=runtime`, `relatedId=<source>:<provider-key>`.
+- Only the promoted sanitized snapshot and provider link are written into the existing issue model.
+- Adding the `runtime` select option must be checked against the live database schema before implementation; no new field or table is planned.
+
+## 11. Deterministic Guidance Contract
+
+| Evidence category | Likely investigation area | Required checks | Escalation condition |
+|---|---|---|---|
+| HTTP 500–503 | Application route, dependency, or recent deployment | Inspect top application frame; compare the first occurrence with the latest deployment | Escalate when the application frame is unavailable or the deployment comparison is inconclusive |
+| HTTP 504 or timeout | Database, external provider, or function duration | Inspect external calls and database latency; inspect Vercel function duration | Escalate when the timed-out dependency cannot be identified or the timeout repeats during manual verification |
+| HTTP 401/403 | Authentication, role, tenant isolation, or environment | Verify session and role; verify tenant and environment configuration | Escalate when the session, role, tenant, and environment are correct but access still fails |
+| HTTP 404 | Domain mapping, middleware, route, or rewrite | Verify tenant-domain mapping; verify middleware and route resolution | Escalate when domain mapping and route resolution are both correct but the route still returns 404 |
+| HTTP 429 | Provider quota or application rate limit | Inspect provider quota; inspect retry and rate-limit behavior | Escalate when provider quota and application rate-limit state do not explain the rejection |
+| Application exception | Application frame or release regression | Inspect the first in-application frame; compare affected release or deployment | Escalate when no in-application frame exists or the release comparison is inconclusive |
+| Unmatched | Provider evidence requires manual investigation | Open the provider event; inspect route, timestamp, and adjacent logs | Escalate when the provider event lacks the route, status, or application frame needed to classify it |
+
+## 12. Non-Functional Requirements
 
 | Area | Requirement |
 |---|---|
 | Security | Page and APIs deny non-super-admin users; provider tokens never reach the browser |
-| Privacy | Sanitization occurs before persistence, rendering, and LLM submission |
-| Reliability | Sentry, Vercel, LLM, and usage-audit failures remain isolated and observable |
-| Performance | Cached `/studio/issues` initial response p95 ≤ 3 seconds under the agreed production incident volume |
-| Idempotency | Reprocessing the same fingerprint does not create another issue or another analysis unless causal evidence changed |
-| Auditability | Automated evidence changes, AI results, human review, assignment, and status changes remain attributable and time-stamped |
+| Privacy | Sanitization happens before rendering or persistence; raw provider payloads are never stored |
+| Reliability | Each provider has an independent timeout and visible error state |
+| Performance | Each provider request returns or terminates within 10 seconds; the Vercel stream is bounded to 5 seconds and 50 accepted rows |
+| Idempotency | Re-promoting the same stable provider key cannot create another tracked issue |
+| Honesty | Unknown tenant attribution and unproven causes remain explicitly unknown |
+| Provider safety | F39 performs read-only provider operations |
 
-## 11. Related Existing Documents
+## 13. Risks and Hard Gates
 
-| Document | Relationship |
-|---|---|
-| `docs/architecture/F99-cicd-monitoring.md` | Defines the broader Sentry monitoring and alerting direction; F39 owns super-admin application incident triage inside Prime Studio |
-| `docs/qa/monitoring.md` | Covers current Sentry SDK and environment verification; F39 adds product workflow coverage rather than replacing those tests |
-| `docs/prd/F40-ai-credit-system.md` | Owns AI credit accounting; F39 only records its LLM usage through the existing monitoring mechanism |
-
-## 12. Risks and Open Questions
-
-| ID | Item | Gate |
+| ID | Risk | Decision |
 |---|---|---|
-| R-01 | Vercel Runtime Logs API retention, pagination, and rate limits must support the chosen sync window | Resolve before implementation |
-| R-02 | Sentry events may lack tenant/request context, reducing correlation quality | Define required instrumentation fields before implementation |
-| R-03 | Provider evidence may exceed safe LLM context limits | Define deterministic evidence limits before implementation |
-| Q-01 | Exact sync trigger and frequency | `[NEED: scheduled polling, provider webhook, or hybrid]` |
-| Q-02 | Exact ticket creation behavior | `[NEED: auto-create an open issue after deduplication, or require super-admin confirmation before first persistence]` |
-| Q-03 | Retention period for sanitized provider evidence | `[NEED]` |
+| R-01 | Vercel Runtime Logs is deployment-scoped, streaming, and has no documented historical filters | Run the Vercel delivery spike before implementation; a failed spike blocks the two-source acceptance criteria |
+| R-02 | Sentry does not guarantee tenant tags in the current instrumentation | Resolve from request hostname when available; otherwise display `Unknown` |
+| R-03 | Vercel messages may contain dynamic values or sensitive text | Cap, sanitize, and hash normalized message text; do not perform fuzzy grouping |
+| R-04 | Provider rate limits or credentials may fail at runtime | Isolate source states and preserve Tracked Issues |
+| R-05 | Technical team members without `super-admin` cannot use Studio | Access-model expansion is outside this baseline |
 
-## 13. Delivery Gates
+## 14. One-Day Delivery Plan
+
+| Timebox | Deliverable | Verification |
+|---|---|---|
+| Hour 0–1 | Vercel credential and Runtime Logs spike against the current production deployment | Receive qualifying rows with domain, path, status, and timestamp; stop safely after 5 seconds or 50 rows |
+| Hour 1–3 | Provider adapters, normalized DTO, server-only API, independent failure handling | Contract tests with provider fixtures and authorization failures |
+| Hour 3–4 | Tenant resolution, sanitization, and deterministic guidance | Unit tests cover custom domain, platform subdomain, `Unknown`, and excluded fields |
+| Hour 4–6 | Live Errors list/detail and manual Create Issue promotion | Browser flow covers success, empty, degraded, detail, and promotion states |
+| Hour 6–7 | Runtime relation, exact deduplication, and existing issue integration | Repeated promotion opens the exact existing issue |
+| Hour 7–8 | Typecheck, focused tests, staging provider smoke, and buffer | Both real sources verified or the two-source delivery is reported blocked |
+
+Cut order if time is lost: cross-source related-evidence display, then custom-domain tenant-name enrichment while preserving the hostname. Authorization, sanitization, source isolation, manual promotion, honest tenant attribution, and the Vercel gate are not cuttable.
+
+## 15. Delivery Gates
 
 ### Definition of Ready
 
-- Approved Mermaid remains unchanged.
-- Q-01 through Q-03 are resolved.
-- Sentry and Vercel read credentials and production projects are confirmed.
-- Required provider context, sanitization allowlist, and evidence limits are agreed.
-- Collection-field changes have matching SQL migration and environment-template updates.
-- QA maps automated cases to the final acceptance criteria.
+- The approved Mermaid flow in Section 5 remains unchanged.
+- Sentry organization, project, `event:read` token, and production environment are confirmed.
+- The Vercel token can resolve the current production deployment and passes the bounded Runtime Logs spike.
+- The provider evidence allowlist and guidance rules in this PRD are accepted.
+- The existing `related_type` database column is verified to accept `runtime`.
+- Test fixtures contain no production secrets or personal data.
 
 ### Definition of Done
 
-- AC-01 through AC-18 pass.
-- `/studio/issues` is the only F39 incident workflow and `/studio/logs` does not exist.
-- `/studio/generations` remains a usage-session monitor with working issue backlinks.
-- Provider and LLM failures are independently recoverable and visible.
-- Sanitization tests prove excluded data never reaches persistence, UI, or LLM input.
-- New routes are not introduced; modified user-facing behavior has Playwright coverage.
-- Production smoke testing confirms Sentry and Vercel evidence, RBAC, deduplication, analysis, review, assignment, and usage-session auditing.
+- AC-01 through AC-16 pass.
+- `/studio/issues` contains Tracked Issues and Live Errors without introducing `/studio/logs`.
+- Sentry and Vercel are fetched independently through server-only credentials.
+- Tenant or subdomain is displayed when supported by evidence; missing attribution is `Unknown`.
+- Suggested checks are deterministic and never presented as confirmed root cause.
+- Raw telemetry and excluded sensitive fields do not reach the browser or database.
+- Manual promotion reuses the existing issue lifecycle and exact duplicate promotion is prevented.
+- `/studio/generations` remains unchanged.
+- The new API route has Playwright coverage and the normalizer has focused unit coverage.
+- Staging smoke testing verifies both real provider contracts, RBAC, sanitization, degraded-source behavior, and issue promotion.
