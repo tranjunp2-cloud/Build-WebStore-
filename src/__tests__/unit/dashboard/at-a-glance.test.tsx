@@ -10,13 +10,14 @@ vi.mock('@/components/dashboard/revamp/charts', () => ({
     ),
 }))
 
-vi.mock('@/components/dashboard/revamp/atoms', () => ({
-    SectionHead: ({ title }: { title: string }) => <h2>{title}</h2>,
-    Delta: ({ value }: { value: number }) => (
-        <span data-testid="delta">{value > 0 ? '+' : ''}{value.toFixed(1)}%</span>
-    ),
-    InfoTooltip: ({ tip }: { tip: string }) => <span aria-label={tip} />,
-}))
+vi.mock('@/components/dashboard/revamp/atoms', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/components/dashboard/revamp/atoms')>()
+    return {
+        ...actual,
+        SectionHead: ({ title }: { title: string }) => <h2>{title}</h2>,
+        InfoTooltip: ({ tip }: { tip: string }) => <span aria-label={tip} />,
+    }
+})
 
 import { AtAGlance } from '@/components/dashboard/revamp/at-a-glance'
 import { I18nProvider } from '@/i18n'
@@ -82,7 +83,7 @@ describe('[TC-F03.55] Active Revenue card', () => {
 
         // Assert
         expect(within(card).getByText('RM 1,234.56')).toBeInTheDocument()
-        expect(within(card).getByText('+12.5%')).toBeInTheDocument()
+        expect(within(card).getByText('+12.5%')).toHaveClass('delta', 'up')
         expect(within(card).getByText('vs prev 7d')).toBeInTheDocument()
         expect(within(card).getByTestId('sparkline')).toHaveAttribute(
             'data-values',
@@ -103,7 +104,7 @@ describe('[TC-F03.55] Revenue edge values', () => {
 
         // Assert
         expect(within(card).getByText('RM 0.00')).toBeInTheDocument()
-        expect(within(card).getByText('0.0%')).toBeInTheDocument()
+        expect(within(card).getByText('0.0%')).toHaveClass('delta', 'flat')
         expect(within(card).getByText('vs yesterday')).toBeInTheDocument()
         expect(card).not.toHaveTextContent(/NaN|Infinity/)
     })
@@ -117,7 +118,7 @@ describe('[TC-F03.55] Revenue edge values', () => {
 
         // Assert
         expect(within(card).getByText('RM 825.50')).toBeInTheDocument()
-        expect(within(card).getByText('-8.3%')).toBeInTheDocument()
+        expect(within(card).getByText('-8.3%')).toHaveClass('delta', 'down')
         expect(within(card).getByText('vs prev 30d')).toBeInTheDocument()
     })
 })

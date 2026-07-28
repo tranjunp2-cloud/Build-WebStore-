@@ -55,4 +55,204 @@ describe('POST /api/e2e/ensure-test-user', () => {
             }),
         }))
     })
+
+    it('TC-F03.57: recreates a current-period pending dashboard fixture when requested', async () => {
+        // Arrange
+        const payload = {
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 42 }] }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 7 }] }
+                if (collection === 'sites') return { docs: [] }
+                if (collection === 'products') return { docs: [] }
+                if (collection === 'orders') return { docs: [{ id: 99 }] }
+                if (collection === 'users') return { docs: [{ id: 84, tenants: [{ tenant: 42 }], roles: ['tenant-owner'] }] }
+                return { docs: [] }
+            }),
+            create: vi.fn().mockImplementation(async ({
+                collection,
+                data,
+            }: {
+                collection: string
+                data: Record<string, unknown>
+            }) => ({
+                id: collection === 'sites'
+                    ? 51
+                    : collection === 'products'
+                        ? 52
+                        : collection === 'orders'
+                            ? 53
+                            : 84,
+                ...data,
+            })),
+            delete: vi.fn(),
+            update: vi.fn(),
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'dashboard@example.com',
+                password: 'password123',
+                seedDashboardFixture: true,
+            }),
+        }))
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(payload.delete).toHaveBeenCalledWith({
+            collection: 'orders',
+            id: 99,
+            overrideAccess: true,
+        })
+        expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'sites',
+            overrideAccess: true,
+            data: expect.objectContaining({
+                tenant: 42,
+                generationStatus: 'completed',
+            }),
+        }))
+        expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            overrideAccess: true,
+            data: expect.objectContaining({
+                tenant: 42,
+                site: 51,
+                status: 'active',
+            }),
+        }))
+        expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'orders',
+            overrideAccess: true,
+            data: expect.objectContaining({
+                tenant: 42,
+                site: 51,
+                orderNumber: 'E2E-DASHBOARD-PENDING-42',
+                status: 'pending',
+                total: 107.8,
+                currency: 'MYR',
+            }),
+        }))
+        expect(body.setupCapability).toBe('dashboard-fixture-v1')
+        expect(body.dashboardFixture).toEqual({
+            orderId: 53,
+            orderNumber: 'E2E-DASHBOARD-PENDING-42',
+            orderTotal: 107.8,
+        })
+    })
+
+    it('uses globally unique dashboard fixture numbers for different E2E tenants', async () => {
+        // Arrange
+        const tenants = new Map([
+            ['e2e-alpha', 42],
+            ['e2e-beta', 43],
+        ])
+        const orders: Array<{
+            id: number
+            tenant: number
+            orderNumber: string
+        }> = []
+        let nextOrderId = 100
+        const payload = {
+            find: vi.fn().mockImplementation(async ({
+                collection,
+                where,
+            }: {
+                collection: string
+                where?: {
+                    slug?: { equals?: string }
+                    and?: Array<Record<string, { equals?: string | number }>>
+                }
+            }) => {
+                if (collection === 'tenants') {
+                    const tenantId = tenants.get(where?.slug?.equals || '')
+                    return { docs: tenantId ? [{ id: tenantId }] : [] }
+                }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 7 }] }
+                if (collection === 'sites') {
+                    const tenantId = where?.and?.[0]?.tenant?.equals as number
+                    return { docs: [{ id: tenantId * 10 + 1 }] }
+                }
+                if (collection === 'products') {
+                    const tenantId = where?.and?.[0]?.tenant?.equals as number
+                    return { docs: [{ id: tenantId * 10 + 2 }] }
+                }
+                if (collection === 'orders') {
+                    const tenantId = where?.and?.[0]?.tenant?.equals
+                    const orderNumber = where?.and?.[1]?.orderNumber?.equals
+                    return {
+                        docs: orders.filter(order => (
+                            order.tenant === tenantId
+                            && order.orderNumber === orderNumber
+                        )),
+                    }
+                }
+                if (collection === 'users') return { docs: [] }
+                return { docs: [] }
+            }),
+            create: vi.fn().mockImplementation(async ({
+                collection,
+                data,
+            }: {
+                collection: string
+                data: Record<string, unknown>
+            }) => {
+                if (collection === 'orders') {
+                    const orderNumber = String(data.orderNumber)
+                    if (orders.some(order => order.orderNumber === orderNumber)) {
+                        throw new Error('duplicate key value violates unique constraint')
+                    }
+                    const order = {
+                        id: nextOrderId++,
+                        tenant: Number(data.tenant),
+                        orderNumber,
+                    }
+                    orders.push(order)
+                    return { ...data, ...order }
+                }
+                return { id: 84, ...data }
+            }),
+            delete: vi.fn(),
+            update: vi.fn(),
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+
+        const provision = async (tenantSlug: string, email: string) => {
+            const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    password: 'password123',
+                    tenantSlug,
+                    seedDashboardFixture: true,
+                }),
+            }))
+            return {
+                response,
+                body: await response.json() as {
+                    dashboardFixture?: { orderNumber: string }
+                },
+            }
+        }
+
+        // Act
+        const alpha = await provision('e2e-alpha', 'alpha@example.com')
+        const beta = await provision('e2e-beta', 'beta@example.com')
+
+        // Assert
+        expect(alpha.response.status).toBe(200)
+        expect(beta.response.status).toBe(200)
+        expect(alpha.body.dashboardFixture?.orderNumber).toBe('E2E-DASHBOARD-PENDING-42')
+        expect(beta.body.dashboardFixture?.orderNumber).toBe('E2E-DASHBOARD-PENDING-43')
+        expect(orders.map(order => order.orderNumber)).toEqual([
+            'E2E-DASHBOARD-PENDING-42',
+            'E2E-DASHBOARD-PENDING-43',
+        ])
+        expect(payload.delete).not.toHaveBeenCalled()
+    })
 })

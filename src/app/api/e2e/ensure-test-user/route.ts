@@ -3,7 +3,8 @@
  *
  * POST /api/e2e/ensure-test-user
  *   headers: Authorization: Bearer {E2E_SETUP_SECRET}
- *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string }
+ *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string,
+ *           seedDashboardFixture?: boolean }
  *
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
@@ -13,13 +14,152 @@
  * NEVER enable this in production — staging only.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
 
 export const dynamic = 'force-dynamic'
 
 const E2E_TENANT_NAME = 'E2E Test Workspace'
 const E2E_TENANT_SLUG = 'e2e-test'
+const E2E_DASHBOARD_SITE_NAME = 'E2E Dashboard Fixture'
+const E2E_DASHBOARD_ORDER_PREFIX = 'E2E-DASHBOARD-PENDING'
+const E2E_DASHBOARD_ORDER_TOTAL = 107.8
+const E2E_SETUP_CAPABILITY = 'dashboard-fixture-v1'
+
+async function ensureDashboardFixture(payload: Payload, tenantId: string | number) {
+    const orderNumber = `${E2E_DASHBOARD_ORDER_PREFIX}-${String(tenantId)}`
+    const sitesResult = await payload.find({
+        collection: 'sites',
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { name: { equals: E2E_DASHBOARD_SITE_NAME } },
+            ],
+        },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+    })
+
+    let siteId: string | number
+    if (sitesResult.docs.length > 0) {
+        siteId = sitesResult.docs[0].id
+        await payload.update({
+            collection: 'sites',
+            id: siteId,
+            data: { generationStatus: 'completed' },
+            overrideAccess: true,
+        })
+    } else {
+        const site = await payload.create({
+            collection: 'sites',
+            data: {
+                tenant: tenantId,
+                name: E2E_DASHBOARD_SITE_NAME,
+                status: 'published',
+                siteType: 'ecommerce',
+                generationStatus: 'completed',
+            },
+            overrideAccess: true,
+        })
+        siteId = site.id
+    }
+
+    const productSlug = `e2e-dashboard-product-${String(tenantId)}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+    const productsResult = await payload.find({
+        collection: 'products',
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { slug: { equals: productSlug } },
+            ],
+        },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+    })
+
+    let productId: string | number
+    if (productsResult.docs.length > 0) {
+        productId = productsResult.docs[0].id
+        await payload.update({
+            collection: 'products',
+            id: productId,
+            data: { status: 'active' },
+            overrideAccess: true,
+        })
+    } else {
+        const product = await payload.create({
+            collection: 'products',
+            data: {
+                tenant: tenantId,
+                site: siteId,
+                name: 'E2E Dashboard Product',
+                slug: productSlug,
+                price: 49.9,
+                status: 'active',
+            },
+            overrideAccess: true,
+        })
+        productId = product.id
+    }
+
+    // Recreate the dedicated fixture so createdAt always belongs to the current
+    // dashboard period and a failed prior run cannot leak status into this one.
+    const previousOrders = await payload.find({
+        collection: 'orders',
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { orderNumber: { equals: orderNumber } },
+            ],
+        },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+    })
+    for (const order of previousOrders.docs) {
+        await payload.delete({
+            collection: 'orders',
+            id: order.id,
+            overrideAccess: true,
+        })
+    }
+
+    const order = await payload.create({
+        collection: 'orders',
+        data: {
+            tenant: tenantId,
+            site: siteId,
+            orderNumber,
+            items: [{
+                product: productId,
+                productName: 'E2E Dashboard Product',
+                quantity: 2,
+                unitPrice: 49.9,
+            }],
+            subtotal: 99.8,
+            shippingFee: 8,
+            tax: 0,
+            total: E2E_DASHBOARD_ORDER_TOTAL,
+            currency: 'MYR',
+            status: 'pending',
+            paymentMethod: 'cod',
+            paymentStatus: 'unpaid',
+            customerName: 'E2E Dashboard Buyer',
+            customerEmail: 'dashboard-fixture@example.invalid',
+        },
+        overrideAccess: true,
+    })
+
+    return {
+        orderId: order.id,
+        orderNumber,
+        orderTotal: E2E_DASHBOARD_ORDER_TOTAL,
+    }
+}
 
 export async function POST(req: NextRequest) {
     // Guard 1: endpoint must be explicitly enabled via env var
@@ -47,7 +187,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse body
-    let body: { email?: string; password?: string; tenantSlug?: string; tenantName?: string }
+    let body: {
+        email?: string
+        password?: string
+        tenantSlug?: string
+        tenantName?: string
+        seedDashboardFixture?: boolean
+    }
     try {
         body = await req.json()
     } catch {
@@ -144,6 +290,10 @@ export async function POST(req: NextRequest) {
             })
         }
 
+        const dashboardFixture = body.seedDashboardFixture === true
+            ? await ensureDashboardFixture(payload, tenantId)
+            : undefined
+
         // Step 3: find or create user
         const usersResult = await payload.find({
             collection: 'users',
@@ -184,9 +334,11 @@ export async function POST(req: NextRequest) {
 
             return NextResponse.json({
                 status: 'updated',
+                setupCapability: E2E_SETUP_CAPABILITY,
                 userId: existingUser.id,
                 tenantId,
                 action: 'password synced + tenant ensured',
+                ...(dashboardFixture ? { dashboardFixture } : {}),
             })
         }
 
@@ -213,8 +365,10 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             status: 'created',
+            setupCapability: E2E_SETUP_CAPABILITY,
             userId: newUser.id,
             tenantId,
+            ...(dashboardFixture ? { dashboardFixture } : {}),
         })
     } catch (error: unknown) {
         console.error('[E2E Setup] Error:', error)
