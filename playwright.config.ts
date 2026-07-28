@@ -42,5 +42,16 @@ export default defineConfig({
             dependencies: ['setup'],
             testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
+        // Public storefront regressions required by repo review rules live in
+        // tests/*.spec.ts and do not need the authenticated E2E setup project.
+        {
+            name: 'storefront-regression',
+            testDir: './tests',
+            testMatch: /cart-drawer\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: undefined,
+            },
+        },
     ],
 })
