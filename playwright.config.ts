@@ -97,6 +97,18 @@ export default defineConfig({
             dependencies: ['setup'],
         },
         {
+            name: 'shipping-label-edge-ios',
+            testDir: './tests',
+            testMatch: /f36-print-label-mobile\.spec\.ts/,
+            use: {
+                ...devices['iPhone 13'],
+                // Edge on iOS is still WebKit, but identifies itself with EdgiOS.
+                userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/128.0 Mobile/15E148 Safari/605.1.15',
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
             name: 'shipping-label-ipad-webkit',
             testDir: './tests',
             testMatch: /f36-print-label-mobile\.spec\.ts/,

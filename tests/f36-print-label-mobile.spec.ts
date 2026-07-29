@@ -10,6 +10,7 @@ const NATIVE_VIEWER_PROJECTS = new Set([
 ])
 const WEBKIT_PROJECTS = new Set([
   'shipping-label-mobile-safari',
+  'shipping-label-edge-ios',
   'shipping-label-ipad-webkit',
   'shipping-label-ipad-landscape',
 ])

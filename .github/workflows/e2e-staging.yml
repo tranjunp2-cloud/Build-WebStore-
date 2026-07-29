@@ -126,7 +126,8 @@ jobs:
             --project=smoke --project=setup --project=chromium --project=storefront-regression \
             --project=shipping-label-regression --project=shipping-label-narrow-desktop \
             --project=shipping-label-android \
-            --project=shipping-label-mobile-safari --project=shipping-label-ipad-webkit \
+            --project=shipping-label-mobile-safari --project=shipping-label-edge-ios \
+            --project=shipping-label-ipad-webkit \
             --project=shipping-label-ipad-landscape 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
