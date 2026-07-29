@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, FileWarning, Loader2 } from 'l
 import { Document, Page, pdfjs } from 'react-pdf'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api.js'
+import { usesWebKitPdfRenderer } from './pdf-preview-device'
 
 // React-PDF requires the worker configuration in the same module as Document/Page.
 // new URL() makes Next emit the matching local worker instead of relying on a CDN.
@@ -240,8 +241,7 @@ export function PdfLabelPreview({
   }
 
   const userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent
-  const usesWebKit = /AppleWebKit/i.test(userAgent)
-    && !/(Android|Chrome|Chromium|Edg|OPR)/i.test(userAgent)
+  const usesWebKit = usesWebKitPdfRenderer(userAgent)
   // WebKit corrupts this courier PDF's soft-mask barcode at a 2× backing
   // canvas. Keep Safari/iOS at 1×; printing and downloading still use the
   // original PDF, while Chromium keeps the sharper 2× preview.
