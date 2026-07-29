@@ -234,7 +234,7 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
             <div>
                 <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.state}</label>
                 <Select value={selectedStateId || undefined} onValueChange={handleStateSelect} disabled={statesLoading}>
-                    <SelectTrigger className={TRIGGER_CLS}>
+                    <SelectTrigger data-testid="settings-local-business-state" className={TRIGGER_CLS}>
                         <SelectValue placeholder={statesLoading ? s.loadingOption : s.selectState} />
                     </SelectTrigger>
                     <SelectContent side="bottom" align="start">
@@ -252,7 +252,7 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
                 <div>
                     <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.city}</label>
                     <Select value={selectedDistrictId || undefined} onValueChange={handleDistrictSelect} disabled={!selectedStateId || districtsLoading}>
-                        <SelectTrigger className={TRIGGER_CLS}>
+                        <SelectTrigger data-testid="settings-local-business-city" className={TRIGGER_CLS}>
                             <SelectValue placeholder={districtsLoading ? s.loadingOption : s.selectCity} />
                         </SelectTrigger>
                         <SelectContent side="bottom" align="start">
@@ -268,7 +268,7 @@ export function GeoCascadeFields({ value, onChange, labels: s, fullWidth }: GeoC
                 <div>
                     <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.postcode}</label>
                     <Select value={value.postcode || undefined} onValueChange={handlePostcodeSelect} disabled={!selectedDistrictId || postcodesLoading}>
-                        <SelectTrigger className={TRIGGER_CLS}>
+                        <SelectTrigger data-testid="settings-local-business-postcode" className={TRIGGER_CLS}>
                             <SelectValue placeholder={postcodesLoading ? s.loadingOption : s.selectPostcode} />
                         </SelectTrigger>
                         <SelectContent side="bottom" align="start">

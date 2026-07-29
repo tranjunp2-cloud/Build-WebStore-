@@ -278,6 +278,7 @@ export function CompactEditorLayout({
                 role="button"
                 tabIndex={0}
                 aria-label={aiRunning ? t.editor.aiChat.stopAI : cl.openChatAndTools}
+                data-testid="editor-tools-trigger"
                 onClick={() => (aiRunning ? onStopAI() : onOpenTools())}
                 onKeyDown={(e) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return
