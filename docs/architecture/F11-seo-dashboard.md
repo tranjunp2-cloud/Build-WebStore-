@@ -12,113 +12,62 @@
 ```
 ┌─ /dashboard/seo ──────────────────────────────────────┐
 │                                                        │
-│  ┌─ SEO Score Card ──────────────────────────────────┐ │
-│  │  Overall Score: 72/100                            │ │
-│  │  [Fix All Issues ✨]                              │ │
-│  │  12 auto-fixable issues                           │ │
-│  └───────────────────────────────────────────────────┘ │
-│                                                        │
-│  ┌─ Category Scores ─────────────────────────────────┐ │
-│  │ Meta Tags: 65  |  Content: 80  |  Technical: 71   │ │
-│  └───────────────────────────────────────────────────┘ │
-│                                                        │
-│  ┌─ Issues List ─────────────────────────────────────┐ │
-│  │ ⚠️ 2 pages missing meta description               │ │
-│  │ ⚠️ 3 images missing alt text                      │ │
-│  │ ⚠️ 1 page title > 60 chars                        │ │
-│  │ ✅ JSON-LD Product schema OK                       │ │
-│  └───────────────────────────────────────────────────┘ │
-│                                                        │
-│  ┌─ Per-Page SEO ────────────────────────────────────┐ │
-│  │ Homepage    72/100  [Edit] [AI Generate]           │ │
-│  │ Products    85/100  [Edit] [AI Generate]           │ │
-│  │ About       60/100  [Edit] [AI Generate]           │ │
+│  ┌─ SeoHealth ───────────────────────────────────────┐ │
+│  │ 67/100  Business │ Schema │ AI │ Technical       │ │
+│  │ [Fix all with AI] — only when metadata is fixable │ │
+│  │ SEO Issues: [AI] Fix │ [You] Edit/Set up/Publish  │ │
 │  └───────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────┘
 ```
 
 ## 2. SEO Score Algorithm
 
-```typescript
-interface SEOScore {
-  overall: number       // 0-100 weighted average
-  metaTags: number      // 40% weight
-  content: number       // 35% weight
-  technical: number     // 25% weight
-}
+F37 PRD §5 is the only score contract: Business Data 20, Schema 35, AI Discoverability 15, Technical Health 30. The Dashboard must not calculate or display the legacy Meta/Content/Technical weighted score.
 
-// Trọng số theo plan SEO Sprint 1:
-// - Meta Tags: 40% (title exists, title length, desc exists, desc length)
-// - Content:   35% (H1/hero, word count ≥300, alt text coverage, contact section)
-// - Technical: 25% (OG image, noIndex check, slug SEO-friendly, Google verification)
-//
-// overall = meta * 0.4 + content * 0.35 + technical * 0.25
-
-// Meta Tags scoring (40%)
-// - Each page has title (≤60 chars): +10 per page
-// - Each page has description (≤160 chars): +10 per page
-// - All images have alt text: +10
-
-// Content scoring (35%)
-// - H1 exists on each page: +10 per page
-// - Content length > 300 words: +10 per page
-// - No duplicate titles: +10
-
-// Technical scoring (25%)
-// - JSON-LD schema on product pages: +15
-// - Sitemap exists: +10
-```
+Four bucket bars use qualitative status only. Point values remain internal to score calculation and never appear beside issue rows.
 
 ## 3. API Routes
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/seo/[siteId]/score` | Calculate and return SEO score |
-| GET | `/api/seo/[siteId]/issues` | List all SEO issues |
-| POST | `/api/seo/[siteId]/fix-all` | AI fix all auto-fixable issues |
-| POST | `/api/seo/[siteId]/generate-meta` | AI generate meta for specific page |
-| GET | `/api/seo/[siteId]/sitemap` | Generate and return sitemap.xml |
+| GET | `/api/sites/[siteId]/local-seo-score` | Return authoritative F37 score + bucket breakdown |
+| POST | `/api/seo/fix-all` | Existing AI fix flow for metadata only |
+| GET | `/sites/[slug]/sitemap.xml` | Storefront sitemap signal |
+| GET | `/sites/[slug]/llms.txt` | Storefront llms.txt signal |
 
 ## 4. AI Fix-All Flow
 
 ```
-User clicks "Fix All Issues ✨"
+AI-owned title/description issue exists
        ↓
-GET /api/seo/[siteId]/issues → list of fixable issues
+Show "Fix all with AI"
        ↓
-For each issue:
-  - Missing meta title → OpenAI generate (≤60 chars)
-  - Missing meta description → OpenAI generate (≤160 chars)
-  - Missing alt text → OpenAI analyze image + generate alt
-  - Title too long → OpenAI rewrite shorter
+Open existing AIFixModal with metadata records only
        ↓
 Show preview of all proposed fixes
        ↓
 User approves → batch update via Payload CMS
        ↓
-Recalculate score → show improvement
+Recalculate score → resolved rows disappear
 ```
 
 ## 5. Component Tree
 
 ```
-SEODashboard
-├── SEOScoreCard (overall + breakdown)
-├── FixAllButton (+ preview modal)
-├── IssuesList
-│   └── IssueItem × N (icon, description, fix button)
-├── PageSEOList
-│   └── PageSEORow × N
-│       ├── Page name + score
-│       ├── Meta title (editable)
-│       ├── Meta description (editable)
-│       ├── Character counters
-│       ├── Google SERP preview
-│       └── "AI Generate" button
-└── SitemapSection
-    ├── Last generated timestamp
-    └── "Regenerate" button
+Dashboard SEO section
+├── SeoHealth
+│   ├── Gauge
+│   ├── BucketBars × 4 (2×2 desktop)
+│   ├── ConditionalAiFixStrip
+│   └── SeoIssues
+│       └── IssueRow × unresolved root cause
+│           ├── AI | You badge
+│           ├── seller-friendly issue text
+│           └── Fix | Edit | Set up | Publish
+└── AIFixModal (metadata only)
 ```
+
+Issue derivation, root-cause deduplication, and destinations follow F37 PRD §12.3. Organization, indexability, and AI crawler access are platform-managed and never create seller issue rows.
 
 ## 6. Error Matrix
 
@@ -126,11 +75,10 @@ SEODashboard
 |-------|--------|
 | OpenAI API failure | Toast error, keep manual edit option |
 | Score calculation error | Show "Unable to calculate" with retry |
-| Sitemap generation fail | Toast + manual retry |
 
 ## 6.1 Business Rules
 
 | Rule | Mô tả |
 |------|-------|
-| BR-06 | Khi AI sinh meta: trường trống → tự điền. Trường đã có nội dung thủ công → đề xuất chỉnh sửa, hiển thị so sánh bản cũ vs bản mới, chỉ ghi đè khi người dùng đồng ý |
+| BR-06 | AI metadata runs only from a user-triggered Fix action, always previews proposed values, and writes only approved rows |
 | Keyword-aware | AI Generate sử dụng `trackedKeywords` từ site settings để kết hợp từ khoá mục tiêu vào meta tự nhiên |

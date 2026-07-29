@@ -20,8 +20,7 @@
 | US-F03-01 | Dashboard — Overview | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-02 | Analytics Details | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-03 | SEO Dashboard Overview ⭐ | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
-| US-F03-04 | Auto SEO Meta Generation | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
-| US-F03-05 | AI SEO Fix All Issues | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-05 | AI Metadata Fix All | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-07 | Mobile Web UX — Responsive Dashboard Metrics & Charts | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 
 ---
@@ -45,7 +44,7 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 `F03 Dashboard Suite` quy hoạch lại thành 3 màn hình:
 1. **Home / Dashboard Overview (`/dashboard`):** Là Command Center lấy top metrics từ Analytics và phần Orders. Theo mặc định, hiển thị Traffic, Leads, Clicks/Engagement, và Revenue/Pending orders. Có hỗ trợ filter thời gian và cho phép user **tuỳ chỉnh (thêm/bớt/sắp xếp)** các widget theo ý muốn.
 2. **Analytics Detail (`/dashboard/analytics` hoặc tab `Dashboard > Analytics`):** Màn hình chi tiết chứa website activity từ PostHog: Visitors, Clicks, Orders, Sales, daily bar chart, Top Pages, Top Products.
-3. **SEO Dashboard (`/dashboard/seo`):** Màn hình chi tiết chứa page-level analysis, Keyword Tracker cơ bản, và tính năng AI Fix All Issues thần thánh với chuẩn SEO MY market.
+3. **SEO Dashboard (`/dashboard/seo`):** Màn hình chi tiết chứa page-level analysis, Keyword Tracker cơ bản, và AI Metadata Fix All cho title/description.
 
 ---
 
@@ -55,7 +54,7 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 - **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget. Cấp số liệu từ **PostHog** + internal analytics fallback.
 - **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị. Trạng thái lọc được hỗ trợ bởi **Redis Cache** dự phòng lỗi Rate Limit.
 - **Analytics Details:** Visitors, Clicks, Orders, Sales, Daily bar chart, Top Pages, Top Products. Dùng PostHog + internal analytics fallback.
-- **SEO Health:** Overall score (0-100) and breakdown, Basic Keyword Tracker nhập tay, AI "Fix All Issues ✨" với SSE streaming (ứng dụng Prompt Batching và Context Limit 150 ký tự), Auto meta tag generation (chuẩn SEO 60/160 chars), Sitemap, JSON-LD Schema.
+- **SEO Health:** Một score 0–100 theo F37 với 4 bucket bars 2×2 và danh sách root-cause issues dạng 2 cột; mỗi row ghi rõ `AI`/`You`, CTA và destination. AI Fix chỉ áp dụng metadata. Basic Keyword Tracker giữ riêng; không hiển thị SEO Action Tools.
 - **Connectivity:** PostHog analytics integration cho website traffic/clicks/funnels. Không dùng GA4 hoặc Google Search Console vì phần lớn seller dùng platform subdomain.
 
 ### Out of Scope
@@ -70,7 +69,7 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 | Metric | Target | Measured By |
 |--------|--------|-------------|
 | Dashboard Overview load | < 2s | Timing |
-| AI Fix All resolves issues | ≥ 80% auto-fixable | Before/after score |
+| AI Fix All resolves metadata issues | ≥ 80% eligible title/description issues | Before/after metadata coverage; seller-owned fields unchanged |
 | Fix All time | < 15 seconds | SSE timing |
 | Data accuracy | ≥ 99% | Validation |
 
@@ -94,15 +93,15 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 | FR-02 | **Overview:** Bộ lọc thời gian (Today, 7d, 30d) áp dụng cho toàn dashboard overview | US-F03-01 | P0 | |
 | FR-03 | **Overview:** Tùy chỉnh hiển thị (Thêm/ẩn/sắp xếp vị trí) các metrics widget | US-F03-01 | P1 | Lưu preference vào DB/Local |
 | FR-04 | **Overview:** Action Required list (3-5 Pending Orders/Messages mới nhất) | US-F03-01 | P0 | Nguồn từ F10 |
-| FR-05 | **Overview:** SEO Widget (Score + CTA [AI Fix All]) | US-F03-01 | P0 | |
+| FR-05 | **Overview:** SEO Widget (Score + root-cause issue rows); CTA `Fix all with AI` appears only while metadata is AI-fixable | US-F03-01 | P0 | F37 §12.3 |
 | FR-06 | **Analytics:** 4 stat cards: Visitors, Clicks, Orders, Sales | US-F03-02 | P0 | Source: PostHog + Orders |
 | FR-07 | **Analytics:** Daily bar chart with period selector (Today, 7d, 30d) | US-F03-02 | P0 | Low-tech chart, no technical labels |
 | FR-08 | **Analytics:** Top Pages + Top Products list (max 10 rows) | US-F03-02 | P0 | Source: PostHog/internal tracking |
-| FR-09 | **SEO:** Overall SEO score (0-100) + 3 category breakdown theo trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%). Dashboard hiển thị điểm từng hạng mục dạng thanh tiến trình hoặc con số để người dùng biết cần cải thiện phần nào. | US-F03-03 | P0 | |
+| FR-09 | **SEO:** Chỉ hiển thị một SEO Health score 0–100 theo F37; bỏ Score History, dùng 4 bucket bars 2×2 không hiện điểm bucket và danh sách root-cause issues theo actor/CTA/destination của F37 §12.3. | US-F03-03 | P0 | F37 §5, §12.3 |
 | FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, rank & trend) | US-F03-06 | P1 | Chỉ nhập từ khoá thủ công (manual input). Không tích hợp Google Search Console trong F03/F37 vì seller dùng platform subdomain. |
-| FR-11 | **SEO:** "Fix All Issues ✨" → SSE streaming. Tối ưu context (chỉ truyền 150 ký tự đầu tiên), Batch process. | US-F03-05 | P0 | < 15s, Token cost optimization. MVP: dùng Promise.all xử lý song song (đủ cho 5-10 trang, ~3-5 giây). SSE streaming sẽ nâng cấp sau khi cần hỗ trợ >10 trang. |
+| FR-11 | **SEO:** `Fix all with AI` xử lý batch meta title/description only; CTA chỉ hiện khi còn eligible metadata issue. | US-F03-05 | P0 | < 15s, tối ưu context; không ghi Local Business/schema/content/alt/crawler/publish/domain/verification. |
 | FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all qua DB Transaction) | US-F03-05 | P0 | |
-| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Desc 150-160 + CTA, Alt Localization) | US-F03-04 | P0 | Chuẩn SEO hiển thị. AI Generate sử dụng trackedKeywords từ cài đặt site để kết hợp từ khoá mục tiêu vào meta một cách tự nhiên (không nhồi nhét). Áp dụng cho cả Fix All lẫn Auto-generate khi publish. |
+| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Description 150-160 + CTA) | US-F03-05 | P0 | User-triggered AI Fix uses trackedKeywords naturally and shows preview before apply. Alt text remains human-owned in the approved F37 issue contract. |
 | FR-19 | **Connectivity:** Cài PostHog Next.js integration cho website analytics (`posthog-js`; `posthog-node` nếu cần server events) | US-F03-08 | P0 | Dùng PostHog thay GA4/GSC |
 | FR-20 | **Connectivity:** Giữ `/api/analytics/track` + `analytics` collection làm fallback/backward compatibility trong giai đoạn migrate PostHog | US-F03-08 | P0 | Không thêm Google token |
 | FR-21 | **Error:** Dashboard có empty/cache state khi analytics source lỗi hoặc chưa có data | US-F03-08 | P0 | |
@@ -118,10 +117,10 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 
 - **BR-01:** Chỉ hiển thị Data scope theo tenant của user hiện hành.
 - **BR-02:** Analytics IP hashed SHA-256 cho anonymization (No PII stored), events fail gracefully.
-- **BR-03:** Auto-generated SEO meta là overridable (user can edit manually), nhưng limits length được enforced.
-- **BR-04:** Fix All Issues trong SEO thực thi dưới 15s và là một single batch cho mục đích Undo/Redo.
+- **BR-03:** AI-generated SEO meta is previewed before apply, remains manually editable, and enforces length limits.
+- **BR-04:** Fix all with AI cho metadata thực thi dưới 15s và là một single batch cho mục đích Undo/Redo.
 - **BR-05:** MY market: Nếu locale='ms', target BM keywords; format address/JSON-LD theo MY.
-- **BR-06:** Khi AI sinh meta (lúc publish hoặc Fix All), nếu trường đang trống → tự động điền. Nếu trường đã có nội dung thủ công → AI đề xuất bản chỉnh sửa và hiển thị so sánh (bản cũ vs bản mới). Chỉ ghi đè khi người dùng đồng ý.
+- **BR-06:** AI metadata generation is user-triggered from SEO Issues. It shows old vs proposed values and writes only the rows the seller approves; no background generation runs on publish.
 
 ---
 
@@ -134,8 +133,9 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   ├── Click vào Pending Order → Chuyển sang /orders (F10)
   ├── Click tab [Analytics] → Chuyển sang /dashboard/analytics
   │     └── Chọn biểu đồ, lọc theo 30 days
-  └── Click [AI Fix All SEO Issues] trực tiếp từ khung Overview hoặc chuyển tab [SEO]
-        └── Call API → Streaming fix → Update điểm SEO
+  └── SEO issue CTA
+        ├── [AI] title/description → Fix hoặc Fix all with AI → preview → apply → recalculate
+        └── [You] → Edit / Set up / Publish tại destination của F37 §12.3
 ```
 
 ---
@@ -156,7 +156,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   - Tabs Navigation: Toolbar gồm 3 tab `[Overview]`, `[Analytics]`, `[SEO Health]` để chuyển đổi màn hình.
   - Stat Cards View (4 cột): Traffic, Leads, Orders, Revenue.
   - Action Required List: Các tác vụ đang pending.
-  - SEO Health Widget: Biểu đồ tròn điểm tổng quát và CTA AI Fix.
+  - SEO Health Widget: Một gauge, 4 bucket bars 2×2 không hiện điểm bucket, conditional AI Fix All strip, và root-cause issues hai cột; AI Fix chỉ xuất hiện cho metadata.
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]text
   - [Link tới file wireframe/design trong thư mục docs/design/...]
@@ -325,7 +325,7 @@ THEN  hệ thống tự động query hạng của website theo từng keyword
 
 ```gherkin
 GIVEN người dùng đã nhập từ khoá theo dõi (VD: "bakery KL", "bánh sinh nhật")
-WHEN  nhấn "Fix All Issues" hoặc "✨ Tự động tối ưu SEO" trên bất kỳ trang nào
+WHEN  nhấn "Fix all with AI" hoặc "Fix" trên metadata issue
 THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu một cách tự nhiên
   AND không nhồi nhét keyword (keyword density ≤ 2%)
   AND khi không có từ khoá theo dõi, AI hoạt động giống hệt hiện tại
@@ -337,7 +337,7 @@ THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu 
 
 ```gherkin
 GIVEN một trang đã có meta title/description do người dùng nhập thủ công
-WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
+WHEN  AI sinh meta mới qua user-triggered AI Fix
 THEN  hiển thị so sánh bản cũ vs bản mới
   AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
   AND chỉ ghi đè khi người dùng đồng ý
@@ -405,7 +405,7 @@ F03 dùng PostHog cho analytics vì seller chủ yếu chạy trên platform sub
 |-----------|--------|---------------|
 | F02 Auth | ✅ Done | |
 | F10 Orders | ⬜ Pending | Cần có API đếm số Pending Orders |
-| OpenAI API | ✅ Setup | Phục vụ Auto SEO & Fix All Streaming (Sử dụng SSE) |
+| OpenAI API | ✅ Setup | Phục vụ AI Metadata Fix streaming (Sử dụng SSE) |
 | PostHog Cloud | ⬜ Pending in repo | Primary analytics source for Overview & Analytics Detail |
 | Internal analytics collection | ✅ Exists | Fallback/backward compatibility during PostHog migration |
 
