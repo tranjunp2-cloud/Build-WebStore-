@@ -1528,7 +1528,12 @@
                 "copiesMeta": "Copies",
                 "markAsPrinted": "Mark as printed",
                 "formatUnavailable": "EasyParcel did not provide this format for this label",
-                "loadingLabel": "Loading label PDF…"
+                "loadingLabel": "Loading label PDF…",
+                "previewFailed": "The preview could not be rendered on this device.",
+                "openPdf": "Open PDF directly",
+                "previousPage": "Previous label page",
+                "nextPage": "Next label page",
+                "pageCount": "Page {page} of {pages}"
             },
             "missingWeight": {
                 "title": "Missing parcel weight",

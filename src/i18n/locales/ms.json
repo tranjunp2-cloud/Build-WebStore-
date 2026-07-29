@@ -1528,7 +1528,12 @@
                 "copiesMeta": "Salinan",
                 "markAsPrinted": "Tanda sebagai dicetak",
                 "formatUnavailable": "EasyParcel tidak menyediakan format ini untuk label ini",
-                "loadingLabel": "Memuatkan PDF label…"
+                "loadingLabel": "Memuatkan PDF label…",
+                "previewFailed": "Pratonton tidak dapat dipaparkan pada peranti ini.",
+                "openPdf": "Buka PDF secara terus",
+                "previousPage": "Halaman label sebelumnya",
+                "nextPage": "Halaman label seterusnya",
+                "pageCount": "Halaman {page} daripada {pages}"
             },
             "missingWeight": {
                 "title": "Berat bungkusan tiada",
