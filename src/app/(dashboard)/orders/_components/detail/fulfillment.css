@@ -428,28 +428,6 @@
 .plabel-grid { display: grid; grid-template-columns: 1fr 264px; gap: 20px; padding: 20px 22px; min-height: 0; }
 @media (max-width: 900px) { .plabel-grid { grid-template-columns: 1fr; } }
 .plabel-preview-pane { background: var(--dash-surface-hover); border: 1px solid var(--dash-border); border-radius: 12px; padding: 10px; display: flex; }
-.plabel-format { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--dash-secondary-bg); border: 1px solid var(--dash-border); }
-.pf-opt {
-  display: flex; align-items: center; justify-content: center; min-height: 34px;
-  padding: 9px 6px; border: none; border-radius: 8px; background: transparent;
-  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--dash-text-muted);
-  cursor: pointer; transition: background 0.12s, color 0.12s; white-space: nowrap;
-}
-.pf-opt.on { background: hsl(var(--primary)); color: hsl(var(--primary-foreground, 222 47% 8%)); }
-.pf-opt:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-/* Tooltip wrapper for a DISABLED format option — receives the hover the button can't */
-.pf-optwrap { display: flex; cursor: not-allowed; }
-.pf-optwrap > .pf-opt { flex: 1; }
-.plabel-check {
-  display: flex; align-items: center; gap: 9px; border: none; background: transparent; padding: 2px 0;
-  font-family: inherit; font-size: 13px; font-weight: 500; color: var(--dash-text); cursor: pointer; text-align: left;
-}
-.pc-box {
-  width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--dash-border);
-  display: grid; place-items: center; flex-shrink: 0; transition: background 0.12s, border-color 0.12s;
-}
-.pc-box.on { background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground, 222 47% 8%)); }
-.pc-box svg { width: 12px; height: 12px; }
 .plabel-pdf-frame { width: 100%; height: 68vh; min-height: 520px; max-height: 780px; border: 1px solid var(--dash-border); border-radius: 8px; background: #fff; }
 .plabel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; flex: 1; min-height: 300px; color: var(--dash-text-muted); background: var(--dash-surface-hover); border: 1px dashed var(--dash-border); border-radius: 12px; font-size: 13px; }
 .awb-label {
@@ -485,10 +463,6 @@
 .plabel-hint { display: flex; gap: 7px; font-size: 11.5px; line-height: 1.45; color: var(--dash-text-muted); margin-top: auto; }
 .plabel-hint svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
 .dialog-foot { padding: 15px 22px; border-top: 1px solid var(--dash-border); display: flex; justify-content: flex-end; gap: 10px; }
-/* Print-label footer: Cancel far-left, Download + Print content-width dồn phải.
-   Scoped riêng để thắng bất kỳ style .btn/.dialog-foot toàn cục nào kéo giãn nút. */
-.plabel-foot .btn { flex: 0 0 auto; width: auto; height: 40px; min-height: 40px; box-sizing: border-box; line-height: 1; }
-.plabel-foot .btn-ghost { margin-right: auto; }
 
 /* ── Tracking timeline ───────────────────────────────────────────────────── */
 .track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding-top: 8px; margin-top: 0; }
