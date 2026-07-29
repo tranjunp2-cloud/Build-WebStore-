@@ -14,7 +14,6 @@ export async function uploadImageUrl(
     alt: string,
     tenantId: number | string,
     payload: BasePayload,
-    assertCanWrite?: () => void,
 ): Promise<number | undefined> {
     const { buffer, mimetype } = await downloadPhotoBuffer(imageUrl)
     const createArgs = {
@@ -26,21 +25,14 @@ export async function uploadImageUrl(
     // rows (drizzle transaction race, see media-create-lock.ts).
     let doc
     try {
-        doc = await withMediaCreateLock(() => {
-            assertCanWrite?.()
-            return payload.create(createArgs)
-        })
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
     } catch (err) {
-        assertCanWrite?.()
         // Belt & braces for genuinely transient failures (network, S3 hiccup).
         console.warn(
             `[upload-media] media create failed for ${filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
         )
         await new Promise((r) => setTimeout(r, 300))
-        doc = await withMediaCreateLock(() => {
-            assertCanWrite?.()
-            return payload.create(createArgs)
-        })
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
     }
     const numId = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
     return Number.isFinite(numId) ? numId : undefined

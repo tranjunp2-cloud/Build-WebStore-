@@ -232,7 +232,7 @@ So that tôi biết đơn hàng đã được ghi nhận
 GIVEN customer placed an order successfully
 WHEN  order confirmed
 THEN  confirmation page shows: order number, total, items list
-  AND "Continue Shopping" link back to products page
+  AND "Continue Shopping" link back to storefront home (`/sites/[slug]` for path-based storefronts; `/` for custom domains)
 ```
 
 ### Definition of Done
@@ -287,6 +287,5 @@ THEN  it takes up 100% of the mobile screen width (fullscreen overlay) instead o
 
 - [ ] 9-Point Checklist pass.
 - [ ] Safe-area-inset-bottom is supported on iOS to avoid overlapping the home indicator.
-
 
 

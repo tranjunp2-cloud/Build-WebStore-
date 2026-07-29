@@ -10,20 +10,22 @@
 const fs = require('fs')
 const path = require('path')
 
-// ── Load DATABASE_URI from .env.local (no dotenv dep) ────────────────────────
-const envPath = path.join(__dirname, '..', '.env.local')
-if (!fs.existsSync(envPath)) {
-  console.log('[db-migrate-dev] .env.local missing — skipping (set DATABASE_URI to enable)')
-  process.exit(0)
-}
+// ── Load DATABASE_URI: env var takes priority (Docker), fallback to .env.local ─
+if (!process.env.DATABASE_URI) {
+  const envPath = path.join(__dirname, '..', '.env.local')
+  if (!fs.existsSync(envPath)) {
+    console.log('[db-migrate-dev] .env.local missing — skipping (set DATABASE_URI to enable)')
+    process.exit(0)
+  }
 
-const envContent = fs.readFileSync(envPath, 'utf8')
-const uriMatch = envContent.match(/^DATABASE_URI="?([^"\n]+)"?/m)
-if (!uriMatch) {
-  console.log('[db-migrate-dev] DATABASE_URI not found in .env.local — skipping')
-  process.exit(0)
+  const envContent = fs.readFileSync(envPath, 'utf8')
+  const uriMatch = envContent.match(/^DATABASE_URI="?([^"\n]+)"?/m)
+  if (!uriMatch) {
+    console.log('[db-migrate-dev] DATABASE_URI not found in .env.local — skipping')
+    process.exit(0)
+  }
+  process.env.DATABASE_URI = uriMatch[1]
 }
-process.env.DATABASE_URI = uriMatch[1]
 
 // ── Import MIGRATIONS from main db-setup.js ───────────────────────────────────
 let MIGRATIONS
@@ -49,7 +51,8 @@ const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null
 const hostMatch = connStr.match(/@([^:/?]+)/)
 const host = hostMatch ? hostMatch[1].toLowerCase() : ''
 const isLocal =
-  host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal'
+  host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal' ||
+  !host.includes('.') // Docker service names (e.g. "postgres") have no dots
 const useSsl = sslmode === 'disable' ? false : isLocal ? false : { rejectUnauthorized: false }
 
 const cleanConn = connStr

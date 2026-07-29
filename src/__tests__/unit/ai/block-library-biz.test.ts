@@ -180,6 +180,27 @@ describe('buildBlockFromLibrary — Plan 07 biz threading', () => {
       expect(String(block.headline)).toContain('Ramen Ichiban')
     })
 
+    it('TC-F01-PAS-10: gallery and newsletter injection use structural locale strings', () => {
+      // Arrange
+      const context = {
+        seed: 42,
+        language: 'zh-CN',
+        userBiz: buildUserBiz(),
+      }
+
+      // Act
+      const gallery = buildBlockFromLibrary('gallery', 'ecommerce', context) as Record<string, unknown>
+      const newsletter = buildBlockFromLibrary('newsletter', 'ecommerce', context) as Record<string, unknown>
+
+      // Assert
+      expect(gallery.sectionLabel).toBe('图片展示')
+      expect(newsletter).toMatchObject({
+        sectionLabel: '订阅通讯',
+        buttonLabel: '订阅',
+        placeholder: '邮箱',
+      })
+    })
+
     it('footer tagline prefers user tagline', () => {
       const block = buildBlockFromLibrary('footer', 'restaurant', {
         seed: 42,

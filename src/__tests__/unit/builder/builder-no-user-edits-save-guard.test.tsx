@@ -330,4 +330,36 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         })
         expect(useBuilderStore.getState().status).toBe('done')
     })
+
+    it('preserves an explicit SSE server error instead of replacing it with a disconnect', async () => {
+        useBuilderStore.setState({
+            step: 'info',
+            status: 'idle',
+            businessInfo: null,
+            blocks: [],
+            theme: null,
+            siteId: null,
+            siteName: '',
+        })
+        const encoder = new TextEncoder()
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(encoder.encode(
+                    'event: generation_accepted\ndata: {"generationRequestId":"request-2"}\n\n' +
+                    'event: error\ndata: {"message":"Generation failed while saving pages"}\n\n',
+                ))
+                controller.close()
+            },
+        })
+        fetchMock.mockResolvedValue({ ok: true, body } as Response)
+        render(<AIBuilderPageClient userId="user-1" />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
+
+        await waitFor(() => {
+            expect(useBuilderStore.getState().status).toBe('error')
+            expect(useBuilderStore.getState().error?.message).toBe('Generation failed while saving pages')
+        })
+        expect(useBuilderStore.getState().error?.message).not.toContain('Connection lost')
+    })
 })

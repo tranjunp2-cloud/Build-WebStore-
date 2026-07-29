@@ -17,9 +17,10 @@
  *   npm run db:seed-qc     # optional re-seed after reset
  */
 
-import { getPayload, type Payload } from 'payload'
+import { getPayload } from 'payload'
 import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
+import { wipeQcCollection } from './qc-reset-helpers'
 
 // Order matters: leaf collections first, root last. Anything not in this
 // list is intentionally preserved (block catalog, template definitions,
@@ -64,34 +65,6 @@ const COLLECTIONS_TO_WIPE = [
   'users',
 ] as const
 
-async function wipeCollection(payload: Payload, slug: string): Promise<number> {
-  let total = 0
-  // Delete in batches of 100 to avoid hammering Payload's cache. Loop until
-  // find() returns empty — resilient against pagination cursors.
-  for (;;) {
-    const { docs } = await payload.find({
-      collection: slug as never,
-      limit: 100,
-      overrideAccess: true,
-      depth: 0,
-    })
-    if (!docs.length) break
-    for (const doc of docs) {
-      try {
-        await payload.delete({ collection: slug as never, id: doc.id, overrideAccess: true })
-        total++
-      } catch (err) {
-        // Some collections (e.g. rels tables) may have partial constraint
-        // errors from race conditions during large batch deletes. Log +
-        // continue rather than abort the whole reset.
-        const msg = err instanceof Error ? err.message.slice(0, 120) : 'unknown'
-        console.warn(`    ! delete failed on ${slug}#${doc.id}: ${msg}`)
-      }
-    }
-  }
-  return total
-}
-
 async function main(): Promise<void> {
   assertQcEnv()
   const t0 = Date.now()
@@ -99,20 +72,27 @@ async function main(): Promise<void> {
 
   console.log('🧹 Resetting QC test data...')
   let grandTotal = 0
+  const failedCollections: string[] = []
   for (const slug of COLLECTIONS_TO_WIPE) {
     const t = Date.now()
     try {
-      const count = await wipeCollection(payload, slug)
+      const count = await wipeQcCollection(payload, slug)
       grandTotal += count
       const elapsed = ((Date.now() - t) / 1000).toFixed(1)
       console.log(`  ✓ ${slug}: ${count} docs (${elapsed}s)`)
     } catch (err) {
       const msg = err instanceof Error ? err.message.slice(0, 120) : 'unknown'
       console.warn(`  ! ${slug}: skipped (${msg})`)
+      failedCollections.push(`${slug}: ${msg}`)
     }
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
+  if (failedCollections.length > 0) {
+    throw new Error(
+      `QC reset incomplete for ${failedCollections.length} collection(s): ${failedCollections.slice(0, 5).join('; ')}`,
+    )
+  }
   console.log(`✅ Reset done in ${elapsed}s. Wiped ${grandTotal} docs across ${COLLECTIONS_TO_WIPE.length} collections.`)
   console.log('   Next: `npm run db:seed-qc` to re-populate dummy fixtures.')
   process.exit(0)

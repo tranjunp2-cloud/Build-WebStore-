@@ -109,7 +109,7 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15. Rate source = hybrid (flat OR EasyParcel real-time per tenant setting — see F14-shipping). | US-F09-03 | P0 | MY market |
 | FR-10 | Place Order → order created, order number ORD-XXXXXXXX | US-F09-03 | P0 | |
 | FR-11 | Cart preserved nếu payment fail | US-F09-03 | P0 | |
-| FR-12 | Confirmation page: order number, items, total. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
+| FR-12 | Confirmation page: order number, items, total. `Continue Shopping` returns to storefront home: `/sites/[slug]` for path-based storefronts, `/` for custom domains. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
 | **FR-12.1** | **[v2.2] Confirmation page COD variant:** Headline "Order Received!" + delivery expectations + tracking placeholder. | US-F09-04 | P0 | D-09 unified template |
 | **FR-12.2** | **[v2.2] Confirmation page Bank Transfer variant** = Post-Order Upload page (F10 FR-16): Headline "Order Received! Awaiting Payment" + expiry timer + QR/STK + reference code + Upload Receipt button + anti-fraud warning. Đồng nhất route + token-based auth. | US-F09-04 | P0 | D-04 D-10 |
 | FR-13 | WhatsApp floating button (nếu store owner set phone) | US-F09-01 | P1 | MY market |
