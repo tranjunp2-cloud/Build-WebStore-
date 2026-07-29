@@ -33,30 +33,30 @@ No collection, database migration, new API route, dashboard card, or Google/GBP 
 - The authenticated and rate-limited Local SEO score route.
 - Responsive one-column editor styling below the desktop breakpoint.
 - Server-side site validation and F37 unit/QA files.
-- A Playwright auth/setup suite under `e2e/`; however, the current config does not discover the repository-mandated `tests/*.spec.ts` location.
+- A Playwright auth/setup suite under `e2e/`; the F37 spec can reuse its authenticated Chromium project.
 
 The implementation should change only the contract gaps, not rebuild those paths.
 
 ## Ownership and Release Gate
 
-The current production formula is `35/30/20/15`. Activating Business 20 alone would cap the total at 85, so runtime score activation belongs to the atomic #1312 `20/40/20/20` cutover.
+The current top-level formula is `35/30/20/15`. #1309 exposes its persisted 7/8/5 contract as an additive `minimalBusinessData` response; it does not replace the legacy Business bucket or create a partial 85-point total.
 
 ```text
-#1309 PR                                 #1312 PR
-├─ pure Business 7/8/5 contract         ├─ activate helper in score engine
-├─ transactional phone save + UI revert ├─ map persisted fields in score API
-├─ editor persistence E2E               └─ prove complete total = 100
-└─ F37 QA mapping                                  │
-                 └──────── staging QC after both ──┘
+#1309 PR                                  #1312 PR
+├─ pure Business 7/8/5 contract          ├─ promote helper into top-level total
+├─ persisted additive API mapping        ├─ atomic 20/40/20/20 cutover
+├─ transactional phone save + UI revert ├─ dashboard/checklist UI
+├─ editor persistence E2E                └─ prove complete total = 100
+└─ F37 QA mapping
 ```
 
-#1309 must remain open until the integrated score API eventually proves AC1 and AC2. This does not block the editor-focused phases below. Do not add temporary bonus points or merge a `20/30/20/15` engine.
+#1309 remains open only for its manual live-staging browser gate. Unit/API evidence now proves complete = 20, name + phone = 12, and 401/403 tenant boundaries. Do not add temporary bonus points or merge a `20/30/20/15` engine.
 
-External completion dependency: GitHub #1312. The current plan intentionally stops at pre-integration QC; when #1312 starts, update this plan with its exact PR, API-test target, atomic score cutover, and final staging gate.
+#1312 is downstream work, not a completion dependency for #1309; it owns only the top-level formula cutover and seller-facing score/checklist UI.
 
 ## Files Owned by #1309
 
-Twelve implementation and QA targets; only the planned Playwright spec is new. The existing runner config must also make the mandated `tests/*.spec.ts` location discoverable:
+Implementation and QA targets; only the scoped Playwright spec is new. It reuses the existing runner and needs only stable selector hooks; the spec discovers the authenticated account's sole site itself and is intentionally not added to the default staging workflow:
 
 1. `src/lib/seo/local-seo-score.ts`
 2. `src/__tests__/unit/seo/local-seo-score.test.ts`
@@ -68,10 +68,14 @@ Twelve implementation and QA targets; only the planned Playwright spec is new. T
 8. `src/__tests__/unit/editor/settings-panel.test.tsx`
 9. `src/__tests__/unit/editor/publish-flow.test.tsx`
 10. `docs/qa/F37-local-seo.md`
-11. `tests/f37-minimal-business-data.spec.ts`
-12. `playwright.config.ts`
+11. `e2e/f37-minimal-business-data.spec.ts`
+12. `src/components/editor/CompactEditorLayout.tsx`
+13. `src/components/editor/EditorToolsSheet.tsx`
+14. `src/components/editor/local-business/geo-cascade-fields.tsx`
+15. `src/app/api/sites/[siteId]/local-seo-score/route.ts`
+16. `src/__tests__/api/local-seo-score.test.ts`
 
-The score route and its API tests are integration ownership for #1312. The future #1312 plan update—not the provisional Phase 3—will verify their output before #1309 is considered complete.
+The additive `minimalBusinessData` mapping and focused API regressions belong to #1309. #1312 retains ownership of replacing the legacy top-level score/breakdown and adding the dashboard/checklist.
 
 ## Phases
 
@@ -79,13 +83,13 @@ The score route and its API tests are integration ownership for #1312. The futur
 |---|---|---:|---|
 | 1 | [Lock Business Score Contract](./phase-01-lock-business-score-contract.md) | 2h | Completed |
 | 2 | [Harden Editor Phone Behavior](./phase-02-harden-editor-save-and-phone-validation.md) | 2h | Completed |
-| 3 | [Pre-integration QC — Provisional](./phase-03-integrate-test-and-complete-qc.md) | 4h | Pending |
+| 3 | [Pre-integration QC — Provisional](./phase-03-integrate-test-and-complete-qc.md) | 4h | In progress — live staging pending |
 
 Progress: 4h/8h (50% by estimated effort); 2/3 phases completed.
 
 Current delivery order: `Phases 1 and 2 completed -> Phase 3 pre-integration QC`.
 
-Future delivery order, to be planned with #1312: `#1312 atomic integration -> update this plan -> final score/staging QC`.
+Delivery order: `#1309 manual staging QC -> close #1309`; #1312 can perform its atomic score/UI cutover independently afterward.
 
 ## Explicitly Not in Scope
 
@@ -101,21 +105,23 @@ Future delivery order, to be planned with #1312: `#1312 atomic integration -> up
 - [x] A failed valid-phone PATCH leaves the confirmed phone in parent state, guards sibling contact saves while pending, and cannot contaminate a later email save.
 - [ ] Valid values persist after reload; 375px has no horizontal overflow.
 - [x] The pure Business helper locks complete = 20, name + phone = 12, and incomplete address = 0.
-- [ ] Playwright discovers and runs the new F37 spec without silently skipping.
+- [x] The persisted score API returns additive Business 20/12 and preserves the legacy top-level formula.
+- [x] Score-route API regressions prove 401/403 tenant boundaries.
+- [x] Playwright locally discovers TC-F37-01-26/27 without silently skipping; live staging execution remains pending.
 - [x] No schema or migration diff in the completed Phase 1 and Phase 2 changes.
 
-Deferred until the #1312 plan update:
+Deferred to #1312:
 
-- Prove the persisted score API returns Business 20/12/0 for the corresponding scenarios.
-- Prove score-route 401/403 tenant boundaries.
-- Prove the full integrated Local SEO total reaches 100.
-- Perform final staging QC and close #1309.
+- Replace the legacy top-level score with the atomic `20/40/20/20` formula and prove total 100.
+- Build the seller-facing score cards, checklist, and deep links.
+
+#1309 still requires its manual live-staging browser run before closure.
 
 ## Engineering Review Outcome
 
 - Architecture: keep domain rules in existing modules; no new service/helper files.
 - Code quality: one score helper and one shared phone predicate; no duplicated regex or fallback scoring.
-- Tests now: the pure contract and Phase 2 server/component/parent-integration regressions cover their current boundaries, including transactional phone failure isolation; real-browser persistence remains pending Phase 3, and #1312 API integration coverage is explicitly deferred.
-- Test harness: update Playwright discovery for both the established `e2e/` suite and mandated `tests/` specs; verify with `--list` so a zero-test pass is impossible.
+- Tests now: the pure helper and persisted API mapping cover 20/12 plus tenant isolation; Phase 2 covers transactional phone failure isolation; the manual real-browser staging run remains pending.
+- Test harness: keep the scoped spec in the established `e2e/` suite; do not change Playwright config or the default staging workflow. Verify targeted discovery with `--list` so a zero-test pass is impossible.
 - Performance: no query, dependency, or bundle-heavy addition; scoring remains O(1).
 - `TODOS.md`: 0 items proposed. Deferred concurrency concerns are existing platform work and are deliberately not expanded by this issue.
