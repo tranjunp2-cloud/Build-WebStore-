@@ -25,6 +25,7 @@ US-F37-01 needed focused browser evidence for minimal business-data persistence,
 - The invalid-phone case keeps a bounded no-site-save-PATCH observation active from blur through the network quiet window, then reloads to prove the last valid phone remained persisted.
 - The stale plan instruction to expand Playwright discovery into another test directory was removed; the established `e2e/` location remains unchanged.
 - No schema, save-API, CI, Playwright config, site-ID environment variable, migration, or global score behavior changed, and no live staging E2E result is claimed.
+- The final local tenant-isolation evidence gap is covered by TC-F37-01-28: with both single-tier and two-tier rate limiters mocked to prevent configured Upstash or in-memory shared state, a complete F37 payload for another tenant returns 403 before subscription lookup or persistence. The targeted assertion failed before the mock and passed after; the full scoped gate passes 33/33, with typecheck, scoped ESLint, and diff-check passing. Live staging TC-26/27 remains pending.
 
 ## Reflection
 
@@ -38,6 +39,7 @@ The issue boundary should have stayed anchored to its acceptance criteria; treat
 | Expose only the additive F37-01 score contract | F37-01 owns 7/8/5 persistence evidence; #1312 owns the legacy-total cutover and UI | Runtime AC is testable without broad score changes |
 | Compare before fixture restore | Refuse to overwrite state changed outside this test run | Fail-safe cleanup without shared-infrastructure changes |
 | Require empty fixture `openingHours` | F37-01 must not rewrite unrelated Payload array metadata | Fails before mutation when fixture scope is unsafe |
+| Test the existing save-route tenant guard | The DoD requires tenant isolation, but production behavior was already correct | Adds IDOR regression evidence without changing the route |
 
 ## Next Steps
 
