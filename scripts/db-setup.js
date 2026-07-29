@@ -5086,6 +5086,33 @@ async function runCategorySlugTenantMigration(pool) {
   }
 }
 
+async function ensureRuntimeIssueUniqueIndex(pool) {
+  const duplicateRuntimeIssues = await pool.query(
+    `SELECT related_id, COUNT(*)::integer AS duplicate_count
+     FROM template_issues
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL
+     GROUP BY related_id
+     HAVING COUNT(*) > 1
+     ORDER BY duplicate_count DESC, related_id
+     LIMIT 10`
+  );
+  if (duplicateRuntimeIssues.rows.length > 0) {
+    const summary = duplicateRuntimeIssues.rows
+      .map((row) => `${row.related_id} (${row.duplicate_count})`)
+      .join(', ');
+    throw new Error(
+      `Cannot create template_issues_runtime_related_id_uniq: duplicate runtime related_id values exist: ${summary}`
+    );
+  }
+
+  await pool.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_runtime_related_id_uniq
+     ON template_issues (related_id)
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL`
+  );
+  console.log('[db-setup] ✅ template_issues.runtime_related_unique_idx (fail-closed)');
+}
+
 /**
  * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
  * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
@@ -5123,6 +5150,43 @@ async function verifyCriticalIndexes(pool) {
     );
   }
   console.log('[db-setup] ✅ verified categories_tenant_slug_uniq exists');
+
+  // F39: runtime issue promotion uses related_type + related_id as its idempotency
+  // boundary. The general migration loop warns-and-continues, so verify the exact
+  // partial unique index definition and fail the build if uniqueness is absent.
+  const runtimeIssueIndex = await pool.query(
+    `SELECT
+       index_metadata.indisunique,
+       index_metadata.indisvalid,
+       pg_get_indexdef(index_metadata.indexrelid, 1, true) AS indexkey,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS index_namespace ON index_namespace.oid = index_class.relnamespace
+     WHERE index_namespace.nspname = 'public'
+       AND index_class.relname = 'template_issues_runtime_related_id_uniq'
+       AND table_class.relname = 'template_issues'`
+  );
+  const runtimeIndex = runtimeIssueIndex.rows[0];
+  const runtimePredicate = String(runtimeIndex?.predicate ?? '')
+    .replaceAll('"', '')
+    .replace(/::text/g, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (
+    !runtimeIndex?.indisunique ||
+    !runtimeIndex?.indisvalid ||
+    runtimeIndex.indexkey !== 'related_id' ||
+    runtimePredicate !== "related_type = 'runtime' and related_id is not null"
+  ) {
+    throw new Error(
+      'template_issues_runtime_related_id_uniq missing or invalid after migrations — exact runtime issue promotion deduplication is not enforced.'
+    );
+  }
+  console.log('[db-setup] ✅ verified template_issues_runtime_related_id_uniq definition');
 
   // GH-1432: these indexes are part of the product-list performance contract.
   // runMigrations() intentionally warns and continues for general migrations, so
@@ -5325,6 +5389,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await runCategorySlugTenantMigration(pool);
+      await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
     }
@@ -5536,6 +5601,7 @@ async function main() {
       if (tableCount > 0) {
         await runMigrations(pool);
         await runCategorySlugTenantMigration(pool);
+        await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);

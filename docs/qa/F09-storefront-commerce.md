@@ -94,7 +94,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F09.36** | `AC-1` | `UI` | **[Positive]** Trang Confirm hiển thị đầy đủ | 1. Vừa hoàn tất đặt hàng. | - Hiển thị: Mã ORDTổng tiềnDanh sách SPHình thức thanh toán. | High | [ ] |
-| **TC-F09.37** | `AC-1` | `Flow` | **[Positive]** Nút "Continue Shopping" điều hướng đúng | 1. Nhấn "Continue Shopping" trên trang Confirm. | - Redirect về `/sites/[slug]/products`. | Medium | [ ] |
+| **TC-F09.37** | `AC-1` | `Flow` | **[Positive]** Nút "Continue Shopping" điều hướng đúng | 1. Nhấn "Continue Shopping" trên trang Confirm. | - Redirect về storefront home: `/sites/[slug]` với path-based storefront hoặc `/` với custom domain. | Medium | [ ] |
 
 ---
 
