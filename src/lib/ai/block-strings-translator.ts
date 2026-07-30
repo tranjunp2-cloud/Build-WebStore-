@@ -13,7 +13,13 @@
 
 import type OpenAI from 'openai'
 import type { BlockStrings, SectionLabels } from './block-i18n'
-import { getBlockStrings, hasDedicatedStrings, injectBlockStrings, injectSectionLabels } from './block-i18n'
+import {
+    getBlockStrings,
+    hasDedicatedStrings,
+    injectBlockStrings,
+    injectNavLabels,
+    injectSectionLabels,
+} from './block-i18n'
 
 /** Flat string keys sent to GPT — function fields reconstructed from these. */
 interface RawTranslation {
@@ -54,6 +60,9 @@ interface RawTranslation {
     service_cards_cta: string
     client_logos_headline: string
     gallery_headline: string
+    blog_read_article: string
+    blog_uncategorized: string
+    blog_empty_state: string
     newsletter_subheadline: string
     newsletter_subscribe: string
     pricing_headline: string
@@ -118,6 +127,9 @@ const ENGLISH_VALUES: RawTranslation = {
     service_cards_cta: 'Learn More',
     client_logos_headline: 'Trusted By',
     gallery_headline: 'Our Work',
+    blog_read_article: 'Read Article',
+    blog_uncategorized: 'Uncategorized',
+    blog_empty_state: 'No published posts yet. Check back soon!',
     newsletter_subheadline: 'Subscribe for exclusive news and offers.',
     newsletter_subscribe: 'Subscribe',
     pricing_headline: 'Our Pricing',
@@ -202,6 +214,11 @@ function buildBlockStrings(t: RawTranslation): BlockStrings {
         },
         clientLogos: { headline: t.client_logos_headline },
         gallery: { headline: t.gallery_headline },
+        blogList: {
+            readArticleLabel: t.blog_read_article,
+            uncategorizedLabel: t.blog_uncategorized,
+            emptyStateLabel: t.blog_empty_state,
+        },
         newsletter: {
             headlineStayUpdated: (name) => `${name}`,
             subheadlineFallback: t.newsletter_subheadline,
@@ -247,7 +264,17 @@ const REQUIRED_KEYS: ReadonlyArray<keyof RawTranslation> = [
     'contact_submit', 'contact_name', 'contact_email', 'contact_phone', 'contact_message',
     'footer_rights', 'footer_about_us',
     'testimonials_headline', 'team_headline', 'pricing_headline', 'stats_headline',
+    'blog_read_article', 'blog_uncategorized', 'blog_empty_state',
     'sl_gallery', 'sl_about', 'sl_contact', 'sl_features',
+]
+
+const MUST_TRANSLATE_KEYS: ReadonlyArray<keyof RawTranslation> = [
+    'nav_about',
+    'nav_get_started',
+    'footer_about_us',
+    'blog_read_article',
+    'blog_uncategorized',
+    'blog_empty_state',
 ]
 
 function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation {
@@ -257,12 +284,19 @@ function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation
     })
 }
 
+function hasUntranslatedCriticalValues(raw: RawTranslation, gpLang: string): boolean {
+    if (gpLang.trim().toLowerCase() === 'english') return false
+    return MUST_TRANSLATE_KEYS.some((key) =>
+        raw[key].trim().toLowerCase() === ENGLISH_VALUES[key].trim().toLowerCase(),
+    )
+}
+
 async function callGptTranslation(
     gpLang: string,
     openai: OpenAI,
 ): Promise<{ blockStrings: BlockStrings; sectionLabels: SectionLabels } | null> {
     const completion = await openai.chat.completions.create({
-        model: 'gpt-4.1-nano',
+        model: 'gpt-4.1-mini',
         messages: [{
             role: 'user',
             content: `Translate all values in the JSON below to ${gpLang}. Return ONLY valid JSON with the exact same keys at the top level. Do not wrap in any parent key. Do not add or remove keys.\n\n${JSON.stringify(ENGLISH_VALUES)}`,
@@ -299,6 +333,15 @@ async function callGptTranslation(
         console.warn(`[block-strings-translator] invalid translation for ${gpLang} — missing/empty: ${missing.join(', ')}`)
         return null
     }
+    if (hasUntranslatedCriticalValues(parsed, gpLang)) {
+        const unchanged = MUST_TRANSLATE_KEYS.filter((key) =>
+            parsed[key].trim().toLowerCase() === ENGLISH_VALUES[key].trim().toLowerCase(),
+        )
+        console.warn(
+            `[block-strings-translator] untranslated values for ${gpLang}: ${unchanged.join(', ')}`,
+        )
+        return null
+    }
 
     return { blockStrings: buildBlockStrings(parsed), sectionLabels: buildSectionLabels(parsed) }
 }
@@ -310,19 +353,50 @@ async function callGptTranslation(
  * The next warm request will find translated strings in cache and apply them.
  */
 export function prefetchBlockStrings(gpLang: string, blockLang: string, openai: OpenAI): void {
-    if (hasDedicatedStrings(blockLang)) return
+    void ensureBlockStrings(gpLang, blockLang, openai)
+}
 
-    void callGptTranslation(gpLang, openai)
-        .then((result) => {
-            if (result) {
-                injectBlockStrings(blockLang, result.blockStrings)
-                injectSectionLabels(blockLang, result.sectionLabels)
-                console.log(`[block-strings-translator] cached block strings + section labels for ${blockLang} (${gpLang})`)
+const inFlightTranslations = new Map<string, Promise<boolean>>()
+
+/**
+ * Resolve block strings for the current request. Calls are deduplicated by
+ * locale, and one retry is attempted before reporting failure.
+ */
+export function ensureBlockStrings(
+    gpLang: string,
+    blockLang: string,
+    openai: OpenAI,
+): Promise<boolean> {
+    if (hasDedicatedStrings(blockLang)) return Promise.resolve(true)
+
+    const cached = inFlightTranslations.get(blockLang)
+    if (cached) return cached
+
+    const request = (async () => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const result = await callGptTranslation(gpLang, openai)
+                if (result) {
+                    injectBlockStrings(blockLang, result.blockStrings)
+                    injectNavLabels(blockLang, result.blockStrings.navigation)
+                    injectSectionLabels(blockLang, result.sectionLabels)
+                    console.log(`[block-strings-translator] cached block strings + section labels for ${blockLang} (${gpLang})`)
+                    return true
+                }
+            } catch (err) {
+                console.warn(
+                    `[block-strings-translator] translation attempt ${attempt} failed for ${gpLang}:`,
+                    err,
+                )
             }
-        })
-        .catch((err) => {
-            console.warn(`[block-strings-translator] prefetch failed for ${gpLang}:`, err)
-        })
+        }
+        return false
+    })().finally(() => {
+        inFlightTranslations.delete(blockLang)
+    })
+
+    inFlightTranslations.set(blockLang, request)
+    return request
 }
 
 /** Translate and return block strings synchronously (for server-side pre-generation). */
@@ -336,6 +410,7 @@ export async function translateBlockStrings(
     const result = await callGptTranslation(gpLang, openai)
     if (result) {
         injectBlockStrings(blockLang, result.blockStrings)
+        injectNavLabels(blockLang, result.blockStrings.navigation)
         injectSectionLabels(blockLang, result.sectionLabels)
         return result.blockStrings
     }

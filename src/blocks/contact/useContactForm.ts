@@ -14,6 +14,7 @@ export type ContactFormValues = {
     name: string
     email: string
     phone: string
+    subject: string
     message: string
     website?: string // honeypot
 }
@@ -55,6 +56,10 @@ function validate(values: ContactFormValues, requiredFields: Set<string>): Conta
         errors.phone = 'Invalid phone format'
     }
 
+    if (requiredFields.has('subject') && !values.subject.trim()) {
+        errors.subject = 'Subject is required'
+    }
+
     if (requiredFields.has('message')) {
         if (!values.message.trim()) {
             errors.message = 'Message is required'
@@ -93,6 +98,7 @@ export function useContactForm({ siteId, requiredFieldNames = [] }: UseContactFo
                 name: String(formData.get('name') || ''),
                 email: String(formData.get('email') || ''),
                 phone: String(formData.get('phone') || ''),
+                subject: String(formData.get('subject') || ''),
                 message: String(formData.get('message') || ''),
                 website: String(formData.get('website') || ''),
             }

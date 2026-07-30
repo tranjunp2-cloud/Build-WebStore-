@@ -67,6 +67,7 @@ const validBody = (overrides = {}) => ({
 	name: 'John Doe',
 	email: 'john@example.com',
 	phone: '123-456-7890',
+	subject: 'Project enquiry',
 	message: 'This is a test message for contact',
 	siteId: '1',
 	website: '', // honeypot: empty (not spam)
@@ -97,6 +98,23 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		expect(res.status).toBe(200)
 		expect(data.success).toBe(true)
 		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:1.1.1.1', 5, 5 * 60 * 1000)
+	})
+
+	it('persists and emails an optional contact subject', async () => {
+		const payloadModule = await import('payload')
+		const mockPayload = await payloadModule.getPayload({} as never)
+		const req = makeReq(validBody({ subject: 'Website consultation' }), { xff: '1.1.1.2' })
+
+		const res = await POST(req)
+
+		expect(res.status).toBe(200)
+		expect(mockPayload.create).toHaveBeenCalledWith(expect.objectContaining({
+			collection: 'contact-submissions',
+			data: expect.objectContaining({ subject: 'Website consultation' }),
+		}))
+		expect(mockPayload.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+			text: expect.stringContaining('Subject: Website consultation'),
+		}))
 	})
 
 	it('TC-F04.CS.02 — Same siteId+IP submitted 6× → 6th call returns 429', async () => {

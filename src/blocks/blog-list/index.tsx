@@ -30,8 +30,35 @@ function extractExcerpt(content: unknown): string {
     return text.length > 160 ? text.substring(0, 157) + '...' : text
 }
 
+function formatBlogDate(value: unknown, locale: string): string {
+    if (!value) return ''
+    const date = new Date(String(value))
+    if (Number.isNaN(date.getTime())) return ''
+    try {
+        return date.toLocaleDateString(locale, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        })
+    } catch {
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        })
+    }
+}
+
 export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>) {
-    const { headline = 'Latest Insights', subheadline, limit = 3, variant = 'cards' } = block
+    const {
+        subheadline,
+        limit = 3,
+        variant = 'cards',
+        readArticleLabel = 'Read Article',
+        uncategorizedLabel = 'Uncategorized',
+        emptyStateLabel = 'No published posts yet. Check back soon!',
+    } = block
+    const headline = block.headline || block.sectionLabel || ''
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -43,6 +70,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     // Using blogPreviewPath (not siteBasePath) keeps the override scoped to blog links only,
     // so product/other blocks in the same preview page retain their existing base paths.
     const siteRec = site as Record<string, unknown>
+    const siteLocale =
+        (typeof siteRec?.generationLocale === 'string' && siteRec.generationLocale)
+        || (typeof siteRec?.locale === 'string' && siteRec.locale)
+        || 'en'
     const blogPreviewPath = typeof siteRec?.blogPreviewPath === 'string' ? (siteRec.blogPreviewPath as string) : null
     const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
     const tenantSlugRaw =
@@ -74,10 +105,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
 
                     return {
                         id: String(doc.id),
-                        title: doc.title || 'Untitled',
+                        title: doc.title || headline,
                         excerpt: extractExcerpt(doc.content),
-                        date: publishDate ? new Date(publishDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
-                        category: catName || 'Uncategorized',
+                        date: formatBlogDate(publishDate, siteLocale),
+                        category: catName || uncategorizedLabel,
                         image: thumbUrl,
                         slug: doc.slug || '',
                     }
@@ -88,7 +119,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                 console.error('[BlogListBlock] Failed to fetch blogs:', err)
             })
             .finally(() => setLoading(false))
-    }, [limit, site])
+    }, [headline, limit, site, siteLocale, uncategorizedLabel])
 
     if (loading) {
         return (
@@ -112,7 +143,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     <div className="text-center">
                         {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                        <p className="opacity-60 text-lg">No published posts yet. Check back soon!</p>
+                        <p className="opacity-60 text-lg">{emptyStateLabel}</p>
                     </div>
                 </SectionWrapper>
             </AnimatedSection>
@@ -192,7 +223,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                             <Body size="small" className="opacity-60 mb-6 flex-1 leading-relaxed">{post.excerpt}</Body>
 
                                             <div className="mt-auto flex items-center text-sm font-semibold tracking-wide" style={{ color: 'var(--brand-primary)' }}>
-                                                Read Article
+                                                {readArticleLabel}
                                                 <span className="ml-2 transform group-hover:translate-x-1 transition-transform">→</span>
                                             </div>
                                             <div className="mt-6 h-0.5 w-0 group-hover:w-16 transition-all duration-500 rounded-full"

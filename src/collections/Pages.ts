@@ -788,6 +788,9 @@ const BlogListBlock = {
         { name: 'subheadline', type: 'textarea' },
         { name: 'sectionLabel', type: 'text' },
         { name: 'limit', type: 'number', defaultValue: 6 },
+        { name: 'readArticleLabel', type: 'text' },
+        { name: 'uncategorizedLabel', type: 'text' },
+        { name: 'emptyStateLabel', type: 'text' },
     ],
 }
 

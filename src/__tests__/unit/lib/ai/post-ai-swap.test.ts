@@ -12,9 +12,17 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { postAISwapStep, SWAPPABLE_BLOCKS, isPostAISwapEnabled } from '@/lib/ai/post-ai-swap'
+import {
+    postAISwapStep,
+    SWAPPABLE_BLOCKS,
+    isPostAISwapEnabled,
+    normalizeGeneratedPageLocaleStrings,
+    normalizeLocaleStructuralStrings,
+} from '@/lib/ai/post-ai-swap'
 import * as composer from '@/lib/ai/template-composer'
 import type { BusinessSample } from '@/lib/ai/content'
+import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
+import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
 
 const BIZ: BusinessSample = {
     name: 'Klinik Dr. Tan',
@@ -243,6 +251,403 @@ describe('Phase 04 — postAISwapStep', () => {
             expect([...SWAPPABLE_BLOCKS].sort()).toEqual([
                 'about', 'cta', 'faq', 'features', 'hero', 'testimonials',
             ])
+        })
+    })
+
+    describe('TC-F01-PAS-08: locale-aware structural fallbacks', () => {
+        it('keeps every block and CTA while replacing English structural fallbacks', () => {
+            // Arrange
+            const blocks = [
+                {
+                    blockType: 'hero',
+                    ctaButtons: [
+                        { label: '立即选购', url: '/contact', style: 'primary' },
+                        { label: 'About Us', url: '#about', style: 'secondary' },
+                    ],
+                },
+                {
+                    blockType: 'gallery',
+                    sectionLabel: 'Gallery',
+                    headline: '作品展示',
+                    images: [],
+                },
+                {
+                    blockType: 'newsletter',
+                    sectionLabel: 'Newsletter',
+                    headline: '最新资讯',
+                    buttonLabel: 'Subscribe',
+                    placeholder: 'your@email.com',
+                },
+            ]
+
+            // Act
+            const result = normalizeLocaleStructuralStrings(blocks, 'zh-CN', '智慧生活家居')
+
+            // Assert
+            expect(result).toHaveLength(blocks.length)
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons.map((cta) => cta.label)).toEqual(['立即选购', '关于我们'])
+            expect(result[1]).toMatchObject({ sectionLabel: '图片展示', headline: '作品展示' })
+            expect(result[2]).toMatchObject({
+                sectionLabel: '订阅通讯',
+                headline: '最新资讯',
+                buttonLabel: '订阅',
+                placeholder: '邮箱',
+            })
+        })
+
+        it('normalizes an English hero CTA even before its placeholder URL is resolved', () => {
+            const pages = [{
+                title: 'Blog',
+                layout: [{
+                    blockType: 'hero',
+                    headline: 'Kiến thức nha khoa nhẹ nhàng và sâu sắc',
+                    ctaButtons: [
+                        { label: 'Đặt lịch khám', url: '#contact', style: 'primary' },
+                        { label: 'About Us', url: '#', style: 'secondary' },
+                    ],
+                }],
+            }]
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                pages,
+                'vi',
+                'Nha Khoa An Tâm',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string; url: string }>
+            }
+            expect(hero.ctaButtons).toEqual([
+                { label: 'Đặt lịch khám', url: '#contact', style: 'primary' },
+                { label: 'Giới Thiệu', url: '#', style: 'secondary' },
+            ])
+        })
+
+        it('injects dynamically translated BlogList labels for a Latin-script locale', () => {
+            const locale = 'fr-blog-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                blogList: {
+                    readArticleLabel: 'Lire l’article',
+                    uncategorizedLabel: 'Sans catégorie',
+                    emptyStateLabel: 'Aucun article publié pour le moment.',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'blog-list',
+                        headline: 'Conseils beauté',
+                        limit: 3,
+                    }],
+                }],
+                locale,
+                'Éclat Peau Studio',
+            )
+
+            expect(result[0]!.layout![0]).toMatchObject({
+                blockType: 'blog-list',
+                headline: 'Conseils beauté',
+                limit: 3,
+                readArticleLabel: 'Lire l’article',
+                uncategorizedLabel: 'Sans catégorie',
+                emptyStateLabel: 'Aucun article publié pour le moment.',
+            })
+        })
+
+        it('replaces an English About Us CTA with dynamically translated Spanish', () => {
+            const locale = 'es-hero-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    about: 'Acerca de',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Historias y sabores de nuestra panadería',
+                        ctaButtons: [
+                            { label: 'Ver últimos posts', url: '/blog', style: 'primary' },
+                            { label: 'About Us', url: '#', style: 'secondary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'Panadería Sol',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string }>
+            }
+            expect(hero.ctaButtons.map((button) => button.label)).toEqual([
+                'Ver últimos posts',
+                'Acerca de',
+            ])
+        })
+
+        it('normalizes Blog hero CTA from request-scoped strings without a locale cache entry', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                navigation: {
+                    ...english.navigation,
+                    about: 'Über uns',
+                    getStarted: 'Jetzt beraten lassen',
+                },
+            }
+            const blocks = [{
+                blockType: 'hero',
+                headline: 'Neuigkeiten von GrünRaum Innenarchitektur',
+                ctaButtons: [
+                    { label: 'Jetzt beraten lassen', url: '/contact', style: 'primary' },
+                    { label: 'About Us', url: '#about', style: 'secondary' },
+                ],
+            }]
+
+            const result = normalizeLocaleStructuralStrings(
+                blocks,
+                'de-request-scoped-test',
+                'GrünRaum Innenarchitektur',
+                german,
+            )
+
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons.map((button) => button.label)).toEqual([
+                'Jetzt beraten lassen',
+                'Über uns',
+            ])
+        })
+
+        it('keeps both hero CTAs and removes English fallback copy when locale context is missing', () => {
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'hero',
+                    headline: 'Neuigkeiten von GrünRaum',
+                    ctaButtons: [
+                        { label: 'Kontaktieren', url: '/contact', style: 'primary' },
+                        { label: 'About Us', url: '#about', style: 'secondary' },
+                    ],
+                }],
+                'de-no-context',
+                'GrünRaum',
+            )
+
+            const hero = result[0] as { ctaButtons: Array<{ label: string }> }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons[1]?.label).toBe('GrünRaum')
+            expect(JSON.stringify(hero)).not.toContain('About Us')
+        })
+
+        it('preserves localized structural copy when locale context is missing', () => {
+            const blocks = [
+                {
+                    blockType: 'features',
+                    sectionLabel: 'Leistungen',
+                    headline: 'Unsere Leistungen',
+                },
+                {
+                    blockType: 'contact',
+                    sectionLabel: 'Kontakt',
+                    headline: 'Kontakt aufnehmen',
+                    subheadline: 'Schreiben Sie uns',
+                    submitLabel: 'Nachricht senden',
+                    formFields: [{ fieldName: 'email', label: 'E-Mail' }],
+                },
+                {
+                    blockType: 'blog-list',
+                    sectionLabel: 'Blog',
+                    headline: 'Aktuelle Beiträge',
+                    readArticleLabel: 'Artikel lesen',
+                    uncategorizedLabel: 'Ohne Kategorie',
+                    emptyStateLabel: 'Noch keine Beiträge',
+                },
+            ]
+
+            const result = normalizeLocaleStructuralStrings(
+                blocks,
+                'de-no-context',
+                'GrünRaum',
+                null,
+            )
+
+            expect(result).toEqual(blocks)
+            expect(JSON.stringify(result)).not.toContain('"GrünRaum"')
+        })
+
+        it('uses field type for contact labels and preserves custom fields', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                contact: {
+                    ...english.contact,
+                    nameLabel: 'Name',
+                    emailLabel: 'E-Mail',
+                    phoneLabel: 'Telefon',
+                    messageLabel: 'Nachricht',
+                },
+            }
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'contact',
+                    formFields: [
+                        { fieldName: 'field', fieldType: 'text', label: 'Name' },
+                        { fieldName: 'field-2', fieldType: 'email', label: 'Email' },
+                        { fieldName: 'field-3', fieldType: 'phone', label: 'Phone' },
+                        { fieldName: 'subject', fieldType: 'text', label: 'Betreff' },
+                        { fieldName: 'field-5', fieldType: 'textarea', label: 'Message' },
+                    ],
+                }],
+                'de',
+                'GrünRaum',
+                german,
+            )
+
+            const contact = result[0] as {
+                formFields: Array<{ fieldName: string; label: string }>
+            }
+            expect(contact.formFields).toEqual([
+                { fieldName: 'name', fieldType: 'text', label: 'Name' },
+                { fieldName: 'email', fieldType: 'email', label: 'E-Mail' },
+                { fieldName: 'phone', fieldType: 'phone', label: 'Telefon' },
+                { fieldName: 'subject', fieldType: 'text', label: 'Betreff' },
+                { fieldName: 'message', fieldType: 'textarea', label: 'Nachricht' },
+            ])
+        })
+
+        it('preserves custom companyName fields and prevents duplicate canonical name fields', () => {
+            const english = resolveLocaleStructuralStrings('en')!
+            const german = {
+                ...english,
+                contact: {
+                    ...english.contact,
+                    nameLabel: 'Name',
+                    emailLabel: 'E-Mail',
+                },
+            }
+            const result = normalizeLocaleStructuralStrings(
+                [{
+                    blockType: 'contact',
+                    formFields: [
+                        { fieldName: 'companyName', fieldType: 'text', label: 'Company name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Contact name' },
+                        { fieldName: 'name', fieldType: 'text', label: 'Assistant name' },
+                        { fieldName: 'email', fieldType: 'email', label: 'Email' },
+                    ],
+                }],
+                'de',
+                'GrünRaum',
+                german,
+            )
+
+            const contact = result[0] as {
+                formFields: Array<{ fieldName: string; label: string }>
+            }
+            expect(contact.formFields.map((field) => field.fieldName)).toEqual([
+                'companyName',
+                'name',
+                'field-3',
+                'email',
+            ])
+        })
+
+        it('normalizes an English CTA stored under an AI alias before Payload sanitization', () => {
+            const locale = 'de-hero-alias-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    about: 'Über uns',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Blog',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Neuigkeiten und Inspirationen',
+                        ctaButtons: [
+                            { label: 'Kontaktieren Sie uns', url: '/contact', style: 'primary' },
+                            { text: 'About Us', url: '#', style: 'secondary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'GrünRaum Innenarchitektur',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label?: string; text?: string }>
+            }
+            expect(hero.ctaButtons).toHaveLength(2)
+            expect(hero.ctaButtons[1]).toMatchObject({
+                label: 'Über uns',
+                text: 'About Us',
+            })
+        })
+
+        it('replaces an English contact CTA with the dynamically translated German label', () => {
+            const locale = 'de-cta-test'
+            injectBlockStrings(locale, {
+                ...getBlockStrings('en'),
+                navigation: {
+                    ...getBlockStrings('en').navigation,
+                    getStarted: 'Gespräch beginnen',
+                },
+            })
+
+            const result = normalizeGeneratedPageLocaleStrings(
+                [{
+                    title: 'Startseite',
+                    layout: [{
+                        blockType: 'hero',
+                        headline: 'Nachhaltige Räume für moderne Unternehmen',
+                        ctaButtons: [
+                            { label: 'Start a Conversation', url: '/contact', style: 'primary' },
+                        ],
+                    }],
+                }],
+                locale,
+                'GrünRaum Innenarchitektur',
+            )
+
+            const hero = result[0]!.layout![0] as {
+                ctaButtons: Array<{ label: string }>
+            }
+            expect(hero.ctaButtons[0]!.label).toBe('Gespräch beginnen')
+        })
+
+        it('preserves generic GPT blocks for every non-English locale', () => {
+            const hero = {
+                blockType: 'hero',
+                headline: 'Willkommen auf unserer Website',
+                subheadline: 'Ihr zuverlässiger Partner für nachhaltige Innenarchitektur.',
+            }
+
+            const result = postAISwapStep(
+                [hero],
+                BIZ,
+                'business',
+                undefined,
+                0,
+                'de',
+            )
+
+            expect(result.blocks[0]).toMatchObject(hero)
+            expect(result.telemetry).toEqual([{
+                blockType: 'hero',
+                action: 'kept-lang-dynamic',
+                reason: 'lang:de',
+            }])
         })
     })
 

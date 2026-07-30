@@ -16,7 +16,12 @@ import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBl
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
-import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
+import {
+    postAISwapStep,
+    isPostAISwapEnabled,
+    normalizeLocaleStructuralStrings,
+    type SwapTelemetry,
+} from './post-ai-swap'
 import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
@@ -38,9 +43,10 @@ import {
     type ContentLang,
 } from './content-rules'
 import { detectLanguage, resolveDetectedLanguage } from './lang-detect'
-import { getNavLabels, hasDedicatedStrings } from './block-i18n'
-import { prefetchNavLabels } from './nav-label-translator'
-import { prefetchBlockStrings } from './block-strings-translator'
+import {
+    resolveLocaleStructuralStrings,
+    type LocaleStructuralStrings,
+} from './locale-structural-strings'
 import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
 function getOpenAI(): OpenAI | null {
@@ -189,19 +195,6 @@ export async function generateSiteWithAI(
     try {
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
-        // For non-English languages not yet in the nav label cache, fire a GPT
-        // micro-call (gpt-4.1-nano, ~50 tokens) to translate the 5 nav labels.
-        // Fire-and-forget: this request keeps GPT output; next warm request uses
-        // the cached translated labels. See nav-label-translator.ts for details.
-        if (gpLang && gpLang !== 'English' && !getNavLabels(blockLang)) {
-            prefetchNavLabels(gpLang, blockLang, openai)
-        }
-        // Same pattern for full block strings (structural labels, form labels, footer text).
-        // Covers long-tail languages not in the static STRINGS seed (en/ms/vi/ja/zh/ko/ar/th).
-        if (gpLang && gpLang !== 'English' && !hasDedicatedStrings(blockLang)) {
-            prefetchBlockStrings(gpLang, blockLang, openai)
-        }
-
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.
         // Precedence downstream: URL extraction visualStyle (route.ts) > this preset > AI output.
@@ -293,12 +286,6 @@ export async function generateSiteWithAI(
                         { role: 'user', content: userPromptText },
                     ],
                     temperature: 0.7,
-                    // Plan 260416: 6000 was too tight — 5-page sites need
-                    // ~6500-7500 tokens, so JSON was truncated on every gen
-                    // causing 100% fallback to legacy composer. 12000 gives
-                    // safe headroom. Cost unchanged (GPT charges actual output,
-                    // not the cap — typical output stays ~5200-7000 tokens).
-                    max_tokens: 12000,
                     response_format: { type: 'json_object' },
                 })
             } catch (err) {
@@ -357,7 +344,7 @@ export async function generateSiteWithAI(
                 throw new Error('Empty AI response')
             }
             if (choice?.finish_reason === 'length') {
-                console.warn(`[AI] WARNING: AI response was truncated due to max_tokens limit (${completion.usage?.completion_tokens} tokens used).`)
+                console.warn(`[AI] WARNING: AI response ended at the model output limit (${completion.usage?.completion_tokens} tokens used).`)
             }
 
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
@@ -398,6 +385,14 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'theme_set', data: { theme } })
 
+        const localeStructuralStrings =
+            blockLang.split('-')[0] === 'en'
+                ? null
+                : resolveLocaleStructuralStrings(blockLang, parsed.localeStrings)
+        console.info(
+            `[locale-strings] locale=${blockLang} source=${localeStructuralStrings ? 'resolved' : 'business-copy-fallback'}`,
+        )
+
         // Detect site category for weighted variant selection
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
 
@@ -411,7 +406,14 @@ export async function generateSiteWithAI(
         // between happy path (here) and fallback path (fallback-adapter).
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const sanitizedBlocks = rawBlocks.map((block) =>
-                sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
+                sanitizeBlockData(
+                    block as Record<string, unknown>,
+                    detectedCategory,
+                    contentLang,
+                    themeSeed,
+                    blockLang,
+                    localeStructuralStrings,
+                )
             )
             const filtered = filterUnsupportedBlocks(sanitizedBlocks, 'ai')
             const valid: Record<string, unknown>[] = []
@@ -478,6 +480,7 @@ export async function generateSiteWithAI(
                 userBiz: enforcerBizOverride,
                 mood: themeMood,
                 language: blockLang,
+                localeStrings: localeStructuralStrings,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -502,6 +505,7 @@ export async function generateSiteWithAI(
                         themeMood,
                         themeSeed,
                         blockLang,
+                        localeStructuralStrings,
                     )
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
@@ -533,6 +537,12 @@ export async function generateSiteWithAI(
                     enforcerCtx,
                 ) as typeof pageBlocks
                 enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                pageBlocks = normalizeLocaleStructuralStrings(
+                    pageBlocks as Record<string, unknown>[],
+                    blockLang,
+                    enforcerBizOverride.name ?? businessInfo.businessName,
+                    localeStructuralStrings,
+                ) as typeof pageBlocks
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
                 generatedPages.push({
@@ -629,6 +639,7 @@ export async function generateSiteWithAI(
                     themeMood,
                     themeSeed,
                     blockLang,
+                    localeStructuralStrings,
                 )
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)
@@ -644,6 +655,7 @@ export async function generateSiteWithAI(
                     userBiz: enforcerBizOverride,
                     mood: themeMood,
                     language: blockLang,
+                    localeStrings: localeStructuralStrings,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],
@@ -657,6 +669,12 @@ export async function generateSiteWithAI(
                 ) as typeof validBlocks
                 enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
+            validBlocks = normalizeLocaleStructuralStrings(
+                validBlocks as Record<string, unknown>[],
+                blockLang,
+                enforcerBizOverride.name ?? businessInfo.businessName,
+                localeStructuralStrings,
+            ) as typeof validBlocks
 
             // Phase 04 — page-level guards for single-page path
             const singleStats = checkPageBlockCount(validBlocks)
@@ -696,6 +714,7 @@ export async function generateSiteWithAI(
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             blockLang,
+            localeStructuralStrings,
             theme,
             // Plan 260415 Phase 04 — swap telemetry surfaced for Phase 07 harness.
             postAISwap: {
@@ -741,7 +760,10 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
-        if (!['en', 'ms', 'vi'].includes(blockLang)) throw error
+        // Curated fallback templates contain English item-level copy. Returning
+        // them for any non-English locale creates a successfully persisted but
+        // mixed-language site, so only English may use this fallback.
+        if (blockLang !== 'en') throw error
         // Fallback succeeded — site will still be created via smart templates.
         // Don't emit 'error' event (would show error UI even though generation succeeds).
         // Keep warn log for ops visibility on fallback rate.
@@ -1356,8 +1378,15 @@ export function sanitizeBlockData(
     siteCategory?: string,
     language: 'en' | 'vi' | 'ms' = 'en',
     seed?: number,
+    structuralLocale: string = language,
+    localeStructuralStrings?: LocaleStructuralStrings | null,
 ): Record<string, unknown> {
     const s = { ...block }
+    const isEnglishStructuralLocale = structuralLocale.split('-')[0] === 'en'
+    const structuralStrings = isEnglishStructuralLocale
+        ? null
+        : localeStructuralStrings ?? resolveLocaleStructuralStrings(structuralLocale)
+    const localFallback = String(s.headline || s.sectionLabel || s.logoText || '')
 
     // Helper: normalize array where strings should be objects
     const norm = (arr: unknown[], toObj: (v: string) => Record<string, unknown>): unknown[] =>
@@ -1486,6 +1515,21 @@ export function sanitizeBlockData(
         }
     }
 
+    // Payload casts number fields before inserting. A model value such as
+    // "compact" becomes NaN and makes the entire page insert fail.
+    if (s.blockType === 'announcement-bar' && s.paddingY !== undefined) {
+        const paddingY = typeof s.paddingY === 'number'
+            ? s.paddingY
+            : typeof s.paddingY === 'string' && s.paddingY.trim() !== ''
+                ? Number(s.paddingY)
+                : Number.NaN
+        if (Number.isFinite(paddingY)) {
+            s.paddingY = Math.min(32, Math.max(4, Math.round(paddingY)))
+        } else {
+            delete s.paddingY
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // NAVIGATION BLOCK
     // ═══════════════════════════════════════════════════════════════════════
@@ -1500,21 +1544,33 @@ export function sanitizeBlockData(
             s.links = s.links.map((link: unknown) => {
                 if (typeof link === 'string') return { label: link, url: '#', openInNewTab: false }
                 const l = (typeof link === 'object' && link !== null ? link : {}) as Record<string, unknown>
+                const url = String(l.url || l.href || l.link || '#')
+                const urlLabels: Record<string, string | undefined> = {
+                    '/': structuralStrings?.navigation.home,
+                    '/about': structuralStrings?.navigation.about,
+                    '/services': structuralStrings?.navigation.services,
+                    '/contact': structuralStrings?.navigation.contact,
+                    '/blog': structuralStrings?.navigation.blog,
+                }
                 return {
-                    label: String(l.label || l.text || l.title || l.name || 'Link'),
-                    url: String(l.url || l.href || l.link || '#'),
+                    label: String(l.label || l.text || l.title || l.name || urlLabels[url] || localFallback || 'Link'),
+                    url,
                     openInNewTab: typeof l.openInNewTab === 'boolean' ? l.openInNewTab : false
                 }
             })
         }
         // Ensure ctaButton has required shape
         if (!s.ctaButton || typeof s.ctaButton !== 'object') {
-            s.ctaButton = { show: true, label: 'Get Started', url: '#' }
+            s.ctaButton = {
+                show: true,
+                label: structuralStrings?.navigation.getStarted || localFallback || 'Get Started',
+                url: '#',
+            }
         } else {
             const btn = s.ctaButton as Record<string, unknown>
             s.ctaButton = {
                 show: typeof btn.show === 'boolean' ? btn.show : true,
-                label: String(btn.label || btn.text || 'Get Started'),
+                label: String(btn.label || btn.text || structuralStrings?.navigation.getStarted || localFallback || 'Get Started'),
                 url: String(btn.url || btn.href || '#'),
             }
         }
@@ -1530,7 +1586,15 @@ export function sanitizeBlockData(
                 const bObj = (typeof btn === 'object' && btn !== null ? btn : {}) as Record<string, unknown>
                 const style = String(bObj.style)
                 return {
-                    label: String(bObj.label || bObj.text || 'Button'),
+                    label: String(
+                        bObj.label
+                        || bObj.text
+                        || (i === 0
+                            ? structuralStrings?.navigation.getStarted
+                            : structuralStrings?.navigation.about)
+                        || localFallback
+                        || 'Button',
+                    ),
                     url: String(bObj.url || bObj.href || '#'),
                     // First button defaults primary, subsequent default secondary for visual contrast
                     style: ['primary', 'secondary', 'outline', 'ghost'].includes(style) ? style : (i === 0 ? 'primary' : 'secondary'),
@@ -1539,11 +1603,18 @@ export function sanitizeBlockData(
             // Enforce min 2 CTAs for visual richness — add secondary if only 1
             // Note: avoid "Learn More" — blocked by design-quality content rules
             if ((s.ctaButtons as unknown[]).length === 1) {
-                (s.ctaButtons as Array<{ label: string; url: string; style: string }>).push({
-                    label: 'About Us',
-                    url: '#about',
-                    style: 'secondary',
-                })
+                const secondaryLabel = isEnglishStructuralLocale
+                    ? 'About Us'
+                    : structuralStrings?.navigation.about
+                        ?? String(s.headline || (s.ctaButtons as Array<Record<string, unknown>>)[0]?.label || '')
+                const ctaButtons = s.ctaButtons as Array<{ label: string; url: string; style: string }>
+                if (secondaryLabel) {
+                    ctaButtons.push({
+                        label: secondaryLabel,
+                        url: '#about',
+                        style: 'secondary',
+                    })
+                }
             }
         }
         // Normalize badge
@@ -1575,14 +1646,25 @@ export function sanitizeBlockData(
     // ═══════════════════════════════════════════════════════════════════════
     const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
     if (Array.isArray(s.formFields)) {
-        s.formFields = s.formFields.map((field: unknown) => {
+        const usedFieldNames = new Set<string>()
+        s.formFields = s.formFields.map((field: unknown, index: number) => {
             if (typeof field === 'string') {
                 const name = field.toLowerCase()
                 let fieldType = 'text'
                 if (name.includes('email')) fieldType = 'email'
                 else if (name.includes('phone') || name.includes('tel') || name.includes('telefon')) fieldType = 'phone'
                 else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
-                return { fieldName: field, label: field, fieldType, required: true }
+                const fieldName = fieldType === 'email'
+                    ? 'email'
+                    : fieldType === 'phone'
+                        ? 'phone'
+                        : fieldType === 'textarea'
+                            ? 'message'
+                            : usedFieldNames.has('name')
+                                ? `field-${index + 1}`
+                                : 'name'
+                usedFieldNames.add(fieldName)
+                return { fieldName, label: field, fieldType, required: true }
             }
             const fObj = (typeof field === 'object' && field !== null ? field : {}) as Record<string, unknown>
             let ft = String(fObj.fieldType || fObj.type || 'text')
@@ -1590,12 +1672,39 @@ export function sanitizeBlockData(
             if (ft === 'number') ft = 'text'
             if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
 
-            return {
-                fieldName: String(fObj.fieldName || fObj.name || 'field'),
-                label: String(fObj.label || fObj.fieldName || fObj.name || 'Field'),
+            const suppliedName = String(fObj.fieldName || fObj.name || '').trim()
+            const normalizedName = suppliedName.toLowerCase()
+            const isGenericName = !normalizedName || /^field(?:[-_\s]*\d+)?$/.test(normalizedName)
+            let fieldName = suppliedName
+
+            if (isGenericName) {
+                if (ft === 'email') fieldName = 'email'
+                else if (ft === 'phone') fieldName = 'phone'
+                else if (ft === 'textarea') fieldName = 'message'
+                else if (!usedFieldNames.has('name')) fieldName = 'name'
+                else if (!usedFieldNames.has('subject')) fieldName = 'subject'
+                else fieldName = `field-${index + 1}`
+            }
+
+            if (usedFieldNames.has(fieldName)) fieldName = `field-${index + 1}`
+            usedFieldNames.add(fieldName)
+
+            const normalizedField = {
+                fieldName,
+                label: String(
+                    fObj.label
+                    || fObj.fieldName
+                    || fObj.name
+                    || structuralStrings?.contact.nameLabel
+                    || localFallback
+                    || 'Field',
+                ),
                 fieldType: ft,
                 required: typeof fObj.required === 'boolean' ? fObj.required : true,
             }
+            return typeof fObj.placeholder === 'string'
+                ? { ...normalizedField, placeholder: fObj.placeholder }
+                : normalizedField
         })
     }
 

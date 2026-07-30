@@ -167,7 +167,6 @@ SEO Dashboard                                      [7 days v]
 | Next steps                                                  |
 | 1. Add business info                         [Continue]     |
 | 2. Connect Google Business Profile           [Connect]      |
-| 3. Allow AI search                           [Turn on]      |
 +-------------------------------------------------------------+
 
 +-------------------------------------------------------------+
@@ -196,7 +195,6 @@ Local SEO
 Next steps
 1. Add business info          [Continue]
 2. Connect Google             [Connect]
-3. Allow AI search            [Turn on]
 
 Google activity
 Calls --   Directions --   Website visits --
@@ -206,9 +204,9 @@ Calls --   Directions --   Website visits --
 
 - Reuse the current SEO tab, card style, and action button style.
 - Do not introduce a new dashboard top tab unless product explicitly approves later.
-- Maximum 3 next steps.
+- Show only seller-actionable next steps.
 - No formula, no crawler list, no technical score breakdown.
-- "Allow AI search" is the friendly label for the one-click crawler setting.
+- AI crawler access is platform-managed and never appears as a setting or next step.
 - Google activity uses Google Business Profile only.
 
 ## 6. Screen C - Settings > Business Info

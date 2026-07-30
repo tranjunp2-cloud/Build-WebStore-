@@ -14,6 +14,7 @@ import {
 	scopedUserPrompt,
 	safeParseJson,
 	mergeSplitParsed,
+	outputMatchesLocale,
 	runParallelPageSplit,
 	applyDeterministicChrome,
 	syncFooterAcrossPages,
@@ -116,6 +117,14 @@ describe('[TC-GENPERF-W2-02] buildHomeSystemPrompt — home-only scope', () => {
 		expect(result).toContain('About="Giới thiệu"')
 		expect(result).toContain('Services="Dịch vụ"')
 	})
+
+	it('TC-F01-LOCALE-PERF-05: requests locale context inside the existing homepage call', () => {
+		const result = buildHomeSystemPrompt('Base', buildBrief('de-contract'))
+
+		expect(result).toContain('REQUIRED LOCALE CONTEXT')
+		expect(result).toContain('"readArticleLabel"')
+		expect(result).toContain('"allRightsReserved"')
+	})
 })
 
 describe('[TC-GENPERF-W2-02] buildSubpagesSystemPrompt — batch scope', () => {
@@ -209,6 +218,42 @@ describe('[TC-GENPERF-W2-03] safeParseJson — truncation repair', () => {
 
 		// Act & Assert
 		expect(() => safeParseJson(noBrace)).toThrow('Invalid JSON response from AI')
+	})
+})
+
+describe('outputMatchesLocale — final generation guard', () => {
+	it('rejects a German site containing substantial English page copy', () => {
+		expect(outputMatchesLocale({
+			pages: [{
+				slug: '/services',
+				blocks: [{
+					blockType: 'service-cards',
+					headline: 'Our Services',
+					subheadline: 'Discover what our professional consulting team can do for you.',
+					services: [
+						{ title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development for growing companies.' },
+						{ title: 'Market Entry', description: 'Comprehensive market research and entry planning for international markets.' },
+					],
+				}],
+			}],
+		}, 'de')).toBe(false)
+	})
+
+	it('accepts substantial German page copy', () => {
+		expect(outputMatchesLocale({
+			pages: [{
+				slug: '/leistungen',
+				blocks: [{
+					blockType: 'service-cards',
+					headline: 'Unsere Leistungen',
+					subheadline: 'Entdecken Sie unsere professionelle Beratung für nachhaltige und funktionale Innenarchitektur.',
+					services: [
+						{ title: 'Raumplanung', description: 'Durchdachte Konzepte für Familien, Wohnungen und wachsende Unternehmen.' },
+						{ title: 'Persönliche Beratung', description: 'Individuelle Begleitung von der ersten Idee bis zur verlässlichen Umsetzung.' },
+					],
+				}],
+			}],
+		}, 'de')).toBe(true)
 	})
 })
 
@@ -450,6 +495,160 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(pages.filter((p) => p.isHomepage === true)).toHaveLength(1)
 	})
 
+	it('TC-F01-LOCALE-PERF-01: uses a locale-safe composer fallback without extra calls', async () => {
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const germanHome = {
+			title: 'Startseite',
+			slug: '/',
+			isHomepage: true,
+			blocks: [{
+				blockType: 'hero',
+				headline: 'Nachhaltige Innenarchitektur für moderne Lebensräume',
+				subheadline: 'Wir gestalten funktionale und hochwertige Räume für Familien und Unternehmen in Berlin mit persönlicher Beratung und sorgfältiger Planung.',
+			}],
+		}
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return {
+								model: 'gpt-4o',
+								usage: { prompt_tokens: 100, completion_tokens: 200 },
+								choices: [{ message: { content: JSON.stringify({
+									siteName: 'GrünRaum',
+									category: 'business',
+									theme: {},
+									seo: {},
+									language: 'en',
+									pages: [germanHome],
+								}) } }],
+							}
+						}
+						throw new Error('API timeout')
+					}),
+				},
+			},
+		}
+
+		const result = await runParallelPageSplit({
+			openai: mockOpenai as any,
+			model: 'gpt-4o',
+			systemPrompt: 'System',
+			userPromptText: 'Website auf Deutsch erstellen',
+			promptText: 'GrünRaum Innenarchitektur',
+			businessInfo: {
+				businessName: 'GrünRaum',
+				industry: 'interior-design',
+				products: 'Innenarchitektur, Raumplanung',
+				shortDescription: 'Nachhaltige Raumgestaltung für Familien und Unternehmen in Berlin.',
+			},
+			seed: 42,
+			// Latin locales use the legacy content enum while blockLang carries
+			// the actual requested output locale.
+			language: 'en',
+			blockLang: 'de',
+		})
+
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(3)
+		expect(vi.mocked(composeTemplateResult)).toHaveBeenCalledTimes(1)
+		expect((result.pages as Array<{ slug: string }>).map((page) => page.slug)).toEqual([
+			'/', '/about', '/services', '/contact', '/blog',
+		])
+		const homepage = (result.pages as Array<{
+			slug: string
+			blocks: Array<Record<string, unknown>>
+		}>).find((page) => page.slug === '/')
+		expect(homepage?.blocks[1]?.headline).toBe(
+			'Nachhaltige Innenarchitektur für moderne Lebensräume',
+		)
+	})
+
+	it('TC-F01-LOCALE-PERF-02: repairs wrong-locale page copy locally without retrying', async () => {
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const response = (pages: Array<Record<string, unknown>>) => ({
+			model: 'gpt-4o',
+			usage: { prompt_tokens: 100, completion_tokens: 200 },
+			choices: [{ message: { content: JSON.stringify({
+				siteName: 'GrünRaum',
+				category: 'business',
+				theme: {},
+				seo: {},
+				language: 'en',
+				pages,
+			}) } }],
+		})
+		const germanPage = (title: string, slug: string) => ({
+			title,
+			slug,
+			isHomepage: slug === '/',
+			blocks: [{
+				blockType: slug === '/' ? 'hero' : 'about',
+				headline: `${title} für nachhaltige Innenarchitektur`,
+				body: 'Wir entwickeln durchdachte, funktionale und hochwertige Raumkonzepte für Familien und Unternehmen mit persönlicher Beratung, klarer Planung und verlässlicher Umsetzung.',
+			}],
+		})
+		const englishPage = (title: string, slug: string) => ({
+			title,
+			slug,
+			isHomepage: false,
+			blocks: [{
+				blockType: 'about',
+				headline: `Our ${title}`,
+				body: 'Discover professional strategy consulting, market entry planning, trusted advisory services and practical solutions for growing companies across every industry.',
+			}],
+		})
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return response([germanPage('Startseite', '/')])
+						}
+						const contactBatch = sys.includes('Contact, Blog')
+						const pages = contactBatch
+							? [
+								englishPage('Kontakt', '/contact'),
+								englishPage('Magazin', '/blog'),
+							]
+							: [
+								englishPage('Über uns', '/about'),
+								englishPage('Leistungen', '/services'),
+							]
+						return response(pages)
+					}),
+				},
+			},
+		}
+
+		const result = await runParallelPageSplit({
+			openai: mockOpenai as any,
+			model: 'gpt-4o',
+			systemPrompt: 'System',
+			userPromptText: 'Website auf Deutsch erstellen',
+			promptText: 'GrünRaum Innenarchitektur',
+			businessInfo: {
+				businessName: 'GrünRaum',
+				industry: 'interior-design',
+				products: 'Innenarchitektur, Raumplanung',
+				shortDescription: 'Wir gestalten nachhaltige und funktionale Räume in Berlin.',
+			},
+			seed: 42,
+			language: 'en',
+			blockLang: 'de',
+		})
+
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(3)
+		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
+		expect((result.pages as Array<{ slug: string }>).map((page) => page.slug)).toEqual([
+			'/', '/about', '/services', '/contact', '/blog',
+		])
+		expect(JSON.stringify(result)).not.toContain('Discover professional strategy consulting')
+		expect(JSON.stringify(result)).toContain('Wir gestalten nachhaltige')
+	})
+
 	it('TC-GENPERF-W2-04: home call failure triggers composer fallback', async () => {
 		// Arrange
 		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
@@ -681,7 +880,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 		const input: ParallelSplitInput = {
 			openai: mockOpenai as any,
-			model: 'gpt-4.1-mini',
+			model: 'gpt-5.4-mini',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -694,12 +893,12 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		// Act
 		await runParallelPageSplit(input)
 
-		// Assert — light batch on mini (default of site-generation-subpages-light),
+		// Assert — both routes default to GPT-5.4 mini,
 		// home + About/Services batch on the caller's main model
 		const light = seenModels.find((m) => m.scope === 'light-batch')
-		expect(light?.model).toBe('gpt-4.1-mini')
-		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-4.1-mini')
-		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-4.1-mini')
+		expect(light?.model).toBe('gpt-5.4-mini')
+		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-5.4-mini')
+		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-5.4-mini')
 	})
 
 	it('[TC-GENPERF-W2-11] applyDeterministicChrome — nav on every page, home footer cloned, GPT chrome stripped', () => {
