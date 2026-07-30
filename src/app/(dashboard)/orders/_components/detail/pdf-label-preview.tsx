@@ -30,6 +30,7 @@ const WEBKIT_PDF_OPTIONS = {
 interface PdfImageObject {
   width: number
   height: number
+  kind?: number
   data?: Uint8Array | Uint8ClampedArray
   bitmap?: ImageBitmap
 }
@@ -53,23 +54,38 @@ function imageObjectToCanvas(image: PdfImageObject) {
   imageCanvas.width = image.width
   imageCanvas.height = image.height
   const context = imageCanvas.getContext('2d')
-  if (!context) return null
+  if (!context) throw new Error('Shipping-label image repair canvas context is unavailable')
 
   if (image.bitmap) {
     context.drawImage(image.bitmap, 0, 0)
     return imageCanvas
   }
 
-  if (!image.data || image.data.byteLength !== image.width * image.height * 4) {
+  if (!image.data) {
     return null
   }
 
-  const rgba = new Uint8ClampedArray(
-    image.data.buffer,
-    image.data.byteOffset,
-    image.data.byteLength,
-  )
-  context.putImageData(new ImageData(new Uint8ClampedArray(rgba), image.width, image.height), 0, 0)
+  const pixelCount = image.width * image.height
+  const rgba = new Uint8ClampedArray(pixelCount * 4)
+
+  if (image.kind === pdfjs.ImageKind.RGBA_32BPP) {
+    if (image.data.byteLength !== pixelCount * 4) return null
+    rgba.set(image.data)
+  } else if (image.kind === pdfjs.ImageKind.RGB_24BPP) {
+    if (image.data.byteLength !== pixelCount * 3) return null
+    for (let source = 0, target = 0; source < image.data.byteLength; source += 3, target += 4) {
+      rgba[target] = image.data[source]
+      rgba[target + 1] = image.data[source + 1]
+      rgba[target + 2] = image.data[source + 2]
+      rgba[target + 3] = 255
+    }
+  } else {
+    // GRAYSCALE_1BPP is bit-packed and does not need the transparent-image
+    // repair. Unknown/malformed image kinds must not fail the whole preview.
+    return null
+  }
+
+  context.putImageData(new ImageData(rgba, image.width, image.height), 0, 0)
   return imageCanvas
 }
 
@@ -128,12 +144,12 @@ async function repairWebKitCarrierImages(page: PDFPageProxy, canvas: HTMLCanvasE
         continue
       }
 
-      repairableImages += 1
       const imageCanvas = imageObjectToCanvas(image)
       if (!imageCanvas) {
-        throw new Error('Shipping-label image data could not be repaired')
+        continue
       }
 
+      repairableImages += 1
       context.save()
       context.scale(1 / image.width, -1 / image.height)
       context.drawImage(

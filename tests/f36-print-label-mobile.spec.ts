@@ -15,6 +15,8 @@ const WEBKIT_PROJECTS = new Set([
   'shipping-label-ipad-landscape',
 ])
 const LABEL_PDF = readFileSync('tests/fixtures/shipping-label-soft-mask.pdf')
+const DEVICE_RGB_LABEL_PDF = readFileSync('tests/fixtures/shipping-label-device-rgb.pdf')
+const IPAD_DESKTOP_PROJECT = 'shipping-label-ipad-landscape'
 
 const orderFixture = {
   id: ORDER_ID,
@@ -67,7 +69,7 @@ const orderFixture = {
   },
 }
 
-async function installFixtures(page: Page) {
+async function installFixtures(page: Page, labelPdf = LABEL_PDF) {
   await page.route((url) => (
     url.pathname === `/api/orders/${ORDER_ID}` &&
     url.searchParams.get('depth') === '2'
@@ -93,7 +95,7 @@ async function installFixtures(page: Page) {
       status: 200,
       contentType: 'application/pdf',
       headers: { 'cache-control': 'no-store' },
-      body: LABEL_PDF,
+      body: labelPdf,
     })
   })
 
@@ -181,10 +183,29 @@ test.describe('GH-1684 shipping label preview regression', () => {
     // Arrange
     const usesNativeViewer = NATIVE_VIEWER_PROJECTS.has(testInfo.project.name)
     const isWebKit = WEBKIT_PROJECTS.has(testInfo.project.name)
+    const emulatesIpadDesktopSite = testInfo.project.name === IPAD_DESKTOP_PROJECT
+    if (emulatesIpadDesktopSite) {
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'maxTouchPoints', {
+          configurable: true,
+          value: 5,
+        })
+      })
+    }
     await installFixtures(page)
 
     // Act
     await page.goto(ORDER_PATH, { waitUntil: 'domcontentloaded' })
+    if (emulatesIpadDesktopSite) {
+      const capabilities = await page.evaluate(() => ({
+        hasMacintoshUserAgent: /Macintosh/i.test(navigator.userAgent),
+        maxTouchPoints: navigator.maxTouchPoints,
+      }))
+      expect(capabilities).toEqual({
+        hasMacintoshUserAgent: true,
+        maxTouchPoints: 5,
+      })
+    }
     await expect(page.getByText(orderFixture.orderNumber, { exact: true })).toBeVisible()
     await page.getByRole('button', { name: /print label|cetak label/i }).click()
 
@@ -313,5 +334,48 @@ test.describe('GH-1684 shipping label preview regression', () => {
     }
     await expect(actions.nth(1)).toBeEnabled()
     await expect(actions.nth(2)).toBeEnabled()
+  })
+
+  test('[TC-F36.OD.051] DeviceRGB image remains on the WebKit canvas', async ({
+    page,
+  }, testInfo) => {
+    // Arrange
+    test.skip(
+      testInfo.project.name !== 'shipping-label-mobile-safari',
+      'One WebKit browser is sufficient for the DeviceRGB conversion regression.',
+    )
+    await installFixtures(page, DEVICE_RGB_LABEL_PDF)
+
+    // Act
+    await page.goto(ORDER_PATH, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByText(orderFixture.orderNumber, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: /print label|cetak label/i }).click()
+
+    // Assert
+    const dialog = page.getByRole('dialog', {
+      name: /print shipping label|cetak label penghantaran/i,
+    })
+    const canvas = dialog.locator('.plabel-pdf-document canvas')
+    await expect(canvas).toBeVisible()
+    await expect(canvas).toHaveAttribute('data-repaired-pdf-images', '1')
+    const renderedColors = await canvas.evaluate((element: HTMLCanvasElement) => {
+      const context = element.getContext('2d', { willReadFrequently: true })
+      if (!context) return { red: false, green: false, blue: false }
+
+      const pixels = context.getImageData(0, 0, element.width, element.height).data
+      const colors = { red: false, green: false, blue: false }
+      for (let index = 0; index < pixels.length; index += 4) {
+        const [red, green, blue, alpha] = pixels.subarray(index, index + 4)
+        if (alpha < 200) continue
+        colors.red ||= red > 180 && green < 100 && blue < 100
+        colors.green ||= green > 180 && red < 100 && blue < 100
+        colors.blue ||= blue > 180 && red < 100 && green < 100
+        if (colors.red && colors.green && colors.blue) break
+      }
+      return colors
+    })
+    expect(renderedColors).toEqual({ red: true, green: true, blue: true })
+    await expect(dialog.locator('.plabel-render-error')).toHaveCount(0)
+    await expect(dialog.locator('iframe, object, embed')).toHaveCount(0)
   })
 })
