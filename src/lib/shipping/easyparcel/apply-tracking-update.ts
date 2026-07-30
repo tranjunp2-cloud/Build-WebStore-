@@ -4,10 +4,9 @@ import { withOrderRowLock } from '@/lib/payload/order-row-lock'
 import { mapTrackingStatus, mapShipmentStatusCode } from './status-map'
 
 /**
- * Shared tracking-update writer — used by BOTH the 30-min sync cron
- * (src/lib/jobs/sync-tracking.ts) and the EasyParcel webhook receiver
- * (src/app/api/webhooks/easyparcel/route.ts) so status mapping, history
- * append, and the delivered→completed auto-complete rule live in ONE place.
+ * Shared tracking-update writer used by the EasyParcel webhook receiver and
+ * the one-off local sync script. Status mapping, history append, and lifecycle
+ * transitions live in one place.
  */
 
 interface TrackingHistoryEntry {
@@ -27,10 +26,9 @@ interface OrderLike {
 
 export type ApplyTrackingResult = 'updated' | 'unchanged'
 
-// Terminal tracking statuses — once reached, a late/out-of-order webhook or cron tick must
-// never regress the order back to a non-terminal status (F7, review #1434). Exported so the
-// sync-tracking cron's order query can exclude the same set (single source of truth, DRY).
-export const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
+// Terminal tracking statuses — once reached, a late/out-of-order webhook must
+// never regress the order back to a non-terminal status (F7, review #1434).
+const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
 
 // Once the courier has possession of the parcel, the merchant lifecycle must leave the
 // ready-to-ship holding state. Code 3/11 map to picked_up and code 4 maps to in_transit;
@@ -71,14 +69,12 @@ export async function applyTrackingUpdate(
         : mapTrackingStatus(epRawStatus)
 
     // F6 (review #1434): never overwrite a real status with 'unknown' (buyer label "Processing").
-    // An unmapped EP code/string must not clobber a valid tracking state. Guarding here — in the
-    // SHARED writer — covers BOTH callers (webhook + cron); the webhook additionally reports the
-    // anomaly to Sentry before it reaches here.
+    // The webhook reports unknown statuses to Sentry before they reach this shared writer.
     if (mapped.internal === 'unknown') return 'unchanged'
 
     return withOrderRowLock(payload, order.id, async (req) => {
-        // Webhook and cron updates for one order share this row lock. Re-read after acquiring it
-        // so lifecycle decisions and the array-history append use one committed snapshot.
+        // Re-read after acquiring the row lock so lifecycle decisions and the array-history
+        // append use one committed snapshot.
         const reRead = await payload.find({
             collection: 'orders',
             where: { id: { equals: order.id } },

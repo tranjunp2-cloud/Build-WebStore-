@@ -18,8 +18,7 @@ export const maxDuration = 30
  *
  * EP does not document an HMAC signature, so auth = shared secret in the query
  * string (timing-safe compare) + the AWB must match an existing order. The
- * 30-min sync cron (/api/cron/sync-tracking) stays on as a fallback for missed
- * deliveries, sharing the same applyTrackingUpdate() writer (idempotent).
+ * This webhook is the sole automatic source of EasyParcel tracking updates.
  *
  * EP's exact payload schema is not publicly documented — extraction below is
  * tolerant across the known field-name variants; unmatched payloads are logged
@@ -188,9 +187,8 @@ export async function POST(req: Request) {
         // Async-AWB backfill: submit can return awb_number null (courier generates it later
         // — verified live 2026-07-10, Pos), so the order holds only easyParcelOrderNo and
         // the AWB lookup above misses. If the payload carries the shipment_number, match on
-        // it and adopt this AWB — the only automatic path that ever delivers the AWB (the
-        // sync cron can't poll: trackingStatus queries BY awb). Requires the "Shipment AWB
-        // Update" webhook topic to be registered alongside the two status topics.
+        // it and adopt this AWB. Requires the "Shipment AWB Update" webhook topic to be
+        // registered alongside the two status topics.
         if (!order) {
             const shipmentNo = extractField(body, ['shipment_number'])
             if (shipmentNo) {
@@ -253,7 +251,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ received: true, matched: true, result })
     } catch (error) {
         payload.logger.error({ error, awb }, '[ep-webhook] failed to process')
-        // 500 → EP retries; transient DB failures self-heal (cron is the backstop)
+        // 500 asks EP to retry transient database failures.
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })
     }
 }

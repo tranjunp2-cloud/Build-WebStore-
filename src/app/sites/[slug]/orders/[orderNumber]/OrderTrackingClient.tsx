@@ -348,7 +348,6 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     type Entry = { state: 'latest' | 'completed'; Icon: React.ElementType; title: string; meta?: string; date: string; time: string }
     const entries: Entry[] = []
     const history = order.shippingTrackingHistory ?? []
-    const isEp = Boolean(order.awbNo) || history.length > 0
 
     entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received ${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     if (order.paymentStatus === 'paid') {
@@ -414,11 +413,6 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
                     </li>
                 ))}
             </ul>
-            {isEp && trackingStatus !== 'delivered' && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--f4, #6b7280)', marginTop: '0.75rem', marginBottom: 0 }}>
-                    Updates every 30–60 min — not realtime.
-                </p>
-            )}
         </div>
     )
 }
