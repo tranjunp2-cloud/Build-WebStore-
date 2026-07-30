@@ -372,5 +372,6 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         const state = useBuilderStore.getState()
         expect(state.status).toBe('error')
         expect(state.error?.message).toBe('Generation failed while saving pages')
+        expect(state.error?.message).not.toContain('Connection lost')
     })
 })
