@@ -13,7 +13,6 @@ import { OnboardingCard, type OnboardingStep } from '@/components/dashboard/reva
 import { AtAGlance } from '@/components/dashboard/revamp/at-a-glance'
 import { TrafficPerformance } from '@/components/dashboard/revamp/traffic-performance'
 import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
-import { SeoTools } from '@/components/dashboard/revamp/seo-tools'
 import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
 import { DashboardToolbarHeader } from '@/components/dashboard/revamp/dashboard-toolbar-header'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
@@ -143,8 +142,6 @@ export default async function DashboardRoot({ searchParams }: Props) {
                 return traffic ? <TrafficPerformance key="traffic" data={traffic} period={period} /> : null
             case 'seo':
                 return seo ? <SeoHealth key="seo" data={seo} /> : null
-            case 'tools':
-                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} aiCrawlersEnabled={seo.aiCrawlersEnabled} /> : null
             case 'orders':
                 return <PendingOrders key="orders" />
             default:

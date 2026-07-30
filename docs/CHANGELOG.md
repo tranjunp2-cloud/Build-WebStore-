@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-05-28
+last_updated: 2026-07-30
 ---
 
 # Project Changelog
@@ -14,6 +14,14 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F37 — Platform-managed AI Discoverability (US-F37-03, GH-1311)
+
+- **Crawler policy:** approved AI assistant crawlers are always allowed by platform policy; legacy `aiCrawlersEnabled` values are non-authoritative. Known scraper bots remain blocked and `/api` + `/admin` exclusions remain in every applicable robots group.
+- **Public discovery routes:** robots, sitemap, and llms routes share tenant/custom-domain resolution and independent failure behavior. Robots applies the tenant-level platform crawler policy even without a published site; sitemap and llms require a published site, generate only real public URLs, and use bounded field-selected queries. Unpublished storefronts retain crawler access while sitemap and llms return 404.
+- **Seller UI simplified:** removed the crawler toggle API, SEO Action Tools block, resubmit action, and related locale/types/preferences. Persisted Dashboard preferences automatically discard the retired Tools block.
+- **Acceptance hardening:** registered unique `TC-F37-03-01..50`; added public Playwright coverage for published/unpublished fixtures and authenticated Dashboard assertions for retired controls; code-review hardening fixed custom-domain request-header forwarding and shared safe slug encoding. Repository variables now provide stable fixture paths, and live staging TC-28/29 passed 2/2 on 2026-07-30; authenticated TC-30 remains pending.
+- **Docs reconciliation:** Stories and QA now follow PRD v2.6 FR-12..14 with an explicit delivery split: #1311 owns route/UI behavior, while US-F37-04 / #1312 consumes those facts for exact 9/5/1 scoring and the 100-point scorecard. Multi-site route disambiguation remains deferred.
 
 ### F01 — AI Gen: images matched the wrong industry (GH-1611)
 

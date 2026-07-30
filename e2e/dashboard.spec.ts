@@ -69,6 +69,25 @@ test.describe('Dashboard', () => {
         }
     })
 
+    test('[TC-F37-03-30] seller-facing AI discoverability controls stay retired', async ({ page }) => {
+        // Arrange
+        await expectPageLoaded(page)
+        const retiredLabels = [
+            /SEO Action Tools|Alat tindakan SEO/i,
+            /Allow AI Crawlers|Benarkan crawler AI/i,
+            /Resubmit to Google|Serah semula ke Google/i,
+            /Auto-write search titles & descriptions|Tulis tajuk & penerangan carian secara automatik/i,
+        ]
+
+        // Act
+        const retiredControls = retiredLabels.map(label => page.getByText(label))
+
+        // Assert
+        for (const control of retiredControls) {
+            await expect(control).toHaveCount(0)
+        }
+    })
+
     test('[TC-F18.30] sidebar shows "Settings" label — not "Store Config" (regression BUG-985)', async ({ page }) => {
         await expectPageLoaded(page)
 

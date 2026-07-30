@@ -42,7 +42,6 @@ vi.mock('@/i18n', () => ({
                         blockGlance: 'At a glance',
                         blockTraffic: 'Traffic & performance',
                         blockSeo: 'SEO health',
-                        blockTools: 'Quick tools',
                         blockOrders: 'Pending orders',
                     },
                 },

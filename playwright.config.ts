@@ -47,7 +47,7 @@ export default defineConfig({
         {
             name: 'storefront-regression',
             testDir: './tests',
-            testMatch: /cart-drawer\.spec\.ts/,
+            testMatch: /(cart-drawer|f37-ai-discoverability)\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: undefined,

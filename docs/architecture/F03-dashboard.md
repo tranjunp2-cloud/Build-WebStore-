@@ -18,10 +18,10 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
     └── dashboard/page.tsx      ← Server Component (single-column stream)
             ├── DashboardToolbarHeader.tsx
             ├── PeriodSelector.tsx
+            ├── OnboardingCard.tsx
             ├── AtAGlance.tsx
             ├── TrafficPerformance.tsx
             ├── SeoHealth.tsx
-            ├── SeoTools.tsx
             └── PendingOrders.tsx
 ```
 

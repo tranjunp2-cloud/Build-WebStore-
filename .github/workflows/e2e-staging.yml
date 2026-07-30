@@ -122,6 +122,7 @@ jobs:
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
             tests/cart-drawer.spec.ts \
+            tests/f37-ai-discoverability.spec.ts \
             --project=smoke --project=setup --project=chromium --project=storefront-regression 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
@@ -144,6 +145,10 @@ jobs:
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
           ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          # Public storefront paths are non-sensitive and intentionally stored
+          # as repository Variables. The F37 spec fails closed if either is absent.
+          E2E_F37_PUBLISHED_SITE_PATH: ${{ vars.E2E_F37_PUBLISHED_SITE_PATH }}
+          E2E_F37_UNPUBLISHED_SITE_PATH: ${{ vars.E2E_F37_UNPUBLISHED_SITE_PATH }}
 
       - name: Upload Playwright report
         if: always()

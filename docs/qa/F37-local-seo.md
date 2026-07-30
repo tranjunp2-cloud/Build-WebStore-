@@ -1,12 +1,16 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 3.0 | **Updated:** 2026-07-22 | **Owner:** QA Team
+> **Version:** 3.4 | **Updated:** 2026-07-30 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v3.4 (2026-07-30)** — Product ownership clarified: #1311 closes on FR-12..14 route/UI behavior and hands trusted crawler/sitemap/llms facts to #1312; #1312 alone owns 9/5/1 attribution and the 100-point scorecard. TC-51 prevents Story Sync from moving score-engine acceptance back into #1311.
+- **v3.3 (2026-07-30)** — Review findings fixed: the staging workflow now executes TC-28/29 with fail-closed repository-variable fixtures; TC-49/50 guard workflow and documentation wiring; stale crawler-toggle, auto-meta, architecture, environment, and verification wording was reconciled. Exact 9/5/1 score integration remains atomically owned by #1312 because changing only the legacy AI bucket would make the current total max 95.
+- **v3.2 (2026-07-30)** — Review hardening made public-route resource use explicit: llms Key Pages are capped at 10 deterministic real URLs from bounded field-selected candidate queries, and sitemap queries are bounded and select only serialization fields. Live TC-28..30 and #1312 9/5/1 evidence remain pending.
+- **v3.1 (2026-07-29)** — Reconciled US-F37-03 with PRD v2.6: retired seller opt-out/action wording, registered unique TC-F37-03-01..48 evidence, added published/unpublished public-route Playwright coverage plus authenticated Dashboard absence coverage, and recorded #1312 as the remaining 9/5/1 score-integration dependency.
 - **v2.7 (2026-07-13)** — Pre-merge code review pass on PR #1591 (US-F37-02 + Opening Hours + Geo-cascade) found and fixed 3 bugs via `/code-review --auto` + `/fix` autonomous modes, all verified red→green: (1) **CONFIRMED, Important** — Zod `.refine()` insufficient for opening-hours required-when-open check — some paths left uncovered, allowing invalid rows through. Fixed by switching to `.superRefine()` (allows per-error granularity) + added cross-field validate at field level in `src/collections/Sites.ts` using `siblingData`. Test: **TC-F37-02-25** (3 new test cases in `sites-local-business.test.ts`, verify closed-but-no-time rejected, opens-no-closes rejected, closes-le-opens rejected). (2) **CONFIRMED, Important** — Geo-cascade `bootstrap()` (reverse-resolve pre-fill on mount) race condition: async lookup completes after user has manually selected a value, overwriting the user's choice. Fixed by adding `userInteractedRef` guard in `geo-cascade-fields.tsx` — bootstrap only writes if user hasn't interacted yet. Test: **TC-F37-01-25** (added to `geo-cascade-fields.test.tsx`, verifies manual selection beats slow mount-time resolve). (3) **CONFIRMED, Minor** — `check-migrations.js::getArrayNestedFieldNames()` false-negative risk + compact-form bug: (a) Caller was skipping names-in-diff that happened to be array-nested somewhere else in file (poor intersection logic), now fixed by explicit intersect with diff-only names — prevents false-negative when field is both array-nested AND newly top-level; (b) Missed compact single-line field form (`{ name, type }` on one line, style used in `Products.ts`) — added regex branch to detect both inline + multi-line forms, parity with diff-scanning logic. Also refactored for testability: added `module.exports` + `require.main === module` guard. Tests: **TC-F37-03-CHECK-01..03** (3 new cases in new `check-migrations.test.ts` file, verify compact form detected, array-nested + top-level handling, false-negative prevention). All 3 fixes verified via fail-without-fix / pass-with-fix cycle. Tổng **64 TC-ID** (61 + 3 new).
 - **v2.6 (2026-07-10)** — Post-implementation visual QA pass on the Opening Hours modal (screenshot comparison against real Google Maps reference) surfaced 1 real functional bug + several visual gaps, all fixed: (1) **CONFIRMED, Important** — `applyBatchSave`'s `closed` encoding (`opening-hours-utils.ts`) produces rows without `opens`/`closes` keys, but `saveSiteSchema.localBusiness.openingHours` required both fields non-optional — **saving any "Closed" day was silently rejected by the save API**. Fixed by making `opens`/`closes` `.optional()` in the Zod schema (matches the pre-existing `OpeningHourRow` TS type, which already declared them optional — a schema/type drift bug). (2) Added a `closes > opens` order validation (user-requested; overnight ranges explicitly out of scope) — new pure `isRangeOrderValid()` helper, inline modal error + disabled Save, and a matching Zod `.refine()` at the save-route boundary. (3) Visual-only fixes: checkbox/border contrast on dark theme, day-toggle row spacing, added missing 3rd quick-action ("Edit Sat–Sun"), scroll/wrap layout, clock-icon contrast — no new TC-IDs (styling only). Added **TC-F37-02-23** (`isRangeOrderValid` unit tests) and **TC-F37-02-24** (Zod refine + closed-row-without-times regression). Tổng **61 TC-ID**.
 - **v2.5 (2026-07-10)** — Opening Hours redesign to Google Maps-style list + edit-modal UX (`plans/260710-1455-opening-hours-google-style/`): multi-day batch select, split-shift support (N time ranges/day), quick-actions ("Edit all hours", "Edit Mon–Fri"), relaxed `maxRows`/Zod cap 7→21 (7 days × up to 3 shifts). New pure-logic module `opening-hours-utils.ts` (overwrite-not-merge batch save, grouping, mode encoding, round-trip). Added **§3.12** (10 TC: TC-F37-02-13..22) across `sites-local-business.test.ts` (+2), `local-business-json-ld.test.ts` (+1 split-shift spec), new `opening-hours-utils.test.ts` (7 TC, 19 tests), new `opening-hours-editor.test.tsx` (1 TC, 4 tests, RTL). No DB migration needed (no unique constraint on `day_of_week`); `json-ld.ts` + `llms.txt` route already split-shift-compatible (1:1 row mapping, no per-day dedup). Tổng **59 TC-ID**.
@@ -28,7 +32,7 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 |---|---|---|
 | **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | ✅ BUILT + tested (§3.1–3.4) |
 | **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | 🟡 PARTIAL — category→subtype dropdown not built (§3.5) |
-| **US-F37-03** | Platform-managed AI Discoverability | 🔴 TARGET REWIRE — remove toggle UI/state, keep crawler allow + llms.txt (§3.6) |
+| **US-F37-03** | Platform-managed AI Discoverability | ✅ ROUTES + UI IMPLEMENTED — score facts handed to #1312 (§3.6) |
 | **US-F37-04** | Unified SEO Health Score + Actions | 🔴 TARGET NOT BUILT — legacy engine/API require rewire (§3.7) |
 | **US-F37-09** | Malaysia opt (MY geo/state, Waze, Halal) | 🟡 PARTIAL — geo built; Waze/Halal chưa (§3.9) |
 
@@ -47,11 +51,11 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 
 | Item | Spec |
 |---|---|
-| Framework | Vitest (unit tests only — no E2E) |
-| Test files | 3 files in `src/__tests__/unit/` |
-| Execution | `npm test` (full suite 1301/1301 tests pass) |
-| Coverage | 100% on new functions/branches (saveSiteSchema, generateLocalBusinessSchema, generatePageSchemas, calculateLocalSeoScore, dayOfWeekToSchema, serializeJsonLd, hasMeaningfulLocalBusinessData) |
-| Test data | Fixtures with real Malaysia geolocation (Petaling Jaya), opening hours, and business categories |
+| Framework | Vitest unit/integration tests + Playwright browser acceptance |
+| Test files | F37 unit/API coverage under `src/__tests__/`; public browser coverage in `tests/f37-ai-discoverability.spec.ts`; authenticated Dashboard coverage in `e2e/dashboard.spec.ts` |
+| Execution | Focused Vitest gates, full `npm test -- --run`, Playwright discovery, and live staging workflow |
+| Coverage | Route behavior, tenant/custom-domain isolation, output safety, Dashboard control retirement, workflow wiring, and the existing Phase-1 score/schema helpers |
+| Test data | Unit fixtures plus stable published/unpublished staging storefront paths stored as non-sensitive GitHub repository Variables |
 | Security | XSS payloads (</script>, <img onerror>, <script>alert) tested; sanitization verified |
 
 ---
@@ -137,21 +141,65 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ---
 
-## 3.6 US-F37-03: Platform-managed AI Discoverability **[TARGET REWIRE]**
+## 3.6 US-F37-03: Platform-managed AI Discoverability **[IMPLEMENTED — SCORE OWNED BY #1312]**
 
-> Target contract: approved AI assistant crawlers are always allowed and always earn 9 points. The seller sees no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. Current toggle-based code must be removed or made non-authoritative during implementation.
+> Canonical product contract: PRD v2.6 AC-01..03 and FR-12..14. #1311 owns platform-managed crawler access, public sitemap/llms behavior, seller-control retirement, and the route facts automated below. The separate Dashboard SEO-page auto-meta control remains outside F37-03. US-F37-04 / #1312 exclusively owns 9/5/1 attribution and the atomic 20/35/15/30 score cutover; it is a downstream score integration, not a #1311 implementation blocker.
 
-| ID | AC/FR | Type | Title | Status | Key Assertions | Impact |
-|---|---|---|---|---|---|---|
-| **TC-F37-03-01** | AC-01 / FR-12 | Func | robots.txt always allows approved AI assistant bots | target `[NOT-BUILT]` | GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot are not blocked for any tenant. | Platform invariant |
-| **TC-F37-03-02** | AC-02 / FR-12 | UI | No seller-facing discoverability controls | target `[NOT-BUILT]` | Dashboard and Site Settings contain no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. | KISS UI |
-| **TC-F37-03-03** | AC-01 / FR-12 | Regression | Persisted legacy `false` cannot block approved AI bots | target `[NOT-BUILT]` | A legacy site record cannot change robots behavior or reduce the 9 crawler points. | Migration safety |
-| **TC-F37-03-04** | AC-01 | Func | Googlebot/Bingbot remain allowed | target `[NOT-BUILT]` | Normal search crawlers remain crawlable. | SEO safety |
-| **TC-F37-03-05** | AC-6 | Func | `GET /llms.txt` → 200 `text/plain` | `[NOT-BUILT]` | Route tồn tại, status 200, MIME text/plain. | AEO signal |
-| **TC-F37-03-06** | AC-6 | Func | llms.txt content: tên, mô tả, ≥5 URL, contact, giờ, markdown | `[NOT-BUILT]` | Đủ element cấu trúc markdown. | llms.txt hợp lệ |
-| **TC-F37-03-07** | BR-09 | Func | llms.txt runtime-generated, cache ngắn | `[NOT-BUILT]` | Không long-cache; phản ánh data mới. | Freshness |
-| **TC-F37-03-08** | NFR-3 | Sec | Platform crawler invariant is tenant-safe | target `[NOT-BUILT]` | Every tenant receives the same approved allow policy without cross-tenant state. | Isolation |
-| **TC-F37-03-09** | §5 / FR-12 | Func | Score always awards crawler baseline | target engine `[NOT-BUILT]` | AI Discoverability always includes 9 crawler points; unpublished sites earn no sitemap/llms points. | Score integrity |
+| ID | AC/FR | Type | Automated assertion | Status / evidence |
+|---|---|---|---|---|
+| **TC-F37-03-01** | AC-01 / FR-12 | Unit | Approved AI assistants are always allowed | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-02** | FR-12 | Unit | Missing legacy value is non-authoritative | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-03** | FR-12 | Regression | Persisted legacy `false` is non-authoritative | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-04** | FR-12 | Unit | Default search-crawler policy remains intact | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-05** | FR-12 | Unit | PerplexityBot belongs to approved assistants | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-06** | FR-12 | Security | Scrapers stay blocked with legacy `true` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-07** | FR-12 | Security | Scrapers stay blocked with legacy `false` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-08** | FR-12 | Edge | Unknown tenant returns 404 | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-09** | AC-02 / FR-12 | Unit | Unpublished/missing site keeps crawler allow policy | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-10** | AC-01 / FR-12 | Unit | robots.txt advertises the storefront sitemap | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-11** | FR-12 | Security | Default group allows public paths and blocks `/api` + `/admin` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-12** | AC-01 / FR-14 | Unit | llms.txt returns 200 UTF-8 plain text | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-13** | FR-14 | Unit | llms.txt emits site name as H1 | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-14** | FR-14 | Unit | llms.txt emits description as blockquote | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-15** | FR-14 | Unit | llms.txt emits Key Pages heading | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-16** | FR-14 | Regression | Lists at most 10 unique real public URLs in deterministic homepage/page/product/blog priority from bounded, field-selected candidate queries; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-17** | FR-14 | Unit | Public URLs use Markdown list syntax | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-18** | FR-14 | Unit | Contact section appears when data exists | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-19** | FR-14 | Unit | Contact section includes phone | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-20** | FR-14 | Unit | Contact section includes email | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-21** | FR-14 | Unit | Contact section includes address | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-22** | FR-14 | Edge | Empty contact data omits Contact section | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-23** | FR-14 | Unit | Experimental-standard notice remains present | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-24** | FR-14 | Edge | llms.txt returns 404 for unknown tenant | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-25** | AC-02 / FR-14 | Unit | llms.txt returns 404 without a published site | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-26** | FR-14 | Edge | Missing description uses safe fallback copy | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-27** | FR-12 / AC-03 | Unit | Persisted Dashboard preferences drop retired Tools block | `[x] AUTO` `dashboard-blocks.test.ts` |
+| **TC-F37-03-28** | AC-01 / FR-12..14 | Playwright | Published storefront exposes robots, sitemap and llms | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — live staging PASS 2026-07-30 (`/sites/kedai-demo`) |
+| **TC-F37-03-29** | AC-02 / FR-12..14 | Playwright | Unpublished storefront returns crawler 200, sitemap/llms 404 | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — live staging PASS 2026-07-30 (`/sites/e2e-test`) |
+| **TC-F37-03-30** | AC-03 / FR-12 | Playwright | Dashboard exposes no retired seller controls | `[x] AUTO` `e2e/dashboard.spec.ts` — authenticated staging run pending |
+| **TC-F37-03-31** | FR-14 | Edge | Empty published storefront lists only its real homepage | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-32** | FR-14 | Security | Blog/product discovery queries are site-scoped | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-33** | FR-14 | Unit | Valid opening hours are emitted | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-34** | FR-14 | Edge | Missing opening hours omit the section | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-35** | FR-14 | Data | Incomplete opening-hours rows are omitted | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-36** | FR-12 | Security | Approved bot groups still block `/api` + `/admin` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-37** | FR-14 | Unit | Middleware rewrites custom-domain llms.txt | `[x] AUTO` `public-discovery-middleware.test.ts` |
+| **TC-F37-03-38** | AC-01 / FR-13 | Unit | Published sitemap emits current public XML URLs | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-39** | FR-13 | Security | Sitemap queries are site-scoped, bounded, and field-selected; unsafe slugs are rejected or encoded | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-40** | FR-13 | Unit | Sitemap resolves active custom-domain URLs | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-41** | AC-02 / FR-13 | Edge | Sitemap returns 404 for missing tenant or published site | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-42** | FR-14 | Security | llms.txt omits checkout and order URLs | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-43** | FR-14 | Unit | Middleware rewrites platform-subdomain llms.txt | `[x] AUTO` `public-discovery-middleware.test.ts` |
+| **TC-F37-03-44** | AC-01 / FR-12..14 | Unit | All routes resolve one published custom-domain storefront | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-45** | FR-12..14 | Edge | All custom-domain routes reject missing host context | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-46** | AC-03 / FR-13..14 | Resilience | One endpoint failure does not change the others | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-47** | FR-12..14 | Security | All routes reject inactive custom domains | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-48** | FR-14 | Security | Seller text stays inline and content slugs are encoded | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-49** | AC-01..03 / CI | Regression | Staging workflow executes the F37 public spec with both repository-variable fixtures | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-50** | FR-12 / Docs | Regression | Closeout docs do not reintroduce the retired crawler toggle, overclaim auto-meta removal, or reference deleted `SeoTools` | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-51** | Ownership / Docs | Regression | Story Sync keeps #1311 route/UI-only and assigns 9/5/1 score integration to #1312 | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+
+**Score handoff:** #1312 must add score-level evidence that crawler/sitemap/llms contribute exactly 9/5/1, unpublished sites score 9/0/0, and sitemap/llms failures deduct independently. Those are US-F37-04 integration tests and do not block #1311 route/UI acceptance.
 
 ---
 
@@ -455,18 +503,14 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ## 8. Test Execution Status
 
-| File | Tests | Status | Coverage | Notes |
-|---|---|---|---|---|
-| `sites-local-business.test.ts` | 17 | ✅ PASS | 100% of saveSiteSchema.localBusiness | Zod schema + security + opening-hours cap + closes-after-opens |
-| `local-business-json-ld.test.ts` | 21 | ✅ PASS | 100% of generateLocalBusinessSchema, generatePageSchemas, dayOfWeekToSchema, serializeJsonLd | JSON-LD + trigger logic + XSS + hasMap + cascade-string regression + split-shift |
-| `local-seo-score.test.ts` | 7 | ✅ PASS | 100% of calculateLocalSeoScore | Scoring logic + bounds |
-| `geo-cascade-fields.test.tsx` | 9 | ✅ PASS | 100% of GeoCascadeFields forward cascade + reverse-resolve + legacy degradation + stale-response guard | RTL + mocked `/api/geo/*` |
-| `malaysia-geo-seed-data.test.ts` | 2 | ✅ PASS | Seed data consistency (`malaysia_states.name` vs `MY_STATES`) | Regression guard, `/code-review` finding |
-| `opening-hours-utils.test.ts` | 30 | ✅ PASS | 100% of groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid, sanitizeLegacyOpeningHours | Pure logic — overwrite semantics, encodings, round-trip, range validation, legacy-row sanitize |
-| `opening-hours-editor.test.tsx` | 4 | ✅ PASS | List view render (7 days, split-shift, closed, quick-actions) | RTL — light integration guard |
-| `check-migrations.test.ts` | 14 | ✅ PASS | 100% of getFieldRoles, diffNewTopLevelFieldNames, isPathMissingAtRef | CI hard-gate script (not F37 feature code) — new-field detection redesign + git-error classification |
-| `sites-opening-hours-sanitize-hook.test.ts` | 8 | ✅ PASS | 100% of sanitizeOpeningHoursOnValidate | `Sites.ts` `beforeValidate` hook — direct coverage added by Stage 3 adversarial finding #7 |
-| **Total** | **112** | ✅ **PASS** | **100%** | Opening Hours Google-style redesign + PR #1591 round-2 code review fixes (legacy-row sanitize on all write paths, check-migrations.js hardening) — reviewer's malaysia_states rename concern investigated and found already fixed by a pre-existing migration (commit `d5c03917`, staging since 2026-05-25) |
+| Gate | Latest evidence | Status |
+|---|---|---|
+| Focused US-F37-03 unit/config | 7 files, 65 tests | ✅ PASS |
+| Full Vitest regression | 662 files, 11,114 tests | ✅ PASS |
+| TypeScript + lint | `npm run typecheck`; `npm run lint` | ✅ 0 errors; repository baseline warnings only |
+| Playwright discovery | storefront TC-28/29; authenticated Dashboard TC-30 | ✅ DISCOVERED |
+| Live public staging acceptance | TC-28/29 against `/sites/kedai-demo` and `/sites/e2e-test` | ✅ 2/2 PASS (2026-07-30) |
+| Live authenticated staging acceptance | TC-30 Dashboard seller-control absence | 🟡 Pending authenticated staging run |
 
 ---
 
@@ -474,7 +518,7 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 > Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
 
-1. **🔴 Platform crawler rewire (US-03, BLOCKER):** Code currently persists and honors a seller crawler toggle. Target behavior ignores/removes that setting, always allows approved AI assistant crawlers, always awards 9 points, and removes the entire SEO Action Tools UI.
+1. **Score follow-up (#1312, outside #1311):** F37-03 route facts and seller-control retirement are implemented. The authoritative score engine/API still use the legacy 35/30/20/15 contract; #1312 must land exact 20/35/15/30 scoring, AI 9/5/1, and independent sitemap/llms deductions atomically. Changing only the AI bucket would cap the current total at 95.
 2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe chưa implement → TC-04-10..12/16..18 spec-based. TC-04-11 verifies the crawler signal stays platform-managed and hidden.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
 4. **Technical Health rewire (US-04):** Code còn placeholder CWV/mobile/HTTPS → phải thay bằng metadata coverage + F03 Content Quality + verification/indexability trước khi surface score cho seller.
@@ -483,4 +527,4 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ---
 
-**Last Verified:** 2026-07-10 (Phase-1 scope; TC-F37-02/03/04/08/09 mapped vào code thật qua 2 vòng review requirements + code-reality scan; trạng thái BUILT/UNTESTED/NOT-BUILT verified against actual `src/`. §3.11 geo-cascade follow-up + §v2.4 post-review fixes: all 10 TC-IDs (TC-F37-01-15..24) executed and passing, `npm test -- geo-cascade-fields local-business-json-ld malaysia-geo-seed-data` green, full suite 9885 tests / 3 pre-existing unrelated failures confirmed via `tester` agent.)
+**Last Verified:** 2026-07-30 — focused US-F37-03/config gate 7 files / 65 tests passed; full Vitest 662 files / 11,114 tests passed; typecheck and lint completed with 0 errors; migration guard and diff check passed; TC-28/29/30 are discoverable. Public TC-28/29 passed live staging 2/2 with repository-variable fixtures; authenticated TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.

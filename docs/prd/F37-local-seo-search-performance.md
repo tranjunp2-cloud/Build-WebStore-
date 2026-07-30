@@ -229,6 +229,8 @@ flowchart TB
 - **Edge — AC-02:** GIVEN a storefront is not published WHEN score is calculated THEN platform crawler access still earns 9 points while sitemap and llms.txt earn 0.
 - **Error — AC-03:** GIVEN a published storefront cannot serve sitemap.xml or llms.txt WHEN score is calculated THEN only the unavailable route's points are withheld AND no seller-facing resubmit control is shown.
 
+**Delivery ownership:** #1311 owns the FR-12..14 route behavior and seller-control retirement that produce these discovery facts. #1312 owns the 9/5/1 attribution, failure deductions, and integration into the approved 100-point scorecard. The point clauses remain the end-to-end product outcome, not score-engine scope for #1311.
+
 
 
 ### US-F37-04: Score, issues, fix loop
@@ -606,7 +608,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 - [ ] Editor checklist and Dashboard SEO Issues copy remain distinct
 - [ ] NFRs §10 met
 - [ ] Behavior matches §6.1 Mermaid
-- [ ] Docs/stories aligned with this PRD v2.5
+- [ ] Docs/stories aligned with this PRD v2.6
 
 ---
 

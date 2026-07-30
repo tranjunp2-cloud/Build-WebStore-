@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -20,6 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 limit: 1,
             })
             tenant = tenantsResult.docs[0]
+            if (!hasActiveCustomDomain(tenant, hostname)) {
+                return new Response('Not found', { status: 404 })
+            }
         } else {
             const tenantsResult = await payload.find({
                 collection: 'tenants',
@@ -41,6 +44,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                     { status: { equals: 'published' } },
                 ]
             },
+            // A tenant may have more than one published site. Keep selection
+            // stable until domain-to-site ownership is modelled explicitly.
+            sort: 'createdAt',
             limit: 1,
         })
 
@@ -52,7 +58,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         // Fetch all indexable content in parallel:
         //  - pages    → published, indexable, visible, not soft-deleted
         //  - products → status 'active' (mirrors PDP live filter), per site
-        //  - blogs    → status 'published', per tenant
+        //  - blogs    → status 'published', per site
         // Functional routes (checkout, orders, order confirm) are intentionally
         // excluded — they are not indexable content.
         const [pagesResult, productsResult, blogsResult] = await Promise.all([
@@ -69,6 +75,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
+                select: { slug: true, updatedAt: true, isHomepage: true },
+                limit: 1000,
             }),
             payload.find({
                 collection: 'products',
@@ -76,23 +84,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                     and: [
                         { site: { equals: site.id } },
                         { status: { equals: 'active' } },
+                        { deletedAt: { exists: false } },
                     ],
                 },
                 pagination: false,
                 depth: 0,
+                select: { slug: true, updatedAt: true },
+                limit: 1000,
             }),
             payload.find({
                 collection: 'blogs',
                 where: {
                     and: [
-                        { tenant: { equals: tenant.id } },
+                        { site: { equals: site.id } },
                         { status: { equals: 'published' } },
                     ],
                 },
                 pagination: false,
                 depth: 0,
+                select: { slug: true, updatedAt: true },
+                limit: 500,
             }),
         ])
+
+        // F37-03 → #1312 score handoff: this published-only 200 response is
+        // `sitemapPresent=true` (5 points). A 404/500 withholds only this fact;
+        // crawler policy and llms.txt reachability remain independent.
 
         const baseUrl = resolveStorefrontOrigin(tenant as any, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
 
@@ -102,22 +119,26 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         const urlNode = (path: string, lastMod: string) =>
             `    <url><loc>${xmlEscape(`${baseUrl}${path}`)}</loc><lastmod>${lastMod}</lastmod></url>`
 
-        const pageNodes = pagesResult.docs.map(p => {
+        const pageNodes = pagesResult.docs.flatMap(p => {
             const isHome = p.isHomepage || p.slug === '/' || p.slug === 'home' || !p.slug
-            const pageSlug = typeof p.slug === 'string' ? p.slug.replace(/^\//, '') : ''
-            const path = isHome || !pageSlug ? '' : `/${pageSlug}`
-            return urlNode(path, isoOrNow(p.updatedAt))
+            if (isHome) return [urlNode('', isoOrNow(p.updatedAt))]
+            const slugPath = encodePublicSlugPath(p.slug)
+            return slugPath ? [urlNode(`/${slugPath}`, isoOrNow(p.updatedAt))] : []
         })
 
         // Products → /products/{slug} (PDP route). Blogs → /blog/{slug} (canonical
         // path the storefront links to via StorefrontBlogList).
         const productNodes = productsResult.docs
-            .filter(p => typeof p.slug === 'string' && p.slug)
-            .map(p => urlNode(`/products/${(p.slug as string).replace(/^\//, '')}`, isoOrNow(p.updatedAt)))
+            .flatMap(p => {
+                const slugPath = encodePublicSlugPath(p.slug)
+                return slugPath ? [urlNode(`/products/${slugPath}`, isoOrNow(p.updatedAt))] : []
+            })
 
         const blogNodes = blogsResult.docs
-            .filter(b => typeof b.slug === 'string' && b.slug)
-            .map(b => urlNode(`/blog/${(b.slug as string).replace(/^\//, '')}`, isoOrNow(b.updatedAt)))
+            .flatMap(b => {
+                const slugPath = encodePublicSlugPath(b.slug)
+                return slugPath ? [urlNode(`/blog/${slugPath}`, isoOrNow(b.updatedAt))] : []
+            })
 
         // Blog index page (only when at least one published post exists).
         const blogIndexNode = blogNodes.length > 0 ? [urlNode('/blogs', new Date().toISOString())] : []

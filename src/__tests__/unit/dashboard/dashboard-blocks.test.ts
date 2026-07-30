@@ -31,6 +31,10 @@ describe('normalizeDashboardBlocks', () => {
         expect(normalizeDashboardBlocks(['glance', 'bogus', 'glance', 'seo'])).toEqual(['glance', 'seo'])
     })
 
+    it('TC-F37-03-27: drops the retired tools block from persisted preferences', () => {
+        expect(normalizeDashboardBlocks(['glance', 'tools', 'seo'])).toEqual(['glance', 'seo'])
+    })
+
     it('supports hiding blocks (omitted ids stay hidden)', () => {
         expect(normalizeDashboardBlocks(['glance'])).toEqual(['glance'])
     })
@@ -44,22 +48,22 @@ describe('buildCustomizeRows', () => {
     it('anchors hidden blocks at their schema position (not appended at the end)', () => {
         // glance + seo visible; the rest hidden but kept at their canonical ALL_BLOCKS slots
         const rows = buildCustomizeRows(['glance', 'seo'])
-        expect(rows.map(r => r.id)).toEqual(['onboarding', 'glance', 'traffic', 'seo', 'tools', 'orders'])
+        expect(rows.map(r => r.id)).toEqual(['onboarding', 'glance', 'traffic', 'seo', 'orders'])
         expect(rows.filter(r => r.visible).map(r => r.id)).toEqual(['glance', 'seo'])
         // every block represented exactly once
         expect(rows).toHaveLength(ALL_BLOCKS.length)
     })
 
     it('keeps a toggled-off block in place across rebuild (no jump to bottom)', () => {
-        // traffic hidden — it must stay at index 2, not move below tools
-        const rows = buildCustomizeRows(['onboarding', 'glance', 'seo', 'tools'])
-        expect(rows.map(r => r.id)).toEqual(['onboarding', 'glance', 'traffic', 'seo', 'tools', 'orders'])
+        // traffic hidden — it must stay at index 2, not move below seo
+        const rows = buildCustomizeRows(['onboarding', 'glance', 'seo'])
+        expect(rows.map(r => r.id)).toEqual(['onboarding', 'glance', 'traffic', 'seo', 'orders'])
         expect(rows.find(r => r.id === 'traffic')?.visible).toBe(false)
     })
 
     it('honours saved order of visible blocks within the schema frame', () => {
-        const rows = buildCustomizeRows(['glance', 'onboarding', 'traffic', 'seo', 'tools'])
-        expect(rows.filter(r => r.visible).map(r => r.id)).toEqual(['glance', 'onboarding', 'traffic', 'seo', 'tools'])
+        const rows = buildCustomizeRows(['glance', 'onboarding', 'traffic', 'seo'])
+        expect(rows.filter(r => r.visible).map(r => r.id)).toEqual(['glance', 'onboarding', 'traffic', 'seo'])
     })
 
     it('marks the orders block as soon (Coming Soon), hidden by default', () => {
