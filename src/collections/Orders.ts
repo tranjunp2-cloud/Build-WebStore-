@@ -501,7 +501,16 @@ export const Orders: CollectionConfig = {
         {
             name: 'pickupScheduledAt',
             type: 'date',
-            admin: { description: 'Chosen courier pickup date/slot (persisted when merchant schedules pickup)' },
+            admin: { description: 'Chosen EasyParcel collection date (used for pickup and drop-off labels)' },
+        },
+        {
+            name: 'collectionMethod',
+            type: 'select',
+            options: [
+                { label: 'Pickup', value: 'pickup' },
+                { label: 'Drop-off', value: 'dropoff' },
+            ],
+            admin: { description: 'Collection method selected when the EasyParcel label was created' },
         },
         {
             name: 'pickupSlot',
@@ -531,6 +540,15 @@ export const Orders: CollectionConfig = {
                 { name: 'status', type: 'text' },
                 { name: 'description', type: 'text' },
                 { name: 'eventTime', type: 'date' },
+                {
+                    name: 'collectionMethod',
+                    type: 'select',
+                    options: [
+                        { label: 'Pickup', value: 'pickup' },
+                        { label: 'Drop-off', value: 'dropoff' },
+                    ],
+                    admin: { description: 'Collection method snapshot for this tracking event' },
+                },
             ],
         },
         // --- Cancellation ---
