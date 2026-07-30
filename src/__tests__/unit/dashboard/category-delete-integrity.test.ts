@@ -11,13 +11,27 @@ vi.mock('@/lib/auth', () => ({
     tenantIdForQuery: vi.fn(),
 }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn(),
+    canUse: vi.fn(),
+}))
+
+vi.mock('@/lib/payload/category-row-lock', () => ({
+    CATEGORY_LOCK_BUSY_ERROR: 'CATEGORY_BUSY_RETRY',
+    isCategoryLockTimeoutError: vi.fn((error: unknown) =>
+        typeof error === 'object' && error !== null && 'code' in error && error.code === '55P03'
+    ),
+    withCategoryMutationGate: vi.fn(async (_payload, operation) => operation()),
+}))
+
 import { deleteCategoryAction } from '@/app/(dashboard)/products/categories/actions'
 import { getPayload } from 'payload'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 
 const mockCurrentUser = { id: 'user-123', tenants: [{ tenant: 'tenant-456' }] }
 
-type MockPayload = { findByID: Mock; db: { drizzle: { execute: Mock } } }
+type MockPayload = { findByID: Mock; db: { drizzle: { transaction: Mock } } }
 
 function extractSqlText(sqlObj: { queryChunks?: unknown[] }): string {
     return (sqlObj.queryChunks ?? [])
@@ -33,17 +47,19 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
     let mockPayload: MockPayload
     let mockFindByID: Mock
     let mockExecute: Mock
+    let mockTransaction: Mock
 
     beforeEach(() => {
         vi.clearAllMocks()
         mockFindByID = vi.fn()
         mockExecute = vi.fn()
+        mockTransaction = vi.fn(async operation => operation({ execute: mockExecute }))
 
         mockPayload = {
             findByID: mockFindByID,
             db: {
                 drizzle: {
-                    execute: mockExecute,
+                    transaction: mockTransaction,
                 },
             },
         }
@@ -51,10 +67,12 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
         vi.mocked(getCurrentUser).mockResolvedValue(mockCurrentUser as any)
         vi.mocked(tenantIdForQuery).mockImplementation((user) => user?.tenants?.[0]?.tenant)
+        vi.mocked(getActivePlanSubscription).mockResolvedValue({ plan: 'PROFESSIONAL_TM_USER' } as any)
+        vi.mocked(canUse).mockResolvedValue(true)
     })
 
     it('TC-F08-05-06: authorizes category access before any raw SQL runs', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null, tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -72,18 +90,32 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             user: mockCurrentUser,
             overrideAccess: false,
         })
-        expect(mockExecute).toHaveBeenCalledTimes(1)
+        expect(mockTransaction).toHaveBeenCalledOnce()
+        expect(mockExecute).toHaveBeenCalledTimes(3)
     })
 
     it('TC-F08-05-06: aborts before raw SQL when access check fails', async () => {
         mockFindByID.mockRejectedValue(new Error('Category not found or access denied'))
 
         await expect(deleteCategoryAction('cat-999')).rejects.toThrow('Category not found or access denied')
+        expect(mockTransaction).not.toHaveBeenCalled()
         expect(mockExecute).not.toHaveBeenCalled()
     })
 
+    it('TC-F08-05-06: blocks raw SQL when product management is unavailable', async () => {
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
+        vi.mocked(canUse).mockResolvedValue(false)
+
+        await expect(deleteCategoryAction('cat-123')).rejects.toThrow(
+            'Product management is not available on your current plan.',
+        )
+
+        expect(getActivePlanSubscription).toHaveBeenCalledWith(mockPayload, 'tenant-456')
+        expect(mockTransaction).not.toHaveBeenCalled()
+    })
+
     it('TC-F08-05-06: throws CATEGORY_HAS_PRODUCTS:N when direct products still exist', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 5,
@@ -97,7 +129,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
     })
 
     it('TC-F08-05-33: throws CATEGORY_REPARENT_NAME_CONFLICT:N before delete when moving children to root would duplicate names', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -111,11 +143,12 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
     })
 
     it('TC-F08-05-06: returns deleted record from the atomic delete statement', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null, tenant: 'tenant-456' })
         const deletedRecord = {
             id: 'cat-123',
             name: 'Fashion',
             parent: null,
+            tenant: 'tenant-456',
             deletedAt: '2026-07-16T12:00:00.000Z',
         }
         mockExecute.mockResolvedValue({
@@ -131,7 +164,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
     })
 
     it('TC-F08-05-34: SQL scopes child re-parenting to the authorized tenant only', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -143,13 +176,13 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         await deleteCategoryAction('cat-123')
 
-        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
+        const sqlText = extractSqlText(mockExecute.mock.calls[2][0])
         expect(sqlText).toContain('c.parent_id = t.id')
         expect(sqlText).toContain('c.tenant_id = t.tenant_id')
     })
 
     it('TC-F08-05-35: SQL preflights duplicate root-name conflicts before re-parenting children', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -161,7 +194,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         await deleteCategoryAction('cat-123')
 
-        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
+        const sqlText = extractSqlText(mockExecute.mock.calls[2][0])
         expect(sqlText).toContain('root.parent_id IS NULL')
         expect(sqlText).toContain('root.id <> t.id')
         expect(sqlText).toContain('lower(trim(root.name)) = lower(trim(ch.name))')
@@ -169,11 +202,12 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
     })
 
     it('TC-F08-05-37: allows delete when a child shares the same name as the target root being deleted', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Shoes', parent: null })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Shoes', parent: null, tenant: 'tenant-456' })
         const deletedRecord = {
             id: 'cat-123',
             name: 'Shoes',
             parent: null,
+            tenant: 'tenant-456',
             deletedAt: '2026-07-16T12:00:00.000Z',
         }
         mockExecute.mockResolvedValue({
@@ -187,13 +221,13 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         await expect(deleteCategoryAction('cat-123')).resolves.toEqual(deletedRecord)
 
-        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
+        const sqlText = extractSqlText(mockExecute.mock.calls[2][0])
         expect(sqlText).toContain('JOIN target t ON TRUE')
         expect(sqlText).toContain('root.id <> t.id')
     })
 
-    it('TC-F08-05-36: SQL locks the target category row before count/re-parent/delete to narrow the product-assignment race', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+    it('TC-F08-05-36: locks the target in a separate statement before count/re-parent/delete gets its snapshot', async () => {
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -205,14 +239,45 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         await deleteCategoryAction('cat-123')
 
-        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
-        expect(sqlText).toContain('FROM categories c')
-        expect(sqlText).toContain('FOR UPDATE')
-        expect(sqlText).toContain('WITH target AS')
+        expect(mockExecute).toHaveBeenCalledTimes(3)
+        const timeoutSql = extractSqlText(mockExecute.mock.calls[0][0])
+        const lockSql = extractSqlText(mockExecute.mock.calls[1][0])
+        const deleteSql = extractSqlText(mockExecute.mock.calls[2][0])
+        expect(timeoutSql).toContain('SET LOCAL lock_timeout')
+        expect(timeoutSql).toContain('2s')
+        expect(lockSql).toContain('FROM categories')
+        expect(lockSql).toContain('FOR UPDATE')
+        expect(lockSql).not.toContain('WITH target AS')
+        expect(deleteSql).toContain('WITH target AS')
+    })
+
+    it('TC-F08-05-06: scopes raw SQL to the authorized category tenant, not the user primary tenant', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValue({ id: 'super-admin', roles: ['super-admin'], tenants: [] } as any)
+        vi.mocked(tenantIdForQuery).mockReturnValue(null)
+        mockFindByID.mockResolvedValue({
+            id: 'cat-123',
+            name: 'Fashion',
+            tenant: { id: 'tenant-target' },
+        })
+        mockExecute.mockResolvedValue({
+            rows: [{
+                direct_count: 0,
+                name_conflict_count: 0,
+                deleted: true,
+                deleted_doc: { id: 'cat-123', deletedAt: '2026-07-16T12:00:00.000Z' },
+            }],
+        })
+
+        await expect(deleteCategoryAction('cat-123')).resolves.toMatchObject({ id: 'cat-123' })
+
+        expect(tenantIdForQuery).not.toHaveBeenCalled()
+        expect(getActivePlanSubscription).not.toHaveBeenCalled()
+        expect(canUse).not.toHaveBeenCalled()
+        expect(JSON.stringify(mockExecute.mock.calls)).toContain('tenant-target')
     })
 
     it('TC-F08-05-06: still counts direct products only, not descendants', async () => {
-        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion' })
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
             rows: [{
                 direct_count: 0,
@@ -224,11 +289,24 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
 
         await deleteCategoryAction('cat-123')
 
-        const sqlText = extractSqlText(mockExecute.mock.calls[0][0])
+        const sqlText = extractSqlText(mockExecute.mock.calls[2][0])
         expect(sqlText).toContain('products_rels')
         expect(sqlText).toContain('r.categories_id = t.id')
         expect(sqlText).toContain("r.path = 'category'")
         expect(sqlText).toContain('p.deleted_at IS NULL')
         expect(sqlText).not.toMatch(/WITH RECURSIVE|getDescendantIds/i)
+    })
+
+    it('[TC-F08-04-111] lock timeout releases the transaction with an explicit retryable error', async () => {
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
+        const lockTimeout = Object.assign(new Error('canceling statement due to lock timeout'), {
+            code: '55P03',
+        })
+        mockExecute
+            .mockResolvedValueOnce({ rows: [] })
+            .mockRejectedValueOnce(lockTimeout)
+
+        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_BUSY_RETRY')
+        expect(mockExecute).toHaveBeenCalledTimes(2)
     })
 })

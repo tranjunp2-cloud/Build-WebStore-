@@ -23,7 +23,7 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('@/app/(dashboard)/products/actions', () => ({
-    saveProductAction: vi.fn(),
+    saveAiProductAction: vi.fn(),
     getProductsAction: vi.fn(),
     getProductAction: vi.fn(),
     updateProductFieldAction: vi.fn(),
@@ -76,7 +76,8 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
     it('TC-GH1599-01: 429 rateLimitExceeded → toast shows the real i18n string with computed minutes-until-reset', async () => {
         // Arrange: resetAt 5 minutes from now
-        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() + 5 * 60000 })
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() + 5 * 60000,
+        })
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
@@ -89,7 +90,8 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
     })
 
     it('TC-GH1599-02: 429 rateLimitExceeded with an already-past resetAt clamps to a minimum of 1 minute (no "0 min"/negative)', async () => {
-        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() - 60000 })
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: Date.now() - 60000,
+        })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
 
@@ -103,7 +105,8 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         // Code-review adversarial finding: Math.max(1, NaN) is NaN (not 1) — a non-numeric
         // resetAt must be coerced BEFORE the minutes arithmetic, matching the coerceFiniteNumber
         // guard already used elsewhere in this file for untrusted numeric input.
-        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: 'not-a-number' })
+        mockParseApiError(429, { error: 'rateLimitExceeded', resetAt: 'not-a-number',
+        })
 
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="test" />)
 
@@ -150,13 +153,16 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             .mockResolvedValueOnce({
                 ok: false,
                 status: 422,
-                json: async () => ({ error: 'merchantLanguageMismatch', retryable: true }),
+                json: async () => ({ error: 'merchantLanguageMismatch', retryable: true,
+                }),
             })
             .mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: async () => ({
-                    products: [{ name: 'Recovered Hat', price: 10, stock: 0, category: '', variants: [] }],
+                    products: [{ name: 'Recovered Hat', price: 10, stock: 0, category: '', variants: [],
+                        },
+                    ],
                 }),
             }) as unknown as typeof fetch
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="topi merah" />)

@@ -8,6 +8,10 @@ import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subs
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
+import {
+    CATEGORY_LOCK_BUSY_ERROR,
+    withActiveCategoryRowLock,
+} from '@/lib/payload/category-row-lock'
 
 // NOTE: This check is best-effort, fast-path UX — two limitations apply:
 //   1. NOT concurrent-safe on its own: two parallel saves with the same SKU can both pass this
@@ -194,8 +198,14 @@ const ProductServerSchema = z.object({
     })).optional(),
 }).passthrough();
 
-export async function saveProductAction(rawData: unknown, id?: string | number) {
-    const user = await getCurrentUser()
+type ProductSaveContext = {
+    user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+    tenantId: string | number
+    payload: Awaited<ReturnType<typeof getPayload>>
+}
+
+async function saveProduct(rawData: unknown, id?: string | number, context?: ProductSaveContext) {
+    const user = context?.user ?? await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
     const data = ProductServerSchema.parse(rawData);
@@ -228,7 +238,7 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
         }))
     }
 
-    const payload = await getPayload({ config: configPromise })
+    const payload = context?.payload ?? await getPayload({ config: configPromise })
 
     const candidateSkus = [
         ...(typeof data.sku === 'string' && data.sku.trim() ? [data.sku.trim()] : []),
@@ -237,7 +247,7 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             .filter(Boolean),
     ]
     // Fix B: coerce to number so SKU scope and tenant filter match Neon integer FK
-    const tenantId = tenantIdForQuery(user)
+    const tenantId = context?.tenantId ?? tenantIdForQuery(user)
 
     // `id != null` (not truthy `id`) — a falsy `id === 0` is a legitimate Payload primary key
     // and must route to the update branch below, not silently fall through to create.
@@ -343,18 +353,19 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
                 data,
                 user,
                 overrideAccess: false,
-                // Bypass Payload/Drizzle transaction: commitTransaction silently swallows COMMIT
-                // errors (done.catch(()=>{}) in beginTransaction absorbs PostgreSQL commit failures),
-                // so products appear created but are rolled back. Without a transaction each INSERT
-                // auto-commits, avoiding the silent-commit-failure bug. Tradeoff: if variants INSERT
-                // fails after the products row commits, the product row stays with no variants;
-                // that failure still propagates to the user via handleUpsertError → throw.
+                // Payload's transaction commit path can swallow PostgreSQL commit failures. Keep
+                // this save auto-committed and verify visibility below. The AI category lock is held
+                // on a separate connection until this entire save finishes.
                 disableTransaction: true,
             })
-            // Verify the product actually exists in DB — detects silent Payload/Drizzle commit failures
-            // where commitTransaction swallows COMMIT errors and returns the doc as if it succeeded.
+            // Verify the auto-committed row exists before reporting success.
             try {
-                const verify = await payload.findByID({ collection: 'products', id: res.id, overrideAccess: true, depth: 0 })
+                const verify = await payload.findByID({
+                    collection: 'products',
+                    id: res.id,
+                    overrideAccess: true,
+                    depth: 0,
+                })
                 if (!verify?.id) {
                     console.error('[products.create] VERIFY FAILED — product not in DB after create!', { id: res?.id })
                     throw new Error('Product was not saved. Please try again.')
@@ -374,6 +385,84 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             throw translateDbSkuConflict(createErr, data as Record<string, unknown>)
         }
     }
+}
+
+export async function saveProductAction(rawData: unknown, id?: string | number) {
+    return saveProduct(rawData, id)
+}
+
+const AiCategoryIdSchema = z.union([
+    z.number().int().positive().max(2_147_483_647),
+    z.string()
+        .trim()
+        .regex(/^[1-9]\d*$/)
+        .transform(value => Number(value))
+        .refine(
+            value => Number.isSafeInteger(value) && value <= 2_147_483_647,
+            'Category ID is out of range',
+        ),
+])
+
+function categoryInvalidResult() {
+    return {
+        ok: false as const,
+        code: 'CATEGORY_INVALID',
+        message: 'Please select an active category from your store.',
+    }
+}
+
+/**
+ * AI bulk-create boundary only.
+ *
+ * Keep the existing manual Product save path unchanged, but independently revalidate the
+ * category selected in the AI review modal. Client-side revalidation is UX; this query is the
+ * authoritative tenant/active-category check for direct Server Action calls.
+ */
+export async function saveAiProductAction(rawData: unknown) {
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+        return categoryInvalidResult()
+    }
+
+    const category = (rawData as Record<string, unknown>).category
+    if (!Array.isArray(category) || category.length !== 1) {
+        return categoryInvalidResult()
+    }
+
+    const parsedCategory = AiCategoryIdSchema.safeParse(category[0])
+    if (!parsedCategory.success) return categoryInvalidResult()
+
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const tenantId = tenantIdForQuery(user)
+    if (tenantId == null) throw new Error('Unauthorized')
+
+    const payload = await getPayload({ config: configPromise })
+    const savedProduct = await (async () => {
+        try {
+            return await withActiveCategoryRowLock(
+                payload,
+                parsedCategory.data,
+                tenantId,
+                canonicalCategoryId => saveProduct({
+                    ...(rawData as Record<string, unknown>),
+                    category: [canonicalCategoryId],
+                    status: 'draft',
+                    aiReviewPending: true,
+                }, undefined, { user, tenantId, payload }),
+            )
+        } catch (error) {
+            if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
+                throw new Error(JSON.stringify({
+                    code: CATEGORY_LOCK_BUSY_ERROR,
+                    message: 'This category is busy. Please try again.',
+                }))
+            }
+            throw error
+        }
+    })()
+
+    return savedProduct ?? categoryInvalidResult()
 }
 
 const ProductFieldUpdateSchema = z.union([

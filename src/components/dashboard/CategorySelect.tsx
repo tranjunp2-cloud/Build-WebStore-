@@ -18,6 +18,7 @@ interface CategorySelectProps {
     onChange: (ids: (string | number)[]) => void
     error?: string
     className?: string
+    disabled?: boolean
 }
 
 function getParentId(cat: Category): string | number | null {
@@ -60,7 +61,7 @@ function ColPanel({
     )
 }
 
-export function CategorySelect({ categories, selectedIds, onChange, error, className }: CategorySelectProps) {
+export function CategorySelect({ categories, selectedIds, onChange, error, className, disabled = false }: CategorySelectProps) {
     const { t } = useI18n()
     const [isOpen, setIsOpen] = useState(false)
     const [hoveredL1, setHoveredL1] = useState<string | number | null>(null)
@@ -119,7 +120,12 @@ export function CategorySelect({ categories, selectedIds, onChange, error, class
         return () => document.removeEventListener('mousedown', handler)
     }, [])
 
+    useEffect(() => {
+        if (disabled) setIsOpen(false)
+    }, [disabled])
+
     const selectLeaf = (cat: Category) => {
+        if (disabled) return
         onChange([cat.id])
         setIsOpen(false)
     }
@@ -178,9 +184,12 @@ export function CategorySelect({ categories, selectedIds, onChange, error, class
     }
 
     return (
-        <div ref={containerRef} className={cn('relative', className)}>
+        <div ref={containerRef} className={cn('relative', disabled && 'pointer-events-none opacity-60', className)}>
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    if (!disabled) setIsOpen(!isOpen)
+                }}
+                aria-disabled={disabled}
                 className={cn(
                     'flex h-9 w-full items-center rounded-lg border border-solid bg-[hsl(var(--card))] px-3 py-2 text-base md:text-sm text-[hsl(var(--foreground))] shadow-none outline-none cursor-pointer transition-colors focus-visible:outline-none focus-visible:border-[hsl(var(--ring))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))]',
                     error ? 'border-[hsl(var(--destructive))]' : 'border-[hsl(var(--input-border))]',
