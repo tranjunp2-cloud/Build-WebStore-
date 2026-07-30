@@ -15,6 +15,7 @@
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
 import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedFallbackMedia, type MediaPipelineContext } from './media-pipeline'
 import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
+import type { ReservoirKind } from './image-sourcing/contracts'
 
 /** Describes how to find/mutate image fields for each block type. */
 export interface BlockImageSpec {
@@ -165,6 +166,241 @@ export interface ImageNeed {
     blockType: string
     count: number
     assign: (mediaIds: number[]) => void
+}
+
+export interface F38PageImageNeed extends ImageNeed {
+    reservoir: ReservoirKind
+    pageIndex: number
+    blockIndex: number
+}
+
+export interface F38PageWithLayout {
+    layout?: unknown
+}
+
+interface F38ImageSlot {
+    read: () => number | undefined
+    write: (mediaId: number) => void
+    clear: () => void
+}
+
+interface F38PageBlockSpec {
+    reservoir: ReservoirKind
+    collectSlots: (block: AIBlock) => F38ImageSlot[]
+}
+
+function numericMediaId(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+        ? value
+        : undefined
+}
+
+function topLevelAliasSlot(block: AIBlock, fields: string[]): F38ImageSlot {
+    return {
+        read: () => {
+            for (const field of fields) {
+                const mediaId = numericMediaId(block[field])
+                if (mediaId != null) return mediaId
+            }
+            return undefined
+        },
+        write: (mediaId) => {
+            for (const field of fields) block[field] = mediaId
+        },
+        clear: () => {
+            for (const field of fields) delete block[field]
+        },
+    }
+}
+
+function nestedArraySlots(
+    block: AIBlock,
+    arrayField: string,
+    itemField: string,
+): F38ImageSlot[] {
+    const items = block[arrayField]
+    if (!Array.isArray(items)) return []
+
+    return items.flatMap((value) => {
+        if (!value || typeof value !== 'object') return []
+        const item = value as AIBlock
+        return [{
+            read: () => numericMediaId(item[itemField]),
+            write: (mediaId: number) => {
+                item[itemField] = mediaId
+            },
+            clear: () => {
+                delete item[itemField]
+            },
+        }]
+    })
+}
+
+function nestedMenuFoodSlots(block: AIBlock): F38ImageSlot[] {
+    const categories = block.categories
+    if (!Array.isArray(categories)) return []
+
+    return categories.flatMap((categoryValue) => {
+        if (!categoryValue || typeof categoryValue !== 'object') return []
+        return nestedArraySlots(categoryValue as AIBlock, 'items', 'image')
+    })
+}
+
+/**
+ * F38-only persisted upload-field map. It intentionally excludes logos and
+ * URL-only fields such as doctor-profile.photoUrl and gallery-masonry.images.url.
+ */
+const F38_PAGE_BLOCK_SPEC: Readonly<Record<string, F38PageBlockSpec>> = {
+    hero: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['image', 'backgroundImage'])],
+    },
+    about: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['image'])],
+    },
+    gallery: {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'images', 'image'),
+    },
+    'portfolio-grid': {
+        reservoir: 'square',
+        collectSlots: (block) => nestedArraySlots(block, 'projects', 'image'),
+    },
+    team: {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'members', 'image'),
+    },
+    testimonials: {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'testimonials', 'avatar'),
+    },
+    'property-card': {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'properties', 'image'),
+    },
+    carousel: {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'items', 'image'),
+    },
+    'social-proof': {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'reviews', 'avatar'),
+    },
+    video: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['posterImage'])],
+    },
+    'menu-food': {
+        reservoir: 'products',
+        collectSlots: nestedMenuFoodSlots,
+    },
+}
+
+function collectF38PageBlockSlots(
+    pages: F38PageWithLayout[],
+): Array<{
+    blockType: string
+    reservoir: ReservoirKind
+    pageIndex: number
+    blockIndex: number
+    slots: F38ImageSlot[]
+}> {
+    const groups: Array<{
+        blockType: string
+        reservoir: ReservoirKind
+        pageIndex: number
+        blockIndex: number
+        slots: F38ImageSlot[]
+    }> = []
+
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const layout = pages[pageIndex]?.layout
+        if (!Array.isArray(layout)) continue
+
+        for (let blockIndex = 0; blockIndex < layout.length; blockIndex++) {
+            const value = layout[blockIndex]
+            if (!value || typeof value !== 'object') continue
+            const block = value as AIBlock
+            const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+            const spec = F38_PAGE_BLOCK_SPEC[blockType]
+            if (!spec) continue
+            const slots = spec.collectSlots(block)
+            if (slots.length === 0) continue
+            groups.push({
+                blockType,
+                reservoir: spec.reservoir,
+                pageIndex,
+                blockIndex,
+                slots,
+            })
+        }
+    }
+
+    return groups
+}
+
+/**
+ * Plan every persisted, non-logo Media slot after final pages are built.
+ * Existing values are cleared immediately so cloned pages cannot retain the
+ * same image. Assigning fewer IDs than requested leaves the overflow empty.
+ */
+export function planF38FinalPageImageNeeds(
+    pages: F38PageWithLayout[],
+): F38PageImageNeed[] {
+    return collectF38PageBlockSlots(pages).map((group) => {
+        for (const slot of group.slots) slot.clear()
+        return {
+            blockType: group.blockType,
+            reservoir: group.reservoir,
+            pageIndex: group.pageIndex,
+            blockIndex: group.blockIndex,
+            count: group.slots.length,
+            assign: (mediaIds) => {
+                for (let index = 0; index < group.slots.length; index++) {
+                    const slot = group.slots[index]!
+                    const mediaId = numericMediaId(mediaIds[index])
+                    if (mediaId == null) slot.clear()
+                    else slot.write(mediaId)
+                }
+            },
+        }
+    })
+}
+
+/**
+ * Final first-wins guard for numeric Media IDs across final page layouts.
+ * Hero image/backgroundImage is one logical slot and therefore one identity.
+ */
+export function dedupeF38FinalPageMediaIds(
+    pages: F38PageWithLayout[],
+    initiallyUsed: Iterable<number> = [],
+): { removed: number; usedMediaIds: Set<number> } {
+    const usedMediaIds = new Set<number>()
+    for (const value of initiallyUsed) {
+        const mediaId = numericMediaId(value)
+        if (mediaId != null) usedMediaIds.add(mediaId)
+    }
+
+    let removed = 0
+    for (const group of collectF38PageBlockSlots(pages)) {
+        for (const slot of group.slots) {
+            const mediaId = slot.read()
+            if (mediaId == null) {
+                slot.clear()
+                continue
+            }
+            if (usedMediaIds.has(mediaId)) {
+                slot.clear()
+                removed++
+                continue
+            }
+            usedMediaIds.add(mediaId)
+            slot.write(mediaId)
+        }
+    }
+
+    return { removed, usedMediaIds }
 }
 
 /**

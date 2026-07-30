@@ -1,6 +1,6 @@
 import { basename, resolve } from 'path'
 
-import type { CollectionConfig, PayloadHandler } from 'payload'
+import type { AccessArgs, CollectionConfig, PayloadHandler } from 'payload'
 import { APIError } from 'payload'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
@@ -83,6 +83,22 @@ const IMAGE_SIGNATURES = [
     { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0 },           // ICO
 ]
 
+const STOCK_SOURCE_PROVIDERS = ['wikimedia', 'pixabay'] as const
+const SYSTEM_PROVENANCE_FIELD_ACCESS = {
+    create: () => false,
+    update: () => false,
+}
+
+function tenantWritableMedia({ req }: AccessArgs) {
+    if (!req.user) return false
+    return {
+        or: [
+            { sourceProvider: { exists: false } },
+            { sourceProvider: { not_in: [...STOCK_SOURCE_PROVIDERS] } },
+        ],
+    }
+}
+
 export const Media: CollectionConfig = {
     slug: 'media',
     hooks: {
@@ -139,8 +155,8 @@ export const Media: CollectionConfig = {
     access: {
         read: () => true,
         create: ({ req }) => Boolean(req.user),
-        update: ({ req }) => Boolean(req.user),
-        delete: ({ req }) => Boolean(req.user),
+        update: tenantWritableMedia,
+        delete: tenantWritableMedia,
     },
     fields: [
         {
@@ -168,6 +184,44 @@ export const Media: CollectionConfig = {
                 condition: (_, siblingData) => Boolean(siblingData?.aiGenerated),
                 description: 'The prompt used to generate this image',
             },
+        },
+        {
+            name: 'sourceProvider',
+            type: 'select',
+            access: SYSTEM_PROVENANCE_FIELD_ACCESS,
+            options: [
+                { label: 'Wikimedia Commons', value: 'wikimedia' },
+                { label: 'Pixabay', value: 'pixabay' },
+                { label: 'AI', value: 'ai' },
+            ],
+            admin: {
+                description: 'System provenance for generated or shared stock media',
+                readOnly: true,
+            },
+        },
+        {
+            name: 'sourceUrl',
+            type: 'text',
+            access: SYSTEM_PROVENANCE_FIELD_ACCESS,
+            admin: { readOnly: true },
+        },
+        {
+            name: 'licenseName',
+            type: 'text',
+            access: SYSTEM_PROVENANCE_FIELD_ACCESS,
+            admin: { readOnly: true },
+        },
+        {
+            name: 'licenseUrl',
+            type: 'text',
+            access: SYSTEM_PROVENANCE_FIELD_ACCESS,
+            admin: { readOnly: true },
+        },
+        {
+            name: 'attribution',
+            type: 'text',
+            access: SYSTEM_PROVENANCE_FIELD_ACCESS,
+            admin: { readOnly: true },
         },
     ],
     timestamps: true,
