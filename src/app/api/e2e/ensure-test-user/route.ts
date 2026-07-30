@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
+import { normalizeDashboardBlocks } from '@/lib/dashboard-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,36 @@ const E2E_DASHBOARD_ORDER_PREFIX = 'E2E-DASHBOARD-PENDING'
 const E2E_DASHBOARD_ORDER_TOTAL = 107.8
 const E2E_SETUP_CAPABILITY = 'dashboard-fixture-v1'
 
-async function ensureDashboardFixture(payload: Payload, tenantId: string | number) {
+type DashboardFixtureTenant = {
+    id: string | number
+    settings?: unknown
+}
+
+function dashboardPreferencesWithOrders(raw: unknown) {
+    const savedPreferences = Array.isArray(raw)
+        ? raw.filter((item): item is string => typeof item === 'string')
+        : undefined
+    const preferences = normalizeDashboardBlocks(savedPreferences)
+    return preferences.includes('orders') ? preferences : [...preferences, 'orders' as const]
+}
+
+async function ensureDashboardFixture(payload: Payload, tenant: DashboardFixtureTenant) {
+    const tenantId = tenant.id
     const orderNumber = `${E2E_DASHBOARD_ORDER_PREFIX}-${String(tenantId)}`
+    const settings = tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings)
+        ? tenant.settings as Record<string, unknown>
+        : {}
+    await payload.update({
+        collection: 'tenants',
+        id: tenantId,
+        data: {
+            settings: {
+                ...settings,
+                dashboardPreferences: dashboardPreferencesWithOrders(settings.dashboardPreferences),
+            },
+        },
+        overrideAccess: true,
+    })
     const sitesResult = await payload.find({
         collection: 'sites',
         where: {
@@ -65,15 +94,31 @@ async function ensureDashboardFixture(payload: Payload, tenantId: string | numbe
         siteId = site.id
     }
 
-    const productSlug = `e2e-dashboard-product-${String(tenantId)}`
+    const productToken = String(tenantId)
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, '-')
+    const productData = {
+        tenant: tenantId,
+        site: siteId,
+        name: 'E2E Dashboard Product',
+        slug: `e2e-dashboard-product-${productToken}`,
+        price: 49.9,
+        sku: `E2E-DASHBOARD-PRODUCT-${productToken}`.toUpperCase(),
+        inventory: 10,
+        weight: 0.5,
+        hasVariants: false,
+        seo: {
+            title: 'E2E Dashboard Product',
+            description: 'Deterministic product fixture for dashboard E2E tests.',
+        },
+        status: 'active' as const,
+    }
     const productsResult = await payload.find({
         collection: 'products',
         where: {
             and: [
                 { tenant: { equals: tenantId } },
-                { slug: { equals: productSlug } },
+                { slug: { equals: productData.slug } },
             ],
         },
         limit: 1,
@@ -87,20 +132,13 @@ async function ensureDashboardFixture(payload: Payload, tenantId: string | numbe
         await payload.update({
             collection: 'products',
             id: productId,
-            data: { status: 'active' },
+            data: productData,
             overrideAccess: true,
         })
     } else {
         const product = await payload.create({
             collection: 'products',
-            data: {
-                tenant: tenantId,
-                site: siteId,
-                name: 'E2E Dashboard Product',
-                slug: productSlug,
-                price: 49.9,
-                status: 'active',
-            },
+            data: productData,
             overrideAccess: true,
         })
         productId = product.id
@@ -236,11 +274,11 @@ export async function POST(req: NextRequest) {
             overrideAccess: true,
         })
 
-        let tenantId: string | number
+        let tenant: DashboardFixtureTenant
         if (tenantsResult.docs.length > 0) {
-            tenantId = tenantsResult.docs[0].id
+            tenant = tenantsResult.docs[0]
         } else {
-            const newTenant = await payload.create({
+            tenant = await payload.create({
                 collection: 'tenants',
                 overrideAccess: true,
                 data: {
@@ -250,8 +288,8 @@ export async function POST(req: NextRequest) {
                     onboardingCompleted: true,
                 },
             })
-            tenantId = newTenant.id
         }
+        const tenantId = tenant.id
 
         // Step 2: ensure the isolated benchmark tenant can pass the same
         // subscription gate as a tenant provisioned through the SSO flow.
@@ -291,7 +329,7 @@ export async function POST(req: NextRequest) {
         }
 
         const dashboardFixture = body.seedDashboardFixture === true
-            ? await ensureDashboardFixture(payload, tenantId)
+            ? await ensureDashboardFixture(payload, tenant)
             : undefined
 
         // Step 3: find or create user

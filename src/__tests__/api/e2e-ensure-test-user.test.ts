@@ -1,13 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
-import { getPayload } from 'payload'
-import { POST } from '@/app/api/e2e/ensure-test-user/route'
+
+const mocks = vi.hoisted(() => ({
+    queueSEOAutoGeneration: vi.fn(),
+}))
 
 vi.mock('@payload-config', () => ({ default: {} }))
 
-vi.mock('payload', () => ({
-    getPayload: vi.fn(),
+vi.mock('payload', async () => {
+    const actual = await vi.importActual<typeof import('payload')>('payload')
+    return { ...actual, getPayload: vi.fn() }
+})
+
+vi.mock('@/lib/ai/seo-queue', () => ({
+    queueSEOAutoGeneration: mocks.queueSEOAutoGeneration,
 }))
+
+import { NextRequest } from 'next/server'
+import {
+    getPayload,
+    type CollectionAfterChangeHook,
+    type CollectionBeforeChangeHook,
+} from 'payload'
+import { POST } from '@/app/api/e2e/ensure-test-user/route'
+import { Products } from '@/collections/Products'
+import { DEFAULT_DASHBOARD_BLOCKS } from '@/lib/dashboard-utils'
+
+const publishGateHook = Products.hooks!.beforeChange![1] as CollectionBeforeChangeHook
+const productAfterChangeHook = Products.hooks!.afterChange![0] as CollectionAfterChangeHook
 
 describe('POST /api/e2e/ensure-test-user', () => {
     beforeEach(() => {
@@ -58,6 +77,9 @@ describe('POST /api/e2e/ensure-test-user', () => {
 
     it('TC-F03.57: recreates a current-period pending dashboard fixture when requested', async () => {
         // Arrange
+        const productHookPayload = {
+            findByID: vi.fn().mockResolvedValue({ seo: { autoMetaEnabled: true } }),
+        }
         const payload = {
             find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
                 if (collection === 'tenants') return { docs: [{ id: 42 }] }
@@ -74,16 +96,27 @@ describe('POST /api/e2e/ensure-test-user', () => {
             }: {
                 collection: string
                 data: Record<string, unknown>
-            }) => ({
-                id: collection === 'sites'
+            }) => {
+                const id = collection === 'sites'
                     ? 51
                     : collection === 'products'
                         ? 52
                         : collection === 'orders'
                             ? 53
-                            : 84,
-                ...data,
-            })),
+                            : 84
+                if (collection === 'products') {
+                    await publishGateHook({ data, operation: 'create' } as never)
+                    await productAfterChangeHook({
+                        doc: { id, ...data },
+                        operation: 'create',
+                        req: { payload: productHookPayload },
+                    } as never)
+                }
+                return {
+                    id,
+                    ...data,
+                }
+            }),
             delete: vi.fn(),
             update: vi.fn(),
         }
@@ -122,8 +155,22 @@ describe('POST /api/e2e/ensure-test-user', () => {
             data: expect.objectContaining({
                 tenant: 42,
                 site: 51,
+                sku: 'E2E-DASHBOARD-PRODUCT-42',
+                inventory: 10,
+                weight: 0.5,
+                hasVariants: false,
                 status: 'active',
             }),
+        }))
+        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'tenants',
+            id: 42,
+            overrideAccess: true,
+            data: {
+                settings: {
+                    dashboardPreferences: [...DEFAULT_DASHBOARD_BLOCKS, 'orders'],
+                },
+            },
         }))
         expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'orders',
@@ -143,13 +190,32 @@ describe('POST /api/e2e/ensure-test-user', () => {
             orderNumber: 'E2E-DASHBOARD-PENDING-42',
             orderTotal: 107.8,
         })
+        expect(mocks.queueSEOAutoGeneration).not.toHaveBeenCalled()
     })
 
-    it('uses globally unique dashboard fixture numbers for different E2E tenants', async () => {
+    it('TC-F03.57: keeps tenant-isolated fixtures unique and preserves dashboard preferences', async () => {
         // Arrange
-        const tenants = new Map([
-            ['e2e-alpha', 42],
-            ['e2e-beta', 43],
+        const tenants = new Map<string, {
+            id: number
+            settings: {
+                allowedWebsites: number
+                dashboardPreferences: string[]
+            }
+        }>([
+            ['e2e-alpha', {
+                id: 42,
+                settings: {
+                    allowedWebsites: 3,
+                    dashboardPreferences: ['seo', 'orders'],
+                },
+            }],
+            ['e2e-beta', {
+                id: 43,
+                settings: {
+                    allowedWebsites: 2,
+                    dashboardPreferences: ['glance'],
+                },
+            }],
         ])
         const orders: Array<{
             id: number
@@ -157,6 +223,9 @@ describe('POST /api/e2e/ensure-test-user', () => {
             orderNumber: string
         }> = []
         let nextOrderId = 100
+        const productHookPayload = {
+            findByID: vi.fn().mockResolvedValue({ seo: { autoMetaEnabled: true } }),
+        }
         const payload = {
             find: vi.fn().mockImplementation(async ({
                 collection,
@@ -169,8 +238,8 @@ describe('POST /api/e2e/ensure-test-user', () => {
                 }
             }) => {
                 if (collection === 'tenants') {
-                    const tenantId = tenants.get(where?.slug?.equals || '')
-                    return { docs: tenantId ? [{ id: tenantId }] : [] }
+                    const tenant = tenants.get(where?.slug?.equals || '')
+                    return { docs: tenant ? [tenant] : [] }
                 }
                 if (collection === 'plan-subscriptions') return { docs: [{ id: 7 }] }
                 if (collection === 'sites') {
@@ -179,7 +248,17 @@ describe('POST /api/e2e/ensure-test-user', () => {
                 }
                 if (collection === 'products') {
                     const tenantId = where?.and?.[0]?.tenant?.equals as number
-                    return { docs: [{ id: tenantId * 10 + 2 }] }
+                    return {
+                        docs: [{
+                            id: tenantId * 10 + 2,
+                            status: 'draft',
+                            price: null,
+                            sku: '',
+                            inventory: null,
+                            weight: 0,
+                            hasVariants: false,
+                        }],
+                    }
                 }
                 if (collection === 'orders') {
                     const tenantId = where?.and?.[0]?.tenant?.equals
@@ -217,7 +296,39 @@ describe('POST /api/e2e/ensure-test-user', () => {
                 return { id: 84, ...data }
             }),
             delete: vi.fn(),
-            update: vi.fn(),
+            update: vi.fn().mockImplementation(async ({
+                collection,
+                data,
+                id,
+            }: {
+                collection: string
+                data: Record<string, unknown>
+                id: number
+            }) => {
+                if (collection === 'products') {
+                    const originalDoc = {
+                        id,
+                        status: 'draft',
+                        price: null,
+                        sku: '',
+                        inventory: null,
+                        weight: 0,
+                        hasVariants: false,
+                    }
+                    await publishGateHook({
+                        data,
+                        operation: 'update',
+                        originalDoc,
+                    } as never)
+                    await productAfterChangeHook({
+                        doc: { id, ...data },
+                        previousDoc: originalDoc,
+                        operation: 'update',
+                        req: { payload: productHookPayload },
+                    } as never)
+                }
+                return { id, ...data }
+            }),
         }
         vi.mocked(getPayload).mockResolvedValue(payload as never)
 
@@ -253,6 +364,30 @@ describe('POST /api/e2e/ensure-test-user', () => {
             'E2E-DASHBOARD-PENDING-42',
             'E2E-DASHBOARD-PENDING-43',
         ])
+        const tenantUpdates = payload.update.mock.calls
+            .map(([call]) => call)
+            .filter(call => call.collection === 'tenants')
+        expect(tenantUpdates).toEqual([
+            expect.objectContaining({
+                id: 42,
+                data: {
+                    settings: {
+                        allowedWebsites: 3,
+                        dashboardPreferences: ['seo', 'orders'],
+                    },
+                },
+            }),
+            expect.objectContaining({
+                id: 43,
+                data: {
+                    settings: {
+                        allowedWebsites: 2,
+                        dashboardPreferences: ['glance', 'orders'],
+                    },
+                },
+            }),
+        ])
         expect(payload.delete).not.toHaveBeenCalled()
+        expect(mocks.queueSEOAutoGeneration).not.toHaveBeenCalled()
     })
 })
