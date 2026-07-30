@@ -8,6 +8,17 @@ import {
 import { isValidBusinessPhone } from '@/lib/seo/local-business-constants'
 import { saveSiteSchema } from '@/lib/validations/sites'
 
+const F37_LOCAL_ORIGIN = 'http://localhost:3000'
+const F37_LIVE_STAGING_ORIGIN = 'https://web-v2.dev.ecommercehub.my'
+const F37_ALLOWED_ORIGINS = new Set([F37_LOCAL_ORIGIN, F37_LIVE_STAGING_ORIGIN])
+const isAllowedF37Target = (() => {
+    try {
+        return F37_ALLOWED_ORIGINS.has(new URL(process.env.BASE_URL ?? F37_LOCAL_ORIGIN).origin)
+    } catch {
+        return false
+    }
+})()
+
 type ContactInfoSnapshot = {
     phone?: string | null
 }
@@ -46,6 +57,7 @@ let siteId: string | undefined
 let restorePayload: RestorableSiteSnapshot | undefined
 let expectedSiteSnapshot: RestorableSiteSnapshot | undefined
 let authenticatedRequest: APIRequestContext | undefined
+let rawPayloadRequest: APIRequestContext | undefined
 
 function restorableSiteSnapshot(site: RawSiteSnapshot): RestorableSiteSnapshot {
     return {
@@ -119,6 +131,9 @@ async function expectSave(
 
 async function openMobileSettings(page: Page) {
     await page.setViewportSize({ width: 375, height: 844 })
+    await page.addInitScript(() => {
+        window.localStorage.setItem('editor:coach-marks:v1:seen', 'true')
+    })
     await page.goto(`/editor/${siteId}`)
     await expect(page.getByTestId('editor-tools-trigger')).toBeVisible()
     await page.getByTestId('editor-tools-trigger').click()
@@ -147,15 +162,37 @@ async function chooseDifferentOption(page: Page, triggerTestId: string): Promise
 }
 
 test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () => {
+    test.skip(
+        !isAllowedF37Target,
+        `Run against ${F37_LOCAL_ORIGIN} or set BASE_URL=${F37_LIVE_STAGING_ORIGIN}.`,
+    )
+
     test.beforeAll(async ({ playwright }, testInfo) => {
         const baseURL = testInfo.project.use.baseURL
         const storageState = testInfo.project.use.storageState
         if (typeof baseURL !== 'string' || !storageState) {
             throw new Error('F37 E2E requires configured baseURL and authenticated storageState.')
         }
+        const email = process.env.TEST_EMAIL
+        const password = process.env.TEST_PASSWORD
+        if (!email || !password) {
+            throw new Error('F37 E2E requires TEST_EMAIL and TEST_PASSWORD for fixture snapshots.')
+        }
 
         authenticatedRequest = await playwright.request.newContext({ baseURL, storageState })
-        const sitesResponse = await authenticatedRequest.get('/api/sites?limit=2&depth=0')
+        // The OTP flow replaces Payload's standard JWT with an MFA JWT understood by
+        // application routes, but not by Payload's generated REST collection routes.
+        // Use a separate standard login only for lossless fixture reads; all mutations
+        // still go through the authenticated application save route.
+        rawPayloadRequest = await playwright.request.newContext({ baseURL })
+        const loginResponse = await rawPayloadRequest.post('/api/users/login', {
+            data: { email, password },
+        })
+        if (!loginResponse.ok()) {
+            throw new Error(`F37 fixture login failed: ${await loginResponse.text()}`)
+        }
+
+        const sitesResponse = await rawPayloadRequest.get('/api/sites?limit=2&depth=0')
         if (!sitesResponse.ok()) {
             throw new Error(`F37 tenant-site lookup failed: ${await sitesResponse.text()}`)
         }
@@ -195,11 +232,15 @@ test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () 
     })
 
     test.afterAll(async () => {
-        if (!authenticatedRequest) return
-
         try {
-            if (!siteId || !restorePayload || !expectedSiteSnapshot) return
-            const currentRawResponse = await authenticatedRequest.get(`/api/sites/${siteId}?depth=0`)
+            if (
+                !authenticatedRequest
+                || !rawPayloadRequest
+                || !siteId
+                || !restorePayload
+                || !expectedSiteSnapshot
+            ) return
+            const currentRawResponse = await rawPayloadRequest.get(`/api/sites/${siteId}?depth=0`)
             if (!currentRawResponse.ok()) {
                 throw new Error(`Pre-restore fixture lookup failed: ${await currentRawResponse.text()}`)
             }
@@ -214,15 +255,17 @@ test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () 
             })
             expect(response.ok(), `Fixture restore failed: ${await response.text()}`).toBeTruthy()
 
-            const restoredRawResponse = await authenticatedRequest.get(`/api/sites/${siteId}?depth=0`)
+            const restoredRawResponse = await rawPayloadRequest.get(`/api/sites/${siteId}?depth=0`)
             if (!restoredRawResponse.ok()) {
                 throw new Error(`Raw fixture verification failed: ${await restoredRawResponse.text()}`)
             }
             const restoredRawSite = await restoredRawResponse.json() as RawSiteSnapshot
             expect(restorableSiteSnapshot(restoredRawSite)).toEqual(restorePayload)
         } finally {
-            await authenticatedRequest.dispose()
+            await authenticatedRequest?.dispose()
             authenticatedRequest = undefined
+            await rawPayloadRequest?.dispose()
+            rawPayloadRequest = undefined
         }
     })
 
@@ -254,11 +297,11 @@ test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () 
         const invalidPhone = '12A3'
         expect(isValidBusinessPhone(invalidPhone)).toBe(false)
 
-        await page.getByTestId('settings-contact-phone').fill(invalidPhone)
         const unexpectedSiteSaveDetected = page.waitForRequest(
             request => saveBody(request) !== null,
             { timeout: 1_000 },
         ).then(() => true, () => false)
+        await page.getByTestId('settings-contact-phone').fill(invalidPhone)
         await page.getByTestId('settings-contact-phone').blur()
         await expect(page.locator('[data-sonner-toast]')).toBeVisible()
         await expect(page.getByTestId('settings-contact-phone')).toHaveValue(validPhone)

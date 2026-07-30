@@ -478,6 +478,89 @@ describe('Publish and Save Flows (TC-F05)', () => {
         expect(saveRequestsAfter).toBe(saveRequestsBefore)
     })
 
+    it('[TC-F37-01-26] reconciles a persisted response loss and locks an unknown contact outcome', async () => {
+        // Arrange
+        const confirmedPhone = '+60 12-111 1111'
+        const persistedPhone = '+60 12-222 2222'
+        const unknownPhone = '+60 12-333 3333'
+        let persistNextSave = true
+        let serverPhone = confirmedPhone
+        let editorDataReads = 0
+        let saveAttempts = 0
+        global.fetch = vi.fn((input: string | URL) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                editorDataReads += 1
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            contactInfo: { phone: serverPhone },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveAttempts += 1
+                if (persistNextSave) serverPhone = persistedPhone
+                return Promise.reject(new Error('Response lost after contact persistence'))
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(confirmedPhone)
+        })
+
+        // Act
+        let result: void | boolean | undefined
+        await act(async () => {
+            result = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { phone: persistedPhone },
+            })
+        })
+
+        // Assert
+        expect(result).toBe(true)
+        expect(saveAttempts).toBe(1)
+        expect(editorDataReads).toBe(2)
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(persistedPhone)
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(false)
+        expect(toast.error).not.toHaveBeenCalled()
+
+        // Act: the next transport rejection cannot be confirmed by reconciliation.
+        persistNextSave = false
+        let unknownResult: void | boolean | undefined
+        await act(async () => {
+            unknownResult = await settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                contactInfo: { phone: unknownPhone },
+            })
+        })
+
+        // Assert: keep the user's value visible, block further contact writes, and require reload.
+        expect(unknownResult).toBe(true)
+        expect(saveAttempts).toBe(2)
+        expect(editorDataReads).toBe(3)
+        expect(settingsPanelHarness.latestProps?.site?.contactInfo?.phone).toBe(unknownPhone)
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(true)
+        expect(toast.error).toHaveBeenCalledWith(
+            'Could not confirm whether contact information was saved.',
+            { description: 'Reload the editor before editing contact information again.' },
+        )
+    })
+
     it('[TC-F37-01-26] releases the contact mutex when fetch setup throws synchronously', async () => {
         // Arrange
         const saveBodies: Array<{ contactInfo?: { phone?: string; email?: string; address?: string } }> = []

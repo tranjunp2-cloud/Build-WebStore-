@@ -737,6 +737,7 @@ export default function EditorPage() {
         )
         if (isContactSave && hasNonContactChanges) return false
         let ownsContactSave = false
+        let keepContactSaveLocked = false
 
         try {
             if (isContactSave) {
@@ -821,25 +822,73 @@ export default function EditorPage() {
                 saveUrl.searchParams.set('pageId', currentPageId)
             }
 
-            const response = await fetch(saveUrl.toString(), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    ...(changes.name ? { siteName: changes.name } : {}),
-                    contactInfo: changes.contactInfo,
-                    localBusiness: changes.localBusiness,
-                    socialLinks: changes.socialLinks,
-                    branding: changes.branding,
-                    seo: changes.seo,
-                    // When name changes, persist updated headerBlock (logoText synced above).
-                    // When logo changes, persist synced header/footer blocks directly to DB.
-                    headerBlock: changes.name
-                        ? useEditorStore.getState().headerBlock
-                        : (logoSyncedHeaderBlock ?? changes.headerBlock),
-                    footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
-                }),
-            })
+            let request: Promise<Response>
+            try {
+                request = fetch(saveUrl.toString(), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        ...(changes.name ? { siteName: changes.name } : {}),
+                        contactInfo: changes.contactInfo,
+                        localBusiness: changes.localBusiness,
+                        socialLinks: changes.socialLinks,
+                        branding: changes.branding,
+                        seo: changes.seo,
+                        // When name changes, persist updated headerBlock (logoText synced above).
+                        // When logo changes, persist synced header/footer blocks directly to DB.
+                        headerBlock: changes.name
+                            ? useEditorStore.getState().headerBlock
+                            : (logoSyncedHeaderBlock ?? changes.headerBlock),
+                        footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
+                    }),
+                })
+            } catch (setupError) {
+                throw setupError
+            }
+
+            let response: Response
+            try {
+                response = await request
+            } catch (transportError) {
+                if (isContactSave && changes.contactInfo) {
+                    try {
+                        const editorUrl = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
+                        if (currentPageId) editorUrl.searchParams.set('pageId', currentPageId)
+                        const reconcileResponse = await fetch(editorUrl.toString(), {
+                            credentials: 'include',
+                            cache: 'no-store',
+                        })
+                        if (reconcileResponse.ok) {
+                            const reconciledData = await reconcileResponse.json() as { site?: SiteData }
+                            const authoritativeSite = reconciledData.site
+                            if (authoritativeSite) {
+                                const authoritativeContactInfo = authoritativeSite.contactInfo ?? {}
+                                setSite(prev => prev
+                                    ? { ...prev, contactInfo: authoritativeSite.contactInfo }
+                                    : authoritativeSite)
+                                const contactFields = Object.keys(changes.contactInfo) as Array<keyof NonNullable<SiteData['contactInfo']>>
+                                const didPersist = contactFields.length > 0 && contactFields.every(
+                                    field => authoritativeContactInfo[field] === changes.contactInfo?.[field],
+                                )
+                                if (didPersist) return true
+                            }
+                        }
+                    } catch (reconcileError) {
+                        console.error('Failed to reconcile contact info after transport error', reconcileError)
+                    }
+                }
+                if (isContactSave) {
+                    console.error('Contact info save outcome is unknown', transportError)
+                    commitChangesToSite()
+                    keepContactSaveLocked = true
+                    toast.error('Could not confirm whether contact information was saved.', {
+                        description: 'Reload the editor before editing contact information again.',
+                    })
+                    return true
+                }
+                throw transportError
+            }
 
             if (!response.ok) {
                 const body = await response.json().catch(() => null)
@@ -869,7 +918,7 @@ export default function EditorPage() {
             toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
             return false
         } finally {
-            if (ownsContactSave) {
+            if (ownsContactSave && !keepContactSaveLocked) {
                 contactSavePendingRef.current = false
                 setIsContactSavePending(false)
             }

@@ -4,7 +4,7 @@
 
 Complete #1309 verification without changing the legacy top-level score formula owned by #1312.
 
-Effort: 4h. Status: Browser spec implemented and discovered locally; live staging execution pending.
+Effort: 4h. Status: Browser spec passes locally (3/3 including auth setup); live staging execution pending.
 
 The additive persisted 7/8/5 runtime contract is implemented; final browser acceptance still requires the manual live-staging run.
 
@@ -12,8 +12,8 @@ The additive persisted 7/8/5 runtime contract is implemented; final browser acce
 
 ```text
 US-F37-01 pre-integration QC
-├─ Playwright discovery
-│  └─ e2e/f37-minimal-business-data.spec.ts lists TC-F37-01-26/27
+├─ Playwright local execution
+│  └─ auth setup + TC-F37-01-26/27 pass against the reserved local account
 ├─ pure Business contract
 │  ├─ complete fields → 20
 │  ├─ name + phone → 12
@@ -64,7 +64,7 @@ npm test -- src/__tests__/unit/editor/settings-panel.test.tsx
 npm test -- src/__tests__/unit/editor/publish-flow.test.tsx
 npm run typecheck
 npx playwright test --list
-npm run test:e2e -- e2e/f37-minimal-business-data.spec.ts
+BASE_URL=https://web-v2.dev.ecommercehub.my npm run test:e2e -- e2e/f37-minimal-business-data.spec.ts
 ```
 
 ## Failure Modes
@@ -88,10 +88,10 @@ npm run test:e2e -- e2e/f37-minimal-business-data.spec.ts
 - [x] Pure Business 7/8/5 tests pass (completed in Phase 1: 15/15 score-suite tests passed).
 - [x] Persisted API regressions prove Business 20/12, 401/403, and unchanged legacy Business = 35 (19/19 with helper suite).
 - [x] Client/server phone validation plus sparse transactional contact component/integration tests pass (completed in Phase 2; included in 107/107 targeted validation and regression tests).
-- [ ] Editor values persist after a confirmed save and reload.
-- [ ] Invalid phone reports, reverts, and sends no PATCH.
-- [ ] Every touched field on the authenticated test account's sole site is restored and raw-verified, including explicit `null` for originally absent values, and no analytics row is created.
-- [ ] 375px flow is usable without horizontal overflow.
+- [x] Editor values persist after a confirmed save and reload in the local browser run.
+- [x] Invalid phone reports, reverts, and sends no PATCH in the local browser run.
+- [x] Every touched field on the local authenticated test account's sole site is restored and raw-verified, including explicit `null` for originally absent values, and no analytics row is created.
+- [x] 375px flow is usable without horizontal overflow in the local browser run.
 - [x] Playwright discovery lists TC-F37-01-26 and TC-F37-01-27 from `e2e/f37-minimal-business-data.spec.ts`.
 - [ ] Both scenarios pass against the authenticated test account's sole live staging site.
 - [x] QA document marks this evidence as pre-integration only.
@@ -101,7 +101,7 @@ npm run test:e2e -- e2e/f37-minimal-business-data.spec.ts
 
 #1312 owns only the adjacent global score/UI work:
 
-- Atomic `20/40/20/20` top-level engine and full total 100.
+- Atomic `20/35/15/30` top-level engine and full total 100.
 - Seller-facing dashboard, checklist, and deep links.
 
 #1309 completion does not depend on that cutover; it depends on the manual live-staging browser gate above.

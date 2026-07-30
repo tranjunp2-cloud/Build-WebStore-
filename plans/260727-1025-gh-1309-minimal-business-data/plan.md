@@ -44,7 +44,7 @@ The current top-level formula is `35/30/20/15`. #1309 exposes its persisted 7/8/
 ```text
 #1309 PR                                  #1312 PR
 ├─ pure Business 7/8/5 contract          ├─ promote helper into top-level total
-├─ persisted additive API mapping        ├─ atomic 20/40/20/20 cutover
+├─ persisted additive API mapping        ├─ atomic 20/35/15/30 cutover
 ├─ transactional phone save + UI revert ├─ dashboard/checklist UI
 ├─ editor persistence E2E                └─ prove complete total = 100
 └─ F37 QA mapping
@@ -103,16 +103,16 @@ Delivery order: `#1309 manual staging QC -> close #1309`; #1312 can perform its 
 
 - [x] Invalid non-empty phone values without a digit or with disallowed characters return before save and immediately revert in the editor implementation.
 - [x] A failed valid-phone PATCH leaves the confirmed phone in parent state, guards sibling contact saves while pending, and cannot contaminate a later email save.
-- [ ] Valid values persist after reload; 375px has no horizontal overflow.
+- [x] Valid values persist after reload; the local 375px browser flow has no horizontal overflow.
 - [x] The pure Business helper locks complete = 20, name + phone = 12, and incomplete address = 0.
 - [x] The persisted score API returns additive Business 20/12 and preserves the legacy top-level formula.
 - [x] Score-route API regressions prove 401/403 tenant boundaries.
-- [x] Playwright locally discovers TC-F37-01-26/27 without silently skipping; live staging execution remains pending.
+- [x] Playwright local execution passes auth setup plus TC-F37-01-26/27 (3/3); only exact local/live-staging origins are allowed. Live staging execution remains pending.
 - [x] No schema or migration diff in the completed Phase 1 and Phase 2 changes.
 
 Deferred to #1312:
 
-- Replace the legacy top-level score with the atomic `20/40/20/20` formula and prove total 100.
+- Replace the legacy top-level score with the atomic `20/35/15/30` formula and prove total 100.
 - Build the seller-facing score cards, checklist, and deep links.
 
 #1309 still requires its manual live-staging browser run before closure.

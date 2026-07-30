@@ -63,14 +63,13 @@ Completed using AAA and source imports without duplicating the calculation in fi
 
 ## #1312 Handoff
 
-#1312 must:
+Phase 3 of #1309 now maps the persisted site fields into the additive `minimalBusinessData` API result and covers that contract with API tests. #1312 must:
 
 1. consume this helper from the main engine;
-2. map `site.name`, four structured address fields, and `contactInfo.phone` in the score route;
-3. remove the legacy free-text address fallback;
-4. update the full formula and API tests atomically so the maximum remains 100.
+2. replace the legacy top-level Business bucket without changing the 100-point maximum;
+3. update the top-level formula, dashboard, and checklist tests atomically.
 
-When #1312 implementation starts, update this plan with its PR URL and exact API test file/command. Until then, Phase 3 verifies only the pure contract and editor behavior; it does not claim runtime score acceptance.
+The additive #1309 result does not claim that the legacy top-level engine has already been cut over.
 
 ## Exit Criteria
 
@@ -78,4 +77,4 @@ When #1312 implementation starts, update this plan with its PR URL and exact API
 - [x] Unit cases lock every Phase 1 AC1/AC2 pure-contract boundary.
 - [x] No runtime score cutover, API route, collection, or migration change is present in the Phase 1 diff.
 
-The #1312 handoff above remains unresolved by design and is not part of Phase 1 completion.
+Only the top-level #1312 handoff above remains unresolved by design and is not part of Phase 1 completion.

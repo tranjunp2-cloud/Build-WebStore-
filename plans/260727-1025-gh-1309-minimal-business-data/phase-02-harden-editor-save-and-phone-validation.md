@@ -51,7 +51,7 @@ When any structured-address edit is saved, retain existing values and persist `c
 - Do not redesign the general autosave/concurrency model; serialization is scoped to the contact group in one editor instance.
 - Existing unrelated settings retain optimistic behavior. Contact fields commit only after `response.ok`, so failure cannot contaminate parent state or a later contact payload.
 - Cross-tab/multi-user conflict resolution remains a broader pre-existing architecture concern and is not claimed here.
-- Do not treat client request timeout as a failed mutation: after PATCH reaches the server, abort is an unknown outcome. Timeout/reconciliation needs operation status or CAS and remains outside this phase.
+- Do not treat client request timeout as a failed mutation. A later narrow follow-up performs one authoritative `/editor-data` re-read after an asynchronous contact PATCH transport rejection and accepts success only when every attempted field matches. If the outcome remains unknown, contact fields stay locked until reload; timeout/CAS conflict handling remains outside scope.
 - Browser AC3 coverage must still start from a value confirmed by save response plus reload; component/integration regressions are not browser persistence proof.
 
 ## Exit Criteria

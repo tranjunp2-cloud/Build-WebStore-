@@ -44,3 +44,13 @@ The issue boundary should have stayed anchored to its acceptance criteria; treat
 ## Next Steps
 
 - Reserve an exclusive staging test account with exactly one schema-valid site and empty `openingHours`, then invoke both scenarios manually. Complete the global score formula and dashboard/UI integration under #1312.
+
+## Final Fix Cycle — Transport Ambiguity and Safe Default
+
+The last review found two narrow correctness gaps. A contact PATCH transport exception was treated as a definite rejection even when the server may already have persisted the change, so the editor could show the old value while storage held the new one. Separately, placing the mutating F37 spec in the established `e2e/` root made it discoverable by default runs despite its reserved-fixture requirement.
+
+The editor now reconciles only asynchronous contact transport failures through a no-cache authenticated `editor-data` read. If every submitted contact field matches authoritative storage, the save returns success and adopts the server state. If persistence remains unknown, the editor keeps the submitted value visible, locks contact inputs, and requires reload instead of claiming rollback; synchronous fetch setup errors and HTTP error responses remain definitive failures. This does not introduce a generic retry, timeout, or save-queue redesign. The Playwright spec allows only the exact local and live-staging origins; malformed, production, and lookalike origins fail closed.
+
+Red evidence: the focused response-lost-after-persistence case failed before the reconciliation branch (1 failed, 13 skipped). Green evidence: the full publish-flow suite passes 14/14 and covers both confirmed persistence and the locked unknown state. The lookalike origin regression entered `beforeAll` before the guard fix; the same command now exits successfully with both scenarios skipped. That skip is a safety check, not browser acceptance.
+
+Live staging TC-F37-01-26/27 remains pending with the exclusive one-site account and empty-`openingHours` fixture. No live browser pass is claimed.
