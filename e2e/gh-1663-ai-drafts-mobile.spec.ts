@@ -123,6 +123,8 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         ])
 
         // Assert
+        await expect(nameInput).toHaveValue(LONG_PRODUCT_NAME)
+        await expect(nameInput).toBeEditable()
         expect(nameBox).not.toBeNull()
         expect(priceBox).not.toBeNull()
         expect(stockBox).not.toBeNull()
