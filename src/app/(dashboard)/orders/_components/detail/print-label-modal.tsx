@@ -167,7 +167,7 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                   <TabsList
                     variant="pill"
                     aria-label={pl.formatLabel}
-                    className="grid h-11 w-full grid-cols-2 rounded-lg border border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1"
+                    className="grid h-11 w-full grid-cols-2 rounded-lg border border-solid border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1"
                   >
                     {(['A6', 'A4'] as LabelFormat[]).map((f) => {
                       const status = formats[f].status
