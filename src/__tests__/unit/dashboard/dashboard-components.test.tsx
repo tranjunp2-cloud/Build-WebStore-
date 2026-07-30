@@ -6,7 +6,7 @@
  *   TC-F03.01c → SitesPageClient empty state renders CTA to /onboarding
  *   TC-F03.01d → SitesPageClient failed site shows "Incomplete" badge + 2 actions
  *   TC-F03.07  → DashboardStats renders 4 default stat cards
- *   TC-F03.11/12 → SEOHealthWidget shows score + "AI Fix All Issues" button
+ *   TC-F03.11/12 → SEOHealthWidget shows score + "AI Fix Issues" button
  *   TC-F03.18  → DashboardStats hides card when excluded from preferences
  *   TC-F03.19  → DashboardStats shows extra card when added to preferences
  *   TC-F03.24/25/26 → TopPerformingList limits displayed items; tab switching
@@ -41,7 +41,7 @@ vi.mock('@/i18n', () => ({
                         title: 'SEO Health',
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
-                        fixAll: 'AI Fix All Issues',
+                        fixAll: 'AI Fix Issues',
                         fix: 'Fix',
                         issue: 'Issue',
                         issues: 'Issues',
