@@ -120,7 +120,7 @@ No order document or customer PII crosses the aggregate boundary. Views, Leads, 
 
 - Revenue is active, no longer shows Coming Soon, and formats MYR with exactly two decimals while preserving delta, note, and sparkline behavior.
 - Component coverage renders through the real EN/MS locale provider rather than a private translation fixture.
-- A PostgreSQL-backed regression calls production `getGlanceData(period, { user })` against session-local TEMP tables and exercises the real Orders permission gate while covering the exact placeholder/runtime failure class; CI provisions PostgreSQL 16 and runs this test separately on pull requests.
+- A PostgreSQL-backed regression calls production `getGlanceData(period, { user })` against session-local TEMP tables and exercises the real Orders permission gate while covering the exact placeholder/runtime failure class. It runs when `DATABASE_URI` is explicitly supplied; the staging browser scenario separately exercises the deployed Vercel→Neon path.
 - Focused Revenue tests, the dashboard regression suite, TypeScript, lint, and diff integrity passed.
 - An isolated Docker BuildKit builder exited 0, compiled successfully, and generated **113/113** pages; a local PostgreSQL `ECONNREFUSED` log during page generation was non-fatal.
 - Remaining operational gates: credentialed browser/responsive QA and `EXPLAIN ANALYZE` on representative staging-like data.

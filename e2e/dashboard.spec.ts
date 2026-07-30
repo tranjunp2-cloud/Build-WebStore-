@@ -112,12 +112,14 @@ test.describe('Dashboard', () => {
     })
 
     test('[TC-F03.57] pending order approval refreshes the widget and Revenue', async ({ page }) => {
+        test.setTimeout(210_000)
+
         let orderId: string | null = null
 
         try {
             // Arrange — every Playwright attempt gets a fresh isolated fixture so
             // retries never inherit the prior attempt's terminal order state.
-            const fixture = await provisionDashboardFixture()
+            const fixture = await provisionDashboardFixture(page.request)
             orderId = fixture.orderId
             await navigateTo(page, '/dashboard?period=7d')
             const pendingOrder = page.locator(

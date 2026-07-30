@@ -7,34 +7,33 @@ session: PR 1706 E2E fixture readiness fixes
 
 ## Context
 
-The PR review found four reliability gaps in dashboard E2E provisioning: CI could mistake an older staging deployment for the fixture-capable build, a fixed order number could violate the globally unique `orders.orderNumber` constraint across custom E2E tenants, Playwright retries inherited the previous attempt's retired fixture, and a UTC date rollover could exclude the fixture from the Revenue query.
+The PR review found that HTTP 200 plus the old `dashboard-fixture-v1` capability could accept a stale Vercel deployment that had not enabled Pending Orders. The final design also had to keep `.github/workflows/**` unchanged and avoid exposing the password-sync setup endpoint to cookie-authenticated callers.
 
 ## What Happened
 
-- Replaced the status-code deployment probe with an authenticated provisioning retry that requires `setupCapability: dashboard-fixture-v1` and validates the returned dashboard fixture before Playwright starts.
-- Made missing provisioning credentials fail fast instead of silently skipping a fixture required by the dashboard scenario.
-- Derived the fixture order number from the tenant ID while keeping tenant-scoped lookup and cleanup.
-- Added route-level regression coverage that provisions two E2E tenants and verifies distinct order numbers.
-- Added a Node `fetch` helper that provisions and validates an exact fixture at the start of every Playwright attempt, so retries recreate the order after prior cleanup.
-- Scoped `E2E_SETUP_SECRET` to the `Run E2E tests` step instead of exposing it job-wide.
-- Changed the Revenue scenario from `today` to `7d` so a UTC midnight rollover between provisioning and assertions does not exclude the fixture.
-- Added regression checks for the helper contract, workflow secret scope, per-attempt provisioning, and the stable Revenue period.
+- Bumped the fixture handshake to `dashboard-fixture-v2` and extracted product, preference, and order provisioning into one server-side module shared by both E2E endpoints.
+- Added a fixture-only `POST /api/e2e/dashboard-fixture` route with `dynamic = force-dynamic` and `maxDuration = 60`.
+- Restricted the route to staging, the authenticated `TEST_EMAIL` account, an explicit v2 intent header, and the primary tenant derived from the session. It accepts no tenant ID, email, or password from the request.
+- Changed the Playwright helper to use `page.request`, which inherits the authenticated browser cookie jar, instead of Node `fetch` plus `E2E_SETUP_SECRET`.
+- Moved deployed-contract readiness into the helper. It retries network errors, 404/429, selected 5xx responses, and incompatible/stale payloads until a complete v2 fixture is returned; auth and other contract errors fail immediately.
+- Provisioned a fresh fixture at the start of every Playwright attempt and retained the seven-day Revenue period so retries and UTC midnight rollover remain deterministic.
+- Added route coverage for staging/auth/tenant isolation and the real Products publish hook, plus helper coverage for v1-to-v2 and missing-route retries.
+- Restored both GitHub Actions workflows to their base-branch content and removed the workflow-specific assertion test.
 
 ## Reflection
 
-Endpoint existence was too weak a readiness signal because it proved routing, not deployed behavior. Likewise, suite-level setup was insufficient for a destructive scenario: Playwright retries are separate attempts and each needs fresh state. Exact capability and fixture identity checks now fail closed, while the wider period removes a calendar-boundary dependency without weakening the Revenue assertion.
+Readiness belongs next to the browser scenario that consumes the deployed contract. The authenticated request context proves both the deployed v2 semantics and the exact tenant that Dashboard queries, while the dedicated fixture route prevents cookie auth from gaining the password-sync powers of `ensure-test-user`.
 
 ## Decisions Made
 
 | Decision | Rationale | Impact |
 |----------|-----------|--------|
-| Treat the response capability and fixture payload as the deployment handshake | These values prove the expected handler ran and completed provisioning | Prevents Playwright from starting against stale code or a missing fixture |
-| Include tenant ID in the fixture order number | `orders.orderNumber` is globally unique while custom `e2e-*` tenants are supported | Multiple E2E tenants can seed independently without collisions |
-| Fail CI when required setup secrets are absent | The dashboard test cannot run deterministically without provisioning | Configuration errors surface before browser execution |
-| Provision through Node `fetch` before every browser attempt | Cleanup intentionally retires the order, including after a failed attempt | Retries receive a new pending order instead of inheriting terminal state |
-| Validate capability, order ID, number prefix, and exact total | A successful HTTP status alone cannot prove fixture compatibility | Browser assertions operate on the intended isolated fixture |
-| Use a seven-day Revenue period | `today` can change at 00:00 UTC during a run | The fixture remains in range across midnight |
+| Use a dedicated cookie-authenticated fixture route | The existing setup route can create users and synchronize passwords | Browser auth can seed only the fixture, not mutate credentials |
+| Derive tenant from the authenticated session | Dashboard reads the user's primary tenant | Fixture data and widget queries cannot target different tenants |
+| Gate on capability v2 inside the helper | Workflow probes cannot prove the new preference semantics are live | TC-F03.57 waits for the deployed contract it actually needs |
+| Retry only deployment-transient failures | Stale aliases can return 404, 5xx, or an older capability | Rollout delay is tolerated while auth/config failures remain visible |
+| Keep `.github/workflows/**` unchanged | Deployment and database ownership remain outside this fixture fix | Existing CI policy is preserved |
 
 ## Next Steps
 
-- Confirm the next staging CI run exercises an actual Playwright retry and returns the expected tenant-specific fixture on each attempt.
+- Run TC-F03.57 against the deployed staging alias so Vercel executes the fixture route against its configured Neon `DATABASE_URI`.

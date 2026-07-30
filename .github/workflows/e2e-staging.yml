@@ -48,60 +48,55 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for staging dashboard fixture capability
-        env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
-          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
-          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      - name: Wait for NEW staging deploy to be ready
         run: |
-          if [ -z "$E2E_SETUP_SECRET" ]; then
-            echo "::error::E2E_SETUP_SECRET is required"
-            exit 1
-          fi
-          if [ -z "$TEST_EMAIL" ]; then
-            echo "::error::TEST_EMAIL is required"
-            exit 1
-          fi
-          if [ -z "$TEST_PASSWORD" ]; then
-            echo "::error::TEST_PASSWORD is required"
-            exit 1
-          fi
-
-          REQUEST_BODY=$(jq -n --arg e "$TEST_EMAIL" --arg p "$TEST_PASSWORD" \
-            '{email:$e,password:$p,seedDashboardFixture:true}')
-
-          echo "Waiting for dashboard fixture capability at $BASE_URL"
+          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          echo "Waiting for Vercel deploy: $URL"
+          # We probe the E2E provisioning endpoint itself. Old deployments return
+          # 404 (route doesn't exist), new deployments return 401/503 (route exists
+          # but auth/config rejects our empty request). Either 401 or 503 means the
+          # new code is live. /api/health would pass on old deploy → race condition.
+          #
+          # Vercel deploy typically takes 2-3 min for Next.js apps.
           sleep 45
           for i in {1..30}; do
-            RESP=$(curl -sS -w "\n%{http_code}" -X POST "$BASE_URL/api/e2e/ensure-test-user" \
-              -H "Authorization: Bearer $E2E_SETUP_SECRET" \
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/api/e2e/ensure-test-user" \
+              -H "Authorization: Bearer probe" \
               -H "Content-Type: application/json" \
-              -d "$REQUEST_BODY" || true)
-            STATUS=$(echo "$RESP" | tail -n 1)
-            BODY=$(echo "$RESP" | sed '$d')
-
-            if [ "$STATUS" = "200" ] && echo "$BODY" | jq -e '
-              .setupCapability == "dashboard-fixture-v2"
-              and .dashboardFixture.orderId != null
-              and (.dashboardFixture.orderNumber | strings | startswith("E2E-DASHBOARD-PENDING-"))
-              and .dashboardFixture.orderTotal == 107.8
-            ' >/dev/null; then
-              echo "Deployment and dashboard fixture ready on attempt $i"
-              echo "$BODY" | jq '{status, setupCapability, dashboardFixture}'
+              -d '{}' || echo "000")
+            # 401 = endpoint exists + wrong token (new deploy ready)
+            # 503 = endpoint exists + E2E_SETUP_SECRET not set on server (config issue, not a deploy issue)
+            if [ "$STATUS" = "401" ] || [ "$STATUS" = "503" ]; then
+              echo "New deploy detected (endpoint responded $STATUS) on attempt $i"
+              # Also verify health for good measure
+              curl -s -o /dev/null -w "health: %{http_code}\n" "$URL/api/health"
               exit 0
             fi
-
-            if [ "$STATUS" = "401" ] || [ "$STATUS" = "403" ] || [ "$STATUS" = "503" ]; then
-              echo "::error::E2E fixture provisioning rejected with status $STATUS"
-              exit 1
-            fi
-
-            echo "Attempt $i/30: status $STATUS without dashboard fixture capability; retrying in 10s..."
+            echo "Attempt $i/30: status $STATUS (still waiting for new deploy), retrying in 10s..."
             sleep 10
           done
-          echo "::error::Dashboard fixture capability did not become ready after 6 min"
+          echo "::error::New deploy didn't appear after 6 min — aborting"
           exit 1
+
+      - name: Ensure E2E test user exists
+        run: |
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
+            echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
+            exit 0
+          fi
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${{ secrets.E2E_SETUP_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg e "${{ secrets.TEST_EMAIL }}" --arg p "${{ secrets.TEST_PASSWORD }}" '{email:$e,password:$p}')")
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | sed '$d')
+          echo "Status: $STATUS"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::E2E user provisioning failed (status $STATUS)"
+            exit 1
+          fi
 
       - name: Run E2E tests
         id: e2e
@@ -142,7 +137,6 @@ jobs:
           exit $EXIT_CODE
         env:
           BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
-          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}

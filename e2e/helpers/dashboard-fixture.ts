@@ -1,6 +1,12 @@
+import type { APIRequestContext } from '@playwright/test'
+
 const DASHBOARD_FIXTURE_CAPABILITY = 'dashboard-fixture-v2'
 const DASHBOARD_FIXTURE_ORDER_PREFIX = 'E2E-DASHBOARD-PENDING-'
 const DASHBOARD_FIXTURE_TOTAL = 107.8
+const DEFAULT_MAX_ATTEMPTS = 25
+const DEFAULT_RETRY_DELAY_MS = 5_000
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+const DEFAULT_READINESS_TIMEOUT_MS = 120_000
 
 export interface DashboardFixture {
     orderId: string
@@ -8,56 +14,24 @@ export interface DashboardFixture {
     orderTotal: number
 }
 
-function requiredEnv(name: 'BASE_URL' | 'E2E_SETUP_SECRET' | 'TEST_EMAIL' | 'TEST_PASSWORD') {
-    const value = process.env[name]
-    if (!value) throw new Error(`${name} is required to provision the dashboard fixture`)
-    return value
+interface ProvisionOptions {
+    maxAttempts?: number
+    retryDelayMs?: number
+    requestTimeoutMs?: number
+    readinessTimeoutMs?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null
 }
 
-/** Recreate the isolated dashboard order at the start of every Playwright attempt. */
-export async function provisionDashboardFixture(): Promise<DashboardFixture> {
-    const baseUrl = requiredEnv('BASE_URL')
-    const setupSecret = requiredEnv('E2E_SETUP_SECRET')
-    const email = requiredEnv('TEST_EMAIL')
-    const password = requiredEnv('TEST_PASSWORD')
-
-    const response = await fetch(new URL('/api/e2e/ensure-test-user', baseUrl), {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${setupSecret}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            email,
-            password,
-            seedDashboardFixture: true,
-        }),
-    })
-    const responseText = await response.text()
-
-    if (!response.ok) {
-        throw new Error(
-            `Dashboard fixture provisioning failed (${response.status}): ${responseText}`,
-        )
-    }
-
-    let responseBody: unknown
-    try {
-        responseBody = JSON.parse(responseText)
-    } catch {
-        throw new Error('Dashboard fixture provisioning returned invalid JSON')
-    }
-
+function readFixture(responseBody: unknown): DashboardFixture | null {
     if (
         !isRecord(responseBody)
         || responseBody.setupCapability !== DASHBOARD_FIXTURE_CAPABILITY
         || !isRecord(responseBody.dashboardFixture)
     ) {
-        throw new Error('Dashboard fixture provisioning returned an incompatible capability')
+        return null
     }
 
     const { orderId, orderNumber, orderTotal } = responseBody.dashboardFixture
@@ -67,7 +41,7 @@ export async function provisionDashboardFixture(): Promise<DashboardFixture> {
         || !orderNumber.startsWith(DASHBOARD_FIXTURE_ORDER_PREFIX)
         || orderTotal !== DASHBOARD_FIXTURE_TOTAL
     ) {
-        throw new Error('Dashboard fixture provisioning returned an invalid fixture')
+        return null
     }
 
     return {
@@ -75,4 +49,81 @@ export async function provisionDashboardFixture(): Promise<DashboardFixture> {
         orderNumber,
         orderTotal,
     }
+}
+
+function isTransientStatus(status: number) {
+    return status === 404
+        || status === 429
+        || status === 500
+        || status === 502
+        || status === 503
+        || status === 504
+}
+
+async function wait(delayMs: number) {
+    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs))
+}
+
+/**
+ * Recreate the isolated dashboard order through the authenticated Playwright
+ * session. Retrying here also gates TC-F03.57 on the deployed v2 contract.
+ */
+export async function provisionDashboardFixture(
+    request: APIRequestContext,
+    options: ProvisionOptions = {},
+): Promise<DashboardFixture> {
+    const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
+    const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS
+    const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    const readinessTimeoutMs = options.readinessTimeoutMs ?? DEFAULT_READINESS_TIMEOUT_MS
+    const readinessDeadline = Date.now() + readinessTimeoutMs
+    let lastFailure = 'incompatible capability'
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const remainingMs = readinessDeadline - Date.now()
+        if (remainingMs <= 0) break
+
+        let response
+        try {
+            response = await request.post('/api/e2e/dashboard-fixture', {
+                headers: {
+                    'x-e2e-fixture-intent': DASHBOARD_FIXTURE_CAPABILITY,
+                },
+                timeout: Math.max(1, Math.min(requestTimeoutMs, remainingMs)),
+            })
+        } catch (error: unknown) {
+            lastFailure = error instanceof Error ? error.message : 'network error'
+            if (attempt < maxAttempts) {
+                await wait(Math.min(retryDelayMs, Math.max(0, readinessDeadline - Date.now())))
+            }
+            continue
+        }
+
+        const status = response.status()
+        if (!response.ok()) {
+            if (!isTransientStatus(status)) {
+                throw new Error(`Dashboard fixture provisioning rejected (${status})`)
+            }
+            lastFailure = `transient HTTP ${status}`
+        } else {
+            const responseText = await response.text()
+            let responseBody: unknown
+            try {
+                responseBody = JSON.parse(responseText)
+            } catch {
+                responseBody = null
+            }
+            const fixture = readFixture(responseBody)
+            if (fixture) return fixture
+            lastFailure = 'incompatible capability or invalid fixture'
+        }
+
+        if (attempt < maxAttempts) {
+            await wait(Math.min(retryDelayMs, Math.max(0, readinessDeadline - Date.now())))
+        }
+    }
+
+    throw new Error(
+        `Dashboard fixture provisioning did not become ready: ${lastFailure}`,
+    )
 }

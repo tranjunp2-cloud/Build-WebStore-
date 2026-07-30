@@ -80,6 +80,6 @@ No new page/route is added, so AGENTS.md does not mandate a new E2E test. Browse
 | Lint | Passed with repository-existing warnings only |
 | Production build | Isolated Docker BuildKit builder exited 0, compiled successfully, and generated 113/113 pages; a local PostgreSQL `ECONNREFUSED` log during page generation was non-fatal |
 | Locale fidelity | Component test now renders through the real `I18nProvider` and EN/MS JSON bundles |
-| CI protection | PostgreSQL 16 service runs the production-query regression on pull requests |
+| Database protection | PostgreSQL production-query regression runs when `DATABASE_URI` is explicitly supplied; staging E2E covers Vercel→Neon |
 
 The automated contract covers completed-status, tenant isolation, MYR/null currency, COD/payment-status neutrality, UTC creation-date boundaries, current/comparison totals, sparkline zero-fill, RM formatting, and EN/MS labels. Credentialed browser fixtures and representative performance measurement remain release operations rather than claimed automated evidence.
