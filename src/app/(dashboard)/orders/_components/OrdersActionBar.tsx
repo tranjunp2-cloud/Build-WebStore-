@@ -104,21 +104,27 @@ export function OrdersActionBar({
             {/* Below xl, chips show only the selected value in a two-column phone /
                 four-column tablet grid. Desktop restores the original one-line
                 "Label : value" auto-width flex layout. Visually hidden labels remain
-                available to screen readers; icons stay hidden below sm. All tweaks
-                target `.chip-trigger`, not the dropdown options. */}
+                available to screen readers; icons stay hidden below sm. Long localized
+                values can wrap and grow the chip below xl instead of being truncated.
+                All tweaks target `.chip-trigger`, not the dropdown options. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full xl:w-auto
                             xl:flex xl:items-center xl:flex-wrap
                             [&_.chip-trigger]:w-full xl:[&_.chip-trigger]:w-auto
-                            [&_.chip-trigger]:h-11 md:[&_.chip-trigger]:h-10
+                            [&_.chip-trigger]:h-auto [&_.chip-trigger]:min-h-11
+                            md:[&_.chip-trigger]:min-h-10 xl:[&_.chip-trigger]:h-10
                             [&_.chip-trigger>span]:flex-1 [&_.chip-trigger>span]:min-w-0
-                            [&_.chip-trigger>span]:text-left xl:[&_.chip-trigger>span]:flex-none
+                            [&_.chip-trigger>span]:text-left [&_.chip-trigger>span]:whitespace-normal
+                            [&_.chip-trigger>span]:overflow-visible
+                            xl:[&_.chip-trigger>span]:flex-none xl:[&_.chip-trigger>span]:whitespace-nowrap
+                            xl:[&_.chip-trigger>span]:overflow-hidden
                             [&_.chip-icon]:hidden sm:[&_.chip-icon]:inline
                             [&_[data-chip-label]]:sr-only
                             xl:[&_[data-chip-label]]:not-sr-only xl:[&_[data-chip-label]]:whitespace-nowrap
                             [&_[data-chip-sep]]:hidden xl:[&_[data-chip-sep]]:inline
                             [&_[data-chip-value]]:block [&_[data-chip-value]]:w-full
-                            [&_[data-chip-value]]:max-w-full [&_[data-chip-value]]:truncate
-                            xl:[&_[data-chip-value]]:inline">
+                            [&_[data-chip-value]]:max-w-full [&_[data-chip-value]]:whitespace-normal
+                            [&_[data-chip-value]]:break-words
+                            xl:[&_[data-chip-value]]:inline xl:[&_[data-chip-value]]:whitespace-nowrap">
                 <FilterChip<string>
                     icon={Calendar}
                     label={o.filterLabels.date}
