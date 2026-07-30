@@ -8,6 +8,7 @@
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
  * - If not: creates with tenant-owner role + active E2E tenant
+ * - Ensures the tenant has the Site prerequisite required by product/category flows
  *
  * Guarded by E2E_SETUP_SECRET env var. Disabled if secret not set.
  * NEVER enable this in production — staging only.
@@ -144,7 +145,27 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // Step 3: find or create user
+        // Step 3: ensure the tenant has the Site prerequisite used by product/category E2E.
+        // Keep this in the guarded setup endpoint: a fresh tenant cannot create its first
+        // category through the dashboard because Categories.site is required.
+        const sitesResult = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 1,
+            overrideAccess: true,
+        })
+        const site = sitesResult.docs[0] ?? await payload.create({
+            collection: 'sites',
+            overrideAccess: true,
+            data: {
+                tenant: tenantId,
+                name: `${tenantName} Site`,
+                status: 'draft',
+                siteType: 'ecommerce',
+            },
+        })
+
+        // Step 4: find or create user
         const usersResult = await payload.find({
             collection: 'users',
             where: { email: { equals: email } },
@@ -186,6 +207,7 @@ export async function POST(req: NextRequest) {
                 status: 'updated',
                 userId: existingUser.id,
                 tenantId,
+                siteId: site.id,
                 action: 'password synced + tenant ensured',
             })
         }
@@ -215,6 +237,7 @@ export async function POST(req: NextRequest) {
             status: 'created',
             userId: newUser.id,
             tenantId,
+            siteId: site.id,
         })
     } catch (error: unknown) {
         console.error('[E2E Setup] Error:', error)

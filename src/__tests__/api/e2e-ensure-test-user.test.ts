@@ -9,18 +9,19 @@ vi.mock('payload', () => ({
     getPayload: vi.fn(),
 }))
 
-describe('POST /api/e2e/ensure-test-user', () => {
+describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         process.env.E2E_SETUP_SECRET = 'setup-secret'
         process.env.APP_ENV = 'staging'
     })
 
-    it('provisions an active FREEMIUM subscription for an isolated benchmark tenant', async () => {
+    it('provisions an active FREEMIUM subscription and Site prerequisite for an isolated tenant', async () => {
         const payload = {
             find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
                 if (collection === 'tenants') return { docs: [{ id: 42 }] }
                 if (collection === 'plan-subscriptions') return { docs: [] }
+                if (collection === 'sites') return { docs: [] }
                 if (collection === 'users') return { docs: [] }
                 return { docs: [] }
             }),
@@ -54,5 +55,51 @@ describe('POST /api/e2e/ensure-test-user', () => {
                 packCode: 'FREEMIUM',
             }),
         }))
+        expect(payload.create).toHaveBeenCalledWith({
+            collection: 'sites',
+            overrideAccess: true,
+            data: {
+                tenant: 42,
+                name: 'E2E Test Workspace Site',
+                status: 'draft',
+                siteType: 'ecommerce',
+            },
+        })
+    })
+
+    it('reuses the existing Site instead of creating a duplicate prerequisite', async () => {
+        const existingUser = {
+            id: 84,
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: 42, role: 'owner', status: 'active', permissions: [] }],
+        }
+        const payload = {
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 42 }] }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 63 }] }
+                if (collection === 'sites') return { docs: [{ id: 77 }] }
+                if (collection === 'users') return { docs: [existingUser] }
+                return { docs: [] }
+            }),
+            create: vi.fn(),
+            update: vi.fn(),
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'benchmark@example.com', password: 'password123' }),
+        }))
+
+        expect(payload.find).toHaveBeenCalledWith({
+            collection: 'sites',
+            where: { tenant: { equals: 42 } },
+            limit: 1,
+            overrideAccess: true,
+        })
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual(expect.objectContaining({ siteId: 77 }))
+        expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
     })
 })
