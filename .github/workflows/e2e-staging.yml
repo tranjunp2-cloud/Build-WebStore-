@@ -106,10 +106,9 @@ jobs:
           # Disable set -e so we can capture playwright exit code and parse stats
           # even when tests fail. GitHub Actions defaults bash to `set -eo pipefail`.
           set +e
-          # Run only specs compatible with a fresh e2e-bot tenant. Provisioning ensures
-          # only the one idempotent Site prerequisite; each included spec owns its other
-          # fixture data. Legacy specs (blog-crud, products-crud, orders-flow,
-          # settings-flow, storefront) assume real data and time out on empty state × retry × 3.
+          # Run only specs compatible with a fresh e2e-bot tenant (no pre-existing
+          # data). Legacy specs (blog-crud, products-crud, orders-flow, settings-flow,
+          # storefront) assume real data and time out on empty state × retry × 3.
           npx playwright test \
             smoke.spec.ts \
             auth.setup.ts \
@@ -120,7 +119,6 @@ jobs:
             admin.spec.ts \
             notifications.spec.ts \
             products.spec.ts \
-            f08-ai-bulk-category.spec.ts \
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
             tests/cart-drawer.spec.ts \
