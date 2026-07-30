@@ -40,6 +40,16 @@ describe('[TC-F36.OD.029–032] Sync-Tracking Auto-Complete on Delivery', () => 
     mockPayload = {
       find: vi.fn(),
       update: vi.fn(),
+      db: {
+        drizzle: {
+          transaction: vi.fn(async (
+            operation: (db: { execute: ReturnType<typeof vi.fn> }) => Promise<unknown>,
+          ) => operation({
+            execute: vi.fn().mockResolvedValue({ rows: [{ id: 'order' }] }),
+          })),
+        },
+        sessions: {},
+      },
       logger: {
         warn: vi.fn(),
         error: vi.fn(),
