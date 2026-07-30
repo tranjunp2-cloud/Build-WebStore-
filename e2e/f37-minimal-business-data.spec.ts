@@ -7,17 +7,13 @@ import {
 } from '@playwright/test'
 import { isValidBusinessPhone } from '@/lib/seo/local-business-constants'
 import { saveSiteSchema } from '@/lib/validations/sites'
+import {
+    isAllowedAuthenticatedE2ETarget,
+    LIVE_STAGING_E2E_ORIGIN,
+    LOCAL_E2E_ORIGIN,
+} from './helpers/authenticated-target'
 
-const F37_LOCAL_ORIGIN = 'http://localhost:3000'
-const F37_LIVE_STAGING_ORIGIN = 'https://web-v2.dev.ecommercehub.my'
-const F37_ALLOWED_ORIGINS = new Set([F37_LOCAL_ORIGIN, F37_LIVE_STAGING_ORIGIN])
-const isAllowedF37Target = (() => {
-    try {
-        return F37_ALLOWED_ORIGINS.has(new URL(process.env.BASE_URL ?? F37_LOCAL_ORIGIN).origin)
-    } catch {
-        return false
-    }
-})()
+const configuredF37Target = process.env.BASE_URL ?? LOCAL_E2E_ORIGIN
 
 type ContactInfoSnapshot = {
     phone?: string | null
@@ -163,8 +159,8 @@ async function chooseDifferentOption(page: Page, triggerTestId: string): Promise
 
 test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () => {
     test.skip(
-        !isAllowedF37Target,
-        `Run against ${F37_LOCAL_ORIGIN} or set BASE_URL=${F37_LIVE_STAGING_ORIGIN}.`,
+        !isAllowedAuthenticatedE2ETarget(configuredF37Target),
+        `Run against ${LOCAL_E2E_ORIGIN} or set BASE_URL=${LIVE_STAGING_E2E_ORIGIN}.`,
     )
 
     test.beforeAll(async ({ playwright }, testInfo) => {
