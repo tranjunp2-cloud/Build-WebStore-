@@ -130,15 +130,6 @@ function isCategoryInvalidResult(result: unknown): result is { ok: false; code: 
         'code' in result && result.code === 'CATEGORY_INVALID'
 }
 
-function isCategoryBusyError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false
-    try {
-        return JSON.parse(error.message)?.code === 'CATEGORY_BUSY_RETRY'
-    } catch {
-        return false
-    }
-}
-
 export function sanitizeXSS(text: string) {
     if (!text) return text
     let safe = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
@@ -479,7 +470,7 @@ export function BulkCreateModal({
 
             const savedDraftIds = new Set<string>()
             let categoryBecameInvalid = false
-            let hasRetryableSaveFailure = false
+            let hasSaveFailure = false
             for (const prod of products) {
                 // Persist the canonical tenant-owned category returned by pre-save revalidation.
                 const categoryId = categoryById.get(String(prod.categoryId))!
@@ -511,6 +502,7 @@ export function BulkCreateModal({
                             savedDraftIds.add(prod._id)
                         } else {
                             const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
+                            hasSaveFailure = true
                             toast.error(`${prod.name}: ${fallback}`)
                             console.error('[bulk-create] saveAiProductAction returned no id', { name: prod.name, res })
                         }
@@ -529,9 +521,7 @@ export function BulkCreateModal({
                             }
                             continue
                         }
-                        if (isCategoryBusyError(err)) {
-                            hasRetryableSaveFailure = true
-                        }
+                        hasSaveFailure = true
                         let msg: string
                         try {
                             msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
@@ -546,10 +536,10 @@ export function BulkCreateModal({
                 if (categoryBecameInvalid) break
             }
 
-            if (categoryBecameInvalid || hasRetryableSaveFailure) {
-                // Keep only unsaved drafts in the drawer. Otherwise retrying after category
-                // replacement/contention would duplicate products that already committed in this
-                // sequential batch.
+            if (categoryBecameInvalid || hasSaveFailure) {
+                // Keep only unsaved drafts in the drawer. Otherwise retrying after any terminal
+                // per-product failure would duplicate products already committed in this
+                // sequential batch, while closing would discard the failed drafts.
                 if (savedDraftIds.size > 0) {
                     setProducts(current => current.filter(product => !savedDraftIds.has(product._id)))
                     if (successCount > 0) {
