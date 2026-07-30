@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { Printer, Download, X, Info, FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
@@ -52,6 +51,7 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
     A4: { status: 'loading' },
   })
   const markPrintedId = React.useId()
+  const formatGroupId = React.useId()
 
   const proxyUrl = (f: LabelFormat) => `/api/orders/${orderId}/label?format=${f}`
 
@@ -155,62 +155,79 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           <div className="plabel-side">
             {/* Label format — a format is only selectable when its PDF actually loads */}
             <div className="plabel-field">
-              <label>{pl.formatLabel}</label>
+              <span
+                id={`${formatGroupId}-label`}
+                className="text-[12px] font-semibold text-[var(--dash-text-muted)]"
+              >
+                {pl.formatLabel}
+              </span>
               {/* delayDuration 0: the default 700ms feels broken on a disabled control —
                   the "why can't I click this" answer must be instant */}
               <TooltipProvider delayDuration={0}>
-                <Tabs
-                  value={format}
-                  onValueChange={(value) => setFormat(value as LabelFormat)}
-                  className="w-full"
+                <div
+                  role="radiogroup"
+                  aria-labelledby={`${formatGroupId}-label`}
+                  className="grid h-11 w-full grid-cols-2 items-center justify-center rounded-lg border border-solid border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1 text-muted-foreground"
                 >
-                  <TabsList
-                    variant="pill"
-                    aria-label={pl.formatLabel}
-                    className="grid h-11 w-full grid-cols-2 rounded-lg border border-solid border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1"
-                  >
-                    {(['A6', 'A4'] as LabelFormat[]).map((f) => {
-                      const status = formats[f].status
-                      const label = f === 'A6' ? pl.formatA6 : pl.formatA4
-                      const trigger = (
-                        <TabsTrigger
+                  {(['A6', 'A4'] as LabelFormat[]).map((f) => {
+                    const status = formats[f].status
+                    const label = f === 'A6' ? pl.formatA6 : pl.formatA4
+                    const option = (
+                      <label
+                        className={`flex h-9 w-full min-w-0 rounded-md ${
+                          status === 'ok' ? 'cursor-pointer' : 'cursor-not-allowed'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`${formatGroupId}-format`}
                           value={f}
-                          variant="pill"
+                          checked={format === f}
+                          onChange={() => setFormat(f)}
                           aria-label={label}
+                          aria-describedby={
+                            status === 'unavailable'
+                              ? `${formatGroupId}-unavailable`
+                              : undefined
+                          }
                           // Selectable ONLY once its probe confirmed a real PDF — while loading
-                          // the trigger stays locked too, so an unverified format can't be picked.
+                          // the input stays locked too, so an unverified format can't be picked.
                           disabled={status !== 'ok'}
-                          className="h-9 w-full min-w-0 rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none hover:text-[var(--dash-text)] data-[state=active]:bg-[hsl(var(--primary))] data-[state=active]:!text-white data-[state=active]:shadow-none"
+                          className="peer sr-only"
+                        />
+                        <span
+                          className={`inline-flex h-9 w-full min-w-0 items-center justify-center whitespace-nowrap rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none transition-all peer-checked:bg-[hsl(var(--primary))] peer-checked:!text-white peer-checked:shadow-none peer-disabled:opacity-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+                            status === 'ok' ? 'hover:text-[var(--dash-text)]' : ''
+                          }`}
                         >
                           {status === 'loading'
                             ? <Loader2 aria-hidden="true" className="h-[13px] w-[13px] animate-spin" />
                             : label}
-                        </TabsTrigger>
-                      )
+                        </span>
+                      </label>
+                    )
 
-                      // Disabled controls swallow hover events — the tooltip needs a span wrapper.
-                      return status === 'unavailable' ? (
-                        <Tooltip key={f}>
-                          <TooltipTrigger asChild>
-                            <span
-                              className="flex min-w-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--dash-surface)]"
-                              tabIndex={0}
-                            >
-                              {trigger}
-                            </span>
-                          </TooltipTrigger>
-                          {/* z-[9100]: the tooltip portals to <body>, and its default z-50 sits
-                              UNDER the .dialog-backdrop (z-index 9000) — bump it above the modal */}
-                          <TooltipContent side="top" className="z-[9100] max-w-[220px] text-center">
-                            {pl.formatUnavailable}
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <React.Fragment key={f}>{trigger}</React.Fragment>
-                      )
-                    })}
-                  </TabsList>
-                </Tabs>
+                    // The non-focusable label wrapper keeps the unavailable tooltip hoverable
+                    // without adding a tab stop outside the native radio-group keyboard model.
+                    return status === 'unavailable' ? (
+                      <Tooltip key={f}>
+                        <TooltipTrigger asChild>
+                          {option}
+                        </TooltipTrigger>
+                        {/* z-[9100]: the tooltip portals to <body>, and its default z-50 sits
+                            UNDER the .dialog-backdrop (z-index 9000) — bump it above the modal */}
+                        <TooltipContent side="top" className="z-[9100] max-w-[220px] text-center">
+                          {pl.formatUnavailable}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <React.Fragment key={f}>{option}</React.Fragment>
+                    )
+                  })}
+                </div>
+                <span id={`${formatGroupId}-unavailable`} className="sr-only">
+                  {pl.formatUnavailable}
+                </span>
               </TooltipProvider>
             </div>
 
