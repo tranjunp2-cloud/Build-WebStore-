@@ -228,6 +228,18 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('Order Successfully Created or received')).toBeInTheDocument()
   })
 
+  it('[TC-F36.C10e] keeps the event method after the order is re-labelled with another method', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+      eventTime: '2026-07-28T03:23:50.000Z',
+      collectionMethod: 'dropoff',
+    }]} collectionMethod="pickup" />)
+
+    expect(screen.getByText('Waiting for Drop-off')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
+  })
+
   it('[TC-F36.C10d] CMS shipment-created event stays single-line', () => {
     render(<TrackingTimeline events={[{
       status: 'pending_pickup',

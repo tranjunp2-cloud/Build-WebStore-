@@ -51,6 +51,7 @@ export interface FulfillmentOrder {
     status?: string | null
     description?: string | null
     eventTime?: string | null
+    collectionMethod?: 'pickup' | 'dropoff' | null
   }> | null
   // Self-delivery
   selfDeliveryCourier?: string | null

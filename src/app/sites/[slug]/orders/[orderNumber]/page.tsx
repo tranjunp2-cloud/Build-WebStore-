@@ -153,6 +153,7 @@ export default async function OrderTrackingPage({
             status: h.status ?? null,
             description: h.description ?? '',
             eventTime: h.eventTime ?? '',
+            collectionMethod: h.collectionMethod ?? null,
         })),
         createdAt: order.createdAt,
         items: (order.items ?? []).map((item: any) => ({

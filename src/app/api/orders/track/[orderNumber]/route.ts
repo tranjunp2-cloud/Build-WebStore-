@@ -83,6 +83,7 @@ export async function GET(
                 status: h.status ?? null,
                 description: h.description ?? '',
                 eventTime: h.eventTime ?? '',
+                collectionMethod: h.collectionMethod ?? null,
             })),
         })
     } catch {

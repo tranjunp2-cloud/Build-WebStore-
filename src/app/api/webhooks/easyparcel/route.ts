@@ -174,8 +174,14 @@ export async function POST(req: Request) {
             id: string | number
             status?: string
             awbNo?: string | null
+            collectionMethod?: 'pickup' | 'dropoff' | null
             shippingTrackingStatus?: string | null
-            shippingTrackingHistory?: { status: string; description: string; eventTime: string }[] | null
+            shippingTrackingHistory?: {
+                status: string
+                description: string
+                eventTime: string
+                collectionMethod?: 'pickup' | 'dropoff' | null
+            }[] | null
         }
         let order = found.docs[0] as WebhookOrder | undefined
 

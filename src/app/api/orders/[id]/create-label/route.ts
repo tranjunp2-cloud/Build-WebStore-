@@ -436,7 +436,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 // Mark the new shipment in the buyer's timeline. EP's own "To Be Collected" webhook
                 // maps to the same 'pending_pickup' we just seeded, so applyTrackingUpdate skips it
                 // as unchanged and would leave "Shipment Cancelled" standing as the newest event.
-                shippingTrackingHistory: [...priorHistory, shipmentCreatedEntry(awbNo)],
+                shippingTrackingHistory: [...priorHistory, shipmentCreatedEntry(awbNo, new Date(), method)],
                 // Seed the sync cursor so the cron's oldest-first (shippingTrackingLastUpdated ASC)
                 // ordering includes this order instead of parking it at NULLS-LAST and starving it.
                 shippingTrackingLastUpdated: new Date().toISOString(),

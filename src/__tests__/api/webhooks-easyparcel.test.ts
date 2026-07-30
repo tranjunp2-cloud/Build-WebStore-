@@ -183,6 +183,7 @@ describe('POST /api/webhooks/easyparcel', () => {
         {
           id: 'order-45a',
           status: 'ready_to_ship',
+          collectionMethod: 'dropoff',
           shippingTrackingStatus: 'pending_pickup',
           shippingTrackingHistory: [],
         },
@@ -209,6 +210,7 @@ describe('POST /api/webhooks/easyparcel', () => {
     expect(updateArg.data.shippingTrackingHistory.at(-1)).toMatchObject({
       status: 'in_transit',
       description: 'Rider is Out for Delivery',
+      collectionMethod: 'dropoff',
     })
   })
 

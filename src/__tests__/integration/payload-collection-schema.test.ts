@@ -56,6 +56,8 @@ const COLLECTION_COLUMN_CHECKS: Record<string, string[]> = {
   sites: ['site_type', 'locale'],
   // Orders: EasyParcel collection method selected at label creation
   orders: ['collection_method'],
+  // EasyParcel activity rows snapshot their shipment method so history stays immutable
+  orders_shipping_tracking_history: ['collection_method'],
 }
 
 describe.skipIf(!RUN_TEST)('Payload collection schema drift [TC-SCHEMA-001]', () => {

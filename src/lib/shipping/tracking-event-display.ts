@@ -1,6 +1,7 @@
 export interface TrackingEventDisplayInput {
     status?: string | null
     description?: string | null
+    collectionMethod?: TrackingCollectionMethod
 }
 
 export type TrackingCollectionMethod = 'pickup' | 'dropoff' | null | undefined
@@ -42,9 +43,10 @@ export function formatTrackingEventDisplay(
     collectionMethod: TrackingCollectionMethod,
     labels: TrackingEventDisplayLabels = EN_TRACKING_EVENT_LABELS,
 ): { title: string; note: string | null } {
+    const eventCollectionMethod = event.collectionMethod ?? collectionMethod
     const friendly: Record<string, string> = {
         order_created: labels.statusOrderCreated,
-        pending_pickup: collectionMethod === 'dropoff'
+        pending_pickup: eventCollectionMethod === 'dropoff'
             ? labels.statusPendingDropoff
             : labels.statusPendingPickup,
         picked_up: labels.statusPickedUp,

@@ -26,6 +26,7 @@ interface BuyerTrackingOrder {
         status?: string | null
         description?: string | null
         eventTime?: string | null
+        collectionMethod?: 'pickup' | 'dropoff' | null
     }> | null
 }
 
@@ -44,6 +45,7 @@ function buyerTrackingState(order: BuyerTrackingOrder) {
             status: entry.status ?? null,
             description: entry.description ?? '',
             eventTime: entry.eventTime ?? '',
+            collectionMethod: entry.collectionMethod ?? null,
         })),
     }
 }

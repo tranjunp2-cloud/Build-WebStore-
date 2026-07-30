@@ -134,6 +134,27 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
         expect(timeline.queryByText('Waiting for Pickup')).not.toBeInTheDocument()
     })
 
+    it('[TC-F36.202] keeps an old drop-off event after the order is re-labelled as pickup', () => {
+        render(
+            <OrderTrackingClient
+                order={makeOrder({
+                    collectionMethod: 'pickup',
+                    shippingTrackingHistory: [{
+                        status: 'pending_pickup',
+                        description: 'Schedule In Arrangement',
+                        eventTime: '2026-07-28T06:26:00.000Z',
+                        collectionMethod: 'dropoff',
+                    }],
+                })}
+                slug="demo"
+            />,
+        )
+
+        const timeline = within(activityCard())
+        expect(timeline.getByText('Waiting for Drop-off')).toBeInTheDocument()
+        expect(timeline.queryByText('Waiting for Pickup')).not.toBeInTheDocument()
+    })
+
     it('[TC-F36.201] applies new courier events received while storefront tracking is open', () => {
         render(
             <OrderTrackingClient

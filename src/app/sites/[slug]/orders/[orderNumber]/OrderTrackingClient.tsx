@@ -35,6 +35,7 @@ type EpTrackingHistoryEntry = {
     status?: string | null
     description: string
     eventTime: string
+    collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
 type OrderData = {

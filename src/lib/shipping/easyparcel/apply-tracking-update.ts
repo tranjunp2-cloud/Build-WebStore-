@@ -13,11 +13,13 @@ interface TrackingHistoryEntry {
     status: string
     description: string
     eventTime: string
+    collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
 interface OrderLike {
     id: string | number
     status?: string
+    collectionMethod?: 'pickup' | 'dropoff' | null
     shippingTrackingStatus?: string | null
     shippingTrackingHistory?: TrackingHistoryEntry[] | null
 }
@@ -99,6 +101,7 @@ export async function applyTrackingUpdate(
         .catch(() => null)
     const fresh = reRead?.docs?.[0] as OrderLike | undefined
     const freshStatus = fresh?.shippingTrackingStatus ?? order.shippingTrackingStatus
+    const collectionMethod = fresh?.collectionMethod ?? order.collectionMethod ?? 'pickup'
     const currentHistory: TrackingHistoryEntry[] = fresh?.shippingTrackingHistory ?? order.shippingTrackingHistory ?? []
 
     // Re-verify the terminal guard against the freshest read. Lifecycle reconciliation below
@@ -147,6 +150,7 @@ export async function applyTrackingUpdate(
                     status: mapped.internal,
                     description: eventDescription,
                     eventTime,
+                    collectionMethod,
                 },
             ],
         }

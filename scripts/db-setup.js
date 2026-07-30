@@ -4877,6 +4877,7 @@ const MIGRATIONS = [
     status varchar,
     description text,
     event_time timestamp with time zone,
+    collection_method varchar,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
   );` },
@@ -4940,6 +4941,14 @@ const MIGRATIONS = [
   { name: 'orders.self_delivery_courier', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS self_delivery_courier varchar;` },
   { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
   { name: 'orders.collection_method', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  { name: 'orders.shipping_tracking_history.collection_method', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  // Freeze legacy rows to the title they render today. Missing order-level method currently
+  // displays as Pickup, so use the same fallback instead of letting a future label rewrite it.
+  { name: 'orders.shipping_tracking_history.collection_method_backfill', sql: `UPDATE orders_shipping_tracking_history AS history
+    SET collection_method = COALESCE(orders.collection_method, 'pickup')
+    FROM orders
+    WHERE history._parent_id = orders.id
+      AND history.collection_method IS NULL;` },
   { name: 'orders.pickup_slot', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot varchar;` },
   // ── GH-1333: persist friendly courier name from EP rate response (e.g. "J&T Express") ──
   { name: 'orders.shipping_courier_name', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_name text;` },

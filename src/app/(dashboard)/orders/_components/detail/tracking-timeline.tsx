@@ -22,6 +22,7 @@ export interface TrackingEvent {
   status?: string | null
   description?: string | null
   eventTime?: string | null
+  collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
 interface TrackingTimelineProps {
