@@ -1,6 +1,6 @@
 /**
  * Component tests for TrackingTimeline — F36 (GH-1333)
- * Tests sorting by eventTime DESC, status label mapping, empty state rendering.
+ * Tests sorting, Figma status/description hierarchy, status fallback, and empty state rendering.
  *
  * TC-F36.C01–F36.C07: Tracking timeline rendering + internationalization.
  */
@@ -18,6 +18,7 @@ vi.mock('@/i18n', () => ({
           tracking: {
             statusOrderCreated: 'Order Created',
             statusPendingPickup: 'Pending Pickup',
+            statusPendingDropoff: 'Waiting for Drop-off',
             statusPickedUp: 'Picked Up',
             statusInTransit: 'In Transit',
             statusOutForDelivery: 'Out for Delivery',
@@ -49,8 +50,8 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('Awaiting Update')).toBeInTheDocument()
   })
 
-  // TC-F36.C03: Single event renders with status label
-  it('[TC-F36.C03] Single event renders with friendly status label', () => {
+  // TC-F36.C03: Status is the title and courier description remains verbatim
+  it('[TC-F36.C03] Single event renders status title and courier description', () => {
     const events: TrackingEvent[] = [
       {
         status: 'delivered',
@@ -148,8 +149,8 @@ describe('TrackingTimeline', () => {
     expect(screen.getByText('CustomUnknownStatus')).toBeInTheDocument()
   })
 
-  // TC-F36.C07: Event without status → defaults to "Processing"
-  it('[TC-F36.C07] Missing status → defaults to "Processing"', () => {
+  // TC-F36.C07: Missing status falls back to Processing while retaining raw description
+  it('[TC-F36.C07] Missing status → renders fallback title and courier description', () => {
     const events: TrackingEvent[] = [
       {
         eventTime: '2026-07-01T10:30:00Z',
@@ -158,6 +159,7 @@ describe('TrackingTimeline', () => {
     ]
     render(<TrackingTimeline events={events} />)
     expect(screen.getByText('Processing')).toBeInTheDocument()
+    expect(screen.getByText('In progress')).toBeInTheDocument()
   })
 
   // TC-F36.C08: Event time formatting — day/month/year · HH:mm
@@ -184,6 +186,7 @@ describe('TrackingTimeline', () => {
     ]
     render(<TrackingTimeline events={events} />)
     expect(screen.getByText('Processing')).toBeInTheDocument()
+    expect(screen.getByText('Order processing')).toBeInTheDocument()
     // Should render without crash, empty time string
     expect(screen.queryByText(/\d{1,2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/)).not.toBeInTheDocument()
   })
@@ -198,7 +201,54 @@ describe('TrackingTimeline', () => {
       },
     ]
     render(<TrackingTimeline events={events} />)
+    expect(screen.getByText('In Transit')).toBeInTheDocument()
     expect(screen.getByText('Left distribution center')).toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10b] Drop-off shipment uses a matching pending status title', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+      eventTime: '2026-07-28T03:23:50.000Z',
+    }]} collectionMethod="dropoff" />)
+
+    expect(screen.getByText('Schedule In Arrangement')).toBeInTheDocument()
+    expect(screen.getByText('Waiting for Drop-off')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10c] Pickup shipment retains the pickup pending status title', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Order Successfully Created or received',
+      eventTime: '2026-07-28T03:23:50.000Z',
+    }]} collectionMethod="pickup" />)
+
+    expect(screen.getByText('Pending Pickup')).toBeInTheDocument()
+    expect(screen.getByText('Order Successfully Created or received')).toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10e] keeps the event method after the order is re-labelled with another method', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+      eventTime: '2026-07-28T03:23:50.000Z',
+      collectionMethod: 'dropoff',
+    }]} collectionMethod="pickup" />)
+
+    expect(screen.getByText('Waiting for Drop-off')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
+  })
+
+  it('[TC-F36.C10d] CMS shipment-created event stays single-line', () => {
+    render(<TrackingTimeline events={[{
+      status: 'pending_pickup',
+      description: 'Shipment created — RMC002343785MY',
+      eventTime: '2026-07-28T07:24:00.000Z',
+    }]} />)
+
+    expect(screen.getByText('Shipment created — RMC002343785MY')).toBeInTheDocument()
+    expect(screen.queryByText('Pending Pickup')).not.toBeInTheDocument()
   })
 
   // TC-F36.C11: Description field skipped when missing

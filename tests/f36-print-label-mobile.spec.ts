@@ -301,8 +301,8 @@ test.describe('GH-1684 shipping label preview regression', () => {
     expect(gridOverflow.scrollWidth).toBeLessThanOrEqual(gridOverflow.clientWidth)
 
     for (const control of [
-      dialog.locator('.plabel-format'),
-      dialog.locator('.plabel-check'),
+      dialog.getByRole('radiogroup'),
+      dialog.getByRole('checkbox'),
       dialog.locator('.plabel-hint'),
     ]) {
       await control.scrollIntoViewIfNeeded()
@@ -327,7 +327,7 @@ test.describe('GH-1684 shipping label preview regression', () => {
       })
     }
 
-    const actions = dialog.locator('.plabel-foot .btn')
+    const actions = dialog.locator('.plabel-foot > button')
     await expect(actions).toHaveCount(3)
     for (let index = 0; index < 3; index += 1) {
       await expect(actions.nth(index)).toBeVisible()

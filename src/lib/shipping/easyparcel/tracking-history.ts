@@ -2,6 +2,7 @@ export interface TrackingHistoryEntry {
     status: string
     description: string
     eventTime: string
+    collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
 /**
@@ -15,12 +16,18 @@ export interface TrackingHistoryEntry {
  *
  * The AWB goes in the description because entries carry no shipment id: when one order has been
  * shipped twice, it is the only thing telling the old parcel's events apart from the new one's.
+ * Collection method is snapshotted for the same reason: re-labelling must not rewrite old events.
  * It is nullable — EP issues the AWB asynchronously for some couriers.
  */
-export function shipmentCreatedEntry(awbNo: string | null, at: Date = new Date()): TrackingHistoryEntry {
+export function shipmentCreatedEntry(
+    awbNo: string | null,
+    at: Date = new Date(),
+    collectionMethod?: 'pickup' | 'dropoff' | null,
+): TrackingHistoryEntry {
     return {
         status: 'pending_pickup',
         description: awbNo ? `Shipment created — ${awbNo}` : 'Shipment created',
         eventTime: at.toISOString(),
+        collectionMethod: collectionMethod ?? 'pickup',
     }
 }

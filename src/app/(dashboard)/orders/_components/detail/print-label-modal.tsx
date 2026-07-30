@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
-import { Printer, Download, X, Info, FileText, Check, Loader2 } from 'lucide-react'
+import { Printer, Download, X, Info, FileText, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
@@ -87,6 +89,8 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
     A6: { status: 'loading' },
     A4: { status: 'loading' },
   })
+  const markPrintedId = React.useId()
+  const formatGroupId = React.useId()
 
   const proxyUrl = (f: LabelFormat) => `/api/orders/${orderId}/label?format=${f}`
 
@@ -230,33 +234,64 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           <div className="plabel-side">
             {/* Label format — a format is only selectable when its PDF actually loads */}
             <div className="plabel-field">
-              <label>{pl.formatLabel}</label>
+              <span
+                id={`${formatGroupId}-label`}
+                className="text-[12px] font-semibold text-[var(--dash-text-muted)]"
+              >
+                {pl.formatLabel}
+              </span>
               {/* delayDuration 0: the default 700ms feels broken on a disabled control —
                   the "why can't I click this" answer must be instant */}
               <TooltipProvider delayDuration={0}>
-                <div className="plabel-format" role="radiogroup" aria-label={pl.formatLabel}>
+                <div
+                  role="radiogroup"
+                  aria-labelledby={`${formatGroupId}-label`}
+                  className="grid h-11 w-full grid-cols-2 items-center justify-center rounded-lg border border-solid border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1 text-muted-foreground"
+                >
                   {(['A6', 'A4'] as LabelFormat[]).map((f) => {
                     const status = formats[f].status
-                    const btn = (
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={format === f}
-                        className={`pf-opt${format === f ? ' on' : ''}`}
-                        aria-busy={status === 'loading'}
-                        disabled={status !== 'ok'}
-                        onClick={() => setFormat(f)}
+                    const label = f === 'A6' ? pl.formatA6 : pl.formatA4
+                    const option = (
+                      <label
+                        className={`flex h-9 w-full min-w-0 rounded-md ${
+                          status === 'ok' ? 'cursor-pointer' : 'cursor-not-allowed'
+                        }`}
                       >
-                        {status === 'loading'
-                          ? <Loader2 className="animate-spin" style={{ width: 13, height: 13 }} />
-                          : (f === 'A6' ? pl.formatA6 : pl.formatA4)}
-                      </button>
+                        <input
+                          type="radio"
+                          name={`${formatGroupId}-format`}
+                          value={f}
+                          checked={format === f}
+                          onChange={() => setFormat(f)}
+                          aria-label={label}
+                          aria-describedby={
+                            status === 'unavailable'
+                              ? `${formatGroupId}-unavailable`
+                              : undefined
+                          }
+                          // Selectable ONLY once its probe confirmed a real PDF — while loading
+                          // the input stays locked too, so an unverified format can't be picked.
+                          disabled={status !== 'ok'}
+                          className="peer sr-only"
+                        />
+                        <span
+                          className={`inline-flex h-9 w-full min-w-0 items-center justify-center whitespace-nowrap rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none transition-all peer-checked:bg-[hsl(var(--primary))] peer-checked:!text-white peer-checked:shadow-none peer-disabled:opacity-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+                            status === 'ok' ? 'hover:text-[var(--dash-text)]' : ''
+                          }`}
+                        >
+                          {status === 'loading'
+                            ? <Loader2 aria-hidden="true" className="h-[13px] w-[13px] animate-spin" />
+                            : label}
+                        </span>
+                      </label>
                     )
-                    // Disabled buttons swallow hover events — the tooltip needs a span wrapper
+
+                    // The non-focusable label wrapper keeps the unavailable tooltip hoverable
+                    // without adding a tab stop outside the native radio-group keyboard model.
                     return status === 'unavailable' ? (
                       <Tooltip key={f}>
                         <TooltipTrigger asChild>
-                          <span className="pf-optwrap" tabIndex={0}>{btn}</span>
+                          {option}
                         </TooltipTrigger>
                         {/* z-[9100]: the tooltip portals to <body>, and its default z-50 sits
                             UNDER the .dialog-backdrop (z-index 9000) — bump it above the modal */}
@@ -265,10 +300,13 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                         </TooltipContent>
                       </Tooltip>
                     ) : (
-                      <React.Fragment key={f}>{btn}</React.Fragment>
+                      <React.Fragment key={f}>{option}</React.Fragment>
                     )
                   })}
                 </div>
+                <span id={`${formatGroupId}-unavailable`} className="sr-only">
+                  {pl.formatUnavailable}
+                </span>
               </TooltipProvider>
             </div>
 
@@ -276,18 +314,23 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                 own copies field; a stepper here could not drive it (removed 260707). */}
 
             {/* Mark as printed */}
-            <button
-              type="button"
-              className="plabel-check"
-              role="checkbox"
-              aria-checked={markPrinted}
-              onClick={() => setMarkPrinted(v => !v)}
-            >
-              <span className={`pc-box${markPrinted ? ' on' : ''}`}>
-                {markPrinted && <Check />}
-              </span>
-              {pl.markAsPrinted}
-            </button>
+            <div className="flex min-h-11 items-center gap-2.5">
+              <Checkbox
+                id={markPrintedId}
+                checked={markPrinted}
+                onCheckedChange={(checked) => setMarkPrinted(checked === true)}
+                aria-labelledby={`${markPrintedId}-label`}
+                style={{ borderColor: markPrinted ? 'hsl(var(--primary))' : 'var(--dash-border)' }}
+                className="h-[18px] w-[18px] rounded-[4px] border border-solid bg-transparent data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:!text-white"
+              />
+              <label
+                id={`${markPrintedId}-label`}
+                htmlFor={markPrintedId}
+                className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium text-[var(--dash-text)]"
+              >
+                {pl.markAsPrinted}
+              </label>
+            </div>
 
             <div className="plabel-hint">
               <Info style={{ width: 13, height: 13, flexShrink: 0, marginTop: 2 }} />
@@ -298,18 +341,27 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
 
         {/* Footer — Cancel pushed left, Download + Print grouped right (content-width) */}
         <div className="dialog-foot plabel-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{pl.cancel}</button>
-          <button className="btn btn-outline" onClick={handleDownload} disabled={active.status !== 'ok'}>
+          <Button type="button" variant="dashSecondary" className="mr-auto h-10 flex-none px-4" onClick={onClose}>
+            {pl.cancel}
+          </Button>
+          <Button
+            type="button"
+            variant="dashSecondary"
+            className="h-10 flex-none px-4"
+            onClick={handleDownload}
+            disabled={active.status !== 'ok'}
+          >
             <Download style={{ width: 15, height: 15 }} /> {pl.download}
-          </button>
-          <button
-            className="btn btn-primary"
-            style={{ backgroundColor: 'rgb(59, 130, 246)' }}
+          </Button>
+          <Button
+            type="button"
+            variant="dashPrimary"
+            className="h-10 flex-none px-4 !text-white"
             onClick={handlePrint}
             disabled={active.status !== 'ok'}
           >
             <Printer style={{ width: 15, height: 15 }} /> {pl.print}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
