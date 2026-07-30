@@ -195,7 +195,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
                 )
             )
             .mockResolvedValueOnce({ id: 456 })
-        const { onSuccess } = await renderAndWaitForProducts(two)
+        const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
 
         // Act
         await act(async () => {
@@ -207,11 +207,15 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
             expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('SKU already in use'))
         })
 
-        // Second product still saved → success toast shown
+        // Second product still saves, while only the failed draft remains for retry.
         await waitFor(() => {
             expect(mockToastSuccess).toHaveBeenCalledOnce()
+            expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
+            expect(screen.queryByDisplayValue('Second Product')).not.toBeInTheDocument()
         })
-        expect(onSuccess).toHaveBeenCalledOnce()
+        expect(onPartialSuccess).toHaveBeenCalledOnce()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
     })
 
     it('TC-F08-04-46: SKU conflict (real fieldErrors.baseSku shape) auto-retries with a regenerated SKU and succeeds silently', async () => {
@@ -462,6 +466,31 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('Test Pants')).not.toBeInTheDocument()
         expect(screen.getByRole('combobox')).toHaveValue('cat-1')
+        expect(onPartialSuccess).toHaveBeenCalledOnce()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-112] keeps a no-id draft open when another item succeeds', async () => {
+        // Arrange
+        const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
+        mockSaveProduct
+            .mockResolvedValueOnce({ id: 202 })
+            .mockResolvedValueOnce({})
+        const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
+
+        // Act
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        // Assert
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledTimes(2)
+            expect(screen.queryByDisplayValue('Test Shirt')).not.toBeInTheDocument()
+            expect(screen.getByDisplayValue('Test Pants')).toBeInTheDocument()
+        })
+        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('Test Pants'))
         expect(onPartialSuccess).toHaveBeenCalledOnce()
         expect(onSuccess).not.toHaveBeenCalled()
         expect(onClose).not.toHaveBeenCalled()
