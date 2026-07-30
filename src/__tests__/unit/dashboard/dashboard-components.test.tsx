@@ -17,6 +17,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
+import enLocale from '@/i18n/locales/en.json'
+import msLocale from '@/i18n/locales/ms.json'
 
 // ── Mock i18n (used by all dashboard components) ─────────────────────────────
 vi.mock('@/i18n', () => ({
@@ -239,10 +241,31 @@ describe('SEOHealthWidget', () => {
         expect(screen.getByText('75')).toBeInTheDocument()
     })
 
-    it('[TC-F03.12] renders "Fix" CTA button', () => {
+    it('[TC-F03.12] renders the exact revised CTA label', () => {
+        // Arrange
         render(<SEOHealthWidget score={60} />)
-        const button = screen.getByRole('button', { name: /fix/i })
+
+        // Act
+        const button = screen.getByRole('button', { name: 'AI Fix Issues' })
+
+        // Assert
         expect(button).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'AI Fix All Issues' })).not.toBeInTheDocument()
+    })
+
+    it('[TC-F03.12] defines emoji-free revised CTA labels for English and Malay', () => {
+        // Arrange
+        const labels = [
+            enLocale.dashboard.overview.seo.fixAll,
+            msLocale.dashboard.overview.seo.fixAll,
+        ]
+
+        // Act
+        const containsSparkle = labels.some((label) => label.includes('✨'))
+
+        // Assert
+        expect(labels).toEqual(['AI Fix Issues', 'AI Baiki Isu'])
+        expect(containsSparkle).toBe(false)
     })
 
     it('[TC-F03.34] shows issue count for score < 90 (e.g. 75)', () => {
