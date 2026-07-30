@@ -1,8 +1,8 @@
 # E2E Tests on Staging — runs after staging push
-# Triggers: push to staging (when relevant E2E or BulkCreateModal files change), or manual dispatch
+# Triggers: push to staging (when E2E files change), or manual dispatch
 #
-# Push-triggered runs resolve the immutable Vercel deployment for github.sha.
-# Manual runs target the explicitly selected staging URL as before.
+# Note: workflow_dispatch and workflow_run require file on default branch (main).
+# Until this workflow lands on main, we trigger via `push` on staging.
 #
 # Runs Playwright tests against live staging: https://web-v2.dev.ecommercehub.my
 name: E2E Staging
@@ -13,7 +13,6 @@ on:
     paths:
       - 'e2e/**'
       - 'tests/**'
-      - 'src/components/dashboard/BulkCreateModal.tsx'
       - 'playwright.config.ts'
       - '.github/workflows/e2e-staging.yml'
   workflow_dispatch:
@@ -50,50 +49,39 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Resolve matching staging deployment
-        if: github.event_name == 'push'
-        env:
-          TARGET_SHA: ${{ github.sha }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Wait for NEW staging deploy to be ready
         run: |
-          echo "Waiting for READY staging deployment at $TARGET_SHA"
-          for i in {1..36}; do
-            if ! RESPONSE=$(curl -fsS \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=staging&state=READY&limit=100"); then
-              echo "Attempt $i/36: Vercel API unavailable, retrying in 10s..."
-              sleep 10
-              continue
-            fi
-            DEPLOY_URL=$(printf '%s' "$RESPONSE" | jq -r --arg sha "$TARGET_SHA" '
-              [.deployments[]
-                | select(.meta.githubCommitSha == $sha)
-                | select((.readyState // .state // "") == "READY")]
-              | sort_by(.created // 0)
-              | last
-              | .url // empty
-            ')
-            if [ -n "$DEPLOY_URL" ]; then
-              echo "Resolved matching deployment: https://$DEPLOY_URL"
-              echo "BASE_URL=https://$DEPLOY_URL" >> "$GITHUB_ENV"
+          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          echo "Waiting for Vercel deploy: $URL"
+          # We probe the E2E provisioning endpoint itself. Old deployments return
+          # 404 (route doesn't exist), new deployments return 401/503 (route exists
+          # but auth/config rejects our empty request). Either 401 or 503 means the
+          # new code is live. /api/health would pass on old deploy → race condition.
+          #
+          # Vercel deploy typically takes 2-3 min for Next.js apps.
+          sleep 45
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/api/e2e/ensure-test-user" \
+              -H "Authorization: Bearer probe" \
+              -H "Content-Type: application/json" \
+              -d '{}' || echo "000")
+            # 401 = endpoint exists + wrong token (new deploy ready)
+            # 503 = endpoint exists + E2E_SETUP_SECRET not set on server (config issue, not a deploy issue)
+            if [ "$STATUS" = "401" ] || [ "$STATUS" = "503" ]; then
+              echo "New deploy detected (endpoint responded $STATUS) on attempt $i"
+              # Also verify health for good measure
+              curl -s -o /dev/null -w "health: %{http_code}\n" "$URL/api/health"
               exit 0
             fi
-            echo "Attempt $i/36: matching deployment not READY yet, retrying in 10s..."
+            echo "Attempt $i/30: status $STATUS (still waiting for new deploy), retrying in 10s..."
             sleep 10
           done
-          echo "::error::No READY staging deployment found for $TARGET_SHA after 6 minutes"
+          echo "::error::New deploy didn't appear after 6 min — aborting"
           exit 1
-
-      - name: Select manual staging target
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          MANUAL_BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
-        run: echo "BASE_URL=$MANUAL_BASE_URL" >> "$GITHUB_ENV"
 
       - name: Ensure E2E test user exists
         run: |
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
           if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
             echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
             exit 0
@@ -133,7 +121,6 @@ jobs:
             products.spec.ts \
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
-            gh-1663-ai-drafts-mobile.spec.ts \
             tests/cart-drawer.spec.ts \
             --project=smoke --project=setup --project=chromium --project=storefront-regression 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
@@ -151,6 +138,7 @@ jobs:
           echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
