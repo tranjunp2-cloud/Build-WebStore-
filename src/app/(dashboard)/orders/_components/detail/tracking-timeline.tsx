@@ -2,10 +2,11 @@
 
 // Tracking event timeline for EP shipped/completed orders.
 // Renders order.shippingTrackingHistory sorted DESC (newest first).
-// Status raw strings → friendly labels via inline map (client-safe;
-// status-map.ts is server-only).
+// Courier descriptions are rendered verbatim beneath the mapped status title,
+// matching the Figma timeline. CMS-created shipment events stay single-line.
 
 import { useI18n } from '@/i18n'
+import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
 
 function fmtEventTime(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -21,33 +22,17 @@ export interface TrackingEvent {
   status?: string | null
   description?: string | null
   eventTime?: string | null
+  collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
-export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
+interface TrackingTimelineProps {
+  events: TrackingEvent[]
+  collectionMethod?: 'pickup' | 'dropoff' | null
+}
+
+export function TrackingTimeline({ events, collectionMethod }: TrackingTimelineProps) {
   const { t } = useI18n()
   const tk = t.dashboard.orders.tracking
-
-  // Keyed by the INTERNAL enum values stored in shippingTrackingHistory[].status
-  // (sync-tracking.ts writes mapped.internal, not the human label).
-  const FRIENDLY: Record<string, string> = {
-    'order_created':      tk.statusOrderCreated,
-    'pending_pickup':     tk.statusPendingPickup,
-    'picked_up':          tk.statusPickedUp,
-    'in_transit':         tk.statusInTransit,
-    'out_for_delivery':   tk.statusOutForDelivery,
-    'delivered':          tk.statusDelivered,
-    'failed_delivery':    tk.statusFailedDelivery,
-    'returned_to_sender': tk.statusReturnedToSender,
-    'lost':               tk.statusLost,
-    'cancelled':          tk.statusCancelled,
-    'exception':          tk.statusException,
-    'processing':         tk.statusProcessing,
-  }
-
-  function friendlyStatus(raw: string | null | undefined): string {
-    if (!raw) return tk.statusProcessing
-    return FRIENDLY[raw] ?? raw
-  }
 
   if (!events || events.length === 0) {
     return (
@@ -70,6 +55,7 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
     <div className="track-timeline">
       {sorted.map((ev, i) => {
         const isFirst = i === 0 // newest = "live" marker
+        const display = formatTrackingEventDisplay(ev, collectionMethod, tk)
         return (
           <div
             key={`${ev.status}-${ev.eventTime}-${i}`}
@@ -78,12 +64,10 @@ export function TrackingTimeline({ events }: { events: TrackingEvent[] }) {
             <span className="tl-dot" />
             <div className="tl-body">
               <div className="tl-head">
-                <span className="tl-t">{friendlyStatus(ev.status)}</span>
+                <span className="tl-t">{display.title}</span>
                 <span className="tl-d">{fmtEventTime(ev.eventTime)}</span>
               </div>
-              {ev.description && (
-                <div className="tl-note">{ev.description}</div>
-              )}
+              {display.note && <div className="tl-note">{display.note}</div>}
             </div>
           </div>
         )
