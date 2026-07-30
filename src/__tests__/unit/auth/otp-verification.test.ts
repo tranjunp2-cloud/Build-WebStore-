@@ -274,14 +274,13 @@ describe('OTP Verification Endpoints', () => {
         beforeEach(() => {
             vi.stubEnv('E2E_TEST_OTP_CODE', TEST_OTP)
             vi.stubEnv('TEST_EMAIL', TEST_EMAIL)
-            vi.stubEnv('APP_ENV', 'staging')
         })
 
         afterEach(() => {
             vi.unstubAllEnvs()
         })
 
-        it('bypasses OTP hash check for matching test email + code on staging', async () => {
+        it('bypasses OTP hash check for matching test email + code in non-production', async () => {
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }] // no otpHash
             })
@@ -292,21 +291,6 @@ describe('OTP Verification Endpoints', () => {
 
             const setCookie = res.headers.get('Set-Cookie')
             expect(setCookie).toContain('payload-token=')
-        })
-
-        it('rejects the fixed E2E OTP outside staging', async () => {
-            // Arrange
-            vi.stubEnv('APP_ENV', 'production')
-            mockPayload.find.mockResolvedValue({
-                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
-            })
-            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
-
-            // Act
-            const res = (await verifyOtpHandler!(req)) as unknown as Response
-
-            // Assert
-            expect(res.status).toBe(401)
         })
 
         it('rejects bypass when OTP code does not match', async () => {

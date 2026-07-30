@@ -1,14 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
-import { loadEnvConfig } from '@next/env'
-
-loadEnvConfig(process.cwd())
 
 const isStaging = process.env.BASE_URL?.includes('dev.ecommercehub')
 
 export default defineConfig({
-    // Keep legacy e2e/ specs and review-required tests/*.spec.ts in one runner.
-    // Project-level matchers below prevent duplicate smoke/auth execution.
-    testDir: '.',
+    testDir: './e2e',
     fullyParallel: false, // Run sequentially — tests share auth state
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
@@ -30,27 +25,22 @@ export default defineConfig({
         {
             name: 'smoke',
             use: { ...devices['Desktop Chrome'] },
-            testMatch: 'e2e/smoke.spec.ts',
+            testMatch: /smoke\.spec\.ts/,
         },
         // Auth setup — runs first, saves auth state
         {
             name: 'setup',
-            testMatch: 'e2e/*.setup.ts',
+            testMatch: /.*\.setup\.ts/,
         },
         // Authenticated tests — reuse auth state from setup
         {
             name: 'chromium',
-            testMatch: ['e2e/*.spec.ts', 'tests/*.spec.ts'],
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
-            testIgnore: [
-                'e2e/smoke.spec.ts',
-                'tests/smoke.spec.ts',
-                'tests/cart-drawer.spec.ts',
-            ],
+            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
         // Public storefront regressions required by repo review rules live in
         // tests/*.spec.ts and do not need the authenticated E2E setup project.

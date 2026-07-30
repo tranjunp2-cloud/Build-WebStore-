@@ -12,7 +12,6 @@ import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/otp/qc-bypass'
-import { isE2EProfileIdentity, isValidE2EProfileOtp } from '@/lib/otp/e2e-profile-bypass'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
@@ -895,11 +894,7 @@ export const Users: CollectionConfig = {
                     const isDev = process.env.NODE_ENV === 'development'
                     const testEmail = process.env.TEST_EMAIL
                     const useDevBypass = isDev && !!testOtpCode
-                    // The profile browser regression uses one dedicated Staff alias derived
-                    // from TEST_EMAIL. Keep the bypass bounded to staging and those two identities.
-                    const useE2EBypass = process.env.APP_ENV === 'staging'
-                        && !!testOtpCode
-                        && isE2EProfileIdentity(email, testEmail)
+                    const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
                     // QC domain bypass — triple-guarded in qc-bypass.ts
                     // (APP_ENV=qc-test + QC_OTP_BYPASS_ENABLED=true + email
                     // ends with QC_OTP_BYPASS_DOMAIN). Skips SES for the
@@ -1025,18 +1020,14 @@ export const Users: CollectionConfig = {
                 // Dev/E2E OTP bypass — three modes:
                 // 1. Dev mode: ANY 6-digit OTP passes (NODE_ENV=development only)
                 // 2. Dev + magic code: specific E2E_TEST_OTP_CODE matches
-                // 3. Staging E2E: specific TEST_EMAIL identity + E2E_TEST_OTP_CODE
+                // 3. E2E test: specific TEST_EMAIL + E2E_TEST_OTP_CODE (any env)
+                // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
                 const isDev = process.env.NODE_ENV === 'development'
                 const isDevBypass = isDev && /^\d{6}$/.test(otp) // Dev: any 6-digit code passes
-                const isE2EBypass = isValidE2EProfileOtp(
-                    email,
-                    otp,
-                    testEmail,
-                    testOtpCode,
-                    process.env.APP_ENV,
-                )
+                const isE2EBypass = !!(testOtpCode && testEmail
+                    && email === testEmail && otp === testOtpCode)
                 // QC domain bypass — accepts fixed QC_OTP_BYPASS_CODE for any
                 // @primeweb.local (or configured) email when APP_ENV=qc-test
                 // AND QC_OTP_BYPASS_ENABLED=true. Triple-guarded in

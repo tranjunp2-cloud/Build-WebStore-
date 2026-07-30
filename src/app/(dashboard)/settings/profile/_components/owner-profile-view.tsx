@@ -29,7 +29,7 @@ function Field({ label, value }: FieldProps) {
 
 // Owner read-only single page (F23 GH-1614 P4): 2-col grid = read-only Profile Card (2fr)
 // + unified SSO widget (1fr), equal height. Pure presentational — no API calls, no forms.
-// 2FA stays hidden until the SSO contract provides an authoritative per-owner status.
+// No 2FA row (no `twoFactor` field on the user model yet, see plan.md decision (b)).
 export function OwnerProfileView({ user, ssoUrl }: Props) {
     const { t } = useI18n()
     const [imgFailed, setImgFailed] = useState(false)
@@ -40,10 +40,7 @@ export function OwnerProfileView({ user, ssoUrl }: Props) {
     const initial = getInitial(user.firstName, user.email)
 
     return (
-        <div
-            data-testid="owner-profile-view"
-            className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-stretch"
-        >
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-stretch">
             {/* Profile Card (2fr) — read-only identity + info grid */}
             <div className="bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-2xl p-6 flex flex-col gap-6">
                 {/* Identity row */}
@@ -77,7 +74,7 @@ export function OwnerProfileView({ user, ssoUrl }: Props) {
                     </div>
                 </div>
 
-                {/* Divider + read-only info grid */}
+                {/* Divider + read-only info grid (Email, Phone, Password dots — no 2FA row) */}
                 <div className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Field label={t.profile.general.email} value={user.email} />
                     <Field label={t.profile.general.phone} value={user.phone || '—'} />

@@ -65,10 +65,7 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
     }
 
     return (
-        <div
-            data-testid="staff-general-info-card"
-            className="bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-2xl p-6"
-        >
+        <div className="bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-2xl p-6">
             {/* Section heading */}
             <div className="flex flex-col gap-0.5 mb-6">
                 <h2 className="text-lg font-bold text-[hsl(var(--foreground))] leading-6">
@@ -105,7 +102,7 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
                         <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                             {t.profile.general.email}
                         </Label>
-                        <div className="relative" data-testid="profile-email-field">
+                        <div className="relative">
                             <Input
                                 type="email"
                                 value={user.email}

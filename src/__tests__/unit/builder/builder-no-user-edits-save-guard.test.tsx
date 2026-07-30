@@ -357,10 +357,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
 
         await waitFor(() => {
-            const state = useBuilderStore.getState()
-            expect(state.status).toBe('error')
-            expect(state.error?.message).toBe('Generation failed while saving pages')
-            expect(state.error?.message).not.toContain('Connection lost')
+            expect(useBuilderStore.getState().status).toBe('error')
+            expect(useBuilderStore.getState().error?.message).toBe('Generation failed while saving pages')
         })
+        expect(useBuilderStore.getState().error?.message).not.toContain('Connection lost')
     })
 })
