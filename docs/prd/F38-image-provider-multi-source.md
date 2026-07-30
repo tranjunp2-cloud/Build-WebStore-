@@ -1,319 +1,213 @@
-# PRD: Multi-Source Image Provider — Pixabay + Unsplash (F38)
+# PRD: Multi-Source Image Selection (F38)
 
-> **Version:** 1.0 | **Created:** 2026-06-24 | **Status:** Draft
-> **Priority:** P2 | **Wave:** TBD | **Size:** S (impl plan estimates ~5h)
-> **Depends on:** F01 AI Builder (image pipeline consumer) | **Blocks:** —
-> **Impl plan:** `plans/260623-1747-pixabay-unsplash-multi-provider/` (4 phases, ready)
+> **Status:** Ready for implementation | **Updated:** 2026-07-20 | **Priority:** P2
+> **Consumer:** F01 AI Builder image pipeline | **No UI:** backend pipeline only
 
-> [!IMPORTANT]
-> **Stories-First gap:** no approved stories exist for F38 yet. FRs below are tagged
-> `[NEED: story]`. Immediate next step: generate `docs/stories/F38-image-provider-stories.md`
-> via `/prd:us`, get them approved, then backfill §0 + §11 from the story files.
+## 1. Decision
 
-## 0. Story Traceability
+Replace the obsolete Pixabay + Unsplash-router proposal with an ordered, license-aware image-selection pipeline:
 
-| Story ID | Title | File | Status |
-|----------|-------|------|--------|
-| US-F38-01 | Fetch block image from primary provider with fallback | `[NEED: story]` | — |
-| US-F38-02 | Switch primary provider via env config | `[NEED: story]` | — |
-| US-F38-03 | Build per-site image pool across providers | `[NEED: story]` | — |
+1. **Wikimedia Commons**
+2. **Pixabay**
+3. **AI image generation**
 
-> Check: every FR in §7 references a story above (or is tagged `[NEED: story]` pending creation).
+For each stock provider, collect its top candidates and ask **`gemini-3.1-flash-lite`** to select the best image for the requested block. The first provider that returns a license-valid candidate that Gemini marks relevant wins. The selected image then uses the existing download, Payload upload, and media-assignment pipeline.
 
-## 1. Problem Statement
+This is deliberately a source-priority fallback, not a random cross-provider pool: a valid Wikimedia result is preferred over a valid Pixabay result.
 
-The image pipeline fetches stock photos from **Unsplash only**. The app runs on the Unsplash
-**Demo tier = 50 requests/hour** (Production tier = 1,000/hr, requires Unsplash approval).
-Generation is already **pool-first** for site blocks, but still depends on Unsplash for the
-pool, per-block deficit fill, image-library seeding, sample products, and blog thumbnails. A
-single provider and single API key remains one point of failure for a core feature (generated
-sites need complete imagery).
+## 2. Current State (verified 2026-07-20)
 
-## 2. Target User & Actors
+- The production code is **Pixabay-only** for search: `src/lib/ai/pixabay-client.ts` is used by the image pool, per-block media pipeline, image-library seeding, sample products, and blog thumbnails.
+- Existing query quality controls must remain: raw business-language keywords, optional English translation for the pool, category filtering, relevance gates, relaxed and category fallback tiers, rate-limit short-circuiting, and pool pre-upload.
+- `PIXABAY_API_KEY`, `PIXABAY_BLOCKS`, and `PIXABAY_FALLBACK_ONLY` already exist. There is no `IMAGE_PROVIDER_PRIMARY`, provider router, Wikimedia client, or Gemini Vision rating step.
+- Existing AI generation is an OpenAI/DALL-E hero-only rollback path behind `ENABLE_DALLE_HERO=true`. F38 extends AI generation to the final fallback for any unresolved eligible image slot.
+- Payload `media` currently stores alt text and AI-generation fields only. It cannot retain stock-image source URL, license, or attribution; F38 therefore requires an additive Media schema migration.
+- Curated static Unsplash fallback URLs remain an existing resilience path. They are not a searchable provider and are outside the new priority order.
 
-| Actor | Type | Description / state | Goal in this feature |
-|-------|------|---------------------|----------------------|
-| Site owner | Primary (indirect) | Authenticated user triggering site generation | Generated site has complete, relevant imagery — no missing blocks |
-| Generation system | Primary (actor) | Server-side AI gen pipeline calling the provider | Fetch image pools and fallback images reliably, within rate limits |
-| Pixabay API | Secondary (system) | External stock-image API, ~6,000 req/hr free | Serve search + image bytes |
-| Unsplash API | Secondary (system) | External stock-image API, fallback source | Serve search + image bytes when primary fails |
+## 3. Problem
 
-## 3. Solution Overview
+Pixabay provides a working stock-image pipeline but has uneven coverage for niche businesses and multilingual searches. Reusing an image without durable provenance is also insufficient when the source has attribution or license conditions. The builder needs more relevant images while preserving a deterministic, auditable license path and the existing generation performance safeguards.
 
-Add **Pixabay** as a second stock-image provider behind a thin **router**. Both providers return
-one **normalized `ProviderPhoto` / `ProviderError` shape**, so callers stop coupling to
-Unsplash-only mechanics. The router uses **Pixabay as primary** (highest free limit, no
-attribution/ToS download-ping) and **falls back to Unsplash** on rate-limit or empty results.
-Primary is switchable via env `IMAGE_PROVIDER_PRIMARY`. Existing media orchestration,
-bounded concurrency, and Payload-upload logic stay intact; provider-specific retry, download,
-and SSRF logic moves behind the provider boundary. No DB change.
+## 4. Target Flow
 
-> **Why Pixabay primary:** Pixabay free ~6,000/hr ≈ 120× Unsplash demo (50/hr), requires no
-> attribution and no mandatory download tracking → safer default for high-volume generation.
-> Unsplash stays as fallback for its richer search relevance.
-
-> **Design note (drives the FRs):** a pure import-swap is **not** clean. Consumers currently use
-> Unsplash-only `buildImgixUrl(photo.urls.raw, …)`, `photo.links.download_location`, and branch on
-> the concrete `UnsplashError` class. The normalized shape removes these couplings; each client
-> pre-bakes its own resize URL internally (Imgix for Unsplash, fixed-size pick for Pixabay).
-
-## 4. Scope
-
-**In scope:** normalized provider shape; `pixabay-client.ts`; router with automatic fallback;
-env-driven primary selection; provider-aware alt-text; wiring of the 6 direct
-`unsplash-client` consumers. `generate-site` remains the orchestration caller and only needs
-provider-neutral comments/log labels if touched.
-**Out of scope:** see §15-style list below —
-- Applying for Unsplash **Production tier** (ops task, tracked separately).
-- AI image generation (gpt-image / DALL-E) — `ENABLE_DALLE_HERO` path untouched.
-- Search-result caching (none exists; YAGNI).
-- New DB schema / migration.
-- Multi-key routing on a single provider (violates Unsplash ToS).
-- Pixabay video/illustration types — `image_type=photo` only.
-
-## 5. Success Metrics
-
-| Metric | Target | Guardrail | Measured By |
-|--------|--------|-----------|-------------|
-| Rate-limit failures during site generation | **0** | Generation wall-clock time must not regress | Server logs / gen telemetry over a generation batch |
-| Block image fill rate | ≥ existing baseline | No increase in image-fetch errors | Count blocks with valid `media` vs total per site |
-
-## 6. Use Cases
-
-**UC-01: Fetch image for a block**
-- **Primary actor:** Generation system · **Secondary:** Pixabay API, Unsplash API
-- **Preconditions:** valid `PIXABAY_API_KEY` and/or `UNSPLASH_ACCESS_KEY` configured; a block needs an image with a search query + orientation.
-- **Postconditions:** a `ProviderPhoto` is returned and uploaded to Payload `media`, OR the caller applies its existing hero-fallback / skip path.
-- **Normal Course:**
-  1. System requests an image for a block (query + orientation).
-  2. Router calls the **primary** provider (Pixabay) search.
-  3. Primary returns ≥1 result; router selects one and returns a normalized `ProviderPhoto`.
-  4. System downloads bytes via the provider's `downloadPhotoBuffer` (SSRF-guarded) and uploads to Payload `media`.
-- **Alternative Courses (still succeed):**
-  - A1. Primary returns **empty** results → router calls **fallback** (Unsplash) → returns a `ProviderPhoto`.
-  - A2. Primary throws a **rate-limit** `ProviderError` → router calls fallback → returns a `ProviderPhoto`.
-  - A3. Count=1 caller on Pixabay → request `per_page=3` (Pixabay minimum), then slice to 1.
-- **Exceptions (goal fails):**
-  - E1. Both providers empty/error → caller invokes existing `heroFallbackChain` (Unsplash hardcoded URL) or skips the image. No crash.
-  - E2. Download host not on SSRF allowlist → download rejected, treated as a failed fetch (caller falls back).
-
-**UC-02: Switch primary provider via config**
-- **Primary actor:** Operator (deploy-time) · **Secondary:** none
-- **Preconditions:** env `IMAGE_PROVIDER_PRIMARY` set to `pixabay` or `unsplash`.
-- **Postconditions:** router routes all subsequent searches to the chosen primary.
-- **Normal Course:**
-  1. Operator sets `IMAGE_PROVIDER_PRIMARY` in the environment.
-  2. On next generation, router reads the flag and selects primary accordingly; the other becomes fallback.
-- **Alternative:** A1. Flag unset/invalid → router defaults to `pixabay`.
-- **Exception:** E1. Primary's API key missing → router uses the other provider as primary (degrade, log warning).
-
-**UC-03: Build per-site image pool across providers**
-- **Primary actor:** Generation system · **Secondary:** primary + fallback providers
-- **Preconditions:** site generation requests a visual-cohesion pool (landscape + square).
-- **Postconditions:** a pool of normalized photos is uploaded to the site's Payload `media`, idempotent per site.
-- **Normal Course:**
-  1. System requests the pool (1–2 searches by orientation).
-  2. Router fetches via primary; on underfill, existing relaxed-query retry applies.
-  3. Pool photos are uploaded once per site (existing alt-key idempotency).
-- **Alternative:** A1. Primary underfills after retry → fallback provider tops up the pool.
-- **Exception:** E1. Both underfill → pool ships partial; callers rotate available photos (existing behavior).
-
-## 7. Functional Requirements
-
-| FR-ID | Requirement | Story Ref | Priority | Status | Notes |
-|-------|-------------|-----------|----------|--------|-------|
-| FR-01 | Define a normalized `ProviderPhoto` + `ProviderError` shape both clients return | `[NEED: story]` | P0 | planned | `src/lib/ai/image-provider-types.ts`; removes Unsplash-only coupling |
-| FR-02 | Implement `pixabay-client.ts` exposing `searchPhotos` + `downloadPhotoBuffer` returning the normalized shape | `[NEED: story]` | P0 | planned | `image_type=photo`, `safesearch=true`, env `PIXABAY_API_KEY` |
-| FR-03 | Pixabay client pre-bakes its resize URL (pick `largeImageURL`/`webformatURL`); no Imgix | `[NEED: story]` | P0 | planned | Pixabay ships fixed sizes; no `urls.raw` |
-| FR-04 | Router `image-provider.ts` exposes the same `searchPhotos`/`downloadPhotoBuffer`; routes to primary, falls back on rate-limit/empty | `[NEED: story]` | P0 | planned | Single entry point for all consumers |
-| FR-05 | Primary provider selectable via env `IMAGE_PROVIDER_PRIMARY` (default `pixabay`) | `[NEED: story]` | P0 | planned | Invalid/unset → default pixabay |
-| FR-06 | Wire all 6 direct consumers to import the router instead of `unsplash-client` directly | `[NEED: story]` | P0 | planned | media-pipeline, image-pool, image-library-seeder, sample-products, blog-posts, upload-media |
-| FR-07 | Alt-text reflects the actual source provider (not hardcoded "on Unsplash") | `[NEED: story]` | P1 | planned | Attribution accuracy |
-| FR-08 | Count=1 callers clamp Pixabay `per_page` to its minimum (3) then slice | `[NEED: story]` | P0 | planned | sample-products, blog-posts |
-| FR-09 | Extend provider download SSRF allowlist to Pixabay hosts (`pixabay.com`, `cdn.pixabay.com`) | `[NEED: story]` | P0 | planned | Do this in provider download guard; media-injector ingest allowlist is separate |
-| FR-10 | Keep existing media orchestration, CONCURRENCY=3 semaphore, and Payload upload flow | `[NEED: story]` | P0 | planned | Provider-specific retry/download logic lives in clients/router |
-| FR-11 | `heroFallbackChain` remains Unsplash-only (hardcoded URLs, bypasses search) | `[NEED: story]` | P2 | planned | Intentional — no change |
-
-## 8. Business Rules
-
-- **BR-01:** Default primary provider = Pixabay when `IMAGE_PROVIDER_PRIMARY` is unset or invalid.
-- **BR-02:** A download is only performed against a host on the SSRF allowlist; otherwise rejected.
-- **BR-03:** Pixabay requests use `image_type=photo` and `safesearch=true` only.
-- **BR-04:** If the configured primary's API key is missing, the other provider becomes primary (degrade, do not crash).
-- **BR-05:** No DB schema change — images flow to the existing Payload `media` collection unchanged.
-
-## 9. User Flow
-
-```
-Site generation requests image for a block
-  ↓
-Router → primary provider (Pixabay) search
-  ↓
-  ├── results ≥1 → pick photo → download (SSRF-guard) → upload to Payload media → DONE
-  ├── empty OR rate-limit error → fallback (Unsplash) search
-  │     ├── results ≥1 → download → upload → DONE
-  │     └── empty/error → heroFallbackChain (Unsplash hardcoded) OR skip image
-  └── primary key missing → use fallback as primary (log warning)
+```mermaid
+flowchart TB
+  start([image_slot_requested]) --> derive_query[derive_query_and_block_context]
+  derive_query --> wiki_search[search_wikimedia_commons]
+  wiki_search --> wiki_valid{wiki_candidates_with_license?}
+  wiki_valid -->|yes| wiki_rate[gemini_rate_wiki_top_candidates]
+  wiki_rate --> wiki_match{relevant_winner?}
+  wiki_match -->|yes| upload_stock[download_validate_upload_media]
+  wiki_match -->|no| pixabay_search[search_pixabay]
+  wiki_valid -->|no| pixabay_search
+  pixabay_search --> pixabay_valid{pixabay_candidates?}
+  pixabay_valid -->|yes| pixabay_rate[gemini_rate_pixabay_top_candidates]
+  pixabay_rate --> pixabay_match{relevant_winner?}
+  pixabay_match -->|yes| upload_stock
+  pixabay_match -->|no| ai_generate[generate_ai_image]
+  pixabay_valid -->|no| ai_generate
+  ai_generate --> ai_ok{image_generated?}
+  ai_ok -->|yes| upload_ai[upload_ai_media_with_prompt]
+  ai_ok -->|no| existing_fallback[existing_hero_fallback_or_empty_slot]
+  upload_stock --> assign_media[assign_media_to_block]
+  upload_ai --> assign_media
+  assign_media --> done([slot_resolved])
+  existing_fallback --> done
 ```
 
-## 10. Screen Layout
+### Selection contract
 
-N/A — backend / pipeline feature, no UI.
+- A candidate is eligible only when its image URL is downloadable from an allowlisted host, its image bytes pass the existing validation, and its source metadata is complete.
+- Wikimedia candidates require a verified original license and attribution data before Gemini may select them.
+- Gemini receives the block context, business context, and a bounded top-N candidate set from **one source at a time**. It returns structured JSON: `winnerId`, `relevant`, `alt`, and `reason`.
+- Invalid JSON, timeout, unavailable Gemini key, or no relevant winner means that source does not win; continue to the next source. Gemini never authorizes a license exception.
+- The selected candidate's source URL, provider, license, and attribution are stored with the uploaded Media record. AI media stores `aiGenerated=true` and its prompt.
 
-## 11. Acceptance Criteria
+## 5. User Stories
 
-> Copied placeholders — finalize from approved `docs/stories/F38-*-stories.md`. ≥3 per story (happy/edge/negative).
+| ID | User story | Outcome |
+|---|---|---|
+| US-F38-01 | As a site owner, I receive a relevant licensed stock image for each eligible generated block. | Better visual relevance without manual sourcing. |
+| US-F38-02 | As an operator, I can trace every selected stock image back to its provider, original URL, license, and attribution. | License auditability. |
+| US-F38-03 | As the generation system, I fall through the approved source order without blocking site generation. | Resilient image completion. |
+| US-F38-04 | As a site owner, I receive an AI-generated image only after neither stock source produced a relevant, license-valid candidate. | Spend AI credits only as final fallback. |
 
-### AC-1: Primary provider happy path — Source: US-F38-01
+## 6. Functional Requirements
+
+| ID | Requirement | Priority |
+|---|---|---|
+| FR-01 | Preserve the current Pixabay client and all current query/relevance safeguards. Do not regress existing Pixabay behavior. | P0 |
+| FR-02 | Add a Wikimedia Commons adapter that returns normalized image candidates plus original file-page URL, creator, license name/URL, and attribution text. Reject candidates without this metadata. | P0 |
+| FR-03 | Keep Pixabay second in the order and normalize its existing result shape into the shared candidate contract. Retain provider URL and photographer metadata. | P0 |
+| FR-04 | Implement a provider-independent candidate contract: ID, provider, preview/download URL, original source URL, creator, license name, license URL, attribution text, dimensions, and alt seed. | P0 |
+| FR-05 | Rate a bounded top-N set from each provider with stable `gemini-3.1-flash-lite`. Require schema-validated JSON and select only a candidate marked relevant. | P0 |
+| FR-06 | Continue to the next provider on empty results, failed license verification, download/validation failure, Gemini failure, or no relevant candidate. Preserve existing timeout and rate-limit handling. | P0 |
+| FR-07 | Use AI image generation only after Wikimedia and Pixabay fail to yield a winner. Persist the existing AI prompt and `aiGenerated=true`. | P0 |
+| FR-08 | Add `sourceProvider`, `sourceUrl`, `licenseName`, `licenseUrl`, and `attribution` to Payload Media. Add the matching safe, additive SQL migration in `scripts/db-setup.js`. | P0 |
+| FR-09 | Add `GEMINI_API_KEY` to both `.env.staging.example` and `.env.production.example`. Do not add a Wikimedia secret unless its selected API path requires one. | P0 |
+| FR-10 | Extend the download SSRF allowlist only for verified Wikimedia hosts. Never download arbitrary result URLs. | P0 |
+| FR-11 | Emit structured logs for source attempted, rejection reason, selected provider, and fallback stage. Never log keys or full Gemini prompts. | P1 |
+
+## 7. Business Rules
+
+1. Source order is fixed: Wikimedia Commons → Pixabay → AI generation.
+2. A later source cannot replace an eligible winner from an earlier source.
+3. All stock media must retain provenance in the Media record; alt text is not a license record.
+4. The existing Pixabay pipeline remains the fallback-compatible baseline during rollout.
+5. If all sources and AI generation fail, preserve current behavior: category hero fallback where available; otherwise leave the image slot empty and complete site generation.
+6. F38 does not create a user-facing provider selector, a cache, a new endpoint, or a new tenant setting.
+
+## 8. Acceptance Criteria
+
+### AC-1 — Wikimedia winner
+
 ```gherkin
-GIVEN IMAGE_PROVIDER_PRIMARY=pixabay and a valid PIXABAY_API_KEY
-WHEN  the generator requests an image for a block with a non-empty query
-THEN  Pixabay is searched and a normalized ProviderPhoto is returned
-  AND the image is downloaded and uploaded to the Payload media collection
+GIVEN Wikimedia returns candidates with complete license and attribution metadata
+WHEN Gemini marks one Wikimedia candidate relevant for the requested block
+THEN that candidate is downloaded, validated, uploaded, and assigned
+AND its provider, original URL, license, and attribution are saved on Media
+AND no lower-priority provider is queried for that slot
 ```
 
-### AC-2: Fallback on empty primary results — Source: US-F38-01
+### AC-2 — Wikimedia rejection falls through
+
 ```gherkin
-GIVEN Pixabay search returns zero results for the query
-WHEN  the router handles the request
-THEN  Unsplash is searched as fallback
-  AND a ProviderPhoto from Unsplash is returned (if available)
+GIVEN Wikimedia returns no candidate with complete reusable-license metadata
+WHEN the slot is resolved
+THEN Pixabay is queried next
+AND site generation does not fail
 ```
 
-### AC-3: Fallback on rate-limit — Source: US-F38-01
+### AC-3 — Pixabay safeguards persist
+
 ```gherkin
-GIVEN the primary provider raises a rate-limit ProviderError
-WHEN  the router handles the request
-THEN  it retries against the fallback provider
-  AND no exception propagates to the generation pipeline
+GIVEN a Pixabay query uses current raw keywords, category filtering, and relevance gates
+WHEN F38 is enabled
+THEN the same safeguards still run before Pixabay candidates are rated
+AND existing Pixabay unit and regression tests pass unchanged
 ```
 
-### AC-4: Both providers fail — Source: US-F38-01
+### AC-4 — Gemini rating is bounded and safe
+
 ```gherkin
-GIVEN both Pixabay and Unsplash return empty/error for a block
-WHEN  the router exhausts both
-THEN  the caller's existing heroFallbackChain or skip path runs
-  AND site generation completes without crashing
+GIVEN Wikimedia or Pixabay returns more candidates than the configured top-N
+WHEN rating runs
+THEN Gemini receives only the top-N candidate images and their context
+AND an invalid response, timeout, or no relevant winner advances the fallback order
+AND no image is selected solely from Gemini output without prior license validation
 ```
 
-### AC-5: Switch primary via env — Source: US-F38-02
+### AC-5 — AI final fallback
+
 ```gherkin
-GIVEN IMAGE_PROVIDER_PRIMARY=unsplash
-WHEN  the generator requests an image
-THEN  Unsplash is searched first and Pixabay is the fallback
+GIVEN Wikimedia and Pixabay have no relevant license-valid winner
+WHEN the image slot is eligible for AI generation
+THEN an AI image is generated and uploaded with aiGenerated=true and its prompt
+AND generation continues if AI generation fails
 ```
 
-### AC-6: Invalid/unset flag defaults to Pixabay — Source: US-F38-02
+### AC-6 — Provenance schema migration
+
 ```gherkin
-GIVEN IMAGE_PROVIDER_PRIMARY is unset or an unrecognized value
-WHEN  the router selects a primary
-THEN  Pixabay is used as primary
+GIVEN F38 adds stock-image provenance fields to Media
+WHEN the deployment migration runs
+THEN the fields are added without dropping existing Media data
+AND existing Media records remain readable
 ```
 
-### AC-7: Missing primary key degrades — Source: US-F38-02
+### AC-7 — No site-generation regression
+
 ```gherkin
-GIVEN the configured primary provider's API key is missing
-WHEN  the router selects a provider
-THEN  the other provider is used as primary
-  AND a warning is logged (no crash)
+GIVEN a normal site generation with valid Pixabay credentials
+WHEN Wikimedia is unavailable or returns no usable result
+THEN the existing Pixabay path still resolves images
+AND a failed provider or rating step does not crash generation
 ```
 
-### AC-8: per_page clamp for count=1 — Source: US-F38-03
-```gherkin
-GIVEN a caller requests exactly 1 image from Pixabay
-WHEN  the search is issued
-THEN  per_page is set to the Pixabay minimum (3)
-  AND exactly 1 photo is returned to the caller after slicing
-```
+## 9. Data and Security Contract
 
-### AC-9: SSRF allowlist enforced — Source: US-F38-01
-```gherkin
-GIVEN a download URL whose host is not on the allowlist
-WHEN  downloadPhotoBuffer is called
-THEN  the download is rejected
-  AND the request is treated as a failed fetch (fallback applies)
-```
+| Media field | Stock image | AI image |
+|---|---|---|
+| `sourceProvider` | `wikimedia` or `pixabay` | `ai` |
+| `sourceUrl` | Original source page URL | N/A |
+| `licenseName` / `licenseUrl` | Required before selection | N/A |
+| `attribution` | Required where source license requires it; store normalized text | N/A |
+| `aiGenerated` | `false` | `true` |
+| `aiPrompt` | Empty | Required existing prompt |
 
-### AC-10: Provider-accurate alt-text — Source: US-F38-01
-```gherkin
-GIVEN an image sourced from Pixabay
-WHEN  it is uploaded to the Payload media collection
-THEN  its alt-text references Pixabay (not "on Unsplash")
-```
+- The Media collection change is additive only. `scripts/db-setup.js` must use `ALTER TABLE ADD COLUMN IF NOT EXISTS`; never drop or rebuild the Media table.
+- The downloader must validate URL host, response type, file size, and image magic bytes before upload.
+- Gemini receives candidate image URLs or image bytes only after a candidate passes source and license validation.
 
-### AC-11: No generation-time regression — Source: US-F38-03
-```gherkin
-GIVEN a full site generation run with Pixabay primary
-WHEN  generation completes
-THEN  wall-clock time is within the pre-change baseline
-  AND zero rate-limit failures are recorded
-```
+## 10. Dependencies and Rollout
 
-## 12. Non-Functional Requirements
+| Dependency | Required action |
+|---|---|
+| Wikimedia Commons API | Use the public API with a compliant User-Agent; confirm requested fields cover file license and attribution. |
+| Gemini API | Provision `GEMINI_API_KEY`; use stable `gemini-3.1-flash-lite` structured JSON output. |
+| Payload Media | Add provenance fields and matching database migration. |
+| Existing tests | Keep F38 Pixabay tests as regression coverage; add source-adapter, license-rejection, rating, provenance, and full-fallback coverage. |
 
-| Category | Requirement | Notes |
-|----------|-------------|-------|
-| **Performance** | Site generation wall-clock time must not regress vs Unsplash-only baseline | CONCURRENCY=3 semaphore reused unchanged |
-| **Reliability** | Zero rate-limit-induced image failures during a generation batch | Primary ~6,000/hr + fallback |
-| **Security** | SSRF download allowlist retained and extended to Pixabay hosts | Reuse existing guard in `downloadPhotoBuffer` |
-| **Maintainability** | Small surface: 2 new provider modules + 6 direct consumers + env/tests | Normalized shape is the only new abstraction |
-| **Config** | New env `PIXABAY_API_KEY` + `IMAGE_PROVIDER_PRIMARY` added to `.env.staging.example`, `.env.production.example`, and Vercel Dashboard | Per `.claude/rules/env-vars.md` |
-| **Data** | No DB schema change; CI schema gate (`check-migrations.js`) is a no-op | `db-setup.js` untouched |
+Roll out behind a server-side F38 flag. Start with a small staging batch, inspect selected-provider logs and stored provenance, then enable for normal generation. Roll back by disabling F38; the current Pixabay-only pipeline remains available.
 
-## 13. API Contract
+## 11. Non-Goals
 
-N/A — no new HTTP endpoint. Internal module contract:
+- Replacing existing curated Unsplash static fallback URLs.
+- A user-facing image-source picker.
+- Caching, image marketplace billing, or provider-specific multi-key rotation.
+- Changing unrelated block layout, image assignment, or tenant authorization behavior.
 
-- `src/lib/ai/image-provider-types.ts` — `ProviderPhoto`, `ProviderError`.
-  - `ProviderPhoto`: `id`, `provider`, `url`, `alt`, `photographer`, `width`, `height`, `downloadLocation`.
-  - `ProviderError`: `provider`, `code`, `status`, `retryable`.
-- `src/lib/ai/image-provider.ts` — `searchPhotos(query, opts)`, `downloadPhotoBuffer(photo)` mirroring the existing client signatures.
-- `src/lib/ai/pixabay-client.ts` — same two functions; `trackDownload` = no-op (Pixabay requires none).
+## 12. Definition of Done
 
-## 14. Dependencies
+- [ ] Wikimedia, Pixabay, Gemini rating, and AI fallback follow the exact approved order.
+- [ ] Existing Pixabay behavior and regression tests remain green.
+- [ ] Every selected stock image has persisted provenance; every AI image has `aiGenerated` and prompt data.
+- [ ] Media schema fields have a non-destructive migration and env variables exist in both example files.
+- [ ] SSRF, Wikimedia-license rejection, rating-failure, and full-fallback paths are covered by automated tests.
+- [ ] A staging generation demonstrates stock selection, provenance storage, and graceful fallback without a generation crash.
 
-| Dependency | Status | Action Needed |
-|-----------|--------|---------------|
-| Impl plan `plans/260623-1747-pixabay-unsplash-multi-provider/` | ✅ ready | Run via `/cook` after PRD + stories approved |
-| `PIXABAY_API_KEY` | ⬜ | Provision a free Pixabay API key; add to Vercel + `.env.*.example` |
-| `docs/stories/F38-image-provider-stories.md` | ⬜ | Create via `/prd:us`, get approved (Stories-First) |
-| `docs/TEST_CONVENTION.md` | ✅ exists | Source TC-IDs for tests (Phase 04) |
+## 13. References
 
-## 15. Risks & Open Questions
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Pixabay search relevance/quality lower than Unsplash for some niches | Medium | Medium | Unsplash fallback on empty; keep `IMAGE_PROVIDER_PRIMARY` switch to flip primary fast |
-| Hero resolution drop — Pixabay `largeImageURL` ~1280px upscaled to 1920 | High | Low | MVP-accepted; hero can stay on Unsplash if a reviewer rejects upscaling |
-| Provider response shape drift breaks the normalized `ProviderPhoto` type | Low | Medium | Type-guard at the client boundary; tests assert mapping per provider |
-| Pixabay rate limit increased only for "properly integrated" apps | Low | Low | ~6,000/hr base is already ample; fallback covers spikes |
-
-| # | Open Question | Owner | Answer |
-|---|---------------|-------|--------|
-| 1 | Exact `docs/qa/F38-*.md` file for new TC-IDs | QC | `[NEED]` — likely new F38 QA doc |
-| 2 | Does `scripts/check-env-vars.js` need an optional-var allowlist? | Dev | No. It only checks new `process.env.*` refs against both env example files; adding placeholders is sufficient. |
-| 3 | Keep hero on Unsplash for resolution, or accept Pixabay upscale? | Product/Design | Pending team review (raised) |
-
-## 16. Done Checklist
-
-- [ ] Normalized `ProviderPhoto`/`ProviderError` shape defined and used by both clients
-- [ ] `pixabay-client.ts` returns the normalized shape; `trackDownload` no-op
-- [ ] Router fallback verified (empty + rate-limit paths)
-- [ ] `IMAGE_PROVIDER_PRIMARY` switch + default-to-pixabay verified
-- [ ] All 6 direct consumers import the router; no direct `unsplash-client` calls remain outside provider adapter code
-- [ ] SSRF allowlist extended to Pixabay hosts
-- [ ] `per_page≥3` clamp on count=1 callers
-- [ ] Provider-accurate alt-text
-- [ ] Env vars added to both `.env.*.example` + Vercel Dashboard
-- [ ] No DB migration; CI schema gate passes as no-op
-- [ ] Tests pass with TC-IDs (Phase 04)
-- [ ] TypeScript clean — `tsc --noEmit`
-
-## 17. Definition of Ready / Done
-
-**Ready:** F38 stories created & approved (§0) · AC in §11 copied from stories · every FR has a
-Story Ref · provider module contract confirmed · `PIXABAY_API_KEY` provisioned · open questions
-resolved.
-**Done:** all FRs implemented & verified · all AC pass · Done Checklist complete · zero
-rate-limit failures measured on a generation run · generation time within baseline · QA report
-written.
+- [Wikimedia Developer Portal: use wiki content](https://developer.wikimedia.org/use-content/content/)
+- [Gemini API: image understanding](https://ai.google.dev/gemini-api/docs/image-understanding)
+- [Gemini API: structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)

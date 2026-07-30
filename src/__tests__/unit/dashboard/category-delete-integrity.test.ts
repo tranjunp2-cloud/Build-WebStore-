@@ -29,6 +29,9 @@ import { getPayload } from 'payload'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 
+type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+type ActiveSubscription = NonNullable<Awaited<ReturnType<typeof getActivePlanSubscription>>>
+
 const mockCurrentUser = { id: 'user-123', tenants: [{ tenant: 'tenant-456' }] }
 
 type MockPayload = { findByID: Mock; db: { drizzle: { transaction: Mock } } }
@@ -67,7 +70,9 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
         vi.mocked(getCurrentUser).mockResolvedValue(mockCurrentUser as any)
         vi.mocked(tenantIdForQuery).mockImplementation((user) => user?.tenants?.[0]?.tenant)
-        vi.mocked(getActivePlanSubscription).mockResolvedValue({ plan: 'PROFESSIONAL_TM_USER' } as any)
+        vi.mocked(getActivePlanSubscription).mockResolvedValue(
+            { plan: 'PROFESSIONAL_TM_USER' } as unknown as ActiveSubscription,
+        )
         vi.mocked(canUse).mockResolvedValue(true)
     })
 
@@ -91,6 +96,104 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             overrideAccess: false,
         })
         expect(mockTransaction).toHaveBeenCalledOnce()
+        expect(mockExecute).toHaveBeenCalledTimes(3)
+    })
+
+
+    it('TC-F08-05-06: blocks mutation when read access passes but product management is unavailable', async () => {
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null, tenant: 'tenant-456' })
+        vi.mocked(canUse).mockResolvedValue(false)
+
+        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('Product management is not available on your current plan.')
+        expect(mockExecute).not.toHaveBeenCalled()
+    })
+
+    it('TC-F08-05-19: checks entitlement against the authorized category tenant before denying delete', async () => {
+        // Arrange
+        vi.mocked(getCurrentUser).mockResolvedValue({
+            id: 'multi-tenant-user',
+            tenants: [{ tenant: 'tenant-a' }, { tenant: 'tenant-b' }],
+        } as unknown as CurrentUser)
+        mockFindByID.mockResolvedValue({
+            id: 'cat-123',
+            name: 'Fashion',
+            parent: null,
+            tenant: 'tenant-b',
+        })
+        vi.mocked(getActivePlanSubscription).mockImplementation(async (_payload, tenantId) => ({
+            plan: tenantId === 'tenant-a' ? 'PROFESSIONAL_TM_USER' : 'FREEMIUM',
+        } as unknown as ActiveSubscription))
+        vi.mocked(canUse).mockImplementation(async (_payload, plan) => plan === 'PROFESSIONAL_TM_USER')
+        mockExecute.mockResolvedValue({
+            rows: [{
+                direct_count: 0,
+                name_conflict_count: 0,
+                deleted: true,
+                deleted_doc: { id: 'cat-123', deletedAt: '2026-07-16T00:00:00.000Z' },
+            }],
+        })
+
+        // Act
+        const action = deleteCategoryAction('cat-123')
+
+        // Assert
+        await expect(action).rejects.toThrow('Product management is not available on your current plan.')
+        expect(getActivePlanSubscription).toHaveBeenCalledWith(mockPayload, 'tenant-b')
+        expect(mockExecute).not.toHaveBeenCalled()
+    })
+
+    it('TC-F08-05-20: accepts a populated category tenant with entitlement even when the first tenant lacks it', async () => {
+        // Arrange
+        vi.mocked(getCurrentUser).mockResolvedValue({
+            id: 'multi-tenant-user',
+            tenants: [{ tenant: 'tenant-a' }, { tenant: 'tenant-b' }],
+        } as unknown as CurrentUser)
+        mockFindByID.mockResolvedValue({
+            id: 'cat-123',
+            name: 'Fashion',
+            parent: null,
+            tenant: { id: 'tenant-b' },
+        })
+        vi.mocked(getActivePlanSubscription).mockImplementation(async (_payload, tenantId) => ({
+            plan: tenantId === 'tenant-b' ? 'PROFESSIONAL_TM_USER' : 'FREEMIUM',
+        } as unknown as ActiveSubscription))
+        vi.mocked(canUse).mockImplementation(async (_payload, plan) => plan === 'PROFESSIONAL_TM_USER')
+        mockExecute.mockResolvedValue({
+            rows: [{
+                direct_count: 0,
+                name_conflict_count: 0,
+                deleted: true,
+                deleted_doc: { id: 'cat-123', deletedAt: '2026-07-16T00:00:00.000Z' },
+            }],
+        })
+
+        // Act
+        const action = deleteCategoryAction('cat-123')
+
+        // Assert
+        await expect(action).resolves.toMatchObject({ id: 'cat-123' })
+        expect(getActivePlanSubscription).toHaveBeenCalledWith(mockPayload, 'tenant-b')
+        expect(mockExecute).toHaveBeenCalledTimes(3)
+    })
+
+    it('TC-F08-05-06: preserves the collection access bypass for super-admin', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValue(
+            { id: 'admin-1', roles: ['super-admin'], tenants: [] } as unknown as CurrentUser,
+        )
+        vi.mocked(tenantIdForQuery).mockReturnValue(null)
+        mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', parent: null, tenant: 'tenant-456' })
+        mockExecute.mockResolvedValue({
+            rows: [{
+                direct_count: 0,
+                name_conflict_count: 0,
+                deleted: true,
+                deleted_doc: { id: 'cat-123', deletedAt: '2026-07-16T00:00:00.000Z' },
+            }],
+        })
+
+        await expect(deleteCategoryAction('cat-123')).resolves.toMatchObject({ id: 'cat-123' })
+        expect(getActivePlanSubscription).not.toHaveBeenCalled()
+        expect(canUse).not.toHaveBeenCalled()
         expect(mockExecute).toHaveBeenCalledTimes(3)
     })
 
@@ -125,7 +228,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             }],
         })
 
-        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_HAS_PRODUCTS:5')
+        await expect(deleteCategoryAction('cat-123')).resolves.toEqual({ success: false, error: 'CATEGORY_HAS_PRODUCTS', count: 5 })
     })
 
     it('TC-F08-05-33: throws CATEGORY_REPARENT_NAME_CONFLICT:N before delete when moving children to root would duplicate names', async () => {
@@ -139,7 +242,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
             }],
         })
 
-        await expect(deleteCategoryAction('cat-123')).rejects.toThrow('CATEGORY_REPARENT_NAME_CONFLICT:2')
+        await expect(deleteCategoryAction('cat-123')).resolves.toEqual({ success: false, error: 'CATEGORY_REPARENT_NAME_CONFLICT', count: 2 })
     })
 
     it('TC-F08-05-06: returns deleted record from the atomic delete statement', async () => {
@@ -248,7 +351,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
         expect(lockSql).toContain('FROM categories')
         expect(lockSql).toContain('FOR UPDATE')
         expect(lockSql).not.toContain('WITH target AS')
-        expect(deleteSql).toContain('WITH target AS')
+        expect(deleteSql).toContain('WITH RECURSIVE target AS')
     })
 
     it('TC-F08-05-06: scopes raw SQL to the authorized category tenant, not the user primary tenant', async () => {
@@ -276,6 +379,29 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
         expect(JSON.stringify(mockExecute.mock.calls)).toContain('tenant-target')
     })
 
+    it('TC-F08-05-06: rebuilds breadcrumbs for the entire descendant subtree', async () => {
+        const fixture = {
+            parent: { id: 'cat-123', name: 'Parent', breadcrumbs: 'Parent', tenant: 'tenant-456' },
+            child: { id: 'cat-124', name: 'Child', breadcrumbs: 'Parent > Child' },
+            grandchild: { id: 'cat-125', name: 'Grandchild', breadcrumbs: 'Parent > Child > Grandchild' },
+        }
+        mockFindByID.mockResolvedValue(fixture.parent)
+        mockExecute.mockResolvedValue({ rows: [{ direct_count: 0, name_conflict_count: 0, deleted: true, deleted_doc: { id: 'cat-123', deletedAt: '2026-07-16T00:00:00.000Z' } }] })
+
+        await deleteCategoryAction(fixture.parent.id)
+
+        const sqlText = extractSqlText(mockExecute.mock.calls[2][0])
+        const expectedAfterDelete = {
+            child: fixture.child.name,
+            grandchild: `${fixture.child.name} > ${fixture.grandchild.name}`,
+        }
+        expect(expectedAfterDelete).toEqual({ child: 'Child', grandchild: 'Child > Grandchild' })
+        expect(sqlText).toContain('WITH RECURSIVE')
+        expect(sqlText).toContain('new_breadcrumbs')
+        expect(sqlText).toContain("s.new_breadcrumbs || ' > ' || c.name")
+        expect(sqlText).toContain('parent_id = CASE WHEN c.parent_id = t.id THEN NULL ELSE c.parent_id END')
+    })
+
     it('TC-F08-05-06: still counts direct products only, not descendants', async () => {
         mockFindByID.mockResolvedValue({ id: 'cat-123', name: 'Fashion', tenant: 'tenant-456' })
         mockExecute.mockResolvedValue({
@@ -294,7 +420,7 @@ describe('deleteCategoryAction (TC-F08-05-06)', () => {
         expect(sqlText).toContain('r.categories_id = t.id')
         expect(sqlText).toContain("r.path = 'category'")
         expect(sqlText).toContain('p.deleted_at IS NULL')
-        expect(sqlText).not.toMatch(/WITH RECURSIVE|getDescendantIds/i)
+        expect(sqlText).not.toMatch(/getDescendantIds/i)
     })
 
     it('[TC-F08-04-111] lock timeout releases the transaction with an explicit retryable error', async () => {

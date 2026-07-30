@@ -224,6 +224,30 @@ const CategoryServerSchema = z.object({
     description: z.string().optional(),
 });
 
+const POSTGRES_INT4_MAX = 2_147_483_647
+
+function normalizeCategoryParentId(
+    parent: string | number | { id: string | number } | null | undefined,
+): number | null | undefined {
+    if (parent == null) return parent
+
+    const rawId = typeof parent === 'object' ? parent.id : parent
+    if (typeof rawId === 'string' && !/^[1-9]\d*$/.test(rawId)) {
+        throw new Error('CATEGORY_PARENT_ID_INVALID')
+    }
+
+    const parentId = typeof rawId === 'string' ? Number(rawId) : rawId
+    if (
+        !Number.isSafeInteger(parentId) ||
+        parentId <= 0 ||
+        parentId > POSTGRES_INT4_MAX
+    ) {
+        throw new Error('CATEGORY_PARENT_ID_INVALID')
+    }
+
+    return parentId
+}
+
 // Name dedup pre-check: case-insensitive + trimmed, scoped to (parent, tenant). Backend source
 // of truth for CATEGORY_NAME_DUPLICATE — the client's debounced check is UX-only and races are
 // expected/acceptable since this same query runs again here on submit.
@@ -252,8 +276,16 @@ export async function checkCategoryNameAvailable(name: string, parentId: string 
     const tenantId = tenantIdForQuery(user)
     if (!tenantId || !name.trim()) return true
 
+    let normalizedParentId: number | null = null
+    let normalizedExcludeId: number | undefined
+    try {
+        normalizedParentId = normalizeCategoryParentId(parentId) ?? null
+        normalizedExcludeId = excludeId == null ? undefined : (normalizeCategoryParentId(excludeId) ?? undefined)
+    } catch {
+        return false
+    }
     const payload = await getPayload({ config: configPromise })
-    const isDuplicate = await findDuplicateCategoryName(payload, { name, parentId, tenantId, excludeId })
+    const isDuplicate = await findDuplicateCategoryName(payload, { name, parentId: normalizedParentId, tenantId, excludeId: normalizedExcludeId })
     return !isDuplicate
 }
 
@@ -285,6 +317,12 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
 
     const data = CategoryServerSchema.parse(rawData);
     data.name = data.name.trim();
+    try {
+        data.parent = normalizeCategoryParentId(data.parent)
+    } catch (error) {
+        if (error instanceof Error && error.message === 'CATEGORY_PARENT_ID_INVALID') return { success: false, error: 'CATEGORY_PARENT_ID_INVALID' }
+        throw error
+    }
 
     const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
@@ -304,18 +342,14 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
     }
 
     if (tenantId) {
-        const rawParent = data.parent
-        const parentId: string | number | null = rawParent && typeof rawParent === 'object'
-            ? (rawParent as { id: string | number }).id
-            : (rawParent as string | number | null | undefined) ?? null
         const isDuplicate = await findDuplicateCategoryName(payload, {
             name: data.name,
-            parentId,
+            parentId: data.parent ?? null,
             tenantId,
             excludeId: id,
         })
         if (isDuplicate) {
-            throw new Error('CATEGORY_NAME_DUPLICATE')
+            return { success: false, error: 'CATEGORY_NAME_DUPLICATE' }
         }
     }
 
@@ -330,7 +364,9 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             })
             return JSON.parse(JSON.stringify(res));
         } catch (updateErr) {
-            throw translateDbCategorySlugConflict(updateErr)
+            const translated = translateDbCategorySlugConflict(updateErr)
+            if (translated.message === 'CATEGORY_SLUG_DUPLICATE') return { success: false, error: 'CATEGORY_SLUG_DUPLICATE' }
+            throw translated
         }
     } else {
         try {
@@ -342,7 +378,9 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             })
             return JSON.parse(JSON.stringify(res));
         } catch (createErr) {
-            throw translateDbCategorySlugConflict(createErr)
+            const translated = translateDbCategorySlugConflict(createErr)
+            if (translated.message === 'CATEGORY_SLUG_DUPLICATE') return { success: false, error: 'CATEGORY_SLUG_DUPLICATE' }
+            throw translated
         }
     }
 }
@@ -365,12 +403,14 @@ export async function deleteCategoryAction(id: string | number) {
         overrideAccess: false,
     })
 
-    const rawCategoryTenant: unknown = (authorizedCategory as Record<string, unknown>).tenant
-    const tenantId = typeof rawCategoryTenant === 'object' && rawCategoryTenant !== null && 'id' in rawCategoryTenant
-        ? rawCategoryTenant.id
-        : rawCategoryTenant
+    // All raw SQL, including super-admin operations, is scoped to the tenant of the category
+    // that passed Payload access control. Relationships may be populated documents or raw IDs.
+    const categoryTenant: unknown = (authorizedCategory as Record<string, unknown>).tenant
+    const tenantId = typeof categoryTenant === 'object' && categoryTenant !== null && 'id' in categoryTenant
+        ? categoryTenant.id
+        : categoryTenant
     if (typeof tenantId !== 'string' && typeof tenantId !== 'number') {
-        throw new Error('Category tenant is unavailable')
+        throw new Error('Product management is not available on your current plan.')
     }
 
     const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
@@ -385,7 +425,8 @@ export async function deleteCategoryAction(id: string | number) {
     // connections each other needs. Across instances, this FOR UPDATE conflicts with the AI
     // action's FOR KEY SHARE lock: either delete commits first and the AI lock finds no active row,
     // or Product creation commits first and the second statement's fresh READ COMMITTED snapshot
-    // sees the relation. Keeping FOR UPDATE inside the count CTE would retain the pre-wait snapshot.
+    // sees the relation. The recursive CTE from staging then reparents the complete descendant
+    // subtree and rebuilds breadcrumbs in the same transaction.
     const { sql } = await import('drizzle-orm')
     type DeleteTransaction = { execute: (query: unknown) => Promise<unknown> }
     type DeleteDatabase = {
@@ -414,7 +455,7 @@ export async function deleteCategoryAction(id: string | number) {
                 FOR UPDATE
             `)
 
-                return transaction.execute(sql`WITH target AS (
+                return transaction.execute(sql`WITH RECURSIVE target AS (
                 SELECT c.id, c.tenant_id
                 FROM categories c
                 WHERE c.id = ${id}
@@ -439,6 +480,22 @@ export async function deleteCategoryAction(id: string | number) {
                  AND c.deleted_at IS NULL
                  AND c.tenant_id = t.tenant_id
                 FOR UPDATE
+            ),
+            subtree AS (
+                SELECT c.id, c.parent_id, c.name, c.tenant_id,
+                       c.name::text AS new_breadcrumbs
+                FROM categories c
+                JOIN target t
+                  ON c.parent_id = t.id
+                 AND c.deleted_at IS NULL
+                 AND c.tenant_id = t.tenant_id
+                UNION ALL
+                SELECT c.id, c.parent_id, c.name, c.tenant_id,
+                       (s.new_breadcrumbs || ' > ' || c.name)::text
+                FROM categories c
+                JOIN subtree s ON c.parent_id = s.id
+                WHERE c.deleted_at IS NULL
+                  AND c.tenant_id = s.tenant_id
             ),
             root_conflicts AS (
                 SELECT COUNT(*)::int AS count
@@ -467,13 +524,11 @@ export async function deleteCategoryAction(id: string | number) {
             ),
             reparent AS (
                 UPDATE categories c
-                SET parent_id = NULL,
-                    breadcrumbs = c.name,
+                SET parent_id = CASE WHEN c.parent_id = t.id THEN NULL ELSE c.parent_id END,
+                    breadcrumbs = s.new_breadcrumbs,
                     updated_at = NOW()
-                FROM target t, direct_products dp, conflicts cf
-                WHERE c.parent_id = t.id
-                  AND c.deleted_at IS NULL
-                  AND c.tenant_id = t.tenant_id
+                FROM target t, subtree s, direct_products dp, conflicts cf
+                WHERE s.id = c.id
                   AND dp.count = 0
                   AND cf.count = 0
                 RETURNING c.id
@@ -510,12 +565,12 @@ export async function deleteCategoryAction(id: string | number) {
 
     const directCount = deleteRow.direct_count || 0
     if (directCount > 0) {
-        throw new Error(`CATEGORY_HAS_PRODUCTS:${directCount}`)
+        return { success: false, error: 'CATEGORY_HAS_PRODUCTS', count: directCount }
     }
 
     const nameConflictCount = deleteRow.name_conflict_count || 0
     if (nameConflictCount > 0) {
-        throw new Error(`CATEGORY_REPARENT_NAME_CONFLICT:${nameConflictCount}`)
+        return { success: false, error: 'CATEGORY_REPARENT_NAME_CONFLICT', count: nameConflictCount }
     }
 
     if (!deleteRow.deleted || !deleteRow.deleted_doc) {

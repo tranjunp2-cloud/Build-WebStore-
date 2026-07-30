@@ -7,61 +7,60 @@
 
 ## 1. Data Model (Payload CMS Collection)
 
-```typescript
-// collections/Products.ts
-const Products: CollectionConfig = {
-  slug: 'products',
-  fields: [
-    { name: 'name', type: 'text', required: true },
-    { name: 'slug', type: 'text', unique: true },
-    { name: 'price', type: 'number', required: true },
-    { name: 'compareAtPrice', type: 'number' },
-    { name: 'description', type: 'richText' },
-    { name: 'descriptionBM', type: 'richText' },  // Bahasa Melayu
-    { name: 'category', type: 'relationship', relationTo: 'categories' },
-    { name: 'images', type: 'array', fields: [
-      { name: 'image', type: 'upload', relationTo: 'media' }
-    ], maxRows: 5 },
-    { name: 'variants', type: 'array', fields: [
-      { name: 'name', type: 'text' },
-      { name: 'sku', type: 'text' },
-      { name: 'price', type: 'number' },
-      { name: 'stock', type: 'number' },
-    ]},
-    { name: 'stock', type: 'number', defaultValue: 0 },
-    { name: 'status', type: 'select', options: ['draft', 'active', 'archived'] },
-    { name: 'site', type: 'relationship', relationTo: 'sites', required: true },
-  ],
-  access: {
-    read: ({ req }) => ({ site: { equals: req.user?.activeSite } }),
-    create: ({ req }) => !!req.user,
-  },
-}
-```
+Schema và access-control source of truth nằm tại `src/collections/Products.ts`; form contract và serialization nằm trong `src/components/dashboard/product-form/`. Không sao chép collection rút gọn vào tài liệu này vì dễ làm mất các field, hooks và tenant-isolation rules hiện hành.
+
+Prototype redesign này chỉ sắp xếp lại presentation/state ownership. Nó không tự thêm field, thay access control, thay API contract hoặc tạo migration. Nếu implementation cần persistence mới—đặc biệt ảnh theo Option 1—phải cập nhật Products collection và `scripts/db-setup.js` theo repository rules trong một thay đổi được review riêng.
 
 ## 2. Component Tree
 
 ```
-ProductsPage (/products)
-├── ProductsHeader
-│   ├── Title + Count
-│   ├── FilterBar (status, category, search)
-│   └── AddProductButton
-├── ProductsTable
-│   ├── ProductRow × N
-│   │   ├── Thumbnail + Name
-│   │   ├── Price
-│   │   ├── Stock (low-stock warning)
-│   │   ├── Status badge
-│   │   └── Actions (Edit, Delete, Duplicate)
-│   └── BulkActions
-│       └── "Generate All Descriptions" (AI)
-└── ProductDetailModal (slide-over)
-    ├── ProductForm (Zod validation)
-    ├── ImageUploader (max 5, drag-drop)
-    ├── VariantsEditor
-    └── AIDescriptionButton
+ProductsFeature
+├── ProductsPage (/products)
+│   ├── ProductsHeader
+│   │   ├── Title + Count
+│   │   ├── FilterBar (status, category, search)
+│   │   └── AddProductButton
+│   └── ProductsTable
+│       ├── ProductRow × N
+│       │   ├── Thumbnail + Name
+│       │   ├── Price
+│       │   ├── Stock (low-stock warning)
+│       │   ├── Status badge
+│       │   └── Actions (Edit, Delete, Duplicate)
+│       └── BulkActions
+│           └── "Generate All Descriptions" (AI)
+├── ProductFormPage (/products/new, /products/[id])
+│   └── ProductFormShell (shared create/edit state + Zod validation)
+│       ├── StickySectionTabs (Basic Info, Pricing & Stock, Shipping & Delivery, More Information)
+│       ├── ProductFormMain (~70% desktop)
+│       │   ├── BasicSection
+│       │   │   ├── CompactMediaEditor (max 5 + per-image ALT disclosure)
+│       │   │   ├── ProductName + CompactSlugDisclosure
+│       │   │   ├── CategoryPickerDialog (searchable L1 → L2 → L3, leaf-only confirm)
+│       │   │   └── DescriptionTextarea
+│       │   ├── VariantsEditor (reactive, max 2 option groups)
+│       │   │   ├── BulkApplyControls
+│       │   │   ├── StableVariantMatrix
+│       │   │   └── OptionOneImageMapping
+│       │   ├── ShippingAndDeliverySection (Weight, Length, Width, Height)
+│       │   └── MoreInformationSection
+│       │       ├── SpecificationsSection
+│       │       └── SeoSettingsSection
+│       ├── ProductFormSidebar (~30% desktop, sticky)
+│       │   ├── ContentStrengthCard (advisory only)
+│       │   └── StatusCard
+│       └── FixedBottomActions (Cancel, Save draft, Publish; content reserves safe bottom space)
+└── responsive: columns collapse; tabs remain sticky; bottom actions remain fixed; variants use cards/accordion
 ```
+
+### 2.1 Prototype boundary and form-state invariants
+
+- Đây là **UI-only design contract**. Việc dựng layout/component theo prototype không tự thêm/sửa field trong Payload, SQL migration, Server Action hay API contract. Mọi nhu cầu persistence mới phải được review riêng theo schema/migration rules của repo.
+- Create/Edit dùng chung shell và serializer; khác nhau ở initial values, ID và slug auto-generation policy.
+- Variant identity không phụ thuộc row index/label hiển thị. Khi option thay đổi, reconcile tổ hợp mới với tổ hợp cũ để giữ SKU/price/stock cho combination còn tồn tại; bulk apply chỉ patch field được chọn. Tối đa hai option groups; image mapping thuộc Option 1.
+- `ContentStrengthCard` tính 5 checklist bằng nhau độc lập với `productPublishBlocks()`/`publishGateHook`: `images.length >= 3`; tên sau trim dài 25–100; mô tả sau trim dài ít nhất 100; đã chọn category; Weight/Length/Width/Height đều là số hữu hạn lớn hơn 0. Không dùng score làm publish gate và không diễn giải publish gate thành content score.
+- Status selector redesign chỉ expose Draft/Active. Trước implementation phải trace schema parsing, hydration và submit của record `archived`, rồi khóa một safe behavior dựa trên code thật: preserve status khi untouched hoặc block edit/transition với hướng dẫn rõ. Không tự map `archived → draft`, không bật Publish ngầm và không giả định round-trip đã hoạt động khi chưa xác minh.
+- Compact ALT editor vẫn theo fallback hiện hành; ALT trống là advisory. Category vẫn required ở Save theo contract hiện tại.
 
 ## 3. API Routes
 
@@ -71,14 +70,14 @@ ProductsPage (/products)
 | POST | `/api/products` | Create product |
 | PATCH | `/api/products/[id]` | Update product |
 | DELETE | `/api/products/[id]` | Soft delete |
-| POST | `/api/products/generate-description` | AI generate description |
+| POST | `/api/ai/product-description` | AI generate description used by the current product form |
 
 ## 4. AI Description Flow
 
 ```
 User clicks "Generate Description with AI"
        ↓
-POST /api/products/generate-description
+POST /api/ai/product-description
   body: { name, price, category, images }
        ↓
 OpenAI streamText():
@@ -355,7 +354,7 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 - Phase 3 (alt-fallback implementation): Shipped 2026-07-03
 - Phase 4 (inline warnings + alt-text Popover): Shipped 2026-07-03; category-required reverted same day
 
-## 7. GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6, complete)
+## 6. GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6, complete)
 
 **Enhanced user experience for the AI chat bulk-product-generation feature. New field tracks AI-generated drafts, improved textarea input, suggestion pills, and visual indicators for AI-created products.**
 
@@ -456,13 +455,13 @@ If complete: product goes live. AiReviewIndicator already gone.
 
 ---
 
-## 6. Error Matrix
+## 7. Error Matrix
 
 | Error | User Sees | Recovery |
 |-------|-----------|----------|
 | Image upload > 5MB | Inline error "Max 5MB" | Resize/compress |
 | Duplicate SKU | Inline error on variant field | Change SKU |
 | AI description fail | Toast + manual input | Retry button |
-| Stock = 0 | Auto-hide from storefront | Restock to show |
+| Stock = 0 | Cảnh báo đỏ trên dashboard; storefront hiển thị “Hết hàng” và vô hiệu Add to Cart, nhưng giữ nguyên status/URL | Restock; không tự chuyển Draft/Archived |
 | Toggle Active without price/sku/inventory | Modal: "Cannot publish yet" + missing fields list | Fill required fields, retry toggle |
 | Bulk-generate fails (API timeout) | Toast error + retry button | Adjust prompt or retry |

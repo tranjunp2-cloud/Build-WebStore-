@@ -306,6 +306,20 @@ describe('normalizeBlocksForPersistence', () => {
         expect(result[0].text).toBe('Copyright 2026')
     })
 
+    it('drops invalid announcement-bar paddingY before Payload persistence', () => {
+        const blocks = [
+            { blockType: 'announcement-bar', message: 'Sale', paddingY: Number.NaN },
+            { blockType: 'announcement-bar', message: 'Sale', paddingY: 'compact' },
+            { blockType: 'announcement-bar', message: 'Sale', paddingY: '20' },
+        ]
+
+        const result = normalizeBlocksForPersistence(blocks)
+
+        expect(result[0]).not.toHaveProperty('paddingY')
+        expect(result[1]).not.toHaveProperty('paddingY')
+        expect(result[2].paddingY).toBe(20)
+    })
+
     // TC-F05-save-04
     it('TC-F05-save-04: navigation link missing label → fallback to "Link"', () => {
         // Arrange — legacy draft from old builder might lack label

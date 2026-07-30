@@ -309,6 +309,37 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
         expect(createTableMatches).toBeNull()
     })
 
+    it('[TC-GH1432-PERF-02] adds idempotent indexes for product list and array hydration', () => {
+        const expectedIndexes = [
+            'products_active_tenant_created_idx',
+            'products_images_parent_order_idx',
+            'products_tags_parent_order_idx',
+            'products_variant_configs_parent_order_idx',
+            'products_variant_configs_options_parent_order_idx',
+            'products_variants_parent_order_idx',
+            'products_attributes_parent_order_idx',
+            'products_rels_parent_order_idx',
+        ]
+
+        for (const indexName of expectedIndexes) {
+            expect(scriptContent).toContain(`CREATE INDEX IF NOT EXISTS ${indexName}`)
+        }
+
+        const verifyStart = scriptContent.indexOf('async function verifyCriticalIndexes')
+        const verifyEnd = scriptContent.indexOf('/**\n * All collection slugs', verifyStart)
+        const verifyBlock = scriptContent.slice(verifyStart, verifyEnd)
+        for (const indexName of expectedIndexes) {
+            expect(verifyBlock).toContain(`'${indexName}'`)
+        }
+        expect(verifyBlock).toContain('index_metadata.indisvalid')
+        expect(verifyBlock).toContain('pg_get_indexdef')
+        expect(verifyBlock).toContain("keys: ['tenant_id', 'created_at'], descending: [false, true]")
+        expect(verifyBlock).toContain('index_metadata.indoption[key_position - 1] & 1')
+        expect(verifyBlock).toContain('directionsMatch')
+        expect(verifyBlock).toContain('pg_get_expr')
+        expect(verifyBlock).toContain('GH-1432 product performance indexes missing or invalid after migrations')
+    })
+
     it('TC-MIG-DB: --migrate-only flag is present in main() function', () => {
         expect(scriptContent).toContain("process.argv.includes('--migrate-only')")
     })

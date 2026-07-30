@@ -2055,6 +2055,7 @@
                     "deleteError": "Failed to delete category",
                     "maxDepthError": "Cannot nest deeper than 3 levels",
                     "cycleError": "Cannot set a category as a child of its own subcategory.",
+                    "parentInvalid": "The selected parent category is invalid. Please choose it again.",
                     "parentTenantMismatch": "Cannot move category to a different tenant's hierarchy",
                     "parentSoftDeleted": "Cannot nest under a deleted category"
                 }

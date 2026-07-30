@@ -12,12 +12,16 @@ export type AdminHandler = (
     context: { user: PlatformUser; params?: Record<string, string> },
 ) => Promise<NextResponse>
 
+type AdminRouteContext = {
+    params?: Record<string, string> | Promise<Record<string, string>>
+}
+
 /**
  * Wraps an API route handler with super-admin auth enforcement.
  * Returns 401 if unauthenticated, 403 if wrong role.
  */
 export function withSuperAdmin(handler: AdminHandler) {
-    return async (req: NextRequest, ctx?: { params?: Record<string, string> }) => {
+    return async (req: NextRequest, ctx?: AdminRouteContext) => {
         const rawUser = await getCurrentUser()
 
         if (!rawUser) {
@@ -30,7 +34,8 @@ export function withSuperAdmin(handler: AdminHandler) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        return handler(req, { user, params: ctx?.params })
+        const params = ctx?.params ? await ctx.params : undefined
+        return handler(req, { user, params })
     }
 }
 

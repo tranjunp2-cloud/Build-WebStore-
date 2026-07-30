@@ -478,6 +478,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_images.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_images_parent_order_idx ON products_images (_parent_id, _order);`,
+  },
+  {
     name: 'products_tags.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_tags (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -486,6 +490,10 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       tag varchar
     );`,
+  },
+  {
+    name: 'products_tags.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_tags_parent_order_idx ON products_tags (_parent_id, _order);`,
   },
   {
     name: 'products_variant_configs.create_table',
@@ -498,6 +506,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variant_configs.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variant_configs_parent_order_idx ON products_variant_configs (_parent_id, _order);`,
+  },
+  {
     name: 'products_variant_configs_options.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_variant_configs_options (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -506,6 +518,10 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       value varchar
     );`,
+  },
+  {
+    name: 'products_variant_configs_options.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variant_configs_options_parent_order_idx ON products_variant_configs_options (_parent_id, _order);`,
   },
   {
     name: 'products_variants.create_table',
@@ -522,6 +538,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variants.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variants_parent_order_idx ON products_variants (_parent_id, _order);`,
+  },
+  {
     name: 'products_attributes.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_attributes (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -531,6 +551,10 @@ const MIGRATIONS = [
       key varchar,
       value varchar
     );`,
+  },
+  {
+    name: 'products_attributes.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_attributes_parent_order_idx ON products_attributes (_parent_id, _order);`,
   },
   // ── Products: Rels table (hasMany relationship → category) ──
   {
@@ -546,6 +570,10 @@ const MIGRATIONS = [
   {
     name: 'products_rels.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_idx ON products_rels (parent_id);`,
+  },
+  {
+    name: 'products_rels.parent_order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_order_idx ON products_rels (parent_id, "order");`,
   },
   // ── Orders: Items array table ──
   {
@@ -1844,7 +1872,8 @@ const MIGRATIONS = [
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
-      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6
+      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6,
+      read_article_label varchar, uncategorized_label varchar, empty_state_label varchar
     );`,
   },
   {
@@ -2173,7 +2202,8 @@ const MIGRATIONS = [
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_blog_list" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
-      variant varchar, headline varchar, subheadline varchar, "limit" integer
+      variant varchar, headline varchar, subheadline varchar, "limit" integer,
+      read_article_label varchar, uncategorized_label varchar, empty_state_label varchar
     );`,
   },
   {
@@ -2500,6 +2530,7 @@ const MIGRATIONS = [
       name varchar NOT NULL,
       email varchar NOT NULL,
       phone varchar,
+      subject varchar(300),
       message text NOT NULL,
       site_id integer NOT NULL,
       status varchar DEFAULT 'new',
@@ -2508,6 +2539,10 @@ const MIGRATIONS = [
       updated_at timestamptz DEFAULT now() NOT NULL,
       created_at timestamptz DEFAULT now() NOT NULL
     );`,
+  },
+  {
+    name: 'contact_submissions.subject',
+    sql: `ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS subject varchar(300);`,
   },
   {
     name: 'contact_submissions.site_created_index',
@@ -4064,6 +4099,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_newsletter.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: 'pages_blocks_blog_list.add_section_label', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_blog_list.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_blog_list.add_locale_labels', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS read_article_label varchar, ADD COLUMN IF NOT EXISTS uncategorized_label varchar, ADD COLUMN IF NOT EXISTS empty_state_label varchar;` },
+  { name: '_pages_v_blocks_blog_list.add_locale_labels', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS read_article_label varchar, ADD COLUMN IF NOT EXISTS uncategorized_label varchar, ADD COLUMN IF NOT EXISTS empty_state_label varchar;` },
   { name: 'pages_blocks_service_cards.add_section_label', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_service_cards.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: 'pages_blocks_client_logos.add_section_label', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
@@ -4126,6 +4163,8 @@ const MIGRATIONS = [
   { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
   { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
   // ── F08-1032: DB-level SKU uniqueness (case-insensitive, per-tenant / per-product) ──
+  // GH-1432: dashboard product list filters active rows by tenant and sorts newest first.
+  { name: 'products.active_tenant_created_idx', sql: `CREATE INDEX IF NOT EXISTS products_active_tenant_created_idx ON products (tenant_id, created_at DESC) WHERE deleted_at IS NULL;` },
   // Closes concurrent-save gap in findConflictingSkus (application-layer check is NOT atomic).
   // Partial index excludes soft-deleted rows and null-tenant (super-admin) products.
   { name: 'products.sku_tenant_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_sku_tenant_uniq ON products (tenant_id, lower(sku)) WHERE sku IS NOT NULL AND deleted_at IS NULL AND tenant_id IS NOT NULL;` },
@@ -5047,6 +5086,33 @@ async function runCategorySlugTenantMigration(pool) {
   }
 }
 
+async function ensureRuntimeIssueUniqueIndex(pool) {
+  const duplicateRuntimeIssues = await pool.query(
+    `SELECT related_id, COUNT(*)::integer AS duplicate_count
+     FROM template_issues
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL
+     GROUP BY related_id
+     HAVING COUNT(*) > 1
+     ORDER BY duplicate_count DESC, related_id
+     LIMIT 10`
+  );
+  if (duplicateRuntimeIssues.rows.length > 0) {
+    const summary = duplicateRuntimeIssues.rows
+      .map((row) => `${row.related_id} (${row.duplicate_count})`)
+      .join(', ');
+    throw new Error(
+      `Cannot create template_issues_runtime_related_id_uniq: duplicate runtime related_id values exist: ${summary}`
+    );
+  }
+
+  await pool.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_runtime_related_id_uniq
+     ON template_issues (related_id)
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL`
+  );
+  console.log('[db-setup] ✅ template_issues.runtime_related_unique_idx (fail-closed)');
+}
+
 /**
  * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
  * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
@@ -5084,6 +5150,116 @@ async function verifyCriticalIndexes(pool) {
     );
   }
   console.log('[db-setup] ✅ verified categories_tenant_slug_uniq exists');
+
+  // F39: runtime issue promotion uses related_type + related_id as its idempotency
+  // boundary. The general migration loop warns-and-continues, so verify the exact
+  // partial unique index definition and fail the build if uniqueness is absent.
+  const runtimeIssueIndex = await pool.query(
+    `SELECT
+       index_metadata.indisunique,
+       index_metadata.indisvalid,
+       pg_get_indexdef(index_metadata.indexrelid, 1, true) AS indexkey,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS index_namespace ON index_namespace.oid = index_class.relnamespace
+     WHERE index_namespace.nspname = 'public'
+       AND index_class.relname = 'template_issues_runtime_related_id_uniq'
+       AND table_class.relname = 'template_issues'`
+  );
+  const runtimeIndex = runtimeIssueIndex.rows[0];
+  const runtimePredicate = String(runtimeIndex?.predicate ?? '')
+    .replaceAll('"', '')
+    .replace(/::text/g, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (
+    !runtimeIndex?.indisunique ||
+    !runtimeIndex?.indisvalid ||
+    runtimeIndex.indexkey !== 'related_id' ||
+    runtimePredicate !== "related_type = 'runtime' and related_id is not null"
+  ) {
+    throw new Error(
+      'template_issues_runtime_related_id_uniq missing or invalid after migrations — exact runtime issue promotion deduplication is not enforced.'
+    );
+  }
+  console.log('[db-setup] ✅ verified template_issues_runtime_related_id_uniq definition');
+
+  // GH-1432: these indexes are part of the product-list performance contract.
+  // runMigrations() intentionally warns and continues for general migrations, so
+  // explicitly fail the build if any performance-critical index was not created.
+  const gh1432ProductIndexes = [
+    { name: 'products_active_tenant_created_idx', table: 'products', keys: ['tenant_id', 'created_at'], descending: [false, true], predicate: 'deleted_at IS NULL' },
+    { name: 'products_images_parent_order_idx', table: 'products_images', keys: ['_parent_id', '_order'] },
+    { name: 'products_tags_parent_order_idx', table: 'products_tags', keys: ['_parent_id', '_order'] },
+    { name: 'products_variant_configs_parent_order_idx', table: 'products_variant_configs', keys: ['_parent_id', '_order'] },
+    { name: 'products_variant_configs_options_parent_order_idx', table: 'products_variant_configs_options', keys: ['_parent_id', '_order'] },
+    { name: 'products_variants_parent_order_idx', table: 'products_variants', keys: ['_parent_id', '_order'] },
+    { name: 'products_attributes_parent_order_idx', table: 'products_attributes', keys: ['_parent_id', '_order'] },
+    { name: 'products_rels_parent_order_idx', table: 'products_rels', keys: ['parent_id', 'order'] },
+  ];
+  const productIndexRows = await pool.query(
+    `SELECT
+       index_class.relname AS indexname,
+       table_class.relname AS tablename,
+       index_metadata.indisvalid,
+       ARRAY(
+         SELECT pg_get_indexdef(index_metadata.indexrelid, key_position, true)
+         FROM generate_series(1, index_metadata.indnkeyatts) AS key_position
+         ORDER BY key_position
+       ) AS indexkeys,
+       ARRAY(
+         SELECT (index_metadata.indoption[key_position - 1] & 1) = 1
+         FROM generate_series(1, index_metadata.indnkeyatts) AS key_position
+         ORDER BY key_position
+       ) AS descending,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     WHERE table_namespace.nspname = 'public'
+       AND index_class.relname = ANY($1::text[])`,
+    [gh1432ProductIndexes.map((index) => index.name)]
+  );
+
+  const normalizeIndexExpression = (value) =>
+    String(value ?? '').replaceAll('"', '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const productIndexMetadata = new Map(productIndexRows.rows.map((row) => [row.indexname, row]));
+  const invalidProductIndexes = gh1432ProductIndexes.flatMap((expected) => {
+    const actual = productIndexMetadata.get(expected.name);
+    if (!actual) return [`${expected.name} (missing)`];
+
+    const actualKeys = Array.isArray(actual.indexkeys)
+      ? actual.indexkeys.map(normalizeIndexExpression)
+      : [];
+    const expectedKeys = expected.keys.map(normalizeIndexExpression);
+    const actualDescending = Array.isArray(actual.descending) ? actual.descending : [];
+    const expectedDescending = expected.descending ?? expected.keys.map(() => false);
+    const tableMatches = actual.tablename === expected.table;
+    const keysMatch =
+      actualKeys.length === expectedKeys.length &&
+      actualKeys.every((key, index) => key === expectedKeys[index]);
+    const directionsMatch =
+      actualDescending.length === expectedDescending.length &&
+      actualDescending.every((descending, index) => descending === expectedDescending[index]);
+    const predicateMatches =
+      expected.predicate == null ||
+      normalizeIndexExpression(actual.predicate) === normalizeIndexExpression(expected.predicate);
+
+    return actual.indisvalid && tableMatches && keysMatch && directionsMatch && predicateMatches
+      ? []
+      : [`${expected.name} (invalid definition)`];
+  });
+  if (invalidProductIndexes.length > 0) {
+    throw new Error(
+      `GH-1432 product performance indexes missing or invalid after migrations: ${invalidProductIndexes.join(', ')}`
+    );
+  }
+  console.log(`[db-setup] ✅ verified ${gh1432ProductIndexes.length} GH-1432 product performance indexes`);
 }
 
 /**
@@ -5213,6 +5389,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await runCategorySlugTenantMigration(pool);
+      await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
     }
@@ -5424,6 +5601,7 @@ async function main() {
       if (tableCount > 0) {
         await runMigrations(pool);
         await runCategorySlugTenantMigration(pool);
+        await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);

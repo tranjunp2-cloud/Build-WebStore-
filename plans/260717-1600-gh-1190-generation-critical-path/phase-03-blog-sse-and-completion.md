@@ -1,5 +1,7 @@
 # Phase 03 - Bound Blog Tail and Fix SSE Completion Semantics
 
+> **Superseded constraint (2026-07-24):** Do not use a route deadline to control blog work. Current policy is one seed call plus three parallel article calls, with locale-safe fallback and no detector-driven retries. See [the corrective locale/performance plan](../260724-1034-locale-safe-generation-performance/plan.md).
+
 ## Context Links
 
 - [Plan](./plan.md)

@@ -7,6 +7,9 @@ export const BlogListConfigSchema = BaseBlockSchema.extend({
     headline: z.string().optional(),
     subheadline: z.string().optional(),
     limit: z.number().int().min(1).max(20).default(3),
+    readArticleLabel: z.string().optional(),
+    uncategorizedLabel: z.string().optional(),
+    emptyStateLabel: z.string().optional(),
 })
 
 export type BlogListConfig = z.infer<typeof BlogListConfigSchema>
@@ -18,7 +21,14 @@ export const blogListMeta: BlockMeta = {
     icon: '📰',
     variants: ['cards', 'list'],
     defaultVariant: 'cards',
-    editableFields: ['headline', 'subheadline', 'limit'],
+    editableFields: [
+        'headline',
+        'subheadline',
+        'limit',
+        'readArticleLabel',
+        'uncategorizedLabel',
+        'emptyStateLabel',
+    ],
     quickActions: ['change-limit'],
     category: 'content' as const,
 }

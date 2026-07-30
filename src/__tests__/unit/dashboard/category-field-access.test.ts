@@ -45,7 +45,22 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockFindByID = vi.fn()
-        mockFind = vi.fn()
+        mockFind = vi.fn().mockImplementation(async (args: { collection: string }) => {
+            if (args.collection === 'plan-subscriptions') {
+                return {
+                    docs: [{
+                        id: 'sub-123',
+                        plan: 'PROFESSIONAL_TM_USER',
+                        status: 'active',
+                        endsAt: '2099-01-01T00:00:00.000Z',
+                    }],
+                }
+            }
+            if (args.collection === 'plan-features') {
+                return { docs: [{ value: 'YES' }] }
+            }
+            return { docs: [] }
+        })
         mockCreate = vi.fn()
         mockUpdate = vi.fn()
         mockExecute = vi.fn()
@@ -161,7 +176,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
                 id: 'cat-123',
                 name: 'Shirts',
                 slug: 'shirts',
-                parent: 'parent-456',
+                parent: 456,
                 description: 'Clothing category',
             })
 
@@ -169,7 +184,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             const result = await saveCategoryAction({
                 name: 'Shirts',
                 slug: 'shirts',
-                parent: 'parent-456',
+                parent: '456',
                 description: 'Clothing category',
             })
 
@@ -177,10 +192,126 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             const createCall = mockCreate.mock.calls[0][0]
             expect(createCall.data.name).toBe('Shirts')
             expect(createCall.data.slug).toBe('shirts')
-            expect(createCall.data.parent).toBe('parent-456')
+            expect(createCall.data.parent).toBe(456)
             expect(createCall.data.description).toBe('Clothing category')
-            expect(result.id).toBe('cat-123')
+            expect(result).toMatchObject({ id: 'cat-123' })
         })
+    })
+
+    describe('TC-F08-05-18: Category parent ID normalization', () => {
+        it('TC-F08-05-18: converts a numeric parent string to a PostgreSQL int4 before create', async () => {
+            // Arrange
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockCreate.mockResolvedValue({ id: 101, name: 'Child', parent: 42 })
+
+            // Act
+            await saveCategoryAction({ name: 'Child', parent: '42' })
+
+            // Assert
+            expect(mockCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ parent: 42 }) })
+            )
+            expect(mockCreate.mock.calls[0][0].data.parent).toBeTypeOf('number')
+        })
+
+        it('TC-F08-05-18: converts an object relationship ID to a PostgreSQL int4 before create', async () => {
+            // Arrange
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockCreate.mockResolvedValue({ id: 102, name: 'Object Child', parent: 43 })
+
+            // Act
+            await saveCategoryAction({ name: 'Object Child', parent: { id: '43' } })
+
+            // Assert
+            expect(mockCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ parent: 43 }) })
+            )
+            expect(mockCreate.mock.calls[0][0].data.parent).toBeTypeOf('number')
+        })
+
+        it('TC-F08-05-18: converts a numeric parent string to a PostgreSQL int4 before update', async () => {
+            // Arrange
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockUpdate.mockResolvedValue({ id: 104, name: 'Updated Child', parent: 44 })
+
+            // Act
+            await saveCategoryAction({ name: 'Updated Child', parent: '44' }, 104)
+
+            // Assert
+            expect(mockUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 104,
+                    data: expect.objectContaining({ parent: 44 }),
+                })
+            )
+            expect(mockUpdate.mock.calls[0][0].data.parent).toBeTypeOf('number')
+        })
+
+        it('TC-F08-05-18: preserves an explicit null parent for a root category', async () => {
+            // Arrange
+            mockExecute.mockResolvedValue({ rows: [] })
+            mockCreate.mockResolvedValue({ id: 103, name: 'Root', parent: null })
+
+            // Act
+            await saveCategoryAction({ name: 'Root', parent: null })
+
+            // Assert
+            expect(mockCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ parent: null }) })
+            )
+        })
+
+        it('TC-F08-05-18: rejects a malformed parent ID before any database lookup or write', async () => {
+            // Arrange
+            const invalidParent = 'parent-456'
+
+            // Act
+            const action = saveCategoryAction({ name: 'Invalid Child', parent: invalidParent })
+
+            // Assert
+            await expect(action).resolves.toEqual({ success: false, error: 'CATEGORY_PARENT_ID_INVALID' })
+            expect(getPayload).not.toHaveBeenCalled()
+            expect(mockExecute).not.toHaveBeenCalled()
+            expect(mockCreate).not.toHaveBeenCalled()
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+
+        it('TC-F08-05-18: rejects an int4-overflow parent ID before any database lookup or write', async () => {
+            // Arrange
+            const overflowParent = '2147483648'
+
+            // Act
+            const action = saveCategoryAction({ name: 'Overflow Child', parent: overflowParent })
+
+            // Assert
+            await expect(action).resolves.toEqual({ success: false, error: 'CATEGORY_PARENT_ID_INVALID' })
+            expect(getPayload).not.toHaveBeenCalled()
+            expect(mockExecute).not.toHaveBeenCalled()
+            expect(mockCreate).not.toHaveBeenCalled()
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+        it.each([
+            { label: 'zero', parent: '0' },
+            { label: 'negative', parent: '-1' },
+            { label: 'decimal', parent: '1.5' },
+        ])('TC-F08-05-18: rejects a $label parent ID before any create or update', async ({ parent }) => {
+            // Arrange
+            const invalidParent = parent
+
+            // Act
+            const action = saveCategoryAction(
+                { name: `Invalid ${parent} Child`, parent: invalidParent },
+                'existing-category',
+            )
+
+            // Assert
+            await expect(action).resolves.toEqual({ success: false, error: 'CATEGORY_PARENT_ID_INVALID' })
+            expect(getPayload).not.toHaveBeenCalled()
+            expect(mockExecute).not.toHaveBeenCalled()
+            expect(mockCreate).not.toHaveBeenCalled()
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+
     })
 
     describe('TC-F08-05-06: Delete & Field Access (GH-1587 H1)', () => {

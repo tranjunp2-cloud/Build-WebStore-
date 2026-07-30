@@ -459,8 +459,13 @@ export function buildUserPrompt(
   // industry-specific CTAs instead of generic "Xem thêm" / "Learn More".
   // Skipped for reference-prompt path (recreation mode uses source content).
   if (!referencePrompt && category) {
-    const ctaLang = (language === 'ms' || language === 'vi') ? language : 'en'
-    const suggestedCtaList = getCTAsByLang(category, ctaLang)
+    // Dynamic locales must not receive the English CTA library. Their labels
+    // are generated in the target language by the existing site call.
+    const dynamicNonEnglishLocale = Boolean(gpLang && gpLang !== 'English')
+    const ctaLang = dynamicNonEnglishLocale && language !== 'ms' && language !== 'vi'
+      ? null
+      : (language === 'ms' || language === 'vi') ? language : 'en'
+    const suggestedCtaList = ctaLang ? getCTAsByLang(category, ctaLang) : []
     if (suggestedCtaList.length > 0) {
       parts.push(
         `\nPREFERRED CTA LABELS for ${category} (use these in hero, navigation, and CTA blocks):\n${suggestedCtaList.map((c) => `  - "${c}"`).join('\n')}\nAvoid generic labels like: learn more, read more, click here, xem thêm, tìm hiểu thêm, đọc thêm`,
