@@ -184,7 +184,7 @@ describe('POST /api/e2e/ensure-test-user', () => {
                 currency: 'MYR',
             }),
         }))
-        expect(body.setupCapability).toBe('dashboard-fixture-v1')
+        expect(body.setupCapability).toBe('dashboard-fixture-v2')
         expect(body.dashboardFixture).toEqual({
             orderId: 53,
             orderNumber: 'E2E-DASHBOARD-PENDING-42',

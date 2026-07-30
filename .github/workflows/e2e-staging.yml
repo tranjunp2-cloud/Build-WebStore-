@@ -82,7 +82,7 @@ jobs:
             BODY=$(echo "$RESP" | sed '$d')
 
             if [ "$STATUS" = "200" ] && echo "$BODY" | jq -e '
-              .setupCapability == "dashboard-fixture-v1"
+              .setupCapability == "dashboard-fixture-v2"
               and .dashboardFixture.orderId != null
               and (.dashboardFixture.orderNumber | strings | startswith("E2E-DASHBOARD-PENDING-"))
               and .dashboardFixture.orderTotal == 107.8

@@ -13,7 +13,8 @@ describe('E2E staging workflow', () => {
     )
 
     it('waits for the dashboard fixture capability before Playwright starts', () => {
-        expect(workflow).toContain('dashboard-fixture-v1')
+        expect(workflow).toContain('dashboard-fixture-v2')
+        expect(workflow).not.toContain('dashboard-fixture-v1')
         expect(workflow).toContain('.dashboardFixture.orderId')
         expect(workflow).toContain('startswith("E2E-DASHBOARD-PENDING-")')
         expect(workflow).not.toContain(

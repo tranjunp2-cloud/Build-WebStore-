@@ -21,7 +21,7 @@ describe('dashboard fixture provisioning helper', () => {
     it('requests a fresh fixture on every invocation and returns its identity', async () => {
         // Arrange
         fetchMock.mockImplementation(async () => new Response(JSON.stringify({
-            setupCapability: 'dashboard-fixture-v1',
+            setupCapability: 'dashboard-fixture-v2',
             dashboardFixture: {
                 orderId: 53,
                 orderNumber: 'E2E-DASHBOARD-PENDING-42',
@@ -60,11 +60,15 @@ describe('dashboard fixture provisioning helper', () => {
         })
     })
 
-    it('rejects a stale deployment without the fixture capability', async () => {
+    it('rejects a stale v1 deployment even when its fixture metadata is valid', async () => {
         // Arrange
         fetchMock.mockResolvedValue(new Response(JSON.stringify({
-            status: 'updated',
-            userId: 84,
+            setupCapability: 'dashboard-fixture-v1',
+            dashboardFixture: {
+                orderId: 53,
+                orderNumber: 'E2E-DASHBOARD-PENDING-42',
+                orderTotal: 107.8,
+            },
         }), { status: 200 }))
 
         // Act + Assert

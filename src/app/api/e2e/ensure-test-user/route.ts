@@ -25,7 +25,7 @@ const E2E_TENANT_SLUG = 'e2e-test'
 const E2E_DASHBOARD_SITE_NAME = 'E2E Dashboard Fixture'
 const E2E_DASHBOARD_ORDER_PREFIX = 'E2E-DASHBOARD-PENDING'
 const E2E_DASHBOARD_ORDER_TOTAL = 107.8
-const E2E_SETUP_CAPABILITY = 'dashboard-fixture-v1'
+const E2E_SETUP_CAPABILITY = 'dashboard-fixture-v2'
 
 type DashboardFixtureTenant = {
     id: string | number
