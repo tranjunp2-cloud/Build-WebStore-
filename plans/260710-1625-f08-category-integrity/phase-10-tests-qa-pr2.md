@@ -27,10 +27,10 @@ Unit-test tenant category prompt/mapping, AI review required selection, and the 
 ## Related Code Files
 
 **Create:**
-- `e2e/f08-ai-bulk-category.spec.ts` — permanent UI/Server Action category selection, draft persistence, fresh-read and cleanup flow; no direct collection REST or hardcoded IDs.
 - `src/__tests__/api/e2e-ensure-test-user.test.ts` — guarded, idempotent Site-prerequisite provisioning coverage for a fresh CI tenant.
 
 **Modify:**
+- `e2e/products.spec.ts` — permanent UI/Server Action category selection, draft persistence, fresh-read and cleanup flow; no direct collection REST or hardcoded IDs.
 - `src/__tests__/api/ai.test.ts` — tenant query, prompt, canonical ID/null and bounded list.
 - `src/__tests__/unit/dashboard/bulk-create-save.test.tsx` — required selection, selected-ID revalidation and partial stale-category handling.
 - `src/__tests__/unit/dashboard/category-list-tenant-scope.test.ts` — dedicated primary-tenant AI list and selected-ID lookup.
