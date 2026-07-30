@@ -1,4 +1,5 @@
 import 'server-only'
+import { sql } from 'drizzle-orm'
 import type { BasePayload } from 'payload'
 import { mapTrackingStatus, mapShipmentStatusCode } from './status-map'
 
@@ -139,6 +140,21 @@ export async function applyTrackingUpdate(
 
     if (!historyNeedsAppend && !autoShip && !autoComplete && !reopenOnCancel) return 'unchanged'
 
+    if (autoShip) {
+        // The fresh read above is still only a snapshot. A cancel/delivered flow can commit
+        // after that read, so promote the lifecycle with a compare-and-swap instead of letting
+        // the later Payload update overwrite the newer status. A miss means another writer won;
+        // do not persist tracking data assembled from the now-stale snapshot.
+        const result = await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders
+            SET status = 'shipped', updated_at = NOW()
+            WHERE id = ${order.id}
+              AND status = 'ready_to_ship'
+            RETURNING id
+        `)
+        if (!result.rows?.length) return 'unchanged'
+    }
+
     const eventTime = new Date().toISOString()
     const trackingData = historyNeedsAppend
         ? {
@@ -161,7 +177,6 @@ export async function applyTrackingUpdate(
         id: order.id,
         data: {
             ...trackingData,
-            ...(autoShip ? { status: 'shipped' } : {}),
             ...(autoComplete ? { status: 'completed' } : {}),
             ...(reopenOnCancel ? {
                 status: 'confirmed',

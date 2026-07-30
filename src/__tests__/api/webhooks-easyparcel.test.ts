@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockFind = vi.fn()
 const mockUpdate = vi.fn()
+const mockExecute = vi.fn().mockResolvedValue({ rows: [{ id: 'order' }] })
 const mockLoggerWarn = vi.fn()
 const mockLoggerInfo = vi.fn()
 const mockLoggerError = vi.fn()
@@ -18,6 +19,7 @@ vi.mock('payload', () => ({
     Promise.resolve({
       find: mockFind,
       update: mockUpdate,
+      db: { drizzle: { execute: mockExecute } },
       logger: {
         warn: mockLoggerWarn,
         info: mockLoggerInfo,
@@ -41,6 +43,16 @@ function callPost(secret: string | null, body: Record<string, unknown>) {
     body: JSON.stringify(body),
   })
   return POST(request)
+}
+
+function sqlToText(sqlObj: any): string {
+  return sqlObj.queryChunks
+    .map((chunk: any) =>
+      chunk && typeof chunk === 'object' && Array.isArray(chunk.value)
+        ? chunk.value.join('')
+        : String(chunk)
+    )
+    .join('')
 }
 
 describe('POST /api/webhooks/easyparcel', () => {
@@ -205,13 +217,15 @@ describe('POST /api/webhooks/easyparcel', () => {
     const updateArg = mockUpdate.mock.calls[0][0]
     expect(updateArg.data).toMatchObject({
       shippingTrackingStatus: 'in_transit',
-      status: 'shipped',
     })
+    expect(updateArg.data).not.toHaveProperty('status')
     expect(updateArg.data.shippingTrackingHistory.at(-1)).toMatchObject({
       status: 'in_transit',
       description: 'Rider is Out for Delivery',
       collectionMethod: 'dropoff',
     })
+    expect(mockExecute).toHaveBeenCalledTimes(1)
+    expect(sqlToText(mockExecute.mock.calls[0][0])).toContain("status = 'ready_to_ship'")
   })
 
   // ───────────────────────────────────────────────────────────────────
@@ -742,15 +756,39 @@ describe('applyTrackingUpdate (unit)', () => {
     const mockPayload = {
       find: vi.fn().mockResolvedValue({ docs: [order] }),
       update: vi.fn().mockResolvedValue({}),
+      db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [{ id: order.id }] }) } },
       logger: { debug: vi.fn() },
     }
 
     const result = await applyTrackingUpdate(mockPayload as any, order, 4, 'Rider is Out for Delivery')
 
     expect(result).toBe('updated')
+    expect(mockPayload.db.drizzle.execute).toHaveBeenCalledTimes(1)
     expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: { status: 'shipped' },
+      data: {},
     }))
+  })
+
+  it('[TC-F36.OD.045e] auto-ship CAS miss preserves a newer lifecycle state', async () => {
+    const order = {
+      id: 'order-concurrent-cancel',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [],
+    }
+    const mockPayload = {
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [] }) } },
+      logger: { debug: vi.fn() },
+    }
+
+    const result = await applyTrackingUpdate(mockPayload as any, order, 4, 'In Transit')
+
+    expect(result).toBe('unchanged')
+    expect(mockPayload.update).not.toHaveBeenCalled()
+    expect(sqlToText(mockPayload.db.drizzle.execute.mock.calls[0][0]))
+      .toContain("status = 'ready_to_ship'")
   })
 
   it('[TC-F36.OD.045d] same internal status appends a new raw courier message once', async () => {
@@ -809,18 +847,20 @@ describe('applyTrackingUpdate (unit)', () => {
     const mockPayload = {
       find: vi.fn().mockResolvedValue({ docs: [order] }),
       update: vi.fn().mockResolvedValue({}),
+      db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [{ id: order.id }] }) } },
       logger: { debug: vi.fn() },
     }
 
     const result = await applyTrackingUpdate(mockPayload as any, order, 3)
 
     expect(result).toBe('updated')
+    expect(mockPayload.db.drizzle.execute).toHaveBeenCalledTimes(1)
     expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        status: 'shipped',
         shippingTrackingStatus: 'picked_up',
       }),
     }))
+    expect(mockPayload.update.mock.calls[0][0].data).not.toHaveProperty('status')
   })
 
   it('[TC-F36.OD.046] unknown EP status → skipped, never overwrites a valid status', async () => {
