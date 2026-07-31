@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import EditorPage from '@/app/(editor)/editor/[siteId]/page'
+import type { LocalBusinessData } from '@/components/editor/local-business/types'
+import { trackEvent } from '@/lib/analytics/track-event'
 import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
@@ -9,23 +11,31 @@ type SettingsPanelHarnessProps = {
     isContactSavePending?: boolean
     site?: {
         contactInfo?: { phone?: string; email?: string; address?: string }
+        localBusiness?: LocalBusinessData
     } | null
     onSiteSettingsChange?: (changes: {
         name?: string
         contactInfo?: { phone?: string; email?: string; address?: string }
+        localBusiness?: LocalBusinessData
     }) => void | boolean | Promise<void | boolean>
 }
 
 const settingsPanelHarness = vi.hoisted(() => ({
     latestProps: null as SettingsPanelHarnessProps | null,
+    siteId: 'test-site-id',
+    searchParams: '',
 }))
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
-    useParams: () => ({ siteId: 'test-site-id' }),
+    useParams: () => ({ siteId: settingsPanelHarness.siteId }),
     useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-    useSearchParams: () => new URLSearchParams(''),
+    useSearchParams: () => new URLSearchParams(settingsPanelHarness.searchParams),
     usePathname: () => '/editor/test-site-id',
+}))
+
+vi.mock('@/lib/analytics/track-event', () => ({
+    trackEvent: vi.fn(),
 }))
 
 vi.mock('next/font/google', () => ({
@@ -136,6 +146,8 @@ vi.mock('sonner', () => ({
 beforeEach(() => {
     vi.clearAllMocks()
     settingsPanelHarness.latestProps = null
+    settingsPanelHarness.siteId = 'test-site-id'
+    settingsPanelHarness.searchParams = ''
     
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -189,6 +201,485 @@ beforeEach(() => {
 })
 
 describe('Publish and Save Flows (TC-F05)', () => {
+
+    it('[TC-F37-01-30] serializes and coalesces overlapping localBusiness saves', async () => {
+        // Arrange
+        const initialLocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Old Street',
+            state: 'Selangor',
+            city: '',
+            postcode: '',
+            country: 'MY',
+            openingHours: [{
+                dayOfWeek: 'Mo',
+                opens: '09:00',
+                closes: '18:00',
+                isClosed: false,
+            }],
+        }
+        const saveBodies: Array<{ localBusiness?: LocalBusinessData }> = []
+        let resolveFirstSave: ((response: {
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }) => void) | undefined
+        const firstSaveResponse = new Promise<{
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }>((resolve) => {
+            resolveFirstSave = resolve
+        })
+
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            localBusiness: initialLocalBusiness,
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveBodies.push(JSON.parse(String(init?.body)))
+                if (saveBodies.length === 1) return firstSaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(initialLocalBusiness)
+        })
+
+        // Act
+        let firstSave: Promise<void | boolean> | undefined
+        act(() => {
+            firstSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { streetAddress: '99 New Street' },
+            }))
+        })
+        await waitFor(() => expect(saveBodies).toHaveLength(1))
+
+        let stateSave: Promise<void | boolean> | undefined
+        let citySave: Promise<void | boolean> | undefined
+        let postcodeSave: Promise<void | boolean> | undefined
+        act(() => {
+            stateSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { state: 'Kuala Lumpur' },
+            }))
+            citySave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { city: 'Kuala Lumpur' },
+            }))
+            postcodeSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { postcode: '50000' },
+            }))
+        })
+
+        // Assert
+        expect(saveBodies).toHaveLength(1)
+        await act(async () => {
+            resolveFirstSave?.({ ok: true, json: async () => ({ success: true }) })
+            expect(await firstSave).toBe(true)
+        })
+        await waitFor(() => expect(saveBodies).toHaveLength(2))
+        expect(saveBodies[1]?.localBusiness).toEqual({
+            streetAddress: '99 New Street',
+            state: 'Kuala Lumpur',
+            city: 'Kuala Lumpur',
+            postcode: '50000',
+            country: 'MY',
+            openingHours: [{
+                dayOfWeek: 'Mo',
+                opens: '09:00',
+                closes: '18:00',
+                isClosed: false,
+            }],
+        })
+        await act(async () => {
+            expect(await stateSave).toBe(true)
+            expect(await citySave).toBe(true)
+            expect(await postcodeSave).toBe(true)
+        })
+        expect(trackEvent).toHaveBeenCalledTimes(2)
+        expect(trackEvent).toHaveBeenNthCalledWith(1, {
+            siteId: 'test-site-id',
+            event: 'local_business_data_saved',
+            pageUrl: '/editor/test-site-id',
+            metadata: { fields_completed_count: 3 },
+        })
+        expect(trackEvent).toHaveBeenLastCalledWith({
+            siteId: 'test-site-id',
+            event: 'local_business_data_saved',
+            pageUrl: '/editor/test-site-id',
+            metadata: { fields_completed_count: 5 },
+        })
+        expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(
+            saveBodies[1]?.localBusiness,
+        )
+    })
+
+    it('[TC-F37-01-30] never drains a queued site snapshot through another site', async () => {
+        // Arrange
+        const siteALocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Site A Street',
+            city: 'Shah Alam',
+            postcode: '40100',
+            country: 'MY',
+        }
+        const siteBLocalBusiness: LocalBusinessData = {
+            streetAddress: '2 Site B Street',
+            city: 'Johor Bahru',
+            postcode: '80000',
+            country: 'MY',
+        }
+        const saveRequests: Array<{ url: string; body: { localBusiness?: LocalBusinessData } }> = []
+        let resolveSiteASave: ((response: {
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }) => void) | undefined
+        const siteASaveResponse = new Promise<{
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }>((resolve) => {
+            resolveSiteASave = resolve
+        })
+
+        settingsPanelHarness.siteId = 'site-a'
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                const isSiteB = url.includes('/sites/site-b/')
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: isSiteB ? 'site-b' : 'site-a',
+                            name: isSiteB ? 'Site B' : 'Site A',
+                            status: 'draft',
+                            localBusiness: isSiteB ? siteBLocalBusiness : siteALocalBusiness,
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveRequests.push({ url, body: JSON.parse(String(init?.body)) })
+                if (url.includes('/sites/site-a/')) return siteASaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        const view = render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteALocalBusiness)
+        })
+
+        // Act: keep site A's first request in flight and queue a second A edit.
+        let firstSiteASave: Promise<void | boolean> | undefined
+        let queuedSiteASave: Promise<void | boolean> | undefined
+        act(() => {
+            firstSiteASave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { streetAddress: '99 Site A Street' },
+            }))
+        })
+        await waitFor(() => expect(saveRequests).toHaveLength(1))
+        act(() => {
+            queuedSiteASave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { city: 'Petaling Jaya' },
+            }))
+        })
+
+        settingsPanelHarness.siteId = 'site-b'
+        view.rerender(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
+        })
+
+        let siteBSave: Promise<void | boolean> | undefined
+        act(() => {
+            siteBSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { postcode: '81100' },
+            }))
+        })
+
+        // Assert: B persists independently while queued A remains owned by A.
+        await waitFor(() => expect(saveRequests).toHaveLength(2))
+        expect(saveRequests[0]?.url).toContain('/sites/site-a/save')
+        expect(saveRequests[1]).toMatchObject({
+            url: expect.stringContaining('/sites/site-b/save'),
+            body: {
+                localBusiness: {
+                    streetAddress: '2 Site B Street',
+                    city: 'Johor Bahru',
+                    postcode: '81100',
+                    country: 'MY',
+                },
+            },
+        })
+        await act(async () => expect(await siteBSave).toBe(true))
+
+        await act(async () => {
+            resolveSiteASave?.({ ok: true, json: async () => ({ success: true }) })
+            expect(await firstSiteASave).toBe(true)
+        })
+        await waitFor(() => expect(saveRequests).toHaveLength(3))
+        expect(saveRequests[2]).toMatchObject({
+            url: expect.stringContaining('/sites/site-a/save'),
+            body: {
+                localBusiness: {
+                    streetAddress: '99 Site A Street',
+                    city: 'Petaling Jaya',
+                    postcode: '40100',
+                    country: 'MY',
+                },
+            },
+        })
+        await act(async () => expect(await queuedSiteASave).toBe(true))
+    })
+
+    it('[TC-F37-01-30] preserves pending localBusiness edits across a same-site page reload', async () => {
+        // Arrange
+        const persistedLocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Old Street',
+            city: 'Shah Alam',
+            postcode: '40100',
+            country: 'MY',
+        }
+        const saveBodies: Array<{ localBusiness?: LocalBusinessData }> = []
+        let editorDataRequests = 0
+        let resolveFirstSave: ((response: {
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }) => void) | undefined
+        const firstSaveResponse = new Promise<{
+            ok: boolean
+            json: () => Promise<{ success: boolean }>
+        }>((resolve) => {
+            resolveFirstSave = resolve
+        })
+
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                editorDataRequests++
+                const pageId = new URL(url).searchParams.get('pageId') || 'page-1'
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            // Both page loads return the pre-save DB snapshot.
+                            localBusiness: persistedLocalBusiness,
+                        },
+                        page: { id: pageId, title: pageId === 'page-2' ? 'About' : 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        pages: [
+                            { id: 'page-1', title: 'Home', slug: '/' },
+                            { id: 'page-2', title: 'About', slug: '/about' },
+                        ],
+                    }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveBodies.push(JSON.parse(String(init?.body)))
+                if (saveBodies.length === 1) return firstSaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        const view = render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(persistedLocalBusiness)
+        })
+
+        let streetSave: Promise<void | boolean> | undefined
+        act(() => {
+            streetSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { streetAddress: '99 New Street' },
+            }))
+        })
+        await waitFor(() => expect(saveBodies).toHaveLength(1))
+
+        // Act: switch pages while the first Local Business PATCH is still pending.
+        settingsPanelHarness.searchParams = 'pageId=page-2'
+        view.rerender(<EditorPage />)
+        await waitFor(() => expect(editorDataRequests).toBe(2))
+        expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual({
+            ...persistedLocalBusiness,
+            streetAddress: '99 New Street',
+        })
+
+        let citySave: Promise<void | boolean> | undefined
+        act(() => {
+            citySave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { city: 'Kuala Lumpur' },
+            }))
+        })
+        expect(saveBodies).toHaveLength(1)
+
+        // Assert: the follow-up combines both edits instead of restoring the old street.
+        await act(async () => {
+            resolveFirstSave?.({ ok: true, json: async () => ({ success: true }) })
+            expect(await streetSave).toBe(true)
+        })
+        await waitFor(() => expect(saveBodies).toHaveLength(2))
+        expect(saveBodies[1]?.localBusiness).toEqual({
+            streetAddress: '99 New Street',
+            city: 'Kuala Lumpur',
+            postcode: '40100',
+            country: 'MY',
+        })
+        await act(async () => expect(await citySave).toBe(true))
+    })
+
+    it('[TC-F37-01-30] ignores a late localBusiness load from the previous site', async () => {
+        // Arrange
+        const siteALocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Site A Street',
+            city: 'Shah Alam',
+            postcode: '40100',
+            country: 'MY',
+        }
+        const siteBLocalBusiness: LocalBusinessData = {
+            streetAddress: '2 Site B Street',
+            city: 'Johor Bahru',
+            postcode: '80000',
+            country: 'MY',
+        }
+        const saveRequests: Array<{ url: string; body: { localBusiness?: LocalBusinessData } }> = []
+        let siteAJsonStarted = false
+        let resolveSiteAJson: ((data: {
+            site: { id: string; name: string; status: string; localBusiness: LocalBusinessData }
+            page: { id: string; title: string; slug: string }
+            blocks: Array<{ id: string; type: string }>
+        }) => void) | undefined
+        const siteAJson = new Promise<{
+            site: { id: string; name: string; status: string; localBusiness: LocalBusinessData }
+            page: { id: string; title: string; slug: string }
+            blocks: Array<{ id: string; type: string }>
+        }>((resolve) => {
+            resolveSiteAJson = resolve
+        })
+
+        settingsPanelHarness.siteId = 'site-a'
+        global.fetch = vi.fn((input: string | URL, init?: RequestInit) => {
+            const url = input.toString()
+            if (url.includes('/sites/site-a/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => {
+                        siteAJsonStarted = true
+                        return siteAJson
+                    },
+                })
+            }
+            if (url.includes('/sites/site-b/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'site-b',
+                            name: 'Site B',
+                            status: 'draft',
+                            localBusiness: siteBLocalBusiness,
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/save')) {
+                saveRequests.push({ url, body: JSON.parse(String(init?.body)) })
+                return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as unknown as typeof fetch
+
+        const view = render(<EditorPage />)
+        await waitFor(() => expect(siteAJsonStarted).toBe(true))
+
+        // Act: navigate to B while A is paused inside response.json().
+        settingsPanelHarness.siteId = 'site-b'
+        view.rerender(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
+        })
+        await act(async () => {
+            resolveSiteAJson?.({
+                site: {
+                    id: 'site-a',
+                    name: 'Site A',
+                    status: 'draft',
+                    localBusiness: siteALocalBusiness,
+                },
+                page: { id: 'page-1', title: 'Home', slug: '/' },
+                blocks: [{ id: 'b1', type: 'hero' }],
+            })
+        })
+
+        let siteBSave: Promise<void | boolean> | undefined
+        act(() => {
+            siteBSave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { postcode: '81100' },
+            }))
+        })
+
+        // Assert
+        await waitFor(() => expect(saveRequests).toHaveLength(1))
+        expect(saveRequests[0]).toMatchObject({
+            url: expect.stringContaining('/sites/site-b/save'),
+            body: {
+                localBusiness: {
+                    streetAddress: '2 Site B Street',
+                    city: 'Johor Bahru',
+                    postcode: '81100',
+                    country: 'MY',
+                },
+            },
+        })
+        await act(async () => expect(await siteBSave).toBe(true))
+        expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(
+            saveRequests[0]?.body.localBusiness,
+        )
+    })
 
     it('[TC-F37-01-26] keeps failed phone changes out of parent state and later contact saves', async () => {
         // Arrange

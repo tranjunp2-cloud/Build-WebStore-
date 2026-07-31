@@ -65,7 +65,7 @@ describe('SettingsPanel', () => {
         expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
     })
 
-    it('[TC-F37-01-27] backfills MY when an address edit starts with whitespace-only legacy country', async () => {
+    it('[TC-F37-01-27][TC-F37-01-30] sends a sparse street/MY patch for a legacy country', async () => {
         // Arrange
         const onSiteSettingsChange = vi.fn(() => false)
         render(
@@ -100,10 +100,10 @@ describe('SettingsPanel', () => {
         // Assert
         await waitFor(() => {
             expect(onSiteSettingsChange).toHaveBeenCalledWith({
-                localBusiness: expect.objectContaining({
+                localBusiness: {
                     streetAddress: '34 New Road',
                     country: 'MY',
-                }),
+                },
             })
         })
     })
