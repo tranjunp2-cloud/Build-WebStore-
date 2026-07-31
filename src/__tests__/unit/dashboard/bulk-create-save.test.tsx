@@ -63,12 +63,14 @@ vi.mock('@radix-ui/react-dialog', () => ({
 }))
 
 vi.mock('@/components/dashboard/CategorySelect', () => ({
-    CategorySelect: ({ categories, selectedIds, onChange, error, triggerId, ariaLabelledBy, disabled }: { categories: { id: string | number; name: string }[]; selectedIds: (string | number)[]; onChange: (ids: (string | number)[]) => void; error?: string; triggerId?: string; ariaLabelledBy?: string; disabled?: boolean }) => (
+    CategorySelect: ({ categories, selectedIds, onChange, error, triggerId, ariaLabelledBy, errorId, disabled }: { categories: { id: string | number; name: string }[]; selectedIds: (string | number)[]; onChange: (ids: (string | number)[]) => void; error?: string; triggerId?: string; ariaLabelledBy?: string; errorId?: string; disabled?: boolean }) => (
         <div>
             <select
                 id={triggerId}
                 aria-label={ariaLabelledBy ? undefined : 'AI product category'}
                 aria-labelledby={ariaLabelledBy}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
                 disabled={disabled}
                 value={selectedIds[0] == null ? '' : String(selectedIds[0])}
                 onChange= {event => {
@@ -83,7 +85,7 @@ vi.mock('@/components/dashboard/CategorySelect', () => ({
                     </option>
                 ))}
             </select>
-            {error ? <span>{error}</span> : null}
+            {error ? <span id={errorId} role="alert">{error}</span> : null}
         </div>
     ),
 }))
@@ -346,6 +348,18 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(categorySelectors).toHaveLength(2)
         expect(screen.getByTestId('ai-category-select-1')).toContainElement(categorySelectors[0])
         expect(screen.getByTestId('ai-category-select-2')).toContainElement(categorySelectors[1])
+        expect(screen.getByRole('combobox', {
+            name: 'Category for Stale Category, draft 1',
+        })).toHaveAttribute('id', 'ai-category-trigger-1')
+        expect(screen.getByRole('combobox', {
+            name: 'Category for No Category, draft 2',
+        })).toHaveAttribute('id', 'ai-category-trigger-2')
+        expect(categorySelectors[0]).toHaveAttribute('aria-describedby', 'ai-category-error-1')
+        expect(categorySelectors[0]).toHaveAttribute('aria-invalid', 'true')
+        expect(screen.getAllByRole('alert')[0]).toHaveAttribute('id', 'ai-category-error-1')
+        expect(categorySelectors[1]).toHaveAttribute('aria-describedby', 'ai-category-error-2')
+        expect(categorySelectors[1]).toHaveAttribute('aria-invalid', 'true')
+        expect(screen.getAllByRole('alert')[1]).toHaveAttribute('id', 'ai-category-error-2')
         expect(mockSaveProduct).not.toHaveBeenCalled()
 
         // Act

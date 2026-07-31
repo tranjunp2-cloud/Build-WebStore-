@@ -359,8 +359,11 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
         await expect(approveButton).toBeDisabled()
         for (const ordinal of [1, 2]) {
             const categorySelect = page.getByTestId(`ai-category-select-${ordinal}`)
-            await categorySelect.locator('.cursor-pointer').first().click()
-            await categorySelect.getByText(fixtureCategoryName, { exact: true }).last().click()
+            const trigger = categorySelect.getByRole('combobox', {
+                name: new RegExp(`Category for .* draft ${ordinal}`, 'i'),
+            })
+            await trigger.press('Enter')
+            await page.getByRole('treeitem', { name: fixtureCategoryName, exact: true }).press('Enter')
         }
         await expect(approveButton).toBeEnabled()
         await approveButton.click()
