@@ -79,4 +79,36 @@ describe('GH-1252 — VARIANT_MIN_CONTENT grid-col mismatch', () => {
             expect(VARIANT_MIN_CONTENT.team?.grid).toBe(3)
         })
     })
+
+    describe('service-cards.featured requires the 1+3 composition', () => {
+        it('TC-GENPERF-W4-07: featured with 3 services falls back to grid', () => {
+            // Arrange, Act
+            const result = enforceMinContent('service-cards', 'featured', 3)
+
+            // Assert
+            expect(result).toBe('grid')
+        })
+
+        it('TC-GENPERF-W4-08: featured with 4 services remains featured', () => {
+            // Arrange, Act
+            const result = enforceMinContent('service-cards', 'featured', 4)
+
+            // Assert
+            expect(result).toBe('featured')
+            expect(VARIANT_MIN_CONTENT['service-cards']?.featured).toBe(4)
+        })
+
+        it('TC-GENPERF-W4-10: featured with 5 services falls back to grid', () => {
+            // Arrange, Act
+            const result = enforceMinContent('service-cards', 'featured', 5)
+
+            // Assert
+            expect(result).toBe('grid')
+        })
+
+        it('TC-GENPERF-W4-11: grid and list declare 3-item compositions', () => {
+            expect(VARIANT_MIN_CONTENT['service-cards']?.grid).toBe(3)
+            expect(VARIANT_MIN_CONTENT['service-cards']?.list).toBe(3)
+        })
+    })
 })

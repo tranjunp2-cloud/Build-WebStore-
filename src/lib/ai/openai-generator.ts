@@ -15,7 +15,14 @@ import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
 import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBlocks } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
+import {
+    backfillContentSections,
+    enforceMinimumStructure,
+    enforceSubpageStructure,
+    enforceMinItems,
+    enforceGridAlignment,
+    MIN_SUBPAGE_CONTENT_SECTIONS,
+} from './structure-enforcer'
 import {
     postAISwapStep,
     isPostAISwapEnabled,
@@ -26,10 +33,15 @@ import { pickCategoryThemeWithMood } from './category-theme-picker'
 import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
 import { resolveBusinessCategory } from './composer-category-resolver'
+import { getCategoryRequirement } from './category-requirements'
 import { startCapture, finishCapture } from './capture-generation'
 import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
+import {
+    dedupePageSingletonBlocks,
+    dedupeRepeatedServiceCardsAcrossPages,
+} from './generated-page-quality'
 import type { BusinessSample } from './content/types'
 import { runConsistencyCheck, logConsistencyReport, emitConsistencyEvents } from './consistency-validator'
 import { resolveFontPairing } from './font-pairings'
@@ -71,6 +83,52 @@ export type SSEEvent = {
 export interface GenerateSiteOptions {
     /** Locale already selected by the user or accepted in the confirmation popup. */
     targetLocale?: string
+}
+
+function countContentSections(blocks: Array<Record<string, unknown>>): number {
+    return blocks.filter(
+        (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
+    ).length
+}
+
+function backfillPagesAfterServiceDedupe(
+    pagesBeforeDedupe: GeneratedPage[],
+    pagesAfterDedupe: GeneratedPage[],
+    category: string,
+    enforcerCtx: Parameters<typeof backfillContentSections>[3],
+): GeneratedPage[] {
+    const excludedBlockTypes = new Set(['service-cards'])
+
+    return pagesAfterDedupe.map((page, pageIndex) => {
+        const previousPage = pagesBeforeDedupe[pageIndex]
+        if (!previousPage) return page
+
+        const currentBlocks = page.blocks as Array<Record<string, unknown>>
+        if (currentBlocks.length === previousPage.blocks.length) return page
+
+        const structuralBlockCount = currentBlocks.filter(
+            (block) => block.blockType === 'navigation' || block.blockType === 'footer',
+        ).length
+        const targetContentCount = page.isHomepage
+            ? Math.max(0, getCategoryRequirement(category).minBlocks - structuralBlockCount)
+            : MIN_SUBPAGE_CONTENT_SECTIONS
+        if (countContentSections(currentBlocks) >= targetContentCount) return page
+
+        let repairedBlocks = backfillContentSections(
+            currentBlocks,
+            category,
+            targetContentCount,
+            enforcerCtx,
+            excludedBlockTypes,
+        )
+        repairedBlocks = enforceMinItems(repairedBlocks, category, enforcerCtx)
+        enforceGridAlignment(repairedBlocks, category, enforcerCtx)
+
+        return {
+            ...page,
+            blocks: repairedBlocks as GeneratedBlock[],
+        }
+    })
 }
 
 /**
@@ -469,6 +527,7 @@ export async function generateSiteWithAI(
             // Multi-page format
             generatedPages = []
             const allBlocks: Record<string, unknown>[] = []
+            const enforcerCategory = presetCategory || detectedCategory || 'business'
 
             const enforcerCtx = {
                 businessName: businessInfo.businessName,
@@ -510,6 +569,9 @@ export async function generateSiteWithAI(
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
                 }
+                pageBlocks = dedupePageSingletonBlocks(
+                    pageBlocks as Record<string, unknown>[],
+                ) as typeof pageBlocks
 
                 // Structure enforcement — homepage gets full `enforceMinimumStructure`
                 // (injects nav/footer/hero/mandatory blocks + pads to minBlocks).
@@ -517,7 +579,6 @@ export async function generateSiteWithAI(
                 // twice or inject mandatory blocks that don't belong on /about
                 // etc. Sub-pages still get item padding + grid alignment via the
                 // other enforcers below (plan 1.3 B5 fix).
-                const enforcerCategory = presetCategory || detectedCategory || 'business'
                 if (p === 0) {
                     pageBlocks = enforceMinimumStructure(
                         pageBlocks as Record<string, unknown>[],
@@ -562,7 +623,20 @@ export async function generateSiteWithAI(
                 events.push({ event: 'step', data: { step: `page_${p}`, label: `Creating ${rawPage.title || 'page'}...`, progress: 60 + Math.round((p / rawPages.length) * 30) } })
             }
 
-            validBlocks = allBlocks
+            const pagesBeforeServiceDedupe = generatedPages
+            const serviceDedupe = dedupeRepeatedServiceCardsAcrossPages(pagesBeforeServiceDedupe)
+            generatedPages = backfillPagesAfterServiceDedupe(
+                pagesBeforeServiceDedupe,
+                serviceDedupe.pages,
+                enforcerCategory,
+                enforcerCtx,
+            )
+            if (serviceDedupe.removedCount > 0) {
+                console.info(
+                    `[design-quality] removed ${serviceDedupe.removedCount} repeated service-card block(s) across pages`,
+                )
+            }
+            validBlocks = (generatedPages[0]?.blocks as Record<string, unknown>[] | undefined) ?? allBlocks
 
             // gen-perf phase-09: the structure enforcer above may restyle the
             // HOMEPAGE footer per its recipe — re-sync subpage footers so all
@@ -644,6 +718,10 @@ export async function generateSiteWithAI(
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)
             }
+
+            validBlocks = dedupePageSingletonBlocks(
+                validBlocks as Record<string, unknown>[],
+            ) as typeof validBlocks
 
             // Apply structure enforcer to ensure min block count + item counts
             if (detectedCategory) {
@@ -2341,6 +2419,7 @@ async function generateTemplateFirst(
 
     // Enforce homepage blocks
     let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
+    homepageBlocks = dedupePageSingletonBlocks(homepageBlocks) as typeof homepageBlocks
     homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     enforceGridAlignment(homepageBlocks, presetCategory, enforcerCtx)
@@ -2354,10 +2433,23 @@ async function generateTemplateFirst(
                 continue
             }
             let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = dedupePageSingletonBlocks(pageBlocks) as typeof pageBlocks
             pageBlocks = enforceSubpageStructure(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
             page.blocks = pageBlocks as GeneratedBlock[]
+        }
+        const pagesBeforeServiceDedupe = composerResult.pages
+        const serviceDedupe = dedupeRepeatedServiceCardsAcrossPages(pagesBeforeServiceDedupe)
+        composerResult.pages = backfillPagesAfterServiceDedupe(
+            pagesBeforeServiceDedupe,
+            serviceDedupe.pages as GeneratedPage[],
+            presetCategory,
+            enforcerCtx,
+        )
+        const dedupedHomepage = composerResult.pages.find((page) => page.isHomepage)
+        if (dedupedHomepage) {
+            composerResult.blocks = dedupedHomepage.blocks
         }
     }
 

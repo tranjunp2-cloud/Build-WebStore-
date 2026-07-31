@@ -178,12 +178,13 @@ ${blockList}
 1. Generate 5 pages: Homepage (8-14 blocks), About (7-9 blocks), Services/Products (7-9 blocks), Contact (7-9 blocks), Blog (7-9 blocks with 3-5 seeded posts)
 2. Every page MUST have at least 7 blocks (including navigation and footer) with non-empty body copy — no stub pages
 3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
-4. Each block MUST have "blockType" and "variant" fields
-5. blockType MUST be one of the listed types — no custom types
-6. variant MUST be one of the listed variants for that block type
-7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
-8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
-9. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
+4. Every service-cards block MUST contain unique service items. Generate EXACTLY 4 items for variant "featured" (1 featured + 3 supporting cards), and EXACTLY 3 items for variants "grid" and "list". Never repeat the same service-card payload on multiple pages.
+5. Each block MUST have "blockType" and "variant" fields
+6. blockType MUST be one of the listed types — no custom types
+7. variant MUST be one of the listed variants for that block type
+8. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+9. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
+10. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
 
 ## LANGUAGE DETECTION
 ${langOverrideRule}- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)

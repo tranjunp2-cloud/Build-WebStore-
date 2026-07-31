@@ -9,8 +9,10 @@
 
 import { describe, it, expect } from 'vitest'
 import { composeFallbackResult } from '@/lib/ai/fallback-adapter'
+import { buildServiceCards } from '@/lib/ai/template-composer'
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
+import type { BusinessSample } from '@/lib/ai/content/types'
 
 function findBlockAnywhere(
   result: GenerationResult,
@@ -28,6 +30,29 @@ function findBlockAnywhere(
 }
 
 describe('TC-F01-W.04 — service-cards from user products', () => {
+  it('TC-GENPERF-W4-09: fills 3 user products to the 4-item featured composition', () => {
+    // Arrange
+    const business: BusinessSample = {
+      name: 'Kopi Warisan Melaka',
+      tagline: 'Rasa warisan setiap hari',
+      description: 'Kafe tempatan di Melaka.',
+      address: 'Melaka',
+      phone: '0123456789',
+      email: 'hello@example.com',
+      heroHeadline: 'Kopi warisan Melaka',
+      heroSubheadline: 'Nikmati hidangan tempatan.',
+      products: ['Kopi gula melaka', 'Roti bakar kaya', 'Nasi lemak pandan'],
+    }
+
+    // Act
+    const block = buildServiceCards(business, 'fnb', 'ms')
+    const services = block.services as Array<{ title: string }>
+
+    // Assert
+    expect(services).toHaveLength(4)
+    expect(services.some((service) => service.title === 'Kedai Runcit')).toBe(true)
+  })
+
   it('emits product-derived services when products.length >= 2 (beauty)', () => {
     const info: BusinessInfoInput = {
       businessName: 'Glow Studio',

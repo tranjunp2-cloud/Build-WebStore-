@@ -285,6 +285,28 @@ describe('pages-schema sanitizer', () => {
         })
     })
 
+    describe('feature-comparison matrix normalization', () => {
+        it('normalizes null and string values to a complete boolean matrix', () => {
+            const block = {
+                blockType: 'feature-comparison',
+                variant: 'table',
+                products: [{ name: 'Basic' }, { name: 'Pro' }, { name: 'Enterprise' }],
+                features: [
+                    { name: 'Hosting', values: null },
+                    { name: 'Migration', values: ['Yes', 'No', 'Add-on'] },
+                    { name: 'Support', values: ['Basic', 'Advanced', '24/7'] },
+                ],
+            }
+
+            const result = sanitizeBlockForPayload(block)
+            const features = result!.features as Array<Record<string, unknown>>
+
+            expect(features[0]!.values).toEqual([false, false, false])
+            expect(features[1]!.values).toEqual([true, false, false])
+            expect(features[2]!.values).toEqual([true, true, true])
+        })
+    })
+
     describe('whitelist coverage invariants', () => {
         it('PAGES_FIELDS covers all PAGES_BLOCK_WHITELIST entries', () => {
             for (const bt of PAGES_BLOCK_WHITELIST) {
