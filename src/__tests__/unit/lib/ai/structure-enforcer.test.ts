@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enforceGridAlignment } from '@/lib/ai/structure-enforcer'
+import {
+    backfillContentSections,
+    enforceMinimumStructure,
+    enforceSubpageStructure,
+    enforceMinItems,
+    enforceGridAlignment,
+} from '@/lib/ai/structure-enforcer'
 import { CATEGORY_REQUIREMENTS, getCategoryRequirement, ITEM_FIELD_BY_BLOCK } from '@/lib/ai/category-requirements'
 
 beforeEach(() => {
@@ -153,6 +159,37 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             // Assert
             expect(result[0]!.variant).toBe('grid')
             expect((result[0]!.services as unknown[])).toHaveLength(3)
+        })
+
+        it('does not downgrade an underfilled non-English featured block to an invalid grid', () => {
+            const blocks = [
+                { blockType: 'navigation' },
+                {
+                    blockType: 'service-cards',
+                    variant: 'featured',
+                    services: [
+                        { title: 'Dịch vụ Một', description: 'Mô tả một', icon: 'Star' },
+                        { title: 'Dịch vụ Hai', description: 'Mô tả hai', icon: 'Star' },
+                    ],
+                },
+                { blockType: 'footer' },
+            ]
+
+            const result = enforceMinItems(blocks, 'beauty', {
+                language: 'vi',
+                userBiz: {
+                    name: 'Làm Đẹp Việt',
+                    description: 'Chăm sóc sắc đẹp theo nhu cầu của bạn.',
+                },
+            })
+            const contentBlocks = result.filter(
+                (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
+            )
+
+            expect(contentBlocks).toHaveLength(1)
+            expect(result.some((block) => block.blockType === 'service-cards')).toBe(false)
+            expect(result[0]!.blockType).toBe('navigation')
+            expect(result[result.length - 1]!.blockType).toBe('footer')
         })
 
         it('TC-GENPERF-W4-06: featured with more than 4 items is normalized to 4', () => {
@@ -504,6 +541,54 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             
             expect(footer1).toBeDefined()
             expect(footer2).toBeDefined()
+        })
+
+        it('does not emit duplicate contact sections while padding', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'features' },
+                    { blockType: 'footer' },
+                ],
+                'restaurant',
+                { seed: 42 },
+            )
+
+            expect(result.filter((block) => block.blockType === 'contact').length).toBeLessThanOrEqual(1)
+            expect(
+                result.filter(
+                    (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
+                ),
+            ).toHaveLength(5)
+        })
+    })
+
+    describe('backfillContentSections', () => {
+        it('restores removed content without re-adding an excluded service-card block', () => {
+            const existing = [
+                { blockType: 'navigation' },
+                { blockType: 'about' },
+                { blockType: 'features' },
+                { blockType: 'testimonials' },
+                { blockType: 'faq' },
+                { blockType: 'footer' },
+            ]
+
+            const result = backfillContentSections(
+                existing,
+                'beauty',
+                5,
+                { seed: 42 },
+                new Set(['service-cards']),
+            )
+            const contentBlocks = result.filter(
+                (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
+            )
+
+            expect(contentBlocks).toHaveLength(5)
+            expect(result.some((block) => block.blockType === 'service-cards')).toBe(false)
+            expect(result[0]).toBe(existing[0])
+            expect(result[result.length - 1]).toBe(existing[existing.length - 1])
         })
     })
 })
