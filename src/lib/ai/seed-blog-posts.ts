@@ -143,6 +143,18 @@ export type PreparedBlogPost = {
     slug: string
     content: string
     thumbnailId?: number
+    /** English stock-image subject retained only for F38 deferred assignment. */
+    imageKeyword?: string
+}
+
+export function assignResolvedBlogThumbnails(
+    prepared: PreparedBlogPost[],
+    thumbnailIds: readonly (number | undefined)[],
+): PreparedBlogPost[] {
+    return prepared.map((post, index) => ({
+        ...post,
+        ...(thumbnailIds[index] !== undefined ? { thumbnailId: thumbnailIds[index] } : {}),
+    }))
 }
 
 /**
@@ -168,6 +180,8 @@ export async function prepareBlogPosts(opts: {
      *  sample products) finished searching — the thumbnail phase waits for
      *  it so blog searches never compete for the rate limit (GH-1190). */
     pixabayGate?: Promise<unknown>
+    /** F38: prepare text and image demands without any provider request. */
+    skipImages?: boolean
 }): Promise<PreparedBlogPost[] | null> {
     const { payload, tenantId, category, businessName, products, industry, seed, locale = 'en' } = opts
     try {
@@ -216,6 +230,19 @@ export async function prepareBlogPosts(opts: {
         const contentPromises = seeds.map((s) =>
             generateBlogPostContent(s.title, businessName, industry ?? category, locale).catch(() => undefined),
         )
+
+        if (opts.skipImages) {
+            const contents = await Promise.all(contentPromises)
+            return seeds.map((s, i) => ({
+                title: s.title,
+                slug: s.slug,
+                content: contents[i] ?? buildFallbackBlogContent(s, businessName, locale),
+                imageKeyword:
+                    ('imageKeyword' in s && s.imageKeyword) ||
+                    ('category' in s && s.category) ||
+                    category,
+            }))
+        }
 
         // Thumbnails keep the legacy sequencing (one at a time, 500ms apart,
         // rate-limit short-circuit) — gentle on Pixabay, and gated behind the
