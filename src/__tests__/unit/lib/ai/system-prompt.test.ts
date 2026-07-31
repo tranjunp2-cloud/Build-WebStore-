@@ -71,6 +71,16 @@ describe('buildSystemPrompt [TC-F01.08]', () => {
         expect(prompt).toContain('Content Quality')
         expect(prompt).toContain('ACTUAL business name')
     })
+
+    it('TC-GENPERF-W4-03: requires complete and unique service-card collections', () => {
+        // Arrange, Act
+        const prompt = buildSystemPrompt()
+
+        // Assert
+        expect(prompt).toContain('EXACTLY 4 items for variant "featured"')
+        expect(prompt).toContain('EXACTLY 3 items for variants "grid" and "list"')
+        expect(prompt).toContain('Never repeat the same service-card payload on multiple pages')
+    })
 })
 
 describe('buildUserPrompt [TC-F01.08]', () => {

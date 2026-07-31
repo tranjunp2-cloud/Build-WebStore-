@@ -685,6 +685,24 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
         // Assert — hero block services untouched
         expect(services[0].title).toBe('')
     })
+
+    it('normalizes feature-comparison values emitted as null or labels', () => {
+        const blocks = [{
+            blockType: 'feature-comparison',
+            variant: 'table',
+            products: [{ name: 'Basic' }, { name: 'Pro' }, { name: 'Enterprise' }],
+            features: [
+                { name: 'Hosting', values: null },
+                { name: 'Migration', values: ['Yes', 'No', 'Add-on'] },
+            ],
+        }]
+
+        const result = normalizeBlocksForPersistence(blocks)
+        const features = result[0].features as Record<string, unknown>[]
+
+        expect(features[0].values).toEqual([false, false, false])
+        expect(features[1].values).toEqual([true, false, false])
+    })
 })
 
 // TC-F05-save-20: GH-1283 — CTA ctaStyle invalid values fail Payload validation on publish/save

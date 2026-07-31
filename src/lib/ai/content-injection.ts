@@ -212,8 +212,14 @@ export function buildBlockFromLibrary(
     // data. For non-English sites, returning null tells the structure-enforcer to
     // skip injection — GPT should provide these blocks in the target language.
     // Structural blocks (nav, footer, hero, contact, about, cta) are still injected.
-    const isNonEnglish = Boolean(ctx.language && ctx.language.split('-')[0] !== 'en')
-    if (isNonEnglish && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+    const language = ctx.language?.split('-')[0]
+    const isNonEnglish = Boolean(language && language !== 'en')
+    const hasLocalizedServiceLibrary = blockType === 'service-cards' && language === 'ms'
+    if (
+        isNonEnglish
+        && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)
+        && !hasLocalizedServiceLibrary
+    ) {
         return null
     }
 
@@ -698,10 +704,13 @@ export function padItems(
     // GPT has already generated items in the target language; adding English
     // library items would produce mixed-language output (e.g. 3 Vietnamese
     // FAQ + 2 English FAQ). Return GPT's items as-is even if below minCount.
+    const language = ctx.language?.split('-')[0]
+    const hasLocalizedServiceLibrary = blockType === 'service-cards' && language === 'ms'
     if (
-        ctx.language
-        && ctx.language.split('-')[0] !== 'en'
+        language
+        && language !== 'en'
         && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)
+        && !hasLocalizedServiceLibrary
     ) {
         return [...existing]
     }
@@ -737,7 +746,13 @@ export function padItems(
     } else {
         // Generic padding — inject from library block, dedup by `title` field
         // (features, service-cards have title). Avoids "Quality Service" appearing twice.
-        const libBlock = buildBlockFromLibrary(blockType, category, ctx)
+        // User products are already in `existing`. Build the padding pool from
+        // curated category services so it can contribute a distinct fourth
+        // card instead of returning the same user-derived cards again.
+        const libraryCtx = blockType === 'service-cards' && ctx.userBiz
+            ? { ...ctx, userBiz: { ...ctx.userBiz, products: undefined } }
+            : ctx
+        const libBlock = buildBlockFromLibrary(blockType, category, libraryCtx)
         if (libBlock) {
             const field = ITEM_FIELD_BY_BLOCK[blockType]
             if (field && Array.isArray(libBlock[field])) {

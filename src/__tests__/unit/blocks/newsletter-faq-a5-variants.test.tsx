@@ -73,6 +73,16 @@ describe('TC-F01D-A5.N02: newsletter/stacked-card renders centered card + form',
         expect(screen.getByText(newsletterBlock.headline)).toBeInTheDocument()
         expect(screen.getByPlaceholderText(newsletterBlock.placeholder)).toBeInTheDocument()
     })
+
+    it('caps the large card radius so pill themes cannot clip its content', () => {
+        const { container } = render(
+            <NewsletterBlock block={{ ...newsletterBlock, variant: 'stacked-card' }} theme={{}} site={{}} page={{}} />,
+        )
+
+        expect(container.querySelector('[data-newsletter-card="stacked"]')).toHaveStyle({
+            borderRadius: 'min(var(--radius-lg), 32px)',
+        })
+    })
 })
 
 describe('TC-F01D-A5.N03: newsletter/minimal renders inline heading + form', () => {

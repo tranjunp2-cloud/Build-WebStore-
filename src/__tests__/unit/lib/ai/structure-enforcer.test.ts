@@ -111,6 +111,92 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             const result = enforceMinItems(blocks, 'beauty')
             expect(result[0]).toBe(blocks[0])
         })
+
+        it('TC-GENPERF-W4-04: pads Malay featured service cards from 3 to 4 items', () => {
+            // Arrange
+            const services = [
+                { title: 'Kopi gula melaka', description: 'Kopi istimewa', icon: 'Star' },
+                { title: 'Roti bakar kaya', description: 'Roti rangup', icon: 'Star' },
+                { title: 'Nasi lemak pandan', description: 'Nasi wangi', icon: 'Star' },
+            ]
+            const blocks = [{ blockType: 'service-cards', variant: 'featured', services }]
+
+            // Act
+            const result = enforceMinItems(blocks, 'fnb', {
+                language: 'ms',
+                userBiz: {
+                    name: 'Kopi Warisan Melaka',
+                    products: services.map((service) => service.title),
+                },
+            })
+
+            // Assert
+            expect(result[0]!.variant).toBe('featured')
+            expect((result[0]!.services as unknown[])).toHaveLength(4)
+        })
+
+        it('TC-GENPERF-W4-05: falls back to grid when featured cannot be padded in-locale', () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'service-cards',
+                variant: 'featured',
+                services: Array.from({ length: 3 }, (_, i) => ({
+                    title: `Dienst ${i + 1}`,
+                    description: `Beschreibung ${i + 1}`,
+                    icon: 'Star',
+                })),
+            }]
+
+            // Act
+            const result = enforceMinItems(blocks, 'beauty', { language: 'de' })
+
+            // Assert
+            expect(result[0]!.variant).toBe('grid')
+            expect((result[0]!.services as unknown[])).toHaveLength(3)
+        })
+
+        it('TC-GENPERF-W4-06: featured with more than 4 items is normalized to 4', () => {
+            // Arrange
+            const blocks = [{
+                blockType: 'service-cards',
+                variant: 'featured',
+                services: Array.from({ length: 5 }, (_, i) => ({
+                    title: `Service ${i + 1}`,
+                    description: `Description ${i + 1}`,
+                    icon: 'Star',
+                })),
+            }]
+
+            // Act
+            const result = enforceMinItems(blocks, 'business', { language: 'en' })
+
+            // Assert
+            expect(result[0]!.variant).toBe('featured')
+            expect((result[0]!.services as unknown[])).toHaveLength(4)
+        })
+
+        it.each(['grid', 'list'])(
+            'TC-GENPERF-W4-12: %s with more than 3 items is normalized to 3',
+            (variant) => {
+                // Arrange
+                const blocks = [{
+                    blockType: 'service-cards',
+                    variant,
+                    services: Array.from({ length: 4 }, (_, i) => ({
+                        title: `Service ${i + 1}`,
+                        description: `Description ${i + 1}`,
+                        icon: 'Star',
+                    })),
+                }]
+
+                // Act
+                const result = enforceMinItems(blocks, 'business', { language: 'en' })
+
+                // Assert
+                expect(result[0]!.variant).toBe(variant)
+                expect((result[0]!.services as unknown[])).toHaveLength(3)
+            },
+        )
     })
 
     // ── TC-F01.SE.10–16: enforceMinItems — new block types (DEFAULT minItems) ──

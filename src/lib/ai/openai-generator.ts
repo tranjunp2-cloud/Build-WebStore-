@@ -30,6 +30,10 @@ import { startCapture, finishCapture } from './capture-generation'
 import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
+import {
+    dedupePageSingletonBlocks,
+    dedupeRepeatedServiceCardsAcrossPages,
+} from './generated-page-quality'
 import type { BusinessSample } from './content/types'
 import { runConsistencyCheck, logConsistencyReport, emitConsistencyEvents } from './consistency-validator'
 import { resolveFontPairing } from './font-pairings'
@@ -537,6 +541,9 @@ export async function generateSiteWithAI(
                     enforcerCtx,
                 ) as typeof pageBlocks
                 enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                pageBlocks = dedupePageSingletonBlocks(
+                    pageBlocks as Record<string, unknown>[],
+                ) as typeof pageBlocks
                 pageBlocks = normalizeLocaleStructuralStrings(
                     pageBlocks as Record<string, unknown>[],
                     blockLang,
@@ -562,7 +569,14 @@ export async function generateSiteWithAI(
                 events.push({ event: 'step', data: { step: `page_${p}`, label: `Creating ${rawPage.title || 'page'}...`, progress: 60 + Math.round((p / rawPages.length) * 30) } })
             }
 
-            validBlocks = allBlocks
+            const serviceDedupe = dedupeRepeatedServiceCardsAcrossPages(generatedPages)
+            generatedPages = serviceDedupe.pages
+            if (serviceDedupe.removedCount > 0) {
+                console.info(
+                    `[design-quality] removed ${serviceDedupe.removedCount} repeated service-card block(s) across pages`,
+                )
+            }
+            validBlocks = (generatedPages[0]?.blocks as Record<string, unknown>[] | undefined) ?? allBlocks
 
             // gen-perf phase-09: the structure enforcer above may restyle the
             // HOMEPAGE footer per its recipe — re-sync subpage footers so all
@@ -669,6 +683,9 @@ export async function generateSiteWithAI(
                 ) as typeof validBlocks
                 enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
+            validBlocks = dedupePageSingletonBlocks(
+                validBlocks as Record<string, unknown>[],
+            ) as typeof validBlocks
             validBlocks = normalizeLocaleStructuralStrings(
                 validBlocks as Record<string, unknown>[],
                 blockLang,
@@ -2344,6 +2361,7 @@ async function generateTemplateFirst(
     homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     enforceGridAlignment(homepageBlocks, presetCategory, enforcerCtx)
+    homepageBlocks = dedupePageSingletonBlocks(homepageBlocks) as typeof homepageBlocks
     composerResult.blocks = homepageBlocks as GeneratedBlock[]
 
     // Enforce sub-pages too (at least 4 blocks each)
@@ -2357,7 +2375,14 @@ async function generateTemplateFirst(
             pageBlocks = enforceSubpageStructure(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
+            pageBlocks = dedupePageSingletonBlocks(pageBlocks) as typeof pageBlocks
             page.blocks = pageBlocks as GeneratedBlock[]
+        }
+        const serviceDedupe = dedupeRepeatedServiceCardsAcrossPages(composerResult.pages)
+        composerResult.pages = serviceDedupe.pages as GeneratedPage[]
+        const dedupedHomepage = composerResult.pages.find((page) => page.isHomepage)
+        if (dedupedHomepage) {
+            composerResult.blocks = dedupedHomepage.blocks
         }
     }
 

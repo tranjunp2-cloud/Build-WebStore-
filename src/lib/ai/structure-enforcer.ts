@@ -401,7 +401,13 @@ export function enforceMinItems(
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
         if (!blockType) continue
-        const minCount = mins[blockType]
+        const configuredMin = mins[blockType] ?? 0
+        const isFeaturedServiceCards =
+            blockType === 'service-cards' && block.variant === 'featured'
+        const serviceCardsTarget = blockType === 'service-cards'
+            ? (isFeaturedServiceCards ? 4 : 3)
+            : null
+        const minCount = serviceCardsTarget ?? configuredMin
         if (minCount == null || minCount <= 0) continue
 
         const itemField = ITEM_FIELD_BY_BLOCK[blockType]
@@ -409,6 +415,14 @@ export function enforceMinItems(
 
         const current = block[itemField]
         if (!Array.isArray(current)) continue
+
+        if (serviceCardsTarget && current.length > serviceCardsTarget) {
+            block[itemField] = current.slice(0, serviceCardsTarget)
+            console.info(
+                `[Structure Enforcer] normalized service-cards.${String(block.variant)}: ${current.length} → ${serviceCardsTarget}`,
+            )
+            continue
+        }
         if (current.length >= minCount) continue
 
         const padded = padItems(blockType, current, minCount, category, ctx)
@@ -416,6 +430,12 @@ export function enforceMinItems(
         console.info(
             `[Structure Enforcer] padded ${blockType}.${itemField}: ${current.length} → ${padded.length}`,
         )
+        if (isFeaturedServiceCards && padded.length !== 4) {
+            block.variant = 'grid'
+            console.info(
+                `[Structure Enforcer] changed service-cards variant featured → grid because locale-safe padding could not reach 4 items`,
+            )
+        }
     }
 
     return blocks

@@ -150,6 +150,14 @@ Duration:   ~45s (total)
 - [x] Tests import from source, no re-implementation
 - [x] TC-IDs in test names per convention
 
+### Wave 4 Content Regression Guards (GH-1190)
+
+| TC | Type | Behavior | Status | Test |
+|---|---|---|---|---|
+| TC-GENPERF-W4-01 | unit | Một page chỉ giữ một contact form sau block alias normalization | AUTO | `generated-page-quality.test.ts` |
+| TC-GENPERF-W4-02 | unit | Exact service-card payload chỉ thuộc một page, ưu tiên `/services` | AUTO | `generated-page-quality.test.ts` |
+| TC-GENPERF-W4-03 | unit | `featured` sinh đúng 4 services; `grid`/`list` sinh đúng 3 services | AUTO | `system-prompt.test.ts`, `structure-enforcer.test.ts`, `variant-rotation.test.ts` |
+
 ---
 
 ## Known Gaps & Future Work
