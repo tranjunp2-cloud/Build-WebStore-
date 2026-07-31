@@ -1,7 +1,8 @@
 'use server'
 
-import { getPayload } from 'payload'
+import { getPayload, type PayloadRequest } from 'payload'
 import { sql } from 'drizzle-orm'
+import productSlugify from 'slugify'
 import configPromise from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
@@ -190,6 +191,7 @@ type ProductSaveContext = {
     user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
     tenantId: string | number
     payload: Awaited<ReturnType<typeof getPayload>>
+    req?: Pick<PayloadRequest, 'transactionID'>
 }
 
 async function saveProduct(rawData: unknown, id?: string | number, context?: ProductSaveContext) {
@@ -341,27 +343,33 @@ async function saveProduct(rawData: unknown, id?: string | number, context?: Pro
                 data,
                 user,
                 overrideAccess: false,
-                // Payload's transaction commit path can swallow PostgreSQL commit failures. Keep
-                // this save auto-committed and verify visibility below. The AI category lock is held
-                // on a separate connection until this entire save finishes.
-                disableTransaction: true,
+                // Manual creates remain auto-committed because Payload's adapter commit helper can
+                // swallow PostgreSQL commit failures. AI creates instead receive the category-lock
+                // transaction request, so the Product write and row lock finalize atomically through
+                // Drizzle's callback transaction.
+                ...(context?.req
+                    ? { req: context.req }
+                    : { disableTransaction: true }),
             })
-            // Verify the auto-committed row exists before reporting success.
-            try {
-                const verify = await payload.findByID({
-                    collection: 'products',
-                    id: res.id,
-                    overrideAccess: true,
-                    depth: 0,
-                })
-                if (!verify?.id) {
-                    console.error('[products.create] VERIFY FAILED — product not in DB after create!', { id: res?.id })
+            if (!context?.req) {
+                // Verify an independently auto-committed manual row before reporting success. An
+                // AI row is still uncommitted here and is verified by the outer transaction result.
+                try {
+                    const verify = await payload.findByID({
+                        collection: 'products',
+                        id: res.id,
+                        overrideAccess: true,
+                        depth: 0,
+                    })
+                    if (!verify?.id) {
+                        console.error('[products.create] VERIFY FAILED — product not in DB after create!', { id: res?.id })
+                        throw new Error('Product was not saved. Please try again.')
+                    }
+                } catch (verifyErr) {
+                    if ((verifyErr as Error)?.message === 'Product was not saved. Please try again.') throw verifyErr
+                    console.error('[products.create] VERIFY ERROR', { id: res?.id, verifyErr })
                     throw new Error('Product was not saved. Please try again.')
                 }
-            } catch (verifyErr) {
-                if ((verifyErr as Error)?.message === 'Product was not saved. Please try again.') throw verifyErr
-                console.error('[products.create] VERIFY ERROR', { id: res?.id, verifyErr })
-                throw new Error('Product was not saved. Please try again.')
             }
             return JSON.parse(JSON.stringify(res))
         } catch (createErr) {
@@ -426,20 +434,56 @@ export async function saveAiProductAction(rawData: unknown) {
     if (tenantId == null) throw new Error('Unauthorized')
 
     const payload = await getPayload({ config: configPromise })
+    const rawSlug = (rawData as Record<string, unknown>).slug
+    const requestedSlug = typeof rawSlug === 'string'
+        ? productSlugify(rawSlug, { lower: true, strict: true })
+        : ''
+    const canReplayAiDraft = /-ai-[a-f0-9]{32}$/.test(requestedSlug)
+    const findReplay = async () => {
+        if (!canReplayAiDraft) return null
+        const replay = await payload.find({
+            collection: 'products',
+            where: {
+                and: [
+                    { deletedAt: { exists: false } },
+                    { tenant: { equals: tenantId } },
+                    { slug: { equals: requestedSlug } },
+                    { aiReviewPending: { equals: true } },
+                ],
+            },
+            limit: 1,
+            pagination: false,
+            depth: 0,
+            overrideAccess: false,
+            user,
+        })
+        return replay.docs[0] ?? null
+    }
+
+    // A previous attempt may have committed even if its connection failed before acknowledging
+    // COMMIT. Reuse that exact AI draft instead of creating a duplicate on the merchant's retry.
+    const existingDraft = await findReplay()
+    if (existingDraft) return JSON.parse(JSON.stringify(existingDraft))
+
     const savedProduct = await (async () => {
         try {
             return await withActiveCategoryRowLock(
                 payload,
                 parsedCategory.data,
                 tenantId,
-                canonicalCategoryId => saveProduct({
+                (canonicalCategoryId, req) => saveProduct({
                     ...(rawData as Record<string, unknown>),
                     category: [canonicalCategoryId],
                     status: 'draft',
                     aiReviewPending: true,
-                }, undefined, { user, tenantId, payload }),
+                }, undefined, { user, tenantId, payload, req }),
             )
         } catch (error) {
+            // Also cover concurrent identical requests and ambiguous commit acknowledgements. If
+            // the lookup itself is unavailable, preserve and report the original write failure.
+            const committedReplay = await findReplay().catch(() => null)
+            if (committedReplay) return JSON.parse(JSON.stringify(committedReplay))
+
             if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
                 throw new Error(JSON.stringify({
                     code: CATEGORY_LOCK_BUSY_ERROR,

@@ -162,8 +162,15 @@ export function buildSavePayload(
     defaultVariantName: string = 'Default',
     tierLabels: VariantTierLabels = DEFAULT_VARIANT_TIER_LABELS) {
     const hasVariants = Boolean(prod.variants?.length)
-    const baseSlug = prod.slug || slugify(prod.name)
-    const finalSlug = baseSlug + '-' + Math.random().toString(36).substring(2, 7)
+    const baseSlug = slugify(prod.slug || prod.name) || 'product'
+    const compactDraftId = prod._id?.replace(/-/g, '').toLowerCase()
+    const stableDraftId = /^[a-f0-9]{32}$/.test(compactDraftId ?? '') ? compactDraftId : null
+    // The generated UUID is persisted in the unique slug, giving retries a stable idempotency
+    // key without adding a new Product field/schema migration. Legacy callers without a UUID
+    // retain the existing random-suffix behaviour.
+    const finalSlug = stableDraftId
+        ? `${baseSlug}-ai-${stableDraftId}`
+        : `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`
 
     // Force generation of variantConfigs from variant names to guarantee 100% option mapping accuracy
     // and correctly capture merged multi-tier options. We ignore AI's variantConfigs because they often
@@ -357,7 +364,7 @@ export function BulkCreateModal({
                     return {
                         ...p,
                         variants: cleanedVariants,
-                        _id: `draft-${draftIndex + 1}`,
+                        _id: crypto.randomUUID(),
                         _draftOrdinal: draftIndex + 1,
                         selected: true,
                         categoryId: typeof p.categoryId === 'string' || typeof p.categoryId === 'number' ? (canonicalCategoryIds.get(String(p.categoryId)) ?? null) : null,
@@ -673,6 +680,10 @@ export function BulkCreateModal({
                                 ) : (
                                     products.map(p => {
                                         const hasVariants = Boolean(p.variants?.length)
+                                        const categoryLabelId = `ai-category-label-${p._draftOrdinal}`
+                                        const categoryTriggerId = `ai-category-trigger-${p._draftOrdinal}`
+                                        const categoryErrorId = `ai-category-error-${p._draftOrdinal}`
+                                        const categoryHasError = !isAvailableCategoryId(p.categoryId)
                                         return (
                                         <div key={p._id} className="flex gap-3 items-start rounded-xl border border-solid border-[hsl(var(--border))] p-3">
                                             <div className="shrink-0 w-[52px] h-[52px] rounded-[10px] bg-[hsl(var(--muted))] flex items-center justify-center text-[hsl(var(--muted-foreground))]">
@@ -735,7 +746,7 @@ export function BulkCreateModal({
                                                     className="mt-1 flex flex-col gap-1"
                                                     data-testid={`ai-category-select-${p._draftOrdinal}`}
                                                 >
-                                                    <div className="text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
+                                                    <div id={categoryLabelId} className="text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
                                                         {t.dashboard?.products?.bulkCreate?.colCategory || 'Category'}
                                                         <span className="sr-only"> for {p.name?.trim() || 'unnamed product'}, draft {p._draftOrdinal}</span>{' '}
                                                         <span aria-hidden="true" className="text-red-500">*</span>
@@ -743,9 +754,12 @@ export function BulkCreateModal({
                                                     <CategorySelect
                                                         categories={availableCategories}
                                                         disabled={isSaving}
+                                                        triggerId={categoryTriggerId}
+                                                        ariaLabelledBy={categoryLabelId}
+                                                        errorId={categoryErrorId}
                                                         selectedIds={isAvailableCategoryId(p.categoryId) ? [p.categoryId!] : []}
                                                         onChange={ids => updateProduct(p._id, 'categoryId', ids[0] ?? null)}
-                                                        error={!isAvailableCategoryId(p.categoryId) ? categoryRequiredMessage : undefined}
+                                                        error={categoryHasError ? categoryRequiredMessage : undefined}
                                                     />
                                                 </div>
                                             </div>
