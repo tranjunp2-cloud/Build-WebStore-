@@ -3065,7 +3065,6 @@
                 "viewsTip": "Total visits from customers across all pages on your website.",
                 "leadsTip": "Potential customers who left their contact details (email, phone) via signup forms on your website.",
                 "engagementTip": "High-value customer actions — like clicking Buy Now, Add to Cart, or social media links.",
-                "revenueSoonTip": "Revenue tracking is coming soon. This card will calculate metrics from paid and completed orders.",
                 "noteToday": "vs yesterday",
                 "note7d": "vs prev 7d",
                 "note30d": "vs prev 30d"
@@ -3184,8 +3183,18 @@
                 "title": "Pending orders",
                 "subtitle": "Orders awaiting fulfilment",
                 "awaiting": "Awaiting",
-                "mockOrder": "Customer order · {count} items",
-                "soonTip": "Order fulfilment queue is in development — coming soon."
+                "emptyTitle": "No pending orders",
+                "emptyDesc": "New orders awaiting fulfilment will appear here.",
+                "unavailableTitle": "Pending orders are unavailable",
+                "unavailableDesc": "We couldn't load pending orders right now. Please try again later.",
+                "count": {
+                    "one": "{count} pending order",
+                    "other": "{count} pending orders"
+                },
+                "items": {
+                    "one": "{count} item",
+                    "other": "{count} items"
+                }
             },
             "customize": {
                 "button": "Customize",
