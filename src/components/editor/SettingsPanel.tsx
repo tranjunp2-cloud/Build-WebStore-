@@ -50,7 +50,6 @@ import { sanitizeLegacyOpeningHours } from './local-business/opening-hours-utils
 import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
-import { trackEvent } from '@/lib/analytics/track-event'
 import { Checkbox } from '@/components/ui/checkbox'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
@@ -62,20 +61,6 @@ function stripHtmlForDisplay(value: unknown): string {
 /** Strip HTML tags from input to prevent XSS */
 function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
-}
-
-/** F37 US-01: analytics `fields_completed_count` — address parts + category +
- *  "has ≥1 open day" flag (phase-03 plan architecture note). Deliberately NOT
- *  the same as the 3-row completion checklist (that's presence-per-group). */
-function countCompletedLocalBusinessFields(data: LocalBusinessData): number {
-    let count = 0
-    if (data.streetAddress?.trim()) count++
-    if (data.city?.trim()) count++
-    if (data.state?.trim()) count++
-    if (data.postcode?.trim()) count++
-    if (data.businessCategory?.trim()) count++
-    if (data.openingHours?.some(row => !row.isClosed && row.opens?.trim() && row.closes?.trim())) count++
-    return count
 }
 
 /** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
@@ -516,10 +501,9 @@ function SettingsPanelInner({
         }
     }
 
-    // F37 US-01: merge a localBusiness patch into current state, save, then fire
-    // the completion analytics event on success (architecture: "on successful
-    // save: trackEvent(...)"). Shared by every field in the accordion below so
-    // the merge-then-track sequence lives in exactly one place (DRY).
+    // F37 US-01: send only the edited fields to the Editor owner. The parent owns
+    // the latest snapshot and serializes persistence, so a render-stale snapshot
+    // here can never overwrite a newer field edit.
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
         const updatesStructuredAddress = (
             'streetAddress' in patch ||
@@ -527,37 +511,18 @@ function SettingsPanelInner({
             'city' in patch ||
             'postcode' in patch
         )
-        const merged: LocalBusinessData = {
-            ...siteLocalBusiness,
+        const normalizedPatch: Partial<LocalBusinessData> = {
             ...patch,
             ...(updatesStructuredAddress ? { country: siteLocalBusiness.country?.trim() || 'MY' } : {}),
         }
-        // Every save re-sends the full openingHours array (full-object merge
-        // above). A row saved before AC-3's strict validation could have
-        // isClosed=false with missing opens/closes, or no dayOfWeek at all —
-        // re-sending it as-is now fails saveSiteSchema. This also has to run
-        // when patch.openingHours IS set: applyBatchSave only re-encodes the
-        // day(s) the user just edited and passes every OTHER day through
-        // unchanged, so a legacy-invalid row on an untouched day would still
-        // 400 the save. sanitizeLegacyOpeningHours is a no-op for well-formed
-        // rows (encodeDay's output always has dayOfWeek, and open rows always
-        // have both opens+closes), so this never weakens validation for a
-        // genuinely new bad submission — there isn't one, since the UI can't
-        // produce one.
-        if (merged.openingHours) {
-            merged.openingHours = sanitizeLegacyOpeningHours(merged.openingHours)
+
+        // Keep component output sparse. The parent also normalizes its full queued
+        // snapshot; normalize here when hours change so analytics sees the same rows.
+        if (normalizedPatch.openingHours) {
+            normalizedPatch.openingHours = sanitizeLegacyOpeningHours(normalizedPatch.openingHours)
         }
-        const result = await onSiteSettingsChange?.({ localBusiness: merged })
-        // Only track on a confirmed successful save — onSiteSettingsChange resolves
-        // even on failure (errors are caught/toasted upstream), so `result === true`
-        // is the only reliable success signal.
-        if (site?.id && result === true) {
-            trackEvent({
-                siteId: site.id,
-                event: 'local_business_data_saved',
-                metadata: { fields_completed_count: countCompletedLocalBusinessFields(merged) },
-            })
-        }
+
+        await onSiteSettingsChange?.({ localBusiness: normalizedPatch })
     }
 
     const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
