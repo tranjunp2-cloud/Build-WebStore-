@@ -161,36 +161,105 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             expect((result[0]!.services as unknown[])).toHaveLength(3)
         })
 
-        it('does not downgrade an underfilled non-English featured block to an invalid grid', () => {
+        it('repairs a localized featured block from user products without English padding', () => {
             const blocks = [
                 { blockType: 'navigation' },
                 {
                     blockType: 'service-cards',
                     variant: 'featured',
                     services: [
-                        { title: 'Dịch vụ Một', description: 'Mô tả một', icon: 'Star' },
-                        { title: 'Dịch vụ Hai', description: 'Mô tả hai', icon: 'Star' },
+                        { title: 'Gesichtsbehandlung', description: 'Individuelle Hautpflege', icon: 'Star' },
+                        { title: 'Hautanalyse', description: 'Persönliche Beratung', icon: 'Star' },
                     ],
                 },
                 { blockType: 'footer' },
             ]
 
             const result = enforceMinItems(blocks, 'beauty', {
-                language: 'vi',
+                language: 'de',
                 userBiz: {
-                    name: 'Làm Đẹp Việt',
-                    description: 'Chăm sóc sắc đẹp theo nhu cầu của bạn.',
+                    name: 'Lumi Skin Studio Berlin',
+                    description: 'Hautpflege passend zu Ihren persönlichen Bedürfnissen.',
+                    products: [
+                        'Gesichtsbehandlung',
+                        'Hautanalyse',
+                        'Bio-Hautpflege',
+                        'Wellness-Ritual',
+                    ],
                 },
             })
-            const contentBlocks = result.filter(
-                (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
-            )
+            const serviceBlock = result.find((block) => block.blockType === 'service-cards')!
+            const services = serviceBlock.services as Array<{
+                title: string
+                description: string
+                cta?: unknown
+            }>
 
-            expect(contentBlocks).toHaveLength(1)
-            expect(result.some((block) => block.blockType === 'service-cards')).toBe(false)
+            expect(serviceBlock.variant).toBe('featured')
+            expect(services).toHaveLength(4)
+            expect(services.map((service) => service.title)).toEqual([
+                'Gesichtsbehandlung',
+                'Hautanalyse',
+                'Bio-Hautpflege',
+                'Wellness-Ritual',
+            ])
+            expect(services[2]!.description).toBe(
+                'Hautpflege passend zu Ihren persönlichen Bedürfnissen.',
+            )
+            expect(services[2]!.cta).toBeUndefined()
             expect(result[0]!.blockType).toBe('navigation')
             expect(result[result.length - 1]!.blockType).toBe('footer')
         })
+
+        it('keeps localized service content when no safe padding source exists', () => {
+            const blocks = [{
+                blockType: 'service-cards',
+                variant: 'featured',
+                services: [
+                    { title: 'Dienst Eins', description: 'Beschreibung eins', icon: 'Star' },
+                    { title: 'Dienst Zwei', description: 'Beschreibung zwei', icon: 'Heart' },
+                ],
+            }]
+
+            const result = enforceMinItems(blocks, 'beauty', { language: 'de' })
+            const services = result[0]!.services as Array<{ title: string }>
+
+            expect(result[0]!.blockType).toBe('service-cards')
+            expect(result[0]!.variant).toBe('featured')
+            expect(services.map((service) => service.title)).toEqual([
+                'Dienst Eins',
+                'Dienst Zwei',
+            ])
+        })
+
+        it.each(['grid', 'list'])(
+            'repairs a localized %s block to 3 items from user products',
+            (variant) => {
+                const blocks = [{
+                    blockType: 'service-cards',
+                    variant,
+                    services: [
+                        { title: 'Gói Một', description: 'Mô tả một', icon: 'Star' },
+                    ],
+                }]
+
+                const result = enforceMinItems(blocks, 'business', {
+                    language: 'vi',
+                    userBiz: {
+                        description: 'Giải pháp phù hợp với nhu cầu của bạn.',
+                        products: ['Gói Một', 'Gói Hai', 'Gói Ba'],
+                    },
+                })
+                const services = result[0]!.services as Array<{ title: string }>
+
+                expect(result[0]!.variant).toBe(variant)
+                expect(services.map((service) => service.title)).toEqual([
+                    'Gói Một',
+                    'Gói Hai',
+                    'Gói Ba',
+                ])
+            },
+        )
 
         it('TC-GENPERF-W4-06: featured with more than 4 items is normalized to 4', () => {
             // Arrange

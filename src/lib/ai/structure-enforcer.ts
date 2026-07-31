@@ -460,10 +460,6 @@ export function enforceMinItems(
     const req = getCategoryRequirement(category)
     const mins = req.minItems
     if (!mins) return blocks
-    const originalContentCount = blocks.filter(
-        (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
-    ).length
-    let removedUnderfilledServiceCards = false
 
     for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
         const block = blocks[blockIndex]!
@@ -504,24 +500,10 @@ export function enforceMinItems(
                 `[Structure Enforcer] changed service-cards variant featured → grid because locale-safe padding could not reach 4 items`,
             )
         } else if (blockType === 'service-cards' && padded.length < 3) {
-            blocks.splice(blockIndex, 1)
-            blockIndex--
-            removedUnderfilledServiceCards = true
-            console.info(
-                `[Structure Enforcer] removed underfilled service-cards block with ${padded.length} item(s)`,
+            console.warn(
+                `[Structure Enforcer] kept underfilled service-cards block with ${padded.length} localized item(s); no safe localized padding source was available`,
             )
         }
-    }
-
-    if (removedUnderfilledServiceCards) {
-        const repaired = backfillContentSections(
-            blocks,
-            category,
-            originalContentCount,
-            ctx,
-            new Set(['service-cards']),
-        )
-        blocks.splice(0, blocks.length, ...repaired)
     }
 
     return blocks

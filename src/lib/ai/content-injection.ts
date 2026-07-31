@@ -691,6 +691,69 @@ const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set([
     'pricing',
 ])
 
+function normalizeServiceTitle(value: unknown): string {
+    return typeof value === 'string'
+        ? value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+        : ''
+}
+
+function isSameServiceTitle(left: string, right: string): boolean {
+    if (left === right) return true
+    const shorterLength = Math.min(left.length, right.length)
+    return shorterLength >= 4 && (left.includes(right) || right.includes(left))
+}
+
+/**
+ * Fill localized service cards from the user's comma-separated products.
+ * Product names and business copy are already in the requested language, so
+ * this path can repair thin AI output without leaking English library content.
+ */
+function padLocalizedServiceCards(
+    existing: readonly unknown[],
+    minCount: number,
+    ctx: InjectionContext,
+): unknown[] {
+    const result = [...existing]
+    const products = (ctx.userBiz?.products ?? [])
+        .map((product) => product.trim())
+        .filter(Boolean)
+    if (products.length === 0) return result
+
+    const existingTitles = result
+        .filter((item): item is Block => typeof item === 'object' && item !== null)
+        .map((item) => normalizeServiceTitle(item.title))
+        .filter(Boolean)
+    const existingIcons = result
+        .filter((item): item is Block => typeof item === 'object' && item !== null)
+        .map((item) => typeof item.icon === 'string' ? item.icon : '')
+        .filter(Boolean)
+    const description = ctx.userBiz?.description?.trim()
+        || ctx.userBiz?.tagline?.trim()
+
+    for (const product of products) {
+        if (result.length >= minCount) break
+        const productTitle = normalizeServiceTitle(product)
+        if (
+            !productTitle
+            || existingTitles.some((title) => isSameServiceTitle(title, productTitle))
+        ) {
+            continue
+        }
+
+        const icon = existingIcons.length > 0
+            ? existingIcons[result.length % existingIcons.length]
+            : 'Star'
+        result.push({
+            title: product,
+            description: description || product,
+            icon,
+        })
+        existingTitles.push(productTitle)
+    }
+
+    return result
+}
+
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
@@ -706,6 +769,14 @@ export function padItems(
     // FAQ + 2 English FAQ). Return GPT's items as-is even if below minCount.
     const language = ctx.language?.split('-')[0]
     const hasLocalizedServiceLibrary = blockType === 'service-cards' && language === 'ms'
+    if (
+        blockType === 'service-cards'
+        && language
+        && language !== 'en'
+        && !hasLocalizedServiceLibrary
+    ) {
+        return padLocalizedServiceCards(existing, minCount, ctx)
+    }
     if (
         language
         && language !== 'en'
