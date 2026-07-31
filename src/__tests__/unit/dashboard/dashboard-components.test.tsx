@@ -6,7 +6,8 @@
  *   TC-F03.01c → SitesPageClient empty state renders CTA to /onboarding
  *   TC-F03.01d → SitesPageClient failed site shows "Incomplete" badge + 2 actions
  *   TC-F03.07  → DashboardStats renders 4 default stat cards
- *   TC-F03.11/12 → SEOHealthWidget shows score + "AI Fix Issues" button
+ *   TC-F03.29  → SEOHealthWidget shows score
+ *   TC-F03.72  → SEOHealthWidget renders concise emoji-free "AI Fix Issues" CTA button (EN/MS)
  *   TC-F03.18  → DashboardStats hides card when excluded from preferences
  *   TC-F03.19  → DashboardStats shows extra card when added to preferences
  *   TC-F03.24/25/26 → TopPerformingList limits displayed items; tab switching
@@ -236,12 +237,12 @@ describe('DashboardStats', () => {
 // SEOHealthWidget
 // ─────────────────────────────────────────────────────────────────────────────
 describe('SEOHealthWidget', () => {
-    it('[TC-F03.11] renders the SEO score', () => {
+    it('[TC-F03.29] renders the SEO score', () => {
         render(<SEOHealthWidget score={75} />)
         expect(screen.getByText('75')).toBeInTheDocument()
     })
 
-    it('[TC-F03.12] renders the exact revised CTA label', () => {
+    it('[TC-F03.72] renders the exact revised CTA label', () => {
         // Arrange
         render(<SEOHealthWidget score={60} />)
 
@@ -253,7 +254,7 @@ describe('SEOHealthWidget', () => {
         expect(screen.queryByRole('button', { name: 'AI Fix All Issues' })).not.toBeInTheDocument()
     })
 
-    it('[TC-F03.12] defines emoji-free revised CTA labels for English and Malay', () => {
+    it('[TC-F03.72] defines emoji-free revised CTA labels for English and Malay', () => {
         // Arrange
         const labels = [
             enLocale.dashboard.overview.seo.fixAll,
