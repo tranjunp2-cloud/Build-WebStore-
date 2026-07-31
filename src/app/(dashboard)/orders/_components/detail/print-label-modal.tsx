@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState, useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
 import { Printer, Download, X, Info, FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -28,6 +29,39 @@ interface PrintLabelModalProps {
 type LabelFormat = 'A6' | 'A4'
 type FormatState = { status: 'loading' | 'ok' | 'unavailable'; blobUrl?: string }
 
+function subscribeToDeviceClassification() {
+  // The browser/device classification is stable for the lifetime of the page.
+  return () => undefined
+}
+
+function getDeviceClassificationSnapshot() {
+  const userAgent = navigator.userAgent
+  return (
+    /(Android|iPhone|iPad|iPod|Mobile)/i.test(userAgent) ||
+    // iPadOS 13+ may request the desktop site and identify itself as macOS.
+    (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1)
+  )
+}
+
+function getServerDeviceClassificationSnapshot() {
+  return false
+}
+
+function PdfPreviewLoading() {
+  const { t } = useI18n()
+  return (
+    <div className="plabel-empty" role="status">
+      <Loader2 className="animate-spin" aria-hidden="true" />
+      <span>{t.dashboard.orders.printLabel.loadingLabel}</span>
+    </div>
+  )
+}
+
+const PdfLabelPreview = dynamic(
+  () => import('./pdf-label-preview').then((module) => module.PdfLabelPreview),
+  { ssr: false, loading: PdfPreviewLoading },
+)
+
 /**
  * Print-label modal (design 260707): LEFT = the ACTUAL EasyParcel PDF, embedded large
  * enough to read (never a custom-drawn label); RIGHT = format toggle (A6 thermal /
@@ -35,8 +69,8 @@ type FormatState = { status: 'loading' | 'ok' | 'unavailable'; blobUrl?: string 
  *
  * PDFs come through OUR proxy (GET /api/orders/[id]/label?format=…), never EP's URL
  * directly: EP's renderer can 400 on a format ("Failed to get label"), and the proxy
- * turns that into a clean unavailable-state instead of raw JSON inside the iframe.
- * Both formats are probed on open — a format is only selectable when its PDF loads.
+ * turns that into a clean unavailable-state. Desktop keeps the existing native PDF
+ * embed; mobile/tablet use PDF.js canvas because their iframe PDF viewers are unreliable.
  * Printing opens the PDF in a new tab (per design note); copies are confirmed in the
  * browser/OS print dialog — JS cannot preset them.
  */
@@ -44,6 +78,11 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
   const { t, ti } = useI18n()
   const pl = t.dashboard.orders.printLabel
 
+  const useCanvasPreview = useSyncExternalStore(
+    subscribeToDeviceClassification,
+    getDeviceClassificationSnapshot,
+    getServerDeviceClassificationSnapshot,
+  )
   const [format, setFormat] = useState<LabelFormat>('A6')
   const [markPrinted, setMarkPrinted] = useState(true)
   const [formats, setFormats] = useState<Record<LabelFormat, FormatState>>({
@@ -55,29 +94,53 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
 
   const proxyUrl = (f: LabelFormat) => `/api/orders/${orderId}/label?format=${f}`
 
-  // Probe both formats once per open: fetch → blob (doubles as the preview source).
+  // Keep the deployed desktop behavior: probe both formats and feed its native
+  // PDF viewer a Blob URL. The same probe also prevents a renderer error from
+  // being confused with an unavailable EasyParcel format on mobile/tablet.
   useEffect(() => {
     let cancelled = false
-    const created: string[] = []
-    ;(['A6', 'A4'] as LabelFormat[]).forEach(async (f) => {
+    const controller = new AbortController()
+    const created = new Set<string>()
+
+    ;(['A6', 'A4'] as LabelFormat[]).forEach(async (candidate) => {
       try {
-        const res = await fetch(proxyUrl(f))
-        if (!res.ok || !(res.headers.get('content-type') ?? '').includes('pdf')) throw new Error('unavailable')
-        const blobUrl = URL.createObjectURL(await res.blob())
-        created.push(blobUrl)
-        if (!cancelled) setFormats((s) => ({ ...s, [f]: { status: 'ok', blobUrl } }))
-      } catch {
-        if (!cancelled) {
-          setFormats((s) => ({ ...s, [f]: { status: 'unavailable' } }))
-          // Active format failed → hop to the other one (its own probe decides usability)
-          setFormat((cur) => (cur === f ? (f === 'A6' ? 'A4' : 'A6') : cur))
+        const response = await fetch(proxyUrl(candidate), { signal: controller.signal })
+        if (
+          !response.ok ||
+          !(response.headers.get('content-type') ?? '').includes('pdf')
+        ) {
+          throw new Error('unavailable')
         }
+
+        const blobUrl = URL.createObjectURL(await response.blob())
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+
+        created.add(blobUrl)
+        setFormats((current) => ({
+          ...current,
+          [candidate]: { status: 'ok', blobUrl },
+        }))
+      } catch (error) {
+        if (cancelled || (error instanceof DOMException && error.name === 'AbortError')) return
+        setFormats((current) => ({
+          ...current,
+          [candidate]: { status: 'unavailable' },
+        }))
+        setFormat((current) => (
+          current === candidate ? (candidate === 'A6' ? 'A4' : 'A6') : current
+        ))
       }
     })
+
     return () => {
       cancelled = true
-      created.forEach((u) => URL.revokeObjectURL(u))
+      controller.abort()
+      created.forEach((blobUrl) => URL.revokeObjectURL(blobUrl))
     }
+  // The modal remounts for each order; proxyUrl is intentionally local to this render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
@@ -106,15 +169,21 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
   }
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog plabel-dialog" onClick={e => e.stopPropagation()}>
+    <div className="dialog-backdrop plabel-backdrop" onClick={onClose}>
+      <div
+        className="dialog plabel-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="print-label-dialog-title"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="dialog-h">
           <span className="plabel-h-ic">
             <Printer style={{ width: 19, height: 19 }} />
           </span>
           <div className="dialog-h-tx">
-            <div className="dialog-t">{pl.title}</div>
+            <div className="dialog-t" id="print-label-dialog-title">{pl.title}</div>
             <div className="dialog-sub">{ti(pl.subtitleAwb, { awb: awbNo ?? '—' })} · {formatDesc}</div>
           </div>
           <button className="dialog-x" onClick={onClose} aria-label="Close">
@@ -126,15 +195,25 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
         <div className="plabel-grid">
           <div className="plabel-preview-pane">
             {active.status === 'ok' && active.blobUrl ? (
-              <iframe
-                key={active.blobUrl}
-                // #toolbar=0&navpanes=0&scrollbar=0: hide the browser PDF viewer's
-                // print/download/rotate controls → preview is view-only, funnel printing
-                // through the "Print label" button (which also stamps labelPrintedAt).
-                src={`${active.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                title="Shipping label PDF"
-                className="plabel-pdf-frame"
-              />
+              useCanvasPreview ? (
+                <PdfLabelPreview
+                  key={format}
+                  url={proxyUrl(format)}
+                  loadingLabel={pl.loadingLabel}
+                  errorLabel={pl.previewFailed}
+                  openPdfLabel={pl.openPdf}
+                  previousPageLabel={pl.previousPage}
+                  nextPageLabel={pl.nextPage}
+                  pageLabel={(page, pages) => ti(pl.pageCount, { page, pages })}
+                />
+              ) : (
+                <iframe
+                  key={active.blobUrl}
+                  src={`${active.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                  title="Shipping label PDF"
+                  className="plabel-pdf-frame"
+                />
+              )
             ) : (
               <div className="plabel-empty">
                 {active.status === 'loading' ? (
