@@ -10,8 +10,8 @@ status: completed
 
 Issue #1663 addresses AI product draft cards breaking at mobile widths because the desktop
 review-row layout compresses the product name and hides variants. Implementation and fresh browser
-verification are complete on branch `fix/f08-1663-ai-drafts-mobile-layout`; PR #1710 is open and
-final re-review found no issues.
+verification are complete on branch `fix/f08-1663-ai-drafts-mobile-layout`; PR #1710 remains open,
+and the final regression cases live in `e2e/products.spec.ts`.
 
 ## What Happened
 
@@ -21,7 +21,7 @@ final re-review found no issues.
   Stock share equal columns, Variants remain visible and wrapping, and the remove target is 44px.
   Existing edit, remove, and save behavior remains unchanged.
 - Phase 2 registered TC-F08-04-94 through TC-F08-04-96 and added deterministic viewport regression
-  coverage at `e2e/gh-1663-ai-drafts-mobile.spec.ts`.
+  coverage to `e2e/products.spec.ts`.
 - Initial evidence: GH-1663 E2E 3/3, targeted unit tests 56/56, TypeScript typecheck and
   `git diff --check` pass.
 - The first code review scored 9.3/10 and approved the implementation with no blocker.
@@ -32,10 +32,10 @@ final re-review found no issues.
   explicit filename allow-list, while TC-F08-04-96 only
   checked partial viewport visibility without exercising the unsaved-exit flow.
 - Root causes were the workflow's explicit filename allow-list and a weak geometry/behavior oracle
-  in TC-F08-04-96. The workflow now selects `gh-1663-ai-drafts-mobile.spec.ts`; TC-F08-04-96 now
+  in TC-F08-04-96. The workflow selects `products.spec.ts`; TC-F08-04-96 now
   verifies full containment of the panel and controls, Cancel → Stay state retention, and
   Discard → Exit modal closure.
-- Prevention evidence: the current workflow-equivalent suite selects 43 tests/13 files and includes
+- Prevention evidence: the current workflow-equivalent suite selects 43 tests/12 files and includes
   TC-F08-04-94 through TC-F08-04-96. GH-1663 browser tests pass 3/3,
   targeted unit tests pass 56/56, and TypeScript
   typecheck plus `git diff --check` pass.
@@ -56,8 +56,8 @@ final re-review found no issues.
 - The test never invokes Approve All and records POST requests to Next.js server actions, requiring
   the observed list to remain empty. Documentation now states this observable boundary instead of
   claiming database/product non-persistence.
-- Staging workflow now includes `gh-1663-ai-drafts-mobile.spec.ts` in its explicit allow-list; the
-  existing `e2e/**` path trigger already covers this spec.
+- Staging workflow includes `products.spec.ts` in its explicit allow-list; the existing `e2e/**`
+  path trigger covers changes to that spec.
 - The targeted unit verification command now includes `bulk-create-parse.test.tsx`, matching the
   three suites that produced the recorded 56/56 result.
 - Verification before the latest review cycle passed: GH-1663 browser regression 3/3 with the strengthened TC-F08-04-96
@@ -84,16 +84,27 @@ final re-review found no issues.
 
 - PR #1710 review found a source-trigger gap, weak TC-F08-04-94/95 geometry oracles, stale evidence,
   and a formal wording mismatch between the issue AC and the defined read-only Variants contract.
-- Staging E2E now triggers for `BulkCreateModal.tsx` as well as the regression spec.
+- The component-only source trigger was not retained after the workflow was restored; the current
+  staging workflow runs these cases when an existing E2E-matching path triggers.
 - TC-F08-04-94 now requires usable card-relative Name/Price/Stock widths and full containment.
 - TC-F08-04-95 now requires desktop left-to-right order, all pairwise non-intersections, and full
   containment for Name, Price, Stock, and Variants.
 - Fresh authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28 using the
   designated dev test account; credentials were not added to source.
-- Workflow-equivalent discovery selects 43 tests across 13 files.
+- Workflow-equivalent discovery selects 43 tests across 12 files.
 - Issue comment #5102689051 records the original contract: Product Name is editable; Variants is
   visible, wrapping, and read-only. PR #1710 already discloses this scope.
-- Final verification passed and the last fix-diff re-review returned no findings.
+- Browser and static verification for this cycle passed; a later re-review identified documentation
+  drift after the regression cases were consolidated.
+
+## Consolidation Documentation Fix
+
+- Commit `4963dd6c4` moved TC-F08-04-94 through TC-F08-04-96 into the existing
+  `e2e/products.spec.ts` suite and removed the standalone regression spec from the PR delta.
+- The existing staging allow-list selects `products.spec.ts`; no workflow modification remains in
+  the final PR delta.
+- Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94 through
+  TC-F08-04-96.
 
 ## Reflection
 

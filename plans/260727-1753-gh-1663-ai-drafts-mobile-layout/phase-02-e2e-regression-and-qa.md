@@ -14,7 +14,7 @@
 - Priority: P1
 - Effort: 4h
 - Implementation status: Completed
-- Review status: Completed — final PR re-review found no issues
+- Review status: Awaiting confirmation after verification-document corrections
 - Goal: add deterministic real-browser coverage for the exact 375–430px regression and register
   its TC IDs.
 
@@ -24,8 +24,8 @@ passed a fresh authenticated Chromium run on 2026-07-28.
 ## Key Insights
 
 - Existing BulkCreateModal tests run in jsdom and mock Dialog layout; they cannot catch geometry.
-- The active Playwright structure uses `e2e/` as its discovery root, so the GH-1663 regression
-  spec belongs in that directory.
+- The active Playwright structure uses `e2e/` as its discovery root, and the staging allow-list
+  already selects `e2e/products.spec.ts`, so the GH-1663 cases belong in that existing suite.
 - Live AI calls are slow, rate-limited, non-deterministic, and irrelevant to this CSS bug.
 
 ## Requirements
@@ -60,10 +60,10 @@ e2e discovery
 
 ### Test Discovery Alignment
 
-Keep the existing `testDir: './e2e'` configuration unchanged. Place the GH-1663 spec under `e2e/`,
-preserve the existing Chromium auth dependency/storage state, and confirm assignment with
-`npx playwright test --list`. Root `tests/*.spec.ts`, shared smoke coverage, and auth setup are
-outside this issue's change scope.
+Keep the existing `testDir: './e2e'` configuration unchanged. Place the GH-1663 cases in
+`e2e/products.spec.ts`, preserve the existing Chromium auth dependency/storage state, and confirm
+assignment with `npx playwright test --list`. Root `tests/*.spec.ts`, shared smoke coverage, auth
+setup, and workflow trigger changes are outside this issue's final delta.
 
 ## Related Code Files
 
@@ -71,18 +71,8 @@ outside this issue's change scope.
 
 - `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/qa/F08-product-crud.md`
   — add GH-1663 responsive TC rows marked AUTO.
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/.github/workflows/e2e-staging.yml`
-  — include the GH-1663 spec in the explicit allow-list and trigger it when
-  `BulkCreateModal.tsx` changes.
-
-### Create
-
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/e2e/gh-1663-ai-drafts-mobile.spec.ts`
-  — real-browser responsive regression.
-
-### Delete
-
-- None.
+- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/e2e/products.spec.ts`
+  — host TC-F08-04-94 through TC-F08-04-96 in the existing staging-allow-listed suite.
 
 ## Implementation Steps
 
@@ -91,8 +81,9 @@ outside this issue's change scope.
    - `TC-F08-04-94`: 375px stacked fields and no horizontal overflow.
    - `TC-F08-04-95`: 430px layout with visible, wrapping read-only variants.
    - `TC-F08-04-96`: short-height reachability plus Name/Price/Stock edit and remove regression.
-2. Create the spec under `e2e/` with top-level fixtures/helpers and AAA sections.
-3. Add its filename and the affected source component to the staging workflow trigger/allow-list.
+2. Add the cases to `e2e/products.spec.ts` with top-level fixtures/helpers and AAA sections.
+3. Confirm the existing staging allow-list selects `products.spec.ts`; do not modify workflow
+   triggers in this PR.
 4. Run `npx playwright test --list`; confirm the spec maps to authenticated Chromium.
 5. Reuse the existing `/products` entry flow and accessible selectors from `e2e/products.spec.ts`.
    Route-fulfill only `/api/ai/products-bulk-parse` with at least two products:
@@ -117,8 +108,8 @@ outside this issue's change scope.
 - [x] Candidate IDs checked repo-wide and against history; TC-F08-04-94..96 reserved without collision
 - [x] Existing e2e-only Playwright discovery remains unchanged
 - [x] GH-1663 Chromium project assignment verified with `--list`
-- [x] Staging E2E explicitly selects the GH-1663 spec and triggers when `BulkCreateModal.tsx` changes
-- [x] Workflow-equivalent discovery selects 43 tests across 13 files, including TC-F08-04-94..96
+- [x] Staging E2E selects `products.spec.ts` through its existing allow-list
+- [x] Workflow-equivalent discovery selects 43 tests across 12 files, including TC-F08-04-94..96
 - [x] Deterministic mobile E2E created
 - [x] Fresh 375×812 and 430×932 usable-width, containment, wrapping, and desktop-order checks pass
 - [x] Fresh 375×568 short-height flow passes, including edit retention, remove, Stay, Exit,
@@ -134,9 +125,9 @@ outside this issue's change scope.
 
 - Fresh authenticated Chromium run: setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28.
 - Strengthened oracles cover usable mobile widths and complete desktop horizontal geometry.
-- Staging E2E explicitly selects the GH-1663 spec and triggers for its E2E file or
-  `src/components/dashboard/BulkCreateModal.tsx`.
-- Workflow-equivalent discovery reports 43 tests across 13 files, including TC-F08-04-94..96.
+- Staging E2E explicitly selects `products.spec.ts` through its existing allow-list; the final PR
+  delta does not modify workflow triggers.
+- Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94..96.
 - Targeted BulkCreateModal unit suites: 56/56 passed.
 - TypeScript, `git diff --check`, and Playwright discovery passed.
 - No responsive screenshots were retained. Geometry, overflow, wrapping, editing, removal, and
@@ -147,16 +138,16 @@ outside this issue's change scope.
 
 ```bash
 npx playwright test --list
-npm run test:e2e -- e2e/gh-1663-ai-drafts-mobile.spec.ts --project=chromium
+npm run test:e2e -- e2e/products.spec.ts --project=chromium --grep 'TC-F08-04-9[4-6]'
 npm test -- src/__tests__/unit/dashboard/bulk-create-save.test.tsx src/__tests__/unit/dashboard/bulk-create-utils.test.ts src/__tests__/unit/dashboard/bulk-create-parse.test.tsx
 npm run typecheck
 ```
 
 ## Success Criteria
 
-- New spec appears in `--list` and passes in Chromium.
-- Staging CI triggers when the GH-1663 spec or `BulkCreateModal.tsx` changes, explicitly selects
-  that spec, and its workflow-equivalent discovery includes TC-F08-04-94..96.
+- TC-F08-04-94..96 appear under `e2e/products.spec.ts` in `--list` and pass in Chromium.
+- The existing staging allow-list selects `products.spec.ts`, and its workflow-equivalent discovery
+  includes TC-F08-04-94..96.
 - No horizontal overflow or input overlap at required viewports.
 - Variant information is visible; Name/Price/Stock editing and remove still work.
 - Header Cancel, footer Discard, and Approve All are fully contained and reachable with a short
@@ -171,7 +162,7 @@ npm run typecheck
 
 | Risk | Level | Mitigation |
 |---|---|---|
-| Regression is omitted from staging E2E | High | Trigger on the spec/component, select the filename, and audit `--list` |
+| Regression is omitted from staging E2E | High | Keep the cases in allow-listed `products.spec.ts` and audit workflow-equivalent `--list`; source-trigger coverage remains owned by workflow maintainers |
 | AI/network flakiness | High | Route-fulfill bulk-parse only; keep real browser/component flow |
 | Pixel assertions become brittle | Medium | Assert bounds/overlap/overflow, not screenshots alone |
 | E2E invokes a product-saving server action | Medium | Never click Approve All and assert zero POST requests to Next.js server actions |

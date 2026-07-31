@@ -62,7 +62,8 @@ No logical blocker in either direction; `blockedBy` and `blocks` stay empty.
 | 2 | [Add browser regression coverage and QA registry](./phase-02-e2e-regression-and-qa.md) | Completed |
 
 Both phases are implemented. On 2026-07-28, authenticated Chromium setup plus all three strengthened
-GH-1663 cases passed 4/4 using the designated dev test account. Final PR re-review found no issues.
+GH-1663 cases passed 4/4 using the designated dev test account. The cases were later consolidated
+into `e2e/products.spec.ts`; workflow-equivalent discovery reports 43 tests across 12 files.
 
 ## Dependencies
 
@@ -78,11 +79,11 @@ GH-1663 cases passed 4/4 using the designated dev test account. Final PR re-revi
 - Header, scrollable list, footer, remove/edit actions remain reachable.
 - Existing parse/save/stock semantics and desktop layout remain unchanged.
 - New Playwright TC is discovered and passes; targeted Vitest and TypeScript checks pass.
-- The GH-1663 spec lives in the existing `e2e/` discovery tree; unrelated root specs remain
-  untouched.
+- The GH-1663 cases live in `e2e/products.spec.ts` within the existing `e2e/` discovery tree;
+  unrelated root specs remain untouched.
 
 ## Resolved Decisions
 
 - Variants is visible and wrapping but read-only.
-- The GH-1663 regression spec lives under `e2e/`; existing discovery, smoke, auth setup, and root
-  specs are unchanged.
+- The GH-1663 regression cases live in `e2e/products.spec.ts`; existing discovery, smoke, auth
+  setup, and root specs are unchanged.

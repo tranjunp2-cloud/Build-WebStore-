@@ -14,7 +14,7 @@
 - Priority: P1
 - Effort: 2h
 - Implementation status: Completed
-- Review status: Completed — final PR re-review found no issues
+- Review status: Implementation complete; PR re-review awaiting documentation-fix confirmation
 - Goal: replace the compressed mobile row with a single-DOM responsive field grid while
   preserving all data and desktop behavior.
 
