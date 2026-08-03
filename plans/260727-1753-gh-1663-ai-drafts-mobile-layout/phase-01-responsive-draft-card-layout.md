@@ -4,9 +4,9 @@
 
 - Parent: [GH-1663 plan](./plan.md)
 - Issue: [primeproduction/ech-prime-web-v2#1663](https://github.com/primeproduction/ech-prime-web-v2/issues/1663)
-- Component: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/src/components/dashboard/BulkCreateModal.tsx`
-- Shared input: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/src/components/ui/input.tsx`
-- Existing QA registry: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/qa/F08-product-crud.md`
+- Component: `src/components/dashboard/BulkCreateModal.tsx`
+- Shared textarea: `src/components/ui/textarea.tsx`
+- Existing QA registry: `docs/qa/F08-product-crud.md`
 
 ## Overview
 
@@ -33,7 +33,8 @@
 
 ### Functional
 
-- Product Name: own full-width mobile row and remain editable.
+- Product Name: own full-width mobile row, auto-grow to show the complete wrapped value up to the
+  canonical 120-character limit, and remain editable.
 - Price and Stock: two equal mobile columns; retain current numeric coercion and variant-stock
   semantics.
 - Variants: own full-width mobile row, wrap long/multiple names, remain read-only.
@@ -72,12 +73,16 @@ track. The regression is caused by the fixed siblings in the current horizontal 
 
 ### Modify
 
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/src/components/dashboard/BulkCreateModal.tsx`
-  — draft-card markup/classes and accessible labels only.
+- `src/components/dashboard/BulkCreateModal.tsx`
+  — Product Name auto-growing control, newline normalization, existing length enforcement, and
+  draft-card markup/classes.
+- `src/hooks/use-auto-resize-textarea.ts`
+  — remeasure textarea height when responsive width changes and include border-box chrome.
 
 ### Create
 
-- None.
+- `src/__tests__/unit/hooks/use-auto-resize-textarea.test.tsx`
+  — protect border-box sizing, finite-height overflow, and the existing borderless consumer.
 
 ### Delete
 
@@ -87,9 +92,11 @@ track. The regression is caused by the fixed siblings in the current horizontal 
 
 1. Continue on the already-created `fix/f08-1663-ai-drafts-mobile-layout` branch from `staging`;
    rebase/resolve pending Category Integrity Phase 09 first if it lands before implementation.
-2. Limit the diff to the draft-card render block around lines 536–599.
+2. Limit behavior changes to Product Name display/edit normalization and the existing 120-character
+   contract, successful parse-state name normalization/capping, and the shared auto-resize hook; keep
+   save, category, and stock flows unchanged.
 3. Replace parallel label/input rows with field wrappers in one responsive grid.
-4. Make Name span full mobile width. Keep `min-w-0` on its flexible wrapper so long names remain
+4. Make Name span full mobile width and use the shared auto-resizing textarea so its complete value wraps without internal scrolling. Keep `min-w-0` on its flexible wrapper so long names remain
    bounded by the grid track.
 5. Place Price and Stock in two mobile columns; preserve `min`, coercion, tooltip, and handlers.
 6. Render Variants on mobile with `min-w-0 whitespace-normal break-words`; preserve read-only
@@ -109,22 +116,29 @@ track. The regression is caused by the fixed siblings in the current horizontal 
 - [x] Remove control implemented with a 44×44px mobile target
 - [x] Accessible labels added
 - [x] Desktop `md` row alignment and horizontal bounds regression-covered at 768px in Phase 02
-- [x] No parse/save/category/state code changed
+- [x] No save/category/stock flow changed; successful parse only normalizes Product Name and enforces
+  its existing 120-character limit before state
 
 ## Implementation Evidence
 
-- Source change is limited to the draft-card presentation block in `BulkCreateModal.tsx`.
-- Existing `updateProduct`, `updateAllVariantsStock`, `removeProduct`, parse, category, and save
-  behavior is unchanged.
-- Targeted validation passed: 56/56 Vitest tests, `npm run typecheck`, and `git diff --check`.
-- Focused implementation review approved the change at 9.7/10 with no critical findings.
-- On 2026-07-28, authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 with the strengthened
-  usable-width, containment, horizontal-order, and non-intersection assertions. No comparison
-  screenshot was retained.
+- Source changes are limited to the Product Name control and successful parse-state name
+  normalization/length enforcement in `BulkCreateModal.tsx`, plus responsive-width remeasurement in
+  the shared auto-resize hook.
+- Existing `updateProduct`, `updateAllVariantsStock`, `removeProduct`, category, and save flows are
+  unchanged. Successful parse now normalizes AI-provided Product Name CR/LF and caps the result at
+  120 UTF-16 code units without splitting Unicode surrogate pairs before state; editing also
+  prevents non-IME Enter, normalizes pasted CR/LF, exposes `maxLength=120`, and preserves explicit
+  IME composition so the field remains a bounded single value.
+- Targeted validation passed: 63/63 BulkCreateModal tests, 3/3 shared auto-resize border-box tests,
+  `npm run typecheck`, and `git diff --check`.
+- A later focused review prompted the auto-grow, responsive-width remeasurement, and internal-clipping oracle added in this cycle.
+- The previous authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28
+  with usable-width, containment, horizontal-order, and non-intersection assertions. That run
+  predates the new internal-clipping oracle; no comparison screenshot was retained.
 
 ## Success Criteria
 
-- 375px Name input is not compressed and does not intersect Price, Stock, thumbnail, or remove.
+- At 375px, the Name textarea shows its complete wrapped value without compression or intersection with Price, Stock, thumbnail, or remove.
 - 430px and `md+` layouts have no overflow or unexpected wrapping.
 - Long variant list is visible on mobile and grows the card vertically.
 - Editing Name/Price/Stock and removing a draft still updates the intended draft.
@@ -148,6 +162,7 @@ track. The regression is caused by the fixed siblings in the current horizontal 
 
 ## Completion Note
 
-Phase 02 completed the browser regression, QA registry, discovery verification, and staging
-allow-list integration. A 1280px screenshot was not retained and is not claimed as completion
-evidence.
+Phase 02 implemented the browser regression coverage, QA registry, discovery verification, and
+staging allow-list integration. The internal-clipping oracle and border-box fix still require a
+fresh credentialed browser rerun. A 1280px screenshot was not retained and is not claimed as
+completion evidence.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, Sparkles, X, ImageIcon } from 'lucide-react'
@@ -8,7 +8,9 @@ import { toast } from 'sonner'
 import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
@@ -57,6 +59,60 @@ interface BulkCreateModalProps {
 
 export function slugify(text: string) {
     return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+export const PRODUCT_NAME_MAX_LENGTH = 120
+
+export function normalizeDraftProductName(value: string) {
+    const singleLineValue = value.replace(/[\r\n]+/g, ' ')
+    let normalizedValue = ''
+
+    for (const character of singleLineValue) {
+        const codePoint = character.codePointAt(0)
+        if (codePoint !== undefined && codePoint >= 0xD800 && codePoint <= 0xDFFF) continue
+        if (normalizedValue.length + character.length > PRODUCT_NAME_MAX_LENGTH) break
+        normalizedValue += character
+    }
+
+    return normalizedValue
+}
+
+interface ProductNameTextareaProps {
+    id: string
+    value: string
+    onChange: (value: string) => void
+}
+
+function ProductNameTextarea({ id, value, onChange }: ProductNameTextareaProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const isComposingRef = useRef(false)
+    useAutoResizeTextarea(textareaRef, value, Number.POSITIVE_INFINITY)
+
+    return (
+        <Textarea
+            ref={textareaRef}
+            id={id}
+            rows={1}
+            maxLength={PRODUCT_NAME_MAX_LENGTH}
+            value={value}
+            onChange={(event) => onChange(normalizeDraftProductName(event.target.value))}
+            onCompositionStart={() => {
+                isComposingRef.current = true
+            }}
+            onCompositionEnd={() => {
+                isComposingRef.current = false
+            }}
+            onBlur={() => {
+                isComposingRef.current = false
+            }}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && !(isComposingRef.current || event.nativeEvent.isComposing)) {
+                    event.preventDefault()
+                }
+            }}
+            className="min-h-8 min-w-0 resize-none overflow-x-hidden px-2.5 py-1.5 text-[12.5px] leading-[18px]"
+        />
+    )
 }
 
 // Guarantees every AI-bulk-created product/variant has a non-empty SKU, even if the AI omits
@@ -325,6 +381,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     }
                     return {
                         ...p,
+                        name: normalizeDraftProductName(p.name || ''),
                         variants: cleanedVariants,
                         _id: Math.random().toString(36).substring(2, 11),
                         selected: true,
@@ -606,17 +663,10 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                     <label htmlFor={nameInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
                                                         {t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}
                                                     </label>
-                                                    {/* Single-line input, matching the design reference (ai-bulk-create.html
-                                                        uses <input class="f-name">, not a textarea) — guarantees this field
-                                                        is always the same fixed height as Price/Stock/Variants next to it;
-                                                        a long name scrolls horizontally within the box rather than
-                                                        wrapping/growing the row. */}
-                                                    <Input
+                                                    <ProductNameTextarea
                                                         id={nameInputId}
-                                                        type="text"
                                                         value={p.name}
-                                                        onChange={(e) => updateProduct(p._id!, 'name', e.target.value)}
-                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
+                                                        onChange={(value) => updateProduct(p._id!, 'name', value)}
                                                     />
                                                 </div>
                                                 <div className="flex min-w-0 flex-col gap-1.5">

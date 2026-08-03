@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { slugify, buildSavePayload, generateFallbackSku } from '../../../components/dashboard/BulkCreateModal'
+import {
+    slugify,
+    buildSavePayload,
+    generateFallbackSku,
+    normalizeDraftProductName,
+} from '@/components/dashboard/BulkCreateModal'
 
 // ─── TC-F08-04-01: Bulk product creation utilities ──────────────────────
 
@@ -36,6 +41,56 @@ describe('slugify [TC-F08-04-01]', () => {
 
     it('handles numbers', () => {
         expect(slugify('Product 123 ABC')).toBe('product-123-abc')
+    })
+})
+
+describe('normalizeDraftProductName [TC-F08-04-94, TC-F08-04-100]', () => {
+    it('keeps product names single-value while allowing the textarea to wrap visually', () => {
+        // Arrange
+        const pastedName = 'Premium Backpack\r\nWith Extended\nProduct Name'
+
+        // Act
+        const result = normalizeDraftProductName(pastedName)
+
+        // Assert
+        expect(result).toBe('Premium Backpack With Extended Product Name')
+    })
+
+    it('TC-F08-04-100: preserves a Product Name at the canonical 120-code-unit limit', () => {
+        // Arrange
+        const maxLengthName = 'A'.repeat(120)
+
+        // Act
+        const result = normalizeDraftProductName(maxLengthName)
+
+        // Assert
+        expect(result).toBe(maxLengthName)
+    })
+
+    it('TC-F08-04-100: discards Product Name characters beyond the canonical limit', () => {
+        // Arrange
+        const overlongName = 'A'.repeat(121)
+
+        // Act
+        const result = normalizeDraftProductName(overlongName)
+
+        // Assert
+        expect(result).toHaveLength(120)
+    })
+
+    it('TC-F08-04-100: never leaves an unpaired surrogate when truncating Unicode', () => {
+        // Arrange
+        const emojiAtBoundary = `${'A'.repeat(118)}😀`
+        const emojiAcrossBoundary = `${'A'.repeat(119)}😀`
+
+        // Act
+        const exactResult = normalizeDraftProductName(emojiAtBoundary)
+        const result = normalizeDraftProductName(emojiAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(emojiAtBoundary)
+        expect(result).toBe('A'.repeat(119))
+        expect(result).not.toMatch(/[\uD800-\uDFFF]$/)
     })
 })
 

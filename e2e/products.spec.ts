@@ -177,7 +177,7 @@ test.describe('Products Management', () => {
             name: 'Color',
             options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
         })
-        await expect(page.locator('.fixed.inset-0 input[type="text"]').first()).toHaveValue('T-Shirt')
+        await expect(page.getByLabel('Product name').first()).toHaveValue('T-Shirt')
         await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
     })
 
@@ -228,7 +228,7 @@ test.describe('Products Management', () => {
     })
 })
 
-const LONG_PRODUCT_NAME = 'Premium Handcrafted Malaysian Travel Backpack With Extended Product Name'
+const LONG_PRODUCT_NAME = 'Premium Handcrafted Malaysian Travel Backpack With Extended Product Name and Waterproof Compartments Weekend Adventures'
 const LONG_VARIANT_NAME = 'UltraLongVariantNameWithoutSpacesABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 const PARSED_PRODUCTS = {
@@ -295,6 +295,13 @@ async function expectNoHorizontalOverflow(locator: Locator) {
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1)
 }
 
+async function expectTextContentFullyVisible(locator: Locator) {
+    await expect.poll(() => locator.evaluate(element => (
+        element.scrollWidth <= element.clientWidth + 1
+        && element.scrollHeight <= element.clientHeight + 1
+    ))).toBe(true)
+}
+
 async function expectNoIntersection(first: Locator, second: Locator) {
     const firstBox = await first.boundingBox()
     const secondBox = await second.boundingBox()
@@ -351,6 +358,7 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         // Assert
         await expect(nameInput).toHaveValue(LONG_PRODUCT_NAME)
         await expect(nameInput).toBeEditable()
+        await expectTextContentFullyVisible(nameInput)
         expect(nameBox).not.toBeNull()
         expect(priceBox).not.toBeNull()
         expect(stockBox).not.toBeNull()
@@ -359,6 +367,7 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         if (!nameBox || !priceBox || !stockBox || !removeBox || !cardBox) return
 
         expect(nameBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.6)
+        expect(nameBox.height).toBeGreaterThan(32)
         expect(priceBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.25)
         expect(stockBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.25)
         expect(Math.abs(nameBox.x - priceBox.x)).toBeLessThanOrEqual(1)
@@ -398,6 +407,7 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
 
         // Assert — mobile value is visible, wrapping, and not editable.
         await expect(variantsField).toContainText(LONG_VARIANT_NAME)
+        await expectTextContentFullyVisible(nameInput)
         await expect(variantsLabel.locator('xpath=..').locator('input')).toHaveCount(0)
         expect(mobileVariantBox).not.toBeNull()
         expect(mobileVariantBox?.height ?? 0).toBeGreaterThan(32)
@@ -406,6 +416,7 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
 
         // Act — cross the md breakpoint using the same DOM and state.
         await page.setViewportSize({ width: 768, height: 932 })
+        await expectTextContentFullyVisible(nameInput)
         const priceInput = page.getByLabel('Price (RM)').first()
         const stockInput = page.getByLabel('Stock').first()
         const [desktopNameBox, desktopPriceBox, desktopStockBox, desktopVariantBox, desktopCardBox] = await Promise.all([

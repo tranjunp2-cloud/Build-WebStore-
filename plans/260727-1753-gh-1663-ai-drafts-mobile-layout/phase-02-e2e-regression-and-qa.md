@@ -4,22 +4,23 @@
 
 - Parent: [GH-1663 plan](./plan.md)
 - Phase 01: [Responsive draft-card layout](./phase-01-responsive-draft-card-layout.md)
-- Test rules: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/TEST_CONVENTION.md`
-- QA registry: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/qa/F08-product-crud.md`
-- Playwright config: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/playwright.config.ts`
+- Test rules: `docs/TEST_CONVENTION.md`
+- QA registry: `docs/qa/F08-product-crud.md`
+- Playwright config: `playwright.config.ts`
 
 ## Overview
 
 - Date: 2026-07-27
 - Priority: P1
 - Effort: 4h
-- Implementation status: Completed
-- Review status: Awaiting confirmation after verification-document corrections
+- Implementation status: In progress — new oracle implemented; credentialed rerun pending
+- Review status: Latest P1 fix implemented; browser rerun pending valid local credentials
 - Goal: add deterministic real-browser coverage for the exact 375–430px regression and register
   its TC IDs.
 
-Phase 01 implementation and QA registry coverage are complete. The strengthened responsive oracles
-passed a fresh authenticated Chromium run on 2026-07-28.
+Phase 01 implementation and QA registry coverage are complete. The authenticated Chromium run on
+2026-07-28 passed the earlier outer-geometry oracles; it predates the newer internal-clipping oracle
+and border-box hook fix, whose fresh credentialed rerun remains pending.
 
 ## Key Insights
 
@@ -69,9 +70,9 @@ setup, and workflow trigger changes are outside this issue's final delta.
 
 ### Modify
 
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/docs/qa/F08-product-crud.md`
+- `docs/qa/F08-product-crud.md`
   — add GH-1663 responsive TC rows marked AUTO.
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/e2e/products.spec.ts`
+- `e2e/products.spec.ts`
   — host TC-F08-04-94 through TC-F08-04-96 in the existing staging-allow-listed suite.
 
 ## Implementation Steps
@@ -90,7 +91,7 @@ setup, and workflow trigger changes are outside this issue's final delta.
    one long product name, multiple long variants, and one non-variant product.
 6. At each viewport assert:
    - modal/card `scrollWidth <= clientWidth`;
-   - Name input has usable width and does not intersect Price/Stock/remove;
+   - Name textarea auto-grows, has usable width, exposes no internal horizontal or vertical clipping, and does not intersect Price/Stock/remove;
    - variant value is visible and wraps inside card bounds;
    - close/header and footer controls are within or reachable through the modal;
    - `document.body.style.overflow === 'hidden'` while modal is open.
@@ -111,11 +112,13 @@ setup, and workflow trigger changes are outside this issue's final delta.
 - [x] Staging E2E selects `products.spec.ts` through its existing allow-list
 - [x] Workflow-equivalent discovery selects 43 tests across 12 files, including TC-F08-04-94..96
 - [x] Deterministic mobile E2E created
-- [x] Fresh 375×812 and 430×932 usable-width, containment, wrapping, and desktop-order checks pass
-- [x] Fresh 375×568 short-height flow passes, including edit retention, remove, Stay, Exit,
+- [x] Prior 375×812 and 430×932 usable-width, containment, wrapping, and desktop-order checks passed
+- [x] Prior 375×568 short-height flow passed, including edit retention, remove, Stay, Exit,
   panel/dialog unmount, body-overflow restoration, and zero observed server-action POSTs
-- [x] Fresh authenticated TC-F08-04-94..96 browser rerun passes (setup + cases: 4/4)
-- [x] Existing BulkCreateModal unit tests pass (56/56)
+- [ ] Fresh authenticated TC-F08-04-94..96 browser rerun with the internal-clipping oracle;
+  local test credentials currently return 401
+- [x] Existing BulkCreateModal unit tests pass (63/63)
+- [x] Shared auto-resize border-box regression tests pass (3/3)
 - [x] TypeScript and `git diff --check` pass
 - [x] PR #1710 uses `Relates to #1663` and discloses the intentional read-only variant decision
 - [x] Issue comment records the defined contract: Product Name editable; Variants visible/read-only
@@ -123,12 +126,14 @@ setup, and workflow trigger changes are outside this issue's final delta.
 
 ## Completion Evidence
 
-- Fresh authenticated Chromium run: setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28.
+- Previous authenticated Chromium run: setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28.
+  This predates the internal-clipping oracle; a fresh credentialed rerun is still required.
 - Strengthened oracles cover usable mobile widths and complete desktop horizontal geometry.
 - Staging E2E explicitly selects `products.spec.ts` through its existing allow-list; the final PR
   delta does not modify workflow triggers.
 - Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94..96.
-- Targeted BulkCreateModal unit suites: 56/56 passed.
+- Targeted BulkCreateModal unit suites: 63/63 passed.
+- Shared auto-resize border-box regression suite: 3/3 passed.
 - TypeScript, `git diff --check`, and Playwright discovery passed.
 - No responsive screenshots were retained. Geometry, overflow, wrapping, editing, removal, and
   short-height reachability are covered by browser assertions; this plan does not claim a stored
@@ -140,6 +145,7 @@ setup, and workflow trigger changes are outside this issue's final delta.
 npx playwright test --list
 npm run test:e2e -- e2e/products.spec.ts --project=chromium --grep 'TC-F08-04-9[4-6]'
 npm test -- src/__tests__/unit/dashboard/bulk-create-save.test.tsx src/__tests__/unit/dashboard/bulk-create-utils.test.ts src/__tests__/unit/dashboard/bulk-create-parse.test.tsx
+npm test -- src/__tests__/unit/hooks/use-auto-resize-textarea.test.tsx
 npm run typecheck
 ```
 
@@ -148,7 +154,7 @@ npm run typecheck
 - TC-F08-04-94..96 appear under `e2e/products.spec.ts` in `--list` and pass in Chromium.
 - The existing staging allow-list selects `products.spec.ts`, and its workflow-equivalent discovery
   includes TC-F08-04-94..96.
-- No horizontal overflow or input overlap at required viewports.
+- No horizontal overflow, textarea content clipping, or control overlap at required viewports.
 - Variant information is visible; Name/Price/Stock editing and remove still work.
 - Header Cancel, footer Discard, and Approve All are fully contained and reachable with a short
   viewport and a multi-draft list; Cancel → Stay preserves Name/Price/Stock plus the remaining

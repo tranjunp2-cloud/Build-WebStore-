@@ -1,7 +1,7 @@
 ---
 date: 2026-07-27
 session: gh-1663-mobile-layout-plan
-status: completed
+status: in_progress
 ---
 
 # Journal: 2026-07-27 — GH-1663 Mobile Layout Plan
@@ -9,9 +9,10 @@ status: completed
 ## Context
 
 Issue #1663 addresses AI product draft cards breaking at mobile widths because the desktop
-review-row layout compresses the product name and hides variants. Implementation and fresh browser
-verification are complete on branch `fix/f08-1663-ai-drafts-mobile-layout`; PR #1710 remains open,
-and the final regression cases live in `e2e/products.spec.ts`.
+review-row layout compresses the product name and hides variants. Local implementation is complete
+on branch `fix/f08-1663-ai-drafts-mobile-layout`; PR #1710 remains open, and the final regression
+cases live in `e2e/products.spec.ts`. The authenticated browser run from 2026-07-28 predates the
+new internal-clipping oracle and border-box hook fix, so a fresh credentialed rerun remains pending.
 
 ## What Happened
 
@@ -106,10 +107,43 @@ and the final regression cases live in `e2e/products.spec.ts`.
 - Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94 through
   TC-F08-04-96.
 
+## Fifth Review Fix Cycle
+
+- The latest PR review found that the single-line Product Name input still hid long values behind
+  internal horizontal scrolling, while TC-F08-04-94 only measured outer card/control geometry.
+- Product Name now uses the shared auto-resizing textarea, grows without an internal height cap,
+  remeasures when responsive width changes, and keeps saved name data single-value by preventing
+  Enter, normalizing AI-provided or pasted CR/LF characters to spaces, and enforcing the existing
+  120-character product-name contract.
+- TC-F08-04-94 now requires the textarea scroll dimensions not to exceed its client dimensions,
+  plus vertical growth beyond the former 32px input height. TC-F08-04-95 repeats the full-visibility
+  oracle after crossing the desktop breakpoint.
+- The shared auto-resize hook now adds border-box chrome to `scrollHeight` and decides finite-height
+  overflow from that complete required height; its focused regression suite passes 3/3.
+- The targeted BulkCreateModal suites pass 63/63, TypeScript and project lint pass (one pre-existing
+  handleParse dependency warning remains), and staging-equivalent discovery remains 43 tests in
+  12 files. A fresh browser execution was attempted, but the local test account was rejected by the
+  local app; the updated case is discovered under Chromium and must be rerun with valid credentials.
+- The PR description is corrected to remove the stale workflow-trigger claim and to report 43 tests
+  across 12 files. No workflow file is modified by this fix.
+
+## Sixth Review Fix Cycle
+
+- Pre-commit review found that the unbounded auto-growing Product Name textarea could retain AI or
+  pasted values longer than the existing 120-character form/server contract.
+- A shared draft-name normalizer now replaces CR/LF and caps values at 120 UTF-16 code units without
+  splitting Unicode surrogate pairs. The textarea exposes `maxLength=120` and tracks IME composition;
+  focused tests cover exact/over-limit AI output, emoji boundaries, and composing Enter behavior.
+- Eleven machine-specific absolute paths in the two phase documents were replaced with stable,
+  repository-root-relative paths.
+- The focused validation now passes 63/63 BulkCreateModal tests and 3/3 shared hook tests.
+
 ## Reflection
 
-The one-DOM grid preserved product-draft behavior while viewport tests supplied the missing geometry
-proof.
+The one-DOM grid preserves save, category, stock, remove, and draft-state flow while Product Name
+editing and successful parse intentionally normalize CR/LF to spaces and enforce the existing
+120-character limit. Viewport tests provide the geometry oracle; the newest internal-clipping
+version still needs a credentialed browser rerun.
 
 ## Decisions Made
 

@@ -1,7 +1,7 @@
 ---
 title: "GH-1663 — Responsive Review AI Drafts modal"
 description: "Fix the mobile AI-draft review cards so product names and variants remain readable without changing bulk-create business behavior."
-status: completed
+status: in_progress
 priority: P1
 effort: 6h
 issue: 1663
@@ -40,7 +40,7 @@ the current local `staging` base before any source changes.
 
 | Issue requirement | Planned result |
 |---|---|
-| Product name readable/editable | Full-width labeled input on 375–430px |
+| Product name readable/editable | Full-width auto-growing textarea that wraps the complete value on 375–430px |
 | Variant details visible | Full-width wrapping value; no `hidden md:block` on mobile |
 | Mobile stacked layout | Name → Price/Stock → Variants |
 | Desktop behavior preserved | Existing four-column row retained from `md` |
@@ -59,26 +59,31 @@ No logical blocker in either direction; `blockedBy` and `blocks` stay empty.
 | Phase | Name | Status |
 |---|---|---|
 | 1 | [Implement responsive draft-card layout](./phase-01-responsive-draft-card-layout.md) | Completed |
-| 2 | [Add browser regression coverage and QA registry](./phase-02-e2e-regression-and-qa.md) | Completed |
+| 2 | [Add browser regression coverage and QA registry](./phase-02-e2e-regression-and-qa.md) | In progress — credentialed rerun pending |
 
-Both phases are implemented. On 2026-07-28, authenticated Chromium setup plus all three strengthened
-GH-1663 cases passed 4/4 using the designated dev test account. The cases were later consolidated
-into `e2e/products.spec.ts`; workflow-equivalent discovery reports 43 tests across 12 files.
+Both phases are implemented. On 2026-07-28, the prior authenticated Chromium run passed setup plus
+all three GH-1663 cases (4/4) using the designated dev test account. That run covered the outer
+geometry but predates the newer internal-clipping oracle and border-box hook fix. The cases now live
+in `e2e/products.spec.ts`; workflow-equivalent discovery reports 43 tests across 12 files. A fresh
+credentialed rerun remains pending.
 
 ## Dependencies
 
-- Existing `Input`, `Button`, Tailwind breakpoints, and modal portal only.
+- Existing `Input`, `Textarea`, `Button`, auto-resize hook, Tailwind breakpoints, and modal portal only.
 - Authenticated Playwright state from `e2e/auth.setup.ts`.
 - `docs/TEST_CONVENTION.md` and AGENTS.md test-location rules.
 
 ## Success Criteria
 
 - No horizontal overflow at 375×812 or 430×932.
-- Name input has usable width; Price/Stock never overlap it or the remove control.
+- Name textarea auto-grows to show its complete wrapped value; Price/Stock never overlap it or the remove control.
 - Variant text is visible and wraps on mobile.
 - Header, scrollable list, footer, remove/edit actions remain reachable.
-- Existing parse/save/stock semantics and desktop layout remain unchanged.
-- New Playwright TC is discovered and passes; targeted Vitest and TypeScript checks pass.
+- Existing save/category/stock semantics and desktop layout remain unchanged; Product Name edit and
+  successful parse paths intentionally normalize CR/LF characters to spaces and enforce the existing
+  120-character product-name contract.
+- New Playwright TC is discovered; its prior outer-geometry run passed, while a fresh authenticated
+  run of the internal-clipping oracle remains pending. Targeted Vitest and TypeScript checks pass.
 - The GH-1663 cases live in `e2e/products.spec.ts` within the existing `e2e/` discovery tree;
   unrelated root specs remain untouched.
 
