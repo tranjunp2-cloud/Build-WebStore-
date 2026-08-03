@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Printer, Download, X, Info, FileText, Check, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
@@ -224,14 +225,13 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           <button className="btn btn-outline" onClick={handleDownload} disabled={active.status !== 'ok'}>
             <Download style={{ width: 15, height: 15 }} /> {pl.download}
           </button>
-          <button
-            className="btn btn-primary"
-            style={{ backgroundColor: 'rgb(59, 130, 246)' }}
+          <Button
+            variant="dashPrimary"
             onClick={handlePrint}
             disabled={active.status !== 'ok'}
           >
             <Printer style={{ width: 15, height: 15 }} /> {pl.print}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -259,27 +259,33 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="pa-label" className="text-[12px] text-[var(--dash-text)]">{copy.fieldLabel}</Label>
+                    <Label htmlFor="pa-label" className="text-[12px] text-[var(--dash-text)]">
+                        {copy.fieldLabel} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                    </Label>
                     <input id="pa-label" value={form.label} onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
                         placeholder={copy.labelPlaceholder} className={EP_INPUT} aria-invalid={showErrors && !!errors.label}
-                        aria-describedby={showErrors && errors.label ? 'pa-label-error' : undefined} />
+                        aria-required="true" aria-describedby={showErrors && errors.label ? 'pa-label-error' : undefined} />
                     {fieldError('label')}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="pa-phone" className="text-[12px] text-[var(--dash-text)]">{copy.senderPhone}</Label>
+                    <Label htmlFor="pa-phone" className="text-[12px] text-[var(--dash-text)]">
+                        {copy.senderPhone} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                    </Label>
                     <input id="pa-phone" value={form.phone} onChange={(event) => setForm((current) => ({
                         ...current,
                         phone: event.target.value.replace(/\D/g, '').slice(0, 15),
-                    }))} inputMode="numeric" autoComplete="tel" placeholder={copy.phonePlaceholder} className={EP_INPUT}
+                    }))} inputMode="numeric" autoComplete="tel" placeholder={copy.phonePlaceholder} className={EP_INPUT} aria-required="true"
                         aria-invalid={showErrors && !!errors.phone} aria-describedby={showErrors && errors.phone ? 'pa-phone-error' : undefined} />
                     {fieldError('phone')}
                 </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-                <Label htmlFor="pa-address1" className="text-[12px] text-[var(--dash-text)]">{copy.addressLine1}</Label>
+                <Label htmlFor="pa-address1" className="text-[12px] text-[var(--dash-text)]">
+                    {copy.addressLine1} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                </Label>
                 <input id="pa-address1" value={form.address1} onChange={(event) => setForm((current) => ({ ...current, address1: event.target.value }))}
-                    placeholder={copy.addressLine1} className={EP_INPUT} aria-invalid={showErrors && !!errors.address1}
+                    placeholder={copy.addressLine1} className={EP_INPUT} aria-required="true" aria-invalid={showErrors && !!errors.address1}
                     aria-describedby={showErrors && errors.address1 ? 'pa-address1-error' : undefined} />
                 {fieldError('address1')}
             </div>
@@ -294,9 +300,11 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="pa-state" className="text-[12px] text-[var(--dash-text)]">{copy.state}</Label>
+                    <Label htmlFor="pa-state" className="text-[12px] text-[var(--dash-text)]">
+                        {copy.state} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                    </Label>
                     <Select value={selectedStateId || undefined} onValueChange={handleStateChange} disabled={statesLoading}>
-                        <SelectTrigger id="pa-state" className={EP_SELECT} aria-invalid={showErrors && !!errors.state}>
+                        <SelectTrigger id="pa-state" className={EP_SELECT} aria-required="true" aria-invalid={showErrors && !!errors.state}>
                             <SelectValue placeholder={statesLoading ? copy.loading : copy.selectState} />
                         </SelectTrigger>
                         <SelectContent>{states.map((state) => <SelectItem key={state.id} value={String(state.id)}>{state.name}</SelectItem>)}</SelectContent>
@@ -304,9 +312,11 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                     {fieldError('state')}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="pa-city" className="text-[12px] text-[var(--dash-text)]">{copy.city}</Label>
+                    <Label htmlFor="pa-city" className="text-[12px] text-[var(--dash-text)]">
+                        {copy.city} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                    </Label>
                     <Select value={selectedDistrictId || undefined} onValueChange={handleDistrictChange} disabled={!selectedStateId || districtsLoading}>
-                        <SelectTrigger id="pa-city" className={EP_SELECT} aria-invalid={showErrors && !!errors.city}>
+                        <SelectTrigger id="pa-city" className={EP_SELECT} aria-required="true" aria-invalid={showErrors && !!errors.city}>
                             <SelectValue placeholder={districtsLoading ? copy.loading : copy.selectCity} />
                         </SelectTrigger>
                         <SelectContent>{districts.map((district) => <SelectItem key={district.id} value={String(district.id)}>{district.name}</SelectItem>)}</SelectContent>
@@ -314,10 +324,12 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                     {fieldError('city')}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="pa-postcode" className="text-[12px] text-[var(--dash-text)]">{copy.postcode}</Label>
+                    <Label htmlFor="pa-postcode" className="text-[12px] text-[var(--dash-text)]">
+                        {copy.postcode} <span aria-hidden="true" className="text-[hsl(var(--destructive))]">*</span>
+                    </Label>
                     <Select value={form.postcode || undefined} onValueChange={(postcode) => setForm((current) => ({ ...current, postcode }))}
                         disabled={!selectedDistrictId || postcodesLoading}>
-                        <SelectTrigger id="pa-postcode" className={EP_SELECT} aria-invalid={showErrors && !!errors.postcode}>
+                        <SelectTrigger id="pa-postcode" className={EP_SELECT} aria-required="true" aria-invalid={showErrors && !!errors.postcode}>
                             <SelectValue placeholder={postcodesLoading ? copy.loading : copy.selectPostcode} />
                         </SelectTrigger>
                         <SelectContent>{postcodeOpts.map((postcode) => <SelectItem key={postcode} value={postcode}>{postcode}</SelectItem>)}</SelectContent>
@@ -331,7 +343,7 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                     checked={mustBeDefault || form.isDefault}
                     disabled={mustBeDefault}
                     onCheckedChange={(checked) => setForm((current) => ({ ...current, isDefault: checked === true }))}
-                    className="h-5 w-5"
+                    className="h-5 w-5 data-[state=checked]:!text-white"
                     style={{
                         border: `1px solid ${mustBeDefault || form.isDefault ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}`,
                         background: mustBeDefault || form.isDefault ? 'hsl(var(--primary))' : 'transparent',
@@ -394,7 +406,7 @@ export function PickupAddresses({ value, onChange, onEditingChange, active = fal
                                 onCheckedChange={() => setDefault(key)}
                                 disabled={formOpen}
                                 aria-label={copy.setDefaultAria}
-                                className="mt-3 h-5 w-5"
+                                className="mt-3 h-5 w-5 data-[state=checked]:!text-white"
                                 style={{
                                     border: `1px solid ${selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}`,
                                     background: selected ? 'hsl(var(--primary))' : 'transparent',
