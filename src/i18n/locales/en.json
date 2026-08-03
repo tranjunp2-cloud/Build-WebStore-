@@ -4455,6 +4455,18 @@
             "seoError": "Error generating SEO",
             "generating": "Generating...",
             "autoSeo": "Automatic SEO Optimization",
+            "seoOverwriteDialog": {
+                "title": "Replace existing SEO metadata?",
+                "description": "Review the current and AI-generated metadata before replacing it.",
+                "metaTitle": "Meta title",
+                "metaDescription": "Meta description",
+                "current": "Current",
+                "proposed": "Proposed",
+                "empty": "Not set",
+                "cancel": "Cancel",
+                "replace": "Replace SEO",
+                "replacing": "Replacing..."
+            },
             "navVariant": "Navigation Style",
             "navVariantDefault": "Default",
             "navVariantCentered": "Centered",
@@ -4746,7 +4758,6 @@
         "settingsValidation": {
             "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
             "primaryColorLabel": "Primary color picker",
-            "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
             "phoneRequired": "Phone number is required",
             "invalidLatitude": "Latitude must be between -90 and 90",
             "invalidLongitude": "Longitude must be between -180 and 180"
