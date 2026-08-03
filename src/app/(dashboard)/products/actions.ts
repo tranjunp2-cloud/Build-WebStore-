@@ -459,11 +459,36 @@ export async function saveAiProductAction(rawData: unknown) {
         })
         return replay.docs[0] ?? null
     }
+    const replayMatchesRequestedCategory = (replay: unknown) => {
+        if (!replay || typeof replay !== 'object') return false
+        const categoryValues = (replay as { category?: unknown }).category
+        if (!Array.isArray(categoryValues) || categoryValues.length !== 1) return false
+
+        const categoryValue = categoryValues[0]
+        const replayCategoryId = (
+            typeof categoryValue === 'string' || typeof categoryValue === 'number'
+                ? categoryValue
+                : categoryValue && typeof categoryValue === 'object' && 'id' in categoryValue
+                    ? (categoryValue as { id?: unknown }).id
+                    : null
+        )
+        return (
+            (typeof replayCategoryId === 'string' || typeof replayCategoryId === 'number')
+            && String(replayCategoryId) === String(parsedCategory.data)
+        )
+    }
+    const replayCategoryConflict = () => new Error(JSON.stringify({
+        code: 'AI_DRAFT_CATEGORY_CONFLICT',
+        message: 'This AI draft was already saved to a different category. Retry using its original category.',
+    }))
 
     // A previous attempt may have committed even if its connection failed before acknowledging
     // COMMIT. Reuse that exact AI draft instead of creating a duplicate on the merchant's retry.
     const existingDraft = await findReplay()
-    if (existingDraft) return JSON.parse(JSON.stringify(existingDraft))
+    if (existingDraft) {
+        if (!replayMatchesRequestedCategory(existingDraft)) throw replayCategoryConflict()
+        return JSON.parse(JSON.stringify(existingDraft))
+    }
 
     const savedProduct = await (async () => {
         try {
@@ -482,7 +507,10 @@ export async function saveAiProductAction(rawData: unknown) {
             // Also cover concurrent identical requests and ambiguous commit acknowledgements. If
             // the lookup itself is unavailable, preserve and report the original write failure.
             const committedReplay = await findReplay().catch(() => null)
-            if (committedReplay) return JSON.parse(JSON.stringify(committedReplay))
+            if (committedReplay) {
+                if (!replayMatchesRequestedCategory(committedReplay)) throw replayCategoryConflict()
+                return JSON.parse(JSON.stringify(committedReplay))
+            }
 
             if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
                 throw new Error(JSON.stringify({
