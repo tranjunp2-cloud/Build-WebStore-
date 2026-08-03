@@ -45,7 +45,7 @@ vi.mock('@/i18n', () => ({
                         title: 'SEO Health',
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
-                        fixAll: 'AI Fix All Issues',
+                        fixAll: 'AI Fix Issues',
                     },
                     periods: { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' },
                     customize: 'Customize',

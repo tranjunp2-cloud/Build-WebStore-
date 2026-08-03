@@ -889,7 +889,7 @@
                 "score": "Score:",
                 "statusGood": "Good",
                 "statusWarning": "Needs Improvement",
-                "fixAll": "✨ AI Fix All Issues",
+                "fixAll": "AI Fix Issues",
                 "fix": "Fix",
                 "issue": "Issue",
                 "issues": "Issues"
@@ -1081,7 +1081,7 @@
             "missingDesc": "Missing description",
             "healthOverview": "SEO Health Overview",
             "scoreLabel": "Score: {score}/100",
-            "fixAllButton": "AI Fix All Issues",
+            "fixAllButton": "AI Fix Issues",
             "contentQuality": "Content Quality",
             "technicalSeo": "Technical SEO",
             "sitemapAndMeta": "Sitemap & Meta Tags",
@@ -3133,7 +3133,7 @@
                 "breakdownContent": "Content Quality",
                 "breakdownTechnical": "Technical SEO",
                 "criticalIssue": "Most critical issue: {count} {text}. Fixing these will lift your score.",
-                "fixAll": "AI Fix All Issues",
+                "fixAll": "AI Fix Issues",
                 "issuesTitle": "SEO issues",
                 "open": "{count} open",
                 "allClear": "All clear",
@@ -3441,7 +3441,7 @@
                                 "The <strong>Overview tab</strong> shows key metrics: total website views (Traffic), link clicks (Leads), and user engagement.",
                                 "Use the <strong>Period Selector</strong> (Today / 7 days / 30 days) at the top right to change the time range for analytics.",
                                 "Click <strong>Customize</strong> to drag-and-drop, show/hide metrics cards to personalize your dashboard layout.",
-                                "The <strong>SEO Health Widget</strong> displays your site's SEO score out of 100 with actionable warnings — click \"AI Fix All Issues\" to auto-optimize."
+                                "The <strong>SEO Health Widget</strong> displays your site's SEO score out of 100 with actionable warnings — click \"AI Fix Issues\" to auto-optimize."
                             ]
                         }
                     ]
@@ -3604,7 +3604,7 @@
                 "qDashboardCustomize": "How to customize the Dashboard layout?",
                 "aDashboardCustomize": "Click the <strong>Customize</strong> button at the top right of the Dashboard. A modal will appear where you can drag-and-drop to reorder metric cards, and toggle the eye icon to show or hide specific metrics.",
                 "qDashboardSeo": "What is the SEO Health Widget?",
-                "aDashboardSeo": "The <strong>SEO Health Widget</strong> displays your website's SEO score out of 100. It shows warnings like missing meta titles or unoptimized images. Click <strong>\"AI Fix All Issues\"</strong> to let AI automatically optimize your site's SEO.",
+                "aDashboardSeo": "The <strong>SEO Health Widget</strong> displays your website's SEO score out of 100. It shows warnings like missing meta titles or unoptimized images. Click <strong>\"AI Fix Issues\"</strong> to let AI automatically optimize your site's SEO.",
                 "builderTitle": "AI Website Builder",
                 "qBuilderCreate": "How to create a website with AI?",
                 "aBuilderCreate": "Click <strong>\"Build with AI\"</strong> on the Dashboard or go to <strong>Builder → New</strong>. Enter your business name, select your industry, describe your products/services, then click <strong>\"Continue — AI will create your website\"</strong>. AI will generate a complete website in about 30-60 seconds.",

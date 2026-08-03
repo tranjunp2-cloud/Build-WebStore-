@@ -77,6 +77,8 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập Dashboard → SEO Health. | - Chỉ có một score /100.<br>- Không có Score History.<br>- Bốn bucket bars hiển thị dạng 2×2, không hiện điểm bucket.<br>- Root-cause issues dùng đúng badge AI/You, CTA và destination theo F37 §12.3.<br>- AI Fix All chỉ hiện khi còn metadata issue AI-fixable.<br>- Derived/platform metrics không tạo issue trùng. | Blocker | [ ] |
 | **TC-F03.31** | `US-03/AC-2` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
+| **TC-F03.72** | `US-03/AC-1` | `UI/Copy` | **[CTA Copy]** Hiển thị nhãn nút AI Fix Issues tinh gọn không chứa emoji ở các ngôn ngữ EN/MS | 1. Kiểm tra nhãn nút CTA SEO Fix ở các locale EN và MS trong file i18n và UI component SEOHealthWidget. | - Nút hiển thị chính xác "AI Fix Issues" (EN) và "AI Baiki Isu" (MS), không chứa emoji ✨ hay từ dư thừa ("All"). | High | [x] |
+
 
 ---
 

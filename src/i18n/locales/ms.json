@@ -889,7 +889,7 @@
                 "score": "Skor:",
                 "statusGood": "Baik",
                 "statusWarning": "Perlu Pembaikan",
-                "fixAll": "✨ AI Baiki Semua Isu",
+                "fixAll": "AI Baiki Isu",
                 "fix": "Baiki",
                 "issue": "Isu",
                 "issues": "Isu"
@@ -1081,7 +1081,7 @@
             "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
-            "fixAllButton": "Baiki Semua Isu",
+            "fixAllButton": "AI Baiki Isu",
             "contentQuality": "Kualiti Kandungan",
             "technicalSeo": "SEO Teknikal",
             "sitemapAndMeta": "Peta Laman & Tag Meta",
@@ -3133,7 +3133,7 @@
                 "breakdownContent": "Kualiti Kandungan",
                 "breakdownTechnical": "SEO Teknikal",
                 "criticalIssue": "Isu paling kritikal: {count} {text}. Membaikinya akan meningkatkan skor anda.",
-                "fixAll": "AI Baiki Semua Isu",
+                "fixAll": "AI Baiki Isu",
                 "issuesTitle": "Isu SEO",
                 "open": "{count} terbuka",
                 "allClear": "Semua selesai",
@@ -3441,7 +3441,7 @@
                                 "Tab <strong>Gambaran Keseluruhan</strong> memaparkan metrik utama: jumlah paparan laman web (Trafik), klik pautan (Petunjuk), dan penglibatan pengguna.",
                                 "Gunakan <strong>Pemilih Tempoh</strong> (Hari Ini / 7 hari / 30 hari) di kanan atas untuk menukar julat masa analitik.",
                                 "Klik <strong>Sesuaikan</strong> untuk seret-dan-lepas, tunjuk/sembunyikan kad metrik untuk memperibadikan susun atur papan pemuka anda.",
-                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Semua Isu\" untuk optimum automatik."
+                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Isu\" untuk optimum automatik."
                             ]
                         }
                     ]
@@ -3604,7 +3604,7 @@
                 "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
                 "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
                 "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
-                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
+                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
                 "builderTitle": "Pembina Laman Web AI",
                 "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
                 "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import en from '@/i18n/locales/en.json'
 
@@ -142,6 +142,8 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
     const fetchMock = vi.fn()
 
     beforeEach(() => {
+        cleanup()
+        document.body.innerHTML = ''
         vi.clearAllMocks()
         window.localStorage.clear()
         Object.defineProperty(window, 'matchMedia', {
@@ -187,6 +189,8 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
     })
 
     afterEach(() => {
+        cleanup()
+        document.body.innerHTML = ''
         vi.useRealTimers()
     })
 
@@ -332,7 +336,7 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
                 'event: done\ndata: {"siteId":"site-123","pageId":"page-1","siteName":"Long Running Bakery","totalBlocks":1,"totalPages":1,"timeMs":76000}\n\n',
             ))
             streamController?.close()
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(100)
         })
         expect(useBuilderStore.getState().status).toBe('done')
     })
