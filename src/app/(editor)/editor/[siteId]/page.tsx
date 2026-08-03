@@ -105,6 +105,7 @@ type LocalBusinessSaveBatch = {
 
 type LocalBusinessSiteState = {
     snapshot: LocalBusinessData
+    persistedSnapshot: LocalBusinessData
     revision: number
     persistedRevision: number
 }
@@ -268,6 +269,8 @@ export default function EditorPage() {
     const localBusinessSaveInFlightSiteIdsRef = useRef(new Set<string>())
     const queuedLocalBusinessSavesRef = useRef(new Map<string, LocalBusinessSaveBatch>())
     const drainLocalBusinessSavesRef = useRef<(targetSiteId: string) => void>(() => {})
+    const activeSiteIdRef = useRef(siteId)
+    activeSiteIdRef.current = siteId
     // F26-04: AbortController for the currently in-flight locale switch.
     // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
     const localeSwitchAbortRef = useRef<AbortController | null>(null)
@@ -433,6 +436,7 @@ export default function EditorPage() {
                         const settledRevision = currentLocalBusiness?.revision ?? 0
                         localBusinessBySiteRef.current.set(siteId, {
                             snapshot: serverLocalBusiness,
+                            persistedSnapshot: serverLocalBusiness,
                             revision: settledRevision,
                             persistedRevision: settledRevision,
                         })
@@ -1012,6 +1016,24 @@ export default function EditorPage() {
         queuedLocalBusinessSavesRef.current.delete(targetSiteId)
         localBusinessSaveInFlightSiteIdsRef.current.add(batch.siteId)
 
+        const rollbackBatch = () => {
+            const current = localBusinessBySiteRef.current.get(batch.siteId)
+            if (!current || current.revision !== batch.revision) return
+
+            const rolledBack: LocalBusinessSiteState = {
+                snapshot: current.persistedSnapshot,
+                persistedSnapshot: current.persistedSnapshot,
+                revision: current.persistedRevision,
+                persistedRevision: current.persistedRevision,
+            }
+            localBusinessBySiteRef.current.set(batch.siteId, rolledBack)
+            if (batch.siteId === activeSiteIdRef.current) {
+                setSite(previous => previous
+                    ? { ...previous, localBusiness: rolledBack.snapshot }
+                    : previous)
+            }
+        }
+
         void persistSiteSettingsChanges(
             { localBusiness: batch.snapshot },
             { commitOptimistically: false, targetSiteId: batch.siteId },
@@ -1023,6 +1045,7 @@ export default function EditorPage() {
                     if (current) {
                         localBusinessBySiteRef.current.set(batch.siteId, {
                             ...current,
+                            persistedSnapshot: batch.snapshot,
                             persistedRevision: Math.max(current.persistedRevision, batch.revision),
                         })
                     }
@@ -1034,11 +1057,14 @@ export default function EditorPage() {
                             fields_completed_count: countCompletedLocalBusinessFields(batch.snapshot),
                         },
                     })
+                } else {
+                    rollbackBatch()
                 }
                 for (const resolve of batch.resolvers) resolve(saved)
             })
             .catch(error => {
                 console.error('Unexpected local business queue failure', error)
+                rollbackBatch()
                 for (const resolve of batch.resolvers) resolve(false)
             })
             .finally(() => {
@@ -1062,6 +1088,7 @@ export default function EditorPage() {
 
         const current = localBusinessBySiteRef.current.get(siteId) ?? {
             snapshot: {},
+            persistedSnapshot: {},
             revision: 0,
             persistedRevision: 0,
         }
@@ -1075,6 +1102,7 @@ export default function EditorPage() {
         const revision = current.revision + 1
         localBusinessBySiteRef.current.set(siteId, {
             snapshot: latestSnapshot,
+            persistedSnapshot: current.persistedSnapshot,
             revision,
             persistedRevision: current.persistedRevision,
         })

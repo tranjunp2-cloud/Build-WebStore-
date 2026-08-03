@@ -42,7 +42,13 @@ import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-
 import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BUSINESS_CATEGORY_OPTIONS, isValidBusinessPhone, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
+import {
+    BUSINESS_CATEGORY_OPTIONS,
+    PRICE_RANGE_OPTIONS,
+    getCompatibleSchemaSubtypes,
+    isValidBusinessPhone,
+    reconcileSchemaSubtype,
+} from '@/lib/seo/local-business-constants'
 import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
 import { OpeningHoursEditor } from './local-business/opening-hours-editor'
@@ -468,6 +474,12 @@ function SettingsPanelInner({
 
     const siteContactInfo = site?.contactInfo || {}
     const siteLocalBusiness = site?.localBusiness || {}
+    const compatibleSchemaSubtypes = getCompatibleSchemaSubtypes(siteLocalBusiness.businessCategory)
+    const hasBusinessCategory = Boolean(siteLocalBusiness.businessCategory)
+    const hasInvalidSchemaSubtype = Boolean(
+        siteLocalBusiness.schemaSubtype
+        && !compatibleSchemaSubtypes.some(option => option.value === siteLocalBusiness.schemaSubtype),
+    )
     const siteSocialLinks = site?.socialLinks || {}
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
@@ -841,12 +853,23 @@ function SettingsPanelInner({
                     <div className="space-y-4 border-t border-white/[0.06] pt-4">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.categoryOfferGroupLabel}</p>
                         <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessCategory}</label>
+                            <label
+                                htmlFor="local-business-category"
+                                className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                            >
+                                {s.businessCategory}
+                            </label>
                             <Select
                                 value={siteLocalBusiness.businessCategory || undefined}
-                                onValueChange={value => void handleLocalBusinessChange({ businessCategory: value })}
+                                onValueChange={value => void handleLocalBusinessChange({
+                                    businessCategory: value,
+                                    schemaSubtype: reconcileSchemaSubtype(value, siteLocalBusiness.schemaSubtype),
+                                })}
                             >
-                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger
+                                    id="local-business-category"
+                                    className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
+                                >
                                     <SelectValue placeholder={s.selectCategory} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
@@ -855,6 +878,62 @@ function SettingsPanelInner({
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="local-business-schema-subtype"
+                                className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                            >
+                                {s.schemaSubtype}
+                            </label>
+                            <Select
+                                value={hasInvalidSchemaSubtype ? undefined : siteLocalBusiness.schemaSubtype || undefined}
+                                disabled={!hasBusinessCategory}
+                                onValueChange={value => void handleLocalBusinessChange({
+                                    schemaSubtype: reconcileSchemaSubtype(siteLocalBusiness.businessCategory, value),
+                                })}
+                            >
+                                <SelectTrigger
+                                    id="local-business-schema-subtype"
+                                    aria-describedby={
+                                        !hasBusinessCategory
+                                            ? 'local-business-schema-subtype-disabled-hint'
+                                            : hasInvalidSchemaSubtype
+                                                ? 'local-business-schema-subtype-validation'
+                                                : undefined
+                                    }
+                                    aria-invalid={hasInvalidSchemaSubtype || undefined}
+                                    className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
+                                >
+                                    <SelectValue placeholder={s.selectSchemaSubtype} />
+                                </SelectTrigger>
+                                <SelectContent
+                                    side="bottom"
+                                    align="start"
+                                    className="max-w-[calc(100vw-2rem)]"
+                                >
+                                    {compatibleSchemaSubtypes.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {!hasBusinessCategory ? (
+                                <p
+                                    id="local-business-schema-subtype-disabled-hint"
+                                    className="mt-1.5 break-words text-xs leading-5 text-slate-400"
+                                >
+                                    {s.schemaSubtypeDisabledHint}
+                                </p>
+                            ) : null}
+                            {hasInvalidSchemaSubtype ? (
+                                <p
+                                    id="local-business-schema-subtype-validation"
+                                    role="alert"
+                                    className="mt-1.5 break-words text-xs leading-5 text-red-400"
+                                >
+                                    {s.schemaSubtypeInvalid}
+                                </p>
+                            ) : null}
                         </div>
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.priceRange}</label>

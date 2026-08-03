@@ -8,13 +8,11 @@
  *   builder's `siteType`. Moved here verbatim from `lib/ai/json-ld-templates.ts`
  *   (no behavior change) so both the AI-gen path and F37 Local SEO can share
  *   one file, NOT one function — the two use different inputs.
- * - F37 `localBusiness.businessCategory` values — already schema.org-shaped
- *   (`foodEstablishment`, `healthAndBeautyBusiness`, ...), designed for a
- *   direct 1:1 capitalize mapping to the Schema.org @type (see Phase 01 note:
- *   "Each maps 1:1 to a schema.org @type in Phase 04"). `schemaTypeForLocalBusiness`
- *   below implements that direct mapping — it does NOT reuse `schemaTypeFor`.
+ * - F37's broad category is separate from its validated Schema.org subtype.
+ *   Only a compatible subtype may select a specific LocalBusiness `@type`.
  */
 
+import { isCompatibleSchemaSubtype, SCHEMA_SUBTYPE_OPTIONS, type SchemaSubtype } from './local-business-constants'
 // ── AI-gen site categories (moved from json-ld-templates.ts, unchanged) ─────
 
 /**
@@ -58,12 +56,12 @@ export function deriveDefaultPriceRange(category: string): string | undefined {
     }
 }
 
-// ── F37 localBusiness.businessCategory (direct schema.org mapping) ─────────
+const LOCAL_BUSINESS_SCHEMA_TYPES = new Set<string>([
+    'LocalBusiness',
+    ...SCHEMA_SUBTYPE_OPTIONS.map(option => option.value),
+])
 
-/** businessCategory enum values (Phase 01, Sites.ts) map 1:1 to their
- *  Schema.org @type — this is a lookup, not a heuristic switch, because the
- *  enum was designed to already be schema.org-shaped. */
-const LOCAL_BUSINESS_TYPE_MAP: Record<string, string> = {
+const LEGACY_LOCAL_BUSINESS_TYPE_MAP: Record<string, string> = {
     localBusiness: 'LocalBusiness',
     store: 'Store',
     restaurant: 'Restaurant',
@@ -76,18 +74,26 @@ const LOCAL_BUSINESS_TYPE_MAP: Record<string, string> = {
     financialService: 'FinancialService',
 }
 
-/** Map F37 `businessCategory` to its Schema.org @type. Falls back to the
- *  generic `LocalBusiness` type for empty/unrecognized values (Google
- *  accepts this as a valid fallback). */
-export function schemaTypeForLocalBusiness(businessCategory: string | null | undefined): string {
-    if (!businessCategory) return 'LocalBusiness'
-    return LOCAL_BUSINESS_TYPE_MAP[businessCategory] || 'LocalBusiness'
+/** Preserve broad-category compatibility for legacy consumers. Strict v2
+ * JSON-LD must use schemaTypeForValidatedLocalBusiness instead. */
+export function schemaTypeForLocalBusiness(businessCategory: unknown): string {
+    return typeof businessCategory === 'string'
+        ? LEGACY_LOCAL_BUSINESS_TYPE_MAP[businessCategory] || 'LocalBusiness'
+        : 'LocalBusiness'
+}
+
+export function schemaTypeForValidatedLocalBusiness(businessCategory: unknown, schemaSubtype?: unknown): 'LocalBusiness' | SchemaSubtype {
+    return isCompatibleSchemaSubtype(businessCategory, schemaSubtype) ? schemaSubtype : 'LocalBusiness'
+}
+
+export function isLocalBusinessSchemaType(value: unknown): value is string {
+    return typeof value === 'string' && LOCAL_BUSINESS_SCHEMA_TYPES.has(value)
 }
 
 /** Fallback priceRange heuristic when the seller hasn't set one explicitly,
  *  keyed by F37's own businessCategory vocabulary (distinct from the AI-gen
  *  category heuristic above — do not conflate the two). */
-export function priceRangeForLocalBusinessCategory(businessCategory: string | null | undefined): string | undefined {
+export function priceRangeForLocalBusinessCategory(businessCategory: unknown): string | undefined {
     switch (businessCategory) {
         case 'restaurant':
         case 'foodEstablishment':
@@ -106,8 +112,77 @@ export function priceRangeForLocalBusinessCategory(businessCategory: string | nu
     }
 }
 
-// ── Opening hours day-of-week mapping (new, F37-only) ───────────────────────
+export function normalizeHttpUrl(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined
+    const hasControlCharacter = [...value].some(character => {
+        const code = character.charCodeAt(0)
+        return code <= 31 || code === 127
+    })
+    if (hasControlCharacter) return undefined
+    const trimmed = value.trim()
+    if (!trimmed || trimmed.startsWith('/') || trimmed.startsWith('//')) return undefined
+    const hasExplicitScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+    const candidate = hasExplicitScheme ? trimmed : 'https://' + trimmed
+    try {
+        const url = new URL(candidate)
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
+        if (!url.hostname || url.username || url.password) return undefined
+        url.hash = ''
+        const normalized = url.toString()
+        return url.pathname === '/' && !url.search
+            ? normalized.slice(0, -1)
+            : normalized
+    } catch {
+        return undefined
+    }
+}
 
+
+export function hasValidGeoCoordinates(latitude: unknown, longitude: unknown): boolean {
+    return typeof latitude === 'number'
+        && Number.isFinite(latitude)
+        && latitude >= -90
+        && latitude <= 90
+        && typeof longitude === 'number'
+        && Number.isFinite(longitude)
+        && longitude >= -180
+        && longitude <= 180
+}
+export type StructuredAddressData = {
+    streetAddress?: unknown
+    city?: unknown
+    postcode?: unknown
+    country?: unknown
+}
+
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0
+}
+
+/** Require the four address fields used by the strict F37 v2 contract.
+ *  State remains optional because not every supported address requires it. */
+export function hasCompleteStructuredAddress(address: StructuredAddressData | null | undefined): boolean {
+    return Boolean(
+        address
+        && isNonEmptyString(address.streetAddress)
+        && isNonEmptyString(address.city)
+        && isNonEmptyString(address.postcode)
+        && isNonEmptyString(address.country),
+    )
+}
+const OPENING_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+
+export function isValidOpeningTimeRange(opens: unknown, closes: unknown): boolean {
+    return typeof opens === 'string'
+        && typeof closes === 'string'
+        && OPENING_TIME_PATTERN.test(opens)
+        && OPENING_TIME_PATTERN.test(closes)
+        && opens < closes
+}
+
+
+// ── Opening hours day-of-week mapping (new, F37-only) ───────────────────────
 const DAY_OF_WEEK_SCHEMA_MAP: Record<string, string> = {
     Mo: 'Monday',
     Tu: 'Tuesday',

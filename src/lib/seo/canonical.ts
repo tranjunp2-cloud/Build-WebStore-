@@ -1,5 +1,5 @@
 type CustomDomain = { domain?: string; status?: string; isPrimary?: boolean }
-type TenantLike = { slug?: string; customDomains?: CustomDomain[] | null }
+export type TenantLike = { slug?: string; customDomains?: CustomDomain[] | null }
 
 /**
  * Canonical public origin (https://host, NO trailing slash) for a tenant's
