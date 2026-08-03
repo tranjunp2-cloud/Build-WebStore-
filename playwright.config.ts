@@ -52,7 +52,7 @@ export default defineConfig({
         {
             name: 'storefront-regression',
             testDir: './tests',
-            testMatch: /cart-drawer\.spec\.ts/,
+            testMatch: /(cart-drawer|product-grid-qa-rework)\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: undefined,

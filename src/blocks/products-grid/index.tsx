@@ -21,17 +21,30 @@ import { hasActiveProductFilters } from './filter-utils'
 import { useProductsGridData } from './use-products-grid-data'
 
 const MOBILE_PRODUCTS_GRID_BREAKPOINT = 1024
-const FILTER_SCROLL_KEYS = new Set(['categoryId', 'minPrice', 'maxPrice', 'search'])
+const SINGLE_VALUE_RESULTS_NAVIGATION_KEYS = ['minPrice', 'maxPrice', 'page', 'search'] as const
+type GridNavigationIntent = 'filter' | 'pagination' | 'view'
 
-function buildFilterScrollSignature(searchParams: { forEach: (callbackfn: (value: string, key: string) => void) => void }) {
-    const entries: string[] = []
+function buildResultsNavigationSignature(searchParams: {
+    forEach: (callbackfn: (value: string, key: string) => void) => void
+    get: (key: string) => string | null
+}) {
+    const entries: Array<[string, string]> = []
 
-    searchParams.forEach((value, key) => {
-        if (FILTER_SCROLL_KEYS.has(key) || key.startsWith('attr_')) entries.push(`${key}=${value}`)
+    SINGLE_VALUE_RESULTS_NAVIGATION_KEYS.forEach((key) => {
+        const value = searchParams.get(key)
+        if (value !== null) entries.push([key, value])
     })
 
-    entries.sort()
-    return entries.join('&')
+    searchParams.forEach((value, key) => {
+        if (key === 'categoryId' || key.startsWith('attr_')) entries.push([key, value])
+    })
+
+    entries.sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+        leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)
+    ))
+    const canonicalParams = new URLSearchParams()
+    entries.forEach(([key, value]) => canonicalParams.append(key, value))
+    return canonicalParams.toString()
 }
 
 function formatPriceChipLabel(minPrice: string | null, maxPrice: string | null, fallbackMin: number, fallbackMax: number, heading: string) {
@@ -54,8 +67,11 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     ))
     const productsPerPage = filtersEnabled ? (isMobileViewport ? 10 : 9) : block.limit
     const siteId = site?.id ? String(site.id) : null
-    const blockTopRef = useRef<HTMLDivElement>(null)
-    const previousFilterScrollSignatureRef = useRef<string | null>(null)
+    const resultsTopRef = useRef<HTMLDivElement>(null)
+    const previousResultsNavigationSignatureRef = useRef<string | null>(null)
+    // Reposition lifecycle: idle -> requested -> observed -> settled.
+    const pendingRepositionRef = useRef(false)
+    const observedRequestStartRef = useRef(false)
 
     useEffect(() => {
         if (typeof window === 'undefined') return
@@ -74,7 +90,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         limit: productsPerPage,
         siteId,
     })
-    const filterScrollSignature = useMemo(() => buildFilterScrollSignature(searchParams), [searchParams])
+    const resultsNavigationSignature = useMemo(() => buildResultsNavigationSignature(searchParams), [searchParams])
     const requestedView = searchParams.get('view')
     const viewMode: ProductsGridConfig['variant'] = requestedView === 'list' ? 'list' : 'grid-3'
     const cardVariant = viewMode
@@ -85,13 +101,30 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const showMobileFilterButton = showSidebar && !filtersLoading
 
     useEffect(() => {
-        const previousSignature = previousFilterScrollSignatureRef.current
-        previousFilterScrollSignatureRef.current = filterScrollSignature
+        const previousSignature = previousResultsNavigationSignatureRef.current
+        previousResultsNavigationSignatureRef.current = resultsNavigationSignature
 
-        if (previousSignature === null || previousSignature === filterScrollSignature) return
+        if (previousSignature === null || previousSignature === resultsNavigationSignature) return
 
-        blockTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
-    }, [filterScrollSignature])
+        pendingRepositionRef.current = true
+        observedRequestStartRef.current = loading || refreshing
+        resultsTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    }, [loading, refreshing, resultsNavigationSignature])
+
+    useEffect(() => {
+        if (!pendingRepositionRef.current) return
+
+        if (loading || refreshing) {
+            observedRequestStartRef.current = true
+            return
+        }
+
+        if (!observedRequestStartRef.current) return
+
+        resultsTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
+        pendingRepositionRef.current = false
+        observedRequestStartRef.current = false
+    }, [loading, refreshing])
 
     const gridCols = {
         'grid-3': 'grid-cols-2 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3 lg:gap-8',
@@ -119,8 +152,9 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         mutate: (params: URLSearchParams) => void,
         event?: React.SyntheticEvent<HTMLElement>,
         historyMode: 'push' | 'replace' = 'replace',
+        intent: GridNavigationIntent = 'filter',
     ) => {
-        if (previewMode && event) {
+        if (previewMode && event && intent !== 'view') {
             handleCartClick(event as unknown as React.MouseEvent<HTMLElement>)
             return
         }
@@ -185,7 +219,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                     background: viewMode === 'grid-3' ? 'rgba(var(--brand-primary-rgb), 0.14)' : 'transparent',
                     color: viewMode === 'grid-3' ? 'var(--brand-primary)' : 'var(--text-secondary)',
                 }}
-                onClick={(event) => navigateParams((params) => params.set('view', 'grid-3'), event, 'push')}
+                onClick={(event) => navigateParams((params) => params.set('view', 'grid-3'), event, 'push', 'view')}
             >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" />
@@ -203,7 +237,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                     background: viewMode === 'list' ? 'rgba(var(--brand-primary-rgb), 0.14)' : 'transparent',
                     color: viewMode === 'list' ? 'var(--brand-primary)' : 'var(--text-secondary)',
                 }}
-                onClick={(event) => navigateParams((params) => params.set('view', 'list'), event, 'push')}
+                onClick={(event) => navigateParams((params) => params.set('view', 'list'), event, 'push', 'view')}
             >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <rect x="1" y="2" width="2" height="2" rx="0.5" fill="currentColor" />
@@ -282,15 +316,35 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         navigateParams((params) => {
             if (page <= 1) params.delete('page')
             else params.set('page', String(page))
-        }, event, 'push')
+        }, event, 'push', 'pagination')
     }
 
     const gridContent = loading ? (
-        <div className="text-center">
-            <div className="animate-pulse flex flex-col items-center gap-4">
-                <div className="h-8 w-64 rounded bg-[rgba(var(--brand-primary-rgb),0.12)]" />
-                <div className="h-4 w-48 rounded bg-[rgba(var(--brand-primary-rgb),0.06)]" />
-            </div>
+        <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            data-testid="products-grid-skeleton"
+            className={`grid min-w-0 motion-safe:animate-pulse ${gridCols}`}
+        >
+            <span className="sr-only">Loading products...</span>
+            {Array.from({ length: 6 }, (_, index) => (
+                <div
+                    key={index}
+                    data-testid="product-card-skeleton"
+                    aria-hidden="true"
+                    style={cardVariant === 'list' ? undefined : { minHeight: 'clamp(260px, 28vw, 360px)' }}
+                    className={`pointer-events-none min-w-0 select-none overflow-hidden border border-[var(--divider)] bg-[var(--surface-primary)] ${cardVariant === 'list' ? 'flex h-[126px] rounded-[16px] md:h-40 md:rounded-2xl' : 'flex min-h-[260px] flex-col rounded-[12px] sm:min-h-[360px] sm:rounded-2xl'}`}
+                >
+                    <div className={`bg-[var(--surface-secondary)] ${cardVariant === 'list' ? 'h-full w-[112px] shrink-0 md:w-44' : 'h-[110px] sm:aspect-square sm:h-auto'}`} />
+                    <div className={`flex min-w-0 flex-1 flex-col ${cardVariant === 'list' ? 'p-3 md:p-6' : 'p-2.5 sm:p-4 md:p-5'}`}>
+                        <div className="h-3 w-1/3 rounded bg-[rgba(var(--brand-primary-rgb),0.12)]" />
+                        <div className="mt-3 h-4 w-4/5 rounded bg-[rgba(var(--brand-primary-rgb),0.16)]" />
+                        <div className="mt-2 h-3 w-full rounded bg-[rgba(var(--brand-primary-rgb),0.08)]" />
+                        <div className="mt-auto h-4 w-2/5 rounded bg-[rgba(var(--brand-primary-rgb),0.14)]" />
+                    </div>
+                </div>
+            ))}
         </div>
     ) : products.length === 0 ? (
         <div className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-secondary)] px-6 py-14 text-center">
@@ -360,10 +414,17 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         </div>
     )
 
+    const resultsContent = (
+        <>
+            <div ref={resultsTopRef} data-testid="products-grid-results-top" className="scroll-mt-24" aria-hidden="true" />
+            {filtersToolbar}
+            {gridPanel}
+        </>
+    )
+
     return (
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
-            <div ref={blockTopRef} className="scroll-mt-24" aria-hidden="true" />
-            <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size="min(500px, 100vw)" opacity={0.04} />
 
             <div className="text-center max-w-2xl mx-auto mb-16">
                 {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
@@ -388,14 +449,12 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                         />
                     </div>
                     <div>
-                        {filtersToolbar}
-                        {gridPanel}
+                        {resultsContent}
                     </div>
                 </div>
             ) : (
                 <div>
-                    {filtersToolbar}
-                    {gridPanel}
+                    {resultsContent}
                 </div>
             )}
         </SectionWrapper>

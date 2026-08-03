@@ -380,6 +380,52 @@ describe('SettingsPanel', () => {
         expect(defaultProps.onBlockFieldChange).toHaveBeenCalledWith(0, 'variant', 'centered')
     })
 
+    // ── TC-F09.253: Products Grid category filter editor control ─────────
+    describe('[TC-F09.253] Products Grid category filter editor control', () => {
+        it('renders checked state with semantic editor theme tokens', () => {
+            // Arrange
+            const onBlockFieldChange = vi.fn()
+            render(
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        {...defaultProps}
+                        block={{ blockType: 'products-grid', headline: 'Products', variant: 'grid-3', showCategoryFilter: true }}
+                        onBlockFieldChange={onBlockFieldChange}
+                    />
+                </I18nProvider>,
+            )
+
+            // Act
+            const checkbox = screen.getByRole('checkbox', { name: 'Show category filter' })
+            const row = checkbox.closest('label')
+
+            // Assert
+            expect(checkbox).toBeChecked()
+            expect(row).not.toBeNull()
+            expect(row).toHaveClass('border-[var(--editor-border)]')
+            expect(row).toHaveClass('border-solid')
+            expect(row).toHaveClass('bg-[var(--editor-surface-elevated)]')
+            expect(row).toHaveClass('text-[var(--editor-text)]')
+            expect(checkbox).toHaveClass('border-[hsl(var(--input-border))]')
+            expect(checkbox).toHaveClass('border-solid')
+            expect(checkbox).toHaveClass('bg-[var(--editor-surface-deep)]')
+            expect(checkbox).toHaveClass('data-[state=checked]:bg-[hsl(var(--primary))]')
+        })
+
+        it('writes the next boolean value through onBlockFieldChange', () => {
+            // Arrange
+            const onBlockFieldChange = vi.fn()
+            render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={{ blockType: 'products-grid', headline: 'Products', variant: 'grid-3', showCategoryFilter: false }} onBlockFieldChange={onBlockFieldChange} /></I18nProvider>)
+            const checkbox = screen.getByRole('checkbox', { name: 'Show category filter' })
+
+            // Act
+            fireEvent.click(checkbox)
+
+            // Assert
+            expect(onBlockFieldChange).toHaveBeenCalledWith(0, 'showCategoryFilter', true)
+        })
+    })
+
     // ── Text fields ──────────────────────────────────────────────────────
 
     it('renders headline input with default value', () => {
