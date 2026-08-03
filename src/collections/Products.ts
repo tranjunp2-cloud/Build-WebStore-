@@ -10,6 +10,8 @@ import {
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
 
+const STABLE_AI_DRAFT_SLUG_PATTERN = /-ai-[a-f0-9]{32}$/
+
 const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
     // If client supplied a value, use it (or slugify it)
     let baseSlug = ''
@@ -24,6 +26,13 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
     }
 
     if (!baseSlug) return value
+
+    // The UUID-derived AI slug is an idempotency key, not a display slug. Keep it exact so the
+    // database unique constraint arbitrates concurrent saves; auto-suffixing would turn the losing
+    // request into a second Product and bypass saveAiProductAction's replay/category reconciliation.
+    if (data?.aiReviewPending === true && STABLE_AI_DRAFT_SLUG_PATTERN.test(baseSlug)) {
+        return baseSlug
+    }
 
     let slug = baseSlug
     let count = 1

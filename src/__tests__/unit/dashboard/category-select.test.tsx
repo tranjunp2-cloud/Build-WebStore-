@@ -3,7 +3,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
 vi.mock('@/i18n', () => ({
@@ -71,6 +71,100 @@ describe('TC-F08-05-03 — CategorySelect trigger display', () => {
     it('falls back to category name when breadcrumbs field absent', () => {
         renderSelect(cats2Level, ['l2'])
         expect(screen.getAllByText('Men').length).toBeGreaterThan(0)
+    })
+})
+
+describe('TC-F08-05-03 — keyboard and ARIA accessibility', () => {
+    it('links a unique accessible label and error to the trigger', () => {
+        render(
+            <div>
+                <span id="category-label">Category for Test Product, draft 1</span>
+                <CategorySelect
+                    categories={cats3Level}
+                    selectedIds={[]}
+                    onChange={vi.fn()}
+                    triggerId="category-trigger"
+                    ariaLabelledBy="category-label"
+                    errorId="category-error"
+                    error="Category is required"
+                />
+            </div>,
+        )
+
+        const trigger = screen.getByRole('combobox', {
+            name: 'Category for Test Product, draft 1',
+        })
+        expect(trigger).toHaveAttribute('id', 'category-trigger')
+        expect(trigger).toHaveAttribute('aria-haspopup', 'tree')
+        expect(trigger).toHaveAttribute('aria-expanded', 'false')
+        expect(trigger).toHaveAttribute('aria-invalid', 'true')
+        expect(trigger).toHaveAttribute('aria-describedby', 'category-error')
+        expect(screen.getByRole('alert')).toHaveAttribute('id', 'category-error')
+    })
+
+    it('uses a real disabled button that cannot open the tree', () => {
+        render(
+            <CategorySelect
+                categories={cats3Level}
+                selectedIds={[]}
+                onChange={vi.fn()}
+                ariaLabel="Category"
+                disabled
+            />,
+        )
+
+        const trigger = screen.getByRole('combobox', { name: 'Category' })
+        expect(trigger).toBeDisabled()
+        fireEvent.click(trigger)
+        expect(screen.queryByRole('tree')).not.toBeInTheDocument()
+    })
+
+    it('does not announce a hovered desktop leaf as selected', () => {
+        renderSelect()
+        fireEvent.click(screen.getByRole('combobox', { name: 'Select categories...' }))
+
+        const accessoryRows = screen.getAllByRole('treeitem', { name: 'Accessories' })
+        const desktopRow = accessoryRows.at(-1) as HTMLButtonElement
+        expect(desktopRow).toHaveAttribute('aria-selected', 'false')
+
+        fireEvent.mouseEnter(desktopRow)
+
+        expect(desktopRow).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('navigates all hierarchy levels with arrows and selects a leaf with Enter', async () => {
+        const { onChange } = renderSelect()
+        const trigger = screen.getByRole('combobox', { name: 'Select categories...' })
+
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+        await waitFor(() => expect(document.activeElement).toHaveTextContent('Fashion'))
+
+        fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' })
+        await waitFor(() => expect(document.activeElement).toHaveTextContent('Men'))
+
+        fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' })
+        await waitFor(() => expect(document.activeElement).toHaveTextContent('T-Shirts'))
+
+        fireEvent.keyDown(document.activeElement as Element, { key: 'Enter' })
+        expect(onChange).toHaveBeenCalledWith(['l3'])
+        await waitFor(() => expect(trigger).toHaveFocus())
+        expect(screen.queryByRole('tree')).not.toBeInTheDocument()
+    })
+
+    it('moves with ArrowDown/ArrowUp and restores trigger focus on Escape', async () => {
+        renderSelect()
+        const trigger = screen.getByRole('combobox', { name: 'Select categories...' })
+
+        fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+        await waitFor(() => expect(document.activeElement).toHaveTextContent('Fashion'))
+        fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' })
+        expect(document.activeElement).toHaveTextContent('Accessories')
+        fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowUp' })
+        expect(document.activeElement).toHaveTextContent('Fashion')
+
+        fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' })
+        await waitFor(() => expect(trigger).toHaveFocus())
+        expect(screen.queryByRole('tree')).not.toBeInTheDocument()
     })
 })
 
