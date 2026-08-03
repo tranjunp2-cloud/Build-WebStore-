@@ -275,7 +275,7 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                           className="peer sr-only"
                         />
                         <span
-                          className={`inline-flex h-9 w-full min-w-0 items-center justify-center whitespace-nowrap rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none transition-all peer-checked:bg-[hsl(var(--primary))] peer-checked:!text-white peer-checked:shadow-none peer-disabled:opacity-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+                          className={`plabel-format-option inline-flex h-9 w-full min-w-0 items-center justify-center whitespace-nowrap rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none transition-all peer-checked:bg-[hsl(var(--primary))] peer-checked:text-[hsl(var(--primary-foreground))] peer-checked:shadow-none peer-disabled:opacity-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
                             status === 'ok' ? 'hover:text-[var(--dash-text)]' : ''
                           }`}
                         >
@@ -321,7 +321,7 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                 onCheckedChange={(checked) => setMarkPrinted(checked === true)}
                 aria-labelledby={`${markPrintedId}-label`}
                 style={{ borderColor: markPrinted ? 'hsl(var(--primary))' : 'var(--dash-border)' }}
-                className="h-[18px] w-[18px] rounded-[4px] border border-solid bg-transparent data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:!text-white"
+                className="plabel-mark-checkbox h-[18px] w-[18px] rounded-[4px] border border-solid bg-transparent data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:text-[hsl(var(--primary-foreground))]"
               />
               <label
                 id={`${markPrintedId}-label`}

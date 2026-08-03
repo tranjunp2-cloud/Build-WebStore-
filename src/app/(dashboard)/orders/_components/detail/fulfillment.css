@@ -21,8 +21,8 @@
    ============================================================================ */
 
 /* ── Base button resets (only what ActionZone needs) ─────────────────────── */
-.action-zone { display: flex; flex-direction: column; gap: 14px; }
-.ship-result { display: flex; flex-direction: column; gap: 14px; }
+.action-zone { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ship-result { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
 /* ── Primary gradient CTA ────────────────────────────────────────────────── */
 .btn-grad {
@@ -87,10 +87,10 @@
 .ship-track {
   display: flex; flex-direction: column; gap: 10px;
   border: 1px solid var(--dash-border); border-radius: 12px;
-  background: var(--dash-secondary-bg); padding: 13px 14px;
+  background: var(--dash-secondary-bg); padding: 13px 14px; min-width: 0;
 }
 .st-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
-.st-field { display: flex; flex-direction: column; gap: 5px; }
+.st-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .st-field.grow { flex: 1; min-width: 180px; }
 .st-courier {
   display: flex; align-items: center; gap: 8px; min-height: 38px;
@@ -172,17 +172,19 @@
 /* ── AWB copy field ─────────────────────────────────────────────────────── */
 .copyfield {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  width: 100%; min-width: 0;
   min-height: 40px; box-sizing: border-box; /* match the 40px Print button beside it */
   background: var(--dash-secondary-bg); border: 1px solid var(--dash-border); border-radius: 9px;
 }
 .copyfield .cf-v {
   font-family: var(--font-mono, monospace); font-size: 14px; font-weight: 600;
-  letter-spacing: 0.04em; color: var(--dash-text); flex: 1;
+  letter-spacing: 0.04em; color: var(--dash-text); flex: 1; min-width: 0;
+  overflow-wrap: anywhere;
 }
 .copyfield .cf-btn {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 12px; font-weight: 600; color: hsl(var(--primary));
-  cursor: pointer; background: none; border: none; padding: 0; font-family: inherit;
+  cursor: pointer; background: none; border: none; padding: 0; font-family: inherit; flex-shrink: 0;
 }
 .copyfield .cf-btn svg { width: 13px; height: 13px; }
 
@@ -447,6 +449,8 @@
   background: var(--dash-surface-hover); border: 1px solid var(--dash-border);
   border-radius: 12px; padding: 10px; display: flex; overflow: hidden;
 }
+html:not(.dark) .peer:checked ~ .plabel-format-option { color: #fff; }
+html:not(.dark) .plabel-mark-checkbox[data-state='checked'] { color: #fff; }
 .plabel-pdf-preview {
   display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 8px;
 }
@@ -542,12 +546,18 @@
 }
 .tl-row:last-child { min-height: 69px; padding-bottom: 0; }
 .tl-body { flex: 1; min-width: 0; padding: 2px 0 26px; }
-.tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.tl-t { font-size: 13.5px; font-weight: 600; color: var(--dash-text); }
-.tl-d { font-size: 12px; color: var(--dash-text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); }
+.tl-head { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tl-t { min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--dash-text); }
+.tl-d { max-width: 100%; font-size: 12px; color: var(--dash-text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); }
 .tl-note { font-size: 12px; line-height: 18px; color: var(--dash-text-muted); margin-top: 1px; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (min-width: 769px) and (max-width: 1270px) {
+  .od-fulfil .st-row { flex-direction: column; align-items: stretch; }
+  .od-fulfil .st-field { width: 100%; }
+  .od-fulfil .st-actions { margin-left: 0; }
+}
+
 @media (max-width: 768px) {
   .ship-foot { flex-direction: column-reverse; align-items: stretch; gap: 12px; }
   .ship-cta-fixed { width: 100%; align-self: stretch; }
@@ -603,6 +613,11 @@
     max-height: calc(100dvh - 16px);
   }
   .plabel-preview-pane { min-height: 220px; }
+}
+
+@media (max-width: 480px) {
+  .tl-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .tl-d { white-space: normal; overflow-wrap: anywhere; }
 }
 
 /* ── US-F36-07: collection method + date row (Ready-to-Ship step) ──────────────

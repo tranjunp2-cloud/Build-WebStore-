@@ -55,12 +55,22 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
 
         if (state === 'disconnected') {
             await expect(statePanel.getByRole('button')).toBeVisible()
+            const brandMark = statePanel.getByTestId('easyparcel-brand-mark')
+            const box = await brandMark.boundingBox()
+            expect(box).not.toBeNull()
+            expect(box!.width).toBe(42)
+            expect(box!.height).toBe(42)
         } else if (state === 'setup') {
             await expect(statePanel.locator('[aria-current="step"]')).toBeVisible()
             await expect(statePanel.getByRole('button', { name: /next/i })).toBeVisible()
         } else {
             await expect(statePanel.locator('[role="switch"]')).toBeVisible()
             await expect(statePanel.getByRole('button', { name: /sync/i })).toBeVisible()
+            const brandMark = statePanel.getByTestId('easyparcel-brand-mark')
+            const box = await brandMark.boundingBox()
+            expect(box).not.toBeNull()
+            expect(box!.width).toBe(42)
+            expect(box!.height).toBe(42)
         }
     })
 })
