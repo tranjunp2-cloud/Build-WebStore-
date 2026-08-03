@@ -68,7 +68,7 @@ function MetadataComparison({
                         {current || <span className="italic text-[var(--editor-text-muted)]">{copy.empty}</span>}
                     </p>
                 </div>
-                <div className="min-w-0 rounded-[10px] border border-[hsl(var(--primary)/0.35)] bg-[hsl(var(--primary)/0.08)] p-3">
+                <div className="min-w-0 rounded-[10px] border-2 border-[hsl(var(--primary)/0.65)] bg-[hsl(var(--primary)/0.16)] p-3 dark:border dark:border-[hsl(var(--primary)/0.35)] dark:bg-[hsl(var(--primary)/0.08)]">
                     <p className="mb-1.5 text-[10px] font-semibold uppercase text-[hsl(var(--primary))]">
                         {copy.proposed}
                     </p>
@@ -102,6 +102,7 @@ export function SeoOverwriteConfirmDialog({
         >
             <DialogContent
                 data-testid="seo-overwrite-dialog"
+                showCloseButton={false}
                 className="editor-portal max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)]"
                 onEscapeKeyDown={(event) => {
                     if (isApplying) event.preventDefault()
@@ -147,7 +148,7 @@ export function SeoOverwriteConfirmDialog({
                         type="button"
                         disabled={isApplying}
                         onClick={onConfirm}
-                        className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 py-2 text-[13px] font-medium !text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {isApplying ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                         {isApplying ? copy.replacing : copy.replace}

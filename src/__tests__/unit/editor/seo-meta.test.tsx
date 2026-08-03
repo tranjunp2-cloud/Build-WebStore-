@@ -153,6 +153,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             expect(screen.getByTestId('seo-proposed-title')).toHaveTextContent('Proposed Title')
             expect(screen.getByTestId('seo-current-description')).toHaveTextContent('Existing Description')
             expect(screen.getByTestId('seo-proposed-description')).toHaveTextContent('Proposed Description')
+            expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
             expect(confirmSpy).not.toHaveBeenCalled()
             expect(toast.dismiss).toHaveBeenCalledWith('seo-loading')
 
