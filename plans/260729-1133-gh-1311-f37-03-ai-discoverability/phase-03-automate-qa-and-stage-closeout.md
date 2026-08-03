@@ -96,7 +96,7 @@ Unit tests own branch-level route and serialization behavior. Playwright owns de
 
 - Pre-review focused suite: 6 files, 62/62 tests passed; pre-review full suite: 661 files, 11,111/11,111 tests passed.
 - Stage 1 fixes: custom-domain request-header forwarding and safe public slug serialization; targeted 4 files, 41/41 passed.
-- Stage 2 fix: deterministic bounded `llms.txt` Key Pages contract; follow-up round-robin selection prevents content-type starvation; focused 22/22 passed and re-review PASS.
+- Stage 2 fix: deterministic 10-URL `llms.txt` output contract; follow-up round-robin selection prevents content-type starvation. Review closeout now fetches every matching candidate with narrow projections before selection and disables success-response caching so publish-state changes cannot remain stale.
 - Stage 3 fix: narrow Payload projections for sitemap/`llms.txt`; focused 27/27 passed and re-review PASS.
 - Final post-review validation: focused 6 files 62/62; full Vitest 661 files 11,111/11,111; typecheck 0 errors; lint 0 errors/139 warnings; migration and `git diff --check` passed. Storefront discovery listed 4 tests in 2 specs including TC-28/29; authenticated Dashboard discovery listed 7 tests in 2 files including setup and TC-30.
 - Live public staging Playwright TC-28/29 passed 2/2 on 2026-07-30 against `/sites/kedai-demo` and `/sites/e2e-test`. The account-derived local run passed setup plus TC-28 and TC-29 against the same site on 2026-07-31 and restored its initial draft state. Authenticated TC-30 remains pending.

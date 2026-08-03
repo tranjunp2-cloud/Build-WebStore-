@@ -43,6 +43,17 @@ export function encodePublicSlugPath(value: unknown): string | null {
 }
 
 /**
+ * Encode a slug consumed by a single dynamic route segment. Nested slugs must
+ * be rejected because /blog/[blogSlug] and /products/[productSlug] cannot
+ * resolve an additional path segment.
+ */
+export function encodePublicSlugSegment(value: unknown): string | null {
+    if (typeof value !== 'string' || !value.trim()) return null
+    if (value === '.' || value === '..' || value.includes('/')) return null
+    return encodeURIComponent(value)
+}
+
+/**
  * Canonical public origin (https://host, NO trailing slash) for a tenant's
  * storefront. Prefers the designated primary active custom domain so canonical /
  * OG / sitemap URLs stay stable and don't split SEO signal across the subdomain

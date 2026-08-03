@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { encodePublicSlugPath, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { dayOfWeekToSchema } from '@/lib/seo/schema-helpers'
 
 function markdownInline(value: unknown): string {
@@ -113,7 +113,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 depth: 0,
                 sort: ['createdAt', 'id'],
                 select: { slug: true, isHomepage: true },
-                limit: 10,
             }),
             payload.find({
                 collection: 'products',
@@ -128,7 +127,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 depth: 0,
                 sort: ['createdAt', 'id'],
                 select: { slug: true },
-                limit: 10,
             }),
             payload.find({
                 collection: 'blogs',
@@ -142,7 +140,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 depth: 0,
                 sort: ['createdAt', 'id'],
                 select: { slug: true },
-                limit: 5,
             }),
         ])
 
@@ -160,19 +157,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 
         const productUrls = productsResult.docs
             .flatMap(p => {
-                const slugPath = encodePublicSlugPath(p.slug)
+                const slugPath = encodePublicSlugSegment(p.slug)
                 return slugPath ? [`${baseUrl}/products/${slugPath}`] : []
             })
 
         const blogUrls = blogsResult.docs
             .flatMap(b => {
-                const slugPath = encodePublicSlugPath(b.slug)
+                const slugPath = encodePublicSlugSegment(b.slug)
                 return slugPath ? [`${baseUrl}/blog/${slugPath}`] : []
             })
 
         // Keep this supplementary document bounded and deterministic. Round-robin
         // selection prevents pages or products from starving later content types
-        // while retaining the oldest-first order within each bounded query.
+        // while retaining the oldest-first order within each candidate group.
         const keyUrls = selectKeyUrls(baseUrl, [pageUrls, productUrls, blogUrls])
 
         // F37-03 → #1312 score handoff: this published-only 200 response is
@@ -238,7 +235,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 // description, en-dash in opening hours) — without it browsers guess the
                 // encoding and mangle those bytes (e.g. "–" renders as "â€"").
                 'Content-Type': 'text/plain; charset=utf-8',
-                'Cache-Control': 'public, max-age=300, s-maxage=300',
+                'Cache-Control': 'no-store',
             },
         })
     } catch (error) {

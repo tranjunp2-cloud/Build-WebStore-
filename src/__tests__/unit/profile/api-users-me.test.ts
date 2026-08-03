@@ -130,6 +130,7 @@ describe('GET /api/users/me', () => {
 
         expect(mockPayload.find).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'sites',
+            limit: 2,
             where: { tenant: { in: ['72'] } },
         }))
         expect(body.sites).toEqual([{ id: 10, tenant: 72, status: 'published' }])

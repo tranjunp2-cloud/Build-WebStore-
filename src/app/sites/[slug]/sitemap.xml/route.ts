@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { encodePublicSlugPath, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -76,7 +76,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 pagination: false,
                 depth: 0,
                 select: { slug: true, updatedAt: true, isHomepage: true },
-                limit: 1000,
             }),
             payload.find({
                 collection: 'products',
@@ -90,7 +89,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 pagination: false,
                 depth: 0,
                 select: { slug: true, updatedAt: true },
-                limit: 1000,
             }),
             payload.find({
                 collection: 'blogs',
@@ -103,7 +101,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 pagination: false,
                 depth: 0,
                 select: { slug: true, updatedAt: true },
-                limit: 500,
             }),
         ])
 
@@ -130,13 +127,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         // path the storefront links to via StorefrontBlogList).
         const productNodes = productsResult.docs
             .flatMap(p => {
-                const slugPath = encodePublicSlugPath(p.slug)
+                const slugPath = encodePublicSlugSegment(p.slug)
                 return slugPath ? [urlNode(`/products/${slugPath}`, isoOrNow(p.updatedAt))] : []
             })
 
         const blogNodes = blogsResult.docs
             .flatMap(b => {
-                const slugPath = encodePublicSlugPath(b.slug)
+                const slugPath = encodePublicSlugSegment(b.slug)
                 return slugPath ? [urlNode(`/blog/${slugPath}`, isoOrNow(b.updatedAt))] : []
             })
 
@@ -150,7 +147,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         return new Response(xml, {
             headers: {
                 'Content-Type': 'application/xml',
-                'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+                'Cache-Control': 'no-store',
             },
         })
     } catch (error) {

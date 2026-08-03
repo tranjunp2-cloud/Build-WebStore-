@@ -52,6 +52,7 @@ export async function GET(_req: NextRequest) {
             ? (await payload.find({
                 collection: 'sites',
                 depth: 0,
+                limit: 2,
                 overrideAccess: true,
                 pagination: false,
                 sort: 'createdAt',

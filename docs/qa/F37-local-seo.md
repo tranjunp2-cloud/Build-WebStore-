@@ -1,11 +1,13 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 3.9 | **Updated:** 2026-07-31 | **Owner:** QA Team
+> **Version:** 4.0 | **Updated:** 2026-08-03 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
+
+- **v4.0 (2026-08-03)** — Closed PR #1719 review gaps: sitemap and llms successful responses now use `Cache-Control: no-store` so publish-state changes cannot remain stale at the CDN; both routes fetch every matching published page/product/blog with narrow field projections; `llms.txt` still emits at most 10 unique URLs after deterministic round-robin selection. Product/blog discovery rejects nested slugs that their single-segment detail routes cannot resolve, blog writes reject new nested slugs, and the account-derived site-status lookup reads at most two rows while enforcing the one-account/one-tenant/one-site invariant.
 
 - **v3.9 (2026-07-31)** — Reconciled TC-16 with TC-52: `llms.txt` keeps its 10-URL bound but selects oldest public pages, products, and blogs in deterministic round-robin order so an available content type cannot be starved by an earlier group.
 - **v3.8 (2026-07-31)** — Aligned E2E fixture discovery with the product invariant of one account, one active tenant, and one site. TC-28/29 use an E2E-only, status-only route guarded by staging-only execution, the server-configured `TEST_EMAIL`, authenticated session, and active-tenant ownership; cleanup verifies and retries restoration in `finally`. A single account-backed run now covers both states without F37-specific env variables or production publish side effects.
@@ -14,7 +16,7 @@
 - **v3.5 (2026-07-30)** — PR review regression closeout: custom-domain product/blog detail loaders now resolve the forwarded hostname, require an active domain, and keep blog lookup site-scoped. TC-52 derives its active custom-domain fixture from `TEST_EMAIL`, requires product/blog details in both sitemap and llms, and rejects redirects or non-200 renders.
 - **v3.4 (2026-07-30)** — Product ownership clarified: #1311 closes on FR-12..14 route/UI behavior and hands trusted crawler/sitemap/llms facts to #1312; #1312 alone owns 9/5/1 attribution and the 100-point scorecard. TC-51 prevents Story Sync from moving score-engine acceptance back into #1311.
 - **v3.3 (2026-07-30)** — Review findings fixed: a dedicated Playwright project discovers TC-28/29 with fail-closed account-owned fixtures while shared workflows remain unchanged; TC-49/50 guard project configuration and documentation alignment. Exact 9/5/1 score integration remains atomically owned by #1312 because changing only the legacy AI bucket would make the current total max 95.
-- **v3.2 (2026-07-30)** — Review hardening made public-route resource use explicit: llms Key Pages are capped at 10 deterministic real URLs from bounded field-selected candidate queries, and sitemap queries are bounded and select only serialization fields. Live TC-28..30 and #1312 9/5/1 evidence remain pending.
+- **v3.2 (2026-07-30)** — Review hardening made public-route resource use explicit: llms Key Pages are capped at 10 deterministic real URLs, and discovery queries select only serialization fields. Superseded by v4.0 for candidate-query completeness and cache behavior. Live TC-28..30 and #1312 9/5/1 evidence remain pending.
 - **v3.1 (2026-07-29)** — Reconciled US-F37-03 with PRD v2.6: retired seller opt-out/action wording, registered unique TC-F37-03-01..48 evidence, added published/unpublished public-route Playwright coverage plus authenticated Dashboard absence coverage, and recorded #1312 as the remaining 9/5/1 score-integration dependency.
 - **v2.18 (2026-07-31)** — Registered `TC-F37-01-30` for the PR #1708 review regression: rapid `localBusiness` edits must be serialized and coalesced so a slower, older PATCH cannot overwrite newer address fields. The component sends sparse field patches to the Editor owner; the owner maintains revisioned snapshots and one queue per site, preserves queued site A work while site B saves independently, and prevents a same-site page refetch from replacing pending optimistic data with an older DB snapshot. Successful analytics now fire once per persisted batch from that batch's full snapshot. Deterministic regressions cover all of these ordering cases.
 - **v2.17 (2026-07-30)** — Hardened the F37 target allowlist at the shared authenticated Playwright setup boundary. The previous suite-level skip ran after the `chromium` project's `setup` dependency, so credentials could be submitted before a disallowed target was rejected. `TC-F37-01-29` now covers exact local/live-staging origins plus malformed, production, and lookalike targets; a direct setup regression confirms the guard throws before navigation or credential entry.
@@ -190,7 +192,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-13** | FR-14 | Unit | llms.txt emits site name as H1 | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-14** | FR-14 | Unit | llms.txt emits description as blockquote | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-15** | FR-14 | Unit | llms.txt emits Key Pages heading | `[x] AUTO` `llms-txt.test.ts` |
-| **TC-F37-03-16** | FR-14 | Regression | Lists at most 10 unique real public URLs using deterministic round-robin coverage across available pages, products, and blogs from bounded, field-selected candidate queries; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-16** | FR-14 | Regression | Fetches all matching published pages, products, and blogs with field-selected queries, then lists at most 10 unique real public URLs using deterministic round-robin coverage; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-17** | FR-14 | Unit | Public URLs use Markdown list syntax | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-18** | FR-14 | Unit | Contact section appears when data exists | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-19** | FR-14 | Unit | Contact section includes phone | `[x] AUTO` `llms-txt.test.ts` |
@@ -213,7 +215,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-36** | FR-12 | Security | Approved bot groups still block `/api` + `/admin` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
 | **TC-F37-03-37** | FR-14 | Unit | Middleware rewrites custom-domain llms.txt | `[x] AUTO` `public-discovery-middleware.test.ts` |
 | **TC-F37-03-38** | AC-01 / FR-13 | Unit | Published sitemap emits current public XML URLs | `[x] AUTO` `sitemap-route.test.ts` |
-| **TC-F37-03-39** | FR-13 | Security | Sitemap queries are site-scoped, bounded, and field-selected; unsafe slugs are rejected or encoded | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-39** | FR-13 | Security | Sitemap queries are site-scoped, fetch all matching published records with field-selected queries, and reject or encode unsafe slugs | `[x] AUTO` `sitemap-route.test.ts` |
 | **TC-F37-03-40** | FR-13 | Unit | Sitemap resolves active custom-domain URLs | `[x] AUTO` `sitemap-route.test.ts` |
 | **TC-F37-03-41** | AC-02 / FR-13 | Edge | Sitemap returns 404 for missing tenant or published site | `[x] AUTO` `sitemap-route.test.ts` |
 | **TC-F37-03-42** | FR-14 | Security | llms.txt omits checkout and order URLs | `[x] AUTO` `llms-txt.test.ts` |

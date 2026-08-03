@@ -26,14 +26,14 @@ const DISCOVERY_ROUTES = [
         route: getSitemap,
         contentType: 'application/xml',
         bodyFragment: '<loc>https://mycafe.example',
-        cacheFragment: 's-maxage=3600',
+        cacheFragment: 'no-store',
     },
     {
         name: 'llms',
         route: getLlmsTxt,
         contentType: 'text/plain; charset=utf-8',
         bodyFragment: '# My Cafe',
-        cacheFragment: 's-maxage=300',
+        cacheFragment: 'no-store',
     },
 ] as const
 

@@ -71,6 +71,7 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         // Assert
         expect(response.status).toBe(200)
         expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8')
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
     })
 
     // ────────────────────────────────────────────────────────────────
@@ -243,9 +244,12 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         expect(urls).toHaveLength(10)
         expect(body).not.toContain('/products/mocha')
         expect(body).not.toContain('/page-5')
-        expect(mockFind.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true, isHomepage: true }, limit: 10 }))
-        expect(mockFind.mock.calls[3]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true }, limit: 10 }))
-        expect(mockFind.mock.calls[4]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true }, limit: 5 }))
+        expect(mockFind.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true, isHomepage: true } }))
+        expect(mockFind.mock.calls[3]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true } }))
+        expect(mockFind.mock.calls[4]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true } }))
+        expect(mockFind.mock.calls[2]?.[0]).not.toHaveProperty('limit')
+        expect(mockFind.mock.calls[3]?.[0]).not.toHaveProperty('limit')
+        expect(mockFind.mock.calls[4]?.[0]).not.toHaveProperty('limit')
         // The selector must skip a duplicate URL and continue filling from a
         // non-empty group when another content group has no candidates.
         mockFind.mockReset()
@@ -821,7 +825,7 @@ describe('[TC-F37-03] llms.txt content contract', () => {
             .mockResolvedValueOnce({ docs: [mockSite] })
             .mockResolvedValueOnce({ docs: [{ slug: 'offers\n## fake' }, { slug: '../admin' }] })
             .mockResolvedValueOnce({ docs: [] })
-            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [{ slug: 'nested/news' }] })
 
         // Act
         const response = await getLlmsTxt(
@@ -837,6 +841,7 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         expect(body).not.toContain('\n- https://evil.example')
         expect(body).toContain('/offers%0A%23%23%20fake')
         expect(body).not.toContain('/../admin')
+        expect(body).not.toContain('/blog/nested/news')
     })
 
     // ────────────────────────────────────────────────────────────────

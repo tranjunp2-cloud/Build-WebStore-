@@ -28,7 +28,7 @@ Verify and minimally harden `robots.txt`, `sitemap.xml`, and `llms.txt` as tenan
 - Unpublished/missing storefront: sitemap and `llms.txt` return the approved not-found behavior; robots retains the platform crawler invariant without leaking private content.
 - `llms.txt` uses `text/plain; charset=utf-8`, valid Markdown, an H1, and up to 10 unique real public URLs with homepage first and deterministic round-robin coverage across available pages, products, and blogs, plus optional contact/hours only from the same site. A homepage-only published site is valid; never fabricate URLs to meet a count.
 - Sitemap includes only current public content and excludes private, deleted, hidden/no-index, inactive, checkout, admin, and order URLs.
-- Preserve short bounded caching and bounded/parallel Payload queries.
+- Prevent stale publish-state responses while keeping parallel Payload queries field-selected.
 - Do not make score code call the application's own HTTP routes.
 
 ## Architecture
@@ -67,7 +67,7 @@ Public routes resolve one authorized storefront context, query only that tenant/
 ## Implementation Steps
 
 1. Build a route matrix for published, unpublished, missing, legacy-false, platform-hosted, and custom-domain storefronts.
-2. Audit each route's site/tenant filters, status handling, content type, cache headers, and query limits.
+2. Audit each route's site/tenant filters, status handling, content type, cache headers, and query completeness.
 3. Add route-import unit regressions before changing behavior; fix only demonstrated contract gaps.
 4. Verify sitemap URL filtering and `llms.txt` URL/contact/hours ownership with multi-tenant fixtures.
 5. Document the 9/5/1 handoff and independent failure semantics in code-level contract comments or the architecture docs owned by the merged #1677 baseline.
@@ -101,7 +101,7 @@ Public routes resolve one authorized storefront context, query only that tenant/
 
 - Existing tests may encode stale 500-versus-404 behavior; settle expected status from merged docs before editing assertions.
 - Multi-site resolution may be broader than #1311; record unresolved ambiguity rather than selecting an arbitrary site.
-- Expanding content queries can cause N+1 or oversized responses; keep limits and parallel access explicit.
+- Full discovery scans can grow with tenant content; keep field projections and parallel access explicit, and move to a sitemap index/paging design in a separate scalability story if production volume requires it.
 
 ## Security Considerations
 
