@@ -52,8 +52,8 @@ const COLLECTION_COLUMN_CHECKS: Record<string, string[]> = {
   tenants: ['stripe_account_id', 'stripe_onboarding_complete', 'whatsapp_number', 'ssm_number'],
   // Users: tenant membership sub-table
   users_tenants: ['tenant_id', 'status', 'role'],
-  // Sites: site_type + locale fields
-  sites: ['site_type', 'locale'],
+  // Sites: site_type + locale + F37 LocalBusiness subtype
+  sites: ['site_type', 'locale', 'local_business_schema_subtype'],
   // Orders: EasyParcel collection method selected at label creation
   orders: ['collection_method'],
   // EasyParcel activity rows snapshot their shipment method so history stays immutable

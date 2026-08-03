@@ -127,7 +127,38 @@ vi.mock('@/components/editor/PageManagerPanel', () => ({ PageManagerPanel: () =>
 vi.mock('@/components/editor/SettingsPanel', () => ({
     SettingsPanel: (props: SettingsPanelHarnessProps) => {
         settingsPanelHarness.latestProps = props
-        return <div data-testid="settings-panel-phone">{props.site?.contactInfo?.phone || ''}</div>
+        return (
+            <div>
+                <div data-testid="settings-panel-phone">{props.site?.contactInfo?.phone || ''}</div>
+                <output data-testid="local-business-pair">
+                    {(props.site?.localBusiness?.businessCategory || '') + ':' + (props.site?.localBusiness?.schemaSubtype || '')}
+                </output>
+                <button
+                    data-testid="reject-local-business-save"
+                    onClick={() => {
+                        void props.onSiteSettingsChange?.({
+                            localBusiness: { businessCategory: 'store', schemaSubtype: 'Store' },
+                        })
+                    }}
+                >
+                    Save rejected pair
+                </button>
+                <button
+                    data-testid="save-address-after-pair"
+                    onClick={() => {
+                        void props.onSiteSettingsChange?.({
+                            localBusiness: {
+                                businessCategory: 'store',
+                                schemaSubtype: 'Store',
+                                streetAddress: 'New confirmed address',
+                            },
+                        })
+                    }}
+                >
+                    Save newer address
+                </button>
+            </div>
+        )
     },
 }))
 vi.mock('@/components/editor/BlockLibraryPanel', () => ({ BlockLibraryPanel: () => <div /> }))
@@ -457,6 +488,84 @@ describe('Publish and Save Flows (TC-F05)', () => {
             },
         })
         await act(async () => expect(await queuedSiteASave).toBe(true))
+    })
+
+    it('[TC-F37-02-47] does not roll back the active site when a previous site save fails late', async () => {
+        // Arrange
+        const siteALocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Site A Street', city: 'Shah Alam', postcode: '40100', country: 'MY',
+        }
+        const siteBLocalBusiness: LocalBusinessData = {
+            streetAddress: '2 Site B Street', city: 'Johor Bahru', postcode: '80000', country: 'MY',
+        }
+        let resolveSiteASave: ((response: {
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }) => void) | undefined
+        const siteASaveResponse = new Promise<{
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }>(resolve => { resolveSiteASave = resolve })
+
+        settingsPanelHarness.siteId = 'site-a'
+        global.fetch = vi.fn((input: string | URL) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                const isSiteB = url.includes('/sites/site-b/')
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: isSiteB ? 'site-b' : 'site-a',
+                            name: isSiteB ? 'Site B' : 'Site A',
+                            status: 'draft',
+                            localBusiness: isSiteB ? siteBLocalBusiness : siteALocalBusiness,
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/sites/site-a/save')) return siteASaveResponse
+            return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+        }) as unknown as typeof fetch
+
+        const view = render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteALocalBusiness)
+        })
+        let siteASave: Promise<void | boolean> | undefined
+        act(() => {
+            siteASave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { streetAddress: '99 Site A Street' },
+            }))
+        })
+
+        // Act
+        settingsPanelHarness.siteId = 'site-b'
+        view.rerender(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
+        })
+        await act(async () => {
+            resolveSiteASave?.({
+                ok: false,
+                status: 500,
+                json: async () => ({ error: 'Site A save failed' }),
+            })
+            expect(await siteASave).toBe(false)
+        })
+
+        // Assert
+        expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
     })
 
     it('[TC-F37-01-30] preserves pending localBusiness edits across a same-site page reload', async () => {
@@ -1232,6 +1341,150 @@ describe('Publish and Save Flows (TC-F05)', () => {
             const pages = useEditorStore.getState().pages
             const newPage = pages.find(p => p.id === 'page-new')
             expect(newPage?.status).toBe('published')
+        })
+    })
+
+    it('[TC-F37-02-47] restores the previous valid category and subtype when save rejects the optimistic pair', async () => {
+        // Arrange
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            localBusiness: {
+                                businessCategory: 'foodEstablishment',
+                                schemaSubtype: 'Restaurant',
+                            },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) {
+                return { ok: true, json: async () => ({ pages: [] }) } as Response
+            }
+            if (url.includes('/save')) {
+                return {
+                    ok: false,
+                    status: 400,
+                    json: async () => ({ error: 'Invalid category/subtype pair' }),
+                } as Response
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+
+        // Assert
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith(
+                'Invalid category/subtype pair',
+                expect.objectContaining({ description: undefined }),
+            )
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+        const saveCall = vi.mocked(global.fetch).mock.calls.find(([input]) => String(input).includes('/save'))
+        expect(saveCall).toBeDefined()
+        const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as {
+            localBusiness?: { businessCategory?: string; schemaSubtype?: string | null }
+        }
+        expect(requestBody.localBusiness).toMatchObject({
+            businessCategory: 'store',
+            schemaSubtype: 'Store',
+        })
+        expect(trackEvent).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F37-02-47] preserves the newer optimistic revision when an older save fails', async () => {
+        // Arrange
+        let resolveOlderSave: ((response: Response) => void) | null = null
+        const olderSave = new Promise<Response>(resolve => {
+            resolveOlderSave = resolve
+        })
+        let saveCount = 0
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            localBusiness: {
+                                businessCategory: 'foodEstablishment',
+                                schemaSubtype: 'Restaurant',
+                            },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) {
+                return { ok: true, json: async () => ({ pages: [] }) } as Response
+            }
+            if (url.includes('/save')) {
+                saveCount += 1
+                if (saveCount === 1) return olderSave
+                return { ok: true, json: async () => ({}) } as Response
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+        await waitFor(() => {
+            expect(saveCount).toBe(1)
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+        })
+        fireEvent.click(screen.getByTestId('save-address-after-pair'))
+        expect(saveCount).toBe(1)
+        act(() => {
+            resolveOlderSave?.({
+                ok: false,
+                status: 409,
+                json: async () => ({ error: 'Older save rejected' }),
+            } as Response)
+        })
+
+        // Assert
+        await waitFor(() => {
+            expect(saveCount).toBe(2)
+            expect(toast.error).toHaveBeenCalledWith(
+                'Older save rejected',
+                expect.objectContaining({ description: undefined }),
+            )
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+        })
+        const saveCalls = vi.mocked(global.fetch).mock.calls.filter(([input]) => String(input).includes('/save'))
+        const latestRequestBody = JSON.parse(String(saveCalls[1]?.[1]?.body)) as {
+            localBusiness?: {
+                businessCategory?: string
+                schemaSubtype?: string | null
+                streetAddress?: string
+            }
+        }
+        expect(latestRequestBody.localBusiness).toMatchObject({
+            businessCategory: 'store',
+            schemaSubtype: 'Store',
+            streetAddress: 'New confirmed address',
         })
     })
 
