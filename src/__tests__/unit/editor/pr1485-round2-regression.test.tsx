@@ -150,6 +150,7 @@ describe('TC-F05-15 — CompactEditorLayout: Global Widget Block Deletion/Move G
             theme: {} as any,
             site: null,
             siteName: 'Test Site',
+            isContactSavePending: false,
             headerBlock: null,
             footerBlock: null,
             pages: [],

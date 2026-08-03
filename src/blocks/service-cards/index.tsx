@@ -1,7 +1,7 @@
 'use client'
 
 import type { BlockProps } from '../types'
-import type { ServiceCardsConfig, ServiceItem } from './config'
+import { serviceCardsGridClass, type ServiceCardsConfig, type ServiceItem } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
@@ -155,7 +155,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
 
                 {/* Content */}
                 {variant === 'grid' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className={`grid ${serviceCardsGridClass(services.length)} gap-6`}>
                         {services.map((service, i) => renderGridCard(service, i))}
                     </div>
                 )}

@@ -21,6 +21,12 @@ export type ServiceCardsConfig = {
     services: ServiceItem[]
 }
 
+export function serviceCardsGridClass(itemCount: number): string {
+    if (itemCount <= 1) return 'grid-cols-1 max-w-xl mx-auto'
+    if (itemCount === 2) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2 max-w-5xl mx-auto'
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+}
+
 export const ServiceCardsConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('service-cards'),
     variant: z.enum(['grid', 'list', 'featured']).default('grid'),

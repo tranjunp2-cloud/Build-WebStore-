@@ -9,6 +9,7 @@
  *   5. CancelOrderModal renders with i18n text
  *   6. OrdersTable status badge + headers use i18n
  *   7. OrderDetailPanel section headers use i18n
+ *   8. OrdersActionBar preserves its responsive wrapping contract
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -295,6 +296,45 @@ describe('TC-F10.i18n.05 — OrdersActionBar dropdown i18n labels', () => {
 
         expect(screen.getByText(enOrders.status.pending)).toBeInTheDocument()
         expect(screen.getByText(enOrders.status.confirmed)).toBeInTheDocument()
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 6: OrdersActionBar Responsive Filter Chips
+// ═══════════════════════════════════════════════════════════════════════
+describe('[TC-F10.responsive.05a] — OrdersActionBar responsive filter chips', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        currentMockLocale = 'ms'
+        currentMockOrders = msOrders
+    })
+
+    it('allows long selected values to wrap below xl and restores the desktop layout', () => {
+        // Arrange
+        const longestDefaultValue = msOrders.sort.dateNewest
+
+        // Act
+        const { container } = render(<OrdersActionBar />)
+        const filterGrid = container.querySelector('.grid.grid-cols-2')
+
+        // Assert
+        expect(screen.getByRole('button', { name: new RegExp(longestDefaultValue) })).toBeInTheDocument()
+        expect(filterGrid).not.toBeNull()
+        expect(filterGrid).toHaveClass(
+            'md:grid-cols-4',
+            '[&_.chip-trigger]:h-auto',
+            '[&_.chip-trigger]:min-h-11',
+            'md:[&_.chip-trigger]:min-h-10',
+            'xl:[&_.chip-trigger]:h-10',
+            '[&_.chip-trigger>span]:whitespace-normal',
+            '[&_.chip-trigger>span]:overflow-visible',
+            'xl:[&_.chip-trigger>span]:whitespace-nowrap',
+            'xl:[&_.chip-trigger>span]:overflow-hidden',
+            '[&_[data-chip-value]]:whitespace-normal',
+            '[&_[data-chip-value]]:break-words',
+            'xl:[&_[data-chip-value]]:whitespace-nowrap',
+        )
+        expect(filterGrid).not.toHaveClass('[&_[data-chip-value]]:truncate')
     })
 })
 

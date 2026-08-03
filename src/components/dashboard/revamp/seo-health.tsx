@@ -115,7 +115,7 @@ export function SeoHealth({ data }: { data: SeoData }) {
                                 text: tp(issueLabelKeys(data.topIssue.fixType, seoT), data.topIssue.count),
                             })}
                         </span>
-                        <Button variant="dashPrimary" size="sm" onClick={openFixAll} disabled={!canFixAll}>
+                        <Button variant="dashPrimary" size="sm" onClick={openFixAll} disabled={!canFixAll} className="shrink-0 whitespace-nowrap">
                             <Sparkles aria-hidden />{seoT.fixAll}
                         </Button>
                     </div>

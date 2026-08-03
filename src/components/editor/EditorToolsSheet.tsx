@@ -79,6 +79,7 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
                             key={tab.id}
                             type="button"
                             role="tab"
+                            data-testid={`editor-tools-tab-${tab.id}`}
                             aria-selected={activeTab === tab.id}
                             onClick={() => onTabChange(tab.id)}
                             className={cn(

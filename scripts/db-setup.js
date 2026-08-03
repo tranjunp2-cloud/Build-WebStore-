@@ -5005,6 +5005,80 @@ const MIGRATIONS = [
     name: 'enum_analytics_event.add_local_business_data_saved',
     sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
   },
+  // ── F38: Local-first multi-source image catalog ──
+  // These are internal PostgreSQL tables, not Payload collections. The catalog
+  // owns one system Media row per provider identity and the response cache is
+  // shared across server instances.
+  {
+    name: 'stock_image_catalog.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS stock_image_catalog (
+      id bigserial PRIMARY KEY,
+      provider varchar NOT NULL,
+      provider_image_id varchar NOT NULL,
+      object_key varchar NOT NULL,
+      media_id integer NOT NULL REFERENCES media(id) ON DELETE RESTRICT,
+      source_url text NOT NULL,
+      creator text,
+      license_name text NOT NULL,
+      license_url text NOT NULL,
+      attribution text NOT NULL,
+      tags text[] NOT NULL DEFAULT '{}',
+      normalized_terms text NOT NULL,
+      category varchar NOT NULL,
+      width integer NOT NULL,
+      height integer NOT NULL,
+      aspect double precision NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      use_count integer NOT NULL DEFAULT 0,
+      last_used_at timestamptz,
+      search_vector tsvector GENERATED ALWAYS AS (
+        to_tsvector('simple', coalesce(normalized_terms, ''))
+      ) STORED,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT stock_image_catalog_provider_identity_uniq UNIQUE (provider, provider_image_id),
+      CONSTRAINT stock_image_catalog_object_key_uniq UNIQUE (object_key)
+    );`,
+  },
+  {
+    name: 'stock_image_catalog.search_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_search_idx
+      ON stock_image_catalog USING GIN (search_vector);`,
+  },
+  {
+    name: 'stock_image_catalog_filter_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_filter_idx
+      ON stock_image_catalog (active, category, aspect);`,
+  },
+  {
+    name: 'stock_image_catalog_media_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_media_idx
+      ON stock_image_catalog (media_id);`,
+  },
+  {
+    name: 'sites.image_library',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS image_library jsonb;`,
+  },
+  {
+    name: 'media.source_provider',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_provider varchar;`,
+  },
+  {
+    name: 'media.source_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_url text;`,
+  },
+  {
+    name: 'media.license_name',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_name varchar;`,
+  },
+  {
+    name: 'media.license_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_url text;`,
+  },
+  {
+    name: 'media.attribution',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS attribution text;`,
+  },
   // ── F08 issue #1587: drop unused Category Image field (YAGNI, stored but never rendered) ──
   {
     name: 'categories.drop_image_id',
