@@ -275,7 +275,7 @@ export type DashboardBlockId = 'onboarding' | 'glance' | 'traffic' | 'seo' | 'to
 
 const ALL_BLOCK_IDS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools', 'orders']
 
-/** Default visible blocks, in order. `orders` (Coming Soon / F10) intentionally OFF. */
+/** Default visible blocks, in order. `orders` intentionally remains OFF by default. */
 export const DEFAULT_DASHBOARD_BLOCKS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools']
 
 /** Legacy stat-pref names saved before the revamp (stat-level granularity is gone). */
@@ -308,7 +308,7 @@ export interface DashboardBlockMeta {
     icon: string
     /** key under i18n `dashboard.overview.customizeModal.blocks.*` */
     labelKey: string
-    /** Coming Soon block (F10) — rendered with overlay, default OFF */
+    /** Coming Soon block rendered with a locked preview. */
     soon?: boolean
 }
 
@@ -319,7 +319,7 @@ export const ALL_BLOCKS: DashboardBlockMeta[] = [
     { id: 'traffic', icon: 'bar-chart-3', labelKey: 'traffic' },
     { id: 'seo', icon: 'search-check', labelKey: 'seo' },
     { id: 'tools', icon: 'wrench', labelKey: 'tools' },
-    { id: 'orders', icon: 'package-check', labelKey: 'orders', soon: true },
+    { id: 'orders', icon: 'package-check', labelKey: 'orders' },
 ]
 
 export interface CustomizeBlockRow extends DashboardBlockMeta {

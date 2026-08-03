@@ -10,9 +10,42 @@
  */
 
 import type { Payload } from 'payload'
+import { createF38StockInfrastructure } from '@/lib/media/stock-adapter'
 import { siteAltKeyPrefix } from './image-library-keys'
 
 export type ImageLibraryS3Map = Record<string, string>
+
+async function resolveF38Assignments(
+    payload: Payload,
+    siteId: number | string,
+): Promise<ImageLibraryS3Map> {
+    const numericSiteId = Number(siteId)
+    if (!Number.isSafeInteger(numericSiteId) || numericSiteId <= 0) return {}
+    const infrastructure = createF38StockInfrastructure(payload)
+    const assignments = await infrastructure.readSiteStockAssignments(numericSiteId)
+    if (assignments.length === 0) return {}
+
+    const mediaIds = [...new Set(assignments.map((row) => row.mediaId))]
+    const media = await payload.find({
+        collection: 'media',
+        where: { id: { in: mediaIds } },
+        limit: mediaIds.length,
+        depth: 0,
+    })
+    const urls = new Map(
+        media.docs.flatMap((doc) => {
+            const id = Number(doc.id)
+            const url = (doc as { url?: string }).url
+            return Number.isSafeInteger(id) && url ? [[id, url] as const] : []
+        }),
+    )
+    return Object.fromEntries(
+        assignments.flatMap(({ slot, mediaId }) => {
+            const url = urls.get(mediaId)
+            return url ? [[slot, url]] : []
+        }),
+    )
+}
 
 /**
  * Fetch all seeded IMAGE_LIBRARY media for a site.
@@ -26,6 +59,9 @@ export async function resolveImageLibraryS3Map(
     siteId: number | string,
 ): Promise<ImageLibraryS3Map> {
     try {
+        if (process.env.F38_IMAGE_PIPELINE === 'true') {
+            return await resolveF38Assignments(payload, siteId)
+        }
         const prefix = siteAltKeyPrefix(siteId)
         const res = await payload.find({
             collection: 'media',

@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import {
+    planImageNeeds,
+    planF38FinalPageImageNeeds,
+    dedupeF38FinalPageMediaIds,
+    fulfillImageNeeds,
+    cleanupNonNumericImageFields,
+    stripOrphanMediaRefs,
+    computePoolBucketSizes,
+    computePoolTargetsForNeeds,
+} from '@/lib/ai/media-injector'
 import { getAvatarMedia, batchFetchFromPool, getMediaForBlock, getCuratedFallbackMedia } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
@@ -171,6 +180,152 @@ describe('media-injector [plan-260414-unsplash]', () => {
             // Only hero should need images, logo-cloud skipped
             expect(needs.length).toBe(1)
             expect(needs[0]!.blockType).toBe('hero')
+        })
+    })
+
+    describe('F38 final-page image planning', () => {
+        it('TC-F38-RES-08: plans every persisted non-logo upload slot when PIXABAY_BLOCKS is unset', () => {
+            // Arrange
+            delete process.env.PIXABAY_BLOCKS
+            const pages = [{
+                layout: [
+                    { blockType: 'hero', image: 1, backgroundImage: 1 },
+                    { blockType: 'about', image: 2 },
+                    { blockType: 'gallery', images: [{ image: 3 }, { image: 4 }] },
+                    { blockType: 'portfolio-grid', projects: [{ image: 5 }] },
+                    { blockType: 'team', members: [{ image: 6 }] },
+                    { blockType: 'testimonials', testimonials: [{ avatar: 7 }] },
+                    { blockType: 'property-card', properties: [{ image: 8 }] },
+                    { blockType: 'carousel', items: [{ image: 9 }] },
+                    { blockType: 'social-proof', reviews: [{ avatar: 10 }] },
+                    { blockType: 'video', posterImage: 11 },
+                    {
+                        blockType: 'menu-food',
+                        categories: [
+                            { items: [{ image: 12 }, { image: 13 }] },
+                        ],
+                    },
+                    { blockType: 'logo-cloud', logos: [{ logo: 14 }] },
+                    {
+                        blockType: 'before-after',
+                        beforeImage: { url: 'https://example.com/before.jpg' },
+                    },
+                ],
+            }]
+
+            // Act
+            const needs = planF38FinalPageImageNeeds(pages)
+
+            // Assert
+            expect(needs).toHaveLength(11)
+            expect(needs.reduce((sum, need) => sum + need.count, 0)).toBe(13)
+            expect(needs.map((need) => [need.blockType, need.reservoir, need.count])).toEqual([
+                ['hero', 'landscape', 1],
+                ['about', 'landscape', 1],
+                ['gallery', 'landscape', 2],
+                ['portfolio-grid', 'square', 1],
+                ['team', 'people', 1],
+                ['testimonials', 'people', 1],
+                ['property-card', 'landscape', 1],
+                ['carousel', 'landscape', 1],
+                ['social-proof', 'people', 1],
+                ['video', 'landscape', 1],
+                ['menu-food', 'products', 2],
+            ])
+            expect((pages[0]!.layout[0] as Record<string, unknown>).image).toBeUndefined()
+            expect((pages[0]!.layout[0] as Record<string, unknown>).backgroundImage).toBeUndefined()
+            expect((pages[0]!.layout[11] as Record<string, unknown>).logos).toEqual([{ logo: 14 }])
+        })
+
+        it('TC-F38-REUSE-02: assigns distinct IDs to repeated blocks on cloned pages', () => {
+            // Arrange
+            const baseLayout = [
+                { blockType: 'hero', image: 10, backgroundImage: 10 },
+                { blockType: 'gallery', images: [{ image: 11 }, { image: 12 }] },
+            ]
+            const pages = [
+                { layout: structuredClone(baseLayout) },
+                { layout: structuredClone(baseLayout) },
+            ]
+            const needs = planF38FinalPageImageNeeds(pages)
+
+            // Act
+            let nextId = 101
+            for (const need of needs) {
+                need.assign(Array.from({ length: need.count }, () => nextId++))
+            }
+
+            // Assert
+            const firstHero = pages[0]!.layout[0] as Record<string, unknown>
+            const secondHero = pages[1]!.layout[0] as Record<string, unknown>
+            expect(firstHero.image).toBe(101)
+            expect(firstHero.backgroundImage).toBe(101)
+            expect(secondHero.image).toBe(104)
+            expect(secondHero.backgroundImage).toBe(104)
+            const assigned = pages.flatMap((page) => {
+                const hero = page.layout[0] as Record<string, unknown>
+                const gallery = page.layout[1] as { images: Array<{ image?: number }> }
+                return [hero.image as number, ...gallery.images.map((item) => item.image!)]
+            })
+            expect(assigned).toEqual([101, 102, 103, 104, 105, 106])
+            expect(new Set(assigned).size).toBe(6)
+        })
+
+        it('TC-F38-REUSE-02: final guard keeps the first logical slot and clears later duplicate Media IDs', () => {
+            // Arrange
+            const pages = [
+                {
+                    layout: [
+                        { blockType: 'hero', image: 77, backgroundImage: 77 },
+                        { blockType: 'gallery', images: [{ image: 78 }] },
+                    ],
+                },
+                {
+                    layout: [
+                        { blockType: 'hero', image: 77, backgroundImage: 77 },
+                        { blockType: 'gallery', images: [{ image: 78 }, { image: 79 }] },
+                    ],
+                },
+            ]
+
+            // Act
+            const result = dedupeF38FinalPageMediaIds(pages)
+
+            // Assert
+            const firstHero = pages[0]!.layout[0] as Record<string, unknown>
+            const secondHero = pages[1]!.layout[0] as Record<string, unknown>
+            const secondGallery = pages[1]!.layout[1] as { images: Array<{ image?: number }> }
+            expect(firstHero).toMatchObject({ image: 77, backgroundImage: 77 })
+            expect(secondHero.image).toBeUndefined()
+            expect(secondHero.backgroundImage).toBeUndefined()
+            expect(secondGallery.images.map((item) => item.image)).toEqual([undefined, 79])
+            expect(result.removed).toBe(2)
+            expect(result.usedMediaIds).toEqual(new Set([77, 78, 79]))
+        })
+
+        it('TC-F38-FALLBACK-03: assignment clears reservoir overflow instead of recycling an image', () => {
+            // Arrange
+            const pages = [{
+                layout: [
+                    { blockType: 'hero', image: 1, backgroundImage: 1 },
+                    {
+                        blockType: 'gallery',
+                        images: [{ image: 2 }, { image: 3 }, { image: 4 }],
+                    },
+                ],
+            }]
+            const needs = planF38FinalPageImageNeeds(pages)
+
+            // Act
+            needs[0]!.assign([])
+            needs[1]!.assign([201])
+
+            // Assert
+            const hero = pages[0]!.layout[0] as Record<string, unknown>
+            const gallery = pages[0]!.layout[1] as { images: Array<{ image?: number }> }
+            expect(hero.image).toBeUndefined()
+            expect(hero.backgroundImage).toBeUndefined()
+            expect(gallery.images.map((item) => item.image)).toEqual([201, undefined, undefined])
         })
     })
 

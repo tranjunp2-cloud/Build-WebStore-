@@ -22,7 +22,7 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
             ├── TrafficPerformance.tsx
             ├── SeoHealth.tsx
             ├── SeoTools.tsx
-            └── PendingOrders.tsx
+            └── PendingOrders.tsx        ← Latest Pending Orders (gated)
 ```
 
 ## Data Flow
@@ -30,13 +30,14 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
 ```
 page.tsx (Server Component)
   │
-  ├── getCurrentTenantId()
+  ├── getCurrentUser() + tenantIdForQuery() → tenant scope
   │
-  ├── getGlanceData() ──► Payload/Drizzle
-  ├── getTrafficData() ─► Payload/Drizzle
-  ├── getSeoData() ─────► Payload/Drizzle
+  ├── getGlanceData(period, { user }) ──► Payload/Drizzle
+  ├── getTrafficData(period) ─► Payload/Drizzle
+  ├── getSeoData() ───────────► Payload/Drizzle
   │
-  └── render dashboard revamp blocks
+  ├── load independent dashboard blocks
+  └── load Pending Orders via secure local loader when tenant/site/block/permission gates pass
 ```
 
 ## API Contract (Next.js Route Handlers)
@@ -48,6 +49,44 @@ page.tsx (Server Component)
 // POST /api/seo/fix (SSE Stream cho AI Fix)
 // GET/POST/DELETE /api/seo/keywords (Keyword Tracker)
 ```
+
+### Active At-a-glance metrics
+
+`getGlanceData(period, { user })` derives the tenant from the authenticated user and returns empty data when there is no usable tenant. Views, Leads, and Engagement remain tenant-scoped analytics metrics.
+Revenue reuses the Orders permission gate: users without Orders access receive zero/empty Revenue and no Orders SQL is executed.
+
+Views, Leads, Engagement, and Revenue share the single
+`DASHBOARD_TIME_ZONE = 'UTC'` contract. Current/comparison boundaries are half-open,
+equal, non-overlapping UTC windows, and `today`, `7d`, and `30d` produce exactly
+1, 7, and 30 UTC day keys. Payload count filters, range labels, zero-filled series,
+and SQL `created_at` grouping therefore do not depend on the Node host or PostgreSQL
+session timezone.
+
+The active Revenue loader uses one tenant-scoped SQL aggregate over the previous and
+current windows. It includes only orders whose current status is `completed`, includes
+`currency = 'MYR'` and legacy null currency via `COALESCE(currency, 'MYR')`, and
+attributes the amount to the order's UTC `created_at` day. Payment method and payment
+status do not alter inclusion, so COD follows the same rule and refunded/non-completed
+orders are excluded. No `completedAt` field is used. The active Revenue card renders the
+same aggregate total, delta, comparison note, and daily sparkline as `RM` with exactly
+two fraction digits; it is visible in both English and Bahasa Melayu.
+
+The aggregate's `EXPLAIN ANALYZE` on representative local/disposable data is still
+outstanding. Add an index only through a separately reviewed schema/migration change if
+the measured query plan requires one.
+
+### Pending Orders widget (GH-1627)
+
+The server loader queries tenant-scoped pending orders with `overrideAccess: false`,
+selects only dashboard DTO fields, sorts newest first, and limits the result to five
+rows. DTO mapping counts only positive safe-integer quantities and ignores malformed
+values or additions that would make the cumulative count unsafe. Access requires a primary
+tenant membership. Tenant-scoped super-admins bypass membership status and role checks;
+otherwise the membership must be active, with owner/admin/editor/viewer receiving full
+access and custom roles requiring explicit Orders permission. Missing tenant, usable site,
+enabled Orders block, or authorization skips the query. Loader
+failures render a distinct `unavailable` state; zero results render the localized
+empty state through the shared `.empty-block` pattern.
 
 ## Data Model
 

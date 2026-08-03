@@ -402,11 +402,24 @@
   border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.55); max-height: calc(100vh - 56px);
   display: flex; flex-direction: column; overflow: hidden;
 }
-.plabel-dialog { max-width: 1080px; width: 94vw; }
+.plabel-backdrop {
+  padding-top: max(28px, env(safe-area-inset-top));
+  padding-right: max(28px, env(safe-area-inset-right));
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  padding-left: max(28px, env(safe-area-inset-left));
+}
+.plabel-dialog {
+  box-sizing: border-box;
+  width: min(1080px, 100%);
+  max-width: 1080px;
+  max-height: calc(100vh - 56px);
+  max-height: calc(100dvh - 56px);
+}
 .dialog-h {
   padding: 20px 22px 16px; border-bottom: 1px solid var(--dash-border);
   display: flex; align-items: center; gap: 11px;
 }
+.plabel-dialog .dialog-h { flex: 0 0 auto; }
 .plabel-h-ic {
   width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
   background: hsl(var(--info) / 0.14); color: hsl(var(--info)); flex-shrink: 0;
@@ -425,32 +438,52 @@
 /* Real EP label PDF embed (replaces the custom-drawn preview) */
 .plabel-body-pdf { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px 22px; }
 /* Design 260707: PDF preview (left, large enough to read) + options column (right) */
-.plabel-grid { display: grid; grid-template-columns: 1fr 264px; gap: 20px; padding: 20px 22px; min-height: 0; }
-@media (max-width: 900px) { .plabel-grid { grid-template-columns: 1fr; } }
-.plabel-preview-pane { background: var(--dash-surface-hover); border: 1px solid var(--dash-border); border-radius: 12px; padding: 10px; display: flex; }
-.plabel-format { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--dash-secondary-bg); border: 1px solid var(--dash-border); }
-.pf-opt {
-  display: flex; align-items: center; justify-content: center; min-height: 34px;
-  padding: 9px 6px; border: none; border-radius: 8px; background: transparent;
-  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--dash-text-muted);
-  cursor: pointer; transition: background 0.12s, color 0.12s; white-space: nowrap;
+.plabel-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 264px; gap: 20px;
+  flex: 1 1 auto; min-height: 0; padding: 20px 22px; overflow-y: auto; overscroll-behavior: contain;
 }
-.pf-opt.on { background: hsl(var(--primary)); color: hsl(var(--primary-foreground, 222 47% 8%)); }
-.pf-opt:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-/* Tooltip wrapper for a DISABLED format option — receives the hover the button can't */
-.pf-optwrap { display: flex; cursor: not-allowed; }
-.pf-optwrap > .pf-opt { flex: 1; }
-.plabel-check {
-  display: flex; align-items: center; gap: 9px; border: none; background: transparent; padding: 2px 0;
-  font-family: inherit; font-size: 13px; font-weight: 500; color: var(--dash-text); cursor: pointer; text-align: left;
+.plabel-preview-pane {
+  min-width: 0; min-height: min(68vh, 720px);
+  background: var(--dash-surface-hover); border: 1px solid var(--dash-border);
+  border-radius: 12px; padding: 10px; display: flex; overflow: hidden;
 }
-.pc-box {
-  width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--dash-border);
-  display: grid; place-items: center; flex-shrink: 0; transition: background 0.12s, border-color 0.12s;
+.plabel-pdf-preview {
+  display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 8px;
 }
-.pc-box.on { background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground, 222 47% 8%)); }
-.pc-box svg { width: 12px; height: 12px; }
-.plabel-pdf-frame { width: 100%; height: 68vh; min-height: 520px; max-height: 780px; border: 1px solid var(--dash-border); border-radius: 8px; background: #fff; }
+.plabel-pdf-scroll {
+  display: flex; flex: 1; min-width: 0; min-height: 0; align-items: flex-start; justify-content: center;
+  overflow: auto; padding: 8px; border-radius: 8px; background: #cbd5e1; overscroll-behavior: contain;
+}
+.plabel-pdf-document { width: 100%; max-width: 100%; display: flex; justify-content: center; }
+.plabel-pdf-document .react-pdf__Page {
+  max-width: 100%; overflow: hidden; background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,0.2);
+}
+.plabel-pdf-document canvas { display: block; max-width: 100%; height: auto !important; }
+.plabel-pdf-loading,
+.plabel-render-error {
+  display: flex; min-height: 220px; flex: 1; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; padding: 24px; text-align: center;
+  color: var(--dash-text-muted); font-size: 13px; line-height: 1.5;
+}
+.plabel-pdf-loading svg { width: 26px; height: 26px; opacity: 0.65; }
+.plabel-render-error svg { width: 28px; height: 28px; opacity: 0.65; }
+.plabel-render-error .btn { min-height: 40px; margin-top: 2px; }
+.plabel-render-error .btn svg { width: 15px; height: 15px; opacity: 1; }
+.plabel-pages {
+  display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 10px;
+  min-height: 36px; color: var(--dash-text-muted); font-size: 12px; font-weight: 600;
+}
+.plabel-page-btn {
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px;
+  border: 1px solid var(--dash-border); background: var(--dash-secondary-bg);
+  color: var(--dash-text); cursor: pointer;
+}
+.plabel-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.plabel-page-btn svg { width: 16px; height: 16px; }
+.plabel-pdf-frame {
+  width: 100%; height: 68vh; min-height: 520px; max-height: 780px;
+  border: 1px solid var(--dash-border); border-radius: 8px; background: #fff;
+}
 .plabel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; flex: 1; min-height: 300px; color: var(--dash-text-muted); background: var(--dash-surface-hover); border: 1px dashed var(--dash-border); border-radius: 12px; font-size: 13px; }
 .awb-label {
   width: 100%; background: #fff; color: #0f172a; border-radius: 4px; padding: 14px 15px;
@@ -485,36 +518,34 @@
 .plabel-hint { display: flex; gap: 7px; font-size: 11.5px; line-height: 1.45; color: var(--dash-text-muted); margin-top: auto; }
 .plabel-hint svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
 .dialog-foot { padding: 15px 22px; border-top: 1px solid var(--dash-border); display: flex; justify-content: flex-end; gap: 10px; }
-/* Print-label footer: Cancel far-left, Download + Print content-width dồn phải.
-   Scoped riêng để thắng bất kỳ style .btn/.dialog-foot toàn cục nào kéo giãn nút. */
-.plabel-foot .btn { flex: 0 0 auto; width: auto; height: 40px; min-height: 40px; box-sizing: border-box; line-height: 1; }
-.plabel-foot .btn-ghost { margin-right: auto; }
+/* Keep the print-label footer outside the scrollable grid so actions remain visible. */
+.plabel-foot { flex: 0 0 auto; }
 
 /* ── Tracking timeline ───────────────────────────────────────────────────── */
-.track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding-top: 8px; margin-top: 0; }
-.tl-row { display: flex; gap: 10px; position: relative; padding-bottom: 6px; }
+.track-timeline { display: flex; flex-direction: column; border-top: 1px solid var(--dash-border); padding: 8px 0 0; margin-top: 0; }
+.tl-row { display: flex; gap: 10px; position: relative; min-height: 75px; padding-bottom: 6px; box-sizing: border-box; }
 .tl-row:not(:last-child)::before {
-  content: ''; position: absolute; left: 5px; top: 11px; bottom: -1px;
+  content: ''; position: absolute; left: 5px; top: 11px; bottom: 1px;
   width: 2px; background: hsl(var(--border));
 }
 .tl-row.done:not(:last-child)::before { background: hsl(var(--success)); }
 .tl-dot {
-  width: 12px; height: 12px; border-radius: 50%; margin-top: 2px; flex-shrink: 0;
+  width: 12px; height: 12px; border-radius: 50%; margin-top: 2px; flex-shrink: 0; box-sizing: border-box;
   background: hsl(var(--border)); border: 2px solid var(--dash-secondary-bg);
-  box-shadow: 0 0 0 2px hsl(var(--border)); z-index: 1;
+  z-index: 1;
 }
 .tl-row.done .tl-dot, .tl-row:first-child .tl-dot {
-  background: hsl(var(--success)); box-shadow: 0 0 0 2px hsl(var(--success));
+  background: hsl(var(--success));
 }
 .tl-row.live .tl-dot {
-  background: hsl(var(--info)); box-shadow: 0 0 0 2px hsl(var(--info)), 0 0 0 5px hsl(var(--info) / 0.2);
+  background: hsl(var(--info));
 }
-.tl-row:last-child { padding-bottom: 0; }
-.tl-body { flex: 1; min-width: 0; }
+.tl-row:last-child { min-height: 69px; padding-bottom: 0; }
+.tl-body { flex: 1; min-width: 0; padding: 2px 0 26px; }
 .tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .tl-t { font-size: 13.5px; font-weight: 600; color: var(--dash-text); }
 .tl-d { font-size: 12px; color: var(--dash-text-muted); white-space: nowrap; font-family: var(--font-mono, monospace); }
-.tl-note { font-size: 12px; color: var(--dash-text-muted); margin-top: 1px; }
+.tl-note { font-size: 12px; line-height: 18px; color: var(--dash-text-muted); margin-top: 1px; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -527,8 +558,51 @@
   .banner-deduct { margin-left: 0; padding-left: 0; flex-basis: 100%; white-space: normal; }
   .cr-options { grid-template-columns: 1fr; }
   .plabel-body { grid-template-columns: 1fr; }
+  .plabel-backdrop {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+  .plabel-dialog {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .plabel-dialog .dialog-h { padding: 14px 14px 12px; }
+  .plabel-dialog .dialog-x { width: 44px; height: 44px; margin: -7px; }
+  .plabel-grid { padding: 12px 14px 16px; gap: 14px; }
+  .plabel-preview-pane { padding: 8px; }
+  .plabel-pdf-scroll { padding: 6px; }
+  .plabel-foot { padding: 12px 14px max(12px, env(safe-area-inset-bottom)); }
+  .plabel-foot > button { min-height: 44px; height: 44px; }
   .sched-anchor, .sched-anchor .btn, .sched-locked { width: 100%; }
   .sched-pop { width: 100%; right: auto; left: 0; }
+}
+
+@media (max-width: 900px) {
+  .plabel-grid { grid-template-columns: minmax(0, 1fr); }
+  .plabel-preview-pane { min-height: clamp(280px, 48dvh, 520px); }
+  .plabel-side { flex: 0 0 auto; }
+  .plabel-hint { margin-top: 0; }
+}
+
+@media (max-width: 520px) {
+  .plabel-preview-pane { min-height: clamp(240px, 42dvh, 420px); }
+  .plabel-foot { flex-direction: column; align-items: stretch; gap: 8px; }
+  .plabel-foot > button { width: 100%; }
+  .plabel-foot > button:first-child { margin-right: 0; }
+}
+
+@media (max-height: 600px) {
+  .plabel-backdrop {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .plabel-dialog {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .plabel-preview-pane { min-height: 220px; }
 }
 
 /* ── US-F36-07: collection method + date row (Ready-to-Ship step) ──────────────

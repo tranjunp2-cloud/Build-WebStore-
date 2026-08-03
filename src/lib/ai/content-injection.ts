@@ -212,8 +212,14 @@ export function buildBlockFromLibrary(
     // data. For non-English sites, returning null tells the structure-enforcer to
     // skip injection — GPT should provide these blocks in the target language.
     // Structural blocks (nav, footer, hero, contact, about, cta) are still injected.
-    const isNonEnglish = Boolean(ctx.language && ctx.language.split('-')[0] !== 'en')
-    if (isNonEnglish && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+    const language = ctx.language?.split('-')[0]
+    const isNonEnglish = Boolean(language && language !== 'en')
+    const hasLocalizedServiceLibrary = blockType === 'service-cards' && language === 'ms'
+    if (
+        isNonEnglish
+        && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)
+        && !hasLocalizedServiceLibrary
+    ) {
         return null
     }
 
@@ -685,6 +691,69 @@ const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set([
     'pricing',
 ])
 
+function normalizeServiceTitle(value: unknown): string {
+    return typeof value === 'string'
+        ? value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+        : ''
+}
+
+function isSameServiceTitle(left: string, right: string): boolean {
+    if (left === right) return true
+    const shorterLength = Math.min(left.length, right.length)
+    return shorterLength >= 4 && (left.includes(right) || right.includes(left))
+}
+
+/**
+ * Fill localized service cards from the user's comma-separated products.
+ * Product names and business copy are already in the requested language, so
+ * this path can repair thin AI output without leaking English library content.
+ */
+function padLocalizedServiceCards(
+    existing: readonly unknown[],
+    minCount: number,
+    ctx: InjectionContext,
+): unknown[] {
+    const result = [...existing]
+    const products = (ctx.userBiz?.products ?? [])
+        .map((product) => product.trim())
+        .filter(Boolean)
+    if (products.length === 0) return result
+
+    const existingTitles = result
+        .filter((item): item is Block => typeof item === 'object' && item !== null)
+        .map((item) => normalizeServiceTitle(item.title))
+        .filter(Boolean)
+    const existingIcons = result
+        .filter((item): item is Block => typeof item === 'object' && item !== null)
+        .map((item) => typeof item.icon === 'string' ? item.icon : '')
+        .filter(Boolean)
+    const description = ctx.userBiz?.description?.trim()
+        || ctx.userBiz?.tagline?.trim()
+
+    for (const product of products) {
+        if (result.length >= minCount) break
+        const productTitle = normalizeServiceTitle(product)
+        if (
+            !productTitle
+            || existingTitles.some((title) => isSameServiceTitle(title, productTitle))
+        ) {
+            continue
+        }
+
+        const icon = existingIcons.length > 0
+            ? existingIcons[result.length % existingIcons.length]
+            : 'Star'
+        result.push({
+            title: product,
+            description: description || product,
+            icon,
+        })
+        existingTitles.push(productTitle)
+    }
+
+    return result
+}
+
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
@@ -698,10 +767,21 @@ export function padItems(
     // GPT has already generated items in the target language; adding English
     // library items would produce mixed-language output (e.g. 3 Vietnamese
     // FAQ + 2 English FAQ). Return GPT's items as-is even if below minCount.
+    const language = ctx.language?.split('-')[0]
+    const hasLocalizedServiceLibrary = blockType === 'service-cards' && language === 'ms'
     if (
-        ctx.language
-        && ctx.language.split('-')[0] !== 'en'
+        blockType === 'service-cards'
+        && language
+        && language !== 'en'
+        && !hasLocalizedServiceLibrary
+    ) {
+        return padLocalizedServiceCards(existing, minCount, ctx)
+    }
+    if (
+        language
+        && language !== 'en'
         && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)
+        && !hasLocalizedServiceLibrary
     ) {
         return [...existing]
     }
@@ -737,7 +817,13 @@ export function padItems(
     } else {
         // Generic padding — inject from library block, dedup by `title` field
         // (features, service-cards have title). Avoids "Quality Service" appearing twice.
-        const libBlock = buildBlockFromLibrary(blockType, category, ctx)
+        // User products are already in `existing`. Build the padding pool from
+        // curated category services so it can contribute a distinct fourth
+        // card instead of returning the same user-derived cards again.
+        const libraryCtx = blockType === 'service-cards' && ctx.userBiz
+            ? { ...ctx, userBiz: { ...ctx.userBiz, products: undefined } }
+            : ctx
+        const libBlock = buildBlockFromLibrary(blockType, category, libraryCtx)
         if (libBlock) {
             const field = ITEM_FIELD_BY_BLOCK[blockType]
             if (field && Array.isArray(libBlock[field])) {

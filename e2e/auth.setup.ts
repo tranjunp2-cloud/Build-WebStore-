@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { assertAllowedAuthenticatedE2ETarget } from './helpers/authenticated-target'
 
 const AUTH_FILE = './e2e/.auth/user.json'
 
@@ -13,7 +14,9 @@ const AUTH_FILE = './e2e/.auth/user.json'
  * TC-F02.19: Login happy path
  * TC-F02.23: OTP verification
  */
-setup('authenticate', async ({ page }) => {
+setup('authenticate', async ({ page }, testInfo) => {
+    assertAllowedAuthenticatedE2ETarget(testInfo.project.use.baseURL)
+
     const email = process.env.TEST_EMAIL
     const password = process.env.TEST_PASSWORD
     if (!email || !password) {
