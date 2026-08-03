@@ -177,6 +177,81 @@ async function canvasRegionMetrics(page: Page, region: NormalizedRegion) {
 }
 
 test.describe('GH-1684 shipping label preview regression', () => {
+  test('[GH-1652] order progress and fulfillment remain contained at QA viewports', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'shipping-label-regression',
+      'One deterministic Chromium run covers the responsive order-detail geometry.',
+    )
+    await installFixtures(page)
+
+    await page.goto(ORDER_PATH, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByText(orderFixture.orderNumber, { exact: true })).toBeVisible()
+
+    const progressCard = page.locator('.od-progress')
+    const progressViewport = progressCard.locator(
+      '[data-order-progress-mode="embedded"] > div',
+    )
+    const fulfillment = page.locator('.od-fulfil')
+    const trackRow = fulfillment.locator('.st-row').first()
+
+    await expect(progressCard).toBeVisible()
+    await expect(progressCard.locator('[data-order-progress-mode="embedded"]')).toBeVisible()
+    await expect(progressCard.locator(':scope > .od-cap')).toHaveCount(1)
+    await expect(fulfillment).toBeVisible()
+    await expect(trackRow).toBeVisible()
+    expect(await trackRow.locator('.st-field').count()).toBeGreaterThan(0)
+
+    for (const width of [374, 390, 481]) {
+      await page.setViewportSize({ width, height: 900 })
+
+      const geometry = await progressViewport.evaluate((viewport) => ({
+        clientWidth: viewport.clientWidth,
+        scrollWidth: viewport.scrollWidth,
+        documentOverflow:
+          document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      }))
+      expect(geometry.scrollWidth).toBeGreaterThanOrEqual(geometry.clientWidth)
+      expect(geometry.documentOverflow).toBe(false)
+    }
+
+    for (const width of [1167, 1200, 1270]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(trackRow).toBeVisible()
+
+      const geometry = await fulfillment.evaluate((container) => {
+        const containerBox = container.getBoundingClientRect()
+        const elements = Array.from(
+          container.querySelectorAll('.st-row, .st-field, .st-actions, .copyfield'),
+        )
+        const overflow = elements
+          .map((element) => {
+            const box = element.getBoundingClientRect()
+            return {
+              className: element.className,
+              left: box.left,
+              right: box.right,
+            }
+          })
+          .filter(({ left, right }) => (
+            left < containerBox.left - 1 || right > containerBox.right + 1
+          ))
+
+        return {
+          checkedElements: elements.length,
+          documentOverflow:
+            document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          overflow,
+        }
+      })
+
+      expect(geometry.checkedElements).toBeGreaterThan(0)
+      expect(geometry.documentOverflow).toBe(false)
+      expect(geometry.overflow).toEqual([])
+    }
+  })
+
   test('[TC-F36.OD.051/052] readable PDF and non-overlapping modal', async ({
     page,
   }, testInfo) => {

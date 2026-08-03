@@ -130,7 +130,7 @@
 .od-cap svg { width: 13px; height: 13px; }
 
 /* ── Progress stepper ──────────────────────────────────────────────────────── */
-.od-progress { margin-bottom: 0; }
+.od-progress { margin-bottom: 0; min-width: 0; }
 
 .od-stepper {
   display: flex;

@@ -211,7 +211,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
             {/* ── Full-width progress stepper ─────────────────────────── */}
             <section className="od-card od-progress">
                 <div className="od-cap">{d.orderProgress}</div>
-                <OrderProgress status={order.status} />
+                <OrderProgress status={order.status} embedded />
             </section>
 
             {/* ── Two-column grid ─────────────────────────────────────── */}

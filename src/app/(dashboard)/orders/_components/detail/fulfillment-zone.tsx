@@ -14,6 +14,7 @@ import {
   MapPin, BadgeCheck,
 } from 'lucide-react'
 import './fulfillment.css'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { CourierLogo, courierById } from './courier-logo'
 import { useCourierLogos, useEpWallet, invalidateEpShippingInfo } from './use-ep-shipping-info'
@@ -530,9 +531,9 @@ export function FulfillmentZone({
               )}
 
               <div className="st-actions">
-                <button
-                  className="btn btn-primary !text-white"
-                  style={{ backgroundColor: 'rgb(59, 130, 246)' }}
+                <Button
+                  variant="dashPrimary"
+                  className="w-full md:w-auto"
                   onClick={() => setPrintOpen(true)}
                   // PD-F13a: gate on awbNo, not labelUrl — PrintLabelModal never reads
                   // labelUrl, it probes /api/orders/[id]/label?format= off awbNo. A valid
@@ -541,7 +542,7 @@ export function FulfillmentZone({
                   disabled={!awbNo}
                 >
                   <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
-                </button>
+                </Button>
 
                 {/* US-F36-07: collection date is chosen before buying the label —
                     once the label exists it is locked (no post-label re-scheduling). */}
@@ -637,15 +638,15 @@ export function FulfillmentZone({
               )}
 
               <div className="st-actions">
-                <button
-                  className="btn btn-primary !text-white"
-                  style={{ backgroundColor: 'rgb(59, 130, 246)' }}
+                <Button
+                  variant="dashPrimary"
+                  className="w-full md:w-auto"
                   onClick={() => setPrintOpen(true)}
                   // PD-F13a: see success-branch comment above — gate on awbNo, not labelUrl.
                   disabled={!awbNo}
                 >
                   <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
-                </button>
+                </Button>
               </div>
             </div>
 

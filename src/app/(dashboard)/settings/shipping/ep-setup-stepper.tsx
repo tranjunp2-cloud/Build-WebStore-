@@ -116,13 +116,16 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
                                         className="absolute left-[calc(50%+12px)] right-[calc(-50%+12px)] top-3 h-px bg-[var(--dash-border)] sm:hidden"
                                     />
                                 )}
-                                <span className={[
-                                    'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-solid text-[11px] font-bold',
+                                <span
+                                    data-step-state={done ? 'done' : current ? 'current' : 'inactive'}
+                                    className={[
+                                    'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
                                     done ? 'bg-[hsl(var(--primary))] text-white'
-                                        : current ? 'border-2 border-[hsl(var(--primary))] bg-[var(--dash-surface-hover)] text-[hsl(var(--primary))]'
-                                            : 'border-2 border-[var(--dash-border)] bg-[var(--dash-surface-hover)] text-[var(--dash-text-muted)]',
-                                ].join(' ')}>
-                                    {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                                        : current ? 'bg-[hsl(var(--primary)/0.14)] text-[hsl(var(--primary))]'
+                                            : 'bg-[var(--dash-surface-hover)] text-[var(--dash-text-muted)]',
+                                    ].join(' ')}
+                                >
+                                    {done ? <Check data-testid="easyparcel-step-complete-icon" className="h-3.5 w-3.5 !text-white" /> : i + 1}
                                 </span>
                                 <span className={['relative z-10 min-w-0 break-words text-[12px] font-medium sm:whitespace-nowrap sm:text-[13px]', current || done ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'].join(' ')}>{label}</span>
                             </div>
@@ -217,15 +220,15 @@ export function EpSetupStepper({ tenantId, initialEpConfig, isSyncing = false, o
 
             {/* Footer nav */}
             <div className="flex flex-col-reverse gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving || isSyncing || isEditingWarehouse} className="h-11 w-full gap-1.5 sm:w-auto">
+                <Button variant="dashSecondary" size="dash" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0 || isSaving || isSyncing || isEditingWarehouse} className="w-full gap-1.5 sm:w-auto">
                     <ChevronLeft className="h-4 w-4" /> {copy.back}
                 </Button>
                 {step < steps.length - 1 ? (
-                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext || isSyncing} className="h-11 w-full gap-1.5 sm:w-auto">
+                    <Button variant="dashPrimary" size="dash" onClick={() => setStep(s => s + 1)} disabled={!canNext || isSyncing} className="w-full gap-1.5 sm:w-auto">
                         {copy.next} <ChevronRight className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving || isSyncing} className="h-11 w-full gap-2 sm:w-auto">
+                    <Button variant="dashPrimary" size="dash" onClick={handleActivate} disabled={!canActivate || isSaving || isSyncing} className="w-full gap-2 sm:w-auto">
                         {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />{copy.activating}</> : <><Check className="h-4 w-4" />{copy.saveAndActivate}</>}
                     </Button>
                 )}
