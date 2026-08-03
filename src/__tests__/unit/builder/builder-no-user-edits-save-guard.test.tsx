@@ -225,6 +225,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         expect(fetchMock).not.toHaveBeenCalled()
         expect(mockPush).toHaveBeenCalledWith('/editor/site-123')
+        await waitFor(() => {
+            expect(useBuilderStore.getState().siteId).toBeNull()
+        })
     })
 
     it('does not call /save when Dashboard is clicked before any manual edits', async () => {
@@ -235,6 +238,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         expect(fetchMock).not.toHaveBeenCalled()
         expect(mockPush).toHaveBeenCalledWith('/dashboard')
+        await waitFor(() => {
+            expect(useBuilderStore.getState().siteId).toBeNull()
+        })
     })
 
     it('calls /save with edited blocks before Publish Website when manual edits exist', async () => {
@@ -357,10 +363,15 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
 
         await waitFor(() => {
-            const state = useBuilderStore.getState()
-            expect(state.status).toBe('error')
-            expect(state.error?.message).toBe('Generation failed while saving pages')
-            expect(state.error?.message).not.toContain('Connection lost')
+            expect(useBuilderStore.getState().status).toBe('error')
         })
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+
+        const state = useBuilderStore.getState()
+        expect(state.status).toBe('error')
+        expect(state.error?.message).toBe('Generation failed while saving pages')
+        expect(state.error?.message).not.toContain('Connection lost')
     })
 })

@@ -72,8 +72,15 @@ vi.mock('@/components/editor/PreviewFrame', () => ({
     PreviewFrame: () => <div data-testid="preview-frame">Preview</div>,
 }))
 
+const settingsPanelHarness = vi.hoisted(() => ({
+    latestProps: null as { isContactSavePending?: boolean } | null,
+}))
+
 vi.mock('@/components/editor/SettingsPanel', () => ({
-    SettingsPanel: () => <div data-testid="settings-panel">Settings</div>,
+    SettingsPanel: (props: { isContactSavePending?: boolean }) => {
+        settingsPanelHarness.latestProps = props
+        return <div data-testid="settings-panel">Settings</div>
+    },
 }))
 
 vi.mock('@/components/editor/EditorToolsSheet', () => ({
@@ -103,6 +110,7 @@ function baseProps(overrides: Partial<CompactEditorLayoutProps>): CompactEditorL
         theme: { primaryColor: '#000000' } as CompactEditorLayoutProps['theme'],
         site: null,
         siteName: 'Test Site',
+        isContactSavePending: false,
         headerBlock: null,
         footerBlock: null,
         pages: [],
@@ -199,6 +207,28 @@ describe('TC-GH1557-07-02: regular block tap still opens the generic block-setti
         expect(screen.getByTestId('settings-panel')).toBeInTheDocument()
         expect(screen.getByText('hero')).toBeInTheDocument()
         expect(screen.getByText('Delete Block')).toBeInTheDocument()
+    })
+
+    it('[TC-F37-01-26] forwards the parent contact-save state through the compact layout', () => {
+        // Arrange
+        const defaultFixture = baseProps({
+            isMobileSettingsOpen: true,
+            currentBlock: { blockType: 'hero', headline: 'Hero' } as never,
+            selectedBlock: 0,
+        })
+
+        // Act
+        const { rerender } = render(<CompactEditorLayout {...defaultFixture} />)
+
+        // Assert
+        expect(defaultFixture.isContactSavePending).toBe(false)
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(false)
+
+        // Act
+        rerender(<CompactEditorLayout {...defaultFixture} isContactSavePending />)
+
+        // Assert
+        expect(settingsPanelHarness.latestProps?.isContactSavePending).toBe(true)
     })
 })
 

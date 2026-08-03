@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { MY_STATES } from '@/lib/shipping/constants'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '@/lib/seo/local-business-constants'
+import {
+    BUSINESS_CATEGORY_OPTIONS,
+    PRICE_RANGE_OPTIONS,
+    DAY_OF_WEEK_OPTIONS,
+    OPENING_HOURS_TIME_REGEX,
+    isValidBusinessPhone,
+} from '@/lib/seo/local-business-constants'
 
 const nullableString = z.string().nullable().optional()
 
@@ -14,13 +20,10 @@ const sanitizedString = z.string()
     .transform(v => stripHtml(v).trim())
     .nullable().optional()
 
-/** BUG-F05-045: Validate phone format — allows +, digits, spaces, hyphens, parens, dots */
+/** Validate optional business phone using the same rule as the Editor. */
 const phoneString = z.string()
+    .refine(isValidBusinessPhone, 'Invalid phone number format')
     .transform(v => stripHtml(v).trim())
-    .pipe(
-        z.string().regex(/^\+?[\d\s\-().]*$/, 'Invalid phone number format')
-            .or(z.literal(''))
-    )
     .nullable().optional()
 
 /** Validate URL format — only allow https:// or http:// */
