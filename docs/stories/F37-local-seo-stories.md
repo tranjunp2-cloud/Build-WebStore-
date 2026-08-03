@@ -58,14 +58,14 @@ THEN save is rejected with validation feedback
 
 ## US-F37-02: Schema-Rich Local Markup
 
-**Wave 4** | **P0** | **M** | **Status:** Ready
+**Wave 4** | **P0** | **M** | **Status:** In progress — Phase 00–02 built/tested; Phase 03 acceptance pending
 
 ### Story
 
 ```
 As a   SME seller
-I want hours, category, map coordinates, price range, and FAQ content to power JSON-LD
-So that search and AI systems receive complete LocalBusiness and FAQPage markup and I earn Schema points
+I want hours, business category, a compatible schema subtype, map coordinates, and price range to power JSON-LD
+So that search and AI systems receive complete LocalBusiness and Organization markup and I earn Schema points
 ```
 
 ### Acceptance Criteria
@@ -73,19 +73,19 @@ So that search and AI systems receive complete LocalBusiness and FAQPage markup 
 #### AC-1: Emit complete LocalBusiness markup
 
 ```gherkin
-GIVEN name and address, at least one open-hours row, a specific category, valid latitude and longitude, and priceRange
+GIVEN name and address, business category, a compatible specific schema subtype, at least one open-hours row, valid latitude and longitude, and priceRange
 WHEN the storefront homepage is rendered
-THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and a non-generic @type
+THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and the selected @type
   AND the corresponding Schema points are earned
 ```
 
-#### AC-2: Emit FAQPage markup
+#### AC-2: Omit unusable opening hours
 
 ```gherkin
-GIVEN a page with FAQ block items
-WHEN that page is rendered
-THEN FAQPage JSON-LD is present
-  AND FAQ Schema points are earned
+GIVEN all opening-hours rows are closed or incomplete
+WHEN score calculation and JSON-LD emission run
+THEN openingHoursSpecification is omitted
+  AND opening-hours points are 0 while other valid Schema points remain earned
 ```
 
 #### AC-3: Omit incomplete coordinates safely
@@ -97,11 +97,24 @@ THEN geo is omitted from JSON-LD
   AND Geo points are 0 without a crash
 ```
 
+#### AC-4: Reject an incompatible subtype
+
+```gherkin
+GIVEN a schema subtype is incompatible with the selected business category
+WHEN the seller saves
+THEN the save is rejected and the previous valid pair remains
+  AND the invalid @type is not emitted
+```
+
 ### Definition of Done
 
-- [ ] FR-04 through FR-12 emit only valid, safely serialized tenant-storefront schema.
-- [ ] The score maps every Schema criterion in PRD section 5 point-for-point.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [x] FR-04 through FR-11 emit only valid, safely serialized tenant-storefront schema.
+- [x] Schema score maps the eight approved criteria to exactly 35 points; FAQ is not scored.
+- [x] Category/subtype persistence, filtering, atomic save, server validation, and generic fallback match the `@dominvopc`-approved versioned mapping.
+- [x] TC-F37-02-29..47 automated coverage passes locally: 10 focused files/219 tests pass; 3 DB-backed schema-drift checks are environment-blocked because PostgreSQL is not running.
+- [x] TC-F37-02-45 automation discovers the authenticated account sole site, derives the canonical storefront URL from the tenant route/hostname, and asserts emitted schema URLs are non-empty and equal that canonical URL; it uses the existing email, password, and OTP credentials and does not require `E2E_SITE_ID`.
+- [x] TC-F37-02-47 covers rejected settings-save rollback, newer-revision preservation, and late cross-site failure isolation in `publish-flow.test.tsx` (21/21 local).
+- [ ] Execute TC-F37-02-45 against the owned staging fixture and capture manual Google Rich Results evidence. PR #1708 is not a dependency or blocker; reconcile it only if it lands first.
 
 ---
 
