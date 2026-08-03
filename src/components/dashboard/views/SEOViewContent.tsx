@@ -119,7 +119,7 @@ export function SEOViewContent({
                                 className="w-fit"
                             >
                                 <Sparkles className="w-4 h-4 shrink-0" aria-hidden />
-                                {seo.fixAllButton || 'AI Fix All Issues'}
+                                {seo.fixAllButton || 'AI Fix Issues'}
                             </Button>
                         </div>
                     </div>

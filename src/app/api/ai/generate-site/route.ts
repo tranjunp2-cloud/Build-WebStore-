@@ -13,7 +13,16 @@ import {
 } from '@/lib/ai/post-ai-swap'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import {
+    planImageNeeds,
+    planF38FinalPageImageNeeds,
+    dedupeF38FinalPageMediaIds,
+    fulfillImageNeeds,
+    cleanupNonNumericImageFields,
+    stripOrphanMediaRefs,
+    computePoolBucketSizes,
+    computePoolTargetsForNeeds,
+} from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -48,9 +57,26 @@ import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
-import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import {
+    assignResolvedSampleProductImages,
+    generateSampleProducts,
+    prepareSampleProducts,
+    type GeneratedProductsResult,
+    type PreparedSampleProductsResult,
+} from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
-import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
+import {
+    assignResolvedBlogThumbnails,
+    seedBlogPosts,
+    prepareBlogPosts,
+    persistBlogPosts,
+    type PreparedBlogPost,
+} from '@/lib/ai/seed-blog-posts'
+import type {
+    F38ImageDemand,
+    ReservoirKind,
+    ResolvedImage,
+} from '@/lib/ai/image-sourcing/contracts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
@@ -367,7 +393,8 @@ export async function POST(req: NextRequest) {
         //
         // Legacy: DALL-E hero-only ($0.04/gen). Enable via ENABLE_DALLE_HERO=true.
         // Kept for research/rollback. Plan 260414-1400-ai-gen-unsplash-pipeline.
-        const ENABLE_DALLE_HERO = process.env.ENABLE_DALLE_HERO === 'true'
+        const F38_IMAGE_PIPELINE = process.env.F38_IMAGE_PIPELINE === 'true'
+        const ENABLE_DALLE_HERO = process.env.ENABLE_DALLE_HERO === 'true' && !F38_IMAGE_PIPELINE
         const heroImagePromise = ENABLE_DALLE_HERO
             ? generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
             : Promise.resolve(null)
@@ -503,7 +530,7 @@ export async function POST(req: NextRequest) {
             // NOTE: field keeps the historical name `englishKeywords` — it now carries
             // the RAW user-language keywords (see plan 260702-1607-GH-1185).
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[]; buildCtx: BuildPoolCtx | null }
-            const imagePoolPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO
+            const imagePoolPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO && !F38_IMAGE_PIPELINE
                 ? (async (): Promise<_PoolResult> => {
                     // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
                     // LLM for 2-4 business-specific visual terms (SAME language as
@@ -611,7 +638,7 @@ export async function POST(req: NextRequest) {
             // rollback). When off, resolves an empty Map immediately so the
             // downstream pool path is byte-identical to pre-Phase-06 behavior.
             const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
-            const preUploadedPoolPromise: Promise<Map<string, number>> = trackPhase('pool_preupload', () => GEN_POOL_PREUPLOAD
+            const preUploadedPoolPromise: Promise<Map<string, number>> = trackPhase('pool_preupload', () => GEN_POOL_PREUPLOAD && !F38_IMAGE_PIPELINE
                 ? imagePoolPromise
                     .then(({ pool }) =>
                         pool
@@ -634,20 +661,28 @@ export async function POST(req: NextRequest) {
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = Promise.race([
-                imagePoolPromise.then(() => undefined),
-                new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-            ]).then(() =>
-                trackPhase('products_prepare', () =>
-                    generateSampleProducts(
-                        businessInfo,
-                        effectiveGenerationLocale,
-                        String(resolvedTenantId),
-                        payload,
-                        undefined,
-                    ),
-                ),
-            )
+            const f38ProductPreparationPromise: Promise<PreparedSampleProductsResult> | null =
+                F38_IMAGE_PIPELINE
+                    ? trackPhase('products_prepare', () =>
+                        prepareSampleProducts(businessInfo, effectiveGenerationLocale))
+                    : null
+            const sampleProductsPromise: Promise<GeneratedProductsResult> | null =
+                F38_IMAGE_PIPELINE
+                    ? null
+                    : Promise.race([
+                        imagePoolPromise.then(() => undefined),
+                        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+                    ]).then(() =>
+                        trackPhase('products_prepare', () =>
+                            generateSampleProducts(
+                                businessInfo,
+                                effectiveGenerationLocale,
+                                String(resolvedTenantId),
+                                payload,
+                                undefined,
+                            ),
+                        ),
+                    )
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('site_ai', () =>
@@ -673,7 +708,7 @@ export async function POST(req: NextRequest) {
             // Thumbnail search is intentionally independent from sample-product
             // completion so a slow product upload cannot hold the blog tail.
             // Never rejects: null = prep failed → synchronous fallback seeding.
-            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+            let blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
                 payload,
                 tenantId: resolvedTenantId,
                 category: normalizeComposerCategory(businessInfo.industry),
@@ -682,8 +717,12 @@ export async function POST(req: NextRequest) {
                 industry: businessInfo.industry,
                 seed: computeGenSeed(businessInfo),
                 locale: effectiveGenerationLocale,
+                ...(F38_IMAGE_PIPELINE ? { skipImages: true } : {}),
             })
                 .catch((): null => null)
+            let f38SampleProductsResult: GeneratedProductsResult | null = null
+            let f38PreparedProducts: PreparedSampleProductsResult | null = null
+            let f38PreparedBlogs: PreparedBlogPost[] | null = null
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -750,14 +789,26 @@ export async function POST(req: NextRequest) {
 
         let blockImageStats = { succeeded: 0, failed: 0 }
         const fallbackHeroMediaIds: number[] = []
+        let f38ImageLibraryMapping = {
+            hero: [] as number[],
+            gallery: [] as number[],
+            about: null as number | null,
+            team: [] as number[],
+            features: [] as number[],
+        }
         if (!ENABLE_DALLE_HERO) {
             try {
                 const allBuckets = collectAllBlockBuckets()
                 // Flatten image needs across homepage + every subpage so a
                 // single fulfillImageNeeds call covers the whole site.
-                const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
+                const needs = F38_IMAGE_PIPELINE
+                    ? []
+                    : allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 const aiPagesForMedia = (result as { pages?: unknown[] }).pages
-                if (!Array.isArray(aiPagesForMedia) || aiPagesForMedia.length === 0) {
+                if (
+                    !F38_IMAGE_PIPELINE
+                    && (!Array.isArray(aiPagesForMedia) || aiPagesForMedia.length === 0)
+                ) {
                     // Single-page AI responses are expanded into Home + three
                     // subpages later by buildGeneratedPages. Reserve their hero
                     // photos in this same batch so cloning the base hero does not
@@ -776,7 +827,20 @@ export async function POST(req: NextRequest) {
                         }
                     }
                 }
-                if (needs.length > 0) {
+                if (F38_IMAGE_PIPELINE) {
+                    f38PreparedProducts = await f38ProductPreparationPromise!.catch(() => ({
+                        products: [],
+                        category: _presetCategoryForPool,
+                    }))
+                    f38PreparedBlogs = await blogPrepPromise.catch(() => null)
+
+                    // Preserve generated copy even when every image source is
+                    // unavailable. F38 image assignment is a non-fatal phase.
+                    f38SampleProductsResult = assignResolvedSampleProductImages(
+                        f38PreparedProducts,
+                        [],
+                    )
+                } else if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
 
                     // O1: await pre-built pool (GH-1190) — typically 0ms wait since
@@ -1131,6 +1195,161 @@ export async function POST(req: NextRequest) {
             result.localeStructuralStrings,
         )
 
+        if (F38_IMAGE_PIPELINE) {
+            try {
+                const preparedProducts = f38PreparedProducts
+                    ?? await f38ProductPreparationPromise!.catch(() => ({
+                        products: [],
+                        category: _presetCategoryForPool,
+                    }))
+                const preparedBlogs = f38PreparedBlogs
+                    ?? await blogPrepPromise.catch(() => null)
+                f38PreparedProducts = preparedProducts
+                f38PreparedBlogs = preparedBlogs
+                f38SampleProductsResult = assignResolvedSampleProductImages(
+                    preparedProducts,
+                    [],
+                )
+
+                const pageNeeds = planF38FinalPageImageNeeds(
+                    pageDefinitions as Array<{ layout?: unknown }>,
+                )
+                const counts: Record<ReservoirKind, number> = {
+                    landscape: 7,
+                    square: 6,
+                    people: 4,
+                    products: preparedProducts.products.length,
+                    blogs: preparedBlogs?.length ?? 0,
+                }
+                for (const need of pageNeeds) {
+                    counts[need.reservoir] += need.count
+                }
+
+                const siteSubject = _parsedProductsForPool[0] || _presetCategoryForPool
+                const subjects: Record<ReservoirKind, string> = {
+                    landscape: siteSubject,
+                    square: siteSubject,
+                    people: 'professional portrait',
+                    products: preparedProducts.products[0]?.imageKeyword || siteSubject,
+                    blogs: preparedBlogs?.[0]?.imageKeyword || siteSubject,
+                }
+                const demands: F38ImageDemand[] = ([
+                    'landscape',
+                    'square',
+                    'people',
+                    'products',
+                    'blogs',
+                ] as const)
+                    .filter((kind) => counts[kind] > 0)
+                    .map((kind) => ({
+                        kind,
+                        count: counts[kind],
+                        subject: subjects[kind],
+                        category: kind === 'people' ? 'people' : _presetCategoryForPool,
+                        aiEligible: false,
+                    }))
+
+                const { createF38RuntimeResolver } = await import('@/lib/ai/image-sourcing')
+                const resolver = createF38RuntimeResolver(payload, {
+                    tenantId: String(resolvedTenantId),
+                    businessName: businessInfo.businessName,
+                    category: _presetCategoryForPool,
+                    products: _parsedProductsForPool.length > 0
+                        ? _parsedProductsForPool
+                        : undefined,
+                })
+                const resolution = await trackPhase('media_f38_resolve', () =>
+                    resolver.resolveF38ImageDemand({ demands }))
+                const reservoirIds = (kind: ReservoirKind): number[] =>
+                    resolution.reservoirs[kind]
+                        .map((image: ResolvedImage) => image.mediaId)
+                        .map((id) => typeof id === 'number' ? id : Number(id))
+                        .filter((id) => Number.isSafeInteger(id) && id > 0)
+                const offsets: Record<ReservoirKind, number> = {
+                    landscape: 0,
+                    square: 0,
+                    people: 0,
+                    products: 0,
+                    blogs: 0,
+                }
+                const claimedMediaIds = new Set<number>()
+                const takeUnique = (kind: ReservoirKind, count: number): number[] => {
+                    const ids = reservoirIds(kind)
+                    const selected: number[] = []
+                    while (offsets[kind] < ids.length && selected.length < count) {
+                        const id = ids[offsets[kind]++]!
+                        if (claimedMediaIds.has(id)) continue
+                        claimedMediaIds.add(id)
+                        selected.push(id)
+                    }
+                    return selected
+                }
+
+                // Final page order is authoritative. Every generated block/page
+                // consumes a distinct Media ID before downstream entity/library slots.
+                for (const need of pageNeeds) {
+                    const ids = takeUnique(need.reservoir, need.count)
+                    need.assign(ids)
+                    blockImageStats.succeeded += ids.length
+                    blockImageStats.failed += Math.max(0, need.count - ids.length)
+                }
+                const pageDedupe = dedupeF38FinalPageMediaIds(
+                    pageDefinitions as Array<{ layout?: unknown }>,
+                )
+                if (pageDedupe.removed > 0) {
+                    blockImageStats.succeeded = Math.max(
+                        0,
+                        blockImageStats.succeeded - pageDedupe.removed,
+                    )
+                    blockImageStats.failed += pageDedupe.removed
+                }
+
+                const productIds = takeUnique('products', preparedProducts.products.length)
+                f38SampleProductsResult = assignResolvedSampleProductImages(
+                    preparedProducts,
+                    productIds,
+                )
+                if (preparedBlogs) {
+                    const blogIds = takeUnique('blogs', preparedBlogs.length)
+                    blogPrepPromise = Promise.resolve(assignResolvedBlogThumbnails(
+                        preparedBlogs,
+                        blogIds,
+                    ))
+                }
+
+                const hero = takeUnique('landscape', 3)
+                const gallery = takeUnique('square', 6)
+                const about = takeUnique('landscape', 1)[0] ?? null
+                const team = takeUnique('people', 4)
+                const features = takeUnique('landscape', 3)
+                f38ImageLibraryMapping = { hero, gallery, about, team, features }
+
+                const finalBlocks = pageDefinitions.flatMap((page) =>
+                    Array.isArray(page.layout)
+                        ? page.layout as Record<string, unknown>[]
+                        : [],
+                )
+                const { stripped, checked } = await stripOrphanMediaRefs(
+                    finalBlocks,
+                    payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
+                )
+                if (stripped > 0) {
+                    blockImageStats = {
+                        succeeded: Math.max(0, blockImageStats.succeeded - stripped),
+                        failed: blockImageStats.failed + stripped,
+                    }
+                    console.warn(
+                        `[generate-site] Stripped ${stripped}/${checked} orphan F38 media refs`,
+                    )
+                }
+            } catch (f38Error) {
+                console.warn(
+                    '[generate-site] F38 final allocation failed (non-fatal):',
+                    f38Error instanceof Error ? f38Error.message : f38Error,
+                )
+            }
+        }
+
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
@@ -1451,7 +1670,12 @@ export async function POST(req: NextRequest) {
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
         try {
-            const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
+            const { products: sampleProducts, stats: imgStats } = F38_IMAGE_PIPELINE
+                ? (f38SampleProductsResult ?? {
+                    products: [],
+                    stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+                })
+                : await sampleProductsPromise!
             productImageStats = imgStats
             // Best-effort: resolve/create a category for sample products now that site.id is available.
             // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
@@ -1660,7 +1884,7 @@ export async function POST(req: NextRequest) {
                                 user.id,
                             )
                         }
-                        if (prepared === null) {
+                        if (prepared === null && !F38_IMAGE_PIPELINE) {
                             return seedBlogPosts(
                                 payload,
                                 resolvedTenantId,
@@ -1702,15 +1926,31 @@ export async function POST(req: NextRequest) {
         // throws; until rows land, blocks fall back to static CDN images.
         if (resolvedTenantId) {
             const _seedCategory = safeSiteType
-            const _imglibSeedTask = () => {
+            const _imglibSeedTask = (): Promise<void> => {
                 const t = Date.now()
                 console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
-                return imagePoolPromise.then(({ englishKeywords }) => {
-                    const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
-                    return import('@/lib/images/image-library-seeder')
-                        .then(({ seedImageLibraryForSite }) =>
-                            seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory, undefined, _productTerms),
+                return imagePoolPromise.then(async ({ englishKeywords }) => {
+                    if (F38_IMAGE_PIPELINE) {
+                        const { persistF38ImageLibraryAssignments } =
+                            await import('@/lib/images/image-library-seeder')
+                        await persistF38ImageLibraryAssignments(
+                            payload,
+                            site.id as string | number,
+                            f38ImageLibraryMapping,
                         )
+                        return
+                    }
+                    const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
+                    const { seedImageLibraryForSite } =
+                        await import('@/lib/images/image-library-seeder')
+                    await seedImageLibraryForSite(
+                        payload,
+                        resolvedTenantId!,
+                        site.id as string | number,
+                        _seedCategory,
+                        undefined,
+                        _productTerms,
+                    )
                 })
                     .catch(err =>
                         console.error('[generate-site] image-library seed failed',

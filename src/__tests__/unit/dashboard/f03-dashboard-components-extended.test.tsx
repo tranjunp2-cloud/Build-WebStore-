@@ -3,8 +3,8 @@
  * Coverage Map (QA Doc Traceability):
  *   TC-F03.01  → AISmartInsights renders insight banner for traffic changes
  *   TC-F03.02  → AISmartInsights returns null when no data
- *   TC-F03.03  → DashboardGreeting renders user name
- *   TC-F03.04  → DashboardSiteGrid renders site cards
+ *   TC-F03.75  → DashboardGreeting renders user name
+ *   TC-F03.76  → DashboardSiteGrid renders site cards
  *   TC-F03.05  → DashboardSiteGrid shows "View All" when > 6 sites
  *   TC-F03.20  → AnalyticsEmptyState renders empty message
  *   TC-F03.23  → AnalyticsChart renders bar chart with data
@@ -45,7 +45,7 @@ vi.mock('@/i18n', () => ({
                         title: 'SEO Health',
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
-                        fixAll: 'AI Fix All Issues',
+                        fixAll: 'AI Fix Issues',
                     },
                     periods: { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' },
                     customize: 'Customize',
@@ -142,12 +142,12 @@ describe('AISmartInsights', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TC-F03.03 — DashboardGreeting
+// TC-F03.75 — DashboardGreeting
 // ─────────────────────────────────────────────────────────────────────────────
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 
 describe('DashboardGreeting', () => {
-    it('[TC-F03.03] renders dashboard title', () => {
+    it('[TC-F03.75] renders dashboard title', () => {
         render(<DashboardGreeting />)
         expect(screen.getByText(/Welcome to Web Store Dashboard/i)).toBeTruthy()
     })
@@ -159,7 +159,7 @@ describe('DashboardGreeting', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TC-F03.04/05 — DashboardSiteGrid
+// TC-F03.76/05 — DashboardSiteGrid
 // ─────────────────────────────────────────────────────────────────────────────
 import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
 
@@ -172,7 +172,7 @@ describe('DashboardSiteGrid', () => {
         updatedAt: '2026-04-01T00:00:00.000Z',
     })
 
-    it('[TC-F03.04] renders site cards with names', () => {
+    it('[TC-F03.76] renders site cards with names', () => {
         const sites = [makeSite('1', 'My Shop'), makeSite('2', 'Blog Site')]
         render(<DashboardSiteGrid sites={sites} />)
         expect(screen.getByText('My Shop')).toBeTruthy()

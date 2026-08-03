@@ -66,9 +66,10 @@ describe('buildCustomizeRows', () => {
         expect(rows.filter(r => r.visible).map(r => r.id)).toEqual(['glance', 'onboarding', 'traffic', 'seo'])
     })
 
-    it('marks the orders block as soon (Coming Soon), hidden by default', () => {
+    it('[TC-F03.73] keeps the orders block available without Soon, hidden by default', () => {
         const rows = buildCustomizeRows(DEFAULT_DASHBOARD_BLOCKS)
-        expect(rows.find(r => r.id === 'orders')?.soon).toBe(true)
+        expect(rows.find(r => r.id === 'orders')?.soon).toBeUndefined()
         expect(rows.find(r => r.id === 'orders')?.visible).toBe(false)
+        expect(DEFAULT_DASHBOARD_BLOCKS).not.toContain('orders')
     })
 })

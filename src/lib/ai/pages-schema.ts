@@ -12,6 +12,8 @@
  * string URLs or placeholder objects which Payload upload fields reject.
  */
 
+import { normalizeComparisonValues } from '@/blocks/feature-comparison/config'
+
 /** Block types that have a persistence schema in Pages.ts layout blocks[]. */
 export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
     // Core blocks
@@ -262,6 +264,17 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
             if (!svc || typeof svc !== 'object') return svc
             if (!svc.title) return { ...svc, title: 'Service' }
             return svc
+        })
+    }
+
+    if (block.blockType === 'feature-comparison' && Array.isArray(block.features)) {
+        const productCount = Array.isArray(block.products) ? block.products.length : 0
+        block.features = (block.features as Array<Record<string, unknown>>).map((feature) => {
+            if (!feature || typeof feature !== 'object') return feature
+            return {
+                ...feature,
+                values: normalizeComparisonValues(feature.values, productCount),
+            }
         })
     }
 

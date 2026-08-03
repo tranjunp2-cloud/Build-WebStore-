@@ -4,7 +4,10 @@ import React, { useEffect, useState } from 'react'
 import { CheckCircle2, PlusCircle, X, XCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import type { ComparisonFeature } from '@/blocks/feature-comparison/config'
+import {
+    normalizeComparisonValues,
+    type ComparisonFeature,
+} from '@/blocks/feature-comparison/config'
 import { useI18n } from '@/i18n'
 
 interface FeatureComparisonFeatureModalProps {
@@ -36,7 +39,7 @@ export default function FeatureComparisonFeatureModal({ open, onOpenChange, feat
         if (!open) return
         const copy: DraftRow[] = features.map(f => ({
             name: f.name,
-            values: Array.from({ length: productNames.length }, (_, i) => f.values[i] ?? false),
+            values: normalizeComparisonValues(f.values, productNames.length),
             _key: nextKey(),
         }))
         setDraft(copy)

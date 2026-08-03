@@ -170,6 +170,7 @@ describe('[TC-F05-15-01..02] CompactEditorLayout — N1 Regression: Global Widge
                 theme={{ primaryColor: '#000000' }}
                 site={null}
                 siteName="Test Site"
+                isContactSavePending={false}
                 headerBlock={null}
                 footerBlock={null}
                 pages={[]}
@@ -257,6 +258,7 @@ describe('[TC-F05-15-01..02] CompactEditorLayout — N1 Regression: Global Widge
                 theme={{ primaryColor: '#000000' }}
                 site={null}
                 siteName="Test Site"
+                isContactSavePending={false}
                 headerBlock={null}
                 footerBlock={null}
                 pages={[]}

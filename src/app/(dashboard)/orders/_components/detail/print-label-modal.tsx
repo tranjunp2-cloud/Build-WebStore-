@@ -1,7 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Printer, Download, X, Info, FileText, Check, Loader2 } from 'lucide-react'
+import React, { useEffect, useState, useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
+import { Printer, Download, X, Info, FileText, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
@@ -26,6 +29,39 @@ interface PrintLabelModalProps {
 type LabelFormat = 'A6' | 'A4'
 type FormatState = { status: 'loading' | 'ok' | 'unavailable'; blobUrl?: string }
 
+function subscribeToDeviceClassification() {
+  // The browser/device classification is stable for the lifetime of the page.
+  return () => undefined
+}
+
+function getDeviceClassificationSnapshot() {
+  const userAgent = navigator.userAgent
+  return (
+    /(Android|iPhone|iPad|iPod|Mobile)/i.test(userAgent) ||
+    // iPadOS 13+ may request the desktop site and identify itself as macOS.
+    (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1)
+  )
+}
+
+function getServerDeviceClassificationSnapshot() {
+  return false
+}
+
+function PdfPreviewLoading() {
+  const { t } = useI18n()
+  return (
+    <div className="plabel-empty" role="status">
+      <Loader2 className="animate-spin" aria-hidden="true" />
+      <span>{t.dashboard.orders.printLabel.loadingLabel}</span>
+    </div>
+  )
+}
+
+const PdfLabelPreview = dynamic(
+  () => import('./pdf-label-preview').then((module) => module.PdfLabelPreview),
+  { ssr: false, loading: PdfPreviewLoading },
+)
+
 /**
  * Print-label modal (design 260707): LEFT = the ACTUAL EasyParcel PDF, embedded large
  * enough to read (never a custom-drawn label); RIGHT = format toggle (A6 thermal /
@@ -33,8 +69,8 @@ type FormatState = { status: 'loading' | 'ok' | 'unavailable'; blobUrl?: string 
  *
  * PDFs come through OUR proxy (GET /api/orders/[id]/label?format=…), never EP's URL
  * directly: EP's renderer can 400 on a format ("Failed to get label"), and the proxy
- * turns that into a clean unavailable-state instead of raw JSON inside the iframe.
- * Both formats are probed on open — a format is only selectable when its PDF loads.
+ * turns that into a clean unavailable-state. Desktop keeps the existing native PDF
+ * embed; mobile/tablet use PDF.js canvas because their iframe PDF viewers are unreliable.
  * Printing opens the PDF in a new tab (per design note); copies are confirmed in the
  * browser/OS print dialog — JS cannot preset them.
  */
@@ -42,38 +78,69 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
   const { t, ti } = useI18n()
   const pl = t.dashboard.orders.printLabel
 
+  const useCanvasPreview = useSyncExternalStore(
+    subscribeToDeviceClassification,
+    getDeviceClassificationSnapshot,
+    getServerDeviceClassificationSnapshot,
+  )
   const [format, setFormat] = useState<LabelFormat>('A6')
   const [markPrinted, setMarkPrinted] = useState(true)
   const [formats, setFormats] = useState<Record<LabelFormat, FormatState>>({
     A6: { status: 'loading' },
     A4: { status: 'loading' },
   })
+  const markPrintedId = React.useId()
+  const formatGroupId = React.useId()
 
   const proxyUrl = (f: LabelFormat) => `/api/orders/${orderId}/label?format=${f}`
 
-  // Probe both formats once per open: fetch → blob (doubles as the preview source).
+  // Keep the deployed desktop behavior: probe both formats and feed its native
+  // PDF viewer a Blob URL. The same probe also prevents a renderer error from
+  // being confused with an unavailable EasyParcel format on mobile/tablet.
   useEffect(() => {
     let cancelled = false
-    const created: string[] = []
-    ;(['A6', 'A4'] as LabelFormat[]).forEach(async (f) => {
+    const controller = new AbortController()
+    const created = new Set<string>()
+
+    ;(['A6', 'A4'] as LabelFormat[]).forEach(async (candidate) => {
       try {
-        const res = await fetch(proxyUrl(f))
-        if (!res.ok || !(res.headers.get('content-type') ?? '').includes('pdf')) throw new Error('unavailable')
-        const blobUrl = URL.createObjectURL(await res.blob())
-        created.push(blobUrl)
-        if (!cancelled) setFormats((s) => ({ ...s, [f]: { status: 'ok', blobUrl } }))
-      } catch {
-        if (!cancelled) {
-          setFormats((s) => ({ ...s, [f]: { status: 'unavailable' } }))
-          // Active format failed → hop to the other one (its own probe decides usability)
-          setFormat((cur) => (cur === f ? (f === 'A6' ? 'A4' : 'A6') : cur))
+        const response = await fetch(proxyUrl(candidate), { signal: controller.signal })
+        if (
+          !response.ok ||
+          !(response.headers.get('content-type') ?? '').includes('pdf')
+        ) {
+          throw new Error('unavailable')
         }
+
+        const blobUrl = URL.createObjectURL(await response.blob())
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+
+        created.add(blobUrl)
+        setFormats((current) => ({
+          ...current,
+          [candidate]: { status: 'ok', blobUrl },
+        }))
+      } catch (error) {
+        if (cancelled || (error instanceof DOMException && error.name === 'AbortError')) return
+        setFormats((current) => ({
+          ...current,
+          [candidate]: { status: 'unavailable' },
+        }))
+        setFormat((current) => (
+          current === candidate ? (candidate === 'A6' ? 'A4' : 'A6') : current
+        ))
       }
     })
+
     return () => {
       cancelled = true
-      created.forEach((u) => URL.revokeObjectURL(u))
+      controller.abort()
+      created.forEach((blobUrl) => URL.revokeObjectURL(blobUrl))
     }
+  // The modal remounts for each order; proxyUrl is intentionally local to this render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
@@ -102,15 +169,21 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
   }
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog plabel-dialog" onClick={e => e.stopPropagation()}>
+    <div className="dialog-backdrop plabel-backdrop" onClick={onClose}>
+      <div
+        className="dialog plabel-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="print-label-dialog-title"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="dialog-h">
           <span className="plabel-h-ic">
             <Printer style={{ width: 19, height: 19 }} />
           </span>
           <div className="dialog-h-tx">
-            <div className="dialog-t">{pl.title}</div>
+            <div className="dialog-t" id="print-label-dialog-title">{pl.title}</div>
             <div className="dialog-sub">{ti(pl.subtitleAwb, { awb: awbNo ?? '—' })} · {formatDesc}</div>
           </div>
           <button className="dialog-x" onClick={onClose} aria-label="Close">
@@ -122,15 +195,25 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
         <div className="plabel-grid">
           <div className="plabel-preview-pane">
             {active.status === 'ok' && active.blobUrl ? (
-              <iframe
-                key={active.blobUrl}
-                // #toolbar=0&navpanes=0&scrollbar=0: hide the browser PDF viewer's
-                // print/download/rotate controls → preview is view-only, funnel printing
-                // through the "Print label" button (which also stamps labelPrintedAt).
-                src={`${active.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                title="Shipping label PDF"
-                className="plabel-pdf-frame"
-              />
+              useCanvasPreview ? (
+                <PdfLabelPreview
+                  key={format}
+                  url={proxyUrl(format)}
+                  loadingLabel={pl.loadingLabel}
+                  errorLabel={pl.previewFailed}
+                  openPdfLabel={pl.openPdf}
+                  previousPageLabel={pl.previousPage}
+                  nextPageLabel={pl.nextPage}
+                  pageLabel={(page, pages) => ti(pl.pageCount, { page, pages })}
+                />
+              ) : (
+                <iframe
+                  key={active.blobUrl}
+                  src={`${active.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                  title="Shipping label PDF"
+                  className="plabel-pdf-frame"
+                />
+              )
             ) : (
               <div className="plabel-empty">
                 {active.status === 'loading' ? (
@@ -151,34 +234,64 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           <div className="plabel-side">
             {/* Label format — a format is only selectable when its PDF actually loads */}
             <div className="plabel-field">
-              <label>{pl.formatLabel}</label>
+              <span
+                id={`${formatGroupId}-label`}
+                className="text-[12px] font-semibold text-[var(--dash-text-muted)]"
+              >
+                {pl.formatLabel}
+              </span>
               {/* delayDuration 0: the default 700ms feels broken on a disabled control —
                   the "why can't I click this" answer must be instant */}
               <TooltipProvider delayDuration={0}>
-                <div className="plabel-format" role="radiogroup" aria-label={pl.formatLabel}>
+                <div
+                  role="radiogroup"
+                  aria-labelledby={`${formatGroupId}-label`}
+                  className="grid h-11 w-full grid-cols-2 items-center justify-center rounded-lg border border-solid border-[var(--dash-border)] bg-[var(--dash-secondary-bg)] p-1 text-muted-foreground"
+                >
                   {(['A6', 'A4'] as LabelFormat[]).map((f) => {
                     const status = formats[f].status
-                    const btn = (
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={format === f}
-                        className={`pf-opt${format === f ? ' on' : ''}`}
-                        // Selectable ONLY once its probe confirmed a real PDF — while loading
-                        // the button stays locked too, so an unverified format can't be picked.
-                        disabled={status !== 'ok'}
-                        onClick={() => setFormat(f)}
+                    const label = f === 'A6' ? pl.formatA6 : pl.formatA4
+                    const option = (
+                      <label
+                        className={`flex h-9 w-full min-w-0 rounded-md ${
+                          status === 'ok' ? 'cursor-pointer' : 'cursor-not-allowed'
+                        }`}
                       >
-                        {status === 'loading'
-                          ? <Loader2 className="animate-spin" style={{ width: 13, height: 13 }} />
-                          : (f === 'A6' ? pl.formatA6 : pl.formatA4)}
-                      </button>
+                        <input
+                          type="radio"
+                          name={`${formatGroupId}-format`}
+                          value={f}
+                          checked={format === f}
+                          onChange={() => setFormat(f)}
+                          aria-label={label}
+                          aria-describedby={
+                            status === 'unavailable'
+                              ? `${formatGroupId}-unavailable`
+                              : undefined
+                          }
+                          // Selectable ONLY once its probe confirmed a real PDF — while loading
+                          // the input stays locked too, so an unverified format can't be picked.
+                          disabled={status !== 'ok'}
+                          className="peer sr-only"
+                        />
+                        <span
+                          className={`inline-flex h-9 w-full min-w-0 items-center justify-center whitespace-nowrap rounded-md px-2 text-[12.5px] font-semibold text-[var(--dash-text-muted)] shadow-none transition-all peer-checked:bg-[hsl(var(--primary))] peer-checked:!text-white peer-checked:shadow-none peer-disabled:opacity-50 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+                            status === 'ok' ? 'hover:text-[var(--dash-text)]' : ''
+                          }`}
+                        >
+                          {status === 'loading'
+                            ? <Loader2 aria-hidden="true" className="h-[13px] w-[13px] animate-spin" />
+                            : label}
+                        </span>
+                      </label>
                     )
-                    // Disabled buttons swallow hover events — the tooltip needs a span wrapper
+
+                    // The non-focusable label wrapper keeps the unavailable tooltip hoverable
+                    // without adding a tab stop outside the native radio-group keyboard model.
                     return status === 'unavailable' ? (
                       <Tooltip key={f}>
                         <TooltipTrigger asChild>
-                          <span className="pf-optwrap" tabIndex={0}>{btn}</span>
+                          {option}
                         </TooltipTrigger>
                         {/* z-[9100]: the tooltip portals to <body>, and its default z-50 sits
                             UNDER the .dialog-backdrop (z-index 9000) — bump it above the modal */}
@@ -187,10 +300,13 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                         </TooltipContent>
                       </Tooltip>
                     ) : (
-                      <React.Fragment key={f}>{btn}</React.Fragment>
+                      <React.Fragment key={f}>{option}</React.Fragment>
                     )
                   })}
                 </div>
+                <span id={`${formatGroupId}-unavailable`} className="sr-only">
+                  {pl.formatUnavailable}
+                </span>
               </TooltipProvider>
             </div>
 
@@ -198,18 +314,23 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
                 own copies field; a stepper here could not drive it (removed 260707). */}
 
             {/* Mark as printed */}
-            <button
-              type="button"
-              className="plabel-check"
-              role="checkbox"
-              aria-checked={markPrinted}
-              onClick={() => setMarkPrinted(v => !v)}
-            >
-              <span className={`pc-box${markPrinted ? ' on' : ''}`}>
-                {markPrinted && <Check />}
-              </span>
-              {pl.markAsPrinted}
-            </button>
+            <div className="flex min-h-11 items-center gap-2.5">
+              <Checkbox
+                id={markPrintedId}
+                checked={markPrinted}
+                onCheckedChange={(checked) => setMarkPrinted(checked === true)}
+                aria-labelledby={`${markPrintedId}-label`}
+                style={{ borderColor: markPrinted ? 'hsl(var(--primary))' : 'var(--dash-border)' }}
+                className="h-[18px] w-[18px] rounded-[4px] border border-solid bg-transparent data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:!text-white"
+              />
+              <label
+                id={`${markPrintedId}-label`}
+                htmlFor={markPrintedId}
+                className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium text-[var(--dash-text)]"
+              >
+                {pl.markAsPrinted}
+              </label>
+            </div>
 
             <div className="plabel-hint">
               <Info style={{ width: 13, height: 13, flexShrink: 0, marginTop: 2 }} />
@@ -220,18 +341,27 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
 
         {/* Footer — Cancel pushed left, Download + Print grouped right (content-width) */}
         <div className="dialog-foot plabel-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{pl.cancel}</button>
-          <button className="btn btn-outline" onClick={handleDownload} disabled={active.status !== 'ok'}>
+          <Button type="button" variant="dashSecondary" className="mr-auto h-10 flex-none px-4" onClick={onClose}>
+            {pl.cancel}
+          </Button>
+          <Button
+            type="button"
+            variant="dashSecondary"
+            className="h-10 flex-none px-4"
+            onClick={handleDownload}
+            disabled={active.status !== 'ok'}
+          >
             <Download style={{ width: 15, height: 15 }} /> {pl.download}
-          </button>
-          <button
-            className="btn btn-primary"
-            style={{ backgroundColor: 'rgb(59, 130, 246)' }}
+          </Button>
+          <Button
+            type="button"
+            variant="dashPrimary"
+            className="h-10 flex-none px-4 !text-white"
             onClick={handlePrint}
             disabled={active.status !== 'ok'}
           >
             <Printer style={{ width: 15, height: 15 }} /> {pl.print}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@
  */
 
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { normalizeComparisonValues } from '@/blocks/feature-comparison/config'
 import { blockRegistry } from '@/blocks/registry'
 
 /** Upload/media field names that must be integer IDs (not objects or URLs) */
@@ -218,6 +219,20 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
                 if (!svc || typeof svc !== 'object') return svc
                 if (!svc.title) return { ...svc, title: 'Service' }
                 return svc
+            })
+        }
+
+        // feature-comparison is a binary matrix, but AI output may contain null
+        // or labels such as "Yes", "No", and "Add-on". Persist a boolean cell
+        // for every product so legacy/malformed rows cannot crash the renderer.
+        if (b.blockType === 'feature-comparison' && Array.isArray(b.features)) {
+            const productCount = Array.isArray(b.products) ? b.products.length : 0
+            b.features = (b.features as Record<string, unknown>[]).map((feature) => {
+                if (!feature || typeof feature !== 'object') return feature
+                return {
+                    ...feature,
+                    values: normalizeComparisonValues(feature.values, productCount),
+                }
             })
         }
 

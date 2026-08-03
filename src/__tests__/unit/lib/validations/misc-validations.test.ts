@@ -3,6 +3,7 @@ import { analyticsTrackSchema } from '@/lib/validations/analytics'
 import { seoAnalyzeSchema, seoFixSchema } from '@/lib/validations/seo'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { generateDescriptionSchema } from '@/lib/validations/products'
+import { isValidBusinessPhone } from '@/lib/seo/local-business-constants'
 
 // ─── TC-F22.02: Analytics tracking validation ─────────────────────────
 // ─── TC-F22.03: GA4 field validation ──────────────────────────────────
@@ -200,43 +201,54 @@ describe('saveSiteSchema', () => {
         expect(result.success).toBe(true)
     })
 
-    // BUG-F05-045: phone format validation
-    describe('contactInfo.phone validation [BUG-F05-045]', () => {
+    describe('[TC-F37-01-26] contactInfo.phone validation', () => {
         const parse = (phone: string | null) =>
             saveSiteSchema.safeParse({ contactInfo: { phone } })
 
-        it('accepts valid international phone +60 12-345-6789', () => {
-            expect(parse('+60 12-345-6789').success).toBe(true)
+        it.each([
+            ['+60 12-345-6789', true],
+            ['0123456789', true],
+            ['+84 (28) 3823.4567', true],
+            ['', true],
+            ['   ', true],
+            [null, true],
+            ['60+12', false],
+            ['++60 12', false],
+            ['abc', false],
+            ['12-34 abc', false],
+            ['+ ()-.', false],
+            ['+60\t12', false],
+            ['+60\n12', false],
+            ['<script>alert(1)</script>', false],
+            ['<b>123</b>', false],
+            ['12<script></script>34', false],
+            ['<img src=x>', false],
+            ['<script>+60</script>', false],
+        ] as const)('validates %j consistently in the shared predicate and save schema', (phone, expected) => {
+            // Arrange
+            const input = phone
+
+            // Act
+            const predicateResult = isValidBusinessPhone(input)
+            const schemaResult = parse(input)
+
+            // Assert
+            expect(predicateResult).toBe(expected)
+            expect(schemaResult.success).toBe(expected)
         })
 
-        it('accepts digits only 0123456789', () => {
-            expect(parse('0123456789').success).toBe(true)
-        })
+        it('trims an accepted phone before returning parsed data', () => {
+            // Arrange
+            const phone = '  +60 12-345-6789  '
 
-        it('accepts phone with parens and dots +84 (28) 3823.4567', () => {
-            expect(parse('+84 (28) 3823.4567').success).toBe(true)
-        })
+            // Act
+            const result = parse(phone)
 
-        it('accepts empty string', () => {
-            expect(parse('').success).toBe(true)
-        })
-
-        it('accepts null', () => {
-            expect(parse(null).success).toBe(true)
-        })
-
-        it('rejects alphabetic characters "abc"', () => {
-            expect(parse('abc').success).toBe(false)
-        })
-
-        it('rejects mixed alphanumeric "12-34 abc"', () => {
-            expect(parse('12-34 abc').success).toBe(false)
-        })
-
-        it('strips HTML tags from phone input', () => {
-            const result = parse('<script>alert(1)</script>')
-            // After stripping HTML → "alert(1)" which contains letters → rejected
-            expect(result.success).toBe(false)
+            // Assert
+            expect(result.success).toBe(true)
+            if (result.success) {
+                expect(result.data.contactInfo?.phone).toBe('+60 12-345-6789')
+            }
         })
     })
 })

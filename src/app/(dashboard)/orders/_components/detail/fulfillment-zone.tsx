@@ -531,7 +531,7 @@ export function FulfillmentZone({
 
               <div className="st-actions">
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary !text-white"
                   style={{ backgroundColor: 'rgb(59, 130, 246)' }}
                   onClick={() => setPrintOpen(true)}
                   // PD-F13a: gate on awbNo, not labelUrl — PrintLabelModal never reads
@@ -638,7 +638,7 @@ export function FulfillmentZone({
 
               <div className="st-actions">
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary !text-white"
                   style={{ backgroundColor: 'rgb(59, 130, 246)' }}
                   onClick={() => setPrintOpen(true)}
                   // PD-F13a: see success-branch comment above — gate on awbNo, not labelUrl.
