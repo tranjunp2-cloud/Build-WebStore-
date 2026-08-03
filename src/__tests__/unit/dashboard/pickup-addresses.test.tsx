@@ -96,6 +96,18 @@ describe('PickupAddresses [TC-F36.204]', () => {
         expect(screen.getByText('Enter a 5-digit postcode.')).toBeInTheDocument()
     })
 
+    it('marks every required field and keeps checked default icons explicitly white', () => {
+        render(<PickupAddresses value={[]} onChange={vi.fn()} />)
+
+        for (const label of ['Label', 'Sender phone', 'Address line 1', 'State', 'City', 'Postcode']) {
+            const control = screen.getByLabelText(new RegExp(`^${label}\\s*\\*$`))
+            expect(control).toHaveAttribute('aria-required', 'true')
+        }
+        expect(screen.getByLabelText(/Address line 2/i)).not.toHaveAttribute('aria-required')
+        expect(screen.getByRole('checkbox', { name: /Set as default pickup address/i }))
+            .toHaveClass('data-[state=checked]:!text-white')
+    })
+
     it('allows the new address default checkbox to toggle when a default already exists', () => {
         render(<PickupAddresses value={[warehouse]} onChange={vi.fn()} />)
 
