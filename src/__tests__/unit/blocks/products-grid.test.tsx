@@ -1113,6 +1113,22 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalled())
     })
 
+    it('[TC-F09.257] repositions when duplicate single-value params change their effective first value', async () => {
+        // Arrange
+        mockSearchParams = new URLSearchParams('site=1&page=2&page=3')
+        mockStorefrontFetch({ page: 2, totalPages: 3, totalDocs: 27 })
+        const view = render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
+        await waitFor(() => expect(screen.getByText('Demo Product')).toBeInTheDocument())
+        mockScrollIntoView.mockClear()
+
+        // Act
+        mockSearchParams = new URLSearchParams('site=1&page=3&page=2')
+        view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
+
+        // Assert
+        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalled())
+    })
+
     it('[TC-F09.258] renders exactly six non-interactive responsive card skeletons during initial loading', async () => {
         // Arrange
         let resolveInitialProducts: (() => void) | undefined

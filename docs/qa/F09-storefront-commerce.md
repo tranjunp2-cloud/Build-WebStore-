@@ -566,7 +566,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 
 > **File test nguồn:** `src/__tests__/unit/editor/settings-panel.test.tsx`, `src/__tests__/unit/blocks/products-grid.test.tsx`, `tests/product-grid-qa-rework.spec.ts`
 >
-> **Validation 2026-08-03:** TC-F09.253–261 đã qua automated validation (87/87 focused tests + typecheck): unit 63/63, API 18/18, Playwright 6/6. `/test-blocks` dùng production AppShell/global Tailwind CSS; browser assertions kiểm tra computed grid columns/display và dùng polling thay fixed waits. Artifact light/dark không hợp lệ đã được gỡ; real-editor visual/manual confirmation và screenshots light/dark của TC-F09.253 vẫn chờ trước QA handoff.
+> **Validation 2026-08-03:** TC-F09.253–261 đã qua automated validation (95/95 focused tests + typecheck): unit 71/71, API 18/18, Playwright 6/6. `/test-blocks` dùng production AppShell/global Tailwind CSS; browser assertions kiểm tra computed grid columns/display và dùng polling thay fixed waits. Artifact light/dark không hợp lệ đã được gỡ; real-editor visual/manual confirmation và screenshots light/dark của TC-F09.253 vẫn chờ trước QA handoff.
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
 |:---|:---|:---|:---|:---|:---|:---|

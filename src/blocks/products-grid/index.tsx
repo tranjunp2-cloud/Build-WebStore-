@@ -21,14 +21,22 @@ import { hasActiveProductFilters } from './filter-utils'
 import { useProductsGridData } from './use-products-grid-data'
 
 const MOBILE_PRODUCTS_GRID_BREAKPOINT = 1024
-const RESULTS_NAVIGATION_KEYS = new Set(['categoryId', 'minPrice', 'maxPrice', 'page', 'search'])
+const SINGLE_VALUE_RESULTS_NAVIGATION_KEYS = ['minPrice', 'maxPrice', 'page', 'search'] as const
 type GridNavigationIntent = 'filter' | 'pagination' | 'view'
 
-function buildResultsNavigationSignature(searchParams: { forEach: (callbackfn: (value: string, key: string) => void) => void }) {
+function buildResultsNavigationSignature(searchParams: {
+    forEach: (callbackfn: (value: string, key: string) => void) => void
+    get: (key: string) => string | null
+}) {
     const entries: Array<[string, string]> = []
 
+    SINGLE_VALUE_RESULTS_NAVIGATION_KEYS.forEach((key) => {
+        const value = searchParams.get(key)
+        if (value !== null) entries.push([key, value])
+    })
+
     searchParams.forEach((value, key) => {
-        if (RESULTS_NAVIGATION_KEYS.has(key) || key.startsWith('attr_')) entries.push([key, value])
+        if (key === 'categoryId' || key.startsWith('attr_')) entries.push([key, value])
     })
 
     entries.sort(([leftKey, leftValue], [rightKey, rightValue]) => (
