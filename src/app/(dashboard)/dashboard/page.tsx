@@ -5,7 +5,6 @@ import config from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { normalizeDashboardBlocks, parsePeriod, type DashboardBlockId } from '@/lib/dashboard-utils'
 import { getGlanceData, emptyGlanceData } from '@/lib/dashboard/glance-data'
-import { getTrafficData } from '@/lib/dashboard/traffic-data'
 import { getSeoData } from '@/lib/dashboard/seo-data'
 import { canReadPendingOrders, getPendingOrdersData } from '@/lib/dashboard/pending-orders-data'
 import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
@@ -13,7 +12,7 @@ import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { CustomizeModal } from '@/components/dashboard/revamp/customize-modal'
 import { OnboardingCard, type OnboardingStep } from '@/components/dashboard/revamp/onboarding-card'
 import { AtAGlance } from '@/components/dashboard/revamp/at-a-glance'
-import { TrafficPerformance } from '@/components/dashboard/revamp/traffic-performance'
+import { TrafficPerformanceClient } from '@/components/dashboard/revamp/traffic-performance-client'
 import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
 import { SeoTools } from '@/components/dashboard/revamp/seo-tools'
 import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
@@ -151,14 +150,13 @@ export default async function DashboardRoot({ searchParams }: Props) {
             : Promise.resolve(emptyPendingOrders)
 
     // Fetch independent block data in parallel only when the store has a usable site.
-    const [glance, traffic, seo, pendingOrders] = hasUsableSites
+    const [glance, seo, pendingOrders] = hasUsableSites
         ? await Promise.all([
             getGlanceData(period, { user }),
-            getTrafficData(period),
             getSeoData(),
             pendingOrdersPromise,
         ])
-        : [emptyGlanceData(), null, null, emptyPendingOrders]
+        : [emptyGlanceData(), null, emptyPendingOrders]
 
     const renderBlocks = canViewOrders ? blocks : blocks.filter(id => id !== 'orders')
 
@@ -169,7 +167,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'glance':
                 return <AtAGlance key="glance" data={glance} showHeader={showOnboarding} period={period} />
             case 'traffic':
-                return traffic ? <TrafficPerformance key="traffic" data={traffic} period={period} /> : null
+                return <TrafficPerformanceClient key="traffic" period={period} />
             case 'seo':
                 return seo ? <SeoHealth key="seo" data={seo} /> : null
             case 'tools':

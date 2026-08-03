@@ -3120,6 +3120,9 @@
                 "emptyChartDesc": "Once visitors land on your site, daily pageviews will show up here.",
                 "emptyListTitle": "Nothing to rank yet",
                 "emptyListDesc": "Top pages, blogs and referrers appear once you have traffic.",
+                "loading": "Loading traffic...",
+                "loadError": "Traffic data could not be loaded.",
+                "retry": "Retry",
                 "periodToday": "today",
                 "period7d": "last 7 days",
                 "period30d": "last 30 days"

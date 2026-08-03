@@ -3120,6 +3120,9 @@
                 "emptyChartDesc": "Sebaik pelawat tiba di laman anda, paparan halaman harian akan dipaparkan di sini.",
                 "emptyListTitle": "Tiada apa untuk disenaraikan lagi",
                 "emptyListDesc": "Halaman, blog dan perujuk teratas akan muncul sebaik anda mempunyai trafik.",
+                "loading": "Memuatkan trafik...",
+                "loadError": "Data trafik tidak dapat dimuatkan.",
+                "retry": "Cuba lagi",
                 "periodToday": "hari ini",
                 "period7d": "7 hari lepas",
                 "period30d": "30 hari lepas"

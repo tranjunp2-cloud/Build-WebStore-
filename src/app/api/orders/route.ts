@@ -3,6 +3,10 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
+import {
+    getViewerPeriodStart,
+    normalizeViewerTimeZone,
+} from '@/lib/viewer-timezone'
 
 /**
  * GET /api/orders
@@ -53,16 +57,18 @@ export const GET = withAuth(async (user, request) => {
         if (dateFilter && dateFilter !== 'all') {
             const now = new Date()
             let fromDate: Date | null = null
+            const viewerTimeZone = normalizeViewerTimeZone(
+                request.headers.get('x-viewer-time-zone'),
+            )
+
             if (dateFilter === 'today') {
-                fromDate = new Date(now.setHours(0, 0, 0, 0))
+                fromDate = getViewerPeriodStart(now, viewerTimeZone, 'today')
             } else if (dateFilter === 'thisWeek') {
-                const startOfWeek = new Date(now)
-                startOfWeek.setDate(now.getDate() - now.getDay())
-                startOfWeek.setHours(0, 0, 0, 0)
-                fromDate = startOfWeek
+                fromDate = getViewerPeriodStart(now, viewerTimeZone, 'thisWeek')
             } else if (dateFilter === 'thisMonth') {
-                fromDate = new Date(now.getFullYear(), now.getMonth(), 1)
+                fromDate = getViewerPeriodStart(now, viewerTimeZone, 'thisMonth')
             }
+
             if (fromDate) {
                 where.createdAt = { greater_than_equal: fromDate.toISOString() }
             }

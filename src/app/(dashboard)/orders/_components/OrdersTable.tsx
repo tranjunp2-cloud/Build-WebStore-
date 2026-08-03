@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
+import { getBrowserViewerTimeZone } from '@/lib/viewer-timezone'
 
 // ───────── TYPES ─────────
 export type { OrderStatus }
@@ -355,7 +356,11 @@ export function OrdersTable({
                 if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
                 if (paymentMethodFilter) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilter)}`
 
-                const res = await fetch(url)
+                const res = await fetch(url, {
+                    headers: {
+                        'X-Viewer-Time-Zone': getBrowserViewerTimeZone(),
+                    },
+                })
                 if (!res.ok) throw new Error('Failed to fetch')
                 const data = await res.json()
 
@@ -387,7 +392,11 @@ export function OrdersTable({
                 if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
                 if (paymentMethodFilterRef.current) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilterRef.current)}`
 
-                const res = await fetch(url)
+                const res = await fetch(url, {
+                    headers: {
+                        'X-Viewer-Time-Zone': getBrowserViewerTimeZone(),
+                    },
+                })
                 if (!res.ok) return
                 const data = await res.json()
                 if (!data.success || !data.docs) return
