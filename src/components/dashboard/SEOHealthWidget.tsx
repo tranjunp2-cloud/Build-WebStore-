@@ -74,10 +74,10 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                     onClick={() => setIsFixModalOpen(true)}
                     disabled={!missingSeoItems || missingSeoItems.length === 0}
                     className="flex shrink-0 items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 !text-white text-[12px] font-semibold leading-none bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shadow-[0_4px_10px_-2px_hsl(var(--info)/0.4)] hover:opacity-90 disabled:opacity-50 transition-opacity"
-                    title={t.dashboard.overview.seo.fixAll || 'Fix All Issues'}
+                    title={t.dashboard.overview.seo.fixAll || 'Fix Issues'}
                 >
                     <Sparkles className="h-3.5 w-3.5 !text-white" />
-                    {t.dashboard.overview.seo.fixAll || 'AI Fix All Issues'}
+                    {t.dashboard.overview.seo.fixAll || 'AI Fix Issues'}
                 </button>
             </div>
 

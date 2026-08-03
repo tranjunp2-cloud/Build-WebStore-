@@ -1,9 +1,14 @@
 /**
- * @fileoverview Tests for calculateLocalSeoScore (F37 US-01 Phase 05)
- * TC-IDs: TC-F37-01-10, TC-F37-01-11 (provisional — docs/qa/F37*.md not yet formalized)
+ * @fileoverview Tests for F37 Local SEO score contracts.
+ * TC-IDs: TC-F37-01-10, TC-F37-01-11
  */
 import { describe, it, expect } from 'vitest'
-import { calculateLocalSeoScore, type LocalSeoScoreInput } from '@/lib/seo/local-seo-score'
+import {
+    calculateBusinessDataScore,
+    calculateLocalSeoScore,
+    type BusinessDataScoreInput,
+    type LocalSeoScoreInput,
+} from '@/lib/seo/local-seo-score'
 
 const bareSite: LocalSeoScoreInput = {
     businessName: true, address: false, phone: false, hours: false, category: false, website: true, description: false,
@@ -26,20 +31,135 @@ const emptySite: LocalSeoScoreInput = {
     coreWebVitals: 0, mobileResponsive: false, httpsEnabled: false,
 }
 
-// ── TC-F37-01-10: ≥20-point gain (AC-1) ─────────────────────────────────────
+// ── TC-F37-01-10: exact Minimal Business Data 7/8/5 contract ────────────────
 
-describe('[TC-F37-01-10] calculateLocalSeoScore — AC-1 gain when business data saved', () => {
-    it('raises score by >=20 when address+hours+category+localBusinessSchema+industrySubtype are saved', () => {
-        const before = calculateLocalSeoScore(bareSite)
-        const after = calculateLocalSeoScore({
-            ...bareSite,
-            address: true,
-            hours: true,
-            category: true,
-            localBusinessSchema: true,
-            industrySubtype: true,
+describe('[TC-F37-01-10] calculateBusinessDataScore — exact 7/8/5 contract', () => {
+    const completeBusinessData: BusinessDataScoreInput = {
+        businessName: 'Kedai Kopi Prime',
+        streetAddress: '12 Jalan Ampang',
+        city: 'Kuala Lumpur',
+        postcode: '50450',
+        country: 'MY',
+        phone: '+60 12-345 6789',
+    }
+
+    it('scores complete name, structured address, and phone as exactly 20 without requiring state', () => {
+        // Arrange
+        const input = completeBusinessData
+
+        // Act
+        const result = calculateBusinessDataScore(input)
+
+        // Assert
+        expect(result).toEqual({
+            score: 20,
+            breakdown: { name: 7, address: 8, phone: 5 },
         })
-        expect(after.score - before.score).toBeGreaterThanOrEqual(20)
+    })
+
+    it('scores name and phone as 12 when the structured address is absent', () => {
+        // Arrange
+        const input: BusinessDataScoreInput = {
+            businessName: 'Kedai Kopi Prime',
+            streetAddress: null,
+            city: undefined,
+            postcode: '',
+            country: '   ',
+            phone: '+60 12-345 6789',
+        }
+
+        // Act
+        const result = calculateBusinessDataScore(input)
+
+        // Assert
+        expect(result).toEqual({
+            score: 12,
+            breakdown: { name: 7, address: 0, phone: 5 },
+        })
+    })
+
+    it('scores a complete structured address alone as 8', () => {
+        // Arrange
+        const input: BusinessDataScoreInput = {
+            ...completeBusinessData,
+            businessName: null,
+            phone: undefined,
+        }
+
+        // Act
+        const result = calculateBusinessDataScore(input)
+
+        // Assert
+        expect(result).toEqual({
+            score: 8,
+            breakdown: { name: 0, address: 8, phone: 0 },
+        })
+    })
+
+    it.each(['streetAddress', 'city', 'postcode', 'country'] as const)(
+        'scores address as 0 when %s is missing',
+        (missingField) => {
+            // Arrange
+            const input: BusinessDataScoreInput = {
+                ...completeBusinessData,
+                [missingField]: '   ',
+            }
+
+            // Act
+            const result = calculateBusinessDataScore(input)
+
+            // Assert
+            expect(result.score).toBe(12)
+            expect(result.breakdown).toEqual({ name: 7, address: 0, phone: 5 })
+        },
+    )
+
+    it('treats whitespace-only values as absent', () => {
+        // Arrange
+        const input: BusinessDataScoreInput = {
+            businessName: ' ',
+            streetAddress: '\t',
+            city: '\n',
+            postcode: '  ',
+            country: '\r',
+            phone: '   ',
+        }
+
+        // Act
+        const result = calculateBusinessDataScore(input)
+
+        // Assert
+        expect(result).toEqual({
+            score: 0,
+            breakdown: { name: 0, address: 0, phone: 0 },
+        })
+    })
+
+    it('does not award points for legacy address, hours, category, website, or description signals', () => {
+        // Arrange — extra legacy/runtime properties intentionally document that
+        // only the v2 helper's six declared inputs can earn Business points.
+        const oldSignalsOnly = {
+            businessName: null,
+            streetAddress: null,
+            city: null,
+            postcode: null,
+            country: null,
+            phone: null,
+            legacyAddress: '12 Legacy Road',
+            hours: true,
+            category: 'restaurant',
+            website: 'https://example.com',
+            description: 'Legacy description',
+        }
+
+        // Act
+        const result = calculateBusinessDataScore(oldSignalsOnly)
+
+        // Assert
+        expect(result).toEqual({
+            score: 0,
+            breakdown: { name: 0, address: 0, phone: 0 },
+        })
     })
 })
 

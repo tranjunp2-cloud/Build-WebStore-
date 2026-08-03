@@ -1,12 +1,13 @@
 # QA Test Plan — F14 Shipping (Malaysia)
 
-> **Version:** 2.5 | **Updated:** 2026-05-15 (full Vietnamese translation cho section 3.13–3.15, Quality Gates, Traceability, Self-Check, Implementation Status) | **Owner:** QA Team
+> **Version:** 2.6 | **Updated:** 2026-07-29 (GH-1684 mobile/tablet shipping-label canvas + desktop native-viewer regression) | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F14-shipping.md`](../prd/F14-shipping.md) v1.2
 > **Stories ref:** [`docs/stories/F14-shipping-stories.md`](../stories/F14-shipping-stories.md) (US-F14-01..06)
 > **Architecture ref:** [`docs/architecture/F14-shipping.md`](../architecture/F14-shipping.md)
 > **Design ref:** [`docs/design/F14-shipping-design.md`](../design/F14-shipping-design.md)
 
 ### Changelog
+- **v2.6 (2026-07-29)** — Preserve the deployed native PDF viewer on desktop; add GH-1684 mobile/tablet canvas coverage for carrier soft-mask barcodes/QR codes and responsive-modal coverage across desktop, Android, iPhone, and iPad.
 - **v2.5 (2026-05-15)** — Dịch tiếng Việt toàn bộ section 3.13–3.15 (TC-F14.57..123b), Quality Gates, Traceability Matrix, Self-Check, Implementation Status. Giữ nguyên TC-ID, mã code, HTTP status, FR/BR/AC references.
 - **v2.4 (2026-05-15)** — Thêm TC-F14.117..123b (8 TC mới): integration race PATCH↔POST shared-state (read-after-write + interleave + concurrent), hợp đồng email tracking plain-text BR-09 self-delivery (không `<a href>` trừ khi có trackingUrl, ký tự đặc biệt render nguyên vẹn, status không phải shipped thì không có khối tracking). Thêm Playwright project `qa-f14` trỏ `https://web-cms-v2.dev.ecommercehub.my`.
 - **v2.3 (2026-05-15)** — Thêm TC-F14.80..116 (37 TC mới): i18n state có dấu/Ả Rập, edge config, lỗ hổng body/input POST, lỗ hổng auth PATCH, error/shape GET, hợp đồng constants ở mức yêu cầu, hint.gap sanity US-F14-06 AC-3, error shape internal POST.
@@ -938,8 +939,16 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 
 | ID | Type | Priority | Title | Input | Expected | Refs |
 |---|---|---|---|---|---|---|
-| **TC-F36.OD.008** | Func | High | Print label modal: open/download/print buttons | State=success, labelUrl present. Click "Open PDF" | Browser opens PDF in new tab; "Download" button triggers file save; "Print" button opens system print dialog | GH-1333 Phase 03 |
-| **TC-F36.OD.009** | UI | Medium | A4/A6 toggle (informational, no re-fetch) | Modal rendered, toggle A4↔A6 | Button state toggles; PDF URL unchanged (API doesn't support dynamic size) | GH-1333 Phase 03 |
+| **TC-F36.OD.008** | Func | High | Print label modal: preview/download/print buttons | State=success, AWB present. Open modal, then Download or Print | Same-origin PDF preview renders; Download saves the active format; Print opens the active proxy PDF in a new tab | GH-1333 Phase 03, GH-1684 |
+| **TC-F36.OD.009** | UI | Medium | A4/A6 format-specific preview | Modal rendered, toggle A4↔A6 | Active format requests `/label?format=A4` or `/label?format=A6`; unavailable format is disabled with a clear fallback | GH-1333 Phase 03, GH-1684 |
+
+#### Shipping Label Canvas & Responsive Modal (TC-F36.OD.051–053)
+
+| ID | Automation | Type | Priority | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|---|---|
+| **TC-F36.OD.051** | [x] AUTO | Func | Critical | PDF label content renders in the viewer appropriate to each device | PII-free carrier-style PDF fixture with two soft-mask barcodes, QR, sender, and recipient; wide/narrow Desktop Chrome, Pixel 7 Chrome, iPhone Safari/Edge WebKit, iPad Mini portrait and 1024×768 landscape WebKit with the iPadOS desktop-site UA | Desktop retains the native PDF iframe regardless of window width; mobile/tablet canvas contains both barcodes, QR, sender, and recipient pixels; WebKit repairs all three transparent image XObjects; mobile/tablet has no iframe/object/embed | GH-1684 AC-1 |
+| **TC-F36.OD.052** | [x] AUTO | UI | Critical | Print modal remains usable on desktop/mobile/tablet | Open modal in the seven Playwright projects above | Dialog and inner scroll area have no horizontal overflow or footer/body intersection; format/mark-printed/hint can each be scrolled into the visible grid above the footer; Cancel/Download/Print remain visible | GH-1684 AC-2 |
+| **TC-F36.OD.053** | [ ] MANUAL | Mobile | High | Physical mobile browser UAT | iOS Safari + Android Chrome, portrait and landscape | Label content is readable; scrolling and all actions work without overlap | GH-1684 AC-1, AC-2 |
 
 #### Schedule Pickup (TC-F36.OD.010–011)
 

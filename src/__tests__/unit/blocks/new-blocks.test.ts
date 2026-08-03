@@ -10,7 +10,11 @@ import { GoogleMapsConfigSchema, googleMapsMeta } from '@/blocks/google-maps/con
 import { SocialProofConfigSchema, socialProofMeta } from '@/blocks/social-proof/config'
 import { CountdownTimerConfigSchema, countdownTimerMeta } from '@/blocks/countdown-timer/config'
 import { BeforeAfterConfigSchema, beforeAfterMeta } from '@/blocks/before-after/config'
-import { FeatureComparisonConfigSchema, featureComparisonMeta } from '@/blocks/feature-comparison/config'
+import {
+    FeatureComparisonConfigSchema,
+    featureComparisonMeta,
+    normalizeComparisonValues,
+} from '@/blocks/feature-comparison/config'
 import { DownloadCTAConfigSchema, downloadCTAMeta } from '@/blocks/download-cta/config'
 import { VideoBackgroundConfigSchema, videoBackgroundMeta } from '@/blocks/video-background/config'
 import { BreadcrumbConfigSchema, breadcrumbMeta } from '@/blocks/breadcrumb/config'
@@ -21,7 +25,11 @@ import { AccordionConfigSchema, accordionMeta } from '@/blocks/accordion/config'
 import { StepProcessConfigSchema, stepProcessMeta } from '@/blocks/step-process/config'
 import { PortfolioGridConfigSchema, portfolioGridMeta } from '@/blocks/portfolio-grid/config'
 import { MenuFoodConfigSchema, menuFoodMeta } from '@/blocks/menu-food/config'
-import { ServiceCardsConfigSchema, serviceCardsMeta } from '@/blocks/service-cards/config'
+import {
+    ServiceCardsConfigSchema,
+    serviceCardsGridClass,
+    serviceCardsMeta,
+} from '@/blocks/service-cards/config'
 import { CarouselConfigSchema, carouselMeta } from '@/blocks/carousel/config'
 
 // ─── TC-F04-NEW: New Block system configuration ────────────────────────────
@@ -382,6 +390,11 @@ describe('New Block Configs [TC-F04-NEW]', () => {
         it('TC-F04-NEW-31: meta has required fields', () => {
             assertValidMeta(featureComparisonMeta)
             expect(featureComparisonMeta.type).toBe('feature-comparison')
+        })
+
+        it('normalizes legacy null and labelled comparison values', () => {
+            expect(normalizeComparisonValues(null, 3)).toEqual([false, false, false])
+            expect(normalizeComparisonValues(['Yes', 'No', 'Add-on'], 3)).toEqual([true, false, false])
         })
     })
 
@@ -837,6 +850,29 @@ describe('New Block Configs [TC-F04-NEW]', () => {
             expect(serviceCardsMeta.type).toBe('service-cards')
             expect(serviceCardsMeta.variants).toContain('list')
             expect(serviceCardsMeta.variants).toContain('featured')
+        })
+
+        it('TC-GENPERF-W4-03: two services use a balanced two-column desktop grid', () => {
+            // Arrange
+            const itemCount = 2
+
+            // Act
+            const className = serviceCardsGridClass(itemCount)
+
+            // Assert
+            expect(className).toContain('lg:grid-cols-2')
+            expect(className).not.toContain('lg:grid-cols-3')
+        })
+
+        it('TC-GENPERF-W4-03: three or more services use the standard three-column grid', () => {
+            // Arrange
+            const itemCount = 3
+
+            // Act
+            const className = serviceCardsGridClass(itemCount)
+
+            // Assert
+            expect(className).toContain('lg:grid-cols-3')
         })
     })
 

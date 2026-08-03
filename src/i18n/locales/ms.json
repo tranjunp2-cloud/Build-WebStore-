@@ -889,7 +889,7 @@
                 "score": "Skor:",
                 "statusGood": "Baik",
                 "statusWarning": "Perlu Pembaikan",
-                "fixAll": "✨ AI Baiki Semua Isu",
+                "fixAll": "AI Baiki Isu",
                 "fix": "Baiki",
                 "issue": "Isu",
                 "issues": "Isu"
@@ -1081,7 +1081,7 @@
             "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
-            "fixAllButton": "Baiki Semua Isu",
+            "fixAllButton": "AI Baiki Isu",
             "contentQuality": "Kualiti Kandungan",
             "technicalSeo": "SEO Teknikal",
             "sitemapAndMeta": "Peta Laman & Tag Meta",
@@ -1529,7 +1529,12 @@
                 "copiesMeta": "Salinan",
                 "markAsPrinted": "Tanda sebagai dicetak",
                 "formatUnavailable": "EasyParcel tidak menyediakan format ini untuk label ini",
-                "loadingLabel": "Memuatkan PDF label…"
+                "loadingLabel": "Memuatkan PDF label…",
+                "previewFailed": "Pratonton tidak dapat dipaparkan pada peranti ini.",
+                "openPdf": "Buka PDF secara terus",
+                "previousPage": "Halaman label sebelumnya",
+                "nextPage": "Halaman label seterusnya",
+                "pageCount": "Halaman {page} daripada {pages}"
             },
             "missingWeight": {
                 "title": "Berat bungkusan tiada",
@@ -3060,7 +3065,6 @@
                 "viewsTip": "Jumlah lawatan pelanggan ke semua halaman di laman web anda.",
                 "leadsTip": "Bakal pelanggan yang meninggalkan maklumat hubungan (e-mel, telefon) melalui borang pendaftaran di laman web anda.",
                 "engagementTip": "Tindakan pelanggan bernilai tinggi — seperti klik Beli Sekarang, Tambah ke Troli, atau pautan media sosial.",
-                "revenueSoonTip": "Penjejakan hasil akan datang. Kad ini akan mengira metrik daripada pesanan yang telah dibayar dan selesai.",
                 "noteToday": "vs semalam",
                 "note7d": "vs 7h lepas",
                 "note30d": "vs 30h lepas"
@@ -3129,7 +3133,7 @@
                 "breakdownContent": "Kualiti Kandungan",
                 "breakdownTechnical": "SEO Teknikal",
                 "criticalIssue": "Isu paling kritikal: {count} {text}. Membaikinya akan meningkatkan skor anda.",
-                "fixAll": "AI Baiki Semua Isu",
+                "fixAll": "AI Baiki Isu",
                 "issuesTitle": "Isu SEO",
                 "open": "{count} terbuka",
                 "allClear": "Semua selesai",
@@ -3179,8 +3183,18 @@
                 "title": "Pesanan belum selesai",
                 "subtitle": "Pesanan menunggu pemenuhan",
                 "awaiting": "Menunggu",
-                "mockOrder": "Pesanan pelanggan · {count} item",
-                "soonTip": "Baris gilir pemenuhan pesanan sedang dibangunkan — akan datang."
+                "emptyTitle": "Tiada pesanan belum selesai",
+                "emptyDesc": "Pesanan baharu yang menunggu pemenuhan akan dipaparkan di sini.",
+                "unavailableTitle": "Pesanan belum selesai tidak tersedia",
+                "unavailableDesc": "Kami tidak dapat memuatkan pesanan belum selesai buat masa ini. Sila cuba lagi kemudian.",
+                "count": {
+                    "one": "{count} pesanan belum selesai",
+                    "other": "{count} pesanan belum selesai"
+                },
+                "items": {
+                    "one": "{count} item",
+                    "other": "{count} item"
+                }
             },
             "customize": {
                 "button": "Sesuaikan",
@@ -3427,7 +3441,7 @@
                                 "Tab <strong>Gambaran Keseluruhan</strong> memaparkan metrik utama: jumlah paparan laman web (Trafik), klik pautan (Petunjuk), dan penglibatan pengguna.",
                                 "Gunakan <strong>Pemilih Tempoh</strong> (Hari Ini / 7 hari / 30 hari) di kanan atas untuk menukar julat masa analitik.",
                                 "Klik <strong>Sesuaikan</strong> untuk seret-dan-lepas, tunjuk/sembunyikan kad metrik untuk memperibadikan susun atur papan pemuka anda.",
-                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Semua Isu\" untuk optimum automatik."
+                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Isu\" untuk optimum automatik."
                             ]
                         }
                     ]
@@ -3590,7 +3604,7 @@
                 "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
                 "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
                 "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
-                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
+                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
                 "builderTitle": "Pembina Laman Web AI",
                 "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
                 "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",

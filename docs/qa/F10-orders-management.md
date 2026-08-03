@@ -379,6 +379,18 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10.responsive.03** | `[Manual/Tablet]` | Man 768-1279px (iPad mini/Air, sidebar mo): van la cuon ngang (deviation da duoc chap nhan) | 1. Mo `/orders` tren viewport 820px va 1024px, sidebar mo. | - Van hien thi cuon ngang 7 the (KHONG len grid deu 7-cot o day — khac AC #1490 goc).<br>- Deviation da duoc xac nhan chap nhan qua code review PR #1506, khong phai bug. | High | [ ] |
 | **TC-F10.responsive.04** | `[Manual/Desktop]` | Man ≥1280px: grid deu 7 cot, khong cuon ngang | 1. Mo `/orders` tren viewport ≥1280px (sidebar mo/dong). | - 7 the xep grid deu 1 hang, khong cuon ngang, khong wrap 4+3. | Blocker | [ ] |
 
+## 4.3 Regression Tests — GH-1711 (Orders Filter Chips Responsive Layout)
+
+> Tests for `OrdersActionBar` (`src/app/(dashboard)/orders/_components/OrdersActionBar.tsx`).
+> The automated test asserts the Tailwind responsive contract because jsdom does not apply media queries;
+> the EN/MS viewport checks remain manual.
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10.responsive.05a** | `[Unit]` | Filter chip cho phep selected value wrap duoi `xl` | 1. Render `OrdersActionBar` voi locale MS.<br>2. Kiem tra className cua filter grid. | - Mobile dung 2 cot, tablet dung 4 cot.<br>- Trigger auto-height, min-height 44px tren mobile.<br>- Span/value cho phep wrap, khong co `truncate` duoi `xl`.<br>- `xl` reset ve height 40px va nowrap. | High | [x] |
+| **TC-F10.responsive.05b** | `[Manual/Mobile/Tablet]` | Selected value EN/MS khong bi cat | 1. Mo `/orders` tai 375, 640, 768 va 1279px.<br>2. Chon cac gia tri Date/Status/Payment/Sort dai nhat trong EN va MS. | - Toan bo selected value doc duoc, co the xuong dong.<br>- Khong co ellipsis, clip hoac scroll ngang trang.<br>- Icon an duoi 640px va hien tu 640px. | High | [ ] |
+| **TC-F10.responsive.05c** | `[Manual/Desktop]` | Desktop filter layout khong thay doi | 1. Mo `/orders` tai viewport ≥1280px.<br>2. Kiem tra ca EN va MS. | - Hien thi `Label : value`, auto-width flex layout, height 40px.<br>- Dropdown va filter behavior hoat dong binh thuong. | High | [ ] |
+
 ---
 
 ## 5. Quality Gates

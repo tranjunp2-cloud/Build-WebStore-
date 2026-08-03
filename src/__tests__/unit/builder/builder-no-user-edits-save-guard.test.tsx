@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import en from '@/i18n/locales/en.json'
 
@@ -142,6 +142,8 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
     const fetchMock = vi.fn()
 
     beforeEach(() => {
+        cleanup()
+        document.body.innerHTML = ''
         vi.clearAllMocks()
         window.localStorage.clear()
         Object.defineProperty(window, 'matchMedia', {
@@ -187,6 +189,8 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
     })
 
     afterEach(() => {
+        cleanup()
+        document.body.innerHTML = ''
         vi.useRealTimers()
     })
 
@@ -225,6 +229,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         expect(fetchMock).not.toHaveBeenCalled()
         expect(mockPush).toHaveBeenCalledWith('/editor/site-123')
+        await waitFor(() => {
+            expect(useBuilderStore.getState().siteId).toBeNull()
+        })
     })
 
     it('does not call /save when Dashboard is clicked before any manual edits', async () => {
@@ -235,6 +242,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         expect(fetchMock).not.toHaveBeenCalled()
         expect(mockPush).toHaveBeenCalledWith('/dashboard')
+        await waitFor(() => {
+            expect(useBuilderStore.getState().siteId).toBeNull()
+        })
     })
 
     it('calls /save with edited blocks before Publish Website when manual edits exist', async () => {
@@ -326,7 +336,7 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
                 'event: done\ndata: {"siteId":"site-123","pageId":"page-1","siteName":"Long Running Bakery","totalBlocks":1,"totalPages":1,"timeMs":76000}\n\n',
             ))
             streamController?.close()
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(100)
         })
         expect(useBuilderStore.getState().status).toBe('done')
     })
@@ -357,10 +367,15 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
 
         await waitFor(() => {
-            const state = useBuilderStore.getState()
-            expect(state.status).toBe('error')
-            expect(state.error?.message).toBe('Generation failed while saving pages')
-            expect(state.error?.message).not.toContain('Connection lost')
+            expect(useBuilderStore.getState().status).toBe('error')
         })
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+
+        const state = useBuilderStore.getState()
+        expect(state.status).toBe('error')
+        expect(state.error?.message).toBe('Generation failed while saving pages')
+        expect(state.error?.message).not.toContain('Connection lost')
     })
 })

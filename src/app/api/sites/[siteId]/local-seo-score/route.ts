@@ -4,15 +4,16 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
-import { calculateLocalSeoScore } from '@/lib/seo/local-seo-score'
+import { calculateBusinessDataScore, calculateLocalSeoScore } from '@/lib/seo/local-seo-score'
 import { hasMeaningfulLocalBusinessData, type LocalBusinessSiteData } from '@/lib/seo/json-ld'
 import { schemaTypeForLocalBusiness } from '@/lib/seo/schema-helpers'
 
 /**
  * GET /api/sites/[siteId]/local-seo-score
- * Minimal read endpoint for US-F37-01 (Phase 05) — returns { score, breakdown }
- * from calculateLocalSeoScore(). NOT the scored US-F37-04 dashboard/checklist
- * widget; that story consumes the same score number via its own UI later.
+ * Returns the legacy { score, breakdown } plus the additive US-F37-01
+ * `minimalBusinessData` 7/8/5 result calculated from persisted site fields.
+ * The top-level total intentionally remains on the legacy formula; US-F37-04
+ * owns the atomic 20/40/20/20 cutover and dashboard/checklist UI.
  *
  * Signal sourcing notes (see calculateLocalSeoScore's Tech Health bucket):
  * `mobileResponsive`/`httpsEnabled`/`coreWebVitals` have no real measurement
@@ -96,7 +97,23 @@ export async function GET(
             httpsEnabled: true, // Vercel hosting always serves HTTPS
         })
 
-        return NextResponse.json({ success: true, ...result })
+        const minimalBusinessData = calculateBusinessDataScore({
+            businessName: site.name,
+            streetAddress: localBusiness?.streetAddress,
+            city: localBusiness?.city,
+            postcode: localBusiness?.postcode,
+            country: localBusiness?.country,
+            phone: contactInfo?.phone,
+        })
+
+        return NextResponse.json({
+            success: true,
+            ...result,
+            minimalBusinessData: {
+                ...minimalBusinessData,
+                maxScore: 20,
+            },
+        })
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error)
         console.error('[Local SEO Score Error]', errMsg.slice(0, 500))

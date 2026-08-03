@@ -2,17 +2,20 @@
 
 /**
  * At-a-glance — 4 stat cards (Views / Leads / Engagement / Revenue).
- * Revenue is locked behind a "Coming Soon" overlay. Ports the design AtAGlance.
+ * All four cards display live period-over-period data. Ports the design AtAGlance.
  * Labels, notes, and tooltips are all driven by the i18n t.dashboard.revamp.glance tree.
  */
 import { Eye, MousePointerClick, ShoppingBag, DollarSign, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Sparkline } from './charts'
-import { SectionHead, Delta, ComingSoonBadgeTooltip, InfoTooltip } from './atoms'
+import { SectionHead, Delta, InfoTooltip } from './atoms'
 import type { DashboardPeriodKey, GlanceData, GlanceStat } from '@/lib/dashboard/dashboard-types'
 
 const fmtNum = (n: number) => new Intl.NumberFormat('en-MY').format(Math.round(n))
-const fmtMYR = (n: number) => 'RM ' + new Intl.NumberFormat('en-MY', { maximumFractionDigits: 0 }).format(Math.round(n))
+const fmtMYR = (n: number) => 'RM ' + new Intl.NumberFormat('en-MY', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+}).format(n)
 
 function statDisplay(stat: GlanceStat): string {
     if (stat.currency) return fmtMYR(stat.value)
@@ -20,7 +23,7 @@ function statDisplay(stat: GlanceStat): string {
     return fmtNum(stat.value)
 }
 
-function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note, tip, comingSoon, comingSoonLabel, comingSoonTip }: {
+function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note, tip }: {
     label: string
     icon: LucideIcon
     accentVar: string
@@ -31,15 +34,10 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
     note: string
     /** Optional plain-language explainer shown via an info-icon tooltip next to the label */
     tip?: string
-    /** Coming Soon (no real data) — hides the comparison cluster + sparkline, shows a badge instead */
-    comingSoon?: boolean
-    /** Translated "Coming Soon" badge text */
-    comingSoonLabel?: string
-    comingSoonTip?: string
 }) {
     return (
-        <div className={`stat-card${comingSoon ? ' stat-card-soon' : ''}`}>
-            {!comingSoon && <Sparkline data={spark} color={`var(${accentVar})`} />}
+        <div className="stat-card">
+            <Sparkline data={spark} color={`var(${accentVar})`} />
             {/* GH-1516: delta/badge moved UP beside the label (same row, right-aligned) —
                 it no longer shares the value row, so the value can't be squeezed/ellipsized
                 and the pill sits well clear of the sparkline zone at the card bottom. */}
@@ -51,14 +49,12 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
                     {/* Title text + tooltip stay glued together (inline-flex, no justify-between) */}
                     <span className="stat-label">{label}{tip && <InfoTooltip tip={tip} />}</span>
                 </div>
-                {comingSoon
-                    ? <ComingSoonBadgeTooltip label={comingSoonLabel ?? ''} tip={comingSoonTip ?? ''} />
-                    : <Delta value={stat.delta} />}
+                <Delta value={stat.delta} />
             </div>
             {/* Value (left) + "vs …" note (right) share one baseline row */}
             <div className="stat-bottom">
                 <span className="stat-val">{statDisplay(stat)}</span>
-                {!comingSoon && <span className="delta-note">{note}</span>}
+                <span className="delta-note">{note}</span>
             </div>
         </div>
     )
@@ -85,7 +81,7 @@ export function AtAGlance({ data, showHeader = true, period }: {
                 <StatCardInner label={r.glance.views} icon={Eye} accentVar="--dr-m-views" bgVar="--dr-m-views-bg" stat={data.stats.views} spark={data.sparks.views} note={note} tip={r.glance.viewsTip} />
                 <StatCardInner label={r.glance.leads} icon={MousePointerClick} accentVar="--dr-m-leads" bgVar="--dr-m-leads-bg" stat={data.stats.leads} spark={data.sparks.leads} note={note} tip={r.glance.leadsTip} />
                 <StatCardInner label={r.glance.engagement} icon={ShoppingBag} accentVar="--dr-m-engage" bgVar="--dr-m-engage-bg" stat={data.stats.engage} spark={data.sparks.engage} note={note} tip={r.glance.engagementTip} />
-                <StatCardInner label={r.glance.revenue} icon={DollarSign} accentVar="--dr-m-rev" bgVar="--dr-m-rev-bg" stat={data.stats.revenue} spark={data.sparks.revenue} note={note} comingSoon comingSoonLabel={r.comingSoon} comingSoonTip={r.glance.revenueSoonTip} />
+                <StatCardInner label={r.glance.revenue} icon={DollarSign} accentVar="--dr-m-rev" bgVar="--dr-m-rev-bg" stat={data.stats.revenue} spark={data.sparks.revenue} note={note} />
             </div>
         </div>
     )
