@@ -37,7 +37,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
-import { getCategoriesAction } from './categories/actions'
+import { getAiCategoriesAction, getCategoriesAction, type AiCategoryOption } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
 import { computeStockDisplay, singleSeverity, type StockDisplay, type StockSeverity } from '@/lib/products/stock-display'
@@ -171,12 +171,16 @@ export default function ProductsPage() {
     const router = useRouter()
     const [products, setProducts] = useState<Product[]>([])
     const [categories, setCategories] = useState<Category[]>([])
+    const [aiCategories, setAiCategories] = useState<AiCategoryOption[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
+    const [aiModalPrompt, setAiModalPrompt] = useState('')
+    const [isPreparingAi, setIsPreparingAi] = useState(false)
+    const productsLoadRequestId = useRef(0)
     const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
     const aiPromptComposingRef = useRef(false)
     useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
@@ -218,27 +222,34 @@ export default function ProductsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const loadProducts = async () => {
-        setIsLoading(true)
-        setError(null)
+    const loadProducts = async ({ showSkeleton = true }: { showSkeleton?: boolean } = {}) => {
+        const requestId = ++productsLoadRequestId.current
+        if (showSkeleton) {
+            setIsLoading(true)
+            setError(null)
+        }
         try {
             const fetchedDocs = await getProductsAction()
 
+            let loadedCategories: Category[] | null = null
             // Fetch categories for filter panel
             try {
                 const catDocs = await getCategoriesAction()
-                setCategories(catDocs as Category[] || [])
+                loadedCategories = catDocs as Category[] || []
             } catch (ignore) { }
 
+            if (requestId !== productsLoadRequestId.current) return
+            if (loadedCategories) setCategories(loadedCategories)
             setProducts(fetchedDocs as Product[])
         } catch (err) {
+            if (requestId !== productsLoadRequestId.current) return
             const message = err instanceof Error ? err.message : t.dashboard.products.list.failedToLoad
-            setError(message)
+            if (showSkeleton) setError(message)
             toast.error(t.dashboard.products.list.failedToLoad, {
-                action: { label: t.dashboard.products.list.retry, onClick: () => loadProducts() },
+                action: { label: t.dashboard.products.list.retry, onClick: () => loadProducts({ showSkeleton }) },
             })
         } finally {
-            setIsLoading(false)
+            if (showSkeleton && requestId === productsLoadRequestId.current) setIsLoading(false)
         }
     }
 
@@ -301,8 +312,33 @@ export default function ProductsPage() {
         archived: products.filter(p => p.status === 'archived').length,
     }
 
-    const handleCreateAi = () => {
-        setShowBulkCreate(true)
+    const handleCreateAi = async () => {
+        const prompt = aiPrompt.trim()
+        if (!prompt || isPreparingAi) return
+
+        setIsPreparingAi(true)
+        try {
+            // Keep AI category data independent from the general/manual category state.
+            const categoryOptions = await getAiCategoriesAction()
+            if (categoryOptions.length === 0) {
+                toast.error(t.dashboard.products.bulkCreate.noCategoriesTitle, {
+                    description: t.dashboard.products.bulkCreate.noCategoriesDescription,
+                    action: {
+                        label: t.dashboard.products.bulkCreate.manageCategories,
+                        onClick: () => router.push('/products/categories'),
+                    },
+                })
+                return
+            }
+            setAiCategories(categoryOptions)
+            setAiModalPrompt(prompt)
+            setShowBulkCreate(true)
+        } catch (error) {
+            console.error('Failed to load AI categories', error)
+            toast.error(t.dashboard.products.list.failedToLoad)
+        } finally {
+            setIsPreparingAi(false)
+        }
     }
 
     const [publishGateFields, setPublishGateFields] = useState<string[] | null>(null)
@@ -407,7 +443,7 @@ export default function ProductsPage() {
                     <AlertCircle className="mx-auto h-12 w-12 text-[hsl(var(--destructive))]/60" />
                     <h2 className="mt-4 text-lg font-semibold text-foreground">{t.dashboard.products.list.failedToLoad}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-                    <Button onClick={loadProducts} className="mt-4">
+                    <Button onClick={() => loadProducts()} className="mt-4">
                         <RefreshCw className="h-4 w-4" /> {t.dashboard.products.list.retry}
                     </Button>
                 </div>
@@ -485,7 +521,7 @@ export default function ProductsPage() {
                                 variant="dashPrimary"
                                 size="dash"
                                 onClick={handleCreateAi}
-                                disabled={!aiPrompt.trim()}
+                                disabled={!aiPrompt.trim() || isPreparingAi}
                                 className="shrink-0 justify-center !h-6 !px-2.5 !text-[11.5px]"
                             >
                                 <Sparkles className="!h-3 !w-3" />
@@ -1187,10 +1223,12 @@ export default function ProductsPage() {
 
             {showBulkCreate && (
                 <BulkCreateModal
-                    initialPrompt={aiPrompt}
+                    initialPrompt={aiModalPrompt}
+                    categories={aiCategories}
                     onClose={() => setShowBulkCreate(false)}
+                    onPartialSuccess={() => loadProducts({ showSkeleton: false })}
                     onSuccess={() => {
-                        setAiPrompt('')
+                        setAiPrompt(currentPrompt => currentPrompt.trim() === aiModalPrompt ? '' : currentPrompt)
                         setFilterStatus('draft')
                         setSortBy('Latest')
                         loadProducts()

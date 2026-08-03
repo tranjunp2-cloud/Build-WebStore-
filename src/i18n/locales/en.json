@@ -1951,6 +1951,9 @@
                 "aiQuotaExceeded": "AI system is overloaded or out of quota. Please try again later.",
                 "aiTimeout": "AI system responses are too slow (Timeout). Please try again with shorter text.",
                 "rateLimitExceeded": "You've used all your AI generation attempts this hour. Try again in {minutes} min.",
+                "noCategoriesTitle": "Create a category before generating AI drafts",
+                "noCategoriesDescription": "AI products need an existing category. Add one, then try again.",
+                "manageCategories": "Manage Categories",
                 "previewTitle": "Preview Grid (AI Processed)",
                 "previewSubtitle": "Empty images will use a default carton icon when saved",
                 "colImage": "Image",
@@ -2045,6 +2048,7 @@
                     "hasProductsError": "Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.",
                     "tooManyChildrenError": "Cannot delete this category. It has {count} subcategories, more than can be safely moved at once. Please move some subcategories out first.",
                     "reparentNameConflictError": "Cannot delete this category yet. Moving its subcategories to the top level would create {count} duplicate category name conflict(s). Please rename or move the conflicting subcategories first.",
+                    "busyRetryError": "This category is being updated. Please try again.",
                     "cancel": "Cancel",
                     "confirm": "Delete",
                     "deleting": "Deleting..."

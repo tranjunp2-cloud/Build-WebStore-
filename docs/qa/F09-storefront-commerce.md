@@ -562,6 +562,24 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.251** | Integration | Critical | Bounds API trả min/max + distinct attribute map; empty catalog → zeros | Facet schema ổn định cho sidebar và catalog rỗng | F08 Phase01/05 | [x] |
 | **TC-F09.252** | Integration | Critical | Invalid site/filter params trả safe empty/default responsekhông 500 | Bad input bị bỏ qua hoặc short-circuit an toàn | F08 Phase01/05 | [x] |
 
+### TC-F09.253–261: Products Grid QA rework (GH-1665)
+
+> **File test nguồn:** `src/__tests__/unit/editor/settings-panel.test.tsx`, `src/__tests__/unit/blocks/products-grid.test.tsx`, `tests/product-grid-qa-rework.spec.ts`
+>
+> **Validation 2026-08-03:** TC-F09.253–261 đã qua automated validation (95/95 focused tests + typecheck): unit 71/71, API 18/18, Playwright 6/6. `/test-blocks` dùng production AppShell/global Tailwind CSS; browser assertions kiểm tra computed grid columns/display và dùng polling thay fixed waits. Artifact light/dark không hợp lệ đã được gỡ; real-editor visual/manual confirmation và screenshots light/dark của TC-F09.253 vẫn chờ trước QA handoff.
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.253** | Unit/Browser/Manual | High | Products Grid checkbox dùng semantic editor tokens | Automated computed styles light/dark giữ contrast; toggle ghi đúng `showCategoryFilter` boolean; real-editor visual confirmation vẫn bắt buộc | GH-1665 Phase01 | [ ] |
+| **TC-F09.254** | Unit/Browser | Critical | Grid/list hoạt động trong editor preview | `view` đổi được và giữ `editor/pageId/site` params | GH-1665 Phase01 | [x] |
+| **TC-F09.255** | Unit | Critical | Preview chỉ allow-list layout view | Filter và pagination vẫn bị intercept, không gọi router | GH-1665 Phase01 | [x] |
+| **TC-F09.256** | Unit/Browser | Critical | Filter reposition tới results anchor | Scroll ngay khi query đổi và thêm một lần sau khi kết quả mới settle | GH-1665 Phase02 | [x] |
+| **TC-F09.257** | Unit/Browser | Critical | Pagination dùng cùng results anchor | `page` kích hoạt reposition; đổi riêng `view` không scroll | GH-1665 Phase02 | [x] |
+| **TC-F09.258** | Unit/Browser | High | Loading giữ ổn định geometry vùng kết quả | Initial load có 6 card skeleton responsive; refetch giữ product cũ | GH-1665 Phase02 | [x] |
+| **TC-F09.259** | Unit/Browser | Critical | Mobile category accordion đóng sibling | Expand một branch đóng sibling subtree, giữ ancestor và selection state | GH-1665 Phase02 | [x] |
+| **TC-F09.260** | Browser | High | Mobile 375px không horizontal overflow | Product grid và filter drawer giữ `scrollWidth <= clientWidth` | GH-1665 Phase03 | [x] |
+| **TC-F09.261** | Unit | Critical | Rapid filter chỉ settle request mới nhất | Request A bị abort không clear reposition pending của request B | GH-1665 Phase02 | [x] |
+
 ### TC-F09.64: Product component variant guard
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |

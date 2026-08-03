@@ -12,6 +12,13 @@ created: 2026-07-10
 # F08 Category Management — Integrity & Integration Fixes
 
 Split into **2 PRs**. PR-1 = backend core + data integrity (merge first). PR-2 = storefront + AI (QA visual after).
+### GH-1588 Scope 02 lock
+
+- Only the AI bulk-create route and review flow change.
+- Manual Add/Edit Product keeps Category required at Save.
+- A null/stale AI match must be resolved with an existing category before Approve; never save an uncategorized AI draft and never auto-create a category.
+- Do not add Category to the global publish guard or Product collection hooks for this scope.
+
 
 ## Issue mapping
 
@@ -23,7 +30,7 @@ Split into **2 PRs**. PR-1 = backend core + data integrity (merge first). PR-2 =
 | #5, #12 | Single-select made official (no behavior change, doc + admin desc) | 1 | 05, 06 |
 | Issue1·mục2 | Category modal UX (contextual title, parent auto-fill/disable, dropdown hierarchy + L3 disable) | 1 | 05b |
 | #8 | Storefront product listing + 3-level sidebar filter | 2 | 08 |
-| #16 | AI bulk-parse tenant-aware real category mapping | 2 | 09 |
+| #1588 Scope 02 | AI bulk-parse tenant-aware real category mapping | 2 | 09, 10 |
 
 ## Phases
 
@@ -38,8 +45,8 @@ Split into **2 PRs**. PR-1 = backend core + data integrity (merge first). PR-2 =
 | 06 | [Docs update (PRD/stories/QA)](phase-06-docs-update.md) | 1 | No | done | 02,03,04,05,05b |
 | 07 | [Tests PR-1](phase-07-tests-pr1.md) | 1 | No | done | 01-05b |
 | 08 | [Storefront listing + sidebar filter](phase-08-storefront-listing.md) | 2 | No | pending | PR-1 merged |
-| 09 | [AI bulk-parse tenant-aware](phase-09-ai-bulk-parse-tenant-aware.md) | 2 | No | pending | PR-1 merged |
-| 10 | [Tests + QA PR-2](phase-10-tests-qa-pr2.md) | 2 | No | pending | 08,09 |
+| 09 | [AI bulk-parse tenant-aware](phase-09-ai-bulk-parse-tenant-aware.md) | 2 | No | completed | PR-1 merged |
+| 10 | [Tests + QA PR-2](phase-10-tests-qa-pr2.md) | 2 | No | in progress | 09 |
 
 **PR-1 Complete:** All phases 01–07 done. Ready for `git-manager` to open PR to staging with commit message `Relates to #5 #10 #11 #12 #14`.
 

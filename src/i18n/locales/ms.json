@@ -1951,6 +1951,9 @@
                 "aiQuotaExceeded": "Sistem AI terlalu sibuk atau kuota habis. Sila cuba lagi nanti.",
                 "aiTimeout": "Sistem AI memberi respons terlalu lambat (Masa Tamat). Sila cuba lagi dengan teks yang lebih pendek.",
                 "rateLimitExceeded": "Anda telah menggunakan semua percubaan penjanaan AI untuk jam ini. Cuba lagi dalam {minutes} minit.",
+                "noCategoriesTitle": "Cipta kategori sebelum menjana draf AI",
+                "noCategoriesDescription": "Produk AI memerlukan kategori sedia ada. Tambah satu, kemudian cuba lagi.",
+                "manageCategories": "Urus Kategori",
                 "previewTitle": "Grid Pratonton (Diproses AI)",
                 "previewSubtitle": "Imej kosong akan menggunakan ikon karton lalai apabila disimpan",
                 "colImage": "Imej",
@@ -2045,6 +2048,7 @@
                     "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
                     "tooManyChildrenError": "Tidak dapat memadamkan kategori ini. Ia mempunyai {count} subkategori, lebih daripada yang boleh dipindahkan dengan selamat sekaligus. Sila pindahkan sebahagian subkategori terlebih dahulu.",
                     "reparentNameConflictError": "Kategori ini belum boleh dipadamkan. Memindahkan subkategorinya ke tahap teratas akan mewujudkan {count} konflik nama kategori pendua. Sila namakan semula atau pindahkan subkategori yang bercanggah terlebih dahulu.",
+                    "busyRetryError": "Kategori ini sedang dikemas kini. Sila cuba lagi.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."

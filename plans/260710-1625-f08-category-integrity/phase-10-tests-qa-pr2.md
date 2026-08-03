@@ -1,15 +1,15 @@
-# Phase 10 — Tests + QA (PR-2)
+# Phase 10 — GH-1588 Scope 02 Tests + QA
 
-**PR:** 2 · **Migration:** No · **Priority:** P1 · **Status:** pending · **Depends:** 08, 09
+**PR:** 2 · **Migration:** No · **Priority:** P1 · **Status:** in progress · **Depends:** 09
 
 ## Context
 
-- PR-2 is storefront + AI — heavier on visual/integration than pure unit. Rule `.claude/rules/testing.md` still applies (TC-IDs, AAA, import from source).
-- Existing AI tests: `src/__tests__/api/ai.test.ts`, `src/__tests__/unit/dashboard/bulk-create-utils.test.ts`.
+- Scope is tenant-aware AI Bulk Create only; storefront filtering remains owned by Phase 08.
+- Follow `docs/TEST_CONVENTION.md`: TC-IDs, AAA, and imports from source.
 
 ## Overview
 
-Unit-test the AI category-mapping + bulk consumer logic; integration/visual-QA the storefront PLP + sidebar filter (can't fully unit-test SSR route rendering — script a manual QA checklist on a seeded tenant).
+Unit-test tenant category prompt/mapping, AI review required selection, and the AI-only server validation boundary; retain a focused Playwright browser/save scenario.
 
 ## Test Matrix
 
@@ -17,67 +17,80 @@ Unit-test the AI category-mapping + bulk consumer logic; integration/visual-QA t
 |----------|-------|------|----|
 | bulk-parse injects tenant categories, returns valid id/null | unit (mock openai+payload) | `src/__tests__/api/ai.test.ts` | new F08 TC |
 | dummy fallback returns categoryId null | unit | same | new |
-| BulkCreateModal maps valid id, drops invalid → null, no auto-create | unit | `bulk-create-utils.test.ts` (+ new) | new |
-| category descendant expansion for PLP filter | unit | new `storefront-category-filter.test.ts` | new |
-| PLP renders products + sidebar filters | manual QA | checklist below | #8 acceptance |
+| BulkCreateModal preselects valid ID; null/stale blocks Approve until existing category is selected | unit | `bulk-create-save.test.tsx` | TC-F08-04-100..102 |
+| selected-ID lookup canonicalizes/deduplicates IDs and rejects malformed input before querying | unit | `category-list-tenant-scope.test.ts` | TC-F08-04-100 |
+| raw selected-ID input is bounded before parsing/deduplication/Payload access | unit | `category-list-tenant-scope.test.ts` | TC-F08-04-108 |
+| pending/failed/retried partial refresh does not unmount the modal; stale response cannot overwrite final refresh | unit | `products-ai-open.test.tsx`, `bulk-create-save.test.tsx` | TC-F08-04-107 |
+| older AI completion preserves a newer prompt | unit | `products-ai-open.test.tsx` | TC-F08-04-104 |
+| zero active categories blocks parse and offers Category management | unit | `products-ai-open.test.tsx` | TC-F08-04-106 |
 
 ## Related Code Files
 
 **Create:**
-- `src/__tests__/unit/storefront/storefront-category-filter.test.ts` (descendant expansion util).
-- `src/__tests__/unit/dashboard/bulk-create-category-mapping.test.ts` (id validation, no auto-create).
+- `src/__tests__/api/e2e-ensure-test-user.test.ts` — guarded, idempotent Site-prerequisite provisioning coverage for a fresh CI tenant.
 
 **Modify:**
-- `src/__tests__/api/ai.test.ts` — new prompt/shape expectations.
-- `src/__tests__/unit/dashboard/bulk-create-utils.test.ts` — updated `buildSavePayload` category shape.
+- `e2e/products.spec.ts` — permanent UI/Server Action category selection, draft persistence, fresh-read and cleanup flow; no direct collection REST or hardcoded IDs.
+- `src/__tests__/api/ai.test.ts` — tenant query, prompt, canonical ID/null and bounded list.
+- `src/__tests__/unit/dashboard/bulk-create-save.test.tsx` — required selection, selected-ID revalidation and partial stale-category handling.
+- `src/__tests__/unit/dashboard/category-list-tenant-scope.test.ts` — dedicated primary-tenant AI list and selected-ID lookup.
+- `src/__tests__/unit/dashboard/products-ai-open.test.tsx` — fresh category preparation before modal open.
+- `src/__tests__/unit/actions/save-product-action.test.ts` — AI-only category boundary and manual save-action contract.
+- `src/app/api/e2e/ensure-test-user/route.ts` — guarded, idempotent Site prerequisite for a fresh CI tenant.
+- `.github/workflows/e2e-staging.yml` — permanent fixture allowlist and fresh-tenant prerequisite contract.
 
-**Read for context:** Phase 08 + 09 implementation files.
+**Read for context:** Phase 09 implementation files.
 
-## Manual QA Checklist (storefront #8)
+## Manual QA Checklist (Scope 02)
 
-- [ ] `/sites/[slug]/products` loads, shows published products only.
-- [ ] Sidebar shows 3-level category tree.
-- [ ] Click L1 → products from L1 + all descendants.
-- [ ] Click L2 / L3 → correctly narrowed.
-- [ ] `?category=` in URL persists on refresh/share.
-- [ ] Empty state when category has no products.
-- [ ] Soft-deleted categories/products not shown.
-- [ ] No route-collision / build errors.
+- [ ] Valid AI category is preselected from the current tenant.
+- [ ] Null/stale AI category blocks Approve until an existing category is selected.
+- [ ] Approving drafts never creates a new category.
+- [ ] Every saved AI draft has exactly one existing tenant category.
+- [ ] Manual Add/Edit Product still blocks Save without Category.
+- [ ] A tenant with no active category cannot start parsing and can navigate to Category management.
+- [ ] After a partial save failure, unsaved drafts remain in the open modal even if refresh fails; an older refresh cannot overwrite the final product list.
+- [ ] Typing a new prompt while an older request is pending does not lose the newer prompt.
 
 ## Implementation Steps
 
-1. Update AI + bulk-create unit tests to new tenant-aware shape; mock OpenAI + payload category fetch.
-2. Add descendant-expansion unit test (pure function, no DB).
-3. Run `npm test` — green on new/changed.
-4. Execute manual QA checklist on seeded tenant; capture findings.
-5. Report failures back to implementers (no faking).
+1. Update API, modal, page and action tests for tenant-aware category IDs.
+2. Run focused unit tests and Playwright discovery.
+3. Execute the Scope 02 manual QA checklist on a seeded tenant.
+4. Record dependency/environment blockers without claiming unexecuted coverage.
 
 ## Todo
 
-- [ ] AI bulk-parse tenant-aware unit tests
-- [ ] BulkCreateModal id-mapping unit tests (no auto-create)
-- [ ] Storefront descendant-filter unit test
-- [ ] `npm test` green
+- [x] AI bulk-parse tenant-aware unit tests
+- [x] BulkCreateModal id-mapping/required-selection unit tests (no auto-create)
+- [x] AI-only forced-draft, active-tenant-category, stale-category, and manual save-action contract regression tests
+- [x] Permanent UI/Server Action Playwright fixture included in staging CI allowlist
+- [x] Guarded setup idempotently ensures the fresh tenant's single Site prerequisite
+- [x] Focused Scope 02 verification green (6 files / 128/128 tests); AI API file remains dependency-blocked
+- [x] Browser verification green (2/2); active product/category fixture residue 0/0
 - [ ] Manual QA checklist executed + signed off
-- [ ] TC-IDs referenced from updated F08 QA doc
+- [x] TC-IDs referenced from updated F08 QA doc
 
 ## Success Criteria
 
-- All new/updated unit tests pass; no regressions.
-- Manual QA checklist fully passes on seeded tenant.
-- No junk categories created during a real bulk import run.
+- Focused new/updated unit tests pass.
+- Scope 02 manual QA passes on a seeded tenant.
+- No junk category is created during a real bulk import.
+- No AI-created product is saved without exactly one existing category; manual ProductForm behavior remains unchanged.
+- Permanent E2E creates, verifies and removes fixture data without direct collection REST or hardcoded IDs.
 
 ## Risk Assessment
 
 | Risk | L×I | Mitigation |
 |------|-----|-----------|
-| SSR PLP hard to unit-test | High×Low | Cover logic (filter util) in unit; page-level via manual QA |
+| Category changes between modal preflight and save | Med×Med | AI-only Server Action revalidates active tenant ownership and returns `CATEGORY_INVALID` as a serializable result. |
 | AI mock diverges from real API shape | Med×Med | Assert against documented JSON contract; smoke-test with real key in staging |
+| Failed/out-of-order partial refresh or stale async completion destroys current UI state | Med×High | Regression tests assert the modal stays mounted, only the latest product response applies, and only the completed session's prompt may be cleared. |
 
 ## Security
 
-- Verify storefront tests assert public-read scoping (published + non-deleted only).
+- Verify category reads and saves are scoped to the actor’s resolved primary tenant and non-deleted categories.
 
 ## Next Steps
 
-- On green + QA sign-off → code-reviewer → git-manager PR-2 to staging (`Relates to #8 #16`).
+- On green + QA sign-off → code-reviewer → PR to staging (`Relates to #1588`).

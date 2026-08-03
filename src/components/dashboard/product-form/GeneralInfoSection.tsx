@@ -57,11 +57,18 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
 
             {/* Category */}
             <div className="flex flex-col gap-2" id="categoryIds">
-                <label className="text-[14px] font-semibold text-foreground leading-[1.43]">
+                <label
+                    id="product-category-label"
+                    htmlFor="product-category-select"
+                    className="text-[14px] font-semibold text-foreground leading-[1.43]"
+                >
                     {t.dashboard.products.form.sections?.category || 'Category'} <span className="text-foreground">*</span>
                 </label>
                 <CategorySelect
                     categories={categories}
+                    triggerId="product-category-select"
+                    ariaLabelledBy="product-category-label"
+                    errorId="product-category-error"
                     selectedIds={categoryIds || []}
                     onChange={(ids) => setValue('categoryIds', ids, { shouldDirty: true, shouldValidate: true })}
                     error={errors.categoryIds?.message}
