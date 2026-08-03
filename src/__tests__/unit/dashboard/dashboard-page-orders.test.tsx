@@ -63,9 +63,6 @@ vi.mock('@/components/dashboard/revamp/traffic-performance', () => ({
 vi.mock('@/components/dashboard/revamp/seo-health', () => ({
     SeoHealth: () => <div data-testid="seo-block" />,
 }))
-vi.mock('@/components/dashboard/revamp/seo-tools', () => ({
-    SeoTools: () => <div data-testid="tools-block" />,
-}))
 vi.mock('@/components/dashboard/revamp/pending-orders', () => ({
     PendingOrders: ({ data }: { data: PendingOrdersLoadState }) => (
         <div data-testid="pending-orders-block">{data.state}</div>
@@ -232,7 +229,7 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         expect(screen.getByTestId('glance-block')).toBeInTheDocument()
         expect(screen.getByTestId('traffic-block')).toBeInTheDocument()
         expect(screen.getByTestId('seo-block')).toBeInTheDocument()
-        expect(screen.getByTestId('tools-block')).toBeInTheDocument()
+        expect(screen.queryByTestId('tools-block')).not.toBeInTheDocument()
         expect(errorSpy).toHaveBeenCalledWith('[Dashboard] Pending Orders data is unavailable')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('ORD-SECRET')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('tenant 42')
