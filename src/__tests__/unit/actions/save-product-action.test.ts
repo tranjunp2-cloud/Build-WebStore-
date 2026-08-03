@@ -1094,7 +1094,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
     it('returns the existing AI draft for a stable-slug replay without creating a duplicate', async () => {
         const stableSlug = 'test-product-ai-1234567890abcdef1234567890abcdef'
-        mockFind.mockResolvedValueOnce({ docs: [{ id: 42, slug: stableSlug, aiReviewPending: true }] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 42, slug: stableSlug, aiReviewPending: true, category: [123] }] })
 
         await expect(saveAiProductAction({
             ...PRODUCT_WITH_IMAGES,
@@ -1122,7 +1122,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         const stableSlug = 'test-product-ai-fedcba0987654321fedcba0987654321'
         mockFind
             .mockResolvedValueOnce({ docs: [] })
-            .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableSlug, aiReviewPending: true }] })
+            .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableSlug, aiReviewPending: true, category: [123] }] })
         mockWithActiveCategoryRowLock.mockRejectedValueOnce(new Error('commit acknowledgement lost'))
 
         await expect(saveAiProductAction({
@@ -1133,6 +1133,97 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
         expect(mockFind).toHaveBeenCalledTimes(2)
         expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-113] rejects a different-category replay visible during the initial lookup', async () => {
+        // Arrange
+        const stableSlug = 'test-product-ai-abcdef1234567890abcdef1234567890'
+        const committedInCategoryA = {
+            id: 43,
+            slug: stableSlug,
+            aiReviewPending: true,
+            category: [123],
+        }
+        mockFind.mockResolvedValueOnce({ docs: [committedInCategoryA] })
+
+        // Act & Assert
+        await expect(saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [456],
+        })).rejects.toThrow('This AI draft was already saved to a different category')
+
+        expect(mockFind).toHaveBeenCalledOnce()
+        expect(mockWithActiveCategoryRowLock).not.toHaveBeenCalled()
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-113] rejects a different-category winner found after a concurrent unique collision', async () => {
+        // Arrange
+        const stableSlug = 'test-product-ai-0123456789abcdef0123456789abcdef'
+        const committedInCategoryA = {
+            id: 44,
+            slug: stableSlug,
+            aiReviewPending: true,
+            category: [123],
+        }
+        mockFind
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [committedInCategoryA] })
+        mockCreate.mockRejectedValueOnce(new Error('Value must be unique: slug'))
+
+        // Act & Assert
+        await expect(saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [456],
+        })).rejects.toThrow('This AI draft was already saved to a different category')
+
+        expect(mockFind).toHaveBeenCalledTimes(2)
+        expect(mockWithActiveCategoryRowLock).toHaveBeenCalledWith(
+            expect.anything(),
+            456,
+            68,
+            expect.any(Function),
+        )
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ slug: stableSlug }),
+        }))
+    })
+
+    it('[TC-F08-04-114] replays a same-category winner after a concurrent unique collision', async () => {
+        // Arrange
+        const stableSlug = 'test-product-ai-11111111111111111111111111111111'
+        const committedInSameCategory = {
+            id: 45,
+            slug: stableSlug,
+            aiReviewPending: true,
+            category: [123],
+        }
+        mockFind
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [committedInSameCategory] })
+        mockCreate.mockRejectedValueOnce(new Error('Value must be unique: slug'))
+
+        // Act
+        const result = await saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [123],
+        })
+
+        // Assert
+        expect(result).toMatchObject({ id: 45, slug: stableSlug })
+        expect(mockFind).toHaveBeenCalledTimes(2)
+        expect(mockWithActiveCategoryRowLock).toHaveBeenCalledWith(
+            expect.anything(),
+            123,
+            68,
+            expect.any(Function),
+        )
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ slug: stableSlug }),
+        }))
     })
 
     it('[TC-F08-04-111] exposes a clear retry message when the category lock is busy', async () => {
