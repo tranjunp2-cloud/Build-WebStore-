@@ -124,9 +124,13 @@ export function MobileFilterDrawer({
         const expanded = new Set<string>()
 
         const visit = (node: CategoryTreeNode): boolean => {
-            if (node.children.length === 0) return activeCategorySet.has(node.id)
-            const containsActive = activeCategorySet.has(node.id) || node.children.some((child) => visit(child))
-            if (containsActive) expanded.add(node.id)
+            let containsActive = activeCategorySet.has(node.id)
+
+            node.children.forEach((child) => {
+                if (visit(child)) containsActive = true
+            })
+
+            if (node.children.length > 0 && containsActive) expanded.add(node.id)
             return containsActive
         }
 

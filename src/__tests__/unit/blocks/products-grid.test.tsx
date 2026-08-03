@@ -1246,6 +1246,71 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         expect(within(dialog).getByText('B Leaf')).toBeInTheDocument()
     })
 
+    it('[TC-F09.259] restores a selected grandchild path when its parent is also selected', async () => {
+        // Arrange
+        render(
+            <MobileFilterDrawer
+                activeFilters={{ categoryIds: ['root', 'grandchild'], minPrice: null, maxPrice: null, search: null, attributeFilters: {}, serializedAttributes: '' }}
+                bounds={{ minPrice: 0, maxPrice: 0, attributes: [] }}
+                categories={[
+                    { id: 'root', name: 'Root', slug: 'root', parent: null },
+                    { id: 'child', name: 'Child', slug: 'child', parent: 'root' },
+                    { id: 'grandchild', name: 'Grandchild', slug: 'grandchild', parent: 'child' },
+                ]}
+                filterButtonLabel="Filters"
+                onApplyFilters={vi.fn()}
+                pricePrefix="$"
+                primaryColor="#84bd00"
+                saveButtonLabel="Save Filters"
+                sections={{ title: 'Filters', search: 'Search', categories: 'Categories', price: 'Price' }}
+                searchPlaceholder="Search products"
+            />,
+        )
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+        const dialog = await screen.findByRole('dialog', { name: 'Filters' })
+
+        // Assert
+        expect(within(dialog).getByRole('checkbox', { name: 'Root' })).toHaveAttribute('data-state', 'checked')
+        expect(within(dialog).getByRole('button', { name: 'Collapse Child' })).toHaveAttribute('aria-expanded', 'true')
+        expect(within(dialog).getByRole('checkbox', { name: 'Grandchild' })).toHaveAttribute('data-state', 'checked')
+    })
+
+    it('[TC-F09.259] restores selected leaves in two sibling branches under the same root', async () => {
+        // Arrange
+        render(
+            <MobileFilterDrawer
+                activeFilters={{ categoryIds: ['leaf-a', 'leaf-b'], minPrice: null, maxPrice: null, search: null, attributeFilters: {}, serializedAttributes: '' }}
+                bounds={{ minPrice: 0, maxPrice: 0, attributes: [] }}
+                categories={[
+                    { id: 'root', name: 'Root', slug: 'root', parent: null },
+                    { id: 'branch-a', name: 'Branch A', slug: 'branch-a', parent: 'root' },
+                    { id: 'leaf-a', name: 'Leaf A', slug: 'leaf-a', parent: 'branch-a' },
+                    { id: 'branch-b', name: 'Branch B', slug: 'branch-b', parent: 'root' },
+                    { id: 'leaf-b', name: 'Leaf B', slug: 'leaf-b', parent: 'branch-b' },
+                ]}
+                filterButtonLabel="Filters"
+                onApplyFilters={vi.fn()}
+                pricePrefix="$"
+                primaryColor="#84bd00"
+                saveButtonLabel="Save Filters"
+                sections={{ title: 'Filters', search: 'Search', categories: 'Categories', price: 'Price' }}
+                searchPlaceholder="Search products"
+            />,
+        )
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Filters' }))
+        const dialog = await screen.findByRole('dialog', { name: 'Filters' })
+
+        // Assert
+        expect(within(dialog).getByRole('button', { name: 'Collapse Branch A' })).toHaveAttribute('aria-expanded', 'true')
+        expect(within(dialog).getByRole('checkbox', { name: 'Leaf A' })).toHaveAttribute('data-state', 'checked')
+        expect(within(dialog).getByRole('button', { name: 'Collapse Branch B' })).toHaveAttribute('aria-expanded', 'true')
+        expect(within(dialog).getByRole('checkbox', { name: 'Leaf B' })).toHaveAttribute('data-state', 'checked')
+    })
+
     it('[TC-F09.261] keeps the latest reposition pending when a rapid filter change aborts its predecessor', async () => {
         // Arrange
         let productRequestCount = 0
