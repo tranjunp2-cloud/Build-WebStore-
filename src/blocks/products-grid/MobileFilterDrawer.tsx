@@ -89,6 +89,11 @@ function buildCategoryTree(categories: SidebarCategory[]): CategoryTreeNode[] {
     return roots
 }
 
+function removeExpandedSubtree(expandedIds: Set<string>, node: CategoryTreeNode) {
+    expandedIds.delete(node.id)
+    node.children.forEach((child) => removeExpandedSubtree(expandedIds, child))
+}
+
 export function MobileFilterDrawer({
     activeFilters,
     bounds,
@@ -153,11 +158,17 @@ export function MobileFilterDrawer({
         ))
     }
 
-    const toggleExpanded = (categoryId: string) => {
+    const toggleExpanded = (node: CategoryTreeNode, siblings: CategoryTreeNode[]) => {
         setExpandedIds((current) => {
             const next = new Set(current)
-            if (next.has(categoryId)) next.delete(categoryId)
-            else next.add(categoryId)
+            if (next.has(node.id)) {
+                removeExpandedSubtree(next, node)
+            } else {
+                siblings.forEach((sibling) => {
+                    if (sibling.id !== node.id) removeExpandedSubtree(next, sibling)
+                })
+                next.add(node.id)
+            }
             return next
         })
     }
@@ -179,7 +190,7 @@ export function MobileFilterDrawer({
         })
     }
 
-    const renderCategoryNode = (node: CategoryTreeNode, depth: number) => {
+    const renderCategoryNode = (node: CategoryTreeNode, depth: number, siblings: CategoryTreeNode[]) => {
         const hasChildren = node.children.length > 0
         const isExpanded = hasChildren && expandedIds.has(node.id)
         const isChecked = draftCategorySet.has(node.id)
@@ -210,7 +221,7 @@ export function MobileFilterDrawer({
                             aria-label={((isExpanded ? productText.collapseCategory : productText.expandCategory) || (isExpanded ? 'Collapse' : 'Expand')) + ' ' + node.name}
                             aria-expanded={isExpanded}
                             className="shrink-0 rounded-sm p-1 text-[18px] leading-none text-[var(--text-secondary)] transition-transform duration-200"
-                            onClick={() => toggleExpanded(node.id)}
+                            onClick={() => toggleExpanded(node, siblings)}
                         >
                             <span aria-hidden="true" className={'block transition-transform' + (isExpanded ? ' rotate-90' : '')}>
                                 ›
@@ -220,7 +231,7 @@ export function MobileFilterDrawer({
                 </div>
                 {hasChildren && isExpanded ? (
                     <div className="mt-1 space-y-3">
-                        {node.children.map((child) => renderCategoryNode(child, depth + 1))}
+                        {node.children.map((child) => renderCategoryNode(child, depth + 1, node.children))}
                     </div>
                 ) : null}
             </React.Fragment>
@@ -327,7 +338,7 @@ export function MobileFilterDrawer({
                                 <div
                                     className="max-h-[260px] space-y-3 overflow-y-auto pr-2 [scrollbar-color:rgba(var(--brand-primary-rgb),0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(var(--brand-primary-rgb),0.28)] [&::-webkit-scrollbar-thumb:hover]:bg-[rgba(var(--brand-primary-rgb),0.42)]"
                                 >
-                                    {categoryTree.map((category) => renderCategoryNode(category, 0))}
+                                    {categoryTree.map((category) => renderCategoryNode(category, 0, categoryTree))}
                                 </div>
                             </section>
                         ) : null}

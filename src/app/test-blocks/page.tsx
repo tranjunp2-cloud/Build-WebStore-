@@ -1,4 +1,5 @@
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
 
 // Prevent static prerender — SiteRenderer imports block registry which
@@ -34,10 +35,12 @@ export default function TestBlocksPage() {
     }
 
     return (
-        <I18nProvider>
-            <div className="bg-black text-white min-h-screen">
-                <SiteRenderer site={site} page={page} />
-            </div>
-        </I18nProvider>
+        <AppShell>
+            <I18nProvider>
+                <div className="min-h-screen bg-black text-white">
+                    <SiteRenderer site={site} page={page} />
+                </div>
+            </I18nProvider>
+        </AppShell>
     )
 }

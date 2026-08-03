@@ -28,7 +28,7 @@ export { DiagonalStripe } from './decorative/DiagonalStripe'
 interface BlobProps {
     color: string
     className?: string
-    size?: number
+    size?: number | string
     opacity?: number
 }
 
