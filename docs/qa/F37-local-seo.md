@@ -1,14 +1,19 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 3.4 | **Updated:** 2026-07-30 | **Owner:** QA Team
+> **Version:** 3.9 | **Updated:** 2026-07-31 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v3.9 (2026-07-31)** — Reconciled TC-16 with TC-52: `llms.txt` keeps its 10-URL bound but selects oldest public pages, products, and blogs in deterministic round-robin order so an available content type cannot be starved by an earlier group.
+- **v3.8 (2026-07-31)** — Aligned E2E fixture discovery with the product invariant of one account, one active tenant, and one site. TC-28/29 use an E2E-only, status-only route guarded by staging-only execution, the server-configured `TEST_EMAIL`, authenticated session, and active-tenant ownership; cleanup verifies and retries restoration in `finally`. A single account-backed run now covers both states without F37-specific env variables or production publish side effects.
+- **v3.7 (2026-07-30)** — Account-backed fixture discovery now consumes hydrated active tenants plus an opt-in, tenant-scoped, whitelisted site-status summary from `/api/users/me?include=site-status`. Publish state is therefore independent of the public endpoints under test without adding work to normal profile requests. Missing unpublished or custom-domain data fails only its owning TC, and custom-domain probes require an HTTPS public DNS hostname, pin Chromium to the validated IP, and block cross-origin requests.
+- **v3.6 (2026-07-30)** — CI reachability fix: the unchanged staging workflow still selects `storefront-regression`, which now depends on `f37-regression → setup`; TC-49 inspects the exported project graph and guards the existing workflow selection without F37-specific env variables.
+- **v3.5 (2026-07-30)** — PR review regression closeout: custom-domain product/blog detail loaders now resolve the forwarded hostname, require an active domain, and keep blog lookup site-scoped. TC-52 derives its active custom-domain fixture from `TEST_EMAIL`, requires product/blog details in both sitemap and llms, and rejects redirects or non-200 renders.
 - **v3.4 (2026-07-30)** — Product ownership clarified: #1311 closes on FR-12..14 route/UI behavior and hands trusted crawler/sitemap/llms facts to #1312; #1312 alone owns 9/5/1 attribution and the 100-point scorecard. TC-51 prevents Story Sync from moving score-engine acceptance back into #1311.
-- **v3.3 (2026-07-30)** — Review findings fixed: the staging workflow now executes TC-28/29 with fail-closed repository-variable fixtures; TC-49/50 guard workflow and documentation wiring; stale crawler-toggle, auto-meta, architecture, environment, and verification wording was reconciled. Exact 9/5/1 score integration remains atomically owned by #1312 because changing only the legacy AI bucket would make the current total max 95.
+- **v3.3 (2026-07-30)** — Review findings fixed: a dedicated Playwright project discovers TC-28/29 with fail-closed account-owned fixtures while shared workflows remain unchanged; TC-49/50 guard project configuration and documentation alignment. Exact 9/5/1 score integration remains atomically owned by #1312 because changing only the legacy AI bucket would make the current total max 95.
 - **v3.2 (2026-07-30)** — Review hardening made public-route resource use explicit: llms Key Pages are capped at 10 deterministic real URLs from bounded field-selected candidate queries, and sitemap queries are bounded and select only serialization fields. Live TC-28..30 and #1312 9/5/1 evidence remain pending.
 - **v3.1 (2026-07-29)** — Reconciled US-F37-03 with PRD v2.6: retired seller opt-out/action wording, registered unique TC-F37-03-01..48 evidence, added published/unpublished public-route Playwright coverage plus authenticated Dashboard absence coverage, and recorded #1312 as the remaining 9/5/1 score-integration dependency.
 - **v2.18 (2026-07-31)** — Registered `TC-F37-01-30` for the PR #1708 review regression: rapid `localBusiness` edits must be serialized and coalesced so a slower, older PATCH cannot overwrite newer address fields. The component sends sparse field patches to the Editor owner; the owner maintains revisioned snapshots and one queue per site, preserves queued site A work while site B saves independently, and prevents a same-site page refetch from replacing pending optimistic data with an older DB snapshot. Successful analytics now fire once per persisted batch from that batch's full snapshot. Deterministic regressions cover all of these ordering cases.
@@ -64,9 +69,9 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 |---|---|
 | Framework | Vitest unit/integration tests + Playwright browser acceptance |
 | Test files | F37 unit/API coverage under `src/__tests__/`; public browser coverage in `tests/f37-ai-discoverability.spec.ts`; authenticated Dashboard coverage in `e2e/dashboard.spec.ts` |
-| Execution | Focused Vitest gates, full `npm test -- --run`, Playwright discovery, and live staging workflow |
-| Coverage | Route behavior, tenant/custom-domain isolation, output safety, Dashboard control retirement, workflow wiring, and the existing Phase-1 score/schema helpers |
-| Test data | Unit fixtures plus stable published/unpublished staging storefront paths stored as non-sensitive GitHub repository Variables |
+| Execution | Focused Vitest gates, full `npm test -- --run`, Playwright project discovery, and targeted live staging runs |
+| Coverage | Route behavior, tenant/custom-domain isolation, output safety, Dashboard control retirement, Playwright project wiring, and the existing Phase-1 score/schema helpers |
+| Test data | Unit fixtures plus the single hydrated active tenant and single whitelisted site status owned by `TEST_EMAIL`; the spec uses the guarded E2E-only route to change only that QA site's `status` field and verifies/restores it after each TC, reads active custom domains from the hydrated tenant document, rejects non-public DNS targets, and keeps storefront assertions public |
 | Security | XSS payloads (</script>, <img onerror>, <script>alert) tested; sanitization verified |
 
 ---
@@ -185,7 +190,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-13** | FR-14 | Unit | llms.txt emits site name as H1 | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-14** | FR-14 | Unit | llms.txt emits description as blockquote | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-15** | FR-14 | Unit | llms.txt emits Key Pages heading | `[x] AUTO` `llms-txt.test.ts` |
-| **TC-F37-03-16** | FR-14 | Regression | Lists at most 10 unique real public URLs in deterministic homepage/page/product/blog priority from bounded, field-selected candidate queries; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-16** | FR-14 | Regression | Lists at most 10 unique real public URLs using deterministic round-robin coverage across available pages, products, and blogs from bounded, field-selected candidate queries; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-17** | FR-14 | Unit | Public URLs use Markdown list syntax | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-18** | FR-14 | Unit | Contact section appears when data exists | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-19** | FR-14 | Unit | Contact section includes phone | `[x] AUTO` `llms-txt.test.ts` |
@@ -197,8 +202,8 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-25** | AC-02 / FR-14 | Unit | llms.txt returns 404 without a published site | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-26** | FR-14 | Edge | Missing description uses safe fallback copy | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-27** | FR-12 / AC-03 | Unit | Persisted Dashboard preferences drop retired Tools block | `[x] AUTO` `dashboard-blocks.test.ts` |
-| **TC-F37-03-28** | AC-01 / FR-12..14 | Playwright | Published storefront exposes robots, sitemap and llms | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — live staging PASS 2026-07-30 (`/sites/kedai-demo`) |
-| **TC-F37-03-29** | AC-02 / FR-12..14 | Playwright | Unpublished storefront returns crawler 200, sitemap/llms 404 | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — live staging PASS 2026-07-30 (`/sites/e2e-test`) |
+| **TC-F37-03-28** | AC-01 / FR-12..14 | Playwright | Published storefront exposes robots, sitemap and llms | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — single-site account-derived local PASS in the combined 2026-07-31 run; earlier path-variable staging PASS (`/sites/kedai-demo`) |
+| **TC-F37-03-29** | AC-02 / FR-12..14 | Playwright | Unpublished storefront returns crawler 200, sitemap/llms 404 | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — single-site account-derived local PASS in the combined 2026-07-31 run; earlier path-variable staging PASS (`/sites/e2e-test`) |
 | **TC-F37-03-30** | AC-03 / FR-12 | Playwright | Dashboard exposes no retired seller controls | `[x] AUTO` `e2e/dashboard.spec.ts` — authenticated staging run pending |
 | **TC-F37-03-31** | FR-14 | Edge | Empty published storefront lists only its real homepage | `[x] AUTO` `llms-txt.test.ts` |
 | **TC-F37-03-32** | FR-14 | Security | Blog/product discovery queries are site-scoped | `[x] AUTO` `llms-txt.test.ts` |
@@ -218,9 +223,10 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-46** | AC-03 / FR-13..14 | Resilience | One endpoint failure does not change the others | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
 | **TC-F37-03-47** | FR-12..14 | Security | All routes reject inactive custom domains | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
 | **TC-F37-03-48** | FR-14 | Security | Seller text stays inline and content slugs are encoded | `[x] AUTO` `llms-txt.test.ts` |
-| **TC-F37-03-49** | AC-01..03 / CI | Regression | Staging workflow executes the F37 public spec with both repository-variable fixtures | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-49** | AC-01..03 / Config | Regression | Existing workflow selection reaches account-derived `f37-regression` through the storefront project dependency, without F37-specific env variables or shared-workflow changes; opt-in site status is restricted to active memberships | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts`, `api-users-me.test.ts` |
 | **TC-F37-03-50** | FR-12 / Docs | Regression | Closeout docs do not reintroduce the retired crawler toggle, overclaim auto-meta removal, or reference deleted `SeoTools` | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
 | **TC-F37-03-51** | Ownership / Docs | Regression | Story Sync keeps #1311 route/UI-only and assigns 9/5/1 score integration to #1312 | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-52** | AC-01 / FR-13..14 | Regression | Active custom-domain product/blog details resolve within the selected site; inactive domains are rejected; sitemap and llms must each advertise direct 200 product/blog renders on the custom origin | `[x] AUTO` `custom-domain-detail-routes.test.ts`, `tests/f37-ai-discoverability.spec.ts` — account-derived live run awaits an active custom domain |
 
 **Score handoff:** #1312 must add score-level evidence that crawler/sitemap/llms contribute exactly 9/5/1, unpublished sites score 9/0/0, and sitemap/llms failures deduct independently. Those are US-F37-04 integration tests and do not block #1311 route/UI acceptance.
 
@@ -555,7 +561,7 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 | Focused US-F37-03 unit/config | 7 files, 65 tests | ✅ PASS |
 | Full Vitest regression | 662 files, 11,114 tests | ✅ PASS |
 | TypeScript + lint | `npm run typecheck`; `npm run lint` | ✅ 0 errors; repository baseline warnings only |
-| Playwright discovery | storefront TC-28/29; authenticated Dashboard TC-30 | ✅ DISCOVERED |
+| Exact staging CI discovery | Unchanged selection reaches TC-28/29/52 via `storefront-regression → f37-regression → setup`; TC-30 via `chromium` | ✅ DISCOVERED |
 | Live public staging acceptance | TC-28/29 against `/sites/kedai-demo` and `/sites/e2e-test` | ✅ 2/2 PASS (2026-07-30) |
 | Live authenticated staging acceptance | TC-30 Dashboard seller-control absence | 🟡 Pending authenticated staging run |
 
@@ -592,6 +598,6 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ---
 
-**US-F37-03 Last Verified:** 2026-07-30 — focused US-F37-03/config gate 7 files / 65 tests passed; full Vitest 662 files / 11,114 tests passed; typecheck and lint completed with 0 errors; migration guard and diff check passed; TC-28/29/30 are discoverable. Public TC-28/29 passed live staging 2/2 with repository-variable fixtures; authenticated TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.
+**US-F37-03 Last Verified:** 2026-08-03 — focused F37/API coverage passed 79/79 across 10 files; typecheck and lint exited 0 (lint retains baseline warnings only). Playwright discovery reaches setup plus TC-28/29/52 and setup plus TC-30 without dedicated F37 environment variables or workflow changes. The single-site account-backed local run passed TC-28/29 and restored the initial site status; local custom-domain route simulation passed, while real DNS/TLS evidence for TC-52 still requires an active custom domain and authenticated staging TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.
 
 **US-F37-01 Last Verified:** 2026-07-30 (the score API regression covers persisted 20/12 plus 401/403 while preserving legacy Business = 35. The guarded local Playwright run passes auth setup plus TC-F37-01-26/27 **3/3** with fixture restoration; no live staging E2E pass is claimed. #1312 retains the atomic F37 §5 top-level 20/35/15/30 and dashboard/checklist cutover.)

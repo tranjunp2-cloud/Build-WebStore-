@@ -178,7 +178,7 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     // ────────────────────────────────────────────────────────────────
     // TC-F37-03-16: Key Pages are real, bounded, and deterministic
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-16: lists at most 10 real public URLs in deterministic content priority', async () => {
+    it('TC-F37-03-16: lists at most 10 real public URLs with deterministic content-type coverage', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -231,21 +231,51 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         expect(urls).toEqual([
             'https://mycafe.primeweb.app',
             'https://mycafe.primeweb.app/page-1',
-            'https://mycafe.primeweb.app/page-2',
-            'https://mycafe.primeweb.app/page-3',
-            'https://mycafe.primeweb.app/page-4',
-            'https://mycafe.primeweb.app/page-5',
-            'https://mycafe.primeweb.app/page-6',
-            'https://mycafe.primeweb.app/page-7',
             'https://mycafe.primeweb.app/products/espresso',
+            'https://mycafe.primeweb.app/blog/coffee-facts',
+            'https://mycafe.primeweb.app/page-2',
             'https://mycafe.primeweb.app/products/cappuccino',
+            'https://mycafe.primeweb.app/blog/brewing-guide',
+            'https://mycafe.primeweb.app/page-3',
+            'https://mycafe.primeweb.app/products/latte',
+            'https://mycafe.primeweb.app/page-4',
         ])
         expect(urls).toHaveLength(10)
-        expect(body).not.toContain('/products/latte')
-        expect(body).not.toContain('/blog/coffee-facts')
-        expect(mockFind.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ sort: 'createdAt', select: { slug: true, isHomepage: true }, limit: 10 }))
-        expect(mockFind.mock.calls[3]?.[0]).toEqual(expect.objectContaining({ sort: 'createdAt', select: { slug: true }, limit: 10 }))
-        expect(mockFind.mock.calls[4]?.[0]).toEqual(expect.objectContaining({ sort: 'createdAt', select: { slug: true }, limit: 5 }))
+        expect(body).not.toContain('/products/mocha')
+        expect(body).not.toContain('/page-5')
+        expect(mockFind.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true, isHomepage: true }, limit: 10 }))
+        expect(mockFind.mock.calls[3]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true }, limit: 10 }))
+        expect(mockFind.mock.calls[4]?.[0]).toEqual(expect.objectContaining({ sort: ['createdAt', 'id'], select: { slug: true }, limit: 5 }))
+        // The selector must skip a duplicate URL and continue filling from a
+        // non-empty group when another content group has no candidates.
+        mockFind.mockReset()
+        mockFind
+            .mockResolvedValueOnce({ docs: [mockTenant] })
+            .mockResolvedValueOnce({ docs: [mockSite] })
+            .mockResolvedValueOnce({ docs: [
+                { id: 'p1', slug: 'products/espresso', isHomepage: false },
+                { id: 'p2', slug: 'about', isHomepage: false },
+            ] })
+            .mockResolvedValueOnce({ docs: [
+                { id: 'pr1', slug: 'espresso' },
+                { id: 'pr2', slug: 'latte' },
+            ] })
+            .mockResolvedValueOnce({ docs: [] })
+
+        const partialResponse = await getLlmsTxt(
+            { headers: new Map([['x-tenant-hostname', '']]) as any } as any,
+            { params: Promise.resolve({ slug: 'mycafe' }) },
+        )
+        const partialUrls = (await partialResponse.text())
+            .split('\n')
+            .filter(line => line.startsWith('- http'))
+            .map(line => line.slice(2))
+        expect(partialUrls).toEqual([
+            'https://mycafe.primeweb.app',
+            'https://mycafe.primeweb.app/products/espresso',
+            'https://mycafe.primeweb.app/products/latte',
+            'https://mycafe.primeweb.app/about',
+        ])
     })
 
     // ────────────────────────────────────────────────────────────────

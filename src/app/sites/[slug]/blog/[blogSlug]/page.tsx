@@ -14,7 +14,7 @@ import type { TenantMembership } from '@/lib/normalize-tenants'
 import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
-import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
 
@@ -24,16 +24,27 @@ type Props = {
     params: Promise<{ slug: string; blogSlug: string }>
 }
 
-const getSiteAndPost = cache(async function getSiteAndPost(tenantSlug: string, blogSlug: string) {
+const getSiteAndPost = cache(async function getSiteAndPost(
+    tenantSlug: string,
+    blogSlug: string,
+    tenantHostname: string | null,
+) {
+    if (tenantSlug === 'custom' && !tenantHostname) return null
+
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
         collection: 'tenants',
-        where: { slug: { equals: tenantSlug } },
+        where: tenantSlug === 'custom'
+            ? { 'customDomains.domain': { equals: tenantHostname } }
+            : { slug: { equals: tenantSlug } },
         limit: 1,
     })
     const tenant = tenantsResult.docs[0]
     if (!tenant) return null
+    if (tenantSlug === 'custom') {
+        if (!tenantHostname || !hasActiveCustomDomain(tenant, tenantHostname)) return null
+    }
 
     const sitesResult = await payload.find({
         collection: 'sites',
@@ -43,6 +54,7 @@ const getSiteAndPost = cache(async function getSiteAndPost(tenantSlug: string, b
                 { status: { equals: 'published' } },
             ],
         },
+        sort: 'createdAt',
         limit: 1,
     })
     const site = sitesResult.docs[0]
@@ -53,6 +65,7 @@ const getSiteAndPost = cache(async function getSiteAndPost(tenantSlug: string, b
         where: {
             and: [
                 { tenant: { equals: tenant.id } },
+                { site: { equals: site.id } },
                 { slug: { equals: blogSlug } },
                 { status: { equals: 'published' } },
             ],
@@ -80,7 +93,9 @@ const getSiteAndPost = cache(async function getSiteAndPost(tenantSlug: string, b
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, blogSlug } = await params
-    const data = await getSiteAndPost(slug, blogSlug)
+    const reqHeaders = await headers()
+    const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const data = await getSiteAndPost(slug, blogSlug, tenantHostname)
     if (!data) return { title: 'Post Not Found' }
 
     const seo = data.post.seo as Record<string, unknown> | undefined
@@ -92,8 +107,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ? (data.post.thumbnail as Record<string, unknown>).url as string
         : null
 
-    const reqHeaders = await headers()
-    const tenantHostname = reqHeaders.get('x-tenant-hostname')
     const origin = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
 
     return {
@@ -118,7 +131,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogDetailPage({ params }: Props) {
     const { slug, blogSlug } = await params
-    const data = await getSiteAndPost(slug, blogSlug)
+    const reqHeaders = await headers()
+    const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const data = await getSiteAndPost(slug, blogSlug, tenantHostname)
     if (!data) notFound()
 
     const { t } = await getServerI18n()
@@ -149,7 +164,7 @@ export default async function BlogDetailPage({ params }: Props) {
 
     const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
 
-    const origin = resolveStorefrontOrigin(tenant as any, { slug })
+    const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const articleJsonLd = origin ? {
         '@context': 'https://schema.org',
         '@type': 'Article',

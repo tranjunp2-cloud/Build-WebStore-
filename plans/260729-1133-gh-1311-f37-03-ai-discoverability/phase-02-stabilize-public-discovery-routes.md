@@ -26,7 +26,7 @@ Verify and minimally harden `robots.txt`, `sitemap.xml`, and `llms.txt` as tenan
 
 - Published storefront: robots, sitemap, and `llms.txt` return valid content for the resolved site.
 - Unpublished/missing storefront: sitemap and `llms.txt` return the approved not-found behavior; robots retains the platform crawler invariant without leaking private content.
-- `llms.txt` uses `text/plain; charset=utf-8`, valid Markdown, an H1, and up to 10 unique real public URLs in deterministic priority order (homepage, pages, products, blogs), plus optional contact/hours only from the same site. A homepage-only published site is valid; never fabricate URLs to meet a count.
+- `llms.txt` uses `text/plain; charset=utf-8`, valid Markdown, an H1, and up to 10 unique real public URLs with homepage first and deterministic round-robin coverage across available pages, products, and blogs, plus optional contact/hours only from the same site. A homepage-only published site is valid; never fabricate URLs to meet a count.
 - Sitemap includes only current public content and excludes private, deleted, hidden/no-index, inactive, checkout, admin, and order URLs.
 - Preserve short bounded caching and bounded/parallel Payload queries.
 - Do not make score code call the application's own HTTP routes.
@@ -87,7 +87,7 @@ Public routes resolve one authorized storefront context, query only that tenant/
 - Pre-review full unit suite: 661 files, 11,111/11,111 tests passed.
 - Typecheck passed; lint passed with 0 errors and 139 pre-existing warnings.
 - `git diff --check` and migration check passed.
-- Review hardening passed: custom-domain request headers and safe slug serialization fixed; deterministic 10-URL `llms.txt` contract and narrow Payload field projections verified (22/22 then 27/27 focused tests).
+- Review hardening passed: custom-domain request headers and safe slug serialization fixed; deterministic balanced 10-URL `llms.txt` contract and narrow Payload field projections verified (22/22 then 27/27 focused tests).
 - Known deferred risk: multi-site-per-tenant disambiguation remains in `OPEN_BLOCKERS`; current product supports one published site per tenant.
 
 ## Success Criteria

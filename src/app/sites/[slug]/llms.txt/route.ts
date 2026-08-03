@@ -10,6 +10,40 @@ function markdownInline(value: unknown): string {
     return collapsed.replace(/([\\`*_[\]{}()<>#!|])/g, '\\$1')
 }
 
+const MAX_KEY_URLS = 10
+
+function selectKeyUrls(baseUrl: string, candidateGroups: string[][]): string[] {
+    const selected: string[] = []
+    const seen = new Set<string>()
+    const indexes = candidateGroups.map(() => 0)
+
+    const add = (url: string): boolean => {
+        if (!url || seen.has(url) || selected.length >= MAX_KEY_URLS) return false
+        seen.add(url)
+        selected.push(url)
+        return true
+    }
+
+    add(baseUrl)
+    while (selected.length < MAX_KEY_URLS) {
+        let addedInRound = false
+        for (let groupIndex = 0; groupIndex < candidateGroups.length; groupIndex++) {
+            const group = candidateGroups[groupIndex]
+            while (indexes[groupIndex] < group.length) {
+                const candidate = group[indexes[groupIndex]++]
+                if (add(candidate)) {
+                    addedInRound = true
+                    break
+                }
+            }
+            if (selected.length >= MAX_KEY_URLS) break
+        }
+        if (!addedInRound) break
+    }
+
+    return selected
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
         const { slug } = await params
@@ -77,7 +111,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                sort: 'createdAt',
+                sort: ['createdAt', 'id'],
                 select: { slug: true, isHomepage: true },
                 limit: 10,
             }),
@@ -92,7 +126,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                sort: 'createdAt',
+                sort: ['createdAt', 'id'],
                 select: { slug: true },
                 limit: 10,
             }),
@@ -106,7 +140,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                sort: 'createdAt',
+                sort: ['createdAt', 'id'],
                 select: { slug: true },
                 limit: 5,
             }),
@@ -136,10 +170,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 return slugPath ? [`${baseUrl}/blog/${slugPath}`] : []
             })
 
-        // Keep this supplementary document bounded and deterministic: homepage
-        // first, then the oldest public pages, products, and blogs returned by
-        // the explicitly sorted queries above.
-        const keyUrls = Array.from(new Set([baseUrl, ...pageUrls, ...productUrls, ...blogUrls])).slice(0, 10)
+        // Keep this supplementary document bounded and deterministic. Round-robin
+        // selection prevents pages or products from starving later content types
+        // while retaining the oldest-first order within each bounded query.
+        const keyUrls = selectKeyUrls(baseUrl, [pageUrls, productUrls, blogUrls])
 
         // F37-03 → #1312 score handoff: this published-only 200 response is
         // `llmsTxtReachable=true` (1 point). Failure here must not affect the

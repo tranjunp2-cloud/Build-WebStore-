@@ -43,15 +43,29 @@ export default defineConfig({
             testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
         // Public storefront regressions required by repo review rules live in
-        // tests/*.spec.ts and do not need the authenticated E2E setup project.
+        // tests/*.spec.ts and render without authenticated browser state.
         {
             name: 'storefront-regression',
             testDir: './tests',
-            testMatch: /(cart-drawer|f37-ai-discoverability)\.spec\.ts/,
+            testMatch: /cart-drawer\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: undefined,
             },
+            // Keep F37 reachable from the shared CI project's existing selection.
+            dependencies: ['f37-regression'],
+        },
+        // F37 uses setup's saved auth only in a separate API context to discover
+        // account-owned fixtures; storefront page assertions remain public.
+        {
+            name: 'f37-regression',
+            testDir: './tests',
+            testMatch: /f37-ai-discoverability\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: undefined,
+            },
+            dependencies: ['setup'],
         },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).
