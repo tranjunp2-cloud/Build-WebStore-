@@ -27,7 +27,7 @@
 - **Create label** (submit_orders wallet auto-deduct) + **idempotency** (chống double-charge)
 - Wallet low → `EASYPARCEL_WALLET_LOW`, order không kẹt, retry được
 - Pickup **cut-off-aware** date picker + server re-validate SLA (không tin client)
-- Tracking sync (webhook topics 1/2/3 primary + cron polling fallback) + numeric status 0-11 → dual-field, **delivered KHÔNG auto-complete**
+- Tracking sync qua webhook topics 1/2/3 + numeric status 0-11 → dual-field, **delivered KHÔNG auto-complete**
 - **COD** eligibility gating + checkout fields + label COD (**DEFERRED**)
 - **Returns** Case A auto-return (courier) + Case B manual buyer-return + cancel/refund by label status (reuse F10)
 - **Currency NFR-1** — sen↔RM `/100`·`×100`, chống regression 100× (BẮT BUỘC)
@@ -205,20 +205,20 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 ---
 
-### 3.9 Phase C — Tracking Sync + View (US-F36-09)
+### 3.9 Phase C — Webhook Tracking + View (US-F36-09)
 
 | ID | Type | Pri | Title | Steps | Expected | Refs |
 |---|---|---|---|---|---|---|
-| **TC-F36.68** | Func | High | Cron poll tracking batch theo tenant | Có orders shipped chưa completed có awbNo. GET `/api/cron/sync-tracking` (cron-secret auth). | Gom orders group theo tenant (đúng OAuth token). Gọi POST `/shipment/tracking_status` + `/shipment/details` batch. Update `shippingTrackingStatus`. Idempotent + backoff. | US-F36-09 AC-1, NFR-5 |
-| **TC-F36.69** | Sec | Critical | Cron reject nếu thiếu/sai cron-secret | GET `/api/cron/sync-tracking` không có/sai secret. | HTTP 401/403. KHÔNG chạy sync. | AC additional, NFR-5 |
 | **TC-F36.70** | Func | High | Numeric status code → 13 display label chuẩn | Nhận status code 4 (In Transit). | `shippingTrackingStatus` map đúng 1 trong 13 status chuẩn EasyParcel (normalize mọi courier). | AC-1, §8 |
 | **TC-F36.71** | Func | Critical | Dual-field — order.status tách shippingTrackingStatus | Order có awbNo + tracking code. Buyer mở trang đơn. | OtShippingCard + OtTimeline hiện courier + AWB + tracking status. `order.status` (lifecycle) TÁCH khỏi `shippingTrackingStatus` (display). | AC-2 |
 | **TC-F36.72** | Func | High | Webhook topic 1/2/3 → order update realtime | Webhook gửi topic 1 (status), 2 (awb), 3 (tracking). | Order update tương ứng (status, awb_url, tracking event). Merchant OrderDetailPanel có badge tracking. | AC additional |
-| **TC-F36.73** | Func | Critical | Codes hiển thị-only KHÔNG đổi order.status (4/7/8) | shippingTrackingStatus ∈ {4 In Transit, 7 Schedule, 8 On Hold}. | CHỈ hiển thị, KHÔNG đổi order.status. Mọi transition do merchant bấm tay. | AC-2b |
-| **TC-F36.74** | Func | High | Code 3 Collected → gợi ý merchant bấm shipped (không auto) | Nhận code 3. | Gợi ý merchant bấm shipped. KHÔNG tự chuyển. | AC-2b |
-| **TC-F36.75** | Func | Blocker | **Delivered (code 5) → KHÔNG auto-complete** | Webhook/polling nhận shipment_status_code=5. | CHỈ update `shippingTrackingStatus=5`. KHÔNG tự chuyển order → completed. Merchant tự bấm "Completed". | AC-3, FR C-9 |
+| **TC-F36.73** | Func | Critical | In-transit tracking tự chuyển lifecycle sang shipped | Order `ready_to_ship`, nhận code 4 In Transit (kể cả courier text "Out for Delivery"). | Cập nhật `shippingTrackingStatus='in_transit'` và tự chuyển `order.status='shipped'`. Code 7 Schedule / 8 On Hold vẫn chỉ cập nhật tracking. | AC-2b |
+| **TC-F36.74** | Func | High | Code 3 Collected tự chuyển lifecycle sang shipped | Order `ready_to_ship`, nhận code 3 Collected hoặc code 11 Drop Off. | Cập nhật tracking và tự chuyển `order.status='shipped'`. Event lặp lại phải self-heal lifecycle mà không append history trùng. | AC-2b |
+| **TC-F36.74a** | UI | High | Activity timeline hiện ngay sau create-label | Merchant tạo label thành công, kể cả courier trả AWB bất đồng bộ (`awbNo=null`). | Success card hiển thị timeline ngay với event `pending_pickup` / "Shipment created"; silent refetch thay optimistic event bằng dữ liệu persisted, không duplicate. | AC-2b |
+| **TC-F36.74b** | UI | High | Activity timeline giữ nguyên collection method lịch sử | Tạo shipment Drop-off, hủy trên EP, sau đó tạo shipment mới bằng Pickup. | Event của shipment cũ vẫn hiển thị `Waiting for Drop-off`; chỉ event shipment mới dùng `Waiting for Pickup`. | AC-2b |
+| **TC-F36.74c** | Func | Critical | Tracking writers không ghi đè lifecycle/history mới hơn | Chạy đồng thời webhook In Transit/Collected và Cancelled/Delivered trên cùng order `ready_to_ship`. | Các writer serialize bằng order row lock; writer sau đọc snapshot đã commit của writer trước. Lifecycle terminal và terminal history không bị ghi lùi hoặc mất event. | AC-2b |
+| **TC-F36.75** | Func | Blocker | **Delivered (code 5) → KHÔNG auto-complete** | Webhook nhận shipment_status_code=5. | CHỈ update `shippingTrackingStatus=5`. KHÔNG tự chuyển order → completed. Merchant tự bấm "Completed". | AC-3, FR C-9 |
 | **TC-F36.76** | Func | High | Code 6 Returned → gợi ý refunded; Code 0 Cancel → gợi ý cancelled | Nhận code 6, rồi code 0. | 6 → gợi ý merchant refunded; 0 → gợi ý cancelled. Vẫn manual (không auto). | AC-2b |
-| **TC-F36.77** | Func | Medium | Cron idempotent + backoff (không spam API) | Chạy cron 2 lần liên tiếp trên cùng orders. | Không double-update, có backoff giữa batch. | NFR-5 |
 | **TC-F36.78** | Func | Medium | Tracking nhúng order detail (KHÔNG màn/scene mới) | Buyer mở sites/[slug]/orders/[orderNumber]. | Làm giàu OtShippingCard + OtTimeline có sẵn. KHÔNG dựng trang/scene mới. | AC-2 |
 
 ---
@@ -262,7 +262,7 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 | ID | Type | Pri | Title | Steps | Expected | Refs |
 |---|---|---|---|---|---|---|
-| **TC-F36.98** | Func | High | Case A — cron/webhook set shippingTrackingStatus='Returned', KHÔNG EP API call | Delivery fail (buyer no-show/COD refusal/undeliverable). Courier auto-return. Webhook topic 1 hoặc cron nhận status map 'Returned'. | shippingTrackingStatus='Returned'. **KHÔNG EP API call cho return leg. KHÔNG reverse label.** codStatus (nếu COD) giữ 'pending'. Merchant thấy badge "Returned". | US-F36-10 AC-1 |
+| **TC-F36.98** | Func | High | Case A — webhook set shippingTrackingStatus='Returned', KHÔNG EP API call | Delivery fail (buyer no-show/COD refusal/undeliverable). Courier auto-return. Webhook topic 1 nhận status map 'Returned'. | shippingTrackingStatus='Returned'. **KHÔNG EP API call cho return leg. KHÔNG reverse label.** codStatus (nếu COD) giữ 'pending'. Merchant thấy badge "Returned". | US-F36-10 AC-1 |
 | **TC-F36.99** | Money | High | Case A — merchant refund qua F10, outbound freight KHÔNG hoàn | shippingTrackingStatus='Returned', merchant inspect goods. Bấm Refund. | POST `/api/orders/[id]/refund` (F10 — refund goods + restock). Inventory restock qua F10. **Cước outbound KHÔNG refund** (freight lost). KHÔNG viết logic refund/restock mới. | AC-2 |
 | **TC-F36.100** | Func | Medium | Case A KHÔNG cần cột DB mới | Kiểm schema. | Case A dùng shippingTrackingStatus có sẵn, KHÔNG cột mới. | AC additional |
 | **TC-F36.101** | Func | Medium | KHÔNG buyer-facing return UI / RMA | Kiểm storefront. | Không có return-request UI cho buyer, không Returns/RMA collection. | AC additional |
@@ -396,8 +396,8 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 ### 3.18d Mark shipment cancelled — merchant attest (mới 2026-07-10)
 
 > Verified live 2026-07-10: EP **không** dispatch webhook cho cancel thao tác trên dashboard
-> (EP delivery log trống, pipeline nhận đã chứng minh thông) + cron không poll được đơn chưa có
-> AWB → đơn `ready_to_ship` có shipment đã hủy bị kẹt vĩnh viễn (không cancel/refund/re-label/
+> (EP delivery log trống, pipeline nhận đã chứng minh thông). Đơn `ready_to_ship` có shipment
+> đã hủy bị kẹt vĩnh viễn (không cancel/refund/re-label/
 > self-deliver). Flow mới (THUẦN BỔ SUNG): seller tự xác nhận đã hủy trên EP →
 > `POST /api/orders/[id]/mark-shipment-cancelled` clear EP fields (giữ audit trong tracking
 > history) → zone quay về màn create-label sẵn có để tạo label mới. Trust model: tiền cước là
@@ -433,8 +433,8 @@ Format: `TC-F36.NN | Type | Priority | Title | Steps | Expected | Refs`
 
 > **Xác nhận live 2026-07-13:** EP nay CÓ bắn webhook cho cancel (`shipment.status.update` code 0 + `shipment.tracking.update` `latest_shipment_status_code:0`). Bảng code đối chiếu spec chính thức EP 2026-06 (github easyparcel/OpenAPI `_webhooks.md`): 0=Cancel, 2=To Be Collected, 3=Collected, 4=Delivery In Transit, 5=Delivered, 6=Returned, 7=Schedule In Arrangement, 8=On Hold, 11=Drop Off — `status-map.ts` khớp đủ 9 code. Guard `ondemand.*` đúng (tránh xung đột code 5 Delivered vs ondemand 5 Cancelled-by-Driver).
 
-| **TC-F36.188** | Money | Critical | Webhook cancel (code 0) auto-reopen order về `confirmed` + clear EP fields | (a) Order `ready_to_ship`/`shipped`/`processing`/`paid`/`confirmed` + webhook code 0. (b) Order `completed`/`cancelled` (terminal) + webhook code 0. | (a) `applyTrackingUpdate` set `shippingTrackingStatus='cancelled'` **và** `status='confirmed'` + clear `easyParcelOrderNo/awbNo/trackingNumber/labelUrl/labelUrls/pickupScheduledAt/codStatus` → mở lại CẢ create-label lẫn /cancel (mirror mark-shipment-cancelled thủ công); chạy cho cả webhook lẫn cron (writer chung). (b) KHÔNG reopen — chỉ ghi tracking, `status` giữ nguyên (không hồi sinh đơn đã đóng). create-label khi ship lại re-seed `shippingTrackingStatus='pending_pickup'` nên không bị terminal-guard đóng băng. | §3.18f |
-| **TC-F36.190** | Func | High | Order detail poll near-real-time (không cần refresh tay) | (manual) Mở màn order detail của đơn `ready_to_ship`/`shipped` (tracking chưa terminal). Trigger webhook (hoặc gọi cron) đổi status/backfill AWB. Chờ ≤20s. | Card fulfillment tự cập nhật (AWB async hiện ra, status đổi) trong ≤20s KHÔNG bấm refresh — client poll `GET /api/orders/[id]/poll` (slim select: updatedAt/status/awbNo/trackingStatus), so `updatedAt` đổi → silent full-fetch (không nháy spinner). Đơn terminal (delivered/cancelled/completed) → poll TỰ DỪNG (0 request). Tab ẩn → không poll. Endpoint access-controlled (merchant chỉ poll đơn của mình → 404/403 nếu khác tenant). | §3.18f |
+| **TC-F36.188** | Money | Critical | Webhook cancel (code 0) auto-reopen order về `confirmed` + clear EP fields | (a) Order `ready_to_ship`/`shipped`/`processing`/`paid`/`confirmed` + webhook code 0. (b) Order `completed`/`cancelled` (terminal) + webhook code 0. | (a) `applyTrackingUpdate` set `shippingTrackingStatus='cancelled'` **và** `status='confirmed'` + clear `easyParcelOrderNo/awbNo/trackingNumber/labelUrl/labelUrls/pickupScheduledAt/codStatus` → mở lại CẢ create-label lẫn /cancel (mirror mark-shipment-cancelled thủ công). (b) KHÔNG reopen — chỉ ghi tracking, `status` giữ nguyên (không hồi sinh đơn đã đóng). create-label khi ship lại re-seed `shippingTrackingStatus='pending_pickup'` nên không bị terminal-guard đóng băng. | §3.18f |
+| **TC-F36.190** | Func | High | Order detail poll near-real-time (không cần refresh tay) | (manual) Mở màn order detail của đơn `ready_to_ship`/`shipped` (tracking chưa terminal). Trigger webhook đổi status/backfill AWB. Chờ ≤20s. | Card fulfillment tự cập nhật (AWB async hiện ra, status đổi) trong ≤20s KHÔNG bấm refresh — client poll `GET /api/orders/[id]/poll` (slim select: updatedAt/status/awbNo/trackingStatus), so `updatedAt` đổi → silent full-fetch (không nháy spinner). Đơn terminal (delivered/cancelled/completed) → poll TỰ DỪNG (0 request). Tab ẩn → không poll. Endpoint access-controlled (merchant chỉ poll đơn của mình → 404/403 nếu khác tenant). | §3.18f |
 | **TC-F36.191** | Func | High | Toast khi webhook cancel auto-reopen (phát hiện live qua poll) | (manual) Mở màn order detail đơn `ready_to_ship`/`shipped`. Cancel shipment trên EP dashboard → webhook về (code 0). Chờ ≤20s (tab visible). | Poll thấy `status='confirmed'` + `shippingTrackingStatus='cancelled'` (chữ ký cancel-reopen; effect chỉ chạy khi đang in-flight nên đây chắc chắn là transition live) → `toast.info` "cancelled on EasyParcel — please create a new label" (i18n `dashboard.orders.toast.shipmentCancelledOnEp`, en+ms) → card về màn create-label. Chỉ bắn **1 lần** (sau reopen `status='confirmed'` → không còn in-flight → poll tự dừng). KHÔNG bắn toast khi mở lại trang một đơn đã cancel từ trước (chỉ bắn khi transition live). Tab ẩn lúc cancel → toast bắn khi quay lại tab (tick kế). | §3.18f |
 
 ### 3.18g Checkout rate = EP wallet-billed amount (shipment_price + shipment_tax), không phải total_amount
@@ -490,7 +490,7 @@ Kết luận: không có con số trung thực nào để đặt vào ô đó �
 
 Hai card tách rời, mà với shipment EP thì **AWB và tracking number là cùng một chuỗi** → buyer đọc `RMC002322989MY` **hai lần**, còn courier / ETA / lịch sử thì rải rác qua cả hai card. Gộp về một card theo design: courier tile (logo + tên) → tracking no. → mini map. (Ô ETA bị ẩn — xem §3.18j.)
 
-**Lịch sử courier về Activity Timeline (2026-07-14):** sự kiện courier là **log**, không phải thông tin shipment — trước đây trang có **hai timeline** (order journey + courier history) và buyer phải đọc cả hai. Nay merge vào Activity Timeline theo thứ tự thời gian: lifecycle → courier events → order cancel/refund. Note *"Updates every 30–60 min"* đi theo xuống chân card đó. Quy tắc highlight rút về **một dòng duy nhất**: entry cuối = `latest` (entries dựng theo thứ tự thời gian) — tái lập đúng hành vi cũ của từng nhánh mà không phải giữ đồng bộ 2 bộ luật.
+**Lịch sử courier về Activity Timeline (2026-07-14):** sự kiện courier là **log**, không phải thông tin shipment — trước đây trang có **hai timeline** (order journey + courier history) và buyer phải đọc cả hai. Nay merge vào Activity Timeline theo thứ tự thời gian: lifecycle → courier events → order cancel/refund. Quy tắc highlight rút về **một dòng duy nhất**: entry cuối = `latest` (entries dựng theo thứ tự thời gian) — tái lập đúng hành vi cũ của từng nhánh mà không phải giữ đồng bộ 2 bộ luật.
 
 | ID | Loại | Ưu tiên | Mục tiêu | Bước | Kỳ vọng | Ref |
 |---|---|---|---|---|---|---|
@@ -562,13 +562,12 @@ Quyết định 2026-07-14: **giữ stepper theo vòng đời đơn** (Order Pla
 |---|---|---|---|---|---|---|
 | **TC-F36.151** | Edge | High | Rate với weight=0 toàn cart → DEFAULT_PARCEL, không gửi 0 | Cart toàn SP weight=0. Rate. | Gửi DEFAULT_PARCEL weight, không gửi 0 (EP reject weight=0). | US-04 additional |
 | **TC-F36.152** | Integration | High | Race: 2 buyer checkout đồng thời cùng site EP ON | 2 buyer concurrent rate + place order. | Cả 2 order persist courier/fee độc lập, không lẫn. | US-04 AC-3 |
-| **TC-F36.153** | Integration | Medium | Cron chạy khi 1 tenant token hết hạn → refresh, không fail toàn batch | Batch có tenant token expired. | Tenant đó refresh token; các tenant khác vẫn sync. Không fail cả batch. | US-01 AC-4, US-09 |
 | **TC-F36.154** | Edge | Medium | Rate khi EP trả 0 quotation (courier không phục vụ tuyến) | Dest tuyến courier không phục vụ. | Fallback flat + log, không vỡ checkout. | NFR-4 |
 | **TC-F36.155** | Edge | Medium | Create-label khi selectedCourier bị đổi giữa order + label | Order lưu J&T, settings đổi Flash sau. Tạo label. | Label dùng shippingServiceId snapshot trên order (không dùng selectedCourier mới). | US-06 |
 | **TC-F36.156** | Sec | High | create-label auth — chỉ owner tenant tạo được | User khác tenant POST create-label order tenant B. | 403. Không gọi submit_orders. | NFR-3 |
 | **TC-F36.157** | Edge | Medium | Tracking status code chưa map (unknown code) | Nhận code lạ (vd 99). | Không crash; giữ status cũ + log; không đổi lifecycle. | US-09 |
 | **TC-F36.158** | Money | High | Free-ship + EP rate: subtotal ≥ freeAbove → fee=0 dù EP trả giá | EP ON, freeAbove=RM100, subtotal RM150, EP trả RM12. | Ship = FREE (fee=0) — free threshold override EP rate. | US-05 AC-3 |
-| **TC-F36.159** | Edge | Medium | Disconnect giữa lúc có order shipped chưa delivered | Disconnect EP khi còn order awbNo shipped. | Order cũ giữ awbNo/tracking; cron sync token đã clear → skip/log (không crash). Warn merchant. | US-01 additional |
+| **TC-F36.159** | Edge | Medium | Disconnect giữa lúc có order shipped chưa delivered | Disconnect EP khi còn order awbNo shipped. | Order cũ giữ awbNo/tracking/history. Webhook tracking vẫn xử lý vì xác thực bằng platform webhook secret, không phụ thuộc tenant access token. | US-01 additional |
 | **TC-F36.160** | Money | Critical | Non-custody guardrail — platform KHÔNG dùng ví EP chung | Kiểm mọi EP call. | Mỗi call dùng token per-merchant → ví riêng. KHÔNG có ví EP chung platform. | NFR non-custody |
 
 ---
@@ -612,8 +611,6 @@ Quyết định 2026-07-14: **giữ stepper theo vòng đời đơn** (Order Pla
 | **TC-F36.182** | Func | Medium | COURIER_CUTOFF có **Aramex** (courier COD chọn được) — không thiếu entry | Chọn Aramex, mở date picker. Test cut-off Aramex. | Aramex có cut-off const **xác định** (KHÔNG rơi vào fallback conservative do thiếu entry). Pos Laju (non-COD, không chọn được) không cần trong picker. **[FLAG doc §9 #12 — COURIER_CUTOFF hiện list Pos nhưng THIẾU Aramex].** | US-07 AC-3, Design §2.3 |
 | **TC-F36.183** | Sec | Medium | Buyer label **vocab-collapse** — KHÔNG render raw Exception/Admin Cancel/Expired | shippingTrackingStatus ∈ {Exception, Admin Cancel, Expired}. Buyer mở track/label. | Buyer thấy label mềm ("Tạm hoãn"/"Đang xử lý"), **TUYỆT ĐỐI không render chữ** "Exception"/"Admin Cancel"/"Expired". Projection ở tầng display-label (bổ sung field-omission TC-126..132). | NFR-10, Design §2.4 |
 | **TC-F36.184** | Sec | Medium | oauthTokens **encrypt at-rest** (assertion riêng, nâng từ note TC-10) | Đọc trực tiếp cột `easyParcelIntegration.oauthTokens` trong DB. | access_token/refresh_token lưu **đã mã hóa** (không plaintext), decrypt khi dùng. (TC-10 chỉ check no-leak ở response/log.) | NFR-3, NFR-8, US-01 DoD |
-| **TC-F36.185** | Func | Low | Cron tracking batch chunk ≤100 AWB/call | Tenant có 250 order shipped chưa complete. Chạy cron. | `tracking_status` gọi theo chunk **≤100 AWB** (PRD §8 batch 100), group per tenant + backoff. KHÔNG gửi >100 trong 1 call. | US-09 AC-1, NFR-5, PRD §8 |
-
 ---
 
 ## 4. End-to-End UAT Flows
@@ -748,8 +745,6 @@ Quyết định 2026-07-14: **giữ stepper theo vòng đời đơn** (Order Pla
 | **COURIER_CUTOFF** Aramex roster (§9 #12) | TC-F36.182, 65 |
 | **NFR-10** buyer label vocab-collapse | TC-F36.183, 126..132 |
 | **US-01 DoD** token encrypt-at-rest | TC-F36.184, 10, 136 |
-| **NFR-5** cron batch chunk≤100 | TC-F36.185, 68, 77 |
-
 **Coverage:** 13/13 US + 10/10 NFR + non-custody guardrails ✅ | Money-critical: currency (12 TC) + idempotency (3 TC) + wallet (4 TC) + projection (7 TC) = 26 dedicated money/security TCs.
 
 ---
@@ -808,14 +803,14 @@ Self-check QA Test Plan F36 (v1.2 — 2026-07-09):
 - Order fixtures đủ trạng thái (chưa label → delivered → returned)
 
 ### Tools
-- Unit/API: Vitest — `src/lib/shipping/easyparcel/{normalize,client}.ts`, `get-rates.ts`, `create-label`, `sync-tracking`
+- Unit/API: Vitest — `src/lib/shipping/easyparcel/{normalize,client}.ts`, `get-rates.ts`, `create-label`, webhook tracking
 - Currency: unit test thuần cho normalize (RM↔sen) — **gold-standard chống regression, chạy mọi PR**
 - E2E: Playwright (khi UI implement) cho E2E #1-5
 - Sandbox manual: TC-F36.144..150 (webhook/COD param/boundary) — QA chạy tay trên sandbox, ghi kết quả vào bảng §9 PRD
 
 ### Coverage targets (theo docs/TEST_CONVENTION.md)
 - `normalize.ts` (RM↔sen) ≥ 95% lines (money-critical)
-- `get-rates.ts` + create-label + sync-tracking ≥ 80% lines, all happy + 4xx + 5xx + fallback paths
+- `get-rates.ts` + create-label + webhook tracking ≥ 80% lines, all happy + 4xx + 5xx paths
 - Idempotency + wallet-low paths: 100% branch
 
 ### Không auto-test (manual/sandbox only)

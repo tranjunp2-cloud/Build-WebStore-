@@ -12,13 +12,25 @@ vi.mock('@/lib/auth', () => ({
     tenantIdForQuery: vi.fn(),
 }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn(),
+    canUse: vi.fn(),
+}))
+
+vi.mock('@/lib/payload/category-row-lock', () => ({
+    CATEGORY_LOCK_BUSY_ERROR: 'CATEGORY_BUSY_RETRY',
+    isCategoryLockTimeoutError: vi.fn(() => false),
+    withCategoryMutationGate: vi.fn(async (_payload, operation) => operation()),
+}))
+
 import { saveCategoryAction, deleteCategoryAction } from '@/app/(dashboard)/products/categories/actions'
 import { getPayload } from 'payload'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 
 const mockCurrentUser = { id: 'user-123', tenants: [{ tenant: 'tenant-456' }] }
 
-type MockPayload = { findByID: Mock; create: Mock; update: Mock; db: { drizzle: { execute: Mock } } }
+type MockPayload = { findByID: Mock; create: Mock; update: Mock; db: { drizzle: { execute: Mock; transaction: Mock } } }
 
 // ── TC-F08-05-05/06/09: Field Access Control & Security Regression ────────
 describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
@@ -28,6 +40,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
     let mockCreate: Mock
     let mockUpdate: Mock
     let mockExecute: Mock
+    let mockTransaction: Mock
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -51,6 +64,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
         mockCreate = vi.fn()
         mockUpdate = vi.fn()
         mockExecute = vi.fn()
+        mockTransaction = vi.fn(async operation => operation({ execute: mockExecute }))
 
         mockPayload = {
             findByID: mockFindByID,
@@ -60,6 +74,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             db: {
                 drizzle: {
                     execute: mockExecute,
+                    transaction: mockTransaction,
                 },
             },
         } as any
@@ -67,6 +82,8 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
         vi.mocked(getCurrentUser).mockResolvedValue(mockCurrentUser as any)
         vi.mocked(tenantIdForQuery).mockImplementation((user) => user?.tenants?.[0]?.tenant)
+        vi.mocked(getActivePlanSubscription).mockResolvedValue({ plan: 'PROFESSIONAL_TM_USER' } as any)
+        vi.mocked(canUse).mockResolvedValue(true)
     })
 
     describe('TC-F08-05-05: Field Access & Allowlist (GH-1587 M1)', () => {
@@ -314,7 +331,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             const result = await deleteCategoryAction('cat-123')
 
             expect(result.deletedAt).toBe('2026-07-16T00:00:00.000Z')
-            const sqlCall = mockExecute.mock.calls[0][0]
+            const sqlCall = mockExecute.mock.calls[2][0]
             expect(JSON.stringify(sqlCall)).toContain('deleted_at')
         })
 
@@ -332,7 +349,7 @@ describe('Category Field Access Control (GH-1587 Security Fixes)', () => {
             await deleteCategoryAction('cat-123')
 
             expect(mockUpdate).not.toHaveBeenCalled()
-            const sqlCall = mockExecute.mock.calls[0][0]
+            const sqlCall = mockExecute.mock.calls[2][0]
             expect(JSON.stringify(sqlCall)).toContain('parent_id')
             expect(JSON.stringify(sqlCall)).toContain('breadcrumbs')
         })

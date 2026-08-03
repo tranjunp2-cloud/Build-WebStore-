@@ -101,6 +101,7 @@ function baseProps(overrides: Partial<CompactEditorLayoutProps>): CompactEditorL
         theme: { primaryColor: '#000000' } as CompactEditorLayoutProps['theme'],
         site: null,
         siteName: 'Test Site',
+        isContactSavePending: false,
         headerBlock: null,
         footerBlock: null,
         pages: [],

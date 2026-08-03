@@ -40,3 +40,14 @@ export const DAY_OF_WEEK_OPTIONS = [
  *  boundary so malformed data (e.g. admin-panel-entered "9:00") can never be
  *  written via any path. */
 export const OPENING_HOURS_TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/**
+ * Client-safe phone validation shared by the Editor and save boundary.
+ * Empty values are allowed so sellers can clear the optional field.
+ */
+export function isValidBusinessPhone(value: string | null | undefined): boolean {
+    const trimmed = value?.trim() ?? ''
+    if (!trimmed) return true
+
+    return /^\+?[\d ().-]+$/.test(trimmed) && /\d/.test(trimmed)
+}

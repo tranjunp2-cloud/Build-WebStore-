@@ -25,7 +25,7 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
     const ENV_KEYS = [
         'AI_MODEL_SITEGEN', 'AI_MODEL_EDIT', 'AI_MODEL_INLINE_EDIT',
         'AI_MODEL_SEO', 'AI_MODEL_REWRITE', 'AI_MODEL_PRODUCT_DESC',
-        'AI_MODEL_URL_EXTRACT', 'AI_MODEL_BULK_PARSE',
+        'AI_MODEL_IMAGE_RATING', 'AI_MODEL_URL_EXTRACT', 'AI_MODEL_BULK_PARSE',
     ]
 
     beforeEach(() => {
@@ -48,6 +48,10 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
 
     it('returns gpt-5.4-mini for the light site-generation batch', () => {
         expect(selectModel('site-generation-subpages-light')).toBe('gpt-5.4-mini')
+    })
+
+    it('returns gpt-5.4-mini for image rating', () => {
+        expect(selectModel('image-rating')).toBe('gpt-5.4-mini')
     })
 
     it('returns gpt-4.1-mini for chat-edit (phase-04: better instruction following)', () => {

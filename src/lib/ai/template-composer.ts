@@ -1283,18 +1283,35 @@ export function buildServiceCards(biz: BusinessSample, category: string, languag
   // rotated from PRODUCT_FEATURE_ICONS). Leaves price empty — storefront can
   // add pricing later via the editor.
   const userProducts = biz.products ?? []
-  const services =
+  const localizedCanned = canned.map(localizeService)
+  const userServices =
     userProducts.length >= 2
-      ? featuresFromProducts(userProducts, category, canned.length).map((card) => ({
+      ? featuresFromProducts(userProducts, category, 6).map((card) => ({
           title: card.title,
           description: card.description,
           icon: card.icon,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
-      : canned.map(localizeService).map((s) => ({
+      : []
+  const services = userServices.length > 0
+    ? [...userServices]
+    : localizedCanned.map((s) => ({
           ...s,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
+
+  if (userServices.length > 0 && services.length < 4) {
+    const existingTitles = new Set(services.map((service) => service.title.toLocaleLowerCase()))
+    for (const fallback of localizedCanned) {
+      if (services.length >= 4) break
+      if (existingTitles.has(fallback.title.toLocaleLowerCase())) continue
+      services.push({
+        ...fallback,
+        cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
+      })
+      existingTitles.add(fallback.title.toLocaleLowerCase())
+    }
+  }
 
   return {
     blockType: 'service-cards',
@@ -1742,13 +1759,19 @@ export function rotateStructuralVariants(
       for (const block of page.layout as Array<Record<string, unknown>>) {
         if (block.blockType === blockType) {
           // Guard: enforce min content for picked variant — prevents grid-4 with 3 items etc.
-          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos']
+          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos', 'services']
           let count = 0
           for (const field of contentFields) {
             const v = block[field]
             if (Array.isArray(v) && v.length > count) count = v.length
           }
           block.variant = count > 0 ? enforceMinContent(blockType, picked, count) : picked
+          if (blockType === 'service-cards' && Array.isArray(block.services)) {
+            const target = block.variant === 'featured' ? 4 : 3
+            if (block.services.length > target) {
+              block.services = block.services.slice(0, target)
+            }
+          }
         }
       }
     }

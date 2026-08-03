@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { Lock } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { profilePatchSchema } from '@/lib/profile/schemas'
 import type { PlatformUser } from '@/types/user'
@@ -101,12 +102,19 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
                         <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                             {t.profile.general.email}
                         </Label>
-                        <Input
-                            type="email"
-                            value={user.email}
-                            disabled
-                            className="bg-[hsl(var(--secondary))] cursor-not-allowed"
-                        />
+                        <div className="relative">
+                            <Input
+                                type="email"
+                                value={user.email}
+                                disabled
+                                className="bg-[hsl(var(--secondary))] pr-10 cursor-not-allowed disabled:opacity-100"
+                            />
+                            <Lock
+                                data-testid="profile-email-lock"
+                                aria-hidden
+                                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"
+                            />
+                        </div>
                         <p className="text-[10px] italic text-[hsl(var(--muted-foreground))] tracking-[1px]">
                             {t.profile.general.emailReadonly}
                         </p>

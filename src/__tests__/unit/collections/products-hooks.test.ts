@@ -1,8 +1,71 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Products } from '../../../collections/Products'
-import { CollectionBeforeChangeHook } from 'payload'
+import type { CollectionBeforeChangeHook, FieldHook } from 'payload'
 
 describe('Products Collection Hooks (TC-F08)', () => {
+
+    describe('slug beforeValidate hook (TC-F08-04-113, TC-F08-04-114)', () => {
+        const slugField = Products.fields.find(
+            field => 'name' in field && field.name === 'slug',
+        ) as { hooks?: { beforeValidate?: FieldHook[] } } | undefined
+        const hook = slugField?.hooks?.beforeValidate?.[0]
+
+        it('[TC-F08-04-113] preserves a stable AI draft slug for the database uniqueness arbiter', async () => {
+            // Arrange
+            const stableSlug = 'test-product-ai-abcdef1234567890abcdef1234567890'
+            const find = vi.fn()
+                .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableSlug }] })
+                .mockResolvedValueOnce({ docs: [] })
+
+            // Act
+            const result = await (hook as FieldHook)({
+                value: stableSlug,
+                data: { aiReviewPending: true },
+                req: { payload: { find } },
+            } as never)
+
+            // Assert
+            expect(result).toBe(stableSlug)
+            expect(find).not.toHaveBeenCalled()
+        })
+
+        it('[TC-F08-04-114] keeps auto-suffix behavior for a stable-looking manual slug', async () => {
+            // Arrange
+            const stableLookingSlug = 'manual-product-ai-abcdef1234567890abcdef1234567890'
+            const find = vi.fn()
+                .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableLookingSlug }] })
+                .mockResolvedValueOnce({ docs: [] })
+
+            // Act
+            const result = await (hook as FieldHook)({
+                value: stableLookingSlug,
+                data: { aiReviewPending: false },
+                req: { payload: { find } },
+            } as never)
+
+            // Assert
+            expect(result).toBe(`${stableLookingSlug}-1`)
+            expect(find).toHaveBeenCalledTimes(2)
+        })
+
+        it('[TC-F08-04-114] keeps auto-suffix behavior for ordinary duplicate product slugs', async () => {
+            // Arrange
+            const find = vi.fn()
+                .mockResolvedValueOnce({ docs: [{ id: 43, slug: 'ordinary-product' }] })
+                .mockResolvedValueOnce({ docs: [] })
+
+            // Act
+            const result = await (hook as FieldHook)({
+                value: 'Ordinary Product',
+                data: { aiReviewPending: true },
+                req: { payload: { find } },
+            } as never)
+
+            // Assert
+            expect(result).toBe('ordinary-product-1')
+            expect(find).toHaveBeenCalledTimes(2)
+        })
+    })
 
     describe('beforeChangeHook (TC-F08-01-07, TC-F08-G-03)', () => {
         const hook = Products.hooks!.beforeChange![0] as CollectionBeforeChangeHook

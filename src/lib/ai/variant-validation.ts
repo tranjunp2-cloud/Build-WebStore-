@@ -14,6 +14,11 @@ export const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
     // grid = 3-col → needs 3 items (GH-1252: was 2, caused empty cell on non-English sites)
     team: { grid: 3, list: 2 },
     stats: { grid: 3, cards: 3, 'chart-bars': 3, row: 2, highlight: 1, 'inline-text': 1 },
+    'service-cards': { featured: 4, grid: 3, list: 3 },
+}
+
+export const VARIANT_EXACT_CONTENT: Record<string, Record<string, number>> = {
+    'service-cards': { featured: 4 },
 }
 
 /**
@@ -23,6 +28,20 @@ export const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
 export function enforceMinContent(blockType: string, variant: string, contentCount: number): string {
     const mins = VARIANT_MIN_CONTENT[blockType]
     if (!mins) return variant
+
+    const exactRequired = VARIANT_EXACT_CONTENT[blockType]?.[variant]
+    if (exactRequired && contentCount !== exactRequired) {
+        const fitting = Object.entries(mins)
+            .filter(([candidate, min]) => candidate !== variant && contentCount >= min)
+            .sort((a, b) => b[1] - a[1])
+        if (fitting.length > 0) {
+            const fallback = fitting[0]![0]
+            console.warn(
+                `[AI Content Guard] "${blockType}": variant "${variant}" needs exactly ${exactRequired} items but got ${contentCount} → fallback to "${fallback}"`
+            )
+            return fallback
+        }
+    }
 
     const required = mins[variant]
     if (required && contentCount < required) {

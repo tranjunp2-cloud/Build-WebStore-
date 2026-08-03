@@ -46,7 +46,10 @@ type TestStatus = 'idle' | 'testing' | 'connected' | 'invalid'
 
 function EasyParcelBrandMark() {
     return (
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#F9278E] sm:h-[52px] sm:w-[52px]">
+        <div
+            data-testid="easyparcel-brand-mark"
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg bg-[#F9278E] sm:h-[52px] sm:w-[52px]"
+        >
             <Image
                 src="/integrations/easyparcel-box.png"
                 alt="EasyParcel"
@@ -334,7 +337,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig, onEnabledSave
                 data-testid="easyparcel-connected-header"
                 className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 p-4 sm:gap-4 sm:p-6"
             >
-                <div className="self-center">
+                <div className="self-start sm:self-center">
                     <EasyParcelBrandMark />
                 </div>
                 <div className="min-w-0">

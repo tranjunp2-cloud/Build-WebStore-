@@ -16,11 +16,12 @@ const AT = new Date('2026-07-14T08:00:00.000Z')
 
 describe('[TC-F36.200] shipment-created history entry', () => {
     it('[TC-F36.200] carries the AWB so a re-shipped order tells its two parcels apart', () => {
-        const entry = shipmentCreatedEntry('RMC002322989MY', AT)
+        const entry = shipmentCreatedEntry('RMC002322989MY', AT, 'dropoff')
 
         expect(entry.description).toContain('RMC002322989MY')
         expect(entry.status).toBe('pending_pickup')
         expect(entry.eventTime).toBe('2026-07-14T08:00:00.000Z')
+        expect(entry.collectionMethod).toBe('dropoff')
     })
 
     it('[TC-F36.200] still logs the shipment when EP has not issued the AWB yet', () => {
@@ -29,6 +30,7 @@ describe('[TC-F36.200] shipment-created history entry', () => {
 
         expect(entry.description).toBe('Shipment created')
         expect(entry.status).toBe('pending_pickup')
+        expect(entry.collectionMethod).toBe('pickup')
     })
 
     // This is WHY the entry has to exist: EP's own "To Be Collected" webhook maps to the exact

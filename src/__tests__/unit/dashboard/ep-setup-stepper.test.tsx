@@ -145,6 +145,25 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         expect(screen.getByText('Pickup').parentElement).toHaveAttribute('aria-current', 'step')
     })
 
+    it('uses fill-only step indicators and dashboard-standard navigation button height', () => {
+        const { container } = render(
+            <EpSetupStepper
+                tenantId="tenant-1"
+                initialEpConfig={{ accessToken: 'token', warehouses: [], enabled: false }}
+            />,
+        )
+
+        const stepNodes = container.querySelectorAll('[data-step-state]')
+        expect(stepNodes).toHaveLength(3)
+        stepNodes.forEach((node) => {
+            expect(node).not.toHaveClass('border-2')
+            expect(node).not.toHaveClass('border-solid')
+        })
+        expect(container.querySelector('[data-step-state="current"]')).toHaveClass('bg-[hsl(var(--primary)/0.14)]')
+        expect(screen.getByRole('button', { name: /back/i })).not.toHaveClass('h-11')
+        expect(screen.getByRole('button', { name: /next/i })).not.toHaveClass('h-11')
+    })
+
     // ──────────────────────────────────────────────────────────────────
     // TC-F36.31: Step 1 Next button enabled when ≥1 warehouse added
     // ──────────────────────────────────────────────────────────────────
@@ -501,6 +520,9 @@ describe('EpSetupStepper [TC-F36.30..F36.39]', () => {
         await waitFor(() => {
             expect(screen.getByText(/Review.*activate/i)).toBeInTheDocument()
         })
+        for (const icon of screen.getAllByTestId('easyparcel-step-complete-icon')) {
+            expect(icon).toHaveClass('!text-white')
+        }
     })
 
     // ──────────────────────────────────────────────────────────────────

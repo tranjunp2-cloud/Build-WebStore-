@@ -101,27 +101,30 @@ export function OrdersActionBar({
                 className="w-full xl:w-auto xl:flex-1 xl:min-w-[220px] xl:max-w-[480px]"
             />
 
-            {/* All 4 selects on ONE row at every width below xl (grid-cols-4) → search +
-                filters = 2 rows total. Desktop (xl+): original auto-width flex-wrap row.
-                To fit 4 pills on a phone the below-xl chips are progressively trimmed:
-                  • label grows (flex-1), stays left-aligned, truncates (min-w-0);
-                  • the leading icon hides below sm (shows again from sm up);
-                  • the " : value" hides below 820px (mobile + iPad mini) so the pill is
-                    just Date / Status / Payment / Sort — the picked option is still shown
-                    once the dropdown opens; from iPad Air (>=820) the value returns;
-                  • padding/font shrink on the smallest widths.
-                All tweaks target `.chip-trigger` (not the dropdown options) and reset at
-                xl so desktop stays byte-identical. */}
-            <div className="grid grid-cols-4 gap-1.5 md:gap-2 w-full xl:w-auto
+            {/* Below xl, chips show only the selected value in a two-column phone /
+                four-column tablet grid. Desktop restores the original one-line
+                "Label : value" auto-width flex layout. Visually hidden labels remain
+                available to screen readers; icons stay hidden below sm. Long localized
+                values can wrap and grow the chip below xl instead of being truncated.
+                All tweaks target `.chip-trigger`, not the dropdown options. */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 w-full xl:w-auto
                             xl:flex xl:items-center xl:flex-wrap
                             [&_.chip-trigger]:w-full xl:[&_.chip-trigger]:w-auto
-                            [&_.chip-trigger]:px-2 min-[820px]:[&_.chip-trigger]:px-3
-                            [&_.chip-trigger]:text-[12px] sm:[&_.chip-trigger]:text-[13px]
-                            [&_.chip-trigger>span]:flex-1 [&_.chip-trigger>span]:text-left [&_.chip-trigger>span]:min-w-0
-                            xl:[&_.chip-trigger>span]:flex-none
+                            [&_.chip-trigger]:h-auto [&_.chip-trigger]:min-h-11
+                            md:[&_.chip-trigger]:min-h-10 xl:[&_.chip-trigger]:h-10
+                            [&_.chip-trigger>span]:flex-1 [&_.chip-trigger>span]:min-w-0
+                            [&_.chip-trigger>span]:text-left [&_.chip-trigger>span]:whitespace-normal
+                            [&_.chip-trigger>span]:overflow-visible
+                            xl:[&_.chip-trigger>span]:flex-none xl:[&_.chip-trigger>span]:whitespace-nowrap
+                            xl:[&_.chip-trigger>span]:overflow-hidden
                             [&_.chip-icon]:hidden sm:[&_.chip-icon]:inline
-                            [&_[data-chip-sep]]:hidden [&_[data-chip-value]]:hidden
-                            min-[820px]:[&_[data-chip-sep]]:inline min-[820px]:[&_[data-chip-value]]:inline">
+                            [&_[data-chip-label]]:sr-only
+                            xl:[&_[data-chip-label]]:not-sr-only xl:[&_[data-chip-label]]:whitespace-nowrap
+                            [&_[data-chip-sep]]:hidden xl:[&_[data-chip-sep]]:inline
+                            [&_[data-chip-value]]:block [&_[data-chip-value]]:w-full
+                            [&_[data-chip-value]]:max-w-full [&_[data-chip-value]]:whitespace-normal
+                            [&_[data-chip-value]]:break-words
+                            xl:[&_[data-chip-value]]:inline xl:[&_[data-chip-value]]:whitespace-nowrap">
                 <FilterChip<string>
                     icon={Calendar}
                     label={o.filterLabels.date}

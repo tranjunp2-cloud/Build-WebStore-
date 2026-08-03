@@ -5,6 +5,8 @@ import { GET as EditorDataGET } from '@/app/api/sites/[siteId]/editor-data/route
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription } from '@/lib/subscriptions/plan-subscription'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => {
@@ -17,6 +19,15 @@ vi.mock('@/lib/auth', () => {
         getCurrentUser: vi.fn().mockResolvedValue(user),
     }
 })
+
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockResolvedValue({
+        allowed: true, remaining: 59, resetAt: Date.now() + 60_000,
+    }),
+    checkTwoTierRateLimit: vi.fn().mockResolvedValue({
+        allowed: true, remaining: 59, resetAt: Date.now() + 60_000,
+    }),
+}))
 
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
@@ -137,6 +148,43 @@ describe('Sites APIs', () => {
                     shippingConfig: { westRate: 1000, eastRate: 2000, freeAbove: 5000 }
                 })
             }))
+        })
+
+        it('[TC-F37-01-28] rejects cross-tenant Minimal Business Data before persistence', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as never })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({
+                id: 'site-123',
+                status: 'draft',
+                tenant: 'tenant-2',
+            } as never)
+            const req = new NextRequest('http://localhost:3000/api/sites/site-123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    siteName: 'Kedai Tenant Dua',
+                    contactInfo: { phone: '+60 12-345 6789' },
+                    localBusiness: {
+                        streetAddress: '12 Jalan Ampang',
+                        city: 'Kuala Lumpur',
+                        postcode: '50450',
+                        country: 'MY',
+                    },
+                }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            // Act
+            const res = await SavePATCH(req, {
+                params: Promise.resolve({ siteId: 'site-123' }),
+            })
+            const result = await res.json()
+
+            // Assert
+            expect(res.status).toBe(403)
+            expect(result).toEqual({ error: 'Forbidden' })
+            expect(checkRateLimit).toHaveBeenCalledWith('save:user-1', 60, 60_000)
+            expect(payload.update).not.toHaveBeenCalled()
+            expect(getActivePlanSubscription).not.toHaveBeenCalled()
         })
 
         it('allows saving header navigation with empty destination (draft link)', async () => {

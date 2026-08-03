@@ -46,8 +46,8 @@ function AutoResizeHarness({ borderHeight, maxHeight, scrollHeight }: AutoResize
     )
 }
 
-// ── TC-F08-04-94: Auto-resizing Product Name content visibility ─────────────
-describe('useAutoResizeTextarea [TC-F08-04-94]', () => {
+// ── TC-F08-04-115: Auto-resizing Product Name content visibility ─────────────
+describe('useAutoResizeTextarea [TC-F08-04-115]', () => {
     it('includes border height so the textarea client box contains its full scroll height', () => {
         // Arrange
         render(<AutoResizeHarness borderHeight={2} maxHeight={Number.POSITIVE_INFINITY} scrollHeight={84} />)

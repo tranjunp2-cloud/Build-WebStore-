@@ -4916,6 +4916,7 @@ const MIGRATIONS = [
     status varchar,
     description text,
     event_time timestamp with time zone,
+    collection_method varchar,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
   );` },
@@ -4978,6 +4979,15 @@ const MIGRATIONS = [
   // ── GH-1333 F36: order detail redesign — self-delivery + pickup schedule ──
   { name: 'orders.self_delivery_courier', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS self_delivery_courier varchar;` },
   { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
+  { name: 'orders.collection_method', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  { name: 'orders.shipping_tracking_history.collection_method', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  // Freeze legacy rows to the title they render today. Missing order-level method currently
+  // displays as Pickup, so use the same fallback instead of letting a future label rewrite it.
+  { name: 'orders.shipping_tracking_history.collection_method_backfill', sql: `UPDATE orders_shipping_tracking_history AS history
+    SET collection_method = COALESCE(orders.collection_method, 'pickup')
+    FROM orders
+    WHERE history._parent_id = orders.id
+      AND history.collection_method IS NULL;` },
   { name: 'orders.pickup_slot', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot varchar;` },
   // ── GH-1333: persist friendly courier name from EP rate response (e.g. "J&T Express") ──
   { name: 'orders.shipping_courier_name', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_name text;` },
@@ -4994,6 +5004,80 @@ const MIGRATIONS = [
   {
     name: 'enum_analytics_event.add_local_business_data_saved',
     sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
+  },
+  // ── F38: Local-first multi-source image catalog ──
+  // These are internal PostgreSQL tables, not Payload collections. The catalog
+  // owns one system Media row per provider identity and the response cache is
+  // shared across server instances.
+  {
+    name: 'stock_image_catalog.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS stock_image_catalog (
+      id bigserial PRIMARY KEY,
+      provider varchar NOT NULL,
+      provider_image_id varchar NOT NULL,
+      object_key varchar NOT NULL,
+      media_id integer NOT NULL REFERENCES media(id) ON DELETE RESTRICT,
+      source_url text NOT NULL,
+      creator text,
+      license_name text NOT NULL,
+      license_url text NOT NULL,
+      attribution text NOT NULL,
+      tags text[] NOT NULL DEFAULT '{}',
+      normalized_terms text NOT NULL,
+      category varchar NOT NULL,
+      width integer NOT NULL,
+      height integer NOT NULL,
+      aspect double precision NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      use_count integer NOT NULL DEFAULT 0,
+      last_used_at timestamptz,
+      search_vector tsvector GENERATED ALWAYS AS (
+        to_tsvector('simple', coalesce(normalized_terms, ''))
+      ) STORED,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT stock_image_catalog_provider_identity_uniq UNIQUE (provider, provider_image_id),
+      CONSTRAINT stock_image_catalog_object_key_uniq UNIQUE (object_key)
+    );`,
+  },
+  {
+    name: 'stock_image_catalog.search_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_search_idx
+      ON stock_image_catalog USING GIN (search_vector);`,
+  },
+  {
+    name: 'stock_image_catalog_filter_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_filter_idx
+      ON stock_image_catalog (active, category, aspect);`,
+  },
+  {
+    name: 'stock_image_catalog_media_idx',
+    sql: `CREATE INDEX IF NOT EXISTS stock_image_catalog_media_idx
+      ON stock_image_catalog (media_id);`,
+  },
+  {
+    name: 'sites.image_library',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS image_library jsonb;`,
+  },
+  {
+    name: 'media.source_provider',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_provider varchar;`,
+  },
+  {
+    name: 'media.source_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_url text;`,
+  },
+  {
+    name: 'media.license_name',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_name varchar;`,
+  },
+  {
+    name: 'media.license_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_url text;`,
+  },
+  {
+    name: 'media.attribution',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS attribution text;`,
   },
   // ── F08 issue #1587: drop unused Category Image field (YAGNI, stored but never rendered) ──
   {

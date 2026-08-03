@@ -73,15 +73,15 @@ setup, and workflow trigger changes are outside this issue's final delta.
 - `docs/qa/F08-product-crud.md`
   — add GH-1663 responsive TC rows marked AUTO.
 - `e2e/products.spec.ts`
-  — host TC-F08-04-94 through TC-F08-04-96 in the existing staging-allow-listed suite.
+  — host TC-F08-04-115 through TC-F08-04-117 in the existing staging-allow-listed suite.
 
 ## Implementation Steps
 
 1. Allocate QA cases before writing tests: search candidate IDs across `docs/qa`, `src/__tests__`,
    `e2e`, and `tests`, then check git history before reserving:
-   - `TC-F08-04-94`: 375px stacked fields and no horizontal overflow.
-   - `TC-F08-04-95`: 430px layout with visible, wrapping read-only variants.
-   - `TC-F08-04-96`: short-height reachability plus Name/Price/Stock edit and remove regression.
+   - `TC-F08-04-115`: 375px stacked fields and no horizontal overflow.
+   - `TC-F08-04-116`: 430px layout with visible, wrapping read-only variants.
+   - `TC-F08-04-117`: short-height reachability plus Name/Price/Stock edit and remove regression.
 2. Add the cases to `e2e/products.spec.ts` with top-level fixtures/helpers and AAA sections.
 3. Confirm the existing staging allow-list selects `products.spec.ts`; do not modify workflow
    triggers in this PR.
@@ -106,16 +106,16 @@ setup, and workflow trigger changes are outside this issue's final delta.
 
 ## Todo List
 
-- [x] Candidate IDs checked repo-wide and against history; TC-F08-04-94..96 reserved without collision
+- [x] Candidate IDs checked repo-wide and against history; TC-F08-04-115..117 reserved without collision
 - [x] Existing e2e-only Playwright discovery remains unchanged
 - [x] GH-1663 Chromium project assignment verified with `--list`
 - [x] Staging E2E selects `products.spec.ts` through its existing allow-list
-- [x] Workflow-equivalent discovery selects 43 tests across 12 files, including TC-F08-04-94..96
+- [x] Workflow-equivalent discovery selects 46 tests across 13 files, including TC-F08-04-115..117
 - [x] Deterministic mobile E2E created
 - [x] Prior 375×812 and 430×932 usable-width, containment, wrapping, and desktop-order checks passed
 - [x] Prior 375×568 short-height flow passed, including edit retention, remove, Stay, Exit,
   panel/dialog unmount, body-overflow restoration, and zero observed server-action POSTs
-- [ ] Fresh authenticated TC-F08-04-94..96 browser rerun with the internal-clipping oracle;
+- [ ] Fresh authenticated TC-F08-04-115..117 browser rerun with the internal-clipping oracle;
   local test credentials currently return 401
 - [x] Existing BulkCreateModal unit tests pass (63/63)
 - [x] Shared auto-resize border-box regression tests pass (3/3)
@@ -126,12 +126,12 @@ setup, and workflow trigger changes are outside this issue's final delta.
 
 ## Completion Evidence
 
-- Previous authenticated Chromium run: setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28.
+- Previous authenticated Chromium run: setup plus TC-F08-04-115..117 passed 4/4 on 2026-07-28.
   This predates the internal-clipping oracle; a fresh credentialed rerun is still required.
 - Strengthened oracles cover usable mobile widths and complete desktop horizontal geometry.
 - Staging E2E explicitly selects `products.spec.ts` through its existing allow-list; the final PR
   delta does not modify workflow triggers.
-- Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94..96.
+- Workflow-equivalent discovery reports 46 tests across 13 files, including TC-F08-04-115..117.
 - Targeted BulkCreateModal unit suites: 63/63 passed.
 - Shared auto-resize border-box regression suite: 3/3 passed.
 - TypeScript, `git diff --check`, and Playwright discovery passed.
@@ -151,9 +151,9 @@ npm run typecheck
 
 ## Success Criteria
 
-- TC-F08-04-94..96 appear under `e2e/products.spec.ts` in `--list` and pass in Chromium.
+- TC-F08-04-115..117 appear under `e2e/products.spec.ts` in `--list` and pass in Chromium.
 - The existing staging allow-list selects `products.spec.ts`, and its workflow-equivalent discovery
-  includes TC-F08-04-94..96.
+  includes TC-F08-04-115..117.
 - No horizontal overflow, textarea content clipping, or control overlap at required viewports.
 - Variant information is visible; Name/Price/Stock editing and remove still work.
 - Header Cancel, footer Discard, and Approve All are fully contained and reachable with a short

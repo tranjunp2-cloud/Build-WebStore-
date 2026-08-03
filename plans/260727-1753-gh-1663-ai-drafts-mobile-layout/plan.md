@@ -64,7 +64,7 @@ No logical blocker in either direction; `blockedBy` and `blocks` stay empty.
 Both phases are implemented. On 2026-07-28, the prior authenticated Chromium run passed setup plus
 all three GH-1663 cases (4/4) using the designated dev test account. That run covered the outer
 geometry but predates the newer internal-clipping oracle and border-box hook fix. The cases now live
-in `e2e/products.spec.ts`; workflow-equivalent discovery reports 43 tests across 12 files. A fresh
+in `e2e/products.spec.ts`; workflow-equivalent discovery reports 46 tests across 13 files. A fresh
 credentialed rerun remains pending.
 
 ## Dependencies

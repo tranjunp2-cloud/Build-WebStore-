@@ -115,8 +115,8 @@ describe('GeneralInfoTab', () => {
         expect(screen.getByTestId('cancel-btn')).toBeInTheDocument()
     })
 
-    // TC-F23-02-02: Email field is always disabled
-    it('renders email field as disabled with help text', () => {
+    // TC-F23-02-02: Email field is always disabled and visibly locked
+    it('renders email field as disabled with a lock icon and help text', () => {
         // Arrange / Act
         render(
             <GeneralInfoTab
@@ -128,6 +128,7 @@ describe('GeneralInfoTab', () => {
         // Assert
         const emailInput = screen.getByDisplayValue('john@test.com') as HTMLInputElement
         expect(emailInput.disabled).toBe(true)
+        expect(screen.getByTestId('profile-email-lock')).toHaveAttribute('aria-hidden', 'true')
         expect(screen.getByText('Email cannot be changed (Login identity)')).toBeInTheDocument()
     })
 

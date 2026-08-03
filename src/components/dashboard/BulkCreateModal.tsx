@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, Sparkles, X, ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
-import { saveProductAction } from '@/app/(dashboard)/products/actions'
+import { saveAiProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
@@ -13,8 +13,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
+import { CategorySelect, type Category } from '@/components/dashboard/CategorySelect'
+
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
-import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
+import { getCategoriesByIdsAction } from '@/app/(dashboard)/products/categories/actions'
 
 interface VariantPayload {
     name: string
@@ -25,7 +27,8 @@ interface VariantPayload {
 }
 
 interface ParsedProduct {
-    _id?: string // for grid keys
+    _id: string // stable parse-local identity for state updates and grid keys
+    _draftOrdinal: number // stable accessible-name discriminator within this parse result
     // No longer read — the review drawer removes an unwanted draft outright (removeProduct)
     // instead of a select/deselect checkbox. Left optional rather than deleted so existing
     // callers/fixtures that still set it don't need updating.
@@ -33,7 +36,7 @@ interface ParsedProduct {
     name: string
     price: number
     compareAtPrice?: number
-    category: string
+    categoryId: string | number | null
     description?: string
     seoTitle?: string
     seoDescription?: string
@@ -48,71 +51,19 @@ interface ParsedProduct {
     width?: number
     height?: number
     variants: VariantPayload[]
-    variantConfigs?: { name: string, options: { value: string }[] }[]
+    variantConfigs?: { name: string; options: { value: string }[] }[]
 }
 
 interface BulkCreateModalProps {
     onClose: () => void
+    onPartialSuccess?: () => void
     onSuccess?: () => void
     initialPrompt?: string
+    categories?: Category[]
 }
 
 export function slugify(text: string) {
     return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-}
-
-export const PRODUCT_NAME_MAX_LENGTH = 120
-
-export function normalizeDraftProductName(value: string) {
-    const singleLineValue = value.replace(/[\r\n]+/g, ' ')
-    let normalizedValue = ''
-
-    for (const character of singleLineValue) {
-        const codePoint = character.codePointAt(0)
-        if (codePoint !== undefined && codePoint >= 0xD800 && codePoint <= 0xDFFF) continue
-        if (normalizedValue.length + character.length > PRODUCT_NAME_MAX_LENGTH) break
-        normalizedValue += character
-    }
-
-    return normalizedValue
-}
-
-interface ProductNameTextareaProps {
-    id: string
-    value: string
-    onChange: (value: string) => void
-}
-
-function ProductNameTextarea({ id, value, onChange }: ProductNameTextareaProps) {
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const isComposingRef = useRef(false)
-    useAutoResizeTextarea(textareaRef, value, Number.POSITIVE_INFINITY)
-
-    return (
-        <Textarea
-            ref={textareaRef}
-            id={id}
-            rows={1}
-            maxLength={PRODUCT_NAME_MAX_LENGTH}
-            value={value}
-            onChange={(event) => onChange(normalizeDraftProductName(event.target.value))}
-            onCompositionStart={() => {
-                isComposingRef.current = true
-            }}
-            onCompositionEnd={() => {
-                isComposingRef.current = false
-            }}
-            onBlur={() => {
-                isComposingRef.current = false
-            }}
-            onKeyDown={(event) => {
-                if (event.key === 'Enter' && !(isComposingRef.current || event.nativeEvent.isComposing)) {
-                    event.preventDefault()
-                }
-            }}
-            className="min-h-8 min-w-0 resize-none overflow-x-hidden px-2.5 py-1.5 text-[12.5px] leading-[18px]"
-        />
-    )
 }
 
 // Guarantees every AI-bulk-created product/variant has a non-empty SKU, even if the AI omits
@@ -139,7 +90,7 @@ function generateUniqueSku(name: string, usedSkus: Set<string>) {
 }
 
 const textToLexical = (text: string) => {
-    if (!text) return undefined;
+    if (!text) return undefined
     return {
         root: {
             type: 'root',
@@ -151,13 +102,15 @@ const textToLexical = (text: string) => {
                 format: '',
                 indent: 0,
                 version: 1,
-                children: p ? [{ type: 'text', text: p, mode: 'normal', style: '', detail: 0, format: 0, version: 1 }] : []
-            }))
-        }
-    };
+                children: p ? [{ type: 'text', text: p, mode: 'normal', style: '', detail: 0, format: 0, version: 1,
+                          },
+                      ] : [],
+            })),
+        },
+    }
 }
 
-// True when saveProductAction rejected specifically because a generated SKU already exists
+// True when saveAiProductAction rejected specifically because a generated SKU already exists
 // for this tenant (base sku and/or one or more variant skus) — the one case worth an
 // automatic retry with freshly regenerated SKUs, since the AI/fallback generator can't see
 // the merchant's existing catalog and occasionally collides with it.
@@ -172,10 +125,17 @@ function isSkuConflictError(err: unknown): boolean {
     }
 }
 
+function isCategoryInvalidResult(result: unknown): result is { ok: false; code: 'CATEGORY_INVALID' } {
+    return typeof result === 'object' &&
+        result !== null &&
+        'ok' in result && result.ok === false &&
+        'code' in result && result.code === 'CATEGORY_INVALID'
+}
+
 export function sanitizeXSS(text: string) {
-    if (!text) return text;
-    let safe = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
-    return safe.replace(/<[^>]*>?/gm, '').trim();
+    if (!text) return text
+    let safe = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+    return safe.replace(/<[^>]*>?/gm, '').trim()
 }
 
 // Untrusted AI output — a malformed/omitted numeric field parses to NaN via `Number(v)`, and
@@ -202,31 +162,37 @@ export function buildSavePayload(
     cartonMediaId: string | number | null,
     categoryId: string | number | null,
     defaultVariantName: string = 'Default',
-    tierLabels: VariantTierLabels = DEFAULT_VARIANT_TIER_LABELS,
-) {
+    tierLabels: VariantTierLabels = DEFAULT_VARIANT_TIER_LABELS) {
     const hasVariants = Boolean(prod.variants?.length)
-    const baseSlug = prod.slug || slugify(prod.name)
-    const finalSlug = baseSlug + '-' + Math.random().toString(36).substring(2, 7)
+    const baseSlug = slugify(prod.slug || prod.name) || 'product'
+    const compactDraftId = prod._id?.replace(/-/g, '').toLowerCase()
+    const stableDraftId = /^[a-f0-9]{32}$/.test(compactDraftId ?? '') ? compactDraftId : null
+    // The generated UUID is persisted in the unique slug, giving retries a stable idempotency
+    // key without adding a new Product field/schema migration. Legacy callers without a UUID
+    // retain the existing random-suffix behaviour.
+    const finalSlug = stableDraftId
+        ? `${baseSlug}-ai-${stableDraftId}`
+        : `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`
 
     // Force generation of variantConfigs from variant names to guarantee 100% option mapping accuracy
     // and correctly capture merged multi-tier options. We ignore AI's variantConfigs because they often
     // mismatch when tiers are clamped/merged.
-    let variantConfigs: { name: string; options: { value: string }[] }[] | undefined = [];
+    let variantConfigs: { name: string; options: { value: string }[] }[] | undefined = []
     if (hasVariants) {
-        const splitVariants = prod.variants!.map(v => (v.name || defaultVariantName).split(' - '));
-        const numTiers = Math.max(...splitVariants.map(v => v.length));
-        const validNumTiers = Math.min(numTiers, 2); // DB schema limits to 2 tiers
-        
+        const splitVariants = prod.variants!.map(v => (v.name || defaultVariantName).split(' - '))
+        const numTiers = Math.max(...splitVariants.map(v => v.length))
+        const validNumTiers = Math.min(numTiers, 2) // DB schema limits to 2 tiers
+
         if (validNumTiers > 0) {
             variantConfigs = Array.from({ length: validNumTiers }).map((_, i) => ({
                 name: i === 0 ? tierLabels.first : tierLabels.second,
                 options: Array.from(
                     new Set(splitVariants.map(v => {
                         // Drop excess splits if AI provided too many
-                        return (v[i] || '').trim();
-                    }).filter(val => val !== ''))
-                ).map(val => ({ value: val }))
-            }));
+                        return (v[i] || '').trim()
+                            }).filter(val => val !== ''))
+                ).map(val => ({ value: val })),
+            }))
         }
     }
 
@@ -236,22 +202,22 @@ export function buildSavePayload(
     // renaming a variant this late (post-parse, pre-save) would desync it from
     // buildVariantMatrix's exact-string tier-combo matching (variant-utils.ts) the next time
     // the merchant edits the tier matrix in ProductForm, silently resetting its price/sku/stock.
-    let safeVariants = prod.variants;
+    let safeVariants = prod.variants
     if (hasVariants && safeVariants) {
         safeVariants = safeVariants.map(v => {
-            const rawName = v.name || defaultVariantName;
-            const parts = rawName.split(' - ');
+            const rawName = v.name || defaultVariantName
+            const parts = rawName.split(' - ')
             if (parts.length > 2) {
                  // Truncate to maximum 2 tiers
                  return { ...v, name: `${parts[0].trim()} - ${parts[1].trim()}` }
             }
-            return { ...v, name: rawName.trim() };
-        });
+            return { ...v, name: rawName.trim() }
+        })
     }
 
-    let safeName = sanitizeXSS(prod.name).trim() || 'Product';
+    let safeName = sanitizeXSS(prod.name).trim() || 'Product'
     if (safeName.length < 3) {
-        safeName = safeName + ' (Bulk)';
+        safeName = safeName + ' (Bulk)'
     }
 
     // AI can repeat a SKU across variant rows (and Payload rejects them as a generic
@@ -275,7 +241,7 @@ export function buildSavePayload(
         return {
             name: sanitizeXSS(v.name || defaultVariantName),
             price: variantPrice,
-            compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+            compareAtPrice: compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice ? Number(compareAtPriceCandidate) : null,
             stock: coerceFiniteNumber(v.stock),
             sku,
         }
@@ -286,22 +252,22 @@ export function buildSavePayload(
         slug: finalSlug,
         sku: baseSku,
         price: Number(prod.price) || 0,
-        compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
+        compareAtPrice: prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price) ? Number(prod.compareAtPrice) : null,
         description: prod.description ? textToLexical(sanitizeXSS(prod.description)) : undefined,
         status: 'draft',
         aiReviewPending: true,
         hasVariants,
         variantConfigs,
-        category: categoryId ? [categoryId] : undefined,
+        category: categoryId != null ? [categoryId] : undefined,
         images: cartonMediaId ? [{ image: cartonMediaId, alt: sanitizeXSS(prod.name) }] : [],
         seo: {
             title: sanitizeXSS(prod.seoTitle || ''),
-            description: sanitizeXSS(prod.seoDescription || '')
+            description: sanitizeXSS(prod.seoDescription || ''),
         },
         dimensions: {
             length: Number(prod.length) || 0,
             width: Number(prod.width) || 0,
-            height: Number(prod.height) || 0
+            height: Number(prod.height) || 0,
         },
         variants,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
@@ -314,7 +280,13 @@ export function buildSavePayload(
     }
 }
 
-export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: BulkCreateModalProps) {
+export function BulkCreateModal({
+    onClose,
+    onPartialSuccess,
+    onSuccess,
+    initialPrompt = "",
+    categories = [],
+}: BulkCreateModalProps) {
     const { t, locale } = useI18n()
     const [isParsing, setIsParsing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -322,6 +294,15 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [hasParsed, setHasParsed] = useState(false)
     const [canRetryParse, setCanRetryParse] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [invalidCategoryIds, setInvalidCategoryIds] = useState<Set<string>>(() => new Set())
+    const availableCategories = useMemo(
+        () => categories.filter(category => !invalidCategoryIds.has(String(category.id))),
+        [categories, invalidCategoryIds],
+    )
+    const canonicalCategoryIds = useMemo(
+        () => new Map(availableCategories.map(category => [String(category.id), category.id])),
+        [availableCategories],
+    )
     const [showExitConfirm, setShowExitConfirm] = useState(false)
     // GH-1491 issue 1 audit: parent only mounts this component while the modal should be
     // open, so it's locked for this component's whole lifetime — no internal open/closed
@@ -346,15 +327,17 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ promptText, locale })
+                body: JSON.stringify({ promptText, locale }),
             })
 
             const data = await res.json()
             if (!res.ok) throw new Error(JSON.stringify(data))
 
             if (data.products && Array.isArray(data.products)) {
-                const initProducts = data.products.map((p: ParsedProduct) => {
-                    let cleanedVariants = p.variants;
+                const initProducts = data.products.map((rawProduct: ParsedProduct & { category?: unknown }, draftIndex: number) => {
+                    // Discard the legacy name-based contract before spreading normalized data.
+                    const { category: _legacyCategory, ...p } = rawProduct
+                    let cleanedVariants = p.variants
                     if (cleanedVariants && cleanedVariants.length > 0) {
                         // Case-insensitive dedup — DB has a case-insensitive unique index
                         // (products_variants_name_parent_uniq on lower(name) per parent) that the
@@ -364,28 +347,30 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         // saved row later — which would desync it from buildVariantMatrix's exact-
                         // string tier-combo matching (variant-utils.ts) and reset its custom
                         // price/sku/stock the next time the merchant edits the tier matrix.
-                        const uniqueMap = new Map<string, NonNullable<ParsedProduct['variants']>[number]>();
+                        const uniqueMap = new Map<string, NonNullable<ParsedProduct['variants']>[number]>()
                         cleanedVariants.forEach(v => {
-                            const rawName = v.name || 'Default';
-                            const parts = rawName.split(' - ');
-                            const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ');
-                            const key = truncatedName.toLowerCase();
+                            const rawName = v.name || 'Default'
+                            const parts = rawName.split(' - ')
+                            const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ')
+                            const key = truncatedName.toLowerCase()
                             if (!uniqueMap.has(key)) {
                                 // Same untrusted-AI-input coercion as the top-level price/stock below —
                                 // fixed here (parse time) so the drawer's per-variant Stock display
                                 // (variants[0].stock) and buildSavePayload both see a clean value.
-                                uniqueMap.set(key, { ...v, name: truncatedName, stock: coerceFiniteNumber(v.stock) });
+                                uniqueMap.set(key, { ...v, name: truncatedName, stock: coerceFiniteNumber(v.stock),
+                                })
                             }
-                        });
-                        cleanedVariants = Array.from(uniqueMap.values());
+                        })
+                        cleanedVariants = Array.from(uniqueMap.values())
                     }
                     return {
                         ...p,
                         name: normalizeDraftProductName(p.name || ''),
                         variants: cleanedVariants,
-                        _id: Math.random().toString(36).substring(2, 11),
+                        _id: crypto.randomUUID(),
+                        _draftOrdinal: draftIndex + 1,
                         selected: true,
-                        category: p.category || '',
+                        categoryId: typeof p.categoryId === 'string' || typeof p.categoryId === 'number' ? (canonicalCategoryIds.get(String(p.categoryId)) ?? null) : null,
                         // Untrusted AI output — the prompt asks for "0 if not specified", but the
                         // model can still omit/malform this on unparseable input (e.g. gibberish
                         // with no price/stock mentioned). Coerce here (not just later in
@@ -393,8 +378,8 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         // receives a raw non-numeric value as `value`.
                         price: coerceFiniteNumber(p.price),
                         stock: coerceFiniteNumber(p.stock),
-                    };
-                });
+                    }
+                })
                 setProducts(initProducts)
             } else {
                 toast.error(t.dashboard?.products?.bulkCreate?.parseInvalidData || 'Invalid products format received from AI')
@@ -404,7 +389,9 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             // Non-ok fetch responses throw JSON.stringify(data) (see the isSkuConflictError /
             // SKU-retry convention above) so 429's resetAt survives the throw — parse once here,
             // falling back to the raw message as the code when it isn't JSON (e.g. a network error).
-            let parsed: { error?: string; resetAt?: number; retryable?: boolean } | null = null
+            let parsed: { error?: string
+                resetAt?: number
+                retryable?: boolean } | null = null
             try {
                 parsed = JSON.parse(errBase.message)
             } catch {
@@ -435,9 +422,26 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         }
     }
 
+    const categoryRequiredMessage = t.dashboard?.products?.form?.errors?.categoryRequired || 'Please select a category for every product'
+    const isAvailableCategoryId = (categoryId: ParsedProduct['categoryId']) => categoryId != null && canonicalCategoryIds.has(String(categoryId))
+    const hasMissingCategories = products.some(product => !isAvailableCategoryId(product.categoryId))
+    const invalidateCategories = (categoryIds: Array<string | number>) => {
+        const invalidIds = new Set(categoryIds.map(String))
+        setInvalidCategoryIds(current => new Set([...current, ...invalidIds]))
+        setProducts(current => current.map(product => (
+            product.categoryId != null && invalidIds.has(String(product.categoryId))
+                ? { ...product, categoryId: null }
+                : product
+        )))
+    }
+
     const handleSave = async () => {
         if (products.length === 0) {
             toast.error(t.dashboard?.products?.bulkCreate?.saveEmptyError || 'Please select at least 1 product')
+            return
+        }
+        if (hasMissingCategories) {
+            toast.error(categoryRequiredMessage)
             return
         }
 
@@ -445,43 +449,41 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         let successCount = 0
 
         try {
+            // Revalidate only selected category IDs before any save-side effect. If this fails,
+            // fail the batch closed: no carton placeholder and no partial products.
+            const selectedCategoryIds = products.map(product => product.categoryId!)
+            let revalidatedCategories: { id: string | number }[]
+            try {
+                revalidatedCategories = await getCategoriesByIdsAction(selectedCategoryIds)
+            } catch (err) {
+                console.warn('Could not fetch categories', err)
+                toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
+                return
+            }
+            const categoryById = new Map(revalidatedCategories.map(category => [String(category.id), category.id]))
+
+            const unavailableCategoryIds = new Set(selectedCategoryIds.filter(categoryId => !categoryById.has(String(categoryId))).map(String))
+
+            if (unavailableCategoryIds.size > 0) {
+                invalidateCategories(Array.from(unavailableCategoryIds))
+                toast.error(categoryRequiredMessage)
+                return
+            }
+
             // Get Crate Carton placeholder ID
             let cartonMediaId = null
             try {
-                cartonMediaId = await getOrCreateCrateCartonIdAction()
+                cartonMediaId = await getOrCreateCrateCartonIdAction() // Update list to prevent duplicate creation for next items
             } catch (err) {
                 console.warn('Could not get default crate carton placeholder', err)
             }
 
-            // Fetch existing categories to map product categories intelligently
-            let allCategories: { id: string | number; name: string }[] = []
-            try {
-                allCategories = await getCategoriesAction()
-            } catch (err) {
-                console.warn('Could not fetch categories', err)
-            }
-
+            const savedDraftIds = new Set<string>()
+            let categoryBecameInvalid = false
+            let hasSaveFailure = false
             for (const prod of products) {
-                // Determine Category Mapping
-                let categoryId: string | number | null = null
-                if (prod.category) {
-                    const matchedCategory = allCategories.find((c) => c.name.toLowerCase().trim() === prod.category.toLowerCase().trim())
-                    
-                    if (matchedCategory) {
-                        categoryId = matchedCategory.id
-                    } else {
-                        // Create the category since it doesn't exist
-                        try {
-                            const newCat = await saveCategoryAction({ name: prod.category })
-                            if (newCat && 'id' in newCat && newCat.id) {
-                                categoryId = newCat.id
-                                allCategories.push(newCat) // Update list to prevent duplicate creation for next items
-                            }
-                        } catch (err) {
-                            console.warn('Failed to auto-create missing category', prod.category, err)
-                        }
-                    }
-                }
+                // Persist the canonical tenant-owned category returned by pre-save revalidation.
+                const categoryId = categoryById.get(String(prod.categoryId))!
 
                 const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
                 const tierLabels = {
@@ -494,19 +496,30 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 // generator can't see the merchant's existing catalog, so an occasional collision
                 // is expected. A handful of attempts resolves it without bothering the merchant.
                 const MAX_SKU_ATTEMPTS = 3
-                for (let attempt = 1; attempt <= MAX_SKU_ATTEMPTS; attempt++) {
+                let skuAttempt = 1
+                while (skuAttempt <= MAX_SKU_ATTEMPTS) {
                     try {
-                        const res = await saveProductAction(payload)
+                        const res = await saveAiProductAction(payload)
+                        if (isCategoryInvalidResult(res)) {
+                            invalidateCategories([categoryId])
+                            categoryBecameInvalid = true
+                            toast.error(categoryRequiredMessage)
+                            break
+                        }
+
                         if (res?.id) {
                             successCount++
+                            savedDraftIds.add(prod._id)
                         } else {
                             const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
+                            hasSaveFailure = true
                             toast.error(`${prod.name}: ${fallback}`)
-                            console.error('[bulk-create] saveProductAction returned no id', { name: prod.name, res })
+                            console.error('[bulk-create] saveAiProductAction returned no id', { name: prod.name, res })
                         }
                         break
                     } catch (err) {
-                        if (isSkuConflictError(err) && attempt < MAX_SKU_ATTEMPTS) {
+                        if (isSkuConflictError(err) && skuAttempt < MAX_SKU_ATTEMPTS) {
+                            skuAttempt++
                             const retrySkus = new Set<string>()
                             payload = {
                                 ...payload,
@@ -518,6 +531,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                             }
                             continue
                         }
+                        hasSaveFailure = true
                         let msg: string
                         try {
                             msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
@@ -529,12 +543,29 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         break
                     }
                 }
+                if (categoryBecameInvalid) break
+            }
+
+            if (categoryBecameInvalid || hasSaveFailure) {
+                // Keep only unsaved drafts in the drawer. Otherwise retrying after any terminal
+                // per-product failure would duplicate products already committed in this
+                // sequential batch, while closing would discard the failed drafts.
+                if (savedDraftIds.size > 0) {
+                    setProducts(current => current.filter(product => !savedDraftIds.has(product._id)))
+                    if (successCount > 0) {
+                        const tmpl = successCount === 1
+                            ? t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.'
+                            : t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`
+                        toast.success(tmpl)
+                    }
+                    onPartialSuccess?.()
+                }
+                return
             }
 
             if (successCount > 0) {
                 const tmpl = successCount === 1
-                    ? (t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.')
-                    : (t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`)
+                    ? t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.' : t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`
                 toast.success(tmpl)
                 if (onSuccess) onSuccess()
                 onClose()
@@ -550,8 +581,9 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         }
     }
 
-    const updateProduct = (id: string, field: keyof ParsedProduct, value: string | number | boolean) => {
-        setProducts(prev => prev.map(p => p._id === id ? { ...p, [field]: value } : p))
+    const updateProduct = (id: string, field: keyof ParsedProduct, value: string | number | boolean | null) => {
+        if (isSaving) return
+        setProducts(prev => prev.map(p => (p._id === id ? { ...p, [field]: value } : p)))
     }
 
     // Stock for a variant product is edited here as one shared value distributed to every
@@ -560,12 +592,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     // The product's own `inventory` is then derived server-side as the sum of variant stocks
     // (Products.ts beforeChange hook), matching the manual Add/Edit Product form's convention.
     const updateAllVariantsStock = (id: string, stock: number) => {
-        setProducts(prev => prev.map(p =>
-            p._id === id ? { ...p, variants: p.variants.map(v => ({ ...v, stock })) } : p
-        ))
+        if (isSaving) return
+        setProducts(prev => prev.map(p => (p._id === id ? { ...p, variants: p.variants.map(v => ({ ...v, stock })) } : p
+        )))
     }
 
     const removeProduct = (id: string) => {
+        if (isSaving) return
         setProducts(prev => prev.filter(p => p._id !== id))
     }
 
@@ -647,87 +680,108 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                             </Button>
                                         ) : null}
                                     </div>
-                                ) : products.map((p) => {
-                                    const hasVariants = Boolean(p.variants?.length)
-                                    const nameInputId = `bulk-draft-name-${p._id}`
-                                    const priceInputId = `bulk-draft-price-${p._id}`
-                                    const stockInputId = `bulk-draft-stock-${p._id}`
-
-                                    return (
-                                        <div key={p._id} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
-                                            <div className="col-start-1 row-start-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
-                                                <ImageIcon className="w-5 h-5" />
-                                            </div>
-                                            <div className="col-span-2 row-start-2 grid min-w-0 grid-cols-2 gap-x-2 gap-y-3 md:col-span-1 md:col-start-2 md:row-start-1 md:grid-cols-[minmax(0,1fr)_100px_72px_110px] md:gap-y-0">
-                                                <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
-                                                    <label htmlFor={nameInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                        {t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}
-                                                    </label>
-                                                    <ProductNameTextarea
-                                                        id={nameInputId}
-                                                        value={p.name}
-                                                        onChange={(value) => updateProduct(p._id!, 'name', value)}
-                                                    />
+                                ) : (
+                                    products.map(p => {
+                                        const hasVariants = Boolean(p.variants?.length)
+                                        const nameInputId = `bulk-draft-name-${p._id}`
+                                        const priceInputId = `bulk-draft-price-${p._id}`
+                                        const stockInputId = `bulk-draft-stock-${p._id}`
+                                        const categoryLabelId = `ai-category-label-${p._draftOrdinal}`
+                                        const categoryTriggerId = `ai-category-trigger-${p._draftOrdinal}`
+                                        const categoryErrorId = `ai-category-error-${p._draftOrdinal}`
+                                        const categoryHasError = !isAvailableCategoryId(p.categoryId)
+                                        return (
+                                            <div key={p._id} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
+                                                <div className="col-start-1 row-start-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                                                    <ImageIcon className="w-5 h-5" />
                                                 </div>
-                                                <div className="flex min-w-0 flex-col gap-1.5">
-                                                    <label htmlFor={priceInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                        {t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}
-                                                    </label>
-                                                    <Input
-                                                        id={priceInputId}
-                                                        type="number"
-                                                        min="0"
-                                                        value={p.price}
-                                                        onChange={(e) => updateProduct(p._id!, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
-                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
-                                                    />
-                                                </div>
-                                                <div className="flex min-w-0 flex-col gap-1.5">
-                                                    <label htmlFor={stockInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                        {t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}
-                                                    </label>
-                                                    <Input
-                                                        id={stockInputId}
-                                                        type="number"
-                                                        min="0"
-                                                        // For a variant product this drawer has no per-variant matrix (that's
-                                                        // ProductForm's job) — so Stock is one shared value distributed to
-                                                        // every variant uniformly on edit. Displays the first variant's own
-                                                        // stock (not a sum) since that's what re-editing this field would
-                                                        // apply everywhere. The AI parse prompt instructs stock:0 uniformly
-                                                        // across variants (route.ts), but that's not an enforced constraint —
-                                                        // the tooltip is explicit about the "applies to every variant"
-                                                        // semantics so a non-uniform AI response is never misread as a total.
-                                                        value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
-                                                        onChange={(e) => {
-                                                            const next = Math.max(0, parseInt(e.target.value, 10) || 0)
-                                                            if (hasVariants) updateAllVariantsStock(p._id!, next)
-                                                            else updateProduct(p._id!, 'stock', next)
-                                                        }}
-                                                        title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
-                                                        className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
-                                                    />
-                                                </div>
-                                                <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
-                                                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                        {t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}
-                                                    </span>
-                                                    <div className="min-h-8 min-w-0 whitespace-normal break-words pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))]">
-                                                        {hasVariants ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
+                                                <div className="col-span-2 row-start-2 grid min-w-0 grid-cols-2 gap-x-2 gap-y-3 md:col-span-1 md:col-start-2 md:row-start-1 md:grid-cols-[minmax(0,1fr)_100px_72px_110px] md:gap-y-0">
+                                                    <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                        <label htmlFor={nameInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}
+                                                        </label>
+                                                        <ProductNameTextarea
+                                                            id={nameInputId}
+                                                            disabled={isSaving}
+                                                            value={p.name}
+                                                            onChange={value => updateProduct(p._id, 'name', value)}
+                                                        />
+                                                    </div>
+                                                    <div className="flex min-w-0 flex-col gap-1.5">
+                                                        <label htmlFor={priceInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}
+                                                        </label>
+                                                        <Input
+                                                            id={priceInputId}
+                                                            type="number"
+                                                            disabled={isSaving}
+                                                            min="0"
+                                                            value={p.price}
+                                                            onChange={e => updateProduct(p._id, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
+                                                            className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
+                                                        />
+                                                    </div>
+                                                    <div className="flex min-w-0 flex-col gap-1.5">
+                                                        <label htmlFor={stockInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}
+                                                        </label>
+                                                        <Input
+                                                            id={stockInputId}
+                                                            type="number"
+                                                            disabled={isSaving}
+                                                            min="0"
+                                                            value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
+                                                            onChange={e => {
+                                                                const next = Math.max(0, parseInt(e.target.value, 10) || 0)
+                                                                if (hasVariants) updateAllVariantsStock(p._id, next)
+                                                                else updateProduct(p._id, 'stock', next)
+                                                            }}
+                                                            title={hasVariants ? t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant' : undefined}
+                                                            className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}
+                                                        </span>
+                                                        <div className="min-h-8 min-w-0 whitespace-normal break-words pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))]">
+                                                            {hasVariants ? p.variants.map(v => v.name).join(', ') : t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'}
+                                                        </div>
+                                                    </div>
+                                                    <div
+                                                        className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-4"
+                                                        data-testid={`ai-category-select-${p._draftOrdinal}`}
+                                                    >
+                                                        <div id={categoryLabelId} className="text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.colCategory || 'Category'}
+                                                            <span className="sr-only"> for {p.name?.trim() || 'unnamed product'}, draft {p._draftOrdinal}</span>{' '}
+                                                            <span aria-hidden="true" className="text-red-500">*</span>
+                                                        </div>
+                                                        <CategorySelect
+                                                            categories={availableCategories}
+                                                            disabled={isSaving}
+                                                            triggerId={categoryTriggerId}
+                                                            ariaLabelledBy={categoryLabelId}
+                                                            errorId={categoryErrorId}
+                                                            selectedIds={isAvailableCategoryId(p.categoryId) ? [p.categoryId!] : []}
+                                                            onChange={ids => updateProduct(p._id, 'categoryId', ids[0] ?? null)}
+                                                            error={categoryHasError ? categoryRequiredMessage : undefined}
+                                                        />
                                                     </div>
                                                 </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={isSaving}
+                                                    onClick={() => removeProduct(p._id)}
+                                                    className="col-start-2 row-start-1 flex h-11 w-11 shrink-0 items-center justify-center justify-self-end rounded-lg text-[hsl(var(--muted-foreground))] transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50 md:col-start-3 md:h-7 md:w-7"
+                                                    aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeProduct(p._id!)}
-                                                className="col-start-2 row-start-1 flex h-11 w-11 shrink-0 items-center justify-center justify-self-end rounded-lg text-[hsl(var(--muted-foreground))] transition-colors hover:bg-red-500/10 hover:text-red-400 md:col-start-3 md:h-7 md:w-7"
-                                                aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
+                                        )
+                                    })
+                                )}
                             </div>
                         </>
                     )}
@@ -737,14 +791,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 <div className="flex w-full items-center justify-between gap-3 p-[18px_24px_18px] border-t border-solid border-[hsl(var(--border))]/30">
                     <span className="text-[13px] text-[hsl(var(--muted-foreground))]">
                         {draftCount === 1
-                            ? (t.dashboard?.products?.bulkCreate?.draftCountOne || '1 draft')
-                            : (t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`)}
+                            ? t.dashboard?.products?.bulkCreate?.draftCountOne || '1 draft' : t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`}
                     </span>
                     <div className="flex items-center gap-2">
                         <Button variant="dashSecondary" size="dash" onClick={handleClose} disabled={isSaving}>
                             {t.dashboard?.products?.bulkCreate?.discard || 'Discard'}
                         </Button>
-                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={isSaving || isParsing || draftCount === 0}>
+                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={isSaving || isParsing || draftCount === 0 || hasMissingCategories}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             {t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
                         </Button>
@@ -759,7 +812,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     return (
         <>
             {modal}
-            <Dialog.Root open={showExitConfirm} onOpenChange={(open) => { if (!open) setShowExitConfirm(false) }}>
+            <Dialog.Root open={showExitConfirm} onOpenChange={open => { if (!open) setShowExitConfirm(false) }}>
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150" />
                     <Dialog.Content
@@ -770,8 +823,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         <div className="dash-shell w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[var(--dash-surface)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
                             <div className="text-center">
                                 <Dialog.Title className="text-xl font-semibold text-dash-text">
-                                    {t.dashboard?.products?.bulkCreate?.exitButton}?
-                                </Dialog.Title>
+                                    {t.dashboard?.products?.bulkCreate?.exitButton}?</Dialog.Title>
                                 <Dialog.Description className="mt-2 text-sm leading-6 text-dash-text-muted">
                                     {t.dashboard?.products?.bulkCreate?.unsavedWarning}
                                 </Dialog.Description>
@@ -787,7 +839,9 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                 </Dialog.Close>
                                 <button
                                     type="button"
-                                    onClick={() => { setShowExitConfirm(false); onClose(); }}
+                                    onClick={() => { setShowExitConfirm(false)
+                                        onClose()
+                                    }}
                                     className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(251,44,54,0.4)] bg-[#FF1F3D] text-sm font-medium text-white transition-colors hover:bg-[#ff3550]"
                                 >
                                     {t.dashboard?.products?.bulkCreate?.exitButton}
@@ -798,5 +852,61 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 </Dialog.Portal>
             </Dialog.Root>
         </>
+    )
+}
+
+export const PRODUCT_NAME_MAX_LENGTH = 120
+
+export function normalizeDraftProductName(value: string) {
+    const singleLineValue = value.replace(/[\r\n]+/g, ' ')
+    let normalizedValue = ''
+
+    for (const character of singleLineValue) {
+        const codePoint = character.codePointAt(0)
+        if (codePoint !== undefined && codePoint >= 0xD800 && codePoint <= 0xDFFF) continue
+        if (normalizedValue.length + character.length > PRODUCT_NAME_MAX_LENGTH) break
+        normalizedValue += character
+    }
+
+    return normalizedValue
+}
+
+interface ProductNameTextareaProps {
+    id: string
+    value: string
+    disabled: boolean
+    onChange: (value: string) => void
+}
+
+function ProductNameTextarea({ id, value, disabled, onChange }: ProductNameTextareaProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const isComposingRef = useRef(false)
+    useAutoResizeTextarea(textareaRef, value, Number.POSITIVE_INFINITY)
+
+    return (
+        <Textarea
+            ref={textareaRef}
+            id={id}
+            rows={1}
+            maxLength={PRODUCT_NAME_MAX_LENGTH}
+            disabled={disabled}
+            value={value}
+            onChange={(event) => onChange(normalizeDraftProductName(event.target.value))}
+            onCompositionStart={() => {
+                isComposingRef.current = true
+            }}
+            onCompositionEnd={() => {
+                isComposingRef.current = false
+            }}
+            onBlur={() => {
+                isComposingRef.current = false
+            }}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && !(isComposingRef.current || event.nativeEvent.isComposing)) {
+                    event.preventDefault()
+                }
+            }}
+            className="min-h-8 min-w-0 resize-none overflow-x-hidden px-2.5 py-1.5 text-[12.5px] leading-[18px]"
+        />
     )
 }

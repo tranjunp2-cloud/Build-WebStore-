@@ -6,7 +6,8 @@
  *   TC-F03.01c → SitesPageClient empty state renders CTA to /onboarding
  *   TC-F03.01d → SitesPageClient failed site shows "Incomplete" badge + 2 actions
  *   TC-F03.07  → DashboardStats renders 4 default stat cards
- *   TC-F03.11/12 → SEOHealthWidget shows score + "AI Fix All Issues" button
+ *   TC-F03.29  → SEOHealthWidget shows score
+ *   TC-F03.72  → SEOHealthWidget renders concise emoji-free "AI Fix Issues" CTA button (EN/MS)
  *   TC-F03.18  → DashboardStats hides card when excluded from preferences
  *   TC-F03.19  → DashboardStats shows extra card when added to preferences
  *   TC-F03.24/25/26 → TopPerformingList limits displayed items; tab switching
@@ -17,6 +18,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
+import enLocale from '@/i18n/locales/en.json'
+import msLocale from '@/i18n/locales/ms.json'
 
 // ── Mock i18n (used by all dashboard components) ─────────────────────────────
 vi.mock('@/i18n', () => ({
@@ -41,7 +44,7 @@ vi.mock('@/i18n', () => ({
                         title: 'SEO Health',
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
-                        fixAll: 'AI Fix All Issues',
+                        fixAll: 'AI Fix Issues',
                         fix: 'Fix',
                         issue: 'Issue',
                         issues: 'Issues',
@@ -230,19 +233,39 @@ describe('DashboardStats', () => {
     })
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SEOHealthWidget
 // ─────────────────────────────────────────────────────────────────────────────
 describe('SEOHealthWidget', () => {
-    it('[TC-F03.11] renders the SEO score', () => {
+    it('[TC-F03.29] renders the SEO score', () => {
         render(<SEOHealthWidget score={75} />)
         expect(screen.getByText('75')).toBeInTheDocument()
     })
 
-    it('[TC-F03.12] renders "Fix" CTA button', () => {
+    it('[TC-F03.72] renders the exact revised CTA label', () => {
+        // Arrange
         render(<SEOHealthWidget score={60} />)
-        const button = screen.getByRole('button', { name: /fix/i })
+
+        // Act
+        const button = screen.getByRole('button', { name: 'AI Fix Issues' })
+
+        // Assert
         expect(button).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'AI Fix All Issues' })).not.toBeInTheDocument()
+    })
+
+    it('[TC-F03.72] defines emoji-free revised CTA labels for English and Malay', () => {
+        // Arrange
+        const labels = [
+            enLocale.dashboard.overview.seo.fixAll,
+            msLocale.dashboard.overview.seo.fixAll,
+        ]
+
+        // Act
+        const containsSparkle = labels.some((label) => label.includes('✨'))
+
+        // Assert
+        expect(labels).toEqual(['AI Fix Issues', 'AI Baiki Isu'])
+        expect(containsSparkle).toBe(false)
     })
 
     it('[TC-F03.34] shows issue count for score < 90 (e.g. 75)', () => {

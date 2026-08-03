@@ -132,7 +132,7 @@ track. The regression is caused by the fixed siblings in the current horizontal 
 - Targeted validation passed: 63/63 BulkCreateModal tests, 3/3 shared auto-resize border-box tests,
   `npm run typecheck`, and `git diff --check`.
 - A later focused review prompted the auto-grow, responsive-width remeasurement, and internal-clipping oracle added in this cycle.
-- The previous authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28
+- The previous authenticated Chromium setup plus TC-F08-04-115..117 passed 4/4 on 2026-07-28
   with usable-width, containment, horizontal-order, and non-intersection assertions. That run
   predates the new internal-clipping oracle; no comparison screenshot was retained.
 

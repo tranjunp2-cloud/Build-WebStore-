@@ -424,9 +424,10 @@ function StackedCardVariant({ block, siteId }: { block: NewsletterConfig; siteId
         <NewsletterSection style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div
                 className={`max-w-lg mx-auto text-center ${CARD_PADDING.lg} relative overflow-hidden`}
+                data-newsletter-card="stacked"
                 style={{
                     background: CSS_VARS.surface,
-                    borderRadius: 'var(--radius-lg)',
+                    borderRadius: 'min(var(--radius-lg), 32px)',
                     boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
                     border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                 }}

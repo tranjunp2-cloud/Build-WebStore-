@@ -1,12 +1,23 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 2.7 | **Updated:** 2026-07-13 | **Owner:** QA Team
-> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.0
-> **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (US-F37-01..09)
+> **Version:** 3.2 | **Updated:** 2026-07-30 | **Owner:** QA Team
+> **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
+> **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v2.18 (2026-07-31)** — Registered `TC-F37-01-30` for the PR #1708 review regression: rapid `localBusiness` edits must be serialized and coalesced so a slower, older PATCH cannot overwrite newer address fields. The component sends sparse field patches to the Editor owner; the owner maintains revisioned snapshots and one queue per site, preserves queued site A work while site B saves independently, and prevents a same-site page refetch from replacing pending optimistic data with an older DB snapshot. Successful analytics now fire once per persisted batch from that batch's full snapshot. Deterministic regressions cover all of these ordering cases.
+- **v2.17 (2026-07-30)** — Hardened the F37 target allowlist at the shared authenticated Playwright setup boundary. The previous suite-level skip ran after the `chromium` project's `setup` dependency, so credentials could be submitted before a disallowed target was rejected. `TC-F37-01-29` now covers exact local/live-staging origins plus malformed, production, and lookalike targets; a direct setup regression confirms the guard throws before navigation or credential entry.
+- **v2.16 (2026-07-30)** — Ran the guarded browser regression against the reserved local one-site account: auth setup, TC-F37-01-26, and TC-F37-01-27 pass **3/3**. The run proves valid PATCH→reload persistence, invalid-phone rollback without PATCH, sequential name/address/phone persistence at 375px, `country: 'MY'`, persisted `minimalBusinessData` = 20 (`7/8/5`), no horizontal overflow, and exact fixture restoration/raw verification. The test marks the first-use editor coach marks as already seen so they do not redirect the Tools sheet during this settings-specific scenario. No staging result is claimed.
+- **v2.15 (2026-07-29)** — Added `TC-F37-01-28`, a focused API regression proving a complete Minimal Business Data payload cannot update a site owned by another tenant. The save route returns 403 before subscription lookup or persistence. Both single-tier and two-tier rate limiters are mocked, preventing configured Upstash or in-memory shared state from affecting the assertion. The targeted assertion failed before the mock and passed after; the full scoped gate passes **33/33**. This closes the local tenant-isolation evidence gap without changing production behavior or expanding into CI/E2E infrastructure.
+- **v2.14 (2026-07-29)** — The existing score GET now adds persisted `minimalBusinessData { score, maxScore: 20, breakdown }` using `Sites.name` (7), complete structured address (8), and `contactInfo.phone` (5), while preserving the legacy top-level score/breakdown. `src/__tests__/api/local-seo-score.test.ts` covers 20, partial 12, 401, 403, and legacy Business = 35. TC-F37-01-27 asserts 20 after the persisted editor flow. The manual one-site fixture must have empty `openingHours` so F37-01 does not rewrite F37-02 row metadata. #1312 still owns the top-level `20/35/15/30` cutover and dashboard/checklist; no live staging E2E pass is claimed.
+- **v2.13 (2026-07-29)** — Added the scoped Playwright spec `e2e/f37-minimal-business-data.spec.ts`. It resolves the authenticated account's sole tenant-owned site and fails closed on zero/multiple results. Teardown restores and raw-verifies every touched value, explicitly writing `null` for fields that were originally absent. The spec supports the exact local and live-staging origins and remains excluded from the default `e2e-staging` workflow. Local discovery lists TC-F37-01-26 and TC-F37-01-27; live staging execution remains pending. The additive persisted `minimalBusinessData` API is active; #1312 retains the top-level formula and dashboard/checklist cutover.
+- **v2.12 (2026-07-28)** — Closed the follow-up review findings for contact canonicalization and compact-layout coverage. Email blur now applies the same strip-HTML/trim canonicalization as `saveSiteSchema` before validation and save, so the request, input, parent state, and persisted value agree. All compact editor fixtures now supply the required parent pending flag, and a direct compact regression verifies that the flag reaches the mounted `SettingsPanel`. The expanded eight-file regression gate passes **131/131** (`misc-validations` 50 + `SettingsPanel` 30 + `publish-flow` 13 + score 15 + compact layout 23). Typecheck, lint, production build, and diff-check pass. Phase 3 browser persistence proof and #1312 runtime activation remain deferred.
+- **v2.11 (2026-07-28)** — Closed the final Phase 2 contact-save review findings. Address blur now applies the same strip-HTML/trim canonicalization as `saveSiteSchema`, so the request, parent state, input, and persisted value cannot diverge. The parent pending flag is passed to desktop, compact Tools, and compact block-sheet mounts, keeping all contact inputs disabled across an actual panel remount; an owner token prevents rejected overlap from releasing the active request's mutex. Contact updates are required to be standalone patches, avoiding partial optimistic side effects from mixed `{ name, contactInfo }` requests, and the mutex now releases even when fetch setup throws synchronously. Four new regression expectations failed before these fixes and the expanded gate now passes **107/107** (`misc-validations` 50 + `SettingsPanel` 29 + `publish-flow` 13 + score 15), with typecheck, lint, production build, and diff-check passing. A client AbortController timeout remains intentionally deferred: after a mutation reaches the server, timeout is an unknown outcome and cannot safely be treated as rollback without operation-status/CAS reconciliation. Phase 3 browser proof and #1312 runtime activation remain deferred.
+- **v2.10 (2026-07-28)** — Closed the Phase 2 contact-save review findings. Phone, email, and address now use one transactional component lifecycle: each blur sends only the edited field, locks sibling inputs within the mounted panel, and restores the server-confirmed value when the save is rejected. Sparse payloads keep legacy-invalid sibling values (for example, a previously stored phone containing a tab) out of unrelated email/address validation. The editor parent now owns a contact-wide mutex that survives `SettingsPanel` rerenders/remounts, rejects overlapping contact writes, and commits every contact field only after `response.ok`; the caller-controlled `commitAfterSave` exception was removed. Four new regression cases plus tightened expectations in two existing cases produced six red test failures before the implementation, then the expanded Phase 2 gate passed **103/103** (`misc-validations` 50 + `SettingsPanel` 27 + `publish-flow` 11 + score 15), with typecheck, lint, production build, and diff-check passing. Cross-tab/multi-user conflict resolution remains outside #1309; Phase 3 browser proof and #1312 runtime score activation remain deferred as documented.
+- **v2.9 (2026-07-27)** — Implemented issue #1309 Phase 2 validation/editor prerequisites and transactional phone-save regression fix. Added client-safe `isValidBusinessPhone()` as the single predicate reused by the Editor and `saveSiteSchema`: optional empty values remain valid; non-empty values require a digit, allow `+` only at the start, allow only digits/ASCII spaces/`-`/`()`/`.`, and reject letters, misplaced/multiple pluses, punctuation-only input, tabs/newlines, and raw HTML/script markup before sanitization. Invalid Editor blur shows feedback, restores the server-confirmed prop value, and returns before `onSiteSettingsChange`. A valid phone now enters parent state only after a successful PATCH; while it is pending, phone/email/address contact saves are guarded, and a failed PATCH restores the confirmed value so a later email save cannot persist the failed phone. Structured-address edits backfill `country: 'MY'` for missing or whitespace-only legacy country values. Phase 2 targeted verification passed **99/99** (`misc-validations` 50 + `SettingsPanel` 25 + `publish-flow` 9 + score 15), with typecheck, lint, build, and diff-check passing. This is component/integration regression evidence, **not** browser E2E: TC-F37-01-26 still needs the real successful PATCH→reload→invalid/no-PATCH/restore proof in Phase 3; TC-F37-01-27 has a component regression for country backfill, while persistence/reload and 375px browser proof remain Phase 3. Runtime score/API activation remains deferred to #1312.
+- **v2.8 (2026-07-27)** — Re-mapped US-F37-01 to the Story Sync v2 Minimal Business Data contract from issue #1309. `TC-F37-01-10` now locks the exact pure Business score: `Sites.name` 7 + complete street/city/postcode/country 8 + `contactInfo.phone` 5; incomplete address earns 0 and old hours/category/website/description signals do not contribute. Registered `[x] AUTO` follow-up coverage `TC-F37-01-26` (phone rejection/revert) and `TC-F37-01-27` (Editor persistence + 375px). Runtime score API activation remains deferred to #1312 so staging never ships a partial 85-point formula.
 - **v2.7 (2026-07-13)** — Pre-merge code review pass on PR #1591 (US-F37-02 + Opening Hours + Geo-cascade) found and fixed 3 bugs via `/code-review --auto` + `/fix` autonomous modes, all verified red→green: (1) **CONFIRMED, Important** — Zod `.refine()` insufficient for opening-hours required-when-open check — some paths left uncovered, allowing invalid rows through. Fixed by switching to `.superRefine()` (allows per-error granularity) + added cross-field validate at field level in `src/collections/Sites.ts` using `siblingData`. Test: **TC-F37-02-25** (3 new test cases in `sites-local-business.test.ts`, verify closed-but-no-time rejected, opens-no-closes rejected, closes-le-opens rejected). (2) **CONFIRMED, Important** — Geo-cascade `bootstrap()` (reverse-resolve pre-fill on mount) race condition: async lookup completes after user has manually selected a value, overwriting the user's choice. Fixed by adding `userInteractedRef` guard in `geo-cascade-fields.tsx` — bootstrap only writes if user hasn't interacted yet. Test: **TC-F37-01-25** (added to `geo-cascade-fields.test.tsx`, verifies manual selection beats slow mount-time resolve). (3) **CONFIRMED, Minor** — `check-migrations.js::getArrayNestedFieldNames()` false-negative risk + compact-form bug: (a) Caller was skipping names-in-diff that happened to be array-nested somewhere else in file (poor intersection logic), now fixed by explicit intersect with diff-only names — prevents false-negative when field is both array-nested AND newly top-level; (b) Missed compact single-line field form (`{ name, type }` on one line, style used in `Products.ts`) — added regex branch to detect both inline + multi-line forms, parity with diff-scanning logic. Also refactored for testability: added `module.exports` + `require.main === module` guard. Tests: **TC-F37-03-CHECK-01..03** (3 new cases in new `check-migrations.test.ts` file, verify compact form detected, array-nested + top-level handling, false-negative prevention). All 3 fixes verified via fail-without-fix / pass-with-fix cycle. Tổng **64 TC-ID** (61 + 3 new).
 - **v2.6 (2026-07-10)** — Post-implementation visual QA pass on the Opening Hours modal (screenshot comparison against real Google Maps reference) surfaced 1 real functional bug + several visual gaps, all fixed: (1) **CONFIRMED, Important** — `applyBatchSave`'s `closed` encoding (`opening-hours-utils.ts`) produces rows without `opens`/`closes` keys, but `saveSiteSchema.localBusiness.openingHours` required both fields non-optional — **saving any "Closed" day was silently rejected by the save API**. Fixed by making `opens`/`closes` `.optional()` in the Zod schema (matches the pre-existing `OpeningHourRow` TS type, which already declared them optional — a schema/type drift bug). (2) Added a `closes > opens` order validation (user-requested; overnight ranges explicitly out of scope) — new pure `isRangeOrderValid()` helper, inline modal error + disabled Save, and a matching Zod `.refine()` at the save-route boundary. (3) Visual-only fixes: checkbox/border contrast on dark theme, day-toggle row spacing, added missing 3rd quick-action ("Edit Sat–Sun"), scroll/wrap layout, clock-icon contrast — no new TC-IDs (styling only). Added **TC-F37-02-23** (`isRangeOrderValid` unit tests) and **TC-F37-02-24** (Zod refine + closed-row-without-times regression). Tổng **61 TC-ID**.
 - **v2.5 (2026-07-10)** — Opening Hours redesign to Google Maps-style list + edit-modal UX (`plans/260710-1455-opening-hours-google-style/`): multi-day batch select, split-shift support (N time ranges/day), quick-actions ("Edit all hours", "Edit Mon–Fri"), relaxed `maxRows`/Zod cap 7→21 (7 days × up to 3 shifts). New pure-logic module `opening-hours-utils.ts` (overwrite-not-merge batch save, grouping, mode encoding, round-trip). Added **§3.12** (10 TC: TC-F37-02-13..22) across `sites-local-business.test.ts` (+2), `local-business-json-ld.test.ts` (+1 split-shift spec), new `opening-hours-utils.test.ts` (7 TC, 19 tests), new `opening-hours-editor.test.tsx` (1 TC, 4 tests, RTL). No DB migration needed (no unique constraint on `day_of_week`); `json-ld.ts` + `llms.txt` route already split-shift-compatible (1:1 row mapping, no per-day dedup). Tổng **59 TC-ID**.
@@ -22,15 +33,14 @@
 
 ## 1. Objective
 
-Test coverage cho **F37 Local SEO — Phase 1** (6 story không phụ thuộc Google connection): US-F37-01, 02, 03, 04, 08, 09.
+Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 
 | Story | Nội dung | Trạng thái code |
 |---|---|---|
-| **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | ✅ BUILT + tested (§3.1–3.4) |
-| **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | ✅ BUILT (§3.5) |
-| **US-F37-03** | AI Crawler permissions + llms.txt | 🔴 NOT BUILT (§3.6) |
-| **US-F37-04** | Local SEO Score + Actionable Checklist | 🟡 PARTIAL — engine+API built, checklist chưa (§3.7) |
-| **US-F37-08** | Auto SEO/AEO Generation (metadata fallback + FAQPage + scope isolation) | ✅ BUILT (§3.8) |
+| **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | 🟡 BUILT + unit/regression tested; live Playwright run pending (§3.1–3.4) |
+| **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | 🟡 PARTIAL — category→subtype dropdown not built (§3.5) |
+| **US-F37-03** | Platform-managed AI Discoverability | 🔴 TARGET REWIRE — remove toggle UI/state, keep crawler allow + llms.txt (§3.6) |
+| **US-F37-04** | Unified SEO Health Score + Actions | 🔴 TARGET NOT BUILT — legacy engine/API require rewire (§3.7) |
 | **US-F37-09** | Malaysia opt (MY geo/state, Waze, Halal) | 🟡 PARTIAL — geo built; Waze/Halal chưa (§3.9) |
 
 ### Legend — Implementation status marker
@@ -85,19 +95,31 @@ Legend: **AC** = Acceptance Criterion | **FR** = Functional Requirement | **Type
 | **TC-F37-01-05** | AC-1 | Func | Full PostalAddress + geo + priceRange emission | `local-business-json-ld.test.ts` lines 33–48 | Emits complete PostalAddress (street/city/state/postcode/country). Includes GeoCoordinates (lat/lng). Includes priceRange ('$$'). Includes areaServed (service description). | Homepage now emits rich, search-engine-discoverable structured data |
 | **TC-F37-01-06** | AC-2 | Func | Closed days filtered from openingHoursSpecification | `local-business-json-ld.test.ts` lines 52–60 | Array excludes Sat/Sun when `isClosed: true`. Only Monday entry remains in example. No Saturday/Sunday keys. | Prevents misleading opening hours for closed days |
 | **TC-F37-01-07** | FR-06 | Edge | NO aggregateRating at LocalBusiness level | `local-business-json-ld.test.ts` lines 64–70 | `aggregateRating` key never present. Object keys don't include 'aggregateRating'. | Compliance with Google 2025–26 policy; prevents bloat |
-| **TC-F37-01-08** | FR-04 | Func | Category-mapped @type (e.g. foodEstablishment → FoodEstablishment) | `local-business-json-ld.test.ts` lines 74–85 | Maps 'foodEstablishment' → @type 'FoodEstablishment' (not generic 'LocalBusiness'). Falls back to generic 'LocalBusiness' when category absent. | Schema.org sub-type improves search engine understanding |
+| **TC-F37-01-08** | Legacy | Func | Legacy category-mapped `@type` | `local-business-json-ld.test.ts` lines 74–85 | Existing behavior maps `businessCategory` directly to `@type`; replace with the approved `schemaSubtype` contract in TC-F37-02-29..32. | Regression evidence only; not target acceptance |
 | **TC-F37-01-09** | AC-1 | Func | Homepage trigger: emits LocalBusiness from localBusiness data alone (no Contact block) | `local-business-json-ld.test.ts` lines 89–119 | Homepage emits FoodEstablishment when `site.localBusiness` present, even without Contact block. Non-homepage rejects LocalBusiness (no Contact, no localBusiness). Exactly ONE LocalBusiness when both present (dedupe). | Loosened trigger: sellers can emit LocalBusiness without Contact block |
 | **TC-F37-01-12** | AC-2 | Edge | Day-of-week mapping: Mo→Monday, Tu→Tuesday, … Su→Sunday (7 variants) | `local-business-json-ld.test.ts` lines 124–135 | Tests all 7 day codes via `it.each`. Unrecognized codes ('XX', undefined) return null, not fabricated strings. | Opening hours day names match Schema.org spec |
 | *Security* | — | Sec | XSS: </script> escaped in JSON-LD serialization | `local-business-json-ld.test.ts` lines 139–146 | Serialized JSON escapes `</script>` as `\\u003c/script\\u003e`. Prevents breakout from dangerouslySetInnerHTML. | Safe embedding of tenant-controlled strings in <script> tag |
 
 ---
 
-### 3.3 Phase 05: Local SEO Score Calculation (calculateLocalSeoScore)
+### 3.3 Legacy Phase 05 Score Tests (replacement required)
 
 | ID | AC/FR | Type | Title | Test File | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
-| **TC-F37-01-10** | AC-1 | Func | Score raises ≥20 pts when business data saved | `local-seo-score.test.ts` lines 31–44 | Compares a bare-site score to the same input with address+hours+category+localBusinessSchema+industrySubtype added. Asserts `(after.score - before.score) >= 20` — delta only, not coupled to exact baseline/after values (deliberate, per plan's own risk mitigation against weight-coupling). | Incentivizes sellers to complete local business profile |
-| **TC-F37-01-11** | FR-10 | Edge | Score bounded 0..100; bucket breakdown sum correct | `local-seo-score.test.ts` lines 48–74 | Full input scores exactly 100. Empty input scores exactly 0 (never negative). Arbitrary partial input within [0, 100]. Bucket sum (businessData + structuredData + aiDiscoverability + technicalHealth) = total score. NO "blocks suspicious bots" sub-signal present (type-level + runtime check on aiDiscoverability = 20 = allowsSearchBots(12) + sitemapPresent(8)). | Score accurately reflects completion; prevents overflow; validates PRD §13.8 architecture decision |
+| **TC-F37-01-10** | AC-1, AC-2 / FR-01..03 | Func/Edge | **[x] AUTO — Exact Minimal Business Data 7/8/5 contract** | `unit/seo/local-seo-score.test.ts`, `api/local-seo-score.test.ts` | Pure cases cover 20/12/8/0 boundaries and excluded legacy signals. The score GET maps persisted name/address/phone into additive `minimalBusinessData`; API regressions cover 20, 12, 401, 403, and unchanged legacy Business = 35. | Exposes the rewritten Business bucket without changing the top-level formula before #1312 |
+| **TC-F37-01-11** | FR-10 | Edge | Score bounded 0..100; bucket breakdown sum correct | `local-seo-score.test.ts` lines 168–202 | Full input scores exactly 100. Empty input scores exactly 0 (never negative). Arbitrary partial input within [0, 100]. Bucket sum (businessData + structuredData + aiDiscoverability + technicalHealth) = total score. NO "blocks suspicious bots" sub-signal present (type-level + runtime check on aiDiscoverability = 20 = allowsSearchBots(12) + sitemapPresent(8)). | Score accurately reflects completion; prevents overflow; validates PRD §13.8 architecture decision |
+
+---
+
+### 3.3a US-F37-01 v2 Editor Follow-up (Phase 2 implemented; Phase 3 passed locally, live staging run pending)
+
+| ID | AC/FR | Type | Title | Test File | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-01-26** | AC-3 / FR-03 | Edge | **[PARTIAL AUTO — local Playwright passed; live run pending]** | `misc-validations.test.ts`, `settings-panel.test.tsx`, `publish-flow.test.tsx`, `compact-editor-layout-nav-footer-menu.test.tsx`, `e2e/f37-minimal-business-data.spec.ts` | Existing regressions cover validation, sparse saves, rollback, pending-state serialization, authoritative reconciliation after a lost PATCH response, and a locked reload-required state when persistence remains unknown. The local Playwright run performs valid PATCH→reload, then verifies invalid blur restores the confirmed phone and emits no matching PATCH. A live staging run is still required before claiming staging browser acceptance. | Failed or invalid contact input cannot replace server-confirmed data; ambiguous transport outcomes cannot silently rollback or admit another contact write; local browser evidence passes |
+| **TC-F37-01-27** | AC-1 / DoD | Func | **[PARTIAL AUTO — local Playwright passed; live run pending]** | `settings-panel.test.tsx`, `e2e/f37-minimal-business-data.spec.ts` | The local one-site scenario with empty `openingHours` saves and reloads name/address/phone at 375px, checks `country: 'MY'`, asserts persisted `minimalBusinessData` = 20 with `7/8/5`, then restores and raw-verifies touched values. | Covers persistence/mobile/runtime Business without rewriting F37-02 row metadata; local browser evidence passes and live staging remains pending |
+| **TC-F37-01-28** | DoD tenant isolation | Sec | **[x] AUTO — Minimal Business Data save rejects a cross-tenant site** | `src/__tests__/api/sites.test.ts` | With both single-tier and two-tier rate limiters mocked to avoid Upstash or in-memory shared state, a complete F37 name/address/phone payload targeting a tenant-2 site returns 403 for a tenant-1 user; `payload.update` and subscription lookup remain uncalled. The targeted assertion failed before the mock and passed after; the full scoped gate passes 33/33. | Prevents IDOR writes without expanding the story scope |
+| **TC-F37-01-29** | Security / test safety | Sec | **[x] AUTO — Authenticated E2E target allowlist runs before login** | `e2e/authenticated-target.smoke.spec.ts`, `e2e/auth.setup.ts` | Allows only exact localhost and live-staging origins, rejects malformed/production/lookalike targets, and asserts the shared setup guard before navigation or credential access. | Prevents a misconfigured manual F37 run from submitting credentials to an unapproved origin |
+| **TC-F37-01-30** | AC-1 / data integrity | Regression | **[x] AUTO — Overlapping Local Business saves serialize and coalesce newest fields** | `settings-panel.test.tsx`, `publish-flow.test.tsx` | `SettingsPanel` sends only edited fields (plus required country backfill). Deferred-response tests prove later edits coalesce into the newest full snapshot, site A's queued batch survives navigation while site B saves independently, a same-site page refetch cannot restore stale DB data over pending edits, and analytics fire once per successful persisted batch with that batch's completion count. | Prevents out-of-order or lifecycle-driven loss of state/city/postcode data and stale/duplicate save analytics |
 
 ---
 
@@ -116,9 +138,9 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ---
 
-## 3.5 US-F37-02: Enhanced LocalBusiness JSON-LD **[FULLY BUILT]**
+## 3.5 US-F37-02: Enhanced LocalBusiness JSON-LD **[PARTIAL — subtype dropdown NOT BUILT]**
 
-> Code: `src/lib/seo/json-ld.ts` + `src/lib/seo/schema-helpers.ts`. Core generators đã test (TC-F37-01-05..12). TC dưới nhắm **surface chưa test** (breadcrumb/website/webpage generators, geo edge, aggregator resilience). `[UNTESTED]` = code có nhưng chưa có test.
+> Existing JSON-LD generators are built. The approved `businessCategory` → `schemaSubtype` dropdown, persistence, validation, and score integration are `[NOT-BUILT]` and use TC-F37-02-29..32 as acceptance tests.
 
 | ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
@@ -131,72 +153,54 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-02-07** | BR-02 | Edge | Address precedence: `localBusiness.streetAddress` ưu tiên, fallback `contactInfo.address` | `json-ld.ts` | streetAddress có → dùng; rỗng → fallback contact block. | Address đúng nguồn |
 | **TC-F37-02-08** | BR-11 | Func | telephone format `+60 12 345 6789` trong schema | `json-ld.ts` | telephone chuẩn hoá E.164-ish MY trong JSON-LD. | NAP consistency |
 | **TC-F37-02-09** | AC-3 | Func | Full LocalBusiness schema — Rich Results validator 0 error | manual/validator | @context/@type hợp lệ, đủ address+geo+hours+priceRange+areaServed, 0 error trên Google Rich Results Test. | Search discoverability (E2E validate) |
+| **TC-F37-02-29** | FR-05 | Func | Category filters subtype dropdown | `[NOT-BUILT]` | Subtype disabled before category; options come only from the versioned compatible mapping; exactly one option auto-selects, multiple options require explicit selection. | Prevents invalid or vague subtype selection |
+| **TC-F37-02-30** | FR-05 | Edge | Category change preserves or clears subtype | `[NOT-BUILT]` | Preserve the selected subtype only when compatible with the new category; otherwise clear it and require a new selection. | Prevents stale category/subtype pairs |
+| **TC-F37-02-31** | AC-04 / FR-05 | Sec/Data | Server rejects an invalid category/subtype pair | `[NOT-BUILT]` | Direct invalid payload is rejected; the previous valid pair remains saved; invalid `@type` is never emitted. | Save boundary enforces the contract |
+| **TC-F37-02-32** | FR-05 / §5 | Func | Subtype controls JSON-LD and score | `[NOT-BUILT]` | Empty subtype emits generic `LocalBusiness` and earns 0/4; a compatible specific subtype emits the exact `@type` and earns 4/4. | Schema and score use one source of truth |
 
 ---
 
-## 3.6 US-F37-03: AI Crawler Permissions & llms.txt **[NOT BUILT — spec-based]**
+## 3.6 US-F37-03: Platform-managed AI Discoverability **[TARGET REWIRE]**
 
-> **🔴 BLOCKER / SPEC CONFLICT** — TC section này **chưa chạy được**, code chưa build đúng spec:
-> - `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03 "default ALLOW" (BR-03).
-> - **KHÔNG có** route `llms.txt`. **KHÔNG có** field per-site toggle (`ai_crawlers_enabled`). Score engine hardcode `allowsSearchBots: false` "until US-F37-03 ships".
-> - TC spec-based, đánh dấu `[NOT-BUILT]` — dùng làm acceptance spec khi implement. **Xem §9 câu hỏi #2.**
+> Target contract: approved AI assistant crawlers are always allowed and always earn 9 points. The seller sees no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. Current toggle-based code must be removed or made non-authoritative during implementation.
 
 | ID | AC/FR | Type | Title | Status | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
-| **TC-F37-03-01** | AC-4 | Func | Default robots.txt **ALLOW** AI bot (no `Disallow: /` cho GPTBot/ClaudeBot/Google-Extended/CCBot) | `[NOT-BUILT]` | Tenant mới → robots.txt KHÔNG chặn AI bot chính. | BR-03 default open |
-| **TC-F37-03-02** | FR-07 | Func | Field `ai_crawlers_enabled` boolean default `true` trên Sites | `[NOT-BUILT]` | Schema default true; migration entry (NFR-9). | Toggle backend |
-| **TC-F37-03-03** | AC-5 | Func | Seller opt-out OFF → robots.txt inject `Disallow: /` cho AI UA | `[NOT-BUILT]` | Toggle off → Disallow xuất hiện cho GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot. | Opt-out hoạt động |
-| **TC-F37-03-04** | AC-5 | Func | Opt-out KHÔNG chặn Googlebot/Bingbot | `[NOT-BUILT]` | Search bot thường vẫn crawl bình thường. | SEO không vỡ |
+| **TC-F37-03-01** | AC-01 / FR-12 | Func | robots.txt always allows approved AI assistant bots | target `[NOT-BUILT]` | GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot are not blocked for any tenant. | Platform invariant |
+| **TC-F37-03-02** | AC-02 / FR-12 | UI | No seller-facing discoverability controls | target `[NOT-BUILT]` | Dashboard and Site Settings contain no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. | KISS UI |
+| **TC-F37-03-03** | AC-01 / FR-12 | Regression | Persisted legacy `false` cannot block approved AI bots | target `[NOT-BUILT]` | A legacy site record cannot change robots behavior or reduce the 9 crawler points. | Migration safety |
+| **TC-F37-03-04** | AC-01 | Func | Googlebot/Bingbot remain allowed | target `[NOT-BUILT]` | Normal search crawlers remain crawlable. | SEO safety |
 | **TC-F37-03-05** | AC-6 | Func | `GET /llms.txt` → 200 `text/plain` | `[NOT-BUILT]` | Route tồn tại, status 200, MIME text/plain. | AEO signal |
 | **TC-F37-03-06** | AC-6 | Func | llms.txt content: tên, mô tả, ≥5 URL, contact, giờ, markdown | `[NOT-BUILT]` | Đủ element cấu trúc markdown. | llms.txt hợp lệ |
 | **TC-F37-03-07** | BR-09 | Func | llms.txt runtime-generated, cache ngắn | `[NOT-BUILT]` | Không long-cache; phản ánh data mới. | Freshness |
-| **TC-F37-03-08** | NFR-3 | Sec | Toggle per-site isolated (site A opt-out ≠ site B) | `[NOT-BUILT]` | robots.txt site B không đổi khi site A toggle. | Cross-tenant isolation |
-| **TC-F37-03-09** | Conflict | Sec | **Current robots.txt chặn 9 AI bot (ngược spec)** — confirm interim vs bug | `robots.txt/route.ts` | Ghi nhận hành vi hiện tại; PM chốt default-allow vs block trước implement. | **Spec conflict flag** |
+| **TC-F37-03-08** | NFR-3 | Sec | Platform crawler invariant is tenant-safe | target `[NOT-BUILT]` | Every tenant receives the same approved allow policy without cross-tenant state. | Isolation |
+| **TC-F37-03-09** | §5 / FR-12 | Func | Score always awards crawler baseline | target engine `[NOT-BUILT]` | AI Discoverability always includes 9 crawler points; unpublished sites earn no sitemap/llms points. | Score integrity |
 
 ---
 
-## 3.7 US-F37-04: Local SEO Score & Checklist **[PARTIAL — engine+API built, checklist NOT built]**
+## 3.7 US-F37-04: Unified SEO Health Score & Actions **[TARGET NOT BUILT]**
 
-> Code: engine `src/lib/seo/local-seo-score.ts` (đã test TC-F37-01-10/11), API `src/app/api/sites/[siteId]/local-seo-score/route.ts` (**chưa test** — giá trị QA cao). Widget checklist one-click-fix (US-04 core) **chưa build** (chỉ có `completion-checklist.tsx` tối giản của US-01).
+> Existing `local-seo-score.ts` and its API still use the legacy top-level contract. #1309 added the pure 7/8/5 Minimal Business helper, an additive persisted `minimalBusinessData` response, and 401/403 API coverage without partially changing the top-level score. Target behavior remains the single F37 §5 score rendered by the existing F03 `SeoHealth` surface; #1312 owns that atomic cutover and the unified dashboard/checklist.
 
 | ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
-| **TC-F37-04-01** | FR-10 | Sec | Score API — unauth → 401 | `route.ts` `[UNTESTED]` | GET không session → 401. | Auth gate |
-| **TC-F37-04-02** | FR-10 | Sec | Score API — cross-tenant → 403 | `route.ts` `[UNTESTED]` | User khác tenant xin score siteId khác → 403 (ownership check). | IDOR guard |
-| **TC-F37-04-03** | FR-10 | Edge | Score API — rate-limit 30/60s → 429 | `route.ts` `[UNTESTED]` | Request thứ 31 trong 60s → 429. | Abuse guard |
-| **TC-F37-04-04** | FR-10 | Edge | Score API — site không tồn tại → 404 | `route.ts` `[UNTESTED]` | siteId sai → 404. | Error handling |
-| **TC-F37-04-05** | FR-10 | Func | Score API — signal derivation (faqBlock, hours predicate, sitemapPresent từ published) | `route.ts` `[UNTESTED]` | faq detect across pages; hours khớp `hasMeaningful`; sitemapPresent = status published. | Điểm phản ánh data thật |
-| **TC-F37-04-06** | FR-10 | Edge | Score API — lỗi nội bộ → 500 handler | `route.ts` `[UNTESTED]` | Exception → 500 sạch, không leak. | Resilience |
-| **TC-F37-04-07** | AC-7 | Func | Engine — Business Data bucket 7×5 trừ điểm per field thiếu | `local-seo-score.ts` | Mỗi field thiếu −5 (tối đa 35). | Bucket đúng |
-| **TC-F37-04-08** | AC-7 | Func | Engine — Structured Data: localBusinessSchema 10 / faq 8 / org 7 / subtype 5 | `local-seo-score.ts` | Weight từng signal đúng (tổng 30). | Bucket đúng |
-| **TC-F37-04-09** | §13.8 | Func | Engine — score normalize earned/applicable ×100; Phase-2 bucket KHÔNG vào mẫu số | `local-seo-score.ts` | Phase-1 hoàn thành đạt 100; Phase-2 locked không kéo điểm xuống. | No-drop rule |
-| **TC-F37-04-10** | AC-1 | Func | **[NOT-BUILT]** Empty site → score ≤30, checklist ≤3 item High | pending widget | Điểm ≤30 + tối đa 3 việc cần làm. | US-04 core UI |
-| **TC-F37-04-11** | AC-2 | Func | **[NOT-BUILT]** One-click "Bật ngay" AI crawler → toggle + robots.txt + item Done + score↑ | pending (phụ thuộc US-03) | Full chain 1-click fix. | US-04 core UI |
-| **TC-F37-04-12** | BR-10 | Func | **[NOT-BUILT]** Checklist tối đa 3 item, ẩn item done | pending widget | ≤3; done bị ẩn. | UX checklist |
-| **TC-F37-04-13** | BR-07 | Func | Score recalc khi save site settings (GBP refresh max 1×/24h) | integration | Save → recompute; PostHog analytics KHÔNG ảnh hưởng score. | Freshness |
+| **TC-F37-04-01** | FR-19 | Sec | Score API — unauth → 401 | `api/local-seo-score.test.ts` `[BUILT]` | GET không session → 401 trước khi đọc site. | Auth gate |
+| **TC-F37-04-02** | FR-19 | Sec | Score API — cross-tenant → 403 | `api/local-seo-score.test.ts` `[BUILT]` | Site ngoài tenant → 403 và không query pages. | IDOR guard |
+| **TC-F37-04-03** | FR-19 | Edge | Score API — rate-limit 30/60s → 429 | `route.ts` `[UNTESTED]` | Request thứ 31 trong 60s → 429. | Abuse guard |
+| **TC-F37-04-04** | FR-19 | Edge | Score API — site không tồn tại → 404 | `route.ts` `[UNTESTED]` | siteId sai → 404. | Error handling |
+| **TC-F37-04-05** | FR-19 | Func | Score API — derive every signal in F37 §5 | target engine `[NOT-BUILT]` | Metadata/content/schema/AI/technical inputs map to the authoritative scorecard. | Điểm phản ánh data thật |
+| **TC-F37-04-06** | FR-19 | Edge | Score API — lỗi nội bộ → 500 handler | `route.ts` `[UNTESTED]` | Exception → 500 sạch, không leak. | Resilience |
+| **TC-F37-04-07** | §5 | Func | Engine — Business Data 7/8/5 | `local-seo-score.test.ts` `[PARTIAL]` | Pure helper proves name + address + phone total exactly 20; top-level engine cutover remains #1312. | Bucket contract guarded without partial runtime drift |
+| **TC-F37-04-08** | §5 | Func | Engine — Schema totals 35 | target engine `[NOT-BUILT]` | Eight approved schema signals total exactly 35. | Bucket đúng |
+| **TC-F37-04-09** | §5 | Func | Engine — four buckets sum exactly 100 | target engine `[NOT-BUILT]` | Business 20 + Schema 35 + AI 15 + Technical 30 = total. | No-drift rule |
+| **TC-F37-04-10** | AC-1 / FR-20 | Func | **[NOT-BUILT]** Unified KISS layout | pending unified widget | One gauge; no Score History; four bucket bars in a 2×2 desktop grid without bucket point values; SEO Issues uses the existing two-column row pattern. | US-04 core UI |
+| **TC-F37-04-11** | AC-2 / FR-12 | Func | **[NOT-BUILT]** AI crawler signal stays hidden | pending unified widget | Crawler access earns 9 points but never renders an issue, toggle, CTA, or Action Tools card. | KISS platform invariant |
+| **TC-F37-04-12** | FR-20 / FR-21 | Func | **[NOT-BUILT]** Actor, CTA, and destination contract | pending unified widget | Every unresolved seller issue uses `AI` or `You` and the matching Fix/Edit/Set up/Publish behavior from PRD §12.3; completed issues are hidden. | Action clarity |
+| **TC-F37-04-13** | FR-19 | Func | Score recalc khi seller thay đổi signal thuộc §5 | integration | Save → recompute; PostHog analytics không ảnh hưởng score. | Freshness |
 | **TC-F37-04-14** | AC-1 | Func | `completion-checklist.tsx` — addressDone cần đủ 4 field, hoursDone predicate | component `[UNTESTED]` | addressDone chỉ khi street+city+state+postcode; hoursDone khi có ≥1 ngày mở. | US-01 indicator đúng |
-
----
-
-## 3.8 US-F37-08: Auto SEO/AEO Generation **[FULLY BUILT]**
-
-> Code: `src/lib/ai/seo-generator.ts` + `src/lib/ai/json-ld-templates.ts` + `src/app/api/seo/analyze/route.ts`. Đã test (TC-F01-W.27..35). TC dưới nhắm branch chưa test + **scope isolation** (ranh giới bảo mật platform↔tenant). FAQPage sở hữu ở story này (dedup theo agent).
-
-| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
-|---|---|---|---|---|---|---|
-| **TC-F37-08-01** | AC-15 | Func | Empty SEO fields → `<head>` đủ title(50–60), desc(150–160), og:*, canonical | `seo-generator.ts` | Không tag thiếu; length trong bound. | Fallback metadata |
-| **TC-F37-08-02** | AC-15 | Func | Auto-title KHÔNG "undefined"/rỗng, từ product+business name | `seo-generator.ts` | Không chuỗi "undefined", non-empty. | Không title rác |
-| **TC-F37-08-03** | AC-15 | Edge | Không tag nào `content=""` hoặc vắng | `seo-generator.ts` | Mọi meta có content thực. | Chất lượng head |
-| **TC-F37-08-04** | FR-24 | Edge | `parseAddress()` branch 1/2/3-phần, country default 'MY' | `json-ld-templates.ts` `[UNTESTED]` | Split đúng street/city/state; thiếu country → 'MY'. | Address parse đúng |
-| **TC-F37-08-05** | AC-16 | Func | `generateFAQSchema` dedup Q trùng qua nhiều faq block + empty→null (SiteRenderer path) | `json-ld.ts` `[UNTESTED]` | Merge nhiều block, bỏ Q trùng; 0 item → null (không emit FAQPage rỗng). | FAQPage đúng |
-| **TC-F37-08-06** | AC-16 | Func | Mỗi FAQ Q → `Question` + `acceptedAnswer`, validator 0 error | `seo-generator.ts` | Mapping đúng, schema hợp lệ. | AEO rich result |
-| **TC-F37-08-07** | AC-17 | Sec | **Scope isolation** — platform route (`/`, `/dashboard`, `/admin`, `/api/v1/*`) KHÔNG dính F37 fallback/llms/crawler | integration | Platform head/robots không bị F37 chèn. | **Ranh giới bảo mật** |
-| **TC-F37-08-08** | AC-17 | Sec | Platform `/llms.txt` → 404 (chỉ tenant storefront) | integration | Fetch domain platform /llms.txt → 404. | Isolation (llms chưa build) |
-| **TC-F37-08-09** | AC-17 | Sec | Platform robots.txt KHÔNG bị F37 sửa | integration | Platform robots giữ nguyên. | Isolation |
-| **TC-F37-08-10** | FR-22 | Func | `analysePage()` scoring branch (image-alt, word-count, no-contact-section) | `analyze/route.ts` | Mỗi issue type trừ điểm đúng + autoFixable flag. | SEO analyze chính xác |
-| **TC-F37-08-11** | BR-14 | Func | auto-meta fallback pure, KHÔNG gọi AI, nhanh | `seo-generator.ts` | Non-async, no OpenAI call ở fallback path. | Perf/cost |
-
----
+| **TC-F37-04-16** | AC-05 / AC-07 | Func | **[NOT-BUILT]** Conditional AI Fix strip | pending unified widget | Strip and Fix All show only when at least one title/description issue is AI-fixable; Fix opens the existing modal filtered to the affected field; Local Business data is unchanged. | Prevents false AI capability |
+| **TC-F37-04-17** | AC-06 | Func | **[NOT-BUILT]** Root-cause deduplication | target issue derivation | Missing address creates one Address issue, not separate Address + LocalBusiness rows; missing phone creates one Phone issue, not Phone + schema telephone rows; unpublished creates one Publish issue, not Sitemap + llms.txt rows. | KISS issue list |
+| **TC-F37-04-18** | FR-21 | Func | **[NOT-BUILT]** Platform-managed metrics create no seller task | target issue derivation | Organization and indexability never render AI/You issue rows; Google verification renders Set up only after its Editor SEO destination exists. | No dead-end CTA |
 
 ## 3.9 US-F37-09: Malaysia Market Optimization **[PARTIAL — geo built, Waze/Halal NOT built]**
 
@@ -219,7 +223,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-09-13** | AC-18 | Edge | **[NOT-BUILT]** Thiếu lat HOẶC lng → KHÔNG render Waze button (BR-16) | pending | Không href rỗng. | Không link vỡ |
 | **TC-F37-09-14** | AC-19 | Func | **[NOT-BUILT]** Halal ON → badge + JSON-LD `additionalProperty` PropertyValue "Halal Certified" + JAKIM `sameAs` | pending | Badge render + schema property + cert/sameAs khi có số cert. | Halal signal |
 | **TC-F37-09-15** | AC-19 | Func | **[NOT-BUILT]** Halal OFF → KHÔNG badge, KHÔNG additionalProperty | pending | Vắng cả 2. | Toggle sạch |
-| **TC-F37-09-16** | AC-14 | Func | Mobile 375px — checklist ≤3 full-width, touch ≥44px, no overflow | responsive | Không tràn ngang, target đủ lớn. | Mobile UX |
+| **TC-F37-09-16** | AC-14 | Func | Mobile 375px — SEO issues one column, CTA ≥44px, no overflow | responsive | Gauge → four bars → conditional AI strip → one-column issues; no horizontal overflow; action targets are full-width and ≥44px. | Mobile UX |
 
 ---
 
@@ -239,16 +243,7 @@ Two dashboard code paths read the shared `analytics` collection:
 
 | ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
 |---|---|---|---|---|---|---|
-| **TC-F37-04-15** | FR-10 | Sec | Score API **403 khi `site.tenant` null/thiếu** (không chỉ cross-tenant) | `local-seo-score/route.ts` dòng 56 `[UNTESTED]` | `siteTenantId` null → 403 (không lọt score cho site không gắn tenant). | IDOR guard đầy đủ |
-| **TC-F37-04-16** | AC-7 | Edge | faqSchema signal: faq block có nhưng **items rỗng → KHÔNG earned** | `local-seo-score/route.ts` dòng 72-75 `[UNTESTED]` | `items.length>0` mới tính; block rỗng không +8 (parity `generateFAQSchema` empty→null). | Điểm không thổi phồng |
-
-### US-F37-08 Auto SEO/AEO — branch chưa cover
-
-| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
-|---|---|---|---|---|---|---|
-| **TC-F37-08-12** | FR-24 | Edge | `parseAddress` boundary: split 1/2/3/>3-part, country default 'MY' per part-count | `json-ld-templates.ts` `[UNTESTED]` | 1-part→street; 2-part→street+city; 3-part→street+city+state; >3 gộp đúng; thiếu country→'MY'. | Address parse chính xác |
-| **TC-F37-08-13** | AC-15 | Edge | Metadata boundary: title=50/60, desc=150/160 (truncate đúng, không cắt giữa entity) | `seo-generator.ts` | Đúng biên length, không vượt, không cắt cụt ký tự đặc biệt. | Meta length compliant |
-| **TC-F37-08-14** | FR-04 | Func | Industry variant: Restaurant `servesCuisine` từ products; MedicalClinic `medicalSpecialty` | `json-ld-templates.ts` `[UNTESTED]` | @type Restaurant → servesCuisine từ product list; MedicalClinic → specialty field. | Schema sub-type richness |
+| **TC-F37-04-15** | FR-19 | Sec | Score API **403 khi `site.tenant` null/thiếu** (không chỉ cross-tenant) | `local-seo-score/route.ts` dòng 56 `[UNTESTED]` | `siteTenantId` null → 403 (không lọt score cho site không gắn tenant). | IDOR guard đầy đủ |
 
 ### US-F37-09 Map parser + resolve-maps-link (SSRF) — branch chưa cover
 
@@ -358,11 +353,33 @@ Two dashboard code paths read the shared `analytics` collection:
 
 **File:** `src/__tests__/unit/seo/local-seo-score.test.ts`
 
-**Test count:** 7 tests (1 functional + 6 edge/validation)
+**Test count:** 15 tests (9 exact Business contract + 6 legacy-engine edge/validation)
 
 **Command:** `npm test -- local-seo-score`
 
 **TC-IDs covered:** TC-F37-01-10, TC-F37-01-11
+
+---
+
+### 4.3a Minimal Business Data Score API Regression
+
+**File:** `src/__tests__/api/local-seo-score.test.ts`
+
+**Coverage:** persisted complete = 20, partial = 12, unauthenticated = 401, cross-tenant = 403, while legacy top-level Business remains 35.
+
+**Command:** `npm test -- src/__tests__/api/local-seo-score.test.ts`
+
+---
+
+### 4.3b Minimal Business Data Phase 2 Verification
+
+**Files:** `src/__tests__/unit/lib/validations/misc-validations.test.ts`, `src/__tests__/unit/editor/settings-panel.test.tsx`, `src/__tests__/unit/editor/publish-flow.test.tsx`, `src/__tests__/unit/seo/local-seo-score.test.ts`, `src/__tests__/unit/editor/compact-editor-layout-pr1485-round2.test.tsx`, `src/__tests__/unit/editor/pr1485-round2-regression.test.tsx`, `src/__tests__/unit/editor/compact-editor-layout-nav-footer-menu.test.tsx`, and `src/__tests__/unit/editor/compact-editor-layout-scroll-lock.test.tsx`
+
+**Test count:** 136 tests (50 validation; 30 `SettingsPanel` regressions, including sparse contact and `localBusiness` payloads, canonical email/address handling, remount-safe pending guards, and phone/email/address restoration; 18 `publish-flow` integration regressions, including failed-contact parent-state isolation, standalone contact patches, owner-safe mutex behavior, serialized/coalesced per-site `localBusiness` saves, same-site refetch protection, cross-site queue isolation, and stale-load cancellation; 15 score regressions; 23 compact-layout regressions, including direct parent-pending propagation)
+
+**Command:** `npm test -- src/__tests__/unit/lib/validations/misc-validations.test.ts src/__tests__/unit/editor/settings-panel.test.tsx src/__tests__/unit/editor/publish-flow.test.tsx src/__tests__/unit/seo/local-seo-score.test.ts src/__tests__/unit/editor/compact-editor-layout-pr1485-round2.test.tsx src/__tests__/unit/editor/pr1485-round2-regression.test.tsx src/__tests__/unit/editor/compact-editor-layout-nav-footer-menu.test.tsx src/__tests__/unit/editor/compact-editor-layout-scroll-lock.test.tsx`
+
+**Result:** 136/136 pass. The review cycles reproduced raw email/address divergence, remount-unlocked inputs, missing desktop/compact parent-pending propagation, a mutex stranded by synchronous setup failure, out-of-order Local Business PATCHes, same-site refetch rollback, cross-site queue loss/blocking, and late previous-site loads; all pass after the fixes. The standalone-patch regression prevents mixed optimistic side effects. `SettingsPanel`, `CompactEditorLayout`, and `publish-flow` provide component/parent-integration guards for canonical sparse contact saves and serialized/coalesced Local Business persistence; they are not direct browser proof of successful PATCH, reload persistence, invalid-phone no-PATCH behavior, or 375px layout. That proof remains assigned to Phase 3.
 
 ---
 
@@ -440,23 +457,15 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ## 5. Known Limitations & PM Review Items
 
-### Technical Health Signals (Decision A — Reuse F03)
+### Technical Health Signals
 
-**Status (PM 2026-07-21):** Technical Health **must** reuse F03 `calculateTechnicalSeoScore()`:
-- Missing OG image → −15 (on F03 0–100 scale)
-- Missing Google verification token → −10
-- Bad slugs → −5 each, max −15
-- noIndex pages → −5 each, max −10
-- Local SEO bucket: `floor(f03Technical × 15 / 100)`
+Technical Health follows the canonical F37 PRD §5:
+- Meta title coverage → 8 points
+- Meta description coverage → 8 points
+- F03 Content Quality → 8 points
+- Google verification + indexable eligible pages → 6 points
 
-**Legacy (remove when wiring US-F37-04):** Phase 05 still may hardcode CWV=80 / mobile=true / https=true → every site +15 free. Treat as **implementation debt**, not product decision. 
-
-**Flagged for:** Before US-F37-04 dashboard surfaces this score to sellers, PM should decide:
-1. Keep assume-passing (current; no infrastructure cost, but overstates accuracy)
-2. Implement real Lighthouse/CWV measurement (adds dependency, more accurate)
-3. Apply PRD §13.8's "earned/applicable" normalization pattern (reweight buckets based on what's measurable per-site)
-
-See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Phase 06 PM review" for full context.
+The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire it to these four approved signals before the unified Dashboard score ships.
 
 ### `check-migrations.js` — `getFieldRoles` parser edge cases (Low, not blocking)
 
@@ -480,18 +489,10 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 - TC-F37-01-07 explicitly asserts this key never appears
 - Prevents non-compliance with search engine guidelines
 
-### AI Crawler Policy Compliance
-
-- AI Discoverability bucket designed per PRD §13.8 without "blocks suspicious bots" sub-signal (contradicts BR-03 default-ALLOW policy)
-- TC-F37-01-11 validates this design via type-level guarantee + runtime assertion
-- Prevents accidental reversion when Phase 2 (GBP OAuth) lands
-
----
-
 ## 7. Related Documentation
 
 - **Architecture:** `docs/architecture/F37-local-seo.md` (full technical design, Phase 04/05 details, security analysis)
-- **PRD:** `docs/prd/F37-local-seo-search-performance.md` (feature spec, scoring formula §13.8, acceptance criteria)
+- **PRD:** `docs/prd/F37-local-seo-search-performance.md` (feature spec, scoring formula §5, acceptance criteria)
 - **Changelog:** `docs/CHANGELOG.md` (Phase 03–05 releases, US-F37-01 entry)
 - **Code Standards:** `docs/standards/CODE_STANDARDS.md` (Zod schema patterns, JSON-LD best practices)
 
@@ -503,14 +504,16 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 |---|---|---|---|---|
 | `sites-local-business.test.ts` | 17 | ✅ PASS | 100% of saveSiteSchema.localBusiness | Zod schema + security + opening-hours cap + closes-after-opens |
 | `local-business-json-ld.test.ts` | 21 | ✅ PASS | 100% of generateLocalBusinessSchema, generatePageSchemas, dayOfWeekToSchema, serializeJsonLd | JSON-LD + trigger logic + XSS + hasMap + cascade-string regression + split-shift |
-| `local-seo-score.test.ts` | 7 | ✅ PASS | 100% of calculateLocalSeoScore | Scoring logic + bounds |
+| `local-seo-score.test.ts` | 15 | ✅ PASS | `calculateBusinessDataScore` 7/8/5 branches + `calculateLocalSeoScore` regression | 9 exact Business contract tests + 6 legacy-engine bounds/validation tests |
 | `geo-cascade-fields.test.tsx` | 9 | ✅ PASS | 100% of GeoCascadeFields forward cascade + reverse-resolve + legacy degradation + stale-response guard | RTL + mocked `/api/geo/*` |
 | `malaysia-geo-seed-data.test.ts` | 2 | ✅ PASS | Seed data consistency (`malaysia_states.name` vs `MY_STATES`) | Regression guard, `/code-review` finding |
 | `opening-hours-utils.test.ts` | 30 | ✅ PASS | 100% of groupRowsByDay, rangesFromDay, applyBatchSave, defaultWeek, describeDay, isRangeOrderValid, sanitizeLegacyOpeningHours | Pure logic — overwrite semantics, encodings, round-trip, range validation, legacy-row sanitize |
 | `opening-hours-editor.test.tsx` | 4 | ✅ PASS | List view render (7 days, split-shift, closed, quick-actions) | RTL — light integration guard |
 | `check-migrations.test.ts` | 14 | ✅ PASS | 100% of getFieldRoles, diffNewTopLevelFieldNames, isPathMissingAtRef | CI hard-gate script (not F37 feature code) — new-field detection redesign + git-error classification |
 | `sites-opening-hours-sanitize-hook.test.ts` | 8 | ✅ PASS | 100% of sanitizeOpeningHoursOnValidate | `Sites.ts` `beforeValidate` hook — direct coverage added by Stage 3 adversarial finding #7 |
-| **Total** | **112** | ✅ **PASS** | **100%** | Opening Hours Google-style redesign + PR #1591 round-2 code review fixes (legacy-row sanitize on all write paths, check-migrations.js hardening) — reviewer's malaysia_states rename concern investigated and found already fixed by a pre-existing migration (commit `d5c03917`, staging since 2026-05-25) |
+| **Total** | **120** | ✅ **PASS** | **100%** | Includes the 8 additional parameter-expanded Minimal Business contract cases from #1309; Opening Hours Google-style redesign + PR #1591 round-2 fixes remain green |
+
+> **Phase 2 targeted gate (2026-07-27):** the four-file command in §4.3a passed **99/99**, with typecheck, lint, build, and `git diff --check` also passing. This targeted count is not added to the 120-test F37 baseline above: the 15 score tests overlap that baseline, while the full validation, `SettingsPanel`, and `publish-flow` files also contain non-F37 regressions. No Playwright E2E was run or claimed.
 
 ---
 
@@ -518,13 +521,14 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 
 > Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
 
-1. **🔴 robots.txt spec conflict (US-03, BLOCKER):** `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03/BR-03 "default ALLOW". Score engine cũng hardcode `allowsSearchBots: false`. **PM chốt:** default-allow (theo spec) hay giữ block-list? → quyết TC-F37-03-01/09. Toàn US-03 (llms.txt + per-site toggle) chưa build.
-2. **US-04 checklist widget chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng widget checklist one-click-fix (US-04 core, AC-1/AC-2) chưa implement → TC-04-10/11/12 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
+1. **🔴 Platform crawler rewire (US-03, BLOCKER):** Code currently persists and honors a seller crawler toggle. Target behavior ignores/removes that setting, always allows approved AI assistant crawlers, always awards 9 points, and removes the entire SEO Action Tools UI.
+2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có; #1309 covers the additive 7/8/5 Minimal Business response plus TC-04-01/02 (401/403), while TC-04-03..06 remain untested. The KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe remain spec-based in TC-04-10..12/16..18. #1312 owns the atomic F37 §5 top-level cutover (20/35/15/30) and unified dashboard/checklist; TC-04-11 verifies the crawler signal stays platform-managed and hidden.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
-4. **Technical Health rewire (US-04):** PM đã chốt **Decision A** — reuse F03 `technical-score.ts` scale ×15/100. Code còn placeholder CWV/mobile/HTTPS → phải thay trước khi surface score cho seller.
+4. **Technical Health rewire (US-04):** Code còn placeholder CWV/mobile/HTTPS → phải thay bằng metadata coverage + F03 Content Quality + verification/indexability trước khi surface score cho seller.
 5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.
 6. **hreflang (AC-20/FR-26) DEFERRED P2:** blocked bởi i18n client-side, chờ F21 URL-based locale routing. KHÔNG viết TC.
+7. **Issue #1309 Phase 3 local browser run passed; live staging pending:** `e2e/f37-minimal-business-data.spec.ts` contains TC-F37-01-26 and TC-F37-01-27. The reserved local one-site run passed auth setup plus both scenarios **3/3**, covering valid PATCH→reload, invalid-phone no-PATCH/restore, sequential name/address/phone persistence, persisted `minimalBusinessData` = 20, restoration/raw verification, and 375px overflow checks. Empty hours prevent this F37-01 flow from rewriting F37-02 row metadata. The spec remains outside the default `e2e-staging` workflow and has not run on staging, so no staging result is claimed. #1312 owns the top-level formula/dashboard/checklist cutover.
 
 ---
 
-**Last Verified:** 2026-07-10 (Phase-1 scope; TC-F37-02/03/04/08/09 mapped vào code thật qua 2 vòng review requirements + code-reality scan; trạng thái BUILT/UNTESTED/NOT-BUILT verified against actual `src/`. §3.11 geo-cascade follow-up + §v2.4 post-review fixes: all 10 TC-IDs (TC-F37-01-15..24) executed and passing, `npm test -- geo-cascade-fields local-business-json-ld malaysia-geo-seed-data` green, full suite 9885 tests / 3 pre-existing unrelated failures confirmed via `tester` agent.)
+**Last Verified:** 2026-07-30 (the score API regression covers persisted 20/12 plus 401/403 while preserving legacy Business = 35. The guarded local Playwright run passes auth setup plus TC-F37-01-26/27 **3/3** with fixture restoration; no live staging E2E pass is claimed. #1312 retains the atomic F37 §5 top-level 20/35/15/30 and dashboard/checklist cutover.)

@@ -327,7 +327,7 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     )
 }
 
-export function OrderProgress({ status }: { status: OrderStatus }) {
+export function OrderProgress({ status, embedded = false }: { status: OrderStatus; embedded?: boolean }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const progressLabels = t.dashboard.orders.progress
@@ -350,77 +350,84 @@ export function OrderProgress({ status }: { status: OrderStatus }) {
 
     return (
         <div
-            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-dash-border bg-dash-surface h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
+            data-order-progress-mode={embedded ? 'embedded' : 'standalone'}
+            className={embedded
+                ? 'flex min-w-0 flex-col items-start self-stretch gap-[12px]'
+                : 'flex h-[118px] shrink-0 flex-col items-start self-stretch gap-[12px] rounded-[16px] border border-dash-border bg-dash-surface p-[17px] pb-[1px] md:h-[130.5px] md:gap-[16px] md:p-[21px] md:pb-[1px]'}
         >
             {/* Section label */}
-            <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-dash-text-muted leading-[1.333em]">
-                {d.orderProgress}
-            </span>
+            {!embedded && (
+                <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-dash-text-muted leading-[1.333em]">
+                    {d.orderProgress}
+                </span>
+            )}
 
             {/* Stepper canvas */}
-            <div className="flex w-full items-start md:justify-between overflow-x-auto overflow-y-hidden pb-3 md:pb-0 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-                {STEPS.map((step, i) => {
-                    const isActive = i <= currentStep
+            <div className="min-h-[68px] w-full min-w-0 overflow-x-auto overflow-y-hidden pb-3 md:pb-0 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-transparent">
+                <div className={`flex w-full items-start md:min-w-0 md:justify-between ${isRefundedStatus ? 'min-w-[624px]' : 'min-w-[520px]'}`}>
+                    {STEPS.map((step, i) => {
+                        const isActive = i <= currentStep
 
-                    return (
-                        <React.Fragment key={step.label}>
-                            {/* Step node */}
-                            <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
-                                {/* Icon container */}
-                                <div className={`flex items-center justify-center shrink-0 rounded-full ${isActive ? 'shadow-[0_0_0_4px_hsl(var(--primary)/0.2)] md:shadow-none' : ''}`}>
-                                    <step.StepIcon isActive={isActive} />
+                        return (
+                            <React.Fragment key={step.label}>
+                                {/* Step node */}
+                                <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
+                                    {/* Icon container */}
+                                    <div className={`flex items-center justify-center shrink-0 rounded-full ${isActive ? 'shadow-[0_0_0_4px_hsl(var(--primary)/0.2)] md:shadow-none' : ''}`}>
+                                        <step.StepIcon isActive={isActive} />
+                                    </div>
+
+                                    {/* Step label text */}
+                                    <span
+                                        className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-normal md:font-semibold text-dash-text-muted md:text-dash-text' : 'font-normal text-dash-text-muted'} text-[12px] md:text-[10px] leading-[1.25em]`}
+                                    >
+                                        {step.label}
+                                    </span>
                                 </div>
 
-                                {/* Step label text */}
-                                <span
-                                    className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-normal md:font-semibold text-dash-text-muted md:text-dash-text' : 'font-normal text-dash-text-muted'} text-[12px] md:text-[10px] leading-[1.25em]`}
+                                {/* Connector Line */}
+                                {i < STEPS.length - 1 && (
+                                    <div
+                                        className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
+                                        style={{
+                                            marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
+                                            height: 2,
+                                            // Connector i joins step i → i+1: filled only once the NEXT step is
+                                            // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
+                                            background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
+                                        }}
+                                    />
+                                )}
+                            </React.Fragment>
+                        )
+                    })}
+
+                    {/* Refunded node — appended after Completed when order is refunded */}
+                    {isRefundedStatus && (
+                        <React.Fragment key="refunded">
+                            {/* Refund connector — fuchsia (#d946ef) */}
+                            <div
+                                className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
+                                style={{ marginTop: 15, height: 2, background: '#d946ef' }}
+                            />
+                            {/* Refunded step node */}
+                            <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
+                                <div
+                                    className="flex items-center justify-center shrink-0 rounded-full shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
+                                    style={{ width: 36, height: 36, background: 'rgba(217,70,239,.12)', border: '2px solid #d946ef', color: '#d946ef' }}
                                 >
-                                    {step.label}
+                                    <RotateCcw className="w-4 h-4" />
+                                </div>
+                                <span
+                                    className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
+                                    style={{ color: '#e879f9' }}
+                                >
+                                    {progressLabels.refunded}
                                 </span>
                             </div>
-
-                            {/* Connector Line */}
-                            {i < STEPS.length - 1 && (
-                                <div
-                                    className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
-                                    style={{
-                                        marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
-                                        height: 2,
-                                        // Connector i joins step i → i+1: filled only once the NEXT step is
-                                        // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
-                                        background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
-                                    }}
-                                />
-                            )}
                         </React.Fragment>
-                    )
-                })}
-
-                {/* Refunded node — appended after Completed when order is refunded */}
-                {isRefundedStatus && (
-                    <React.Fragment key="refunded">
-                        {/* Refund connector — fuchsia (#d946ef) */}
-                        <div
-                            className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
-                            style={{ marginTop: 15, height: 2, background: '#d946ef' }}
-                        />
-                        {/* Refunded step node */}
-                        <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
-                            <div
-                                className="flex items-center justify-center shrink-0 rounded-full shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
-                                style={{ width: 36, height: 36, background: 'rgba(217,70,239,.12)', border: '2px solid #d946ef', color: '#d946ef' }}
-                            >
-                                <RotateCcw className="w-4 h-4" />
-                            </div>
-                            <span
-                                className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
-                                style={{ color: '#e879f9' }}
-                            >
-                                {progressLabels.refunded}
-                            </span>
-                        </div>
-                    </React.Fragment>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     )
@@ -1171,6 +1178,4 @@ export function OrderDetailPanel({
         </div>
     )
 }
-
-
 

@@ -21,7 +21,7 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
 - Phase 1 implemented a responsive, single-DOM grid: Product Name spans the mobile card, Price and
   Stock share equal columns, Variants remain visible and wrapping, and the remove target is 44px.
   Existing edit, remove, and save behavior remains unchanged.
-- Phase 2 registered TC-F08-04-94 through TC-F08-04-96 and added deterministic viewport regression
+- Phase 2 registered TC-F08-04-115 through TC-F08-04-117 and added deterministic viewport regression
   coverage to `e2e/products.spec.ts`.
 - Initial evidence: GH-1663 E2E 3/3, targeted unit tests 56/56, TypeScript typecheck and
   `git diff --check` pass.
@@ -30,14 +30,14 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
 ## Post-Code-Review Fix Cycle
 
 - A follow-up review found two P1 coverage gaps: staging CI did not include the GH-1663 spec in its
-  explicit filename allow-list, while TC-F08-04-96 only
+  explicit filename allow-list, while TC-F08-04-117 only
   checked partial viewport visibility without exercising the unsaved-exit flow.
 - Root causes were the workflow's explicit filename allow-list and a weak geometry/behavior oracle
-  in TC-F08-04-96. The workflow selects `products.spec.ts`; TC-F08-04-96 now
+  in TC-F08-04-117. The workflow selects `products.spec.ts`; TC-F08-04-117 now
   verifies full containment of the panel and controls, Cancel → Stay state retention, and
   Discard → Exit modal closure.
-- Prevention evidence: the current workflow-equivalent suite selects 43 tests/12 files and includes
-  TC-F08-04-94 through TC-F08-04-96. GH-1663 browser tests pass 3/3,
+- Prevention evidence: the current workflow-equivalent suite selects 46 tests/13 files and includes
+  TC-F08-04-115 through TC-F08-04-117. GH-1663 browser tests pass 3/3,
   targeted unit tests pass 56/56, and TypeScript
   typecheck plus `git diff --check` pass.
 - Generated auth state and test/report artifacts were cleaned after verification. The test
@@ -45,12 +45,12 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
 
 ## Second Review Fix Cycle
 
-- A stricter review identified five evidence/documentation gaps: TC-F08-04-96 did not reassert
+- A stricter review identified five evidence/documentation gaps: TC-F08-04-117 did not reassert
   Price and Stock after Stay, did not prove DOM removal or body-scroll restoration after Exit,
   the staging workflow did not select the new spec, the documented unit
   command reproduced only 49 rather than the recorded 56 tests, and the test wording inferred
   product non-persistence without observing the save boundary.
-- TC-F08-04-96 now reasserts Name `Edited mobile draft`, Price `88.5`, Stock `7`, and the remaining
+- TC-F08-04-117 now reasserts Name `Edited mobile draft`, Price `88.5`, Stock `7`, and the remaining
   draft count after Cancel → Stay. After Discard → Exit it requires the review panel and
   confirmation dialog to be absent from the DOM and the body's pre-modal overflow value to be
   restored.
@@ -61,36 +61,36 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
   path trigger covers changes to that spec.
 - The targeted unit verification command now includes `bulk-create-parse.test.tsx`, matching the
   three suites that produced the recorded 56/56 result.
-- Verification before the latest review cycle passed: GH-1663 browser regression 3/3 with the strengthened TC-F08-04-96
+- Verification before the latest review cycle passed: GH-1663 browser regression 3/3 with the strengthened TC-F08-04-117
   oracle; targeted unit tests 56/56; and the staging-equivalent selection includes
-  TC-F08-04-94 through TC-F08-04-96. TypeScript typecheck and `git diff --check` also passed.
+  TC-F08-04-115 through TC-F08-04-117. TypeScript typecheck and `git diff --check` also passed.
 - Generated authentication state and Playwright test/report artifacts were removed after that
   browser run; the latest fixes require fresh verification and re-review before final approval.
 
 ## Third Review Fix Cycle
 
 - The final strict review found that TC-F08-04-89 through TC-F08-04-91 were already owned by
-  existing API tests, and that TC-F08-04-94 did not prove the complete mobile field/control
+  existing API tests, and that TC-F08-04-115 did not prove the complete mobile field/control
   geometry described by its QA row.
-- The GH-1663 cases were atomically reassigned to TC-F08-04-94 through TC-F08-04-96 after checking
+- The GH-1663 cases were atomically reassigned to TC-F08-04-115 through TC-F08-04-117 after checking
   `docs/qa`, `src/__tests__`, `e2e`, `tests`, and Git history. Each executable ID now has one owner;
   94 through 96 have no committed historical owner.
-- TC-F08-04-94 now requires Price and Stock to share a row, Name to finish above both controls,
+- TC-F08-04-115 now requires Price and Stock to share a row, Name to finish above both controls,
   and all six pairs among Name, Price, Stock, and Remove to have zero intersection.
-- At that point, browser evidence still predated the TC-F08-04-94 strengthening.
+- At that point, browser evidence still predated the TC-F08-04-115 strengthening.
 - Non-browser verification passed TypeScript, 56/56 targeted unit tests, lint, build, diff check,
   and Playwright discovery; a subsequent PR review reopened the browser and oracle gates.
 
 ## Fourth Review Fix Cycle
 
-- PR #1710 review found a source-trigger gap, weak TC-F08-04-94/95 geometry oracles, stale evidence,
+- PR #1710 review found a source-trigger gap, weak TC-F08-04-115/116 geometry oracles, stale evidence,
   and a formal wording mismatch between the issue AC and the defined read-only Variants contract.
 - The component-only source trigger was not retained after the workflow was restored; the current
   staging workflow runs these cases when an existing E2E-matching path triggers.
-- TC-F08-04-94 now requires usable card-relative Name/Price/Stock widths and full containment.
-- TC-F08-04-95 now requires desktop left-to-right order, all pairwise non-intersections, and full
+- TC-F08-04-115 now requires usable card-relative Name/Price/Stock widths and full containment.
+- TC-F08-04-116 now requires desktop left-to-right order, all pairwise non-intersections, and full
   containment for Name, Price, Stock, and Variants.
-- Fresh authenticated Chromium setup plus TC-F08-04-94..96 passed 4/4 on 2026-07-28 using the
+- Fresh authenticated Chromium setup plus TC-F08-04-115..117 passed 4/4 on 2026-07-28 using the
   designated dev test account; credentials were not added to source.
 - Workflow-equivalent discovery selects 43 tests across 12 files.
 - Issue comment #5102689051 records the original contract: Product Name is editable; Variants is
@@ -100,23 +100,23 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
 
 ## Consolidation Documentation Fix
 
-- Commit `4963dd6c4` moved TC-F08-04-94 through TC-F08-04-96 into the existing
+- Commit `4963dd6c4` moved TC-F08-04-115 through TC-F08-04-117 into the existing
   `e2e/products.spec.ts` suite and removed the standalone regression spec from the PR delta.
 - The existing staging allow-list selects `products.spec.ts`; no workflow modification remains in
   the final PR delta.
-- Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-94 through
-  TC-F08-04-96.
+- Workflow-equivalent discovery reports 43 tests across 12 files, including TC-F08-04-115 through
+  TC-F08-04-117.
 
 ## Fifth Review Fix Cycle
 
 - The latest PR review found that the single-line Product Name input still hid long values behind
-  internal horizontal scrolling, while TC-F08-04-94 only measured outer card/control geometry.
+  internal horizontal scrolling, while TC-F08-04-115 only measured outer card/control geometry.
 - Product Name now uses the shared auto-resizing textarea, grows without an internal height cap,
   remeasures when responsive width changes, and keeps saved name data single-value by preventing
   Enter, normalizing AI-provided or pasted CR/LF characters to spaces, and enforcing the existing
   120-character product-name contract.
-- TC-F08-04-94 now requires the textarea scroll dimensions not to exceed its client dimensions,
-  plus vertical growth beyond the former 32px input height. TC-F08-04-95 repeats the full-visibility
+- TC-F08-04-115 now requires the textarea scroll dimensions not to exceed its client dimensions,
+  plus vertical growth beyond the former 32px input height. TC-F08-04-116 repeats the full-visibility
   oracle after crossing the desktop breakpoint.
 - The shared auto-resize hook now adds border-box chrome to `scrollHeight` and decides finite-height
   overflow from that complete required height; its focused regression suite passes 3/3.

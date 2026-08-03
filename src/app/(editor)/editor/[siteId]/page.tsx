@@ -21,6 +21,9 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import type { LocalBusinessData } from '@/components/editor/local-business/types'
+import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
+import { countCompletedLocalBusinessFields } from '@/components/editor/local-business/completion-utils'
+import { trackEvent } from '@/lib/analytics/track-event'
 import { useEditorStore, BLOCK_TYPE_TO_KEY, PAGE_META_LOCALE_KEY, getDisplayPageTitle, type SiteLocale } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
@@ -91,6 +94,24 @@ import type { PageData, BlockData } from '@/store/editorStore'
 type SaveOptions = {
     showToast?: boolean
     refreshPreview?: boolean
+}
+
+type LocalBusinessSaveBatch = {
+    siteId: string
+    snapshot: LocalBusinessData
+    revision: number
+    resolvers: Array<(saved: boolean) => void>
+}
+
+type LocalBusinessSiteState = {
+    snapshot: LocalBusinessData
+    revision: number
+    persistedRevision: number
+}
+
+type PersistSiteSettingsOptions = {
+    commitOptimistically?: boolean
+    targetSiteId?: string
 }
 
 // Maps Payload field path segments → user-facing labels for publish error toasts.
@@ -241,6 +262,12 @@ export default function EditorPage() {
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
     const pendingSaveRef = useRef<SaveOptions | null>(null)
+    const contactSavePendingRef = useRef(false)
+    const [isContactSavePending, setIsContactSavePending] = useState(false)
+    const localBusinessBySiteRef = useRef(new Map<string, LocalBusinessSiteState>())
+    const localBusinessSaveInFlightSiteIdsRef = useRef(new Set<string>())
+    const queuedLocalBusinessSavesRef = useRef(new Map<string, LocalBusinessSaveBatch>())
+    const drainLocalBusinessSavesRef = useRef<(targetSiteId: string) => void>(() => {})
     // F26-04: AbortController for the currently in-flight locale switch.
     // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
     const localeSwitchAbortRef = useRef<AbortController | null>(null)
@@ -350,6 +377,15 @@ export default function EditorPage() {
     useEffect(() => {
         if (!siteId) return
 
+        let cancelled = false
+        const localBusinessAtLoadStart = localBusinessBySiteRef.current.get(siteId)
+        const localBusinessRevisionAtLoadStart = localBusinessAtLoadStart?.revision ?? 0
+        const hadPendingLocalBusinessAtLoadStart = localBusinessAtLoadStart !== undefined && (
+            localBusinessAtLoadStart.revision !== localBusinessAtLoadStart.persistedRevision ||
+            localBusinessSaveInFlightSiteIdsRef.current.has(siteId) ||
+            queuedLocalBusinessSavesRef.current.has(siteId)
+        )
+
         async function loadData() {
             setIsLoading(true)
 
@@ -365,14 +401,46 @@ export default function EditorPage() {
                     fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' }),
                 ])
 
+                if (cancelled) return
+
                 if (!editorRes.ok) {
                     throw new Error(`Failed to load editor data (${editorRes.status})`)
                 }
 
                 const data = await editorRes.json()
 
+                if (cancelled) return
+
                 if (data.site) {
-                    setSite(data.site)
+                    const currentLocalBusiness = localBusinessBySiteRef.current.get(siteId)
+                    const hasNewerOrPendingLocalBusiness = currentLocalBusiness !== undefined && (
+                        hadPendingLocalBusinessAtLoadStart ||
+                        currentLocalBusiness.revision !== localBusinessRevisionAtLoadStart ||
+                        currentLocalBusiness.revision !== currentLocalBusiness.persistedRevision ||
+                        localBusinessSaveInFlightSiteIdsRef.current.has(siteId) ||
+                        queuedLocalBusinessSavesRef.current.has(siteId)
+                    )
+                    const serverLocalBusiness: LocalBusinessData = {
+                        ...(data.site.localBusiness || {}),
+                    }
+
+                    if (hasNewerOrPendingLocalBusiness && currentLocalBusiness) {
+                        setSite({
+                            ...data.site,
+                            localBusiness: currentLocalBusiness.snapshot,
+                        })
+                    } else {
+                        const settledRevision = currentLocalBusiness?.revision ?? 0
+                        localBusinessBySiteRef.current.set(siteId, {
+                            snapshot: serverLocalBusiness,
+                            revision: settledRevision,
+                            persistedRevision: settledRevision,
+                        })
+                        setSite({
+                            ...data.site,
+                            localBusiness: serverLocalBusiness,
+                        })
+                    }
                 }
 
                 // Extract user info for menu drawer
@@ -463,14 +531,18 @@ export default function EditorPage() {
 
                 setSelectedBlock(null)
             } catch (err) {
+                if (cancelled) return
                 const message = err instanceof Error ? err.message : 'Failed to load site data'
                 toast.error('Failed to load site', { description: message })
             } finally {
-                setIsLoading(false)
+                if (!cancelled) setIsLoading(false)
             }
         }
 
         void loadData()
+        return () => {
+            cancelled = true
+        }
     }, [init, selectedPageId, setCurrentPageId, setPages, siteId])
 
     // User data is loaded from editor-data API in loadData useEffect above
@@ -723,47 +795,73 @@ export default function EditorPage() {
         }
     }, [updateTheme, handleSave])
 
-    const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
-        if (!siteId) return
+    const persistSiteSettingsChanges = useCallback(async (
+        changes: Partial<SiteData>,
+        options: PersistSiteSettingsOptions = {},
+    ) => {
+        const persistenceSiteId = options.targetSiteId ?? siteId
+        if (!persistenceSiteId) return
 
         // Business name is required — silently ignore blank submissions
         if ('name' in changes && !changes.name) return
 
-        if (changes.name) {
-            updateSiteName(changes.name)
-            // Sync business name into navigation logoText so the nav header
-            // reflects the new name without a separate block edit.
-            updateHeaderBlock({ logoText: changes.name })
+        const isContactSave = changes.contactInfo !== undefined
+        const hasNonContactChanges = Object.entries(changes).some(
+            ([key, value]) => key !== 'contactInfo' && value !== undefined,
+        )
+        if (isContactSave && hasNonContactChanges) return false
+        let ownsContactSave = false
+        let keepContactSaveLocked = false
+
+        try {
+            if (isContactSave) {
+                if (contactSavePendingRef.current) return false
+                contactSavePendingRef.current = true
+                ownsContactSave = true
+                setIsContactSavePending(true)
+            }
+
+            if (changes.name) {
+                updateSiteName(changes.name)
+                // Sync business name into navigation logoText so the nav header
+                // reflects the new name without a separate block edit.
+                updateHeaderBlock({ logoText: changes.name })
+            }
+
+        const commitChangesToSite = () => {
+            setSite(prev => {
+                if (!prev) return prev
+
+                return {
+                    ...prev,
+                    ...changes,
+                    contactInfo: {
+                        ...(prev.contactInfo || {}),
+                        ...(changes.contactInfo || {}),
+                    },
+                    localBusiness: {
+                        ...(prev.localBusiness || {}),
+                        ...(changes.localBusiness || {}),
+                    },
+                    socialLinks: {
+                        ...(prev.socialLinks || {}),
+                        ...(changes.socialLinks || {}),
+                    },
+                    seo: {
+                        ...(prev.seo || {}),
+                        ...(changes.seo || {}),
+                    },
+                    branding: {
+                        ...(prev.branding || {}),
+                        ...(changes.branding || {}),
+                    },
+                }
+            })
         }
 
-        setSite(prev => {
-            if (!prev) return prev
-
-            return {
-                ...prev,
-                ...changes,
-                contactInfo: {
-                    ...(prev.contactInfo || {}),
-                    ...(changes.contactInfo || {}),
-                },
-                localBusiness: {
-                    ...(prev.localBusiness || {}),
-                    ...(changes.localBusiness || {}),
-                },
-                socialLinks: {
-                    ...(prev.socialLinks || {}),
-                    ...(changes.socialLinks || {}),
-                },
-                seo: {
-                    ...(prev.seo || {}),
-                    ...(changes.seo || {}),
-                },
-                branding: {
-                    ...(prev.branding || {}),
-                    ...(changes.branding || {}),
-                },
-            }
-        })
+        if (!isContactSave && options.commitOptimistically !== false) {
+            commitChangesToSite()
+        }
 
         // If logo is changing (value differs from current store), silently sync header/footer block logos.
         // This avoids handleContentChange (no "Changes Pending") — branding saves go live immediately.
@@ -795,59 +893,216 @@ export default function EditorPage() {
             }
         }
 
-        try {
-            const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (currentPageId) {
+            const saveUrl = new URL(`/api/sites/${persistenceSiteId}/save`, window.location.origin)
+            if (options.targetSiteId === undefined && currentPageId) {
                 saveUrl.searchParams.set('pageId', currentPageId)
             }
 
-            const response = await fetch(saveUrl.toString(), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    ...(changes.name ? { siteName: changes.name } : {}),
-                    contactInfo: changes.contactInfo,
-                    localBusiness: changes.localBusiness,
-                    socialLinks: changes.socialLinks,
-                    branding: changes.branding,
-                    seo: changes.seo,
-                    // When name changes, persist updated headerBlock (logoText synced above).
-                    // When logo changes, persist synced header/footer blocks directly to DB.
-                    headerBlock: changes.name
-                        ? useEditorStore.getState().headerBlock
-                        : (logoSyncedHeaderBlock ?? changes.headerBlock),
-                    footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
-                }),
-            })
+            let request: Promise<Response>
+            try {
+                request = fetch(saveUrl.toString(), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        ...(changes.name ? { siteName: changes.name } : {}),
+                        contactInfo: changes.contactInfo,
+                        localBusiness: changes.localBusiness,
+                        socialLinks: changes.socialLinks,
+                        branding: changes.branding,
+                        seo: changes.seo,
+                        // When name changes, persist updated headerBlock (logoText synced above).
+                        // When logo changes, persist synced header/footer blocks directly to DB.
+                        headerBlock: changes.name
+                            ? useEditorStore.getState().headerBlock
+                            : (logoSyncedHeaderBlock ?? changes.headerBlock),
+                        footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
+                    }),
+                })
+            } catch (setupError) {
+                throw setupError
+            }
+
+            let response: Response
+            try {
+                response = await request
+            } catch (transportError) {
+                if (isContactSave && changes.contactInfo) {
+                    try {
+                        const editorUrl = new URL(`/api/sites/${persistenceSiteId}/editor-data`, window.location.origin)
+                        if (currentPageId) editorUrl.searchParams.set('pageId', currentPageId)
+                        const reconcileResponse = await fetch(editorUrl.toString(), {
+                            credentials: 'include',
+                            cache: 'no-store',
+                        })
+                        if (reconcileResponse.ok) {
+                            const reconciledData = await reconcileResponse.json() as { site?: SiteData }
+                            const authoritativeSite = reconciledData.site
+                            if (authoritativeSite) {
+                                const authoritativeContactInfo = authoritativeSite.contactInfo ?? {}
+                                setSite(prev => prev
+                                    ? { ...prev, contactInfo: authoritativeSite.contactInfo }
+                                    : authoritativeSite)
+                                const contactFields = Object.keys(changes.contactInfo) as Array<keyof NonNullable<SiteData['contactInfo']>>
+                                const didPersist = contactFields.length > 0 && contactFields.every(
+                                    field => authoritativeContactInfo[field] === changes.contactInfo?.[field],
+                                )
+                                if (didPersist) return true
+                            }
+                        }
+                    } catch (reconcileError) {
+                        console.error('Failed to reconcile contact info after transport error', reconcileError)
+                    }
+                }
+                if (isContactSave) {
+                    console.error('Contact info save outcome is unknown', transportError)
+                    commitChangesToSite()
+                    keepContactSaveLocked = true
+                    toast.error('Could not confirm whether contact information was saved.', {
+                        description: 'Reload the editor before editing contact information again.',
+                    })
+                    return true
+                }
+                throw transportError
+            }
 
             if (!response.ok) {
                 const body = await response.json().catch(() => null)
                 throw new Error(resolveApiError(body, `Server returned ${response.status}`, sub))
             }
 
-            setSaveSuccess(true)
-            // header/footer update in-place; branding (CSS vars) still needs full reload
-            if (changes.headerBlock || changes.name) {
-                const s = useEditorStore.getState()
-                const h = s.headerBlock
-                if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
+            if (isContactSave) commitChangesToSite()
+
+            if (persistenceSiteId === siteId) {
+                setSaveSuccess(true)
+                // header/footer update in-place; branding (CSS vars) still needs full reload
+                if (changes.headerBlock || changes.name) {
+                    const s = useEditorStore.getState()
+                    const h = s.headerBlock
+                    if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
+                }
+                if (changes.footerBlock) {
+                    const s = useEditorStore.getState()
+                    const f = s.footerBlock
+                    if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
+                }
+                if (changes.branding) setIframeKey(key => key + 1)
+                window.setTimeout(() => setSaveSuccess(false), 1800)
             }
-            if (changes.footerBlock) {
-                const s = useEditorStore.getState()
-                const f = s.footerBlock
-                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
-            }
-            if (changes.branding) setIframeKey(key => key + 1)
-            window.setTimeout(() => setSaveSuccess(false), 1800)
             return true
         } catch (error) {
             console.error('Failed to update site settings', error)
             const errMsg = error instanceof Error ? error.message : null
             toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
             return false
+        } finally {
+            if (ownsContactSave && !keepContactSaveLocked) {
+                contactSavePendingRef.current = false
+                setIsContactSavePending(false)
+            }
         }
     }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
+
+    const drainLocalBusinessSaves = useCallback((targetSiteId: string) => {
+        if (localBusinessSaveInFlightSiteIdsRef.current.has(targetSiteId)) return
+
+        const batch = queuedLocalBusinessSavesRef.current.get(targetSiteId)
+        if (!batch) return
+
+        queuedLocalBusinessSavesRef.current.delete(targetSiteId)
+        localBusinessSaveInFlightSiteIdsRef.current.add(batch.siteId)
+
+        void persistSiteSettingsChanges(
+            { localBusiness: batch.snapshot },
+            { commitOptimistically: false, targetSiteId: batch.siteId },
+        )
+            .then(result => {
+                const saved = result === true
+                if (saved) {
+                    const current = localBusinessBySiteRef.current.get(batch.siteId)
+                    if (current) {
+                        localBusinessBySiteRef.current.set(batch.siteId, {
+                            ...current,
+                            persistedRevision: Math.max(current.persistedRevision, batch.revision),
+                        })
+                    }
+                    trackEvent({
+                        siteId: batch.siteId,
+                        event: 'local_business_data_saved',
+                        pageUrl: `/editor/${batch.siteId}`,
+                        metadata: {
+                            fields_completed_count: countCompletedLocalBusinessFields(batch.snapshot),
+                        },
+                    })
+                }
+                for (const resolve of batch.resolvers) resolve(saved)
+            })
+            .catch(error => {
+                console.error('Unexpected local business queue failure', error)
+                for (const resolve of batch.resolvers) resolve(false)
+            })
+            .finally(() => {
+                localBusinessSaveInFlightSiteIdsRef.current.delete(batch.siteId)
+                drainLocalBusinessSavesRef.current(batch.siteId)
+            })
+    }, [persistSiteSettingsChanges])
+
+    drainLocalBusinessSavesRef.current = drainLocalBusinessSaves
+
+    const handleSiteSettingsChange = useCallback((changes: Partial<SiteData>) => {
+        const localBusinessPatch = changes.localBusiness
+        if (localBusinessPatch === undefined) {
+            return persistSiteSettingsChanges(changes)
+        }
+
+        const hasNonLocalBusinessChanges = Object.entries(changes).some(
+            ([key, value]) => key !== 'localBusiness' && value !== undefined,
+        )
+        if (hasNonLocalBusinessChanges) return Promise.resolve(false)
+
+        const current = localBusinessBySiteRef.current.get(siteId) ?? {
+            snapshot: {},
+            revision: 0,
+            persistedRevision: 0,
+        }
+        const latestSnapshot: LocalBusinessData = {
+            ...current.snapshot,
+            ...localBusinessPatch,
+        }
+        if (latestSnapshot.openingHours) {
+            latestSnapshot.openingHours = sanitizeLegacyOpeningHours(latestSnapshot.openingHours)
+        }
+        const revision = current.revision + 1
+        localBusinessBySiteRef.current.set(siteId, {
+            snapshot: latestSnapshot,
+            revision,
+            persistedRevision: current.persistedRevision,
+        })
+        setSite(prev => prev
+            ? { ...prev, localBusiness: latestSnapshot }
+            : prev)
+
+        return new Promise<boolean>(resolve => {
+            const queued = queuedLocalBusinessSavesRef.current.get(siteId)
+            queuedLocalBusinessSavesRef.current.set(
+                siteId,
+                queued
+                    ? {
+                        ...queued,
+                        snapshot: latestSnapshot,
+                        revision,
+                        resolvers: [...queued.resolvers, resolve],
+                    }
+                    : {
+                        siteId,
+                        snapshot: latestSnapshot,
+                        revision,
+                        resolvers: [resolve],
+                    },
+            )
+            drainLocalBusinessSavesRef.current(siteId)
+        })
+    }, [persistSiteSettingsChanges, siteId])
 
     // F-26: Auto-translate header or footer block into target locale if not already cached.
     // Stores translation in block._localeContent[locale] (no history entry — silent background op).
@@ -2293,6 +2548,7 @@ export default function EditorPage() {
             site,
             siteName: siteName || site?.name || '',
             siteStatus: site?.status || 'draft',
+            isContactSavePending,
             headerBlock,
             footerBlock,
             pages,
@@ -2509,6 +2765,7 @@ export default function EditorPage() {
                     theme={theme}
                     site={site}
                     siteName={siteName}
+                    isContactSavePending={isContactSavePending}
                     headerBlock={headerBlock}
                     footerBlock={footerBlock}
                     pages={pages}
@@ -2577,6 +2834,7 @@ export default function EditorPage() {
                             theme={theme}
                             site={site}
                             siteName={siteName || site?.name || ''}
+                            isContactSavePending={isContactSavePending}
                             siteStatus={site?.status || 'draft'}
                             headerBlock={headerBlock}
                             footerBlock={footerBlock}

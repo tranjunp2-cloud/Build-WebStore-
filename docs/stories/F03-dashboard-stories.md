@@ -175,21 +175,14 @@ So that Google index site tốt hơn
 GIVEN user ở /dashboard/seo
 WHEN  page load
 THEN  Overall SEO Score (0-100) hiển thị rõ
-  AND breakdown 3 hạng mục có trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%)
-  AND mỗi hạng mục hiển thị điểm riêng (0-100) dạng thanh tiến trình hoặc con số
+  AND đây là score duy nhất, không có Local SEO card thứ hai
+  AND bốn bucket bars hiển thị Business Data, Schema, AI Discoverability, Technical Health theo layout 2×2 mà không hiện điểm bucket
+  AND mỗi unresolved root-cause issue hiển thị đúng badge AI/You, CTA và destination theo F37 §12.3
+  AND AI Fix chỉ áp dụng metadata; derived/platform metrics không tạo issue trùng
   AND người dùng nhìn vào biết ngay cần cải thiện phần nào
 ```
 
-#### AC-2: Generate Sitemap
-
-```gherkin
-GIVEN click "Generate Sitemap"
-WHEN  click
-THEN  auto-generate sitemap.xml
-  AND toast "Sitemap đã tạo"
-```
-
-#### AC-3: Auto-scan Failure
+#### AC-2: Score loading failure
 
 ```gherkin
 GIVEN user ở /dashboard/seo
@@ -200,77 +193,13 @@ THEN  hiển thị state lỗi cho widget thay vì score
 
 ### Analytics / Tracking Notes
 - Track sự kiện `view_seo_dashboard`.
-- Track sự kiện `generate_sitemap_clicked`.
 - Track sự kiện `seo_category_breakdown_viewed`.
 
 ### Definition of Done
 
 - [ ] Score calculation works correctly
 
----
-
-## US-F03-04: Auto SEO Meta Generation
-
-**Wave 3** | **P0** | **M** | **Status:** Ready
-
-### Story
-
-```
-As a   store owner with no SEO knowledge
-I want store tự động có proper meta tags khi publish
-So that tôi xuất hiện trên Google không cần thuê SEO consultant
-```
-
-### Acceptance Criteria
-
-#### AC-1: Happy Path — Auto Meta on First Publish
-
-```gherkin
-GIVEN I publish my store for the first time và chưa manually set bất kỳ SEO meta nào
-WHEN  publish action completes
-THEN  all published pages have AI-generated:
-      meta title (≤ 60 chars, includes business name + primary keyword)
-  AND meta description (≤ 160 chars, compelling, includes a call-to-action)
-  AND AI sử dụng trackedKeywords từ cài đặt site để kết hợp từ khoá mục tiêu vào meta một cách tự nhiên (không nhồi nhét)
-```
-
-#### AC-2: Retry mechanism if generation fails
-
-```gherkin
-GIVEN AI service fail khi đang generate meta tags
-WHEN  tiến trình publish hoàn tất
-THEN  hệ thống lưu lại log lỗi và queue để tự động retry background
-```
-
-#### AC-3: AI đề xuất chỉnh sửa meta đã có sẵn
-
-```gherkin
-GIVEN một trang đã có meta title/description do người dùng nhập thủ công
-WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
-THEN  hiển thị so sánh bản cũ vs bản mới
-  AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
-  AND chỉ ghi đè khi người dùng đồng ý
-```
-
-### Analytics / Tracking Notes
-- Track sự kiện `auto_seo_meta_generated` (background).
-
-### Additional Criteria
-
-- [ ] Product pages: format = "{Product Name} | {Shop Name} | Buy Online Malaysia"
-- [ ] Homepage: format = "{Shop Name} | {Business Category} Online Malaysia"
-- [ ] JSON-LD Product schema auto-injected on every product page
-- [ ] Sitemap.xml auto-generated on publish
-- [ ] AI Generate sử dụng trackedKeywords từ site settings
-- [ ] Nếu meta đã có nội dung thủ công → hiển thị so sánh, chỉ ghi đè khi đồng ý
-
-### Definition of Done
-
-- [ ] Meta limits enforced.
-
----
-
-## US-F03-05: AI SEO Fix All Issues
+## US-F03-05: AI Metadata Fix All
 
 **Wave 3** | **P0** | **L** | **Status:** Ready
 
@@ -278,8 +207,8 @@ THEN  hiển thị so sánh bản cũ vs bản mới
 
 ```
 As a   store owner reviewing SEO dashboard
-I want một nút fix toàn bộ SEO issues tự động
-So that tôi cải thiện search ranking chỉ với 1 action
+I want một nút fix toàn bộ metadata issues mà AI được phép xử lý
+So that tôi cải thiện meta coverage mà không ghi đè seller-owned data
 ```
 
 ### Acceptance Criteria
@@ -287,10 +216,11 @@ So that tôi cải thiện search ranking chỉ với 1 action
 #### AC-1: Happy Path — Fix All với Preview
 
 ```gherkin
-GIVEN my SEO dashboard shows warnings (missing alt text, heavy titles)
-WHEN  I click "AI Fix All Issues"
+GIVEN my SEO dashboard has at least one missing meta title or description
+WHEN  I click "Fix all with AI"
 THEN  AI proposes changes — user can approve or skip individual fixes
   AND SEO score updates to reflect improvements
+  AND không thay đổi Local Business, schema, content, alt text, crawler, publish, domain, hoặc verification data
   AND tất cả trong 15 giây
   AND all fixes undoable as single batch action
 ```
@@ -298,7 +228,7 @@ THEN  AI proposes changes — user can approve or skip individual fixes
 #### AC-2: Timeout or Partial Failure
 
 ```gherkin
-GIVEN I click "AI Fix All Issues"
+GIVEN I click "Fix all with AI"
 WHEN  tiến trình bị quá 15 giây hoặc lỗi nội bộ
 THEN  hiển thị toast lỗi: "Không thể hoàn tất AI Fix All, vui lòng thử lại"
   AND giữ nguyên tiến trình đã sinh và cho phép resume (Thử lại)
@@ -313,6 +243,10 @@ THEN  hệ thống chỉ gửi mảng batch 5-10 items gồm [Tên, Chuyên mụ
   AND ép Output dưới định dạng JSON thuần
   AND sinh Meta Tags tuân thủ chuẩn SEO: Title 50-60 ký tự, Meta Desc 150-160 ký tự kết hợp CTA.
   AND sử dụng trackedKeywords từ cài đặt site để từ khoá mục tiêu xuất hiện tự nhiên trong meta sinh ra
+
+GIVEN không còn missing meta title hoặc description
+WHEN  SEO Issues render
+THEN  nút "Fix all with AI" không hiển thị
 ```
 
 ### Analytics / Tracking Notes

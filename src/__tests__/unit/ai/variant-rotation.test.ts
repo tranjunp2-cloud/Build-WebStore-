@@ -88,3 +88,36 @@ describe('TC-F01-W.A1 — variant rotation stability', () => {
     expect(diffs.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('TC-GENPERF-W4 — service-card counts follow the selected variant', () => {
+  function rotateTo(targetVariant: 'grid' | 'list' | 'featured'): Record<string, unknown> {
+    for (let seed = 0; seed < 100; seed++) {
+      const block: Record<string, unknown> = {
+        blockType: 'service-cards',
+        variant: 'grid',
+        services: Array.from({ length: 4 }, (_, i) => ({
+          title: `Service ${i + 1}`,
+          description: `Description ${i + 1}`,
+          icon: 'Star',
+        })),
+      }
+      const candidate: TemplatePage[] = [{ title: 'Home', slug: '/', layout: [block] }]
+      rotateStructuralVariants(candidate, 'fnb', seed)
+      if (block.variant === targetVariant) return block
+    }
+    throw new Error(`Unable to select service-cards variant: ${targetVariant}`)
+  }
+
+  it('TC-GENPERF-W4-13: featured keeps 4 services', () => {
+    const block = rotateTo('featured')
+    expect(block.services).toHaveLength(4)
+  })
+
+  it.each(['grid', 'list'] as const)(
+    'TC-GENPERF-W4-14: %s keeps exactly 3 services',
+    (variant) => {
+      const block = rotateTo(variant)
+      expect(block.services).toHaveLength(3)
+    },
+  )
+})

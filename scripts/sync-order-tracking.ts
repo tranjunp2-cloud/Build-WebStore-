@@ -1,6 +1,6 @@
 /**
  * DEV helper — pull the REAL EasyParcel tracking status for ONE order and apply it
- * through the exact same writer the webhook + 30-min cron use (applyTrackingUpdate:
+ * through the exact same writer the webhook uses (applyTrackingUpdate:
  * status mapping, history append, delivered→completed auto-complete). No fake data:
  * whatever EP's tracking_status endpoint reports is what lands on the order.
  *
@@ -64,7 +64,7 @@ async function main() {
         console.log(`   ${log.event_date}  code=${log.shipment_status_code}  ${log.tracking_status}`)
     }
 
-    // Same code path as webhook + cron — includes the delivered→completed auto-complete
+    // Same code path as the webhook — includes the delivered→completed auto-complete
     const outcome = await applyTrackingUpdate(payload, order, result.latest_shipment_status_code, result.latest_tracking_status)
 
     const after = await payload.findByID({ collection: 'orders', id: orderId, depth: 0, overrideAccess: true }) as

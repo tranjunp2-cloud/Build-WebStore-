@@ -33,7 +33,7 @@
 
 1. Delete hard-block counts **directly-assigned** products only (not recursive). — CONFIRM.
 2. Keep `hasMany:true` for product.category; UI+docs assert single. No migration. — recommended.
-3. AI null-category → product stays uncategorized draft; merchant assigns before publish. — CONFIRM vs publish-guard.
+3. GH-1588 Scope 02 correction: AI null-category stays unresolved in the review modal; merchant must select an existing category before Approve. Manual ProductForm and publish-guard rules remain unchanged.
 4. Name dedup case-insensitive + trimmed. — CONFIRM.
 
 ## Unresolved questions

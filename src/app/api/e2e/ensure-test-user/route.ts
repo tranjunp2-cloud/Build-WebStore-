@@ -3,11 +3,13 @@
  *
  * POST /api/e2e/ensure-test-user
  *   headers: Authorization: Bearer {E2E_SETUP_SECRET}
- *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string }
+ *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string,
+ *           seedDashboardFixture?: boolean }
  *
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
  * - If not: creates with tenant-owner role + active E2E tenant
+ * - Ensures the tenant has the Site prerequisite required by product/category flows
  *
  * Guarded by E2E_SETUP_SECRET env var. Disabled if secret not set.
  * NEVER enable this in production — staging only.
@@ -15,12 +17,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import {
+    DASHBOARD_FIXTURE_CAPABILITY,
+    ensureDashboardFixture,
+    type DashboardFixtureTenant,
+} from '@/lib/e2e/dashboard-fixture'
 
 export const dynamic = 'force-dynamic'
 
 const E2E_TENANT_NAME = 'E2E Test Workspace'
 const E2E_TENANT_SLUG = 'e2e-test'
-
 export async function POST(req: NextRequest) {
     // Guard 1: endpoint must be explicitly enabled via env var
     const expectedSecret = process.env.E2E_SETUP_SECRET
@@ -47,7 +53,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse body
-    let body: { email?: string; password?: string; tenantSlug?: string; tenantName?: string }
+    let body: {
+        email?: string
+        password?: string
+        tenantSlug?: string
+        tenantName?: string
+        seedDashboardFixture?: boolean
+    }
     try {
         body = await req.json()
     } catch {
@@ -90,11 +102,11 @@ export async function POST(req: NextRequest) {
             overrideAccess: true,
         })
 
-        let tenantId: string | number
+        let tenant: DashboardFixtureTenant
         if (tenantsResult.docs.length > 0) {
-            tenantId = tenantsResult.docs[0].id
+            tenant = tenantsResult.docs[0]
         } else {
-            const newTenant = await payload.create({
+            tenant = await payload.create({
                 collection: 'tenants',
                 overrideAccess: true,
                 data: {
@@ -104,8 +116,8 @@ export async function POST(req: NextRequest) {
                     onboardingCompleted: true,
                 },
             })
-            tenantId = newTenant.id
         }
+        const tenantId = tenant.id
 
         // Step 2: ensure the isolated benchmark tenant can pass the same
         // subscription gate as a tenant provisioned through the SSO flow.
@@ -144,7 +156,32 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // Step 3: find or create user
+        // Step 3: ensure the tenant has the Site prerequisite used by product/category E2E.
+        // Keep this in the guarded setup endpoint: a fresh tenant cannot create its first
+        // category through the dashboard because Categories.site is required.
+        const sitesResult = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 1,
+            overrideAccess: true,
+        })
+        const site = sitesResult.docs[0] ?? await payload.create({
+            collection: 'sites',
+            overrideAccess: true,
+            data: {
+                tenant: tenantId,
+                name: `${tenantName} Site`,
+                status: 'draft',
+                siteType: 'ecommerce',
+            },
+        })
+
+        // Step 4: optionally seed dashboard fixtures
+        const dashboardFixture = body.seedDashboardFixture === true
+            ? await ensureDashboardFixture(payload, tenant)
+            : undefined
+
+        // Step 5: find or create user
         const usersResult = await payload.find({
             collection: 'users',
             where: { email: { equals: email } },
@@ -184,9 +221,12 @@ export async function POST(req: NextRequest) {
 
             return NextResponse.json({
                 status: 'updated',
+                setupCapability: DASHBOARD_FIXTURE_CAPABILITY,
                 userId: existingUser.id,
                 tenantId,
+                siteId: site.id,
                 action: 'password synced + tenant ensured',
+                ...(dashboardFixture ? { dashboardFixture } : {}),
             })
         }
 
@@ -213,8 +253,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             status: 'created',
+            setupCapability: DASHBOARD_FIXTURE_CAPABILITY,
             userId: newUser.id,
             tenantId,
+            siteId: site.id,
+            ...(dashboardFixture ? { dashboardFixture } : {}),
         })
     } catch (error: unknown) {
         console.error('[E2E Setup] Error:', error)

@@ -87,3 +87,24 @@ export interface SeoData {
     autoMetaEnabled: boolean
     aiCrawlersEnabled: boolean
 }
+
+// ── Pending orders ──────────────────────────────────────────────────────────
+export type PendingOrderCurrency = 'MYR' | 'USD' | 'SGD'
+
+export interface PendingOrderRow {
+    id: string | number
+    orderNumber: string
+    itemCount: number
+    total: number
+    currency: PendingOrderCurrency
+    status: 'pending'
+}
+
+export interface PendingOrdersData {
+    orders: PendingOrderRow[]
+    totalCount: number
+}
+
+export type PendingOrdersLoadState =
+    | ({ state: 'ready' } & PendingOrdersData)
+    | { state: 'unavailable' }

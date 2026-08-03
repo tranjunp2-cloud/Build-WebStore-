@@ -50,8 +50,8 @@ describe('POST /api/orders/[id]/mark-shipment-cancelled', () => {
     vi.clearAllMocks()
   })
 
-  // TC-F36.159: happy path — clears EP fields atomically + appends audit history
-  it('[TC-F36.159] ready_to_ship + real shipment → 200, CAS clears fields, history keeps old shipment/awb', async () => {
+  // TC-F36.159: happy path — clears EP fields without adding a customer-facing tracking event
+  it('[TC-F36.159] ready_to_ship + real shipment → 200, CAS clears fields without tracking history', async () => {
     // Arrange
     mockFindByID.mockResolvedValue({
       id: 128,
@@ -63,8 +63,6 @@ describe('POST /api/orders/[id]/mark-shipment-cancelled', () => {
       ],
     })
     mockExecute.mockResolvedValue({ rows: [{ id: 128 }] })
-    mockUpdate.mockResolvedValue({})
-
     // Act
     const res = await callPost(128)
     const body = await res.json()
@@ -76,14 +74,7 @@ describe('POST /api/orders/[id]/mark-shipment-cancelled', () => {
     // Order returns to 'confirmed' — re-opens BOTH exits (create-label + /cancel)
     expect(body.data.status).toBe('confirmed')
     expect(mockExecute).toHaveBeenCalledTimes(1)
-    // History append preserves the audit trail (old shipment + awb in the description)
-    const updateArg = mockUpdate.mock.calls[0][0]
-    expect(updateArg.id).toBe(128)
-    const history = updateArg.data.shippingTrackingHistory
-    expect(history).toHaveLength(2)
-    expect(history[1].status).toBe('cancelled')
-    expect(history[1].description).toContain('ES-2607-NM4HA')
-    expect(history[1].description).toContain('POS12345')
+    expect(mockUpdate).not.toHaveBeenCalled()
   })
 
   // TC-F36.160: guards
@@ -142,7 +133,7 @@ describe('POST /api/orders/[id]/mark-shipment-cancelled', () => {
     expect(res.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.data.alreadyMarked).toBe(true)
-    expect(mockUpdate).not.toHaveBeenCalled() // no duplicate history entry
+    expect(mockUpdate).not.toHaveBeenCalled()
   })
 
   it('[TC-F36.161] CAS miss + order moved on (still holds a shipment) → 409 CONFLICT', async () => {

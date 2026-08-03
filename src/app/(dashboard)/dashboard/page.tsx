@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { getCurrentTenantId } from '@/lib/auth'
+import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { normalizeDashboardBlocks, parsePeriod, type DashboardBlockId } from '@/lib/dashboard-utils'
 import { getGlanceData, emptyGlanceData } from '@/lib/dashboard/glance-data'
 import { getTrafficData } from '@/lib/dashboard/traffic-data'
 import { getSeoData } from '@/lib/dashboard/seo-data'
+import { canReadPendingOrders, getPendingOrdersData } from '@/lib/dashboard/pending-orders-data'
+import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { CustomizeModal } from '@/components/dashboard/revamp/customize-modal'
 import { OnboardingCard, type OnboardingStep } from '@/components/dashboard/revamp/onboarding-card'
@@ -52,7 +54,8 @@ export default async function DashboardRoot({ searchParams }: Props) {
     let hasProducts = false
     let hasShippingConfigured = false
 
-    const tenantId = await getCurrentTenantId()
+    const user = await getCurrentUser()
+    const tenantId = tenantIdForQuery(user)
     if (tenantId) {
         const payload = await getPayload({ config })
         const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
@@ -114,6 +117,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
     }
 
     const blocks = normalizeDashboardBlocks(dashboardPreferences)
+    const canViewOrders = canReadPendingOrders(user)
     const editHref = siteId ? `/editor/${siteId}` : '/builder/new'
     // "Publish" step opens the editor with the publish modal pre-opened (only when a site exists)
     const launchHref = siteId ? `/editor/${siteId}?publish=1` : '/builder/new'
@@ -128,10 +132,35 @@ export default async function DashboardRoot({ searchParams }: Props) {
     const allStepsDone = steps.every(s => s.done)
     const showOnboarding = blocks.includes('onboarding') && !allStepsDone
 
-    // Fetch block data only when the store has a usable site
-    const [glance, traffic, seo] = hasUsableSites
-        ? await Promise.all([getGlanceData(period), getTrafficData(period), getSeoData()])
-        : [emptyGlanceData(), null, null]
+    const emptyPendingOrders: PendingOrdersLoadState = {
+        state: 'ready',
+        orders: [],
+        totalCount: 0,
+    }
+    const pendingOrdersPromise: Promise<PendingOrdersLoadState> =
+        tenantId != null
+        && hasUsableSites
+        && blocks.includes('orders')
+        && canViewOrders
+            ? getPendingOrdersData({ user })
+                .then((data): PendingOrdersLoadState => ({ state: 'ready', ...data }))
+                .catch((): PendingOrdersLoadState => {
+                    console.error('[Dashboard] Pending Orders data is unavailable')
+                    return { state: 'unavailable' }
+                })
+            : Promise.resolve(emptyPendingOrders)
+
+    // Fetch independent block data in parallel only when the store has a usable site.
+    const [glance, traffic, seo, pendingOrders] = hasUsableSites
+        ? await Promise.all([
+            getGlanceData(period, { user }),
+            getTrafficData(period),
+            getSeoData(),
+            pendingOrdersPromise,
+        ])
+        : [emptyGlanceData(), null, null, emptyPendingOrders]
+
+    const renderBlocks = canViewOrders ? blocks : blocks.filter(id => id !== 'orders')
 
     const renderBlock = (id: DashboardBlockId) => {
         switch (id) {
@@ -146,7 +175,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'tools':
                 return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} aiCrawlersEnabled={seo.aiCrawlersEnabled} /> : null
             case 'orders':
-                return <PendingOrders key="orders" />
+                return <PendingOrders key="orders" data={pendingOrders} />
             default:
                 return null
         }
@@ -174,7 +203,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             </div>
 
             <div className="stream">
-                {blocks.map(renderBlock)}
+                {renderBlocks.map(renderBlock)}
             </div>
         </div>
     )

@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-05-28
+last_updated: 2026-07-29
 ---
 
 # Project Changelog
@@ -51,6 +51,8 @@ A bakery's generated Gallery mixed cake photos with clothing photos (jeans flatl
 ---
 
 ### Bug Fixes
+
+- **GH-1588 Scope 02:** AI bulk parsing now receives the actor's resolved primary tenant's active category IDs and returns a canonical `categoryId` or `null`. The review modal requires an existing category, revalidates selected IDs before side effects, canonicalizes/deduplicates IDs, rejects malformed IDs before querying, and never auto-creates categories. Tenants with zero active categories are directed to category management before parsing; partial saves refresh Products without unmounting the remaining drafts even when refresh fails, and stale partial responses cannot overwrite a newer final refresh; completion of an older AI session no longer clears a newer prompt. An AI-only Server Action independently enforces exactly one active tenant category and draft status while the manual Product save flow remains unchanged. Concurrent category deletion uses a shared per-Payload-pool FIFO mutation gate locally and conflicting `FOR KEY SHARE`/`FOR UPDATE` row locks across instances; both lock paths use a bounded two-second wait and return a retryable error instead of pinning connections indefinitely. Mixed batches retain timeout-failed drafts in the drawer and remove only products that committed. The same user/tenant/Payload context is reused through persistence. The permanent staging E2E fixture creates and removes category/product data through the dashboard UI and tenant-scoped Server Actions—no direct collection REST or hardcoded IDs; guarded provisioning idempotently ensures only the fresh tenant's required Site. Browser verification passed 2/2 with zero active product/category fixture residue.
 
 - **GH-1587** security(multi-tenant): five cross-tenant IDOR/anonymous-read bugs fixed — **Bugs A/C/D/E verified live against real Postgres before fix.** (1) Categories `beforeChange` hook now validates parent-field & bare tenant/site field-spoof independently, not just when parent present (Bug A/C). (2) Products `beforeChangeHook` applies same guard (Bug D). (3) saveBlogAction now checks `findByID` + tenant-ownership before update (Bug E, was present on create but missing on update branch). (4) Categories/Products/Blogs/BlogCategories all block anonymous REST reads via `if (!req.user) return false` in `access.read` (Bug B). **Root cause:** Payload's `access.update` Where-filter gates row *selection*, not write-body mutations — hooks must independently re-validate tenant-scoped fields. Same gap exists (deferred) in Orders/Customers/Sites. **Tests:** 31 persisted unit tests + 8 TC-IDs (TC-F08-05-14/15/16, TC-F09-SEC-01/02, TC-F17-SEC-01/02/03) verify each bug exploitable pre-fix, blocked post-fix. See `docs/journals/260714-gh1587-tenant-isolation-bugs-a-e.md` for pattern analysis + follow-up scope (Orders/Customers/Sites).
 
