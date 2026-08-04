@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { useEditorStore } from '@/store/editorStore'
+import { runSerializedEditorSave, useEditorStore } from '@/store/editorStore'
 
 const mockBlocks = [
     { blockType: 'hero', heading: 'Welcome', subheading: 'Hello' },
@@ -235,6 +235,51 @@ describe('EditorStore', () => {
             expect(useEditorStore.getState().saveStatus).toBe('saved')
         })
 
+        it('serializes autosave behind another editor write for the same site', async () => {
+            let releaseFirstWrite!: () => void
+            const firstWriteGate = new Promise<void>((resolve) => {
+                releaseFirstWrite = resolve
+            })
+            const firstWrite = runSerializedEditorSave('site-1', async () => {
+                await firstWriteGate
+                return true
+            })
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Queued latest state' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            expect(global.fetch).not.toHaveBeenCalled()
+
+            releaseFirstWrite()
+            await firstWrite
+            await savePromise
+
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+            const requestBody = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+            expect(requestBody.blocks[0].heading).toBe('Queued latest state')
+        })
+
+        it('keeps newer edits dirty when an older save response succeeds', async () => {
+            let resolveSave!: (response: { ok: boolean }) => void
+            ;(global.fetch as any).mockImplementationOnce(() => new Promise((resolve) => {
+                resolveSave = resolve
+            }))
+
+            useEditorStore.getState().updateBlock(0, { heading: 'First revision' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Newer revision' })
+            resolveSave({ ok: true })
+            await savePromise
+
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+            expect(useEditorStore.getState().saveStatus).toBe('idle')
+            expect(useEditorStore.getState().blocks[0].heading).toBe('Newer revision')
+        })
+
         it('TC-F12.06: should include isDraft, headerBlock, and footerBlock when saving', async () => {
             ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
 
@@ -312,23 +357,19 @@ describe('EditorStore', () => {
             expect(global.fetch).toHaveBeenCalledTimes(1)
 
             // Advance 5s
-            vi.advanceTimersByTime(5000)
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(5000)
             expect(global.fetch).toHaveBeenCalledTimes(2)
 
             // Advance 10s
-            vi.advanceTimersByTime(10000)
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(10000)
             expect(global.fetch).toHaveBeenCalledTimes(3)
 
             // Advance 20s
-            vi.advanceTimersByTime(20000)
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(20000)
             expect(global.fetch).toHaveBeenCalledTimes(4)
 
             // No more retries
-            vi.advanceTimersByTime(30000)
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(30000)
             expect(global.fetch).toHaveBeenCalledTimes(4)
         })
 
@@ -585,8 +626,7 @@ describe('EditorStore', () => {
             useEditorStore.setState({ currentPageId: 'page-about' })
 
             // Advance to retry (5s)
-            vi.advanceTimersByTime(5000)
-            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(5000)
 
             // Retry should use fresh currentPageId (page-about), not stale page-home
             expect((global.fetch as any).mock.calls[1][0]).toContain('pageId=page-about')

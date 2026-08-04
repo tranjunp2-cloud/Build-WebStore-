@@ -9,6 +9,41 @@ import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presen
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { stripStructuralFields } from '@/lib/editor/structural-block-fields'
 
+// Serialize all editor writes for a site within this browser tab. Each task is
+// created only after earlier writes settle, so it can snapshot the latest state.
+const editorSaveTails = new Map<string, Promise<void>>()
+
+export function hasPendingSerializedEditorSave(siteId: string): boolean {
+    return editorSaveTails.has(siteId)
+}
+
+export async function runSerializedEditorSave<T>(
+    siteId: string,
+    task: () => Promise<T>,
+): Promise<T> {
+    const previous = editorSaveTails.get(siteId)
+    let run: Promise<T>
+    if (previous) {
+        run = previous.catch(() => undefined).then(task)
+    } else {
+        try {
+            run = Promise.resolve(task())
+        } catch (error) {
+            run = Promise.reject(error)
+        }
+    }
+    const tail = run.then(() => undefined, () => undefined)
+    editorSaveTails.set(siteId, tail)
+
+    try {
+        return await run
+    } finally {
+        if (editorSaveTails.get(siteId) === tail) {
+            editorSaveTails.delete(siteId)
+        }
+    }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type BlockData = { blockType: string;[key: string]: unknown }
@@ -128,7 +163,7 @@ type EditorState = {
     hasUnpublishedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
-    pendingManualSave: boolean
+    contentRevision: number
     saveStatus: 'idle' | 'saving' | 'saved' | 'error'
     autoSaveTimer: NodeJS.Timeout | null
     autoSaveEnabled: boolean
@@ -184,7 +219,8 @@ type EditorActions = {
     // Save (F-07)
     handleContentChange: () => void
     performSave: (isManual?: boolean) => Promise<boolean>
-    markSaved: () => void
+    markDirty: (scheduleAutoSave?: boolean) => void
+    markSaved: (savedRevision?: number) => void
     markPublished: () => void
     setIsSaving: (saving: boolean) => void
     setAutoSaveEnabled: (val: boolean) => void
@@ -362,7 +398,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     hasUnpublishedChanges: false,
     lastSavedAt: null,
     isSaving: false,
-    pendingManualSave: false,
+    contentRevision: 0,
     autoSaveEnabled: true,
     autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
@@ -404,6 +440,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             lastSavedAt: null,
             autoSaveTimer: null,
             isSaving: false,
+            contentRevision: 0,
             saveStatus: 'idle',
             isAIStreaming: false,
             // M1 fix: reset locale state on every page switch so stale overrides never bleed.
@@ -659,7 +696,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         if (!siteId) return
 
         // Always mark dirty — auto-save disabled only suspends scheduling, not tracking
-        set({ hasUnsavedChanges: true, saveStatus: 'idle' })
+        set(state => ({
+            hasUnsavedChanges: true,
+            saveStatus: 'idle',
+            contentRevision: state.contentRevision + 1,
+        }))
 
         // Suspend scheduling while auto-save is disabled (e.g. template applied) or
         // inline editing is active (TEXT_EDITING_STOPPED pipeline handles that case)
@@ -674,26 +715,31 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         set({ autoSaveTimer: timer })
     },
 
-    performSave: async (isManual = false) => {
+    performSave: async (_isManual = false) => {
         const { siteId, autoSaveTimer, isSaving } = get()
         if (!siteId) return false
-
-        // If a save is already in-flight, mark as pending and return.
-        // The in-flight save's success path reads this flag and fires a retry immediately
-        // after it completes — deterministic, no magic timeout.
-        if (isManual && isSaving) {
-            set({ pendingManualSave: true })
-            return false
-        }
+        // `isSaving` is also used by UI code. If it is set without a registered
+        // task, preserve the existing anti-spam behavior instead of starting an
+        // unowned request. Active queue tasks are safe to serialize behind.
+        if (isSaving && !editorSaveTails.has(siteId)) return false
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
-        set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
+        set({ autoSaveTimer: null })
 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
         const attemptSave = async (retryCount = 0): Promise<boolean> => {
             // Re-read all state each attempt to prevent stale closure after page switch
-            const { blocks, theme, headerBlock, footerBlock, globalBlocks, currentPageId: pageIdNow } = get()
+            const {
+                blocks,
+                theme,
+                headerBlock,
+                footerBlock,
+                globalBlocks,
+                currentPageId: pageIdNow,
+                contentRevision: savedRevision,
+            } = get()
+            set({ isSaving: true, saveStatus: 'saving' })
             try {
                 const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
                 if (pageIdNow) {
@@ -711,22 +757,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 })
 
                 if (res.ok) {
-                    const hasPending = get().pendingManualSave
-                    set({
-                        hasUnsavedChanges: false,
-                        hasUnpublishedChanges: true,
-                        saveStatus: 'saved',
-                        lastSavedAt: Date.now(),
-                        isSaving: false,
-                        pendingManualSave: false,
-                    })
-                    // Fire the queued manual save immediately now that the slot is free.
-                    // Uses latest store blocks — no stale-closure risk.
-                    if (hasPending) void get().performSave(true)
+                    get().markSaved(savedRevision)
+                    set({ isSaving: false })
                     return true
                 } else {
                     if (res.status === 401) {
-                        set({ saveStatus: 'error', isSaving: false, pendingManualSave: false })
+                        set({ saveStatus: 'error', isSaving: false })
                         return false
                     }
                     throw new Error('Save failed')
@@ -735,21 +771,41 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 set({ saveStatus: 'error', isSaving: false })
                 if (retryCount < RETRY_DELAYS.length) {
                     const timer = setTimeout(() => {
-                        set({ isSaving: true, saveStatus: 'saving' })
-                        attemptSave(retryCount + 1)
+                        set({ autoSaveTimer: null })
+                        const state = get()
+                        if (state.siteId !== siteId || !state.hasUnsavedChanges) return
+                        void runSerializedEditorSave(siteId, () => attemptSave(retryCount + 1))
                     }, RETRY_DELAYS[retryCount])
                     set({ autoSaveTimer: timer })
-                } else {
-                    set({ pendingManualSave: false })
                 }
                 return false
             }
         }
 
-        return await attemptSave(0)
+        return await runSerializedEditorSave(siteId, () => attemptSave(0))
     },
 
-    markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
+    markDirty: (scheduleAutoSave = true) => {
+        if (scheduleAutoSave) {
+            get().handleContentChange()
+            return
+        }
+        set(state => ({
+            hasUnsavedChanges: true,
+            saveStatus: 'idle',
+            contentRevision: state.contentRevision + 1,
+        }))
+    },
+    markSaved: (savedRevision) => set(state => ({
+        hasUnsavedChanges: savedRevision === undefined || state.contentRevision === savedRevision
+            ? false
+            : state.hasUnsavedChanges,
+        hasUnpublishedChanges: true,
+        lastSavedAt: Date.now(),
+        saveStatus: savedRevision === undefined || state.contentRevision === savedRevision
+            ? 'saved'
+            : state.saveStatus,
+    })),
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
     setAutoSaveEnabled: (val) => set({ autoSaveEnabled: val }),
@@ -981,7 +1037,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             history: [], historyIndex: -1,
             isAIStreaming: false,
             isInlineEditing: false,
-            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+            contentRevision: 0,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
             // F26-04: reset all locale-related state (was leaking across site navigations).

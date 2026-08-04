@@ -727,10 +727,7 @@ function PreviewFrameInner({
                         window.location.origin,
                     )
                     void performSave(true).then(saved => {
-                        // false + pendingManualSave means this save was queued behind an in-flight
-                        // one and re-fires with the same store blocks — the change WILL persist.
-                        const queued = useEditorStore.getState().pendingManualSave
-                        if (saved || queued) replyResult(true)
+                        if (saved) replyResult(true)
                         else replyResult(false, 'Could not save the change — please try again')
                     }).catch(() => replyResult(false, 'Could not save the change — please try again'))
                 } catch (err) {
