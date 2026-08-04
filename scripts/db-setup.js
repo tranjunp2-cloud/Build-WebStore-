@@ -5441,6 +5441,20 @@ async function ensureRuntimeIssueUniqueIndex(pool) {
   console.log('[db-setup] ✅ template_issues.runtime_related_unique_idx (fail-closed)');
 }
 
+function normalizeIndexPredicate(predicate) {
+  return String(predicate ?? '')
+    .replaceAll('"', '')
+    // PostgreSQL renders enum columns with their concrete type cast (for
+    // example ::enum_template_issues_related_type). Casts do not change the
+    // predicate semantics and vary by schema/type, so remove them before the
+    // exact normalized expression comparison below.
+    .replace(/::[a-z_][a-z0-9_.]*/gi, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 /**
  * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
  * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
@@ -5497,13 +5511,7 @@ async function verifyCriticalIndexes(pool) {
        AND table_class.relname = 'template_issues'`
   );
   const runtimeIndex = runtimeIssueIndex.rows[0];
-  const runtimePredicate = String(runtimeIndex?.predicate ?? '')
-    .replaceAll('"', '')
-    .replace(/::text/g, '')
-    .replace(/[()]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  const runtimePredicate = normalizeIndexPredicate(runtimeIndex?.predicate);
   if (
     !runtimeIndex?.indisunique ||
     !runtimeIndex?.indisvalid ||
@@ -6119,4 +6127,5 @@ module.exports = {
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,
   cleanupApprovedDuplicateIndexes,
+  normalizeIndexPredicate,
 };
