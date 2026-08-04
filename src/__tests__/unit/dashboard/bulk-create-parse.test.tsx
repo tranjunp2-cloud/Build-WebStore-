@@ -55,7 +55,7 @@ vi.mock('@radix-ui/react-dialog', () => ({
     Close: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
-import { BulkCreateModal } from '../../../components/dashboard/BulkCreateModal'
+import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -175,5 +175,121 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         fireEvent.click(retryButton)
         await waitFor(() => expect(screen.getByDisplayValue('Recovered Hat')).toBeVisible())
         expect(global.fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('TC-F08-04-118: normalizes AI-provided line breaks before rendering the Product Name textarea', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                products: [{
+                    name: 'Premium Backpack\r\nWith Extended\u2028Product\u2029Name',
+                    price: 10,
+                    stock: 0,
+                    category: '',
+                    variants: [],
+                }],
+            }),
+        }) as unknown as typeof fetch
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="long product name" />)
+        const nameField = await screen.findByLabelText('Product name')
+
+        // Assert
+        expect(nameField.tagName).toBe('TEXTAREA')
+        expect(nameField).toHaveValue('Premium Backpack With Extended Product Name')
+    })
+
+    it('TC-F08-04-118: caps an AI-provided Product Name at the canonical save limit', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                products: [{
+                    name: 'A'.repeat(121),
+                    price: 10,
+                    stock: 0,
+                    category: '',
+                    variants: [],
+                }],
+            }),
+        }) as unknown as typeof fetch
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="overlong product name" />)
+        const nameField = await screen.findByLabelText('Product name')
+
+        // Assert
+        expect(nameField).not.toHaveAttribute('maxlength')
+        expect(nameField).toHaveValue('A'.repeat(120))
+    })
+
+    it('TC-F08-04-118: lets the controlled textarea normalize complete graphemes before enforcing the limit', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                products: [{
+                    name: 'Editable product name',
+                    price: 10,
+                    stock: 0,
+                    category: '',
+                    variants: [],
+                }],
+            }),
+        }) as unknown as typeof fetch
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="editable unicode product name" />)
+        const nameField = await screen.findByLabelText('Product name')
+        const combiningAcrossBoundary = `${'A'.repeat(119)}e\u0301`
+        const zwjAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
+
+        // Act
+        fireEvent.change(nameField, { target: { value: combiningAcrossBoundary } })
+
+        // Assert
+        expect(nameField).not.toHaveAttribute('maxlength')
+        expect(nameField).toHaveValue('A'.repeat(119))
+
+        // Act
+        fireEvent.change(nameField, { target: { value: zwjAcrossBoundary } })
+
+        // Assert
+        expect(nameField).toHaveValue('A'.repeat(118))
+    })
+
+    it('TC-F08-04-119: does not block Enter while explicit IME composition is active', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                products: [{
+                    name: 'Vietnamese product',
+                    price: 10,
+                    stock: 0,
+                    category: '',
+                    variants: [],
+                }],
+            }),
+        }) as unknown as typeof fetch
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="IME product name" />)
+        const nameField = await screen.findByLabelText('Product name')
+        fireEvent.compositionStart(nameField)
+        const composingEnterDispatched = fireEvent.keyDown(nameField, {
+            key: 'Enter',
+            isComposing: false,
+        })
+        fireEvent.compositionEnd(nameField)
+        const normalEnterDispatched = fireEvent.keyDown(nameField, { key: 'Enter' })
+
+        // Assert
+        expect(composingEnterDispatched).toBe(true)
+        expect(normalEnterDispatched).toBe(false)
     })
 })

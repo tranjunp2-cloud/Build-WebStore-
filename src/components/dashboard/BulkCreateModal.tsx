@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, Sparkles, X, ImageIcon } from 'lucide-react'
@@ -8,7 +8,9 @@ import { toast } from 'sonner'
 import { saveAiProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 
 import { CategorySelect, type Category } from '@/components/dashboard/CategorySelect'
@@ -363,6 +365,7 @@ export function BulkCreateModal({
                     }
                     return {
                         ...p,
+                        name: normalizeDraftProductName(p.name || ''),
                         variants: cleanedVariants,
                         _id: crypto.randomUUID(),
                         _draftOrdinal: draftIndex + 1,
@@ -680,99 +683,102 @@ export function BulkCreateModal({
                                 ) : (
                                     products.map(p => {
                                         const hasVariants = Boolean(p.variants?.length)
+                                        const nameInputId = `bulk-draft-name-${p._id}`
+                                        const priceInputId = `bulk-draft-price-${p._id}`
+                                        const stockInputId = `bulk-draft-stock-${p._id}`
                                         const categoryLabelId = `ai-category-label-${p._draftOrdinal}`
                                         const categoryTriggerId = `ai-category-trigger-${p._draftOrdinal}`
                                         const categoryErrorId = `ai-category-error-${p._draftOrdinal}`
                                         const categoryHasError = !isAvailableCategoryId(p.categoryId)
                                         return (
-                                        <div key={p._id} className="flex gap-3 items-start rounded-xl border border-solid border-[hsl(var(--border))] p-3">
-                                            <div className="shrink-0 w-[52px] h-[52px] rounded-[10px] bg-[hsl(var(--muted))] flex items-center justify-center text-[hsl(var(--muted-foreground))]">
-                                                <ImageIcon className="w-5 h-5" />
-                                            </div>
-                                            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                                                <div className="flex gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                    <span className="flex-1">{t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}</span>
-                                                    <span className="w-[72px] md:w-[100px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}</span>
-                                                    <span className="w-[64px] md:w-[72px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}</span>
-                                                    <span className="hidden md:block w-[110px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}</span>
+                                            <div key={p._id} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
+                                                <div className="col-start-1 row-start-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                                                    <ImageIcon className="w-5 h-5" />
                                                 </div>
-                                                <div className="flex gap-2 items-start">
-                                                    {/* Single-line input, matching the design reference (ai-bulk-create.html
-                                                        uses <input class="f-name">, not a textarea) — guarantees this field
-                                                        is always the same fixed height as Price/Stock/Variants next to it;
-                                                        a long name scrolls horizontally within the box rather than
-                                                        wrapping/growing the row. */}
-                                                    <Input
-                                                        type="text"
-                                                        disabled={isSaving}
-                                                        value={p.name}
-                                                        onChange={e => updateProduct(p._id, 'name', e.target.value)}
-                                                        className="flex-1 min-w-0 h-8 px-2.5 py-1.5 text-[12.5px]"
-                                                    />
-                                                    <Input
-                                                        type="number"
-                                                        disabled={isSaving}
-                                                        min="0"
-                                                        value={p.price}
-                                                        onChange={e => updateProduct(p._id, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
-                                                        className="w-[72px] md:w-[100px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
-                                                    />
-                                                    <Input
-                                                        type="number"
-                                                        disabled={isSaving}
-                                                        min="0"
-                                                        // For a variant product this drawer has no per-variant matrix (that's
-                                                        // ProductForm's job) — so Stock is one shared value distributed to
-                                                        // every variant uniformly on edit. Displays the first variant's own
-                                                        // stock (not a sum) since that's what re-editing this field would
-                                                        // apply everywhere. The AI parse prompt instructs stock:0 uniformly
-                                                        // across variants (route.ts), but that's not an enforced constraint —
-                                                        // the tooltip is explicit about the "applies to every variant"
-                                                        // semantics so a non-uniform AI response is never misread as a total.
-                                                        value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
-                                                        onChange={e => {
-                                                            const next = Math.max(0, parseInt(e.target.value, 10) || 0)
-                                                            if (hasVariants) updateAllVariantsStock(p._id, next)
-                                                            else updateProduct(p._id, 'stock', next)
-                                                        }}
-                                                        title={hasVariants ? t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant' : undefined}
-                                                        className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
-                                                    />
-                                                    <div className="hidden md:block min-w-[110px] w-[110px] shrink-0 self-start pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))] whitespace-normal break-words">
-                                                        {hasVariants ? p.variants.map(v => v.name).join(', ') : t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'}
+                                                <div className="col-span-2 row-start-2 grid min-w-0 grid-cols-2 gap-x-2 gap-y-3 md:col-span-1 md:col-start-2 md:row-start-1 md:grid-cols-[minmax(0,1fr)_100px_72px_110px] md:gap-y-0">
+                                                    <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                        <label htmlFor={nameInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}
+                                                        </label>
+                                                        <ProductNameTextarea
+                                                            id={nameInputId}
+                                                            disabled={isSaving}
+                                                            value={p.name}
+                                                            onChange={value => updateProduct(p._id, 'name', value)}
+                                                        />
+                                                    </div>
+                                                    <div className="flex min-w-0 flex-col gap-1.5">
+                                                        <label htmlFor={priceInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}
+                                                        </label>
+                                                        <Input
+                                                            id={priceInputId}
+                                                            type="number"
+                                                            disabled={isSaving}
+                                                            min="0"
+                                                            value={p.price}
+                                                            onChange={e => updateProduct(p._id, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
+                                                            className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
+                                                        />
+                                                    </div>
+                                                    <div className="flex min-w-0 flex-col gap-1.5">
+                                                        <label htmlFor={stockInputId} className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}
+                                                        </label>
+                                                        <Input
+                                                            id={stockInputId}
+                                                            type="number"
+                                                            disabled={isSaving}
+                                                            min="0"
+                                                            value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
+                                                            onChange={e => {
+                                                                const next = Math.max(0, parseInt(e.target.value, 10) || 0)
+                                                                if (hasVariants) updateAllVariantsStock(p._id, next)
+                                                                else updateProduct(p._id, 'stock', next)
+                                                            }}
+                                                            title={hasVariants ? t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant' : undefined}
+                                                            className="h-8 min-w-0 px-2.5 py-1.5 text-[12.5px]"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-2 flex min-w-0 flex-col gap-1.5 md:col-span-1">
+                                                        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}
+                                                        </span>
+                                                        <div className="min-h-8 min-w-0 whitespace-normal break-words pt-1.5 text-[12px] text-[hsl(var(--muted-foreground))]">
+                                                            {hasVariants ? p.variants.map(v => v.name).join(', ') : t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'}
+                                                        </div>
+                                                    </div>
+                                                    <div
+                                                        className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-4"
+                                                        data-testid={`ai-category-select-${p._draftOrdinal}`}
+                                                    >
+                                                        <div id={categoryLabelId} className="text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
+                                                            {t.dashboard?.products?.bulkCreate?.colCategory || 'Category'}
+                                                            <span className="sr-only"> for {p.name?.trim() || 'unnamed product'}, draft {p._draftOrdinal}</span>{' '}
+                                                            <span aria-hidden="true" className="text-red-500">*</span>
+                                                        </div>
+                                                        <CategorySelect
+                                                            categories={availableCategories}
+                                                            disabled={isSaving}
+                                                            triggerId={categoryTriggerId}
+                                                            ariaLabelledBy={categoryLabelId}
+                                                            errorId={categoryErrorId}
+                                                            selectedIds={isAvailableCategoryId(p.categoryId) ? [p.categoryId!] : []}
+                                                            onChange={ids => updateProduct(p._id, 'categoryId', ids[0] ?? null)}
+                                                            error={categoryHasError ? categoryRequiredMessage : undefined}
+                                                        />
                                                     </div>
                                                 </div>
-                                                <div
-                                                    className="mt-1 flex flex-col gap-1"
-                                                    data-testid={`ai-category-select-${p._draftOrdinal}`}
+                                                <button
+                                                    type="button"
+                                                    disabled={isSaving}
+                                                    onClick={() => removeProduct(p._id)}
+                                                    className="col-start-2 row-start-1 flex h-11 w-11 shrink-0 items-center justify-center justify-self-end rounded-lg text-[hsl(var(--muted-foreground))] transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50 md:col-start-3 md:h-7 md:w-7"
+                                                    aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
                                                 >
-                                                    <div id={categoryLabelId} className="text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
-                                                        {t.dashboard?.products?.bulkCreate?.colCategory || 'Category'}
-                                                        <span className="sr-only"> for {p.name?.trim() || 'unnamed product'}, draft {p._draftOrdinal}</span>{' '}
-                                                        <span aria-hidden="true" className="text-red-500">*</span>
-                                                    </div>
-                                                    <CategorySelect
-                                                        categories={availableCategories}
-                                                        disabled={isSaving}
-                                                        triggerId={categoryTriggerId}
-                                                        ariaLabelledBy={categoryLabelId}
-                                                        errorId={categoryErrorId}
-                                                        selectedIds={isAvailableCategoryId(p.categoryId) ? [p.categoryId!] : []}
-                                                        onChange={ids => updateProduct(p._id, 'categoryId', ids[0] ?? null)}
-                                                        error={categoryHasError ? categoryRequiredMessage : undefined}
-                                                    />
-                                                </div>
+                                                    <X className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                disabled={isSaving}
-                                                onClick={() => removeProduct(p._id)}
-                                                className="shrink-0 p-1.5 rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                                aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
                                         )
                                     })
                                 )}
@@ -846,5 +852,116 @@ export function BulkCreateModal({
                 </Dialog.Portal>
             </Dialog.Root>
         </>
+    )
+}
+
+export const PRODUCT_NAME_MAX_LENGTH = 120
+// More than 34x the persisted limit: ample headroom for separators/invalid code points while
+// bounding work and intermediate memory for pathological paste or AI-generated values.
+const PRODUCT_NAME_INPUT_SCAN_LIMIT = 4096
+
+let productNameGraphemeSegmenter: Intl.Segmenter | undefined
+
+function getProductNameGraphemeSegmenter(): Intl.Segmenter | undefined {
+    const Segmenter = Intl.Segmenter
+    if (typeof Segmenter !== 'function') return undefined
+
+    productNameGraphemeSegmenter ??= new Segmenter(undefined, { granularity: 'grapheme' })
+    return productNameGraphemeSegmenter
+}
+
+function sanitizeDraftProductNameInput(value: string) {
+    const boundedValue = value.slice(0, PRODUCT_NAME_INPUT_SCAN_LIMIT)
+    let sanitizedValue = ''
+    let previousCharacterWasSeparator = false
+
+    for (const character of boundedValue) {
+        if (/[\r\n\u2028\u2029]/.test(character)) {
+            if (!previousCharacterWasSeparator) sanitizedValue += ' '
+            previousCharacterWasSeparator = true
+            continue
+        }
+
+        previousCharacterWasSeparator = false
+        const codePoint = character.codePointAt(0)
+        if (codePoint !== undefined && codePoint >= 0xD800 && codePoint <= 0xDFFF) continue
+        sanitizedValue += character
+    }
+
+    return {
+        sanitizedValue,
+        inputWasTruncated: value.length > PRODUCT_NAME_INPUT_SCAN_LIMIT,
+    }
+}
+
+function* completeDraftProductNameSegments(segments: Iterable<{ segment: string }>, omitTrailingSegment: boolean) {
+    let pendingSegment: string | undefined
+
+    for (const { segment } of segments) {
+        if (pendingSegment !== undefined) yield pendingSegment
+        pendingSegment = segment
+    }
+
+    // A truncated raw prefix may end inside an arbitrarily long grapheme. Holding back its final
+    // segment prevents returning a cluster that was only partial in the original input.
+    if (!omitTrailingSegment && pendingSegment !== undefined) yield pendingSegment
+}
+
+export function normalizeDraftProductName(value: string) {
+    const segmenter = getProductNameGraphemeSegmenter()
+    if (!segmenter) {
+        // Do not guess Unicode boundaries in browsers without Intl.Segmenter. Preserve over-limit
+        // input for the authoritative server-side max(120) validation instead of corrupting it.
+        if (value.length > PRODUCT_NAME_INPUT_SCAN_LIMIT) return value
+        return sanitizeDraftProductNameInput(value).sanitizedValue
+    }
+
+    const { sanitizedValue, inputWasTruncated } = sanitizeDraftProductNameInput(value)
+    let normalizedValue = ''
+
+    for (const segment of completeDraftProductNameSegments(segmenter.segment(sanitizedValue), inputWasTruncated)) {
+        if (normalizedValue.length + segment.length > PRODUCT_NAME_MAX_LENGTH) break
+        normalizedValue += segment
+    }
+
+    return normalizedValue
+}
+
+interface ProductNameTextareaProps {
+    id: string
+    value: string
+    disabled: boolean
+    onChange: (value: string) => void
+}
+
+function ProductNameTextarea({ id, value, disabled, onChange }: ProductNameTextareaProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const isComposingRef = useRef(false)
+    useAutoResizeTextarea(textareaRef, value, Number.POSITIVE_INFINITY)
+
+    return (
+        <Textarea
+            ref={textareaRef}
+            id={id}
+            rows={1}
+            disabled={disabled}
+            value={value}
+            onChange={(event) => onChange(normalizeDraftProductName(event.target.value))}
+            onCompositionStart={() => {
+                isComposingRef.current = true
+            }}
+            onCompositionEnd={() => {
+                isComposingRef.current = false
+            }}
+            onBlur={() => {
+                isComposingRef.current = false
+            }}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && !(isComposingRef.current || event.nativeEvent.isComposing)) {
+                    event.preventDefault()
+                }
+            }}
+            className="min-h-8 min-w-0 resize-none overflow-x-hidden px-2.5 py-1.5 text-[12.5px] leading-[18px]"
+        />
     )
 }
