@@ -53,6 +53,7 @@ import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
 import { OpeningHoursEditor } from './local-business/opening-hours-editor'
 import { sanitizeLegacyOpeningHours } from './local-business/opening-hours-utils'
+import { sanitizeLocalBusinessText } from './local-business/normalization'
 import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
@@ -290,6 +291,8 @@ interface SettingsPanelProps {
     }) => void | boolean | Promise<void | boolean>
     /** Parent-owned contact mutex state so every SettingsPanel mount stays locked. */
     isContactSavePending?: boolean
+    /** Parent-owned lock after an indeterminate LocalBusiness save; cleared by reload. */
+    isLocalBusinessSaveLocked?: boolean
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
@@ -328,6 +331,7 @@ function SettingsPanelInner({
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     isContactSavePending = false,
+    isLocalBusinessSaveLocked = false,
     requestedTab,
     siteLocale = 'en',
     generationLocale, primaryLocale, secondaryLocale, pendingLocale,
@@ -476,10 +480,19 @@ function SettingsPanelInner({
     const siteLocalBusiness = site?.localBusiness || {}
     const compatibleSchemaSubtypes = getCompatibleSchemaSubtypes(siteLocalBusiness.businessCategory)
     const hasBusinessCategory = Boolean(siteLocalBusiness.businessCategory)
+    const hasCompatibleSchemaSubtypes = compatibleSchemaSubtypes.length > 0
+    const isSchemaSubtypeDisabled = !hasBusinessCategory || !hasCompatibleSchemaSubtypes
     const hasInvalidSchemaSubtype = Boolean(
         siteLocalBusiness.schemaSubtype
         && !compatibleSchemaSubtypes.some(option => option.value === siteLocalBusiness.schemaSubtype),
     )
+    const schemaSubtypeDescriptionIds = [
+        !hasBusinessCategory ? 'local-business-schema-subtype-disabled-hint' : null,
+        hasBusinessCategory && !hasCompatibleSchemaSubtypes
+            ? 'local-business-schema-subtype-unavailable-hint'
+            : null,
+        hasInvalidSchemaSubtype ? 'local-business-schema-subtype-validation' : null,
+    ].filter(Boolean).join(' ') || undefined
     const siteSocialLinks = site?.socialLinks || {}
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
@@ -517,6 +530,7 @@ function SettingsPanelInner({
     // the latest snapshot and serializes persistence, so a render-stale snapshot
     // here can never overwrite a newer field edit.
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
+        if (isLocalBusinessSaveLocked) return
         const updatesStructuredAddress = (
             'streetAddress' in patch ||
             'state' in patch ||
@@ -766,6 +780,24 @@ function SettingsPanelInner({
                 §2): address → coordinates (+ map preview) → category/offer → opening hours → checklist. */}
             {renderGlobalAccordion('localBusiness', s.localBusinessInfo, (
                 <div className="space-y-5">
+                    {isLocalBusinessSaveLocked ? (
+                        <div
+                            id="local-business-save-locked"
+                            role="alert"
+                            className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100"
+                        >
+                            <p>
+                                <span className="font-semibold">{s.localBusinessSaveLockedTitle}</span>{' '}
+                                {s.localBusinessSaveLockedDescription}
+                            </p>
+                        </div>
+                    ) : null}
+                    <fieldset
+                        disabled={isLocalBusinessSaveLocked}
+                        aria-describedby={isLocalBusinessSaveLocked ? 'local-business-save-locked' : undefined}
+                        className="min-w-0 space-y-5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <legend className="sr-only">{s.localBusinessInfo}</legend>
                     <div className="space-y-4" data-testid="settings-local-business-address">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
                         <div>
@@ -888,20 +920,14 @@ function SettingsPanelInner({
                             </label>
                             <Select
                                 value={hasInvalidSchemaSubtype ? undefined : siteLocalBusiness.schemaSubtype || undefined}
-                                disabled={!hasBusinessCategory}
+                                disabled={isSchemaSubtypeDisabled}
                                 onValueChange={value => void handleLocalBusinessChange({
                                     schemaSubtype: reconcileSchemaSubtype(siteLocalBusiness.businessCategory, value),
                                 })}
                             >
                                 <SelectTrigger
                                     id="local-business-schema-subtype"
-                                    aria-describedby={
-                                        !hasBusinessCategory
-                                            ? 'local-business-schema-subtype-disabled-hint'
-                                            : hasInvalidSchemaSubtype
-                                                ? 'local-business-schema-subtype-validation'
-                                                : undefined
-                                    }
+                                    aria-describedby={schemaSubtypeDescriptionIds}
                                     aria-invalid={hasInvalidSchemaSubtype || undefined}
                                     className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
                                 >
@@ -923,6 +949,14 @@ function SettingsPanelInner({
                                     className="mt-1.5 break-words text-xs leading-5 text-slate-400"
                                 >
                                     {s.schemaSubtypeDisabledHint}
+                                </p>
+                            ) : null}
+                            {hasBusinessCategory && !hasCompatibleSchemaSubtypes ? (
+                                <p
+                                    id="local-business-schema-subtype-unavailable-hint"
+                                    className="mt-1.5 break-words text-xs leading-5 text-slate-400"
+                                >
+                                    {s.schemaSubtypeUnavailableHint}
                                 </p>
                             ) : null}
                             {hasInvalidSchemaSubtype ? (
@@ -956,7 +990,7 @@ function SettingsPanelInner({
                             <Textarea
                                 defaultValue={siteLocalBusiness.serviceAreaDescription || ''}
                                 key={`lb-service-area-${siteLocalBusiness.serviceAreaDescription || ''}`}
-                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: e.target.value })}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: sanitizeLocalBusinessText(e.target.value) })}
                                 variant="editor"
                                 className={editorTextareaClassName}
                                 placeholder={s.serviceAreaPlaceholder}
@@ -1005,6 +1039,7 @@ function SettingsPanelInner({
                             categorySaved: s.checklistCategorySaved,
                         }}
                     />
+                    </fieldset>
                 </div>
             ))}
 

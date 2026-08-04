@@ -43,6 +43,7 @@ export interface CompactEditorLayoutProps {
     site: SiteData | null
     siteName: string
     isContactSavePending: boolean
+    isLocalBusinessSaveLocked?: boolean
     headerBlock: BlockData | null
     footerBlock: BlockData | null
     pages: PageData[]
@@ -120,6 +121,7 @@ export function CompactEditorLayout({
     site,
     siteName,
     isContactSavePending,
+    isLocalBusinessSaveLocked = false,
     headerBlock,
     footerBlock,
     pages,
@@ -380,6 +382,7 @@ export function CompactEditorLayout({
                                 site={site}
                                 siteName={siteName || site?.name || ''}
                                 isContactSavePending={isContactSavePending}
+                                isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                                 siteStatus={site?.status || 'draft'}
                                 headerBlock={headerBlock}
                                 footerBlock={footerBlock}

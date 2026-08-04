@@ -22,6 +22,9 @@ import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import type { LocalBusinessData } from '@/components/editor/local-business/types'
 import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
+import {
+    normalizeLocalBusinessSnapshot,
+} from '@/components/editor/local-business/normalization'
 import { countCompletedLocalBusinessFields } from '@/components/editor/local-business/completion-utils'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useEditorStore, BLOCK_TYPE_TO_KEY, PAGE_META_LOCALE_KEY, getDisplayPageTitle, type SiteLocale } from '@/store/editorStore'
@@ -113,6 +116,38 @@ type LocalBusinessSiteState = {
 type PersistSiteSettingsOptions = {
     commitOptimistically?: boolean
     targetSiteId?: string
+}
+
+const LOCAL_BUSINESS_COMPARISON_FIELDS = [
+    'streetAddress', 'city', 'state', 'postcode', 'country',
+    'latitude', 'longitude', 'businessCategory', 'schemaSubtype',
+    'priceRange', 'serviceAreaDescription',
+] as const
+
+const LOCAL_BUSINESS_RECONCILE_TIMEOUT_MS = 5_000
+
+function normalizeLocalBusinessForComparison(value: unknown) {
+    const record = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {}
+    const normalizedRecord = normalizeLocalBusinessSnapshot(record as LocalBusinessData)
+    const openingHours = Array.isArray(normalizedRecord.openingHours)
+        ? normalizedRecord.openingHours.map(row => {
+            const item = row && typeof row === 'object' && !Array.isArray(row)
+                ? row as Record<string, unknown>
+                : {}
+            return [item.dayOfWeek ?? null, item.opens ?? null, item.closes ?? null, item.isClosed === true]
+        })
+        : []
+    return {
+        fields: LOCAL_BUSINESS_COMPARISON_FIELDS.map(field => normalizedRecord[field] ?? null),
+        openingHours,
+    }
+}
+
+function localBusinessSnapshotsMatch(authoritative: unknown, requested: unknown): boolean {
+    return JSON.stringify(normalizeLocalBusinessForComparison(authoritative))
+        === JSON.stringify(normalizeLocalBusinessForComparison(requested))
 }
 
 // Maps Payload field path segments → user-facing labels for publish error toasts.
@@ -269,9 +304,14 @@ export default function EditorPage() {
     const localBusinessSaveInFlightSiteIdsRef = useRef(new Set<string>())
     const queuedLocalBusinessSavesRef = useRef(new Map<string, LocalBusinessSaveBatch>())
     const drainLocalBusinessSavesRef = useRef<(targetSiteId: string) => void>(() => {})
+    const localBusinessUnknownOutcomeSiteIdsRef = useRef(new Set<string>())
     const activeSiteIdRef = useRef(siteId)
     activeSiteIdRef.current = siteId
     // F26-04: AbortController for the currently in-flight locale switch.
+    const [localBusinessLockedSiteIds, setLocalBusinessLockedSiteIds] = useState<ReadonlySet<string>>(
+        () => new Set(),
+    )
+    const isLocalBusinessSaveLocked = localBusinessLockedSiteIds.has(siteId)
     // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
     const localeSwitchAbortRef = useRef<AbortController | null>(null)
 
@@ -931,6 +971,53 @@ export default function EditorPage() {
             try {
                 response = await request
             } catch (transportError) {
+                if (changes.localBusiness) {
+                    const reconcileController = new AbortController()
+                    const reconcileTimeoutId = window.setTimeout(
+                        () => reconcileController.abort(),
+                        LOCAL_BUSINESS_RECONCILE_TIMEOUT_MS,
+                    )
+                    try {
+                        const editorUrl = new URL(`/api/sites/${persistenceSiteId}/editor-data`, window.location.origin)
+                        const reconcileResponse = await fetch(editorUrl.toString(), {
+                            credentials: 'include',
+                            cache: 'no-store',
+                            signal: reconcileController.signal,
+                        })
+                        if (reconcileResponse.ok) {
+                            const reconciledData = await reconcileResponse.json() as { site?: SiteData }
+                            const authoritativeLocalBusiness = reconciledData.site?.localBusiness
+                            if (localBusinessSnapshotsMatch(authoritativeLocalBusiness, changes.localBusiness)) {
+                                localBusinessUnknownOutcomeSiteIdsRef.current.delete(persistenceSiteId)
+                                setLocalBusinessLockedSiteIds(previous => {
+                                    if (!previous.has(persistenceSiteId)) return previous
+                                    const next = new Set(previous)
+                                    next.delete(persistenceSiteId)
+                                    return next
+                                })
+                                return true
+                            }
+                        }
+                    } catch (reconcileError) {
+                        console.error('Failed to reconcile local business information after transport error', reconcileError)
+                    } finally {
+                        window.clearTimeout(reconcileTimeoutId)
+                    }
+
+                    localBusinessUnknownOutcomeSiteIdsRef.current.add(persistenceSiteId)
+                    setLocalBusinessLockedSiteIds(previous => {
+                        const next = new Set(previous)
+                        next.add(persistenceSiteId)
+                        return next
+                    })
+                    console.error('Local business save outcome is unknown', transportError)
+                    toast.error(t.editor.settings.localBusinessSaveUnknownTitle, {
+                        description: t.editor.settings.localBusinessSaveUnknownDescription,
+                    })
+                    // Keep the optimistic snapshot visible and prevent later full-snapshot
+                    // writes until reload; rolling back could overwrite a late server commit.
+                    return false
+                }
                 if (isContactSave && changes.contactInfo) {
                     try {
                         const editorUrl = new URL(`/api/sites/${persistenceSiteId}/editor-data`, window.location.origin)
@@ -1005,13 +1092,18 @@ export default function EditorPage() {
                 setIsContactSavePending(false)
             }
         }
-    }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
+    }, [currentPageId, siteId, t.editor.settings.localBusinessSaveUnknownDescription, t.editor.settings.localBusinessSaveUnknownTitle, updateSiteName, updateHeaderBlock])
 
     const drainLocalBusinessSaves = useCallback((targetSiteId: string) => {
         if (localBusinessSaveInFlightSiteIdsRef.current.has(targetSiteId)) return
 
         const batch = queuedLocalBusinessSavesRef.current.get(targetSiteId)
         if (!batch) return
+        if (localBusinessUnknownOutcomeSiteIdsRef.current.has(targetSiteId)) {
+            queuedLocalBusinessSavesRef.current.delete(targetSiteId)
+            for (const resolve of batch.resolvers) resolve(false)
+            return
+        }
 
         queuedLocalBusinessSavesRef.current.delete(targetSiteId)
         localBusinessSaveInFlightSiteIdsRef.current.add(batch.siteId)
@@ -1040,7 +1132,24 @@ export default function EditorPage() {
         )
             .then(result => {
                 const saved = result === true
-                if (saved) {
+                const outcomeUnknown = localBusinessUnknownOutcomeSiteIdsRef.current.has(batch.siteId)
+                if (outcomeUnknown) {
+                    // A later queued revision was never sent. Keep only the ambiguous
+                    // in-flight snapshot visible, then let the locked drain reject the queue.
+                    const current = localBusinessBySiteRef.current.get(batch.siteId)
+                    if (current) {
+                        localBusinessBySiteRef.current.set(batch.siteId, {
+                            ...current,
+                            snapshot: batch.snapshot,
+                            revision: batch.revision,
+                        })
+                        if (batch.siteId === activeSiteIdRef.current) {
+                            setSite(previous => previous
+                                ? { ...previous, localBusiness: batch.snapshot }
+                                : previous)
+                        }
+                    }
+                } else if (saved) {
                     const current = localBusinessBySiteRef.current.get(batch.siteId)
                     if (current) {
                         localBusinessBySiteRef.current.set(batch.siteId, {
@@ -1081,6 +1190,10 @@ export default function EditorPage() {
             return persistSiteSettingsChanges(changes)
         }
 
+        if (localBusinessUnknownOutcomeSiteIdsRef.current.has(siteId)) {
+            return Promise.resolve(false)
+        }
+
         const hasNonLocalBusinessChanges = Object.entries(changes).some(
             ([key, value]) => key !== 'localBusiness' && value !== undefined,
         )
@@ -1092,10 +1205,12 @@ export default function EditorPage() {
             revision: 0,
             persistedRevision: 0,
         }
-        const latestSnapshot: LocalBusinessData = {
-            ...current.snapshot,
-            ...localBusinessPatch,
-        }
+        const latestSnapshot = normalizeLocalBusinessSnapshot(
+            {
+                ...current.snapshot,
+                ...localBusinessPatch,
+            },
+        )
         if (latestSnapshot.openingHours) {
             latestSnapshot.openingHours = sanitizeLegacyOpeningHours(latestSnapshot.openingHours)
         }
@@ -2574,6 +2689,7 @@ export default function EditorPage() {
             blockIndex: null,
             theme,
             site,
+            isLocalBusinessSaveLocked,
             siteName: siteName || site?.name || '',
             siteStatus: site?.status || 'draft',
             isContactSavePending,
@@ -2799,6 +2915,7 @@ export default function EditorPage() {
                     pages={pages}
                     currentPageId={currentPageId}
                     siteLocale={siteLocale}
+                    isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                     primaryLocale={primaryLocale}
                     secondaryLocale={secondaryLocale}
                     pendingLocale={pendingLocale}
@@ -2867,6 +2984,7 @@ export default function EditorPage() {
                             headerBlock={headerBlock}
                             footerBlock={footerBlock}
                             pages={pages}
+                            isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                             currentPageId={currentPageId}
                             siteLocale={siteLocale}
                             generationLocale={site?.generationLocale ?? siteLocale}
