@@ -39,8 +39,8 @@ export async function findRegisteredMedia(
 // ("No files were uploaded."), so we INSERT the row directly — the media
 // upload collection has no `prefix`, no image sizes, and no tenant column, so a
 // flat filename + core fields is a complete record. `url` is virtual (generated
-// on read via generateFileURL), so we never store it. Bypassing Payload hooks
-// is safe here: the only upload hook (magic-byte check) runs for images only.
+// on read via generateFileURL), so we never store it. Direct image registration
+// validates magic bytes from S3 before calling this helper.
 export async function registerUploadedMedia(
     payload: BasePayload,
     { alt, filename, mimeType, filesize }: { alt: string; filename: string; mimeType: string; filesize: number },

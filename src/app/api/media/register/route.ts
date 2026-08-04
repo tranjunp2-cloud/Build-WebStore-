@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getCurrentUser } from '@/lib/auth'
 import { checkUploadSize } from '@/lib/media/upload-limits'
 import { buildS3Client } from '@/lib/media/s3-client'
 import { findRegisteredMedia, registerUploadedMedia } from '@/lib/media/register-media'
+import { hasValidImageSignature, SUPPORTED_IMAGE_MIMES } from '@/lib/media/image-signature'
 
-// GH-1284 — second half of the direct-upload flow. After the browser POSTs the
-// video straight to S3 (via /api/media/presign), it calls this to create the
+// Second half of the direct-upload flow. After the browser POSTs the media file
+// straight to S3 (via /api/media/presign), it calls this to create the
 // Payload media record. We HeadObject the key first so a caller can't register
 // a row for a file that was never uploaded, and we trust S3's real size/mime
 // over the client's claimed values.
@@ -27,6 +28,22 @@ async function deleteUnregisteredObject(
     }
 }
 
+async function readImageSignature(
+    s3: NonNullable<ReturnType<typeof buildS3Client>>,
+    key: string,
+): Promise<Uint8Array> {
+    const object = await s3.client.send(new GetObjectCommand({
+        Bucket: s3.bucket,
+        Key: key,
+        Range: 'bytes=0-11',
+    }))
+    const body = object.Body as unknown as {
+        transformToByteArray?: () => Promise<Uint8Array>
+    } | undefined
+    if (!body?.transformToByteArray) throw new Error('Image body unavailable')
+    return body.transformToByteArray()
+}
+
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -39,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const key = typeof body.key === 'string' ? body.key : ''
-    const alt = typeof body.alt === 'string' && body.alt.trim() ? body.alt.trim() : 'Uploaded video'
+    const alt = typeof body.alt === 'string' && body.alt.trim() ? body.alt.trim() : 'Uploaded media'
     if (!key) return NextResponse.json({ error: 'key required' }, { status: 400 })
     // The key is server-minted (buildMediaKey → `u{userId}-…`); reject anything
     // that didn't come from this user's presign so one user can't claim another's
@@ -62,14 +79,34 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Uploaded file not found' }, { status: 400 })
     }
 
-    if (!VIDEO_MIMES.has(mimeType)) {
+    const isVideo = VIDEO_MIMES.has(mimeType)
+    const isImage = SUPPORTED_IMAGE_MIMES.has(mimeType)
+    if (!isVideo && !isImage) {
         await deleteUnregisteredObject(s3, key)
-        return NextResponse.json({ error: 'Only MP4 and WebM videos are supported' }, { status: 415 })
+        return NextResponse.json(
+            { error: 'Only JPEG, PNG, WebP, ICO, MP4, and WebM files are supported' },
+            { status: 415 },
+        )
     }
     const sizeError = checkUploadSize(mimeType, size)
     if (sizeError) {
         await deleteUnregisteredObject(s3, key)
         return NextResponse.json({ error: sizeError }, { status: 413 })
+    }
+    if (isImage) {
+        try {
+            const signature = await readImageSignature(s3, key)
+            if (!hasValidImageSignature(signature)) {
+                await deleteUnregisteredObject(s3, key)
+                return NextResponse.json({ error: 'Invalid image file' }, { status: 400 })
+            }
+        } catch (err) {
+            console.error('[/api/media/register] Failed to validate uploaded image:', err)
+            // Keep the object when storage validation itself fails. The client
+            // can retry registration, and we avoid deleting a valid upload on
+            // a transient S3/Spaces read error.
+            return NextResponse.json({ error: 'Could not validate uploaded image' }, { status: 500 })
+        }
     }
 
     let payload: Awaited<ReturnType<typeof getPayload>> | undefined

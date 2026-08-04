@@ -28,12 +28,15 @@ vi.mock('@aws-sdk/client-s3', () => ({
     HeadObjectCommand: class HeadObjectCommand {
         constructor(public input: unknown) {}
     },
+    GetObjectCommand: class GetObjectCommand {
+        constructor(public input: unknown) {}
+    },
     DeleteObjectCommand: class DeleteObjectCommand {
         constructor(public input: unknown) {}
     },
 }))
 
-import { DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { POST } from '@/app/api/media/register/route'
 
 function makeRequest(key = 'u1-hero-video.mp4') {
@@ -124,6 +127,92 @@ describe('TC-F30-HMO-019: failed direct-upload registration removes the S3 objec
         // Assert
         expect(response.status).toBe(415)
         expectDeleted(key)
+        expect(mockRegisterUploadedMedia).not.toHaveBeenCalled()
+    })
+
+    it('registers an image after validating its stored bytes', async () => {
+        // Arrange
+        const key = 'u1-logo.png'
+        const media = {
+            id: 10,
+            url: 'https://cdn/logo.png',
+            filename: key,
+            mimeType: 'image/png',
+            filesize: 48_000,
+        }
+        mockRegisterUploadedMedia.mockResolvedValue(media)
+        mockS3Send.mockImplementation(async (command: unknown) => {
+            if (command instanceof HeadObjectCommand) {
+                return { ContentLength: 48_000, ContentType: 'image/png' }
+            }
+            if (command instanceof GetObjectCommand) {
+                return {
+                    Body: {
+                        transformToByteArray: async () =>
+                            Uint8Array.from([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]),
+                    },
+                }
+            }
+            return {}
+        })
+
+        // Act
+        const response = await POST(makeRequest(key))
+
+        // Assert
+        expect(response.status).toBe(200)
+        await expect(response.json()).resolves.toEqual(media)
+        expect(mockRegisterUploadedMedia).toHaveBeenCalledWith(
+            {},
+            { alt: 'Hero video', filename: key, mimeType: 'image/png', filesize: 48_000 },
+        )
+    })
+
+    it('deletes an image whose bytes do not match a supported image signature', async () => {
+        // Arrange
+        const key = 'u1-fake.png'
+        mockS3Send.mockImplementation(async (command: unknown) => {
+            if (command instanceof HeadObjectCommand) {
+                return { ContentLength: 48_000, ContentType: 'image/png' }
+            }
+            if (command instanceof GetObjectCommand) {
+                return {
+                    Body: {
+                        transformToByteArray: async () => Uint8Array.from([1, 2, 3, 4]),
+                    },
+                }
+            }
+            return {}
+        })
+
+        // Act
+        const response = await POST(makeRequest(key))
+
+        // Assert
+        expect(response.status).toBe(400)
+        expectDeleted(key)
+        expect(mockRegisterUploadedMedia).not.toHaveBeenCalled()
+    })
+
+    it('keeps an image when its stored bytes cannot be read for validation', async () => {
+        // Arrange
+        const key = 'u1-retry.png'
+        mockS3Send.mockImplementation(async (command: unknown) => {
+            if (command instanceof HeadObjectCommand) {
+                return { ContentLength: 48_000, ContentType: 'image/png' }
+            }
+            if (command instanceof GetObjectCommand) {
+                throw new Error('temporary storage failure')
+            }
+            return {}
+        })
+
+        // Act
+        const response = await POST(makeRequest(key))
+
+        // Assert
+        expect(response.status).toBe(500)
+        expect(mockS3Send).not.toHaveBeenCalledWith(expect.any(DeleteObjectCommand))
         expect(mockRegisterUploadedMedia).not.toHaveBeenCalled()
     })
 })
