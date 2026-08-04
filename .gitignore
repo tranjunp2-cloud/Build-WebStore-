@@ -65,6 +65,7 @@ docs/qa/qa-automation/auth-state.json
 
 ## Test and AI Agent data
 test-results/
+playwright-report/
 .agents/
 .agent/
 _agents/

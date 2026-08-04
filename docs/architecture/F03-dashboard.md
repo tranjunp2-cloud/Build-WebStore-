@@ -21,7 +21,6 @@ Dùng Payload CMS Local API để query — không qua REST, nhanh hơn.
             ├── AtAGlance.tsx
             ├── TrafficPerformance.tsx
             ├── SeoHealth.tsx
-            ├── SeoTools.tsx
             └── PendingOrders.tsx        ← Latest Pending Orders (gated)
 ```
 

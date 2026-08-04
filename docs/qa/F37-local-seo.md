@@ -1,12 +1,24 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 3.2 | **Updated:** 2026-07-30 | **Owner:** QA Team
+> **Version:** 4.1 | **Updated:** 2026-08-04 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v4.1 (2026-08-04)** — Kept the unchanged shared staging workflow and default Playwright Run All healthy while the real custom-domain fixture is unavailable: `storefront-regression → f37-regression → setup` runs TC-28/29 only, while `playwright.f37-custom-domain.config.ts` explicitly exposes `f37-custom-domain-manual → setup` for TC-52 without `skip`/`fixme`. Custom-domain DNS discovery runs only through that opt-in config; TC-49 guards the partition and TC-52 remains pending a live active-domain/product/blog fixture.
+- **v4.0 (2026-08-03)** — Closed PR #1719 review gaps: sitemap and llms successful responses now use `Cache-Control: no-store` so publish-state changes cannot remain stale at the CDN; both routes fetch every matching published page/product/blog with narrow field projections; `llms.txt` still emits at most 10 unique URLs after deterministic round-robin selection. Product/blog discovery rejects nested slugs that their single-segment detail routes cannot resolve, blog writes reject new nested slugs, and the account-derived site-status lookup reads at most two rows while enforcing the one-account/one-tenant/one-site invariant.
+
+- **v3.9 (2026-07-31)** — Reconciled TC-16 with TC-52: `llms.txt` keeps its 10-URL bound but selects oldest public pages, products, and blogs in deterministic round-robin order so an available content type cannot be starved by an earlier group.
+- **v3.8 (2026-07-31)** — Aligned E2E fixture discovery with the product invariant of one account, one active tenant, and one site. TC-28/29 use an E2E-only, status-only route guarded by staging-only execution, the server-configured `TEST_EMAIL`, authenticated session, and active-tenant ownership; cleanup verifies and retries restoration in `finally`. A single account-backed run now covers both states without F37-specific env variables or production publish side effects.
+- **v3.7 (2026-07-30)** — Account-backed fixture discovery now consumes hydrated active tenants plus an opt-in, tenant-scoped, whitelisted site-status summary from `/api/users/me?include=site-status`. Publish state is therefore independent of the public endpoints under test without adding work to normal profile requests. Missing unpublished or custom-domain data fails only its owning TC, and custom-domain probes require an HTTPS public DNS hostname, pin Chromium to the validated IP, and block cross-origin requests.
+- **v3.6 (2026-07-30)** — CI reachability fix: the unchanged staging workflow still selects `storefront-regression`, which now depends on `f37-regression → setup`; TC-49 inspects the exported project graph and guards the existing workflow selection without F37-specific env variables.
+- **v3.5 (2026-07-30)** — PR review regression closeout: custom-domain product/blog detail loaders now resolve the forwarded hostname, require an active domain, and keep blog lookup site-scoped. TC-52 derives its active custom-domain fixture from `TEST_EMAIL`, requires product/blog details in both sitemap and llms, and rejects redirects or non-200 renders.
+- **v3.4 (2026-07-30)** — Product ownership clarified: #1311 closes on FR-12..14 route/UI behavior and hands trusted crawler/sitemap/llms facts to #1312; #1312 alone owns 9/5/1 attribution and the 100-point scorecard. TC-51 prevents Story Sync from moving score-engine acceptance back into #1311.
+- **v3.3 (2026-07-30)** — Review findings fixed: a dedicated Playwright project discovers TC-28/29 with fail-closed account-owned fixtures while shared workflows remain unchanged; TC-49/50 guard project configuration and documentation alignment. Exact 9/5/1 score integration remains atomically owned by #1312 because changing only the legacy AI bucket would make the current total max 95.
+- **v3.2 (2026-07-30)** — Review hardening made public-route resource use explicit: llms Key Pages are capped at 10 deterministic real URLs, and discovery queries select only serialization fields. Superseded by v4.0 for candidate-query completeness and cache behavior. Live TC-28..30 and #1312 9/5/1 evidence remain pending.
+- **v3.1 (2026-07-29)** — Reconciled US-F37-03 with PRD v2.6: retired seller opt-out/action wording, registered unique TC-F37-03-01..48 evidence, added published/unpublished public-route Playwright coverage plus authenticated Dashboard absence coverage, and recorded #1312 as the remaining 9/5/1 score-integration dependency.
 - **v2.18 (2026-07-31)** — Registered `TC-F37-01-30` for the PR #1708 review regression: rapid `localBusiness` edits must be serialized and coalesced so a slower, older PATCH cannot overwrite newer address fields. The component sends sparse field patches to the Editor owner; the owner maintains revisioned snapshots and one queue per site, preserves queued site A work while site B saves independently, and prevents a same-site page refetch from replacing pending optimistic data with an older DB snapshot. Successful analytics now fire once per persisted batch from that batch's full snapshot. Deterministic regressions cover all of these ordering cases.
 - **v2.17 (2026-07-30)** — Hardened the F37 target allowlist at the shared authenticated Playwright setup boundary. The previous suite-level skip ran after the `chromium` project's `setup` dependency, so credentials could be submitted before a disallowed target was rejected. `TC-F37-01-29` now covers exact local/live-staging origins plus malformed, production, and lookalike targets; a direct setup regression confirms the guard throws before navigation or credential entry.
 - **v2.16 (2026-07-30)** — Ran the guarded browser regression against the reserved local one-site account: auth setup, TC-F37-01-26, and TC-F37-01-27 pass **3/3**. The run proves valid PATCH→reload persistence, invalid-phone rollback without PATCH, sequential name/address/phone persistence at 375px, `country: 'MY'`, persisted `minimalBusinessData` = 20 (`7/8/5`), no horizontal overflow, and exact fixture restoration/raw verification. The test marks the first-use editor coach marks as already seen so they do not redirect the Tools sheet during this settings-specific scenario. No staging result is claimed.
@@ -39,7 +51,7 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 |---|---|---|
 | **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | 🟡 BUILT + unit/regression tested; live Playwright run pending (§3.1–3.4) |
 | **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | 🟡 PARTIAL — category→subtype dropdown not built (§3.5) |
-| **US-F37-03** | Platform-managed AI Discoverability | 🔴 TARGET REWIRE — remove toggle UI/state, keep crawler allow + llms.txt (§3.6) |
+| **US-F37-03** | Platform-managed AI Discoverability | ✅ ROUTES + UI IMPLEMENTED — score facts handed to #1312 (§3.6) |
 | **US-F37-04** | Unified SEO Health Score + Actions | 🔴 TARGET NOT BUILT — legacy engine/API require rewire (§3.7) |
 | **US-F37-09** | Malaysia opt (MY geo/state, Waze, Halal) | 🟡 PARTIAL — geo built; Waze/Halal chưa (§3.9) |
 
@@ -58,11 +70,11 @@ Test coverage cho **F37 Local SEO — Phase 1**: US-F37-01, 02, 03, 04, 09.
 
 | Item | Spec |
 |---|---|
-| Framework | Vitest (unit tests only — no E2E) |
-| Test files | 3 files in `src/__tests__/unit/` |
-| Execution | `npm test` (full suite 1301/1301 tests pass) |
-| Coverage | 100% on new functions/branches (saveSiteSchema, generateLocalBusinessSchema, generatePageSchemas, calculateLocalSeoScore, dayOfWeekToSchema, serializeJsonLd, hasMeaningfulLocalBusinessData) |
-| Test data | Fixtures with real Malaysia geolocation (Petaling Jaya), opening hours, and business categories |
+| Framework | Vitest unit/integration tests + Playwright browser acceptance |
+| Test files | F37 unit/API coverage under `src/__tests__/`; public browser coverage in `tests/f37-ai-discoverability.spec.ts`; authenticated Dashboard coverage in `e2e/dashboard.spec.ts` |
+| Execution | Focused Vitest gates, full `npm test -- --run`, Playwright project discovery, and targeted live staging runs |
+| Coverage | Route behavior, tenant/custom-domain isolation, output safety, Dashboard control retirement, Playwright project wiring, and the existing Phase-1 score/schema helpers |
+| Test data | Unit fixtures plus the single hydrated active tenant and single whitelisted site status owned by `TEST_EMAIL`; the spec uses the guarded E2E-only route to change only that QA site's `status` field and verifies/restores it after each TC, reads active custom domains from the hydrated tenant document, rejects non-public DNS targets, and keeps storefront assertions public |
 | Security | XSS payloads (</script>, <img onerror>, <script>alert) tested; sanitization verified |
 
 ---
@@ -160,21 +172,66 @@ Two dashboard code paths read the shared `analytics` collection:
 
 ---
 
-## 3.6 US-F37-03: Platform-managed AI Discoverability **[TARGET REWIRE]**
+## 3.6 US-F37-03: Platform-managed AI Discoverability **[IMPLEMENTED — SCORE OWNED BY #1312]**
 
-> Target contract: approved AI assistant crawlers are always allowed and always earn 9 points. The seller sees no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. Current toggle-based code must be removed or made non-authoritative during implementation.
+> Canonical product contract: PRD v2.6 AC-01..03 and FR-12..14. #1311 owns platform-managed crawler access, public sitemap/llms behavior, seller-control retirement, and the route facts automated below. The separate Dashboard SEO-page auto-meta control remains outside F37-03. US-F37-04 / #1312 exclusively owns 9/5/1 attribution and the atomic 20/35/15/30 score cutover; it is a downstream score integration, not a #1311 implementation blocker.
 
-| ID | AC/FR | Type | Title | Status | Key Assertions | Impact |
-|---|---|---|---|---|---|---|
-| **TC-F37-03-01** | AC-01 / FR-12 | Func | robots.txt always allows approved AI assistant bots | target `[NOT-BUILT]` | GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot are not blocked for any tenant. | Platform invariant |
-| **TC-F37-03-02** | AC-02 / FR-12 | UI | No seller-facing discoverability controls | target `[NOT-BUILT]` | Dashboard and Site Settings contain no crawler toggle, sitemap resubmit, auto-meta toggle, or SEO Action Tools section. | KISS UI |
-| **TC-F37-03-03** | AC-01 / FR-12 | Regression | Persisted legacy `false` cannot block approved AI bots | target `[NOT-BUILT]` | A legacy site record cannot change robots behavior or reduce the 9 crawler points. | Migration safety |
-| **TC-F37-03-04** | AC-01 | Func | Googlebot/Bingbot remain allowed | target `[NOT-BUILT]` | Normal search crawlers remain crawlable. | SEO safety |
-| **TC-F37-03-05** | AC-6 | Func | `GET /llms.txt` → 200 `text/plain` | `[NOT-BUILT]` | Route tồn tại, status 200, MIME text/plain. | AEO signal |
-| **TC-F37-03-06** | AC-6 | Func | llms.txt content: tên, mô tả, ≥5 URL, contact, giờ, markdown | `[NOT-BUILT]` | Đủ element cấu trúc markdown. | llms.txt hợp lệ |
-| **TC-F37-03-07** | BR-09 | Func | llms.txt runtime-generated, cache ngắn | `[NOT-BUILT]` | Không long-cache; phản ánh data mới. | Freshness |
-| **TC-F37-03-08** | NFR-3 | Sec | Platform crawler invariant is tenant-safe | target `[NOT-BUILT]` | Every tenant receives the same approved allow policy without cross-tenant state. | Isolation |
-| **TC-F37-03-09** | §5 / FR-12 | Func | Score always awards crawler baseline | target engine `[NOT-BUILT]` | AI Discoverability always includes 9 crawler points; unpublished sites earn no sitemap/llms points. | Score integrity |
+| ID | AC/FR | Type | Automated assertion | Status / evidence |
+|---|---|---|---|---|
+| **TC-F37-03-01** | AC-01 / FR-12 | Unit | Approved AI assistants are always allowed | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-02** | FR-12 | Unit | Missing legacy value is non-authoritative | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-03** | FR-12 | Regression | Persisted legacy `false` is non-authoritative | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-04** | FR-12 | Unit | Default search-crawler policy remains intact | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-05** | FR-12 | Unit | PerplexityBot belongs to approved assistants | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-06** | FR-12 | Security | Scrapers stay blocked with legacy `true` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-07** | FR-12 | Security | Scrapers stay blocked with legacy `false` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-08** | FR-12 | Edge | Unknown tenant returns 404 | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-09** | AC-02 / FR-12 | Unit | Unpublished/missing site keeps crawler allow policy | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-10** | AC-01 / FR-12 | Unit | robots.txt advertises the storefront sitemap | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-11** | FR-12 | Security | Default group allows public paths and blocks `/api` + `/admin` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-12** | AC-01 / FR-14 | Unit | llms.txt returns 200 UTF-8 plain text | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-13** | FR-14 | Unit | llms.txt emits site name as H1 | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-14** | FR-14 | Unit | llms.txt emits description as blockquote | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-15** | FR-14 | Unit | llms.txt emits Key Pages heading | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-16** | FR-14 | Regression | Fetches all matching published pages, products, and blogs with field-selected queries, then lists at most 10 unique real public URLs using deterministic round-robin coverage; no fabricated minimum | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-17** | FR-14 | Unit | Public URLs use Markdown list syntax | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-18** | FR-14 | Unit | Contact section appears when data exists | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-19** | FR-14 | Unit | Contact section includes phone | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-20** | FR-14 | Unit | Contact section includes email | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-21** | FR-14 | Unit | Contact section includes address | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-22** | FR-14 | Edge | Empty contact data omits Contact section | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-23** | FR-14 | Unit | Experimental-standard notice remains present | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-24** | FR-14 | Edge | llms.txt returns 404 for unknown tenant | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-25** | AC-02 / FR-14 | Unit | llms.txt returns 404 without a published site | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-26** | FR-14 | Edge | Missing description uses safe fallback copy | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-27** | FR-12 / AC-03 | Unit | Persisted Dashboard preferences drop retired Tools block | `[x] AUTO` `dashboard-blocks.test.ts` |
+| **TC-F37-03-28** | AC-01 / FR-12..14 | Playwright | Published storefront exposes robots, sitemap and llms | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — single-site account-derived local PASS in the combined 2026-07-31 run; earlier path-variable staging PASS (`/sites/kedai-demo`) |
+| **TC-F37-03-29** | AC-02 / FR-12..14 | Playwright | Unpublished storefront returns crawler 200, sitemap/llms 404 | `[x] AUTO` `tests/f37-ai-discoverability.spec.ts` — single-site account-derived local PASS in the combined 2026-07-31 run; earlier path-variable staging PASS (`/sites/e2e-test`) |
+| **TC-F37-03-30** | AC-03 / FR-12 | Playwright | Dashboard exposes no retired seller controls | `[x] AUTO` `e2e/dashboard.spec.ts` — authenticated staging run pending |
+| **TC-F37-03-31** | FR-14 | Edge | Empty published storefront lists only its real homepage | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-32** | FR-14 | Security | Blog/product discovery queries are site-scoped | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-33** | FR-14 | Unit | Valid opening hours are emitted | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-34** | FR-14 | Edge | Missing opening hours omit the section | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-35** | FR-14 | Data | Incomplete opening-hours rows are omitted | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-36** | FR-12 | Security | Approved bot groups still block `/api` + `/admin` | `[x] AUTO` `ai-crawlers-robots.test.ts` |
+| **TC-F37-03-37** | FR-14 | Unit | Middleware rewrites custom-domain llms.txt | `[x] AUTO` `public-discovery-middleware.test.ts` |
+| **TC-F37-03-38** | AC-01 / FR-13 | Unit | Published sitemap emits current public XML URLs | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-39** | FR-13 | Security | Sitemap queries are site-scoped, fetch all matching published records with field-selected queries, and reject or encode unsafe slugs | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-40** | FR-13 | Unit | Sitemap resolves active custom-domain URLs | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-41** | AC-02 / FR-13 | Edge | Sitemap returns 404 for missing tenant or published site | `[x] AUTO` `sitemap-route.test.ts` |
+| **TC-F37-03-42** | FR-14 | Security | llms.txt omits checkout and order URLs | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-43** | FR-14 | Unit | Middleware rewrites platform-subdomain llms.txt | `[x] AUTO` `public-discovery-middleware.test.ts` |
+| **TC-F37-03-44** | AC-01 / FR-12..14 | Unit | All routes resolve one published custom-domain storefront | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-45** | FR-12..14 | Edge | All custom-domain routes reject missing host context | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-46** | AC-03 / FR-13..14 | Resilience | One endpoint failure does not change the others | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-47** | FR-12..14 | Security | All routes reject inactive custom domains | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
+| **TC-F37-03-48** | FR-14 | Security | Seller text stays inline and content slugs are encoded | `[x] AUTO` `llms-txt.test.ts` |
+| **TC-F37-03-49** | AC-01..03 / Config | Regression | Existing workflow selection reaches account-derived TC-28/29 through `storefront-regression → f37-regression → setup`; default Run All excludes TC-52, while `playwright.f37-custom-domain.config.ts` explicitly exposes `f37-custom-domain-manual → setup`; no F37-specific env variables or shared-workflow changes | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts`, `api-users-me.test.ts` |
+| **TC-F37-03-50** | FR-12 / Docs | Regression | Closeout docs do not reintroduce the retired crawler toggle, overclaim auto-meta removal, or reference deleted `SeoTools` | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-51** | Ownership / Docs | Regression | Story Sync keeps #1311 route/UI-only and assigns 9/5/1 score integration to #1312 | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
+| **TC-F37-03-52** | AC-01 / FR-13..14 | Regression | Active custom-domain product/blog details resolve within the selected site; inactive domains are rejected; sitemap and llms must each advertise direct 200 product/blog renders on the custom origin | `[x] AUTO` `custom-domain-detail-routes.test.ts`; `[ ] MANUAL` `playwright.f37-custom-domain.config.ts` / `f37-custom-domain-manual` — opt-in and executable without skip/fixme, account-derived live run awaits an active custom domain with product/blog fixtures |
+
+**Score handoff:** #1312 must add score-level evidence that crawler/sitemap/llms contribute exactly 9/5/1, unpublished sites score 9/0/0, and sitemap/llms failures deduct independently. Those are US-F37-04 integration tests and do not block #1311 route/UI acceptance.
 
 ---
 
@@ -500,6 +557,20 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ## 8. Test Execution Status
 
+### US-F37-03 acceptance gates
+
+| Gate | Latest evidence | Status |
+|---|---|---|
+| Focused US-F37-03 unit/config | 12 files, 90 tests | ✅ PASS |
+| Full Vitest regression | 662 files, 11,114 tests | ✅ PASS |
+| TypeScript + lint | `npm run typecheck`; `npm run lint` | ✅ 0 errors; repository baseline warnings only |
+| Shared staging CI discovery | Unchanged selection reaches TC-28/29 via `storefront-regression → f37-regression → setup`; TC-30 via `chromium` | ✅ DISCOVERED |
+| Custom-domain live discovery | Opt-in `playwright.f37-custom-domain.config.ts` exposes `f37-custom-domain-manual → setup`; shared staging and default Run All do not select TC-52 | 🟡 DISCOVERED; live fixture pending |
+| Live public staging acceptance | TC-28/29 against `/sites/kedai-demo` and `/sites/e2e-test` | ✅ 2/2 PASS (2026-07-30) |
+| Live authenticated staging acceptance | TC-30 Dashboard seller-control absence | 🟡 Pending authenticated staging run |
+
+### Existing F37 baseline
+
 | File | Tests | Status | Coverage | Notes |
 |---|---|---|---|---|
 | `sites-local-business.test.ts` | 17 | ✅ PASS | 100% of saveSiteSchema.localBusiness | Zod schema + security + opening-hours cap + closes-after-opens |
@@ -521,8 +592,8 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 > Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
 
-1. **🔴 Platform crawler rewire (US-03, BLOCKER):** Code currently persists and honors a seller crawler toggle. Target behavior ignores/removes that setting, always allows approved AI assistant crawlers, always awards 9 points, and removes the entire SEO Action Tools UI.
-2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có; #1309 covers the additive 7/8/5 Minimal Business response plus TC-04-01/02 (401/403), while TC-04-03..06 remain untested. The KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe remain spec-based in TC-04-10..12/16..18. #1312 owns the atomic F37 §5 top-level cutover (20/35/15/30) and unified dashboard/checklist; TC-04-11 verifies the crawler signal stays platform-managed and hidden.
+1. **Score follow-up (#1312, outside #1311):** F37-03 route facts and seller-control retirement are implemented. The authoritative score engine/API still use the legacy 35/30/20/15 contract; #1312 must land exact 20/35/15/30 scoring, AI 9/5/1, and independent sitemap/llms deductions atomically. Changing only the AI bucket would cap the current total at 95.
+2. **US-04 unified SEO Issues chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng KISS card, actor/CTA/destination mapping, AI-strip gating, and root-cause dedupe chưa implement → TC-04-10..12/16..18 spec-based. TC-04-11 verifies the crawler signal stays platform-managed and hidden.
 3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
 4. **Technical Health rewire (US-04):** Code còn placeholder CWV/mobile/HTTPS → phải thay bằng metadata coverage + F03 Content Quality + verification/indexability trước khi surface score cho seller.
 5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.
@@ -531,4 +602,6 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ---
 
-**Last Verified:** 2026-07-30 (the score API regression covers persisted 20/12 plus 401/403 while preserving legacy Business = 35. The guarded local Playwright run passes auth setup plus TC-F37-01-26/27 **3/3** with fixture restoration; no live staging E2E pass is claimed. #1312 retains the atomic F37 §5 top-level 20/35/15/30 and dashboard/checklist cutover.)
+**US-F37-03 Last Verified:** 2026-08-04 — focused F37/API coverage passed 90/90 across 12 files; typecheck and lint exited 0 (lint retains baseline warnings only). Shared Playwright discovery reaches setup plus TC-28/29 without dedicated F37 environment variables or workflow changes; default Run All excludes TC-52, while opt-in `playwright.f37-custom-domain.config.ts` reaches setup plus TC-52 without skip/fixme. The single-site account-backed local run passed TC-28/29 and restored the initial site status; local custom-domain route simulation passed, while real DNS/TLS evidence for TC-52 still requires an active custom domain and authenticated staging TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.
+
+**US-F37-01 Last Verified:** 2026-07-30 (the score API regression covers persisted 20/12 plus 401/403 while preserving legacy Business = 35. The guarded local Playwright run passes auth setup plus TC-F37-01-26/27 **3/3** with fixture restoration; no live staging E2E pass is claimed. #1312 retains the atomic F37 §5 top-level 20/35/15/30 and dashboard/checklist cutover.)
