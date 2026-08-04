@@ -16,6 +16,7 @@ import { getSiteBasePath } from '@/lib/site-base-path'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
+import { resolveMetadataImageUrl } from '@/lib/seo/metadata-image'
 import {
     getCachedTenantBySlug,
     getCachedTenantByDomain,
@@ -194,14 +195,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const title = blogPost?.seo?.metaTitle || blogPost?.title || page?.seo?.title || site.seo?.metaTitle || site.name
     const description = blogPost?.seo?.metaDescription || page?.seo?.description || site.seo?.metaDescription
-    type BlogMedia = { url?: string }
-    const blogThumb = blogPost ? (blogPost as unknown as { thumbnail?: BlogMedia | string }).thumbnail : null
-    const blogOgImage = blogThumb && typeof blogThumb === 'object' ? blogThumb.url ?? null : null
-    const ogImage = blogOgImage
-        || (page?.seo as any)?.ogImage
-        || (site.seo as any)?.ogImage
-        || (site.branding as any)?.logo
-        || null
+    const blogThumb = blogPost ? (blogPost as unknown as { thumbnail?: unknown }).thumbnail : null
+    const ogImage = resolveMetadataImageUrl(
+        blogThumb,
+        page?.seo?.ogImage,
+        site.seo?.ogImage,
+        site.branding?.logo,
+    )
 
     // Resolve canonical URL — prefer primary custom domain, then middleware header, then subdomain
     const reqHeaders = await headers()
