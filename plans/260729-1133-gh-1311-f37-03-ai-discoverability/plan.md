@@ -28,7 +28,7 @@ PR #1677 merged to `origin/staging` at `38d5868e` on 2026-07-29, so the local PR
 | Issue #1311 wording | Resolved | Product/docs | Route/UI AC synchronized; score ownership handed to #1312 |
 | PR #1708 | Coordinate | US-F37-01 | Rebase/coordinate; this plan does not edit its score helper |
 | Issue #1312 | External closeout | US-F37-04 | Own runtime score/API/Dashboard cutover and verify 9/5/1 |
-| Staging fixtures | Resolved | QA | Published/unpublished repository-variable paths configured |
+| Staging fixtures | Partial | QA | Account-derived published/unpublished site resolved; active custom-domain/product/blog fixture for manual TC-52 pending |
 
 No relevant unfinished F37 plan exists in the current `plans/` tree; these are external delivery dependencies, not `blockedBy` plan directories.
 
@@ -77,7 +77,7 @@ Seller-control retirement is required by FR-12 plus the PRD UI/refactor contract
 - Five approved AI assistants are allowed even when a legacy site value is `false`; known scraper policy and `/api/`/`/admin/` restrictions remain intact.
 - No crawler toggle, sitemap resubmit action, or SEO Action Tools section is seller-visible under the v2.6 contract. The separate Dashboard SEO-page auto-meta control remains outside F37-03.
 - Published storefronts expose tenant-safe sitemap and Markdown `llms.txt`; unpublished/missing storefront behavior is explicit and tested.
-- Playwright discovers and runs the F37-03 public-route scenarios against stable staging data; no permanent `test.skip()`.
+- Shared/default Playwright runs TC-28/29 against stable account-derived staging data and excludes TC-52; `playwright.f37-custom-domain.config.ts` exposes the separate `f37-custom-domain-manual` project without `skip`/`fixme`, pending its live fixture.
 - #1312 can consume unambiguous crawler/sitemap/`llms.txt` facts and independently implement 9/5/1 within the 100-point scorecard without reopening #1311 route code.
 - PR uses `feat(F37): [US-F37-03] platform-managed AI discoverability` and `Relates to #1311`, never `Closes #1311`.
 

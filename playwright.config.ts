@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const isStaging = process.env.BASE_URL?.includes('dev.ecommercehub')
+export const F37_CUSTOM_DOMAIN_TEST = /\[TC-F37-03-52\]/
 
 export default defineConfig({
     testDir: './e2e',
@@ -61,6 +62,7 @@ export default defineConfig({
             name: 'f37-regression',
             testDir: './tests',
             testMatch: /f37-ai-discoverability\.spec\.ts/,
+            grepInvert: F37_CUSTOM_DOMAIN_TEST,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: undefined,

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import playwrightConfig from '../../../../playwright.config'
+import customDomainPlaywrightConfig from '../../../../playwright.f37-custom-domain.config'
 
 const readWorkspaceFile = (path: string) =>
     readFileSync(resolve(process.cwd(), path), 'utf8')
@@ -19,16 +20,28 @@ describe('[TC-F37-03-49] F37-03 Playwright project', () => {
         const projects = playwrightConfig.projects ?? []
         const f37Projects = projects.filter(project => project.name === 'f37-regression')
         const f37Project = f37Projects[0]
+        const manualProjects = customDomainPlaywrightConfig.projects ?? []
+        const customDomainProjects = manualProjects.filter(
+            project => project.name === 'f37-custom-domain-manual',
+        )
+        const customDomainProject = customDomainProjects[0]
+        const manualSetupProjects = manualProjects.filter(project => project.name === 'setup')
         const storefrontProject = projects.find(project => project.name === 'storefront-regression')
         const redundantSpecVariables = discoverySpec.match(/process\.env\.E2E_F37_/g) ?? []
 
         // Assert
         expect(f37Projects).toHaveLength(1)
+        expect(projects.some(project => project.name === 'f37-custom-domain-manual')).toBe(false)
+        expect(customDomainProjects).toHaveLength(1)
+        expect(manualSetupProjects).toHaveLength(1)
         expect(redundantSpecVariables).toHaveLength(0)
         expect(stagingWorkflow).toContain('--project=storefront-regression')
         expect(stagingWorkflow).not.toContain('--project=f37-regression')
+        expect(stagingWorkflow).not.toContain('--project=f37-custom-domain-manual')
         expect(stagingWorkflow).not.toContain('E2E_F37_')
         expect(storefrontProject?.dependencies).toEqual(['f37-regression'])
+        expect(f37Project?.grepInvert).toEqual(/\[TC-F37-03-52\]/)
+        expect(customDomainProject?.grep).toEqual(/\[TC-F37-03-52\]/)
         expect(discoverySpec).toContain("await request.get('/api/users/me?include=site-status')")
         expect(discoverySpec).toContain("membership.status === 'active'")
         expect(discoverySpec).toContain('storageState: AUTH_STATE_PATH')
@@ -59,6 +72,12 @@ describe('[TC-F37-03-49] F37-03 Playwright project', () => {
         expect(discoverySpec).toContain('findEligibleCustomDomainTargets(')
         expect(f37Project?.dependencies).toEqual(['setup'])
         expect(f37Project?.use?.storageState).toBeUndefined()
+        expect(customDomainProject?.dependencies).toEqual(['setup'])
+        expect(customDomainProject?.use?.storageState).toBeUndefined()
+        expect(discoverySpec).toContain(
+            "testInfo.project.name === 'f37-custom-domain-manual'",
+        )
+        expect(discoverySpec).not.toMatch(/test\.(?:skip|fixme)\s*\(/)
     })
 })
 

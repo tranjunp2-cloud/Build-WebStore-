@@ -1,12 +1,13 @@
 # QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 4.0 | **Updated:** 2026-08-03 | **Owner:** QA Team
+> **Version:** 4.1 | **Updated:** 2026-08-04 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.6
 > **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (target scope US-F37-01..04)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v4.1 (2026-08-04)** — Kept the unchanged shared staging workflow and default Playwright Run All healthy while the real custom-domain fixture is unavailable: `storefront-regression → f37-regression → setup` runs TC-28/29 only, while `playwright.f37-custom-domain.config.ts` explicitly exposes `f37-custom-domain-manual → setup` for TC-52 without `skip`/`fixme`. Custom-domain DNS discovery runs only through that opt-in config; TC-49 guards the partition and TC-52 remains pending a live active-domain/product/blog fixture.
 - **v4.0 (2026-08-03)** — Closed PR #1719 review gaps: sitemap and llms successful responses now use `Cache-Control: no-store` so publish-state changes cannot remain stale at the CDN; both routes fetch every matching published page/product/blog with narrow field projections; `llms.txt` still emits at most 10 unique URLs after deterministic round-robin selection. Product/blog discovery rejects nested slugs that their single-segment detail routes cannot resolve, blog writes reject new nested slugs, and the account-derived site-status lookup reads at most two rows while enforcing the one-account/one-tenant/one-site invariant.
 
 - **v3.9 (2026-07-31)** — Reconciled TC-16 with TC-52: `llms.txt` keeps its 10-URL bound but selects oldest public pages, products, and blogs in deterministic round-robin order so an available content type cannot be starved by an earlier group.
@@ -225,10 +226,10 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-03-46** | AC-03 / FR-13..14 | Resilience | One endpoint failure does not change the others | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
 | **TC-F37-03-47** | FR-12..14 | Security | All routes reject inactive custom domains | `[x] AUTO` `public-discovery-route-matrix.test.ts` |
 | **TC-F37-03-48** | FR-14 | Security | Seller text stays inline and content slugs are encoded | `[x] AUTO` `llms-txt.test.ts` |
-| **TC-F37-03-49** | AC-01..03 / Config | Regression | Existing workflow selection reaches account-derived `f37-regression` through the storefront project dependency, without F37-specific env variables or shared-workflow changes; opt-in site status is restricted to active memberships | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts`, `api-users-me.test.ts` |
+| **TC-F37-03-49** | AC-01..03 / Config | Regression | Existing workflow selection reaches account-derived TC-28/29 through `storefront-regression → f37-regression → setup`; default Run All excludes TC-52, while `playwright.f37-custom-domain.config.ts` explicitly exposes `f37-custom-domain-manual → setup`; no F37-specific env variables or shared-workflow changes | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts`, `api-users-me.test.ts` |
 | **TC-F37-03-50** | FR-12 / Docs | Regression | Closeout docs do not reintroduce the retired crawler toggle, overclaim auto-meta removal, or reference deleted `SeoTools` | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
 | **TC-F37-03-51** | Ownership / Docs | Regression | Story Sync keeps #1311 route/UI-only and assigns 9/5/1 score integration to #1312 | `[x] AUTO` `f37-ai-discoverability-closeout.test.ts` |
-| **TC-F37-03-52** | AC-01 / FR-13..14 | Regression | Active custom-domain product/blog details resolve within the selected site; inactive domains are rejected; sitemap and llms must each advertise direct 200 product/blog renders on the custom origin | `[x] AUTO` `custom-domain-detail-routes.test.ts`, `tests/f37-ai-discoverability.spec.ts` — account-derived live run awaits an active custom domain |
+| **TC-F37-03-52** | AC-01 / FR-13..14 | Regression | Active custom-domain product/blog details resolve within the selected site; inactive domains are rejected; sitemap and llms must each advertise direct 200 product/blog renders on the custom origin | `[x] AUTO` `custom-domain-detail-routes.test.ts`; `[ ] MANUAL` `playwright.f37-custom-domain.config.ts` / `f37-custom-domain-manual` — opt-in and executable without skip/fixme, account-derived live run awaits an active custom domain with product/blog fixtures |
 
 **Score handoff:** #1312 must add score-level evidence that crawler/sitemap/llms contribute exactly 9/5/1, unpublished sites score 9/0/0, and sitemap/llms failures deduct independently. Those are US-F37-04 integration tests and do not block #1311 route/UI acceptance.
 
@@ -560,10 +561,11 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 | Gate | Latest evidence | Status |
 |---|---|---|
-| Focused US-F37-03 unit/config | 7 files, 65 tests | ✅ PASS |
+| Focused US-F37-03 unit/config | 12 files, 90 tests | ✅ PASS |
 | Full Vitest regression | 662 files, 11,114 tests | ✅ PASS |
 | TypeScript + lint | `npm run typecheck`; `npm run lint` | ✅ 0 errors; repository baseline warnings only |
-| Exact staging CI discovery | Unchanged selection reaches TC-28/29/52 via `storefront-regression → f37-regression → setup`; TC-30 via `chromium` | ✅ DISCOVERED |
+| Shared staging CI discovery | Unchanged selection reaches TC-28/29 via `storefront-regression → f37-regression → setup`; TC-30 via `chromium` | ✅ DISCOVERED |
+| Custom-domain live discovery | Opt-in `playwright.f37-custom-domain.config.ts` exposes `f37-custom-domain-manual → setup`; shared staging and default Run All do not select TC-52 | 🟡 DISCOVERED; live fixture pending |
 | Live public staging acceptance | TC-28/29 against `/sites/kedai-demo` and `/sites/e2e-test` | ✅ 2/2 PASS (2026-07-30) |
 | Live authenticated staging acceptance | TC-30 Dashboard seller-control absence | 🟡 Pending authenticated staging run |
 
@@ -600,6 +602,6 @@ The current F37 engine still uses legacy CWV/mobile/HTTPS placeholders. Rewire i
 
 ---
 
-**US-F37-03 Last Verified:** 2026-08-03 — focused F37/API coverage passed 79/79 across 10 files; typecheck and lint exited 0 (lint retains baseline warnings only). Playwright discovery reaches setup plus TC-28/29/52 and setup plus TC-30 without dedicated F37 environment variables or workflow changes. The single-site account-backed local run passed TC-28/29 and restored the initial site status; local custom-domain route simulation passed, while real DNS/TLS evidence for TC-52 still requires an active custom domain and authenticated staging TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.
+**US-F37-03 Last Verified:** 2026-08-04 — focused F37/API coverage passed 90/90 across 12 files; typecheck and lint exited 0 (lint retains baseline warnings only). Shared Playwright discovery reaches setup plus TC-28/29 without dedicated F37 environment variables or workflow changes; default Run All excludes TC-52, while opt-in `playwright.f37-custom-domain.config.ts` reaches setup plus TC-52 without skip/fixme. The single-site account-backed local run passed TC-28/29 and restored the initial site status; local custom-domain route simulation passed, while real DNS/TLS evidence for TC-52 still requires an active custom domain and authenticated staging TC-30 remains pending. Exact score 9/5/1 is handed off to #1312 and is outside #1311 implementation scope.
 
 **US-F37-01 Last Verified:** 2026-07-30 (the score API regression covers persisted 20/12 plus 401/403 while preserving legacy Business = 35. The guarded local Playwright run passes auth setup plus TC-F37-01-26/27 **3/3** with fixture restoration; no live staging E2E pass is claimed. #1312 retains the atomic F37 §5 top-level 20/35/15/30 and dashboard/checklist cutover.)

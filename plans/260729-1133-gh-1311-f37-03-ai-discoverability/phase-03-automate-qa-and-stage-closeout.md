@@ -21,7 +21,7 @@ Reconcile the docs left inconsistent after PR #1677 merged, turn the approved v2
 
 ## Key Insights
 
-- Repository Playwright root tests live under `e2e/`; F37 therefore uses a dedicated `f37-regression` project under `tests/` with an auth-setup dependency for account-scoped fixture discovery.
+- Repository Playwright root tests live under `e2e/`; F37 therefore uses `f37-regression` in the default config for shared TC-28/29 and `f37-custom-domain-manual` in the opt-in `playwright.f37-custom-domain.config.ts` for TC-52. Both point at `tests/` and depend on auth setup for account-scoped fixture discovery.
 - A skipped test or a file absent from `--list` is not acceptance coverage.
 - #1311 closes on route/UI acceptance; #1312 separately owns 9/5/1 attribution and the complete 100-point scorecard.
 - PRD v2.6 is canonical. Stories still describe seller opt-out; QA references stale `AC-6`/`BR-09`, requires `>=5` URLs, and registers only `TC-F37-03-01..09` while implementation uses IDs through `TC-F37-03-48`.
@@ -31,7 +31,7 @@ Reconcile the docs left inconsistent after PR #1677 merged, turn the approved v2
 - Follow `docs/TEST_CONVENTION.md`, AAA, source imports, top-level `vi.mock()`, and a reconciled one-to-one TC-ID registry.
 - Add narrowly scoped real-browser acceptance hardening for published public routes and seller-control absence.
 - Use the dedicated account's single tenant/site fixture, transition only its `status` through a guarded E2E-only route for published/unpublished cases, and verify/restore its initial state.
-- Configure a dedicated Playwright project reached by the workflow-selected `storefront-regression` project via dependency so the new spec runs against staging without changing shared workflows.
+- Keep shared TC-28/29 reachable through the workflow-selected `storefront-regression → f37-regression` dependency, and register TC-52 only in the opt-in custom-domain config without changing shared workflows or silently skipping the missing live fixture.
 - Do not silently skip when required staging data or origin is absent; fail setup or report the run as not executed.
 - Align Stories, QA, and blocker tracking to the merged PRD v2.6 before acceptance closeout.
 
@@ -45,6 +45,7 @@ Unit tests own branch-level route and serialization behavior. Playwright owns de
 
 - `tests/f37-ai-discoverability.spec.ts`
 - `src/app/api/e2e/site-status/route.ts`
+- `playwright.f37-custom-domain.config.ts`
 
 ### Modify
 
@@ -72,7 +73,7 @@ Unit tests own branch-level route and serialization behavior. Playwright owns de
 4. Add a public Playwright spec against a stable storefront origin: robots 200 and approved assistants allowed; scraper blocked; sitemap 200 with storefront URLs; `llms.txt` 200 with UTF-8 Markdown, H1, and only real public links.
 5. Cover published and unpublished route states by temporarily changing only the dedicated QA site's `status` through the guarded E2E route and verifying/restoring it in `finally`; keep legacy-false behavior in route-level tests.
 6. Add an authenticated Dashboard assertion that the retired SEO Action Tools controls/actions are absent; do not assert removal of the separate SEO-page auto-meta control.
-7. Expand `storefront-regression.testMatch` (or create a narrowly scoped F37 project), prove discovery with `--list`, then run focused unit tests, typecheck, lint, migration validation, Playwright staging checks, and the full unit suite.
+7. Keep a narrowly scoped shared F37 project for TC-28/29 and expose TC-52 only through the opt-in custom-domain config, prove both partitions with `--list`, then run focused unit tests, typecheck, lint, migration validation, Playwright staging checks, and the full unit suite.
 8. Update QA evidence/changelog and request #1312 integration evidence for independent 9/5/1 scoring.
 
 ## Todo
@@ -81,9 +82,9 @@ Unit tests own branch-level route and serialization behavior. Playwright owns de
 - [x] Reconcile unique F37-03 TC IDs as official `TC-F37-03-01..52` coverage.
 - [x] Remove stale QA/Open Blockers wording and update implementation evidence.
 - [x] Ensure `TEST_EMAIL` has exactly one active tenant and one site; discover both from the authenticated profile and use the server-configured `TEST_EMAIL` identity plus authenticated tenant ownership to update only `status`, then verify/restore the initial state after each acceptance case.
-- [x] Add the public-route Playwright spec and wire `storefront-regression → f37-regression → setup` so the unchanged CI selection executes it while setup auth remains limited to fixture discovery.
+- [x] Add the public-route Playwright spec; wire `storefront-regression → f37-regression → setup` for TC-28/29 and register `f37-custom-domain-manual → setup` only in `playwright.f37-custom-domain.config.ts` so unchanged CI and default Run All remain healthy while the pending case stays executable.
 - [x] Complete one combined account-derived run: setup, TC-28, and TC-29 passed against the same site on 2026-07-31, with its initial draft state restored. The earlier path-variable run also passed 2/2.
-- [ ] Run TC-52 on the primary active custom domain discovered from `TEST_EMAIL`.
+- [ ] Run `f37-custom-domain-manual` from `playwright.f37-custom-domain.config.ts` on an active custom domain discovered from `TEST_EMAIL` after product/blog fixtures exist.
 - [x] Add authenticated Dashboard absence assertion and verify `chromium` discovery includes TC-30.
 - [ ] Run authenticated Dashboard absence scenario on staging (TC-30).
 - [x] Synchronize QA implementation evidence and changelog.
@@ -101,7 +102,7 @@ Unit tests own branch-level route and serialization behavior. Playwright owns de
 - Final post-review validation: focused 6 files 62/62; full Vitest 661 files 11,111/11,111; typecheck 0 errors; lint 0 errors/139 warnings; migration and `git diff --check` passed. Storefront discovery listed 4 tests in 2 specs including TC-28/29; authenticated Dashboard discovery listed 7 tests in 2 files including setup and TC-30.
 - Live public staging Playwright TC-28/29 passed 2/2 on 2026-07-30 against `/sites/kedai-demo` and `/sites/e2e-test`. The account-derived local run passed setup plus TC-28 and TC-29 against the same site on 2026-07-31 and restored its initial draft state. Authenticated TC-30 remains pending.
 - Finding-closeout validation: focused F37/config 7 files 65/65; full Vitest 662 files 11,114/11,114; flaky unrelated AI timeout rerun 75/75 then full suite green; typecheck 0 errors; lint 0 errors/139 baseline warnings; migration guard passed; TC-28/29 live staging 2/2; TC-30 discovered and awaiting authenticated staging execution.
-- Fixture discovery enforces the product invariant of one hydrated active tenant and one owned site, using an opt-in tenant-scoped site-status summary from `/api/users/me?include=site-status`, avoiding protected tenant/site collection calls that return 404 for the E2E user, extra work on normal profile requests, and self-fulfilling classification from the routes under test. Custom-domain probes require HTTPS public DNS, pin Chromium to the validated IP, block cross-origin requests before network, try every active domain deterministically, and preserve diagnostics. TC-52 fails only its own case when `TEST_EMAIL` lacks an active custom domain or advertised product/blog detail; live execution remains pending that account fixture.
+- Fixture discovery enforces the product invariant of one hydrated active tenant and one owned site, using an opt-in tenant-scoped site-status summary from `/api/users/me?include=site-status`, avoiding protected tenant/site collection calls that return 404 for the E2E user, extra work on normal profile requests, and self-fulfilling classification from the routes under test. Shared TC-28/29 do not perform custom-domain DNS discovery. The manual TC-52 project requires HTTPS public DNS, pins Chromium to the validated IP, blocks cross-origin requests before network, tries every active domain deterministically, and fails closed when the account lacks an active domain or advertised product/blog detail; live execution remains pending that fixture.
 - #1312 exact crawler 9 / sitemap 5 / `llms.txt` 1 integration evidence remains external.
 
 ## Validation Commands
@@ -113,6 +114,8 @@ npm run lint
 node scripts/check-migrations.js origin/staging
 npx playwright test --project=f37-regression --list
 npx playwright test tests/f37-ai-discoverability.spec.ts --project=f37-regression
+npx playwright test --config=playwright.f37-custom-domain.config.ts --project=f37-custom-domain-manual --list
+npx playwright test --config=playwright.f37-custom-domain.config.ts tests/f37-ai-discoverability.spec.ts --project=f37-custom-domain-manual
 npm test
 git diff --check
 ```
@@ -120,14 +123,14 @@ git diff --check
 ## Success Criteria
 
 - Focused and full unit suites, typecheck, lint, and migration validation pass.
-- `--list` includes every new F37-03 Playwright scenario and the staging run passes without permanent skips.
+- Shared `--list` includes TC-28/29 and excludes TC-52; manual `--list` includes TC-52, and neither path uses permanent skips.
 - QA IDs map one-to-one to executable coverage; Stories, QA, PRD DoD, and Open Blockers no longer describe stale seller-toggle or fabricated minimum-URL contracts.
 - #1311 route/UI acceptance is independently reviewable; #1312 receives a documented crawler/sitemap/`llms.txt` fact contract for later 9/5/1 integration.
 - PR title is `feat(F37): [US-F37-03] platform-managed AI discoverability`; body says `Relates to #1311`.
 
 ## Risk Assessment
 
-- CI could omit the spec if the project dependency is severed; TC-49 guards both the unchanged workflow selection and `storefront-regression → f37-regression`, while the exact workflow `--list` remains explicit evidence.
+- CI could regress by reattaching TC-52 or omitting TC-28/29; TC-49 guards the unchanged workflow selection, `storefront-regression → f37-regression`, the TC-52 grep partition, and the separate opt-in manual config while both `--list` commands remain executable evidence.
 - Shared F37 docs remain conflict-prone; start from latest staging and coordinate any overlap with #1708 before editing.
 - Staging instability can create false negatives; use seeded fixtures and record exact URLs/build SHA.
 

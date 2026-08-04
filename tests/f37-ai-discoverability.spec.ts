@@ -269,6 +269,7 @@ async function discoverFixtures(
     request: APIRequestContext,
     expectedEmail: string,
     platformOrigin: string,
+    includeCustomDomains: boolean,
 ): Promise<DiscoveryFixtures> {
     if (!expectedEmail) {
         throw new Error('TEST_EMAIL is required to discover the F37 staging fixtures')
@@ -321,10 +322,12 @@ async function discoverFixtures(
         initiallyPublished: ownedSite.status === 'published',
     }
 
-    const customDomain = await findEligibleCustomDomainTargets(
-        fixture,
-        platformOrigin,
-    )
+    const customDomain = includeCustomDomains
+        ? await findEligibleCustomDomainTargets(fixture, platformOrigin)
+        : {
+            targets: [],
+            error: 'custom-domain fixture discovery is reserved for f37-custom-domain-manual',
+        }
 
     return {
         site: fixture,
@@ -489,7 +492,7 @@ test.describe('F37-03 platform-managed AI discoverability', () => {
     let customDomainTargets: CustomDomainTarget[] = []
     let customDomainError: string | undefined
 
-    test.beforeAll(async ({ playwright }) => {
+    test.beforeAll(async ({ playwright }, testInfo) => {
         const baseURL = requireStorefrontOrigin('BASE_URL', PLATFORM_BASE_URL)
         authenticatedRequest = await playwright.request.newContext({
             baseURL,
@@ -499,6 +502,7 @@ test.describe('F37-03 platform-managed AI discoverability', () => {
             authenticatedRequest,
             EXPECTED_TEST_EMAIL ?? '',
             baseURL,
+            testInfo.project.name === 'f37-custom-domain-manual',
         )
         siteFixture = fixtures.site
         customDomainTargets = fixtures.customDomainTargets
