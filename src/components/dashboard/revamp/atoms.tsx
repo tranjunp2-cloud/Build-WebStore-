@@ -2,12 +2,12 @@
 
 /**
  * Shared atoms for the single-column dashboard revamp.
- * Ports the design's SectionHead / Delta / ComingSoon / HelpTip primitives.
+ * Ports the design's SectionHead / Delta / ComingSoon primitives.
  * Styling comes from dashboard-revamp.css (class names kept identical to the design).
  */
 import type { ReactNode } from 'react'
 import {
-    LayoutGrid, BarChart3, SearchCheck, Wrench, PackageCheck, ListChecks,
+    LayoutGrid, BarChart3, SearchCheck, PackageCheck, ListChecks,
     TrendingUp, TrendingDown, Minus, Clock, Info, type LucideIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -18,7 +18,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
     'layout-grid': LayoutGrid,
     'bar-chart-3': BarChart3,
     'search-check': SearchCheck,
-    wrench: Wrench,
     'package-check': PackageCheck,
     'list-checks': ListChecks,
 }
@@ -125,11 +124,5 @@ export function ComingSoonLock({ children, label, tip }: { children: ReactNode; 
             <ComingSoonCorner label={label} tip={tip} />
             <div className="cs-lockzone" />
         </div>
-    )
-}
-
-export function HelpTip({ tip }: { tip: string }) {
-    return (
-        <span className="help-tip" data-tip={tip}><Info aria-hidden /></span>
     )
 }

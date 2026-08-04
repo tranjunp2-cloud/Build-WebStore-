@@ -3162,30 +3162,6 @@
                     "other": "items missing a meta title"
                 }
             },
-            "tools": {
-                "title": "SEO action tools",
-                "subtitle": "AI works quietly in the background so customers can find your store on Google",
-                "sitemap": "Sitemap",
-                "sitemapTip": "A sitemap lists every page in your store. We hand it to Google so it can find and list all your products.",
-                "sitemapDesc": "Submit your sitemap so Google can discover and index all your pages.",
-                "resubmit": "Resubmit to Google",
-                "autoMeta": "Auto-write search titles & descriptions",
-                "autoMetaTip": "This is the headline customers see on Google. AI writes a short, tempting one for every page automatically.",
-                "autoMetaDesc": "AI writes short, catchy titles that draw customers in when they search on Google.",
-                "active": "Active",
-                "sitemapDone": "Sitemap submitted — {count} URLs sent to Google",
-                "sitemapRegenerated": "Sitemap regenerated",
-                "sitemapError": "Could not generate sitemap",
-                "metaOn": "Auto meta tags turned on",
-                "metaOff": "Auto meta tags turned off",
-                "metaError": "Could not update setting",
-                "aiCrawlers": "Allow AI crawlers to index your website",
-                "aiCrawlersTip": "Lets AI assistants like ChatGPT, Perplexity and Gemini read your store so they can recommend your business.",
-                "aiCrawlersDesc": "Allows GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront so ChatGPT/Perplexity/Gemini can recommend your business.",
-                "aiCrawlersOn": "AI crawlers turned on",
-                "aiCrawlersOff": "AI crawlers turned off",
-                "aiCrawlersError": "Could not update setting"
-            },
             "orders": {
                 "title": "Pending orders",
                 "subtitle": "Orders awaiting fulfilment",
@@ -3221,7 +3197,6 @@
                 "blockGlance": "At-a-glance stats",
                 "blockTraffic": "Traffic & performance",
                 "blockSeo": "SEO health",
-                "blockTools": "SEO action tools",
                 "blockOrders": "Pending orders"
             }
         }
@@ -4351,6 +4326,10 @@
             "address": "Address",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "localBusinessInfo": "Local Business Info",
+            "localBusinessSaveUnknownTitle": "Could not confirm whether local business information was saved.",
+            "localBusinessSaveUnknownDescription": "Reload the editor before editing local business information again.",
+            "localBusinessSaveLockedTitle": "Local business editing is temporarily locked.",
+            "localBusinessSaveLockedDescription": "Reload the editor to confirm the last save before continuing.",
             "addressGroupLabel": "Address",
             "streetAddress": "Street Address",
             "streetAddressPlaceholder": "123 Jalan Bukit Bintang",
@@ -4382,6 +4361,11 @@
             "categoryOfferGroupLabel": "Category & Offer",
             "businessCategory": "Business Category",
             "selectCategory": "-- Select category --",
+            "schemaSubtype": "Schema subtype",
+            "selectSchemaSubtype": "-- Select compatible type --",
+            "schemaSubtypeDisabledHint": "Select a business category first.",
+            "schemaSubtypeUnavailableHint": "The generic Local Business category uses LocalBusiness directly and has no schema subtype.",
+            "schemaSubtypeInvalid": "This schema subtype is not compatible with the selected business category. Choose another type.",
             "priceRange": "Price Range",
             "selectPriceRange": "-- Select price range --",
             "serviceAreaDescription": "Service Area",

@@ -17,19 +17,22 @@ import { GET as getRobotsTxt } from '@/app/sites/[slug]/robots.txt/route'
 /**
  * TC-F37-03: AI Crawler Permissions in robots.txt
  *
- * Tests the robots.txt route behavior when aiCrawlersEnabled toggle
- * is true (default), false, or undefined. Also verifies scraper bots
- * are always blocked regardless of toggle state.
+ * Tests the platform-managed crawler invariant, including legacy site values
+ * that must no longer influence robots output. Scraper bots remain blocked.
  */
-describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
+describe('[TC-F37-03] platform-managed robots.txt', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // The route no longer consumes the legacy sites lookup. Reset queued
+        // one-time results so an unused site fixture cannot leak into the next
+        // test's tenant lookup.
+        mockFind.mockReset()
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-01: Default allow (toggle ON)
+    // TC-F37-03-01: Approved AI assistants are always allowed
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-01: allows AI crawlers when aiCrawlersEnabled=true', async () => {
+    it('TC-F37-03-01: always allows approved AI crawlers', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -74,9 +77,9 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-02: Default allow (toggle UNDEFINED)
+    // TC-F37-03-02: Legacy undefined value is non-authoritative
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-02: allows AI crawlers when aiCrawlersEnabled undefined (defaults to true)', async () => {
+    it('TC-F37-03-02: allows AI crawlers when the legacy value is undefined', async () => {
         // Arrange — site without explicit toggle (legacy data)
         const mockTenant = { id: 'tenant-1', slug: 'oldshop' }
         const mockSite = {
@@ -106,9 +109,9 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-03: Opt-out (toggle OFF)
+    // TC-F37-03-03: Persisted legacy false cannot block approved assistants
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-03: blocks AI crawlers when aiCrawlersEnabled=false', async () => {
+    it('TC-F37-03-03: ignores a persisted legacy aiCrawlersEnabled=false value', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'private-shop' }
         const mockSite = {
@@ -133,13 +136,14 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
 
         // Assert
         expect(response.status).toBe(200)
+        expect(mockFind).toHaveBeenCalledTimes(1)
 
-        // Each AI bot should have Disallow: /
-        expect(body).toMatch(/User-agent: GPTBot\nDisallow: \//)
-        expect(body).toMatch(/User-agent: ClaudeBot\nDisallow: \//)
-        expect(body).toMatch(/User-agent: Google-Extended\nDisallow: \//)
-        expect(body).toMatch(/User-agent: PerplexityBot\nDisallow: \//)
-        expect(body).toMatch(/User-agent: CCBot\nDisallow: \//)
+        // Legacy state is inert: all approved assistants keep the platform policy.
+        expect(body).toMatch(/User-agent: GPTBot\nAllow: \//)
+        expect(body).toMatch(/User-agent: ClaudeBot\nAllow: \//)
+        expect(body).toMatch(/User-agent: Google-Extended\nAllow: \//)
+        expect(body).toMatch(/User-agent: PerplexityBot\nAllow: \//)
+        expect(body).toMatch(/User-agent: CCBot\nAllow: \//)
     })
 
     // ────────────────────────────────────────────────────────────────
@@ -207,9 +211,9 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-06: Scraper bots always blocked (toggle ON)
+    // TC-F37-03-06: Scraper bots remain blocked with legacy true
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-06: always blocks scraper bots when toggle ON', async () => {
+    it('TC-F37-03-06: blocks scraper bots when the legacy value is true', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -232,7 +236,7 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
         )
         const body = await response.text()
 
-        // Assert — all scraper bots should have Disallow: / regardless of toggle
+        // Assert — all scraper bots remain outside the approved assistant policy.
         expect(body).toMatch(/User-agent: Amazonbot\nDisallow: \//)
         expect(body).toMatch(/User-agent: Applebot-Extended\nDisallow: \//)
         expect(body).toMatch(/User-agent: Bytespider\nDisallow: \//)
@@ -241,9 +245,9 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-07: Scraper bots always blocked (toggle OFF)
+    // TC-F37-03-07: Scraper bots remain blocked with legacy false
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-07: always blocks scraper bots when toggle OFF', async () => {
+    it('TC-F37-03-07: blocks scraper bots when the legacy value is false', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'private' }
         const mockSite = {
@@ -292,9 +296,9 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-09: Default allow when published site not found (BR-03)
+    // TC-F37-03-09: Default allow when published site not found
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-09: defaults to allow when published site not found (BR-03)', async () => {
+    it('TC-F37-03-09: defaults to allow when published site not found', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         mockFind
@@ -385,11 +389,11 @@ describe('[TC-F37-03] robots.txt with AI crawler toggle', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-47: AI-bot groups repeat /api//admin/ exclusions when allowed
+    // TC-F37-03-36: AI-bot groups repeat /api//admin/ exclusions when allowed
     // (RFC 9309 §2.2.1 — a crawler applies only its own most-specific group,
     // ignoring User-agent: * entirely, so the exclusions must be per-group)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-47: AI bot groups include Disallow: /api/ and /admin/ when allowed', async () => {
+    it('TC-F37-03-36: AI bot groups include Disallow: /api/ and /admin/ when allowed', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {

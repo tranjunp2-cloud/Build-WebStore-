@@ -89,6 +89,14 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
     return data
 }
 
+export function validateBlogSlug(value: unknown): true | string {
+    if (typeof value !== 'string' || !value.trim()) return 'Slug is required'
+    if (value === '.' || value === '..' || value.includes('/')) {
+        return 'Blog slug must be a single URL segment'
+    }
+    return true
+}
+
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
     hooks: {
@@ -187,6 +195,7 @@ export const Blogs: CollectionConfig = {
             required: true,
             unique: true,
             index: true,
+            validate: validateBlogSlug,
         },
         {
             name: 'content',

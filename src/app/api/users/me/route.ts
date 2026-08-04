@@ -9,6 +9,21 @@ import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 
 export const runtime = 'nodejs'
 
+type RelationshipValue = string | number | { id?: string | number } | null
+
+interface TenantMembershipValue {
+    tenant?: RelationshipValue
+    status?: string
+}
+
+function relationshipId(value: RelationshipValue | undefined): string | null {
+    if (typeof value === 'string' || typeof value === 'number') return String(value)
+    if (!value || typeof value !== 'object') return null
+    return typeof value.id === 'string' || typeof value.id === 'number'
+        ? String(value.id)
+        : null
+}
+
 export async function GET(_req: NextRequest) {
     try {
         const user = await getCurrentUser()
@@ -23,6 +38,29 @@ export async function GET(_req: NextRequest) {
             depth: 1,
         }) as unknown as Record<string, unknown>
 
+        const includeSiteStatus = _req.nextUrl.searchParams.get('include') === 'site-status'
+        const memberships = Array.isArray(doc.tenants)
+            ? doc.tenants as TenantMembershipValue[]
+            : []
+        const activeTenantIds = Array.from(new Set(
+            memberships
+                .filter(membership => membership.status === 'active')
+                .map(membership => relationshipId(membership.tenant))
+                .filter((id): id is string => Boolean(id)),
+        ))
+        const siteDocs = includeSiteStatus && activeTenantIds.length > 0
+            ? (await payload.find({
+                collection: 'sites',
+                depth: 0,
+                limit: 2,
+                overrideAccess: true,
+                pagination: false,
+                sort: 'createdAt',
+                where: { tenant: { in: activeTenantIds } },
+                select: { tenant: true, status: true },
+            })).docs as unknown as Array<Record<string, unknown>>
+            : []
+
         return NextResponse.json({
             id: doc.id,
             email: doc.email,
@@ -32,6 +70,13 @@ export async function GET(_req: NextRequest) {
             avatar: doc.avatar,
             roles: doc.roles,
             tenants: doc.tenants,
+            sites: includeSiteStatus
+                ? siteDocs.map(site => ({
+                    id: site.id,
+                    tenant: site.tenant,
+                    status: site.status,
+                }))
+                : undefined,
             createdAt: doc.createdAt,
             lastLoginAt: doc.lastLoginAt,
         })

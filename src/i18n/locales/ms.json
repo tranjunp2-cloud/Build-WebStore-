@@ -3162,30 +3162,6 @@
                     "other": "item tiada tajuk meta"
                 }
             },
-            "tools": {
-                "title": "Alat tindakan SEO",
-                "subtitle": "AI bekerja secara senyap di latar belakang supaya pelanggan dapat menemui kedai anda di Google",
-                "sitemap": "Peta laman",
-                "sitemapTip": "Peta laman menyenaraikan setiap halaman dalam kedai anda. Kami menyerahkannya kepada Google supaya ia dapat mencari dan menyenaraikan semua produk anda.",
-                "sitemapDesc": "Serahkan peta laman anda supaya Google dapat menemui dan mengindeks semua halaman anda.",
-                "resubmit": "Serah semula ke Google",
-                "autoMeta": "Tulis tajuk & penerangan carian secara automatik",
-                "autoMetaTip": "Inilah tajuk yang pelanggan lihat di Google. AI menulis tajuk yang ringkas dan menarik untuk setiap halaman secara automatik.",
-                "autoMetaDesc": "AI menulis tajuk ringkas dan menarik yang memikat pelanggan apabila mereka mencari di Google.",
-                "active": "Aktif",
-                "sitemapDone": "Peta laman diserahkan — {count} URL dihantar ke Google",
-                "sitemapRegenerated": "Peta laman dijana semula",
-                "sitemapError": "Tidak dapat menjana peta laman",
-                "metaOn": "Tag meta automatik dihidupkan",
-                "metaOff": "Tag meta automatik dimatikan",
-                "metaError": "Tidak dapat mengemas kini tetapan",
-                "aiCrawlers": "Benarkan crawler AI mengindeks laman web anda",
-                "aiCrawlersTip": "Membolehkan pembantu AI seperti ChatGPT, Perplexity dan Gemini membaca kedai anda supaya mereka boleh mengesyorkan perniagaan anda.",
-                "aiCrawlersDesc": "Membenarkan GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot mengindeks laman ini supaya ChatGPT/Perplexity/Gemini boleh mengesyorkan perniagaan anda.",
-                "aiCrawlersOn": "Crawler AI dihidupkan",
-                "aiCrawlersOff": "Crawler AI dimatikan",
-                "aiCrawlersError": "Tidak dapat mengemas kini tetapan"
-            },
             "orders": {
                 "title": "Pesanan belum selesai",
                 "subtitle": "Pesanan menunggu pemenuhan",
@@ -3221,7 +3197,6 @@
                 "blockGlance": "Statistik sekilas pandang",
                 "blockTraffic": "Trafik & prestasi",
                 "blockSeo": "Kesihatan SEO",
-                "blockTools": "Alat tindakan SEO",
                 "blockOrders": "Pesanan belum selesai"
             }
         }
@@ -4351,6 +4326,10 @@
             "address": "Alamat",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "localBusinessInfo": "Maklumat Perniagaan Tempatan",
+            "localBusinessSaveUnknownTitle": "Tidak dapat mengesahkan sama ada maklumat perniagaan tempatan telah disimpan.",
+            "localBusinessSaveUnknownDescription": "Muat semula editor sebelum mengedit maklumat perniagaan tempatan sekali lagi.",
+            "localBusinessSaveLockedTitle": "Penyuntingan perniagaan tempatan dikunci buat sementara waktu.",
+            "localBusinessSaveLockedDescription": "Muat semula editor untuk mengesahkan simpanan terakhir sebelum meneruskan.",
             "addressGroupLabel": "Alamat",
             "streetAddress": "Alamat Jalan",
             "streetAddressPlaceholder": "123 Jalan Bukit Bintang",
@@ -4382,6 +4361,11 @@
             "categoryOfferGroupLabel": "Kategori & Tawaran",
             "businessCategory": "Kategori Perniagaan",
             "selectCategory": "-- Pilih kategori --",
+            "schemaSubtype": "Subjenis skema",
+            "selectSchemaSubtype": "-- Pilih jenis yang serasi --",
+            "schemaSubtypeDisabledHint": "Pilih kategori perniagaan terlebih dahulu.",
+            "schemaSubtypeUnavailableHint": "Kategori Perniagaan Tempatan generik menggunakan LocalBusiness secara langsung dan tidak mempunyai subjenis skema.",
+            "schemaSubtypeInvalid": "Subjenis skema ini tidak serasi dengan kategori perniagaan yang dipilih. Pilih jenis lain.",
             "priceRange": "Julat Harga",
             "selectPriceRange": "-- Pilih julat harga --",
             "serviceAreaDescription": "Kawasan Perkhidmatan",

@@ -58,14 +58,14 @@ THEN save is rejected with validation feedback
 
 ## US-F37-02: Schema-Rich Local Markup
 
-**Wave 4** | **P0** | **M** | **Status:** Ready
+**Wave 4** | **P0** | **M** | **Status:** In progress — Phase 00–02 built/tested; Phase 03 acceptance pending
 
 ### Story
 
 ```
 As a   SME seller
-I want hours, category, map coordinates, price range, and FAQ content to power JSON-LD
-So that search and AI systems receive complete LocalBusiness and FAQPage markup and I earn Schema points
+I want hours, business category, a compatible schema subtype, map coordinates, and price range to power JSON-LD
+So that search and AI systems receive complete LocalBusiness and Organization markup and I earn Schema points
 ```
 
 ### Acceptance Criteria
@@ -73,19 +73,19 @@ So that search and AI systems receive complete LocalBusiness and FAQPage markup 
 #### AC-1: Emit complete LocalBusiness markup
 
 ```gherkin
-GIVEN name and address, at least one open-hours row, a specific category, valid latitude and longitude, and priceRange
+GIVEN name and address, business category, a compatible specific schema subtype, at least one open-hours row, valid latitude and longitude, and priceRange
 WHEN the storefront homepage is rendered
-THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and a non-generic @type
+THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and the selected @type
   AND the corresponding Schema points are earned
 ```
 
-#### AC-2: Emit FAQPage markup
+#### AC-2: Omit unusable opening hours
 
 ```gherkin
-GIVEN a page with FAQ block items
-WHEN that page is rendered
-THEN FAQPage JSON-LD is present
-  AND FAQ Schema points are earned
+GIVEN all opening-hours rows are closed or incomplete
+WHEN score calculation and JSON-LD emission run
+THEN openingHoursSpecification is omitted
+  AND opening-hours points are 0 while other valid Schema points remain earned
 ```
 
 #### AC-3: Omit incomplete coordinates safely
@@ -97,11 +97,25 @@ THEN geo is omitted from JSON-LD
   AND Geo points are 0 without a crash
 ```
 
+#### AC-4: Reject an incompatible subtype
+
+```gherkin
+GIVEN a schema subtype is incompatible with the selected business category
+WHEN the seller saves
+THEN the save is rejected and the previous valid pair remains
+  AND the invalid @type is not emitted
+```
+
 ### Definition of Done
 
-- [ ] FR-04 through FR-12 emit only valid, safely serialized tenant-storefront schema.
-- [ ] The score maps every Schema criterion in PRD section 5 point-for-point.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [x] FR-04 through FR-11 emit only valid, safely serialized tenant-storefront schema.
+- [x] Schema score maps the eight approved criteria to exactly 35 points; FAQ is not scored.
+- [x] Category/subtype persistence, filtering, atomic save, server validation, and generic fallback match the `@dominvopc`-approved versioned mapping.
+- [x] TC-F37-02-29..48 automated coverage passes locally. The TC-F37-02-48 targeted gate passes 65/65; a broader related run has 245 passing assertions, while 3 DB-backed schema-drift checks are environment-blocked because PostgreSQL is not running. The migration suite passes 24/24.
+- [x] TC-F37-02-45 automation discovers the authenticated account sole site, derives the canonical storefront URL from the tenant route/hostname, and asserts emitted schema URLs are non-empty and equal that canonical URL; it uses the existing email, password, and OTP credentials and does not require `E2E_SITE_ID`.
+- [x] TC-F37-02-47 covers rejected settings-save rollback, newer-revision preservation, and late cross-site failure isolation in `publish-flow.test.tsx` (21/21 local).
+- [x] TC-F37-02-48 covers normalized response-loss reconciliation, a bounded 5-second reconciliation timeout, unknown-outcome caller failure and cross-mount UI lock, queued-revision removal, and combined subtype a11y descriptions.
+- [ ] Execute TC-F37-02-45 against the owned staging fixture and capture manual Google Rich Results evidence. PR #1708 is not a dependency or blocker; reconcile it only if it lands first.
 
 ---
 
@@ -113,45 +127,49 @@ THEN geo is omitted from JSON-LD
 
 ```
 As a   SME seller
-I want AI crawler access on by default, with opt-out, and publishing to expose sitemap and llms.txt
-So that AI Discoverability points reflect real crawl access
+I want the platform to maintain AI crawler access automatically and publish to expose sitemap and llms.txt
+So that discoverability does not require technical settings
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Expose published-storefront discovery endpoints
+#### AC-01: Published storefront exposes every discovery signal
 
 ```gherkin
-GIVEN a published site with AI crawlers enabled by default
-WHEN robots.txt, sitemap.xml, and llms.txt are requested for the storefront
-THEN AI bots are allowed
-  AND sitemap returns URLs and llms.txt returns Markdown
-  AND full AI Discoverability points are available
+GIVEN a published storefront
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawlers are allowed
+  AND sitemap returns current URLs
+  AND llms.txt returns Markdown
 ```
 
-#### AC-2: Let the seller opt out of AI crawlers
+#### AC-02: Unpublished storefront hides publish-only discovery files
 
 ```gherkin
-GIVEN the seller turns AI crawlers off
-WHEN robots.txt is fetched
-THEN configured AI user-agents are disallowed
-  AND AI crawler points are 0
+GIVEN a storefront is not published
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawler access remains allowed
+  AND sitemap returns 404
+  AND llms.txt returns 404
 ```
 
-#### AC-3: Do not count an unpublished sitemap
+#### AC-03: Discovery endpoint failures are independent
 
 ```gherkin
-GIVEN the site is not published
-WHEN sitemap availability is evaluated
-THEN sitemap is not available as a present signal
-  AND Sitemap points are 0
+GIVEN a published storefront cannot serve sitemap.xml or llms.txt
+WHEN the discovery endpoints are requested
+THEN the other available discovery endpoints keep their normal behavior
+  AND no seller-facing resubmit control is shown
 ```
+
+> **Score ownership: #1312** — US-F37-04 consumes these route facts, awards crawler/sitemap/llms exactly 9/5/1, and integrates the approved 100-point scorecard. Score-engine changes are not part of #1311.
 
 ### Definition of Done
 
-- [ ] FR-13 through FR-15 work only below `/sites/[slug]/*`.
-- [ ] Robots, sitemap, and llms.txt behaviour is covered for published, unpublished, and opt-out states.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [ ] FR-12 through FR-14 expose platform-managed robots, sitemap, and llms.txt below `/sites/[slug]/*` and through supported storefront host rewrites.
+- [ ] Approved AI assistant crawlers are always allowed; no seller toggle, resubmit action, or SEO Action Tools section remains.
+- [ ] Published, unpublished, legacy-value, and independent endpoint-failure states have automated coverage.
+- [ ] The route/UI acceptance criteria above have automated or manual coverage; the score handoff is documented for #1312.
 
 ---
 
