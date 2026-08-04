@@ -20,6 +20,7 @@ vi.mock('lucide-react', () => ({
     ZoomIn: () => null,
     X: () => null,
     RotateCcw: () => <span data-testid="refund-icon" />,
+    Check: () => <span data-testid="order-progress-check-icon" />,
 }))
 
 vi.mock('@/app/(dashboard)/orders/_components/CancelOrderModal', () => ({ CancelOrderModal: () => null }))
@@ -53,6 +54,74 @@ describe('OrderProgress responsive composition [GH-1652]', () => {
         const { container } = render(<OrderProgress status="refunded" embedded />)
 
         expect(container.querySelector('.min-w-\\[624px\\]')).not.toBeNull()
+        expect(screen.getByTestId('refund-icon')).toBeInTheDocument()
+    })
+})
+
+describe('[TC-F10-01-13][GH-1695 AC-1/AC-2/AC-3/AC-4] OrderProgress step states', () => {
+    it('distinguishes completed, current, and upcoming nodes at Ready to Ship', () => {
+        const { container } = render(<OrderProgress status="ready_to_ship" embedded />)
+
+        const states = Array.from(container.querySelectorAll('[data-order-step-state]'))
+            .map(node => node.getAttribute('data-order-step-state'))
+        const icons = Array.from(container.querySelectorAll('[data-order-step-icon]'))
+        const labels = Array.from(container.querySelectorAll('[data-order-step-label]'))
+        const connectors = Array.from(container.querySelectorAll('[data-order-step-connector]'))
+
+        expect(states).toEqual(['completed', 'completed', 'current', 'upcoming', 'upcoming'])
+        expect(screen.getAllByTestId('order-progress-check-icon')).toHaveLength(2)
+        expect(icons).toHaveLength(5)
+        expect(icons.every(icon => (
+            icon.classList.contains('h-8') &&
+            icon.classList.contains('w-8') &&
+            icon.classList.contains('md:h-9') &&
+            icon.classList.contains('md:w-9')
+        ))).toBe(true)
+        expect(icons[0]).not.toHaveClass('shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]')
+        expect(icons[1]).not.toHaveClass('shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]')
+        expect(icons[2]).toHaveClass('shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]')
+        expect(labels.slice(0, 3).every(label => (
+            label.classList.contains('font-semibold') &&
+            label.classList.contains('text-dash-text') &&
+            !label.classList.contains('text-dash-text-muted')
+        ))).toBe(true)
+        expect(labels.slice(3).every(label => (
+            label.classList.contains('font-normal') &&
+            label.classList.contains('text-dash-text-muted')
+        ))).toBe(true)
+        expect(connectors).toHaveLength(4)
+        expect(connectors.map(connector => (connector as HTMLElement).style.background)).toEqual([
+            'hsl(var(--success))',
+            'hsl(var(--success))',
+            'var(--dash-border)',
+            'var(--dash-border)',
+        ])
+        expect(connectors.every(connector => (
+            connector.classList.contains('mt-[15px]') &&
+            connector.classList.contains('md:mt-[17px]')
+        ))).toBe(true)
+    })
+
+    it('keeps Pending current without rendering a completed checkmark', () => {
+        const { container } = render(<OrderProgress status="pending" embedded />)
+
+        const states = Array.from(container.querySelectorAll('[data-order-step-state]'))
+            .map(node => node.getAttribute('data-order-step-state'))
+        const canvas = container.querySelector('[data-order-stepper-canvas]')
+
+        expect(states).toEqual(['current', 'upcoming', 'upcoming', 'upcoming', 'upcoming'])
+        expect(screen.queryByTestId('order-progress-check-icon')).not.toBeInTheDocument()
+        expect(canvas).toHaveClass('pt-1')
+    })
+
+    it('marks all standard nodes completed and the appended Refunded node current', () => {
+        const { container } = render(<OrderProgress status="refunded" embedded />)
+
+        const states = Array.from(container.querySelectorAll('[data-order-step-state]'))
+            .map(node => node.getAttribute('data-order-step-state'))
+
+        expect(states).toEqual(['completed', 'completed', 'completed', 'completed', 'completed', 'current'])
+        expect(screen.getAllByTestId('order-progress-check-icon')).toHaveLength(5)
         expect(screen.getByTestId('refund-icon')).toBeInTheDocument()
     })
 })
