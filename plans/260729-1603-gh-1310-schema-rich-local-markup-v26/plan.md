@@ -133,7 +133,7 @@ This plan replaces the obsolete local Schema-40 draft `260729-1037-gh-1310-schem
 
 - Fast-forwarded the feature branch to current `origin/staging`, then reapplied the Phase 00–03 WIP with a recoverable stash retained.
 - PR #1708 is now present on staging. Conflict resolution retained its per-site revisioned/coalescing LocalBusiness serializer and added US02 rollback from the last persisted snapshot.
-- A failed latest batch rolls back the category/subtype pair; a failed older batch preserves and drains a newer optimistic revision.
+- A confirmed HTTP rejection of the latest batch rolls back the category/subtype pair. After response loss, the editor reconciles against authoritative data; if the outcome remains unknown, it preserves the optimistic pair and blocks later full-snapshot LocalBusiness writes until reload. A failed older batch preserves and drains a newer optimistic revision.
 - Verification passed: 10/10 focused files and 210/210 tests, database schema drift against local PostgreSQL, typecheck, diff check, Playwright discovery, and 2-test no-credential skip.
 - Live staging fixture execution and manual Google Rich Results evidence remain open; no `E2E_SITE_ID` was introduced.
 
@@ -143,6 +143,15 @@ This plan replaces the obsolete local Schema-40 draft `260729-1037-gh-1310-schem
 - Preserved the legacy score API semantics while keeping the new pure Schema 35 scorer isolated for #1312.
 - Fixed sparse effective-state validation, legacy-hours self-healing, mixed-request prevalidation, bounded geo/HTTP URL emission, FAQ compatibility semantics, and stale cross-site rollback.
 - Verification passed: typecheck, lint, diff check, 163/163 remediation tests, Playwright discovery, and the explicit 2-test no-credential skip.
-- Focused verification: 10 files/219 tests passed; the remaining 3 checks require local PostgreSQL. Full Vitest: 11,401 passed, 3 skipped, and 4 PostgreSQL connection failures.
+- Focused verification after the response-loss and generic-subtype fixes: 15 files/278 tests passed; typecheck and lint pass. TC-F37-02-45 authenticates through a temporary local loopback proxy without repository configuration changes, then stops at the read-only fixture guard because the current site is `draft`.
 - Phase 03 remains open only for live staging TC-F37-02-45 and manual Google Rich Results evidence.
 - Docker Compose files and `scripts/db-migrate-dev.js` remain untouched local WIP and are excluded from US-F37-02 review/commit scope.
+
+### Session 6 — 2026-08-04 response-loss resilience closeout
+
+- Registered TC-F37-02-48 for normalized response-loss reconciliation, Payload row-metadata tolerance, a bounded 5-second reconciliation timeout, caller-visible failure on unknown outcome, cross-mount LocalBusiness locking, queued-revision removal, i18n, and subtype a11y descriptions.
+- Client queueing, comparison, and server validation now share the same LocalBusiness text canonicalization. A semantically committed save reconciles successfully; an unresolved outcome retains only the ambiguous in-flight snapshot and prevents later full-snapshot writes until reload.
+- Red baseline: 6 failures across the two targeted files. Green verification: 65/65 targeted tests, TypeScript typecheck, and repository lint pass.
+- Broader related verification: 245 assertions pass; the only 3 failures are database schema-drift checks blocked by unavailable `127.0.0.1:5432`. The migration suite passes 24/24.
+- TC-F37-02-45 live staging execution and manual Rich Results evidence remain the only open Phase 03 acceptance items.
+- `.github/workflows`, Playwright configuration, Docker Compose WIP, and `scripts/db-migrate-dev.js` were not changed by this remediation.

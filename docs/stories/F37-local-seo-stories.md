@@ -111,9 +111,10 @@ THEN the save is rejected and the previous valid pair remains
 - [x] FR-04 through FR-11 emit only valid, safely serialized tenant-storefront schema.
 - [x] Schema score maps the eight approved criteria to exactly 35 points; FAQ is not scored.
 - [x] Category/subtype persistence, filtering, atomic save, server validation, and generic fallback match the `@dominvopc`-approved versioned mapping.
-- [x] TC-F37-02-29..47 automated coverage passes locally: 10 focused files/219 tests pass; 3 DB-backed schema-drift checks are environment-blocked because PostgreSQL is not running.
+- [x] TC-F37-02-29..48 automated coverage passes locally. The TC-F37-02-48 targeted gate passes 65/65; a broader related run has 245 passing assertions, while 3 DB-backed schema-drift checks are environment-blocked because PostgreSQL is not running. The migration suite passes 24/24.
 - [x] TC-F37-02-45 automation discovers the authenticated account sole site, derives the canonical storefront URL from the tenant route/hostname, and asserts emitted schema URLs are non-empty and equal that canonical URL; it uses the existing email, password, and OTP credentials and does not require `E2E_SITE_ID`.
 - [x] TC-F37-02-47 covers rejected settings-save rollback, newer-revision preservation, and late cross-site failure isolation in `publish-flow.test.tsx` (21/21 local).
+- [x] TC-F37-02-48 covers normalized response-loss reconciliation, a bounded 5-second reconciliation timeout, unknown-outcome caller failure and cross-mount UI lock, queued-revision removal, and combined subtype a11y descriptions.
 - [ ] Execute TC-F37-02-45 against the owned staging fixture and capture manual Google Rich Results evidence. PR #1708 is not a dependency or blocker; reconcile it only if it lands first.
 
 ---

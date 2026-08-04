@@ -4,7 +4,7 @@
 **Reviewed by:** `@dominvopc` (Product/SEO approver confirmed for this implementation)
 **Runtime policy:** checked-in and dependency-free; never fetched at request time.
 
-**Delivery status (2026-08-03):** Phase 00–02 and Phase 03 local automation are built and synced to `origin/staging`. The per-site revisioned/coalescing serializer retains persisted-snapshot rollback and isolates late failures from a previously active site. The focused run has 219 passing tests plus 3 DB-only checks blocked by unavailable local PostgreSQL; typecheck, lint, diff check, Playwright discovery, and the no-credential skip pass. TC-F37-02-45 still requires the live staging fixture and manual Rich Results evidence. No `E2E_SITE_ID` is used.
+**Delivery status (2026-08-04):** Phase 00–02 and Phase 03 local automation are built. The per-site revisioned/coalescing serializer rolls back confirmed HTTP rejections and reconciles response loss against an authoritative, canonically normalized snapshot while ignoring Payload array-row metadata. Reconciliation is bounded to 5 seconds; an unresolved outcome returns failure, removes any never-sent queued revision from visible state, and locks all LocalBusiness Settings mounts until reload. The TC-F37-02-48 targeted gate passes 65/65; typecheck and lint pass. A broader related run has 245 passing assertions, with 3 schema-drift checks blocked only by unavailable local PostgreSQL. TC-F37-02-45 can authenticate locally through a temporary loopback proxy without changing repository configuration, but the current fixture is still `draft`; a published fixture and manual Rich Results evidence remain pending. No `E2E_SITE_ID` is used.
 
 ## Sources
 
@@ -32,7 +32,7 @@ mapping below intentionally exposes one primary subtype only; multiple
 
 ## Reconciliation and fallback
 
-- Before a category is selected, the subtype control is disabled.
+- Before a category is selected, or when the generic Local Business category has no compatible subtype, the subtype control is disabled. The generic category shows an explanation that it emits `LocalBusiness` directly.
 - A sole compatible option is auto-selected only after a seller changes the
   category. Legacy hydration never mutates a missing subtype.
 - Multiple compatible options require an explicit selection.
@@ -40,6 +40,8 @@ mapping below intentionally exposes one primary subtype only; multiple
   option, or clears the subtype.
 - Empty or incompatible persisted data emits generic `LocalBusiness` and earns
   zero subtype points. Save boundaries reject incompatible non-empty pairs.
+- Response-loss reconciliation compares server-canonical text and opening-hours values, ignores Payload row metadata, and aborts after 5 seconds.
+- If reconciliation remains unknown, only the in-flight snapshot stays visible; later queued edits are rejected and every LocalBusiness form remains disabled until reload.
 - `businessCategory` may still derive `priceRange`; it never directly selects
   JSON-LD `@type`.
 
