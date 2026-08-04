@@ -739,6 +739,7 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
     const renderLocalBusinessSettings = (
         localBusiness: NonNullable<NonNullable<React.ComponentProps<typeof SettingsPanel>['site']>['localBusiness']>,
         onSiteSettingsChange = vi.fn(),
+        isLocalBusinessSaveLocked = false,
     ) => {
         render(
             <I18nProvider defaultLocale="en">
@@ -755,6 +756,7 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
                     siteName="F37 Bakery"
                     siteStatus="draft"
                     onSiteSettingsChange={onSiteSettingsChange}
+                    isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                     fullWidth
                 />
             </I18nProvider>,
@@ -775,6 +777,62 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
         expect(onSiteSettingsChange).not.toHaveBeenCalled()
     })
 
+    it('[TC-F37-02-29] disables subtype for the generic LocalBusiness category with an explanation', () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn()
+
+        // Act
+        renderLocalBusinessSettings({ businessCategory: 'localBusiness' }, onSiteSettingsChange)
+
+        // Assert
+        expect(screen.getByRole('combobox', { name: 'Schema subtype' })).toBeDisabled()
+        expect(screen.getByText(
+            'The generic Local Business category uses LocalBusiness directly and has no schema subtype.',
+        )).toBeVisible()
+        expect(onSiteSettingsChange).not.toHaveBeenCalled()
+    })
+
+
+    it('[TC-F37-02-48] disables the LocalBusiness form and keeps a persistent reload alert after an unknown save', () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn()
+
+        // Act
+        renderLocalBusinessSettings({
+            businessCategory: 'store',
+            schemaSubtype: 'Store',
+            streetAddress: '1 Confirmed Street',
+        }, onSiteSettingsChange, true)
+
+        // Assert
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Local business editing is temporarily locked. Reload the editor to confirm the last save before continuing.',
+        )
+        expect(screen.getByTestId('settings-local-business-street-address')).toBeDisabled()
+        expect(screen.getByRole('combobox', { name: 'Business Category' })).toBeDisabled()
+        expect(screen.getByRole('combobox', { name: 'Schema subtype' })).toBeDisabled()
+        expect(onSiteSettingsChange).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F37-02-29] describes both generic unavailability and an incompatible legacy subtype', () => {
+        // Arrange
+
+        // Act
+        renderLocalBusinessSettings({
+            businessCategory: 'localBusiness',
+            schemaSubtype: 'Store',
+        })
+
+        // Assert
+        expect(screen.getByRole('combobox', { name: 'Schema subtype' })).toHaveAttribute(
+            'aria-describedby',
+            expect.stringContaining('local-business-schema-subtype-unavailable-hint'),
+        )
+        expect(screen.getByRole('combobox', { name: 'Schema subtype' })).toHaveAttribute(
+            'aria-describedby',
+            expect.stringContaining('local-business-schema-subtype-validation'),
+        )
+    })
     it('[TC-F37-02-29] exposes only compatible subtype options in the 375px-safe full-width layout', async () => {
         // Arrange
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 })
