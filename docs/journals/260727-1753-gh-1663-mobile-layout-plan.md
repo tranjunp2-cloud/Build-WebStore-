@@ -138,12 +138,32 @@ new internal-clipping oracle and border-box hook fix, so a fresh credentialed re
   repository-root-relative paths.
 - The focused validation now passes 63/63 BulkCreateModal tests and 3/3 shared hook tests.
 
+## Seventh Review Fix Cycle
+
+- Re-review found that code-point truncation could split combining-mark and ZWJ grapheme clusters,
+  and that U+2028/U+2029 separators bypassed the single-value Product Name normalization.
+- When `Intl.Segmenter` is available, the normalizer converts CR/LF/U+2028/U+2029 runs to spaces and
+  appends only complete grapheme clusters within the 120 UTF-16-code-unit budget while retaining
+  the lone-surrogate guard.
+- Native textarea `maxLength` was removed because browsers can truncate a grapheme before React's
+  controlled `onChange` handler receives it.
+- When `Intl.Segmenter` is absent, the client preserves Unicode instead of guessing boundaries and
+  relies on the existing server-side `max(120)` validation. No runtime dependency is added.
+- Native-path sanitization scans at most 4,096 raw UTF-16 code units; the unsupported-browser path
+  returns pathological oversized input unchanged without creating full-string intermediate copies.
+- TC-F08-04-118 now covers combining marks, ZWJ emoji, Unicode separators, missing
+  `Intl.Segmenter`, oversized input, and the textarea path that prevents native pre-truncation.
+  Final focused validation passes 78/78 BulkCreateModal
+  tests plus 3/3 shared hook tests.
+
 ## Reflection
 
 The one-DOM grid preserves save, category, stock, remove, and draft-state flow while Product Name
-editing and successful parse intentionally normalize CR/LF to spaces and enforce the existing
-120-character limit. Viewport tests provide the geometry oracle; the newest internal-clipping
-version still needs a credentialed browser rerun.
+editing and successful parse normalize CR/LF/U+2028/U+2029 to spaces. Native segmentation enforces
+the 120-UTF-16-code-unit limit at complete grapheme boundaries; browsers without that API preserve
+Unicode and defer over-limit rejection to the server.
+Viewport tests provide the geometry oracle; the newest internal-clipping version still needs a
+credentialed browser rerun.
 
 ## Decisions Made
 

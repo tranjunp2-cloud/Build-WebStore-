@@ -80,8 +80,11 @@ credentialed rerun remains pending.
 - Variant text is visible and wraps on mobile.
 - Header, scrollable list, footer, remove/edit actions remain reachable.
 - Existing save/category/stock semantics and desktop layout remain unchanged; Product Name edit and
-  successful parse paths intentionally normalize CR/LF characters to spaces and enforce the existing
-  120-character product-name contract.
+  successful parse paths intentionally normalize CR/LF/U+2028/U+2029 separators to spaces and
+  enforce the existing 120-UTF-16-code-unit product-name contract without splitting grapheme
+  clusters when native `Intl.Segmenter` is available. Browsers without it preserve Unicode and
+  defer over-limit rejection to the existing server validation rather than guessing boundaries.
+  Native-path paste/AI scanning remains bounded before lazy segmentation.
 - New Playwright TC is discovered; its prior outer-geometry run passed, while a fresh authenticated
   run of the internal-clipping oracle remains pending. Targeted Vitest and TypeScript checks pass.
 - The GH-1663 cases live in `e2e/products.spec.ts` within the existing `e2e/` discovery tree;

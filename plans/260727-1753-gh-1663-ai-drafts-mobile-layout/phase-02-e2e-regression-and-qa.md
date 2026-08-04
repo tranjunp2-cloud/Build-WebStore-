@@ -117,7 +117,7 @@ setup, and workflow trigger changes are outside this issue's final delta.
   panel/dialog unmount, body-overflow restoration, and zero observed server-action POSTs
 - [ ] Fresh authenticated TC-F08-04-115..117 browser rerun with the internal-clipping oracle;
   local test credentials currently return 401
-- [x] Existing BulkCreateModal unit tests pass (63/63)
+- [x] Existing BulkCreateModal unit tests pass (78/78)
 - [x] Shared auto-resize border-box regression tests pass (3/3)
 - [x] TypeScript and `git diff --check` pass
 - [x] PR #1710 uses `Relates to #1663` and discloses the intentional read-only variant decision
@@ -132,7 +132,7 @@ setup, and workflow trigger changes are outside this issue's final delta.
 - Staging E2E explicitly selects `products.spec.ts` through its existing allow-list; the final PR
   delta does not modify workflow triggers.
 - Workflow-equivalent discovery reports 46 tests across 13 files, including TC-F08-04-115..117.
-- Targeted BulkCreateModal unit suites: 63/63 passed.
+- Targeted BulkCreateModal unit suites: 78/78 passed.
 - Shared auto-resize border-box regression suite: 3/3 passed.
 - TypeScript, `git diff --check`, and Playwright discovery passed.
 - No responsive screenshots were retained. Geometry, overflow, wrapping, editing, removal, and
@@ -143,7 +143,7 @@ setup, and workflow trigger changes are outside this issue's final delta.
 
 ```bash
 npx playwright test --list
-npm run test:e2e -- e2e/products.spec.ts --project=chromium --grep 'TC-F08-04-9[4-6]'
+npm run test:e2e -- e2e/products.spec.ts --project=chromium --grep 'TC-F08-04-11[5-7]'
 npm test -- src/__tests__/unit/dashboard/bulk-create-save.test.tsx src/__tests__/unit/dashboard/bulk-create-utils.test.ts src/__tests__/unit/dashboard/bulk-create-parse.test.tsx
 npm test -- src/__tests__/unit/hooks/use-auto-resize-textarea.test.tsx
 npm run typecheck

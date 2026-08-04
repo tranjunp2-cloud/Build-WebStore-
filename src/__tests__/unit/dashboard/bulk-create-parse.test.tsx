@@ -184,7 +184,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             status: 200,
             json: async () => ({
                 products: [{
-                    name: 'Premium Backpack\r\nWith Extended\nProduct Name',
+                    name: 'Premium Backpack\r\nWith Extended\u2028Product\u2029Name',
                     price: 10,
                     stock: 0,
                     category: '',
@@ -223,8 +223,42 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         const nameField = await screen.findByLabelText('Product name')
 
         // Assert
-        expect(nameField).toHaveAttribute('maxlength', '120')
+        expect(nameField).not.toHaveAttribute('maxlength')
         expect(nameField).toHaveValue('A'.repeat(120))
+    })
+
+    it('TC-F08-04-118: lets the controlled textarea normalize complete graphemes before enforcing the limit', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                products: [{
+                    name: 'Editable product name',
+                    price: 10,
+                    stock: 0,
+                    category: '',
+                    variants: [],
+                }],
+            }),
+        }) as unknown as typeof fetch
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="editable unicode product name" />)
+        const nameField = await screen.findByLabelText('Product name')
+        const combiningAcrossBoundary = `${'A'.repeat(119)}e\u0301`
+        const zwjAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
+
+        // Act
+        fireEvent.change(nameField, { target: { value: combiningAcrossBoundary } })
+
+        // Assert
+        expect(nameField).not.toHaveAttribute('maxlength')
+        expect(nameField).toHaveValue('A'.repeat(119))
+
+        // Act
+        fireEvent.change(nameField, { target: { value: zwjAcrossBoundary } })
+
+        // Assert
+        expect(nameField).toHaveValue('A'.repeat(118))
     })
 
     it('TC-F08-04-119: does not block Enter while explicit IME composition is active', async () => {

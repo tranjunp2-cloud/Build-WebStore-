@@ -125,11 +125,16 @@ track. The regression is caused by the fixed siblings in the current horizontal 
   normalization/length enforcement in `BulkCreateModal.tsx`, plus responsive-width remeasurement in
   the shared auto-resize hook.
 - Existing `updateProduct`, `updateAllVariantsStock`, `removeProduct`, category, and save flows are
-  unchanged. Successful parse now normalizes AI-provided Product Name CR/LF and caps the result at
-  120 UTF-16 code units without splitting Unicode surrogate pairs before state; editing also
-  prevents non-IME Enter, normalizes pasted CR/LF, exposes `maxLength=120`, and preserves explicit
-  IME composition so the field remains a bounded single value.
-- Targeted validation passed: 63/63 BulkCreateModal tests, 3/3 shared auto-resize border-box tests,
+  unchanged. With native `Intl.Segmenter`, successful parse normalizes AI-provided Product Name
+  CR/LF/U+2028/U+2029 and caps the result at 120 UTF-16 code units without splitting grapheme
+  clusters or leaving unpaired surrogates before state. Editing uses the same controlled normalizer
+  instead of native `maxLength`, so complete pasted/composed graphemes reach the guard; non-IME
+  Enter remains blocked and explicit IME composition remains supported.
+- Browsers without native segmentation preserve Unicode rather than guessing boundaries and defer
+  over-limit rejection to the existing server-side `max(120)` validation; no dependency is added.
+- Native-path sanitization processes at most 4,096 raw UTF-16 code units and segmentation is lazy.
+  The unsupported-browser path avoids additional full-input copies for pathological oversized data.
+- Targeted validation passed: 78/78 BulkCreateModal tests, 3/3 shared auto-resize border-box tests,
   `npm run typecheck`, and `git diff --check`.
 - A later focused review prompted the auto-grow, responsive-width remeasurement, and internal-clipping oracle added in this cycle.
 - The previous authenticated Chromium setup plus TC-F08-04-115..117 passed 4/4 on 2026-07-28

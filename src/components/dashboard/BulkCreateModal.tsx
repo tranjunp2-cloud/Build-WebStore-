@@ -856,16 +856,72 @@ export function BulkCreateModal({
 }
 
 export const PRODUCT_NAME_MAX_LENGTH = 120
+// More than 34x the persisted limit: ample headroom for separators/invalid code points while
+// bounding work and intermediate memory for pathological paste or AI-generated values.
+const PRODUCT_NAME_INPUT_SCAN_LIMIT = 4096
 
-export function normalizeDraftProductName(value: string) {
-    const singleLineValue = value.replace(/[\r\n]+/g, ' ')
-    let normalizedValue = ''
+let productNameGraphemeSegmenter: Intl.Segmenter | undefined
 
-    for (const character of singleLineValue) {
+function getProductNameGraphemeSegmenter(): Intl.Segmenter | undefined {
+    const Segmenter = Intl.Segmenter
+    if (typeof Segmenter !== 'function') return undefined
+
+    productNameGraphemeSegmenter ??= new Segmenter(undefined, { granularity: 'grapheme' })
+    return productNameGraphemeSegmenter
+}
+
+function sanitizeDraftProductNameInput(value: string) {
+    const boundedValue = value.slice(0, PRODUCT_NAME_INPUT_SCAN_LIMIT)
+    let sanitizedValue = ''
+    let previousCharacterWasSeparator = false
+
+    for (const character of boundedValue) {
+        if (/[\r\n\u2028\u2029]/.test(character)) {
+            if (!previousCharacterWasSeparator) sanitizedValue += ' '
+            previousCharacterWasSeparator = true
+            continue
+        }
+
+        previousCharacterWasSeparator = false
         const codePoint = character.codePointAt(0)
         if (codePoint !== undefined && codePoint >= 0xD800 && codePoint <= 0xDFFF) continue
-        if (normalizedValue.length + character.length > PRODUCT_NAME_MAX_LENGTH) break
-        normalizedValue += character
+        sanitizedValue += character
+    }
+
+    return {
+        sanitizedValue,
+        inputWasTruncated: value.length > PRODUCT_NAME_INPUT_SCAN_LIMIT,
+    }
+}
+
+function* completeDraftProductNameSegments(segments: Iterable<{ segment: string }>, omitTrailingSegment: boolean) {
+    let pendingSegment: string | undefined
+
+    for (const { segment } of segments) {
+        if (pendingSegment !== undefined) yield pendingSegment
+        pendingSegment = segment
+    }
+
+    // A truncated raw prefix may end inside an arbitrarily long grapheme. Holding back its final
+    // segment prevents returning a cluster that was only partial in the original input.
+    if (!omitTrailingSegment && pendingSegment !== undefined) yield pendingSegment
+}
+
+export function normalizeDraftProductName(value: string) {
+    const segmenter = getProductNameGraphemeSegmenter()
+    if (!segmenter) {
+        // Do not guess Unicode boundaries in browsers without Intl.Segmenter. Preserve over-limit
+        // input for the authoritative server-side max(120) validation instead of corrupting it.
+        if (value.length > PRODUCT_NAME_INPUT_SCAN_LIMIT) return value
+        return sanitizeDraftProductNameInput(value).sanitizedValue
+    }
+
+    const { sanitizedValue, inputWasTruncated } = sanitizeDraftProductNameInput(value)
+    let normalizedValue = ''
+
+    for (const segment of completeDraftProductNameSegments(segmenter.segment(sanitizedValue), inputWasTruncated)) {
+        if (normalizedValue.length + segment.length > PRODUCT_NAME_MAX_LENGTH) break
+        normalizedValue += segment
     }
 
     return normalizedValue
@@ -888,7 +944,6 @@ function ProductNameTextarea({ id, value, disabled, onChange }: ProductNameTexta
             ref={textareaRef}
             id={id}
             rows={1}
-            maxLength={PRODUCT_NAME_MAX_LENGTH}
             disabled={disabled}
             value={value}
             onChange={(event) => onChange(normalizeDraftProductName(event.target.value))}
