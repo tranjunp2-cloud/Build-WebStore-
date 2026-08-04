@@ -9,10 +9,19 @@ import {
 } from '@/lib/viewer-timezone'
 
 describe('viewer timezone helpers', () => {
-    it('validates IANA timezone names and safely falls back to UTC', () => {
-        expect(normalizeViewerTimeZone('Asia/Ho_Chi_Minh')).toBe('Asia/Ho_Chi_Minh')
+    it('canonicalizes IANA timezone names and safely falls back to UTC', () => {
+        const canonicalVietnamTimeZone = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+        }).resolvedOptions().timeZone
+
+        expect(normalizeViewerTimeZone('Asia/Ho_Chi_Minh')).toBe(canonicalVietnamTimeZone)
+        expect(normalizeViewerTimeZone('america/new_york')).toBe('America/New_York')
+        expect(normalizeViewerTimeZone('AMERICA/NEW_YORK')).toBe('America/New_York')
+        expect(normalizeViewerTimeZone('US/Eastern')).toBe('America/New_York')
         expect(normalizeViewerTimeZone('not-a-timezone')).toBe('UTC')
         expect(normalizeViewerTimeZone(undefined)).toBe('UTC')
+        expect(normalizeViewerTimeZone(['UTC'])).toBe('UTC')
+        expect(normalizeViewerTimeZone({ timeZone: 'UTC' })).toBe('UTC')
         expect(getBrowserViewerTimeZone()).toBe(
             normalizeViewerTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone),
         )
@@ -43,6 +52,31 @@ describe('viewer timezone helpers', () => {
         expect(springForward.end.toISOString()).toBe('2026-03-09T04:00:00.000Z')
         expect(springForward.end.getTime() - springForward.start.getTime())
             .toBe(23 * 60 * 60 * 1000)
+    })
+
+    it.each([
+        {
+            timeZone: 'Africa/Cairo',
+            now: '2026-04-24T12:00:00.000Z',
+            start: '2026-04-23T22:00:00.000Z',
+            end: '2026-04-24T21:00:00.000Z',
+        },
+        {
+            timeZone: 'Asia/Beirut',
+            now: '2026-03-29T12:00:00.000Z',
+            start: '2026-03-28T22:00:00.000Z',
+            end: '2026-03-29T21:00:00.000Z',
+        },
+    ])('uses the first valid instant when $timeZone skips local midnight', ({
+        timeZone,
+        now,
+        start,
+        end,
+    }) => {
+        const range = getViewerDayRange(new Date(now), timeZone)
+
+        expect(range.start.toISOString()).toBe(start)
+        expect(range.end.toISOString()).toBe(end)
     })
 
     it('calculates week, month and year starts in the viewer calendar', () => {

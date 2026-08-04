@@ -13,9 +13,10 @@ export interface ViewerDateTimeParts {
     second: number
 }
 
-export function normalizeViewerTimeZone(value: string | null | undefined): string {
+export function normalizeViewerTimeZone(value: unknown): string {
     if (
-        !value
+        typeof value !== 'string'
+        || !value
         || value.length > MAX_TIME_ZONE_LENGTH
         || !TIME_ZONE_PATTERN.test(value)
     ) {
@@ -23,8 +24,9 @@ export function normalizeViewerTimeZone(value: string | null | undefined): strin
     }
 
     try {
-        new Intl.DateTimeFormat('en-US', { timeZone: value }).format(0)
-        return value
+        return new Intl.DateTimeFormat('en-US', { timeZone: value })
+            .resolvedOptions()
+            .timeZone
     } catch {
         return DEFAULT_VIEWER_TIME_ZONE
     }
@@ -124,19 +126,56 @@ function timeZoneOffsetMs(date: Date, timeZone: string): number {
 function viewerWallTimeToUtc(
     parts: Pick<ViewerDateTimeParts, 'year' | 'month' | 'day'>,
     requestedTimeZone: string,
-): Date {
+): Date | null {
     const timeZone = normalizeViewerTimeZone(requestedTimeZone)
     const wallTimeAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day)
-    let instant = wallTimeAsUtc
+    const targetDateKey = toViewerDateKey(parts)
+    const oneDayMs = 24 * 60 * 60 * 1000
 
-    // Re-evaluate the offset to cover zones whose offset changes near this date.
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-        const adjusted = wallTimeAsUtc - timeZoneOffsetMs(new Date(instant), timeZone)
-        if (adjusted === instant) break
-        instant = adjusted
+    // Most dates have a real local 00:00. Check the offsets immediately around
+    // the target date and choose the earliest match if midnight is repeated.
+    const midnightCandidates = new Set<number>()
+    for (const sampleDelta of [-oneDayMs, 0, oneDayMs]) {
+        const sample = new Date(wallTimeAsUtc + sampleDelta)
+        const candidate = wallTimeAsUtc - timeZoneOffsetMs(sample, timeZone)
+        const candidateParts = getViewerDateTimeParts(new Date(candidate), timeZone)
+
+        if (
+            toViewerDateKey(candidateParts) === targetDateKey
+            && candidateParts.hour === 0
+            && candidateParts.minute === 0
+            && candidateParts.second === 0
+        ) {
+            midnightCandidates.add(candidate)
+        }
     }
 
-    return new Date(instant)
+    if (midnightCandidates.size > 0) {
+        return new Date(Math.min(...midnightCandidates))
+    }
+
+    // Some DST transitions skip local midnight. Find the first instant that
+    // actually belongs to the requested calendar date (often local 01:00).
+    let low = wallTimeAsUtc - (2 * oneDayMs)
+    let high = wallTimeAsUtc + (2 * oneDayMs)
+
+    while (low < high) {
+        const middle = low + Math.floor((high - low) / 2)
+        const middleDateKey = toViewerDateKey(
+            getViewerDateTimeParts(new Date(middle), timeZone),
+        )
+
+        if (middleDateKey < targetDateKey) {
+            low = middle + 1
+        } else {
+            high = middle
+        }
+    }
+
+    const firstInstant = new Date(low)
+    return toViewerDateKey(getViewerDateTimeParts(firstInstant, timeZone)) === targetDateKey
+        ? firstInstant
+        : null
 }
 
 export function shiftViewerDateKey(dateKey: string, days: number): string | null {
