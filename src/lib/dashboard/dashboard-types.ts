@@ -84,8 +84,6 @@ export interface SeoData {
     topIssue: { count: number; fixType: 'title' | 'description' | 'alt' } | null
     missingSeoItems: MissingSeoItem[]
     siteId: string | number | null
-    autoMetaEnabled: boolean
-    aiCrawlersEnabled: boolean
 }
 
 // ── Pending orders ──────────────────────────────────────────────────────────

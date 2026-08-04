@@ -127,45 +127,49 @@ THEN the save is rejected and the previous valid pair remains
 
 ```
 As a   SME seller
-I want AI crawler access on by default, with opt-out, and publishing to expose sitemap and llms.txt
-So that AI Discoverability points reflect real crawl access
+I want the platform to maintain AI crawler access automatically and publish to expose sitemap and llms.txt
+So that discoverability does not require technical settings
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Expose published-storefront discovery endpoints
+#### AC-01: Published storefront exposes every discovery signal
 
 ```gherkin
-GIVEN a published site with AI crawlers enabled by default
-WHEN robots.txt, sitemap.xml, and llms.txt are requested for the storefront
-THEN AI bots are allowed
-  AND sitemap returns URLs and llms.txt returns Markdown
-  AND full AI Discoverability points are available
+GIVEN a published storefront
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawlers are allowed
+  AND sitemap returns current URLs
+  AND llms.txt returns Markdown
 ```
 
-#### AC-2: Let the seller opt out of AI crawlers
+#### AC-02: Unpublished storefront hides publish-only discovery files
 
 ```gherkin
-GIVEN the seller turns AI crawlers off
-WHEN robots.txt is fetched
-THEN configured AI user-agents are disallowed
-  AND AI crawler points are 0
+GIVEN a storefront is not published
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawler access remains allowed
+  AND sitemap returns 404
+  AND llms.txt returns 404
 ```
 
-#### AC-3: Do not count an unpublished sitemap
+#### AC-03: Discovery endpoint failures are independent
 
 ```gherkin
-GIVEN the site is not published
-WHEN sitemap availability is evaluated
-THEN sitemap is not available as a present signal
-  AND Sitemap points are 0
+GIVEN a published storefront cannot serve sitemap.xml or llms.txt
+WHEN the discovery endpoints are requested
+THEN the other available discovery endpoints keep their normal behavior
+  AND no seller-facing resubmit control is shown
 ```
+
+> **Score ownership: #1312** — US-F37-04 consumes these route facts, awards crawler/sitemap/llms exactly 9/5/1, and integrates the approved 100-point scorecard. Score-engine changes are not part of #1311.
 
 ### Definition of Done
 
-- [ ] FR-13 through FR-15 work only below `/sites/[slug]/*`.
-- [ ] Robots, sitemap, and llms.txt behaviour is covered for published, unpublished, and opt-out states.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [ ] FR-12 through FR-14 expose platform-managed robots, sitemap, and llms.txt below `/sites/[slug]/*` and through supported storefront host rewrites.
+- [ ] Approved AI assistant crawlers are always allowed; no seller toggle, resubmit action, or SEO Action Tools section remains.
+- [ ] Published, unpublished, legacy-value, and independent endpoint-failure states have automated coverage.
+- [ ] The route/UI acceptance criteria above have automated or manual coverage; the score handoff is documented for #1312.
 
 ---
 

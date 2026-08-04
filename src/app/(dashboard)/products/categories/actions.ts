@@ -5,6 +5,11 @@ import configPromise from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import {
+    CATEGORY_LOCK_BUSY_ERROR,
+    isCategoryLockTimeoutError,
+    withCategoryMutationGate,
+} from '@/lib/payload/category-row-lock'
 
 export async function getCategoriesAction() {
     const user = await getCurrentUser()
@@ -79,6 +84,129 @@ export async function getCategoriesAction() {
 }
 
 import { z } from 'zod';
+
+const CategoryIdSchema = z.union([
+    z.number().int().positive().max(2_147_483_647),
+    z.string()
+        .trim()
+        .regex(/^[1-9]\d*$/)
+        .transform(Number)
+        .refine(
+            id => Number.isSafeInteger(id) && id <= 2_147_483_647,
+            'Category ID must be a positive PostgreSQL integer',
+        ),
+])
+
+const MAX_CATEGORY_IDS_PER_REQUEST = 200
+
+const CategoryIdListSchema = z.array(CategoryIdSchema)
+    .transform(ids => [...new Set(ids)])
+    .pipe(z.array(z.number()).max(MAX_CATEGORY_IDS_PER_REQUEST))
+
+function parseCategoryIds(rawIds: unknown): number[] {
+    // Reject before Zod walks/transforms every entry. The Server Action body limit is 50 MB,
+    // so applying the ceiling only after dedupe would still allow expensive duplicate floods.
+    if (!Array.isArray(rawIds) || rawIds.length > MAX_CATEGORY_IDS_PER_REQUEST) {
+        throw new Error(`Category ID list must contain at most ${MAX_CATEGORY_IDS_PER_REQUEST} items`)
+    }
+    return CategoryIdListSchema.parse(rawIds)
+}
+
+export type AiCategoryOption = {
+    id: string | number
+    name: string
+    breadcrumbs?: string
+    parent?: string | number | { id: string | number } | null
+}
+
+/** Lightweight category contract for the AI review modal. */
+export async function getAiCategoriesAction(): Promise<AiCategoryOption[]> {
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const tenantId = tenantIdForQuery(user)
+    if (tenantId == null) throw new Error('Unauthorized')
+
+    const payload = await getPayload({ config: configPromise })
+    const result = await payload.find({
+        collection: 'categories',
+        user,
+        overrideAccess: false,
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { deletedAt: { exists: false } },
+            ],
+        },
+        depth: 0,
+        limit: 1000,
+        sort: ['breadcrumbs', 'id'],
+        select: {
+            name: true,
+            parent: true,
+            breadcrumbs: true,
+        },
+    })
+
+    const options: AiCategoryOption[] = []
+    for (const category of result.docs) {
+        if (typeof category.name !== 'string') continue
+
+        const rawParent: unknown = category.parent
+        let parent: AiCategoryOption['parent'] = null
+        if (typeof rawParent === 'string' || typeof rawParent === 'number') {
+            parent = rawParent
+        } else if (typeof rawParent === 'object' && rawParent !== null && 'id' in rawParent) {
+            const parentId = rawParent.id
+            if (typeof parentId === 'string' || typeof parentId === 'number') {
+                parent = { id: parentId }
+            }
+        }
+
+        options.push({
+            id: category.id,
+            name: category.name,
+            ...(typeof category.breadcrumbs === 'string'
+                ? { breadcrumbs: category.breadcrumbs }
+                : {}),
+            parent,
+        })
+    }
+
+    return options
+}
+
+/** Revalidate selected categories against the current tenant before any AI save side effect. */
+export async function getCategoriesByIdsAction(rawIds: unknown): Promise<Array<{ id: string | number }>> {
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const tenantId = tenantIdForQuery(user)
+    if (tenantId == null) throw new Error('Unauthorized')
+
+    const categoryIds = parseCategoryIds(rawIds)
+    if (categoryIds.length === 0) return []
+
+    const payload = await getPayload({ config: configPromise })
+    const result = await payload.find({
+        collection: 'categories',
+        user,
+        overrideAccess: false,
+        where: {
+            and: [
+                { id: { in: categoryIds } },
+                { tenant: { equals: tenantId } },
+                { deletedAt: { exists: false } },
+            ],
+        },
+        depth: 0,
+        limit: categoryIds.length,
+        sort: 'id',
+        select: { id: true },
+    })
+
+    return result.docs.map(category => ({ id: category.id }))
+}
 
 // Explicit allowlist (GH-1587 M1) — replaces the former `.passthrough()`, which let a client
 // smuggle arbitrary extra keys (`dna`, `tenant`, `site`, `deletedAt`, ...) into `rawData`. Zod's
@@ -275,35 +403,64 @@ export async function deleteCategoryAction(id: string | number) {
         overrideAccess: false,
     })
 
+    // All raw SQL, including super-admin operations, is scoped to the tenant of the category
+    // that passed Payload access control. Relationships may be populated documents or raw IDs.
+    const categoryTenant: unknown = (authorizedCategory as Record<string, unknown>).tenant
+    const tenantId = typeof categoryTenant === 'object' && categoryTenant !== null && 'id' in categoryTenant
+        ? categoryTenant.id
+        : categoryTenant
+    if (typeof tenantId !== 'string' && typeof tenantId !== 'number') {
+        throw new Error('Product management is not available on your current plan.')
+    }
+
     const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
     if (!isSuperAdmin) {
-        // Entitlement must be checked against the tenant of the resource that passed Payload's
-        // access control, not the first membership. A team member may belong to multiple
-        // tenants with different plans, and Payload relationships may be populated or raw IDs.
-        const categoryTenant = authorizedCategory.tenant
-        const tenantId = typeof categoryTenant === 'object' && categoryTenant !== null
-            ? categoryTenant.id
-            : categoryTenant
-        if (tenantId == null) {
-            throw new Error('Product management is not available on your current plan.')
-        }
         const subscription = await getActivePlanSubscription(payload, tenantId)
         if (!subscription || !(await canUse(payload, subscription.plan as PlanCode, 'product_management'))) {
             throw new Error('Product management is not available on your current plan.')
         }
     }
 
-    // Hard-block + re-parent + soft-delete run as one SQL statement, anchored by a FOR UPDATE
-    // lock on the target category row. This keeps the delete decision and the writes in one DB
-    // critical section without depending on Payload's transaction wrapper, scopes child moves to
-    // the authorized tenant only, and preflights root-level name conflicts before any re-parent.
+    // The shared per-pool FIFO gate prevents same-process AI saves and deletes from consuming the
+    // connections each other needs. Across instances, this FOR UPDATE conflicts with the AI
+    // action's FOR KEY SHARE lock: either delete commits first and the AI lock finds no active row,
+    // or Product creation commits first and the second statement's fresh READ COMMITTED snapshot
+    // sees the relation. The recursive CTE from staging then reparents the complete descendant
+    // subtree and rebuilds breadcrumbs in the same transaction.
     const { sql } = await import('drizzle-orm')
-    const deleteResult = await (payload.db as any).drizzle.execute(
-        sql`WITH RECURSIVE target AS (
+    type DeleteTransaction = { execute: (query: unknown) => Promise<unknown> }
+    type DeleteDatabase = {
+        drizzle: {
+            transaction: <T>(
+                operation: (transaction: DeleteTransaction) => Promise<T>,
+                options?: unknown,
+            ) => Promise<T>
+        }
+        transactionOptions?: unknown
+    }
+    const database = payload.db as unknown as DeleteDatabase
+    let deleteResult: { rows: unknown[] }
+    try {
+        deleteResult = await withCategoryMutationGate(payload, () =>
+            database.drizzle.transaction(async transaction => {
+                // Bound cross-instance waiters so blocked delete transactions cannot pin every
+                // database connection while the AI save holding FOR KEY SHARE needs one to commit.
+                await transaction.execute(sql`SET LOCAL lock_timeout = '2s'`)
+                await transaction.execute(sql`
+                SELECT id
+                FROM categories
+                WHERE id = ${id}
+                  AND tenant_id = ${tenantId}
+                  AND deleted_at IS NULL
+                FOR UPDATE
+            `)
+
+                return transaction.execute(sql`WITH RECURSIVE target AS (
                 SELECT c.id, c.tenant_id
                 FROM categories c
-                WHERE c.id = ${id} AND c.deleted_at IS NULL
-                FOR UPDATE
+                WHERE c.id = ${id}
+                  AND c.tenant_id = ${tenantId}
+                  AND c.deleted_at IS NULL
             ),
             direct_products AS (
                 SELECT COUNT(DISTINCT p.id)::int AS count
@@ -386,13 +543,18 @@ export async function deleteCategoryAction(id: string | number) {
                   AND cf.count = 0
                 RETURNING c.*
             )
-            SELECT
-                COALESCE((SELECT count FROM direct_products), 0) AS direct_count,
-                COALESCE((SELECT count FROM conflicts), 0) AS name_conflict_count,
-                COALESCE((SELECT COUNT(*)::int FROM reparent), 0) AS reparented_count,
-                EXISTS(SELECT 1 FROM soft_delete) AS deleted,
-                (SELECT row_to_json(sd) FROM soft_delete sd) AS deleted_doc`
-    )
+                SELECT
+                    COALESCE((SELECT count FROM direct_products), 0) AS direct_count,
+                    COALESCE((SELECT count FROM conflicts), 0) AS name_conflict_count,
+                    COALESCE((SELECT COUNT(*)::int FROM reparent), 0) AS reparented_count,
+                    EXISTS(SELECT 1 FROM soft_delete) AS deleted,
+                    (SELECT row_to_json(sd) FROM soft_delete sd) AS deleted_doc`)
+            }, database.transactionOptions),
+        ) as { rows: unknown[] }
+    } catch (error) {
+        if (isCategoryLockTimeoutError(error)) throw new Error(CATEGORY_LOCK_BUSY_ERROR)
+        throw error
+    }
 
     const deleteRow = (deleteResult.rows[0] as {
         direct_count?: number

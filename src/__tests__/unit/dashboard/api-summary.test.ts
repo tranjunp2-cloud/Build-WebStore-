@@ -4,7 +4,7 @@
  *   TC-F03.20  → Analytics summary returns chart data
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { cacheDelete } from '@/lib/cache'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
@@ -30,7 +30,11 @@ describe('GET /api/analytics/summary [TC-F03.20]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockUser.tenants = [{ tenant: 'tenant-1' }]
-        cacheDelete('analytics:tenant-1:7d')
+        cacheDelete('analytics:tenant-1:7d:UTC')
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     it('[TC-F03.20] returns chart, topPages, metrics', async () => {
@@ -93,5 +97,35 @@ describe('GET /api/analytics/summary [TC-F03.20]', () => {
 
         const findCall = mockFind.mock.calls[0]
         expect(findCall[0].where.event.not_in).toEqual(expect.arrayContaining(['local_business_data_saved']))
+    })
+
+    it('uses the viewer timezone for analytics ranges and daily buckets', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-08-03T05:00:00.000Z'))
+        cacheDelete('analytics:tenant-1:today:Asia/Ho_Chi_Minh')
+        mockCount.mockResolvedValue({ totalDocs: 1 })
+        mockFind.mockResolvedValue({
+            docs: [{
+                createdAt: '2026-08-02T17:30:00.000Z',
+                event: 'pageview',
+                pageUrl: '/',
+            }],
+            totalDocs: 1,
+        })
+
+        const { GET } = await import('@/app/api/analytics/summary/route')
+        const req = new Request('http://localhost/api/analytics/summary?period=today', {
+            headers: { 'X-Viewer-Time-Zone': 'Asia/Ho_Chi_Minh' },
+        })
+        const res = await GET(req, {} as any)
+        const body = await res.json()
+
+        expect(mockCount.mock.calls[0][0].where.createdAt).toEqual({
+            greater_than_equal: '2026-08-02T17:00:00.000Z',
+            less_than: '2026-08-03T17:00:00.000Z',
+        })
+        expect(body.data.chart).toEqual([
+            { date: '3/8', views: 1, clicks: 0 },
+        ])
     })
 })

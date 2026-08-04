@@ -495,4 +495,35 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         // Not asserting inequality since it's random — just check format
         expect(slug1).toMatch(/^same-name-[a-z0-9]{5}$/)
     })
+
+    it('uses the draft UUID as a stable persisted idempotency key', () => {
+        const product = {
+            _id: '12345678-90ab-cdef-1234-567890abcdef',
+            _draftOrdinal: 1,
+            selected: true,
+            name: 'Same Name',
+            price: 10,
+            categoryId: null,
+            variants: [],
+        }
+
+        const slug1 = buildSavePayload(product, null, null).slug
+        const slug2 = buildSavePayload(product, null, null).slug
+        const otherSlug = buildSavePayload({
+            ...product,
+            _id: 'fedcba09-8765-4321-fedc-ba0987654321',
+        }, null, null).slug
+        const customBaseSlug = buildSavePayload({
+            ...product, slug: 'Custom Product Slug',
+        }, null, null).slug
+        const nonLatinBaseSlug = buildSavePayload({
+            ...product, name: '商品',
+        }, null, null).slug
+
+        expect(slug1).toBe('same-name-ai-1234567890abcdef1234567890abcdef')
+        expect(slug2).toBe(slug1)
+        expect(otherSlug).not.toBe(slug1)
+        expect(customBaseSlug).toBe('custom-product-slug-ai-1234567890abcdef1234567890abcdef')
+        expect(nonLatinBaseSlug).toBe('product-ai-1234567890abcdef1234567890abcdef')
+    })
 })

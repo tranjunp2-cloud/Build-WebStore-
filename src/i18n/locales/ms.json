@@ -1951,6 +1951,9 @@
                 "aiQuotaExceeded": "Sistem AI terlalu sibuk atau kuota habis. Sila cuba lagi nanti.",
                 "aiTimeout": "Sistem AI memberi respons terlalu lambat (Masa Tamat). Sila cuba lagi dengan teks yang lebih pendek.",
                 "rateLimitExceeded": "Anda telah menggunakan semua percubaan penjanaan AI untuk jam ini. Cuba lagi dalam {minutes} minit.",
+                "noCategoriesTitle": "Cipta kategori sebelum menjana draf AI",
+                "noCategoriesDescription": "Produk AI memerlukan kategori sedia ada. Tambah satu, kemudian cuba lagi.",
+                "manageCategories": "Urus Kategori",
                 "previewTitle": "Grid Pratonton (Diproses AI)",
                 "previewSubtitle": "Imej kosong akan menggunakan ikon karton lalai apabila disimpan",
                 "colImage": "Imej",
@@ -2045,6 +2048,7 @@
                     "hasProductsError": "Tidak dapat memadamkan kategori ini. Terdapat {count} produk yang masih ditetapkan kepadanya. Sila tetapkan semula produk anda terlebih dahulu.",
                     "tooManyChildrenError": "Tidak dapat memadamkan kategori ini. Ia mempunyai {count} subkategori, lebih daripada yang boleh dipindahkan dengan selamat sekaligus. Sila pindahkan sebahagian subkategori terlebih dahulu.",
                     "reparentNameConflictError": "Kategori ini belum boleh dipadamkan. Memindahkan subkategorinya ke tahap teratas akan mewujudkan {count} konflik nama kategori pendua. Sila namakan semula atau pindahkan subkategori yang bercanggah terlebih dahulu.",
+                    "busyRetryError": "Kategori ini sedang dikemas kini. Sila cuba lagi.",
                     "cancel": "Batal",
                     "confirm": "Padam",
                     "deleting": "Memadam..."
@@ -3116,6 +3120,9 @@
                 "emptyChartDesc": "Sebaik pelawat tiba di laman anda, paparan halaman harian akan dipaparkan di sini.",
                 "emptyListTitle": "Tiada apa untuk disenaraikan lagi",
                 "emptyListDesc": "Halaman, blog dan perujuk teratas akan muncul sebaik anda mempunyai trafik.",
+                "loading": "Memuatkan trafik...",
+                "loadError": "Data trafik tidak dapat dimuatkan.",
+                "retry": "Cuba lagi",
                 "periodToday": "hari ini",
                 "period7d": "7 hari lepas",
                 "period30d": "30 hari lepas"
@@ -3155,30 +3162,6 @@
                     "other": "item tiada tajuk meta"
                 }
             },
-            "tools": {
-                "title": "Alat tindakan SEO",
-                "subtitle": "AI bekerja secara senyap di latar belakang supaya pelanggan dapat menemui kedai anda di Google",
-                "sitemap": "Peta laman",
-                "sitemapTip": "Peta laman menyenaraikan setiap halaman dalam kedai anda. Kami menyerahkannya kepada Google supaya ia dapat mencari dan menyenaraikan semua produk anda.",
-                "sitemapDesc": "Serahkan peta laman anda supaya Google dapat menemui dan mengindeks semua halaman anda.",
-                "resubmit": "Serah semula ke Google",
-                "autoMeta": "Tulis tajuk & penerangan carian secara automatik",
-                "autoMetaTip": "Inilah tajuk yang pelanggan lihat di Google. AI menulis tajuk yang ringkas dan menarik untuk setiap halaman secara automatik.",
-                "autoMetaDesc": "AI menulis tajuk ringkas dan menarik yang memikat pelanggan apabila mereka mencari di Google.",
-                "active": "Aktif",
-                "sitemapDone": "Peta laman diserahkan — {count} URL dihantar ke Google",
-                "sitemapRegenerated": "Peta laman dijana semula",
-                "sitemapError": "Tidak dapat menjana peta laman",
-                "metaOn": "Tag meta automatik dihidupkan",
-                "metaOff": "Tag meta automatik dimatikan",
-                "metaError": "Tidak dapat mengemas kini tetapan",
-                "aiCrawlers": "Benarkan crawler AI mengindeks laman web anda",
-                "aiCrawlersTip": "Membolehkan pembantu AI seperti ChatGPT, Perplexity dan Gemini membaca kedai anda supaya mereka boleh mengesyorkan perniagaan anda.",
-                "aiCrawlersDesc": "Membenarkan GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot mengindeks laman ini supaya ChatGPT/Perplexity/Gemini boleh mengesyorkan perniagaan anda.",
-                "aiCrawlersOn": "Crawler AI dihidupkan",
-                "aiCrawlersOff": "Crawler AI dimatikan",
-                "aiCrawlersError": "Tidak dapat mengemas kini tetapan"
-            },
             "orders": {
                 "title": "Pesanan belum selesai",
                 "subtitle": "Pesanan menunggu pemenuhan",
@@ -3214,7 +3197,6 @@
                 "blockGlance": "Statistik sekilas pandang",
                 "blockTraffic": "Trafik & prestasi",
                 "blockSeo": "Kesihatan SEO",
-                "blockTools": "Alat tindakan SEO",
                 "blockOrders": "Pesanan belum selesai"
             }
         }
@@ -4464,6 +4446,18 @@
             "seoError": "Ralat menjana SEO",
             "generating": "Menjana...",
             "autoSeo": "Pengoptimuman SEO Automatik",
+            "seoOverwriteDialog": {
+                "title": "Gantikan metadata SEO sedia ada?",
+                "description": "Semak metadata semasa dan metadata janaan AI sebelum menggantikannya.",
+                "metaTitle": "Tajuk meta",
+                "metaDescription": "Penerangan meta",
+                "current": "Semasa",
+                "proposed": "Dicadangkan",
+                "empty": "Belum ditetapkan",
+                "cancel": "Batal",
+                "replace": "Gantikan SEO",
+                "replacing": "Menggantikan..."
+            },
             "navVariant": "Gaya Navigasi",
             "navVariantDefault": "Lalai",
             "navVariantCentered": "Berpusat",
@@ -4755,7 +4749,6 @@
         "settingsValidation": {
             "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
             "primaryColorLabel": "Pemilih warna utama",
-            "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?",
             "phoneRequired": "Nombor telefon diperlukan",
             "invalidLatitude": "Latitud mesti di antara -90 dan 90",
             "invalidLongitude": "Longitud mesti di antara -180 dan 180"

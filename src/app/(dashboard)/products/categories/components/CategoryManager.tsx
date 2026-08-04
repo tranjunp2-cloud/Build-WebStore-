@@ -411,6 +411,9 @@ export default function CategoryManager() {
                 const count = message.split(':')[1]
                 toast.error(t.dashboard.products.categories.deleteModal.reparentNameConflictError.replace('{count}', count))
                 // Keep modal open so the user can resolve the conflicting top-level names first.
+            } else if (message === 'CATEGORY_BUSY_RETRY') {
+                toast.error(t.dashboard.products.categories.deleteModal.busyRetryError)
+                // The competing save/delete is bounded; keep the modal open for an immediate retry.
             } else {
                 toast.error(t.dashboard.products.categories.toast.deleteError)
                 setIsDeleteOpen(false)

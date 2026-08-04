@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
     getPendingOrdersData: vi.fn(),
     getGlanceData: vi.fn(),
     emptyGlanceData: vi.fn(),
-    getTrafficData: vi.fn(),
     getSeoData: vi.fn(),
     findByID: vi.fn(),
     count: vi.fn(),
@@ -26,6 +25,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: mocks.getPayload }))
+vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: mocks.getCurrentUser,
     tenantIdForQuery: mocks.tenantIdForQuery,
@@ -37,9 +37,6 @@ vi.mock('@/lib/dashboard/pending-orders-data', () => ({
 vi.mock('@/lib/dashboard/glance-data', () => ({
     getGlanceData: mocks.getGlanceData,
     emptyGlanceData: mocks.emptyGlanceData,
-}))
-vi.mock('@/lib/dashboard/traffic-data', () => ({
-    getTrafficData: mocks.getTrafficData,
 }))
 vi.mock('@/lib/dashboard/seo-data', () => ({
     getSeoData: mocks.getSeoData,
@@ -57,14 +54,11 @@ vi.mock('@/components/dashboard/revamp/onboarding-card', () => ({
 vi.mock('@/components/dashboard/revamp/at-a-glance', () => ({
     AtAGlance: () => <div data-testid="glance-block" />,
 }))
-vi.mock('@/components/dashboard/revamp/traffic-performance', () => ({
-    TrafficPerformance: () => <div data-testid="traffic-block" />,
+vi.mock('@/components/dashboard/revamp/traffic-performance-client', () => ({
+    TrafficPerformanceClient: () => <div data-testid="traffic-block" />,
 }))
 vi.mock('@/components/dashboard/revamp/seo-health', () => ({
     SeoHealth: () => <div data-testid="seo-block" />,
-}))
-vi.mock('@/components/dashboard/revamp/seo-tools', () => ({
-    SeoTools: () => <div data-testid="tools-block" />,
 }))
 vi.mock('@/components/dashboard/revamp/pending-orders', () => ({
     PendingOrders: ({ data }: { data: PendingOrdersLoadState }) => (
@@ -127,7 +121,6 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         })
         mocks.getGlanceData.mockResolvedValue({ rangeLabel: '1–7 Jul 2026' })
         mocks.emptyGlanceData.mockReturnValue({ rangeLabel: '1–7 Jul 2026' })
-        mocks.getTrafficData.mockResolvedValue({ hasData: true })
         mocks.getSeoData.mockResolvedValue({
             siteId: 'site-1',
             autoMetaEnabled: true,
@@ -232,7 +225,7 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         expect(screen.getByTestId('glance-block')).toBeInTheDocument()
         expect(screen.getByTestId('traffic-block')).toBeInTheDocument()
         expect(screen.getByTestId('seo-block')).toBeInTheDocument()
-        expect(screen.getByTestId('tools-block')).toBeInTheDocument()
+        expect(screen.queryByTestId('tools-block')).not.toBeInTheDocument()
         expect(errorSpy).toHaveBeenCalledWith('[Dashboard] Pending Orders data is unavailable')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('ORD-SECRET')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('tenant 42')

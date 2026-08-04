@@ -1,8 +1,48 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { dayOfWeekToSchema } from '@/lib/seo/schema-helpers'
+
+function markdownInline(value: unknown): string {
+    if (typeof value !== 'string') return ''
+    const collapsed = value.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim()
+    return collapsed.replace(/([\\`*_[\]{}()<>#!|])/g, '\\$1')
+}
+
+const MAX_KEY_URLS = 10
+
+function selectKeyUrls(baseUrl: string, candidateGroups: string[][]): string[] {
+    const selected: string[] = []
+    const seen = new Set<string>()
+    const indexes = candidateGroups.map(() => 0)
+
+    const add = (url: string): boolean => {
+        if (!url || seen.has(url) || selected.length >= MAX_KEY_URLS) return false
+        seen.add(url)
+        selected.push(url)
+        return true
+    }
+
+    add(baseUrl)
+    while (selected.length < MAX_KEY_URLS) {
+        let addedInRound = false
+        for (let groupIndex = 0; groupIndex < candidateGroups.length; groupIndex++) {
+            const group = candidateGroups[groupIndex]
+            while (indexes[groupIndex] < group.length) {
+                const candidate = group[indexes[groupIndex]++]
+                if (add(candidate)) {
+                    addedInRound = true
+                    break
+                }
+            }
+            if (selected.length >= MAX_KEY_URLS) break
+        }
+        if (!addedInRound) break
+    }
+
+    return selected
+}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -21,6 +61,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 limit: 1,
             })
             tenant = tenantsResult.docs[0]
+            if (!hasActiveCustomDomain(tenant, hostname)) {
+                return new Response('Not found', { status: 404 })
+            }
         } else {
             const tenantsResult = await payload.find({
                 collection: 'tenants',
@@ -68,7 +111,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                limit: 10,
+                sort: ['createdAt', 'id'],
+                select: { slug: true, isHomepage: true },
             }),
             payload.find({
                 collection: 'products',
@@ -81,7 +125,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                limit: 10,
+                sort: ['createdAt', 'id'],
+                select: { slug: true },
             }),
             payload.find({
                 collection: 'blogs',
@@ -93,36 +138,54 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 },
                 pagination: false,
                 depth: 0,
-                limit: 5,
+                sort: ['createdAt', 'id'],
+                select: { slug: true },
             }),
         ])
 
         const baseUrl = resolveStorefrontOrigin(tenant as any, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
 
-        // ≥5 key URLs (AC-6): these 5 static storefront routes always exist regardless
-        // of published-content count, guaranteeing the floor even for brand-new sites.
-        const coreUrls = [baseUrl, `${baseUrl}/products`, `${baseUrl}/blogs`, `${baseUrl}/checkout`, `${baseUrl}/orders`]
-
+        // Start with the storefront home and add only content proven public by
+        // the scoped queries above. Never advertise checkout or private order
+        // lookup routes merely to reach an arbitrary URL count.
         const pageUrls = pagesResult.docs
             .filter(p => !(p.isHomepage || p.slug === '/' || p.slug === 'home' || !p.slug))
-            .map(p => `${baseUrl}/${(p.slug as string).replace(/^\//, '')}`)
+            .flatMap(p => {
+                const slugPath = encodePublicSlugPath(p.slug)
+                return slugPath ? [`${baseUrl}/${slugPath}`] : []
+            })
 
         const productUrls = productsResult.docs
-            .filter(p => typeof p.slug === 'string' && p.slug)
-            .map(p => `${baseUrl}/products/${(p.slug as string).replace(/^\//, '')}`)
+            .flatMap(p => {
+                const slugPath = encodePublicSlugSegment(p.slug)
+                return slugPath ? [`${baseUrl}/products/${slugPath}`] : []
+            })
 
         const blogUrls = blogsResult.docs
-            .filter(b => typeof b.slug === 'string' && b.slug)
-            .map(b => `${baseUrl}/blog/${(b.slug as string).replace(/^\//, '')}`)
+            .flatMap(b => {
+                const slugPath = encodePublicSlugSegment(b.slug)
+                return slugPath ? [`${baseUrl}/blog/${slugPath}`] : []
+            })
 
-        const keyUrls = Array.from(new Set([...coreUrls, ...pageUrls, ...productUrls, ...blogUrls])).slice(0, 10)
+        // Keep this supplementary document bounded and deterministic. Round-robin
+        // selection prevents pages or products from starving later content types
+        // while retaining the oldest-first order within each candidate group.
+        const keyUrls = selectKeyUrls(baseUrl, [pageUrls, productUrls, blogUrls])
 
-        const description = site.seo?.metaDescription?.trim() || `${site.name} — cửa hàng trực tuyến`
+        // F37-03 → #1312 score handoff: this published-only 200 response is
+        // `llmsTxtReachable=true` (1 point). Failure here must not affect the
+        // independent crawler-policy or sitemap facts.
+
+        const siteName = markdownInline(site.name) || 'Storefront'
+        const description = markdownInline(site.seo?.metaDescription) || `${siteName} — cửa hàng trực tuyến`
 
         const contactLines: string[] = []
-        if (site.contactInfo?.phone) contactLines.push(`- Phone: ${site.contactInfo.phone}`)
-        if (site.contactInfo?.email) contactLines.push(`- Email: ${site.contactInfo.email}`)
-        if (site.contactInfo?.address) contactLines.push(`- Address: ${site.contactInfo.address}`)
+        const phone = markdownInline(site.contactInfo?.phone)
+        const email = markdownInline(site.contactInfo?.email)
+        const address = markdownInline(site.contactInfo?.address)
+        if (phone) contactLines.push(`- Phone: ${phone}`)
+        if (email) contactLines.push(`- Email: ${email}`)
+        if (address) contactLines.push(`- Address: ${address}`)
 
         // Opening hours: from US-F37-01's site.localBusiness.openingHours (Mo/Tu/../Su codes).
         const openingHoursLines = ((site.localBusiness?.openingHours || []) as Array<{
@@ -133,15 +196,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         }>)
             .filter(h => h.dayOfWeek)
             .map(h => {
-                const day = dayOfWeekToSchema(h.dayOfWeek) || h.dayOfWeek
+                const day = markdownInline(dayOfWeekToSchema(h.dayOfWeek) || h.dayOfWeek)
                 if (h.isClosed) return `- ${day}: Closed`
-                if (h.opens && h.closes) return `- ${day}: ${h.opens}–${h.closes}`
+                const opens = markdownInline(h.opens)
+                const closes = markdownInline(h.closes)
+                if (opens && closes) return `- ${day}: ${opens}–${closes}`
                 return null
             })
             .filter((line): line is string => line !== null)
 
         const lines = [
-            `# ${site.name}`,
+            `# ${siteName}`,
             '',
             `> ${description}`,
             '',
@@ -170,7 +235,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 // description, en-dash in opening hours) — without it browsers guess the
                 // encoding and mangle those bytes (e.g. "–" renders as "â€"").
                 'Content-Type': 'text/plain; charset=utf-8',
-                'Cache-Control': 'public, max-age=300, s-maxage=300',
+                'Cache-Control': 'no-store',
             },
         })
     } catch (error) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -22,6 +22,10 @@ import { GET } from '@/app/api/orders/route'
 describe('GET /api/orders [TC-F10.20, TC-F10.23]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     it('returns paginated order list', async () => {
@@ -185,5 +189,47 @@ describe('GET /api/orders [TC-F10.20, TC-F10.23]', () => {
         // Assert
         const call = mockFind.mock.calls[0][0]
         expect(call.where.status).toBeUndefined()
+    })
+
+    it('filters today from midnight in the viewer timezone', async () => {
+        // Arrange
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-08-03T05:00:00.000Z'))
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+
+        // Act
+        const req = new Request('http://localhost/api/orders?date=today', {
+            headers: { 'X-Viewer-Time-Zone': 'Asia/Ho_Chi_Minh' },
+        })
+        await GET(req, {} as any)
+
+        // Assert
+        expect(mockFind).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    createdAt: {
+                        greater_than_equal: '2026-08-02T17:00:00.000Z',
+                    },
+                }),
+            }),
+        )
+    })
+
+    it('falls back to UTC when the viewer timezone header is invalid', async () => {
+        // Arrange
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-08-03T05:00:00.000Z'))
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+
+        // Act
+        const req = new Request('http://localhost/api/orders?date=thisMonth', {
+            headers: { 'X-Viewer-Time-Zone': 'not-a-timezone' },
+        })
+        await GET(req, {} as any)
+
+        // Assert
+        expect(mockFind.mock.calls[0][0].where.createdAt).toEqual({
+            greater_than_equal: '2026-08-01T00:00:00.000Z',
+        })
     })
 })

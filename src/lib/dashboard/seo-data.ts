@@ -40,8 +40,6 @@ export async function getSeoData(): Promise<SeoData> {
     let metaTagsScore = 100
     let contentQualityScore = 100
     let technicalSeoScore = 100
-    let autoMetaEnabled = true
-    let aiCrawlersEnabled = true
     let siteId: string | number | null = null
     const missingSeoItems: MissingSeoItem[] = []
     let missingTitleCount = 0
@@ -57,9 +55,6 @@ export async function getSeoData(): Promise<SeoData> {
             const site = sitesRes.docs[0]
             if (site) {
                 siteId = site.id
-                autoMetaEnabled = site.seo?.autoMetaEnabled !== false
-                aiCrawlersEnabled = site.aiCrawlersEnabled !== false
-
                 const pageDbRows = await (payload.db.drizzle.execute(sql`
                     SELECT id, title, slug, seo_title, seo_description, seo_no_index
                     FROM pages WHERE site_id = ${site.id} AND deleted_at IS NULL LIMIT 1000
@@ -183,7 +178,5 @@ export async function getSeoData(): Promise<SeoData> {
         topIssue: topIssue ? { count: topIssue.count, fixType: topIssue.fixType } : null,
         missingSeoItems,
         siteId,
-        autoMetaEnabled,
-        aiCrawlersEnabled,
     }
 }

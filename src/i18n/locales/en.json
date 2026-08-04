@@ -1951,6 +1951,9 @@
                 "aiQuotaExceeded": "AI system is overloaded or out of quota. Please try again later.",
                 "aiTimeout": "AI system responses are too slow (Timeout). Please try again with shorter text.",
                 "rateLimitExceeded": "You've used all your AI generation attempts this hour. Try again in {minutes} min.",
+                "noCategoriesTitle": "Create a category before generating AI drafts",
+                "noCategoriesDescription": "AI products need an existing category. Add one, then try again.",
+                "manageCategories": "Manage Categories",
                 "previewTitle": "Preview Grid (AI Processed)",
                 "previewSubtitle": "Empty images will use a default carton icon when saved",
                 "colImage": "Image",
@@ -2045,6 +2048,7 @@
                     "hasProductsError": "Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.",
                     "tooManyChildrenError": "Cannot delete this category. It has {count} subcategories, more than can be safely moved at once. Please move some subcategories out first.",
                     "reparentNameConflictError": "Cannot delete this category yet. Moving its subcategories to the top level would create {count} duplicate category name conflict(s). Please rename or move the conflicting subcategories first.",
+                    "busyRetryError": "This category is being updated. Please try again.",
                     "cancel": "Cancel",
                     "confirm": "Delete",
                     "deleting": "Deleting..."
@@ -3116,6 +3120,9 @@
                 "emptyChartDesc": "Once visitors land on your site, daily pageviews will show up here.",
                 "emptyListTitle": "Nothing to rank yet",
                 "emptyListDesc": "Top pages, blogs and referrers appear once you have traffic.",
+                "loading": "Loading traffic...",
+                "loadError": "Traffic data could not be loaded.",
+                "retry": "Retry",
                 "periodToday": "today",
                 "period7d": "last 7 days",
                 "period30d": "last 30 days"
@@ -3155,30 +3162,6 @@
                     "other": "items missing a meta title"
                 }
             },
-            "tools": {
-                "title": "SEO action tools",
-                "subtitle": "AI works quietly in the background so customers can find your store on Google",
-                "sitemap": "Sitemap",
-                "sitemapTip": "A sitemap lists every page in your store. We hand it to Google so it can find and list all your products.",
-                "sitemapDesc": "Submit your sitemap so Google can discover and index all your pages.",
-                "resubmit": "Resubmit to Google",
-                "autoMeta": "Auto-write search titles & descriptions",
-                "autoMetaTip": "This is the headline customers see on Google. AI writes a short, tempting one for every page automatically.",
-                "autoMetaDesc": "AI writes short, catchy titles that draw customers in when they search on Google.",
-                "active": "Active",
-                "sitemapDone": "Sitemap submitted — {count} URLs sent to Google",
-                "sitemapRegenerated": "Sitemap regenerated",
-                "sitemapError": "Could not generate sitemap",
-                "metaOn": "Auto meta tags turned on",
-                "metaOff": "Auto meta tags turned off",
-                "metaError": "Could not update setting",
-                "aiCrawlers": "Allow AI crawlers to index your website",
-                "aiCrawlersTip": "Lets AI assistants like ChatGPT, Perplexity and Gemini read your store so they can recommend your business.",
-                "aiCrawlersDesc": "Allows GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront so ChatGPT/Perplexity/Gemini can recommend your business.",
-                "aiCrawlersOn": "AI crawlers turned on",
-                "aiCrawlersOff": "AI crawlers turned off",
-                "aiCrawlersError": "Could not update setting"
-            },
             "orders": {
                 "title": "Pending orders",
                 "subtitle": "Orders awaiting fulfilment",
@@ -3214,7 +3197,6 @@
                 "blockGlance": "At-a-glance stats",
                 "blockTraffic": "Traffic & performance",
                 "blockSeo": "SEO health",
-                "blockTools": "SEO action tools",
                 "blockOrders": "Pending orders"
             }
         }
@@ -4464,6 +4446,18 @@
             "seoError": "Error generating SEO",
             "generating": "Generating...",
             "autoSeo": "Automatic SEO Optimization",
+            "seoOverwriteDialog": {
+                "title": "Replace existing SEO metadata?",
+                "description": "Review the current and AI-generated metadata before replacing it.",
+                "metaTitle": "Meta title",
+                "metaDescription": "Meta description",
+                "current": "Current",
+                "proposed": "Proposed",
+                "empty": "Not set",
+                "cancel": "Cancel",
+                "replace": "Replace SEO",
+                "replacing": "Replacing..."
+            },
             "navVariant": "Navigation Style",
             "navVariantDefault": "Default",
             "navVariantCentered": "Centered",
@@ -4755,7 +4749,6 @@
         "settingsValidation": {
             "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
             "primaryColorLabel": "Primary color picker",
-            "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
             "phoneRequired": "Phone number is required",
             "invalidLatitude": "Latitude must be between -90 and 90",
             "invalidLongitude": "Longitude must be between -180 and 180"

@@ -34,7 +34,6 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
             glance: czT.blockGlance,
             traffic: czT.blockTraffic,
             seo: czT.blockSeo,
-            tools: czT.blockTools,
             orders: czT.blockOrders,
         }
         return map[id]

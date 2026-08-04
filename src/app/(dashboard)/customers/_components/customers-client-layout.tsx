@@ -10,19 +10,58 @@ import { getShopCustomersAction, exportShopCustomersCsvAction } from '../actions
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 import type { RankFilter, DateFilter } from './customers-list-toolbar'
 import type { SortKey } from '../_lib/shop-customer-record'
+import {
+    getBrowserViewerTimeZone,
+    getViewerCustomDateRange,
+    getViewerDateTimeParts,
+    getViewerPeriodStart,
+    shiftViewerDateKey,
+    toViewerDateKey,
+    viewerDateKeyToUtc,
+} from '@/lib/viewer-timezone'
 
 function toDateRange(f: DateFilter, customFrom?: string, customTo?: string): { dateFrom?: string; dateTo?: string } {
     const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    if (f === 'today')       return { dateFrom: today.toISOString(), dateTo: now.toISOString() }
-    if (f === 'last7d')      return { dateFrom: new Date(today.getTime() - 6 * 86400000).toISOString() }
-    if (f === 'last30d')     return { dateFrom: new Date(today.getTime() - 29 * 86400000).toISOString() }
-    if (f === 'last90d')     return { dateFrom: new Date(today.getTime() - 89 * 86400000).toISOString() }
-    if (f === 'thisYear')    return { dateFrom: new Date(today.getFullYear(), 0, 1).toISOString() }
-    if (f === 'customRange' && customFrom && customTo) {
-        // Use explicit UTC end-of-day so the range is consistent across timezones
-        return { dateFrom: new Date(customFrom + 'T00:00:00.000Z').toISOString(), dateTo: new Date(customTo + 'T23:59:59.999Z').toISOString() }
+    const viewerTimeZone = getBrowserViewerTimeZone()
+    const todayKey = toViewerDateKey(getViewerDateTimeParts(now, viewerTimeZone))
+
+    if (f === 'today') {
+        return {
+            dateFrom: getViewerPeriodStart(now, viewerTimeZone, 'today').toISOString(),
+            dateTo: now.toISOString(),
+        }
     }
+
+    const rollingDays = f === 'last7d'
+        ? 7
+        : f === 'last30d'
+            ? 30
+            : f === 'last90d'
+                ? 90
+                : null
+
+    if (rollingDays) {
+        const startKey = shiftViewerDateKey(todayKey, -(rollingDays - 1))
+        const start = startKey ? viewerDateKeyToUtc(startKey, viewerTimeZone) : null
+        return start ? { dateFrom: start.toISOString() } : {}
+    }
+
+    if (f === 'thisYear') {
+        return {
+            dateFrom: getViewerPeriodStart(now, viewerTimeZone, 'thisYear').toISOString(),
+        }
+    }
+
+    if (f === 'customRange' && customFrom && customTo) {
+        const range = getViewerCustomDateRange(customFrom, customTo, viewerTimeZone)
+        return range
+            ? {
+                dateFrom: range.start.toISOString(),
+                dateTo: range.endInclusive.toISOString(),
+            }
+            : {}
+    }
+
     return {}
 }
 

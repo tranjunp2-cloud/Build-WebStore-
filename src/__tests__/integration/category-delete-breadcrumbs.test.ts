@@ -53,9 +53,22 @@ describe.skipIf(!runIntegration)('category delete action breadcrumbs (GH-1571)',
             vi.mocked(tenantIdForQuery).mockReturnValue(1)
             vi.mocked(getActivePlanSubscription).mockResolvedValue({ plan: 'PROFESSIONAL_TM_USER' } as unknown as ActiveSubscription)
             vi.mocked(canUse).mockResolvedValue(true)
+            const testDrizzle = drizzle(client)
+            const transaction = vi.fn(async <T>(
+                operation: (transaction: typeof testDrizzle) => Promise<T>,
+            ) => operation(testDrizzle))
             vi.mocked(getPayload).mockResolvedValue({
                 findByID: vi.fn().mockResolvedValue({ id: 1, name: 'Parent', parent: null, tenant: 1 }),
-                db: { drizzle: drizzle(client) },
+                db: {
+                    // The production action requires Payload's pool-backed mutation gate. Keep
+                    // the gate contract while executing its transaction against this test's
+                    // already-open client so TEMP tables remain visible until the outer rollback.
+                    pool: {
+                        connect: vi.fn(() => pool.connect()),
+                        options: { max: 2 },
+                    },
+                    drizzle: { transaction },
+                },
             } as unknown as PayloadInstance)
 
             await deleteCategoryAction(1)

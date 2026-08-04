@@ -333,7 +333,10 @@ export const Sites: CollectionConfig = {
             type: 'checkbox',
             defaultValue: true,
             label: 'Cho phép AI crawlers index website',
-            admin: { description: 'Allow GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront.' },
+            admin: {
+                hidden: true,
+                description: 'Deprecated legacy field. AI crawler access is managed by the platform.',
+            },
         },
         {
             name: 'socialLinks',
