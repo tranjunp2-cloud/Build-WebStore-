@@ -853,6 +853,55 @@ html[data-period-pending="1"] .dash-revamp .stream {
   padding: 18px 20px 14px;
 }
 
+.dash-revamp .traffic-load-state {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--dr-ink-3);
+}
+
+.dash-revamp .traffic-load-state > svg {
+  width: 24px;
+  height: 24px;
+}
+
+.dash-revamp .traffic-load-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.dash-revamp .traffic-load-state button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--dr-line-2);
+  border-radius: 8px;
+  background: var(--dr-surface-2);
+  color: var(--dr-ink-1);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-revamp .traffic-load-state button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dash-revamp .traffic-loading-icon {
+  animation: traffic-loading-spin 0.8s linear infinite;
+}
+
+@keyframes traffic-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
 .dash-revamp .chart-head {
   display: flex;
   align-items: center;

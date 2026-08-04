@@ -12,6 +12,11 @@ const fmtNum = (n: number): string =>
 // fmtDM: format date as "D/M" (e.g. "19/5") for bar chart x-axis labels.
 // Accepts ISO string ('yyyy-MM-dd') or Date object.
 const fmtDM = (d: string | Date): string => {
+    if (typeof d === 'string') {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
+        if (match) return `${Number(match[3])}/${Number(match[2])}`
+    }
+
     const date = typeof d === 'string' ? new Date(d) : d
     return `${date.getDate()}/${date.getMonth() + 1}`
 }
