@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { notFound } from 'next/navigation'
-import TenantSitePage from '@/app/sites/[slug]/[[...path]]/page'
+import TenantSitePage, { generateMetadata } from '@/app/sites/[slug]/[[...path]]/page'
 
 // Mock next utilities
 vi.mock('next/navigation', () => ({
@@ -121,5 +121,34 @@ describe('TenantSitePage', () => {
 
         expect(notFound).not.toHaveBeenCalled()
         expect(result).toBeTruthy()
+    })
+
+    it('[TC-GH-1717] resolves a populated SEO image in public metadata', async () => {
+        // Arrange
+        mockSite = {
+            id: 'site-1',
+            name: 'Test Site',
+            status: 'published',
+            seo: {
+                ogImage: {
+                    id: 42,
+                    url: '/media/social-image.png',
+                },
+            },
+        }
+
+        // Act
+        const metadata = await generateMetadata({
+            params: Promise.resolve({ slug: 'my-site' }),
+            searchParams: Promise.resolve({}),
+        })
+
+        // Assert
+        expect(metadata.openGraph).toMatchObject({
+            images: [{ url: '/media/social-image.png' }],
+        })
+        expect(metadata.twitter).toMatchObject({
+            images: ['/media/social-image.png'],
+        })
     })
 })
