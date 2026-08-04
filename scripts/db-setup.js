@@ -264,6 +264,7 @@ const MIGRATIONS = [
   { name: 'sites.local_business_latitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_latitude numeric;' },
   { name: 'sites.local_business_longitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_longitude numeric;' },
   { name: 'sites.local_business_business_category', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_business_category varchar;' },
+  { name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' },
   { name: 'sites.local_business_price_range', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_price_range varchar;' },
   { name: 'sites.local_business_service_area_description', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_service_area_description varchar;' },
   // ── Products: Halal + Weight ──

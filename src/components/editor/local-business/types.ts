@@ -1,3 +1,5 @@
+import type { SchemaSubtype } from '@/lib/seo/local-business-constants'
+
 /** F37 US-01: shared shapes for the Local Business accordion sub-components.
  *  Mirrors `localBusinessSchema` in `src/lib/validations/sites.ts` — keep
  *  fields in sync with that Zod schema (the save-route boundary). */
@@ -20,6 +22,7 @@ export interface LocalBusinessData {
     /** Real JS number — never a numeric string (Zod validates with `z.number()`, not `z.coerce.number()`). */
     longitude?: number
     businessCategory?: string
+    schemaSubtype?: SchemaSubtype | null
     priceRange?: string
     serviceAreaDescription?: string
     openingHours?: OpeningHourRow[]

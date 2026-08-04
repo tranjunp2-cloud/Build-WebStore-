@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const isStaging = process.env.BASE_URL?.includes('dev.ecommercehub')
+const hasE2EAccount = Boolean(
+    process.env.TEST_EMAIL
+    && process.env.TEST_PASSWORD
+    && process.env.E2E_TEST_OTP_CODE,
+)
 export const F37_CUSTOM_DOMAIN_TEST = /\[TC-F37-03-52\]/
 
 export default defineConfig({
@@ -68,6 +73,18 @@ export default defineConfig({
                 storageState: undefined,
             },
             dependencies: ['setup'],
+        },
+        // F37 auth is used only to discover the account's sole site. The
+        // storefront assertions themselves run in an unauthenticated context.
+        {
+            name: 'f37-storefront-regression',
+            testDir: './tests',
+            testMatch: /f37-schema-rich-local-markup\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: undefined,
+            },
+            dependencies: hasE2EAccount ? ['setup'] : [],
         },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).

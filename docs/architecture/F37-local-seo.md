@@ -124,7 +124,7 @@ Loose, human-friendly codes used by the AI site builder's composer:
 
 - `businessCategory`: broad seller-facing category used to filter the next field.
 - `schemaSubtype`: one primary, specific LocalBusiness type selected from the compatible dropdown.
-- Source of truth: a versioned category→subtype mapping snapshot built from Google Local Business guidance and the Schema.org LocalBusiness hierarchy; never fetched at request time.
+- Source of truth: [`F37-local-business-subtype-mapping-v2.6.md`](./F37-local-business-subtype-mapping-v2.6.md), a versioned category→subtype mapping snapshot built from Google Local Business guidance and the Schema.org LocalBusiness hierarchy; never fetched at request time.
 - Mapping validation is shared by Editor filtering and the save boundary. An incompatible pair is rejected server-side.
 - Category change preserves a compatible subtype; otherwise clears it. Empty subtype emits `LocalBusiness` and earns no subtype points.
 - `priceRangeForLocalBusinessCategory()` continues to derive only the price fallback from the broad category.

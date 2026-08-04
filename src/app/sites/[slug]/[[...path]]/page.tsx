@@ -14,7 +14,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
-import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { resolveStorefrontOrigin, type TenantLike } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { resolveMetadataImageUrl } from '@/lib/seo/metadata-image'
 import {
@@ -206,7 +206,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Resolve canonical URL — prefer primary custom domain, then middleware header, then subdomain
     const reqHeaders = await headers()
     const tenantHostname = reqHeaders.get('x-tenant-hostname')
-    const baseUrl = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
+    const baseUrl = resolveStorefrontOrigin(data.tenant as unknown as TenantLike, { fallbackHostname: tenantHostname, slug })
 
     const canonicalPath = pagePath ? `/${pagePath}` : ''
     const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
@@ -348,33 +348,16 @@ export default async function TenantSitePage({ params }: Props) {
     const payload = await getPayload({ config })
     const imageLibraryS3 = await resolveImageLibraryS3Map(payload, site.id)
 
-    const origin = resolveStorefrontOrigin(data.tenant as any, { slug })
-    const orgJsonLd = pagePath === '' && origin ? {
-        '@context': 'https://schema.org',
-        '@graph': [
-            {
-                '@type': 'Organization', '@id': `${origin}#org`,
-                name: site.name, url: origin,
-                ...((site.branding as any)?.logo ? { logo: (site.branding as any).logo } : {}),
-            },
-            {
-                '@type': 'WebSite', '@id': `${origin}#website`,
-                name: site.name, url: origin,
-                publisher: { '@id': `${origin}#org` },
-            },
-        ],
-    } : null
+    const tenantHostname = (await headers()).get('x-tenant-hostname')
+    const origin = resolveStorefrontOrigin(data.tenant as unknown as TenantLike, { fallbackHostname: tenantHostname, slug })
 
     return (
-        <>
-            {orgJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(orgJsonLd) }} />}
-            <SiteRenderer
-                site={{ ...site, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-                page={page as unknown as PageData}
-                pages={pages as unknown as NavPage[]}
-                siteId={String(site.id)}
-                isOwner={isOwner}
-            />
-        </>
+        <SiteRenderer
+            site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
+            page={page as unknown as PageData}
+            pages={pages as unknown as NavPage[]}
+            siteId={String(site.id)}
+            isOwner={isOwner}
+        />
     )
 }

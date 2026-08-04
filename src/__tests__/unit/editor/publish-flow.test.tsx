@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import EditorPage from '@/app/(editor)/editor/[siteId]/page'
 import type { LocalBusinessData } from '@/components/editor/local-business/types'
@@ -9,6 +9,7 @@ import '@testing-library/jest-dom'
 
 type SettingsPanelHarnessProps = {
     isContactSavePending?: boolean
+    isLocalBusinessSaveLocked?: boolean
     site?: {
         contactInfo?: { phone?: string; email?: string; address?: string }
         localBusiness?: LocalBusinessData
@@ -22,6 +23,7 @@ type SettingsPanelHarnessProps = {
 
 const settingsPanelHarness = vi.hoisted(() => ({
     latestProps: null as SettingsPanelHarnessProps | null,
+    savePromises: [] as Array<Promise<void | boolean>>,
     siteId: 'test-site-id',
     searchParams: '',
 }))
@@ -69,6 +71,10 @@ vi.mock('@/i18n', () => ({
                     unpublishFailed: 'Gỡ website thất bại',
                     versionConflict: 'Version conflict',
                     viewAction: 'View',
+                },
+                settings: {
+                    localBusinessSaveUnknownTitle: 'Could not confirm whether local business information was saved.',
+                    localBusinessSaveUnknownDescription: 'Reload the editor before editing local business information again.',
                 },
             },
             dashboard: { overview: {} },
@@ -127,7 +133,44 @@ vi.mock('@/components/editor/PageManagerPanel', () => ({ PageManagerPanel: () =>
 vi.mock('@/components/editor/SettingsPanel', () => ({
     SettingsPanel: (props: SettingsPanelHarnessProps) => {
         settingsPanelHarness.latestProps = props
-        return <div data-testid="settings-panel-phone">{props.site?.contactInfo?.phone || ''}</div>
+        return (
+            <div>
+                <div data-testid="settings-panel-phone">{props.site?.contactInfo?.phone || ''}</div>
+                <output data-testid="local-business-pair">
+                    {(props.site?.localBusiness?.businessCategory || '') + ':' + (props.site?.localBusiness?.schemaSubtype || '')}
+                </output>
+                <output data-testid="local-business-address">
+                    {props.site?.localBusiness?.streetAddress || ''}
+                </output>
+                <output data-testid="local-business-locked">
+                    {props.isLocalBusinessSaveLocked ? 'locked' : 'unlocked'}
+                </output>
+                <button
+                    data-testid="reject-local-business-save"
+                    disabled={props.isLocalBusinessSaveLocked}
+                    onClick={() => {
+                        settingsPanelHarness.savePromises.push(Promise.resolve(props.onSiteSettingsChange?.({
+                            localBusiness: { businessCategory: 'store', schemaSubtype: 'Store' },
+                        })))
+                    }}
+                >
+                    Save rejected pair
+                </button>
+                <button
+                    data-testid="save-address-after-pair"
+                    disabled={props.isLocalBusinessSaveLocked}
+                    onClick={() => {
+                        settingsPanelHarness.savePromises.push(Promise.resolve(props.onSiteSettingsChange?.({
+                            localBusiness: {
+                                streetAddress: 'New confirmed address',
+                            },
+                        })))
+                    }}
+                >
+                    Save newer address
+                </button>
+            </div>
+        )
     },
 }))
 vi.mock('@/components/editor/BlockLibraryPanel', () => ({ BlockLibraryPanel: () => <div /> }))
@@ -146,6 +189,7 @@ vi.mock('sonner', () => ({
 beforeEach(() => {
     vi.clearAllMocks()
     settingsPanelHarness.latestProps = null
+    settingsPanelHarness.savePromises = []
     settingsPanelHarness.siteId = 'test-site-id'
     settingsPanelHarness.searchParams = ''
     
@@ -202,6 +246,10 @@ beforeEach(() => {
 
 describe('Publish and Save Flows (TC-F05)', () => {
 
+
+afterEach(() => {
+    vi.useRealTimers()
+})
     it('[TC-F37-01-30] serializes and coalesces overlapping localBusiness saves', async () => {
         // Arrange
         const initialLocalBusiness: LocalBusinessData = {
@@ -457,6 +505,84 @@ describe('Publish and Save Flows (TC-F05)', () => {
             },
         })
         await act(async () => expect(await queuedSiteASave).toBe(true))
+    })
+
+    it('[TC-F37-02-47] does not roll back the active site when a previous site save fails late', async () => {
+        // Arrange
+        const siteALocalBusiness: LocalBusinessData = {
+            streetAddress: '1 Site A Street', city: 'Shah Alam', postcode: '40100', country: 'MY',
+        }
+        const siteBLocalBusiness: LocalBusinessData = {
+            streetAddress: '2 Site B Street', city: 'Johor Bahru', postcode: '80000', country: 'MY',
+        }
+        let resolveSiteASave: ((response: {
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }) => void) | undefined
+        const siteASaveResponse = new Promise<{
+            ok: boolean
+            status: number
+            json: () => Promise<{ error: string }>
+        }>(resolve => { resolveSiteASave = resolve })
+
+        settingsPanelHarness.siteId = 'site-a'
+        global.fetch = vi.fn((input: string | URL) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                const isSiteB = url.includes('/sites/site-b/')
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: isSiteB ? 'site-b' : 'site-a',
+                            name: isSiteB ? 'Site B' : 'Site A',
+                            status: 'draft',
+                            localBusiness: isSiteB ? siteBLocalBusiness : siteALocalBusiness,
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ pages: [{ id: 'page-1', title: 'Home', slug: '/' }] }),
+                })
+            }
+            if (url.includes('/sites/site-a/save')) return siteASaveResponse
+            return Promise.resolve({ ok: true, json: async () => ({ success: true }) })
+        }) as unknown as typeof fetch
+
+        const view = render(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteALocalBusiness)
+        })
+        let siteASave: Promise<void | boolean> | undefined
+        act(() => {
+            siteASave = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: { streetAddress: '99 Site A Street' },
+            }))
+        })
+
+        // Act
+        settingsPanelHarness.siteId = 'site-b'
+        view.rerender(<EditorPage />)
+        await waitFor(() => {
+            expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
+        })
+        await act(async () => {
+            resolveSiteASave?.({
+                ok: false,
+                status: 500,
+                json: async () => ({ error: 'Site A save failed' }),
+            })
+            expect(await siteASave).toBe(false)
+        })
+
+        // Assert
+        expect(settingsPanelHarness.latestProps?.site?.localBusiness).toEqual(siteBLocalBusiness)
     })
 
     it('[TC-F37-01-30] preserves pending localBusiness edits across a same-site page reload', async () => {
@@ -1232,6 +1358,411 @@ describe('Publish and Save Flows (TC-F05)', () => {
             const pages = useEditorStore.getState().pages
             const newPage = pages.find(p => p.id === 'page-new')
             expect(newPage?.status).toBe('published')
+        })
+    })
+
+    it('[TC-F37-02-47] restores the previous valid category and subtype when save rejects the optimistic pair', async () => {
+        // Arrange
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            localBusiness: {
+                                businessCategory: 'foodEstablishment',
+                                schemaSubtype: 'Restaurant',
+                            },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) {
+                return { ok: true, json: async () => ({ pages: [] }) } as Response
+            }
+            if (url.includes('/save')) {
+                return {
+                    ok: false,
+                    status: 400,
+                    json: async () => ({ error: 'Invalid category/subtype pair' }),
+                } as Response
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+
+        // Assert
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith(
+                'Invalid category/subtype pair',
+                expect.objectContaining({ description: undefined }),
+            )
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+        const saveCall = vi.mocked(global.fetch).mock.calls.find(([input]) => String(input).includes('/save'))
+        expect(saveCall).toBeDefined()
+        const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as {
+            localBusiness?: { businessCategory?: string; schemaSubtype?: string | null }
+        }
+        expect(requestBody.localBusiness).toMatchObject({
+            businessCategory: 'store',
+            schemaSubtype: 'Store',
+        })
+        expect(trackEvent).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F37-02-48] reconciles a normalized committed LocalBusiness save when the response is lost', async () => {
+        // Arrange
+        let serverLocalBusiness: LocalBusinessData & {
+            openingHours?: Array<NonNullable<LocalBusinessData['openingHours']>[number] & {
+                id?: string
+                _uuid?: string
+            }>
+        } = {
+            businessCategory: 'foodEstablishment',
+            schemaSubtype: 'Restaurant',
+            openingHours: [{ dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false }],
+        }
+        const saveBodies: Array<{ localBusiness?: LocalBusinessData }> = []
+        let editorDataReads = 0
+        vi.mocked(global.fetch).mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                editorDataReads += 1
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: { id: 'test-site-id', name: 'Test Site', status: 'draft', localBusiness: serverLocalBusiness },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) return { ok: true, json: async () => ({ pages: [] }) } as Response
+            if (url.includes('/save')) {
+                const body = JSON.parse(String(init?.body)) as { localBusiness?: LocalBusinessData }
+                saveBodies.push(body)
+                if (saveBodies.length === 1) {
+                    const requested = body.localBusiness ?? {}
+                    serverLocalBusiness = {
+                        ...requested,
+                        openingHours: requested.openingHours?.map((row, index) => ({
+                            ...row,
+                            id: `payload-row-${index}`,
+                            _uuid: `payload-uuid-${index}`,
+                        })),
+                    }
+                    throw new Error('Response lost after LocalBusiness persistence')
+                }
+                return { ok: true, json: async () => ({ success: true }) } as Response
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant'))
+
+        // Act
+        let saveResult: Promise<void | boolean> | undefined
+        act(() => {
+            saveResult = Promise.resolve(settingsPanelHarness.latestProps?.onSiteSettingsChange?.({
+                localBusiness: {
+                    businessCategory: 'store',
+                    schemaSubtype: 'Store',
+                    serviceAreaDescription: '  <b>Kuala Lumpur</b>  ',
+                },
+            }))
+        })
+
+        // Assert
+        let resolvedSaveResult: void | boolean | undefined
+        await act(async () => {
+            resolvedSaveResult = await saveResult
+        })
+        expect(resolvedSaveResult).toBe(true)
+        await waitFor(() => {
+            expect(editorDataReads).toBe(2)
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+        })
+        expect(toast.error).not.toHaveBeenCalled()
+        expect(trackEvent).toHaveBeenCalledTimes(1)
+        expect(saveBodies[0]?.localBusiness?.serviceAreaDescription).toBe('Kuala Lumpur')
+
+        // Act: a real sparse address edit must build on the reconciled pair.
+        fireEvent.click(screen.getByTestId('save-address-after-pair'))
+
+        // Assert
+        let addressSaveResult: void | boolean | undefined
+        await act(async () => {
+            addressSaveResult = await settingsPanelHarness.savePromises[0]
+        })
+        expect(addressSaveResult).toBe(true)
+        await waitFor(() => expect(saveBodies).toHaveLength(2))
+        expect(saveBodies[1]?.localBusiness).toMatchObject({
+            businessCategory: 'store', schemaSubtype: 'Store', streetAddress: 'New confirmed address',
+        })
+    })
+
+    it('[TC-F37-02-48] locks LocalBusiness saves when a transport outcome cannot be confirmed', async () => {
+        // Arrange
+        let editorDataReads = 0
+        let saveAttempts = 0
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                editorDataReads += 1
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id', name: 'Test Site', status: 'draft',
+                            localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Restaurant' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) return { ok: true, json: async () => ({ pages: [] }) } as Response
+            if (url.includes('/save')) {
+                saveAttempts += 1
+                throw new Error('LocalBusiness save outcome is unknown')
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant'))
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+
+        // Assert
+        await waitFor(() => {
+            expect(editorDataReads).toBe(2)
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+            expect(toast.error).toHaveBeenCalledWith(
+                'Could not confirm whether local business information was saved.',
+                { description: 'Reload the editor before editing local business information again.' },
+            )
+        })
+        expect(saveAttempts).toBe(1)
+        expect(trackEvent).not.toHaveBeenCalled()
+        await expect(settingsPanelHarness.savePromises[0]).resolves.toBe(false)
+        expect(screen.getByTestId('local-business-locked')).toHaveTextContent('locked')
+
+        // Act: a locked panel cannot schedule another full-snapshot write.
+        fireEvent.click(screen.getByTestId('save-address-after-pair'))
+
+        // Assert
+        expect(settingsPanelHarness.savePromises).toHaveLength(1)
+        await act(async () => { await Promise.resolve() })
+        expect(saveAttempts).toBe(1)
+    })
+
+    it('[TC-F37-02-48] removes a queued revision from the visible snapshot when the in-flight outcome is unknown', async () => {
+        // Arrange
+        let resolveReconciliation: ((response: Response) => void) | undefined
+        const reconciliation = new Promise<Response>((resolve) => { resolveReconciliation = resolve })
+        let editorDataReads = 0
+        let saveAttempts = 0
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                editorDataReads += 1
+                if (editorDataReads === 2) return reconciliation
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id', name: 'Test Site', status: 'draft',
+                            localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Restaurant' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) return { ok: true, json: async () => ({ pages: [] }) } as Response
+            if (url.includes('/save')) {
+                saveAttempts += 1
+                throw new Error('LocalBusiness save outcome is unknown')
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant'))
+
+        // Act: queue B while A is reconciling.
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+        await waitFor(() => expect(editorDataReads).toBe(2))
+        fireEvent.click(screen.getByTestId('save-address-after-pair'))
+        expect(screen.getByTestId('local-business-address')).toHaveTextContent('New confirmed address')
+        let firstSaveResult: void | boolean | undefined
+        let queuedSaveResult: void | boolean | undefined
+        await act(async () => {
+            resolveReconciliation?.({
+                ok: true,
+                json: async () => ({
+                    site: {
+                        id: 'test-site-id', name: 'Test Site', status: 'draft',
+                        localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Restaurant' },
+                    },
+                }),
+            } as Response)
+            firstSaveResult = await settingsPanelHarness.savePromises[0]
+            queuedSaveResult = await settingsPanelHarness.savePromises[1]
+        })
+
+        // Assert: A remains the only ambiguous snapshot; B is definitely unsaved.
+        expect(firstSaveResult).toBe(false)
+        expect(queuedSaveResult).toBe(false)
+        await waitFor(() => {
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+            expect(screen.getByTestId('local-business-address')).toBeEmptyDOMElement()
+            expect(screen.getByTestId('local-business-locked')).toHaveTextContent('locked')
+        })
+        expect(saveAttempts).toBe(1)
+    })
+
+    it('[TC-F37-02-48] times out a stalled reconciliation and settles the save as unknown', async () => {
+        // Arrange
+        let editorDataReads = 0
+        let reconcileSignal: AbortSignal | undefined
+        vi.mocked(global.fetch).mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                editorDataReads += 1
+                if (editorDataReads === 2) {
+                    reconcileSignal = init?.signal ?? undefined
+                    return new Promise<Response>((_resolve, reject) => {
+                        reconcileSignal?.addEventListener('abort', () => {
+                            reject(new DOMException('Reconciliation timed out', 'AbortError'))
+                        }, { once: true })
+                    })
+                }
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id', name: 'Test Site', status: 'draft',
+                            localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Restaurant' },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) return { ok: true, json: async () => ({ pages: [] }) } as Response
+            if (url.includes('/save')) throw new Error('Response lost before reconciliation timeout')
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant'))
+        vi.useFakeTimers()
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+        await act(async () => {
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(5_000)
+        })
+
+        // Assert
+        expect(reconcileSignal?.aborted).toBe(true)
+        await expect(settingsPanelHarness.savePromises[0]).resolves.toBe(false)
+        expect(screen.getByTestId('local-business-locked')).toHaveTextContent('locked')
+    })
+
+    it('[TC-F37-02-47] preserves the newer optimistic revision when an older save fails', async () => {
+        // Arrange
+        let resolveOlderSave: ((response: Response) => void) | null = null
+        const olderSave = new Promise<Response>(resolve => {
+            resolveOlderSave = resolve
+        })
+        let saveCount = 0
+        vi.mocked(global.fetch).mockImplementation(async (input) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        site: {
+                            id: 'test-site-id',
+                            name: 'Test Site',
+                            status: 'draft',
+                            localBusiness: {
+                                businessCategory: 'foodEstablishment',
+                                schemaSubtype: 'Restaurant',
+                            },
+                        },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                } as Response
+            }
+            if (url.includes('/pages')) {
+                return { ok: true, json: async () => ({ pages: [] }) } as Response
+            }
+            if (url.includes('/save')) {
+                saveCount += 1
+                if (saveCount === 1) return olderSave
+                return { ok: true, json: async () => ({}) } as Response
+            }
+            return { ok: true, json: async () => ({}) } as Response
+        })
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('foodEstablishment:Restaurant')
+        })
+
+        // Act
+        fireEvent.click(screen.getByTestId('reject-local-business-save'))
+        await waitFor(() => {
+            expect(saveCount).toBe(1)
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+        })
+        fireEvent.click(screen.getByTestId('save-address-after-pair'))
+        expect(saveCount).toBe(1)
+        act(() => {
+            resolveOlderSave?.({
+                ok: false,
+                status: 409,
+                json: async () => ({ error: 'Older save rejected' }),
+            } as Response)
+        })
+
+        // Assert
+        await waitFor(() => {
+            expect(saveCount).toBe(2)
+            expect(toast.error).toHaveBeenCalledWith(
+                'Older save rejected',
+                expect.objectContaining({ description: undefined }),
+            )
+            expect(screen.getByTestId('local-business-pair')).toHaveTextContent('store:Store')
+        })
+        const saveCalls = vi.mocked(global.fetch).mock.calls.filter(([input]) => String(input).includes('/save'))
+        const latestRequestBody = JSON.parse(String(saveCalls[1]?.[1]?.body)) as {
+            localBusiness?: {
+                businessCategory?: string
+                schemaSubtype?: string | null
+                streetAddress?: string
+            }
+        }
+        expect(latestRequestBody.localBusiness).toMatchObject({
+            businessCategory: 'store',
+            schemaSubtype: 'Store',
+            streetAddress: 'New confirmed address',
         })
     })
 

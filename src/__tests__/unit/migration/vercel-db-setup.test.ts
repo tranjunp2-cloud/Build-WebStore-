@@ -357,3 +357,18 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
         expect(migrateOnlyBlock).not.toContain('spawnServer')
     })
 })
+
+describe('[TC-F37-02-31] schemaSubtype additive SQL migration', () => {
+    it('adds the group column idempotently and never drops it', () => {
+        // Arrange
+        const scriptContent = fs.readFileSync(path.resolve(process.cwd(), 'scripts/db-setup.js'), 'utf-8')
+        const migration = "{ name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' }"
+
+        // Act
+        const occurrences = scriptContent.split(migration).length - 1
+
+        // Assert
+        expect(occurrences).toBe(1)
+        expect(scriptContent).not.toMatch(/DROP\s+(?:COLUMN|TABLE)[^;]*local_business_schema_subtype/i)
+    })
+})

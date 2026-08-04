@@ -1,5 +1,5 @@
 type CustomDomain = { domain?: string; status?: string; isPrimary?: boolean }
-type TenantLike = { slug?: string; customDomains?: CustomDomain[] | null }
+export type TenantLike = { slug?: string; customDomains?: CustomDomain[] | null }
 
 function normalizeDomain(value: string): string {
     return value.trim().toLowerCase().replace(/\.$/, '')
