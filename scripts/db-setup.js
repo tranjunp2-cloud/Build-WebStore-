@@ -5154,13 +5154,27 @@ function approvedDuplicateGroupMap(approvedPairs) {
   return groups;
 }
 
-function buildDuplicateIndexCleanupPlan(indexRows, detectedPairs, approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS) {
+function partitionDetectedDuplicateIndexPairs(
+  detectedPairs,
+  approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS
+) {
   const approvedGroups = approvedDuplicateGroupMap(approvedPairs);
-  const unknownPairs = detectedPairs.filter((pair) => {
+  const approved = [];
+  const unapproved = [];
+  for (const pair of detectedPairs) {
     const firstGroup = approvedGroups.get(`${pair.table_name}:${pair.index_1}`);
     const secondGroup = approvedGroups.get(`${pair.table_name}:${pair.index_2}`);
-    return !firstGroup || firstGroup !== secondGroup;
-  });
+    if (firstGroup && firstGroup === secondGroup) {
+      approved.push(pair);
+    } else {
+      unapproved.push(pair);
+    }
+  }
+  return { approved, unapproved };
+}
+
+function buildDuplicateIndexCleanupPlan(indexRows, detectedPairs, approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS) {
+  const { unapproved: unknownPairs } = partitionDetectedDuplicateIndexPairs(detectedPairs, approvedPairs);
   if (unknownPairs.length > 0) {
     const names = unknownPairs
       .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
@@ -5301,8 +5315,20 @@ async function cleanupApprovedDuplicateIndexes(pool) {
     }
 
     const detectedPairs = await detectExactDuplicateIndexPairs(client);
+    const {
+      approved: approvedDetectedPairs,
+      unapproved: unapprovedDetectedPairs,
+    } = partitionDetectedDuplicateIndexPairs(detectedPairs);
+    if (unapprovedDetectedPairs.length > 0) {
+      const names = unapprovedDetectedPairs
+        .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
+        .join(', ');
+      console.warn(
+        `[db-setup] ⚠️ PERF-04 skipped unapproved exact duplicate indexes; audit before cleanup: ${names}`
+      );
+    }
     const beforeRows = await loadApprovedIndexMetadata(client);
-    const actions = buildDuplicateIndexCleanupPlan(beforeRows, detectedPairs);
+    const actions = buildDuplicateIndexCleanupPlan(beforeRows, approvedDetectedPairs);
 
     if (actions.length === 0) {
       console.log('[db-setup] ✅ PERF-04 duplicate indexes already clean');
@@ -6127,5 +6153,6 @@ module.exports = {
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,
   cleanupApprovedDuplicateIndexes,
+  partitionDetectedDuplicateIndexPairs,
   normalizeIndexPredicate,
 };

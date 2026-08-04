@@ -13,6 +13,19 @@ import { stripStructuralFields } from '@/lib/editor/structural-block-fields'
 // created only after earlier writes settle, so it can snapshot the latest state.
 const editorSaveTails = new Map<string, Promise<void>>()
 
+export type EditorSaveContext = {
+    siteId: string
+    pageId: string | null
+}
+
+export function isEditorSaveContextCurrent(
+    expected: EditorSaveContext,
+    current: { siteId: string | null; currentPageId: string | null },
+): boolean {
+    return current.siteId === expected.siteId
+        && (current.currentPageId || null) === expected.pageId
+}
+
 export function hasPendingSerializedEditorSave(siteId: string): boolean {
     return editorSaveTails.has(siteId)
 }
@@ -616,13 +629,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const snapshot = createSnapshot(sanitized, theme, headerBlock, footerBlock, label, 'ai_chat', globalBlocks)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
-        set({
+        set(state => ({
             blocks: JSON.parse(JSON.stringify(sanitized)),
             theme: JSON.parse(JSON.stringify(theme)),
             history: newHistory,
             historyIndex: newHistory.length - 1,
             hasUnsavedChanges: true,
-        })
+            saveStatus: 'idle',
+            contentRevision: state.contentRevision + 1,
+        }))
     },
 
     // ── Undo/Redo (F-11) ────────────────────────────────────────────────
@@ -716,8 +731,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     performSave: async (_isManual = false) => {
-        const { siteId, autoSaveTimer, isSaving } = get()
+        const { siteId, currentPageId, autoSaveTimer, isSaving } = get()
         if (!siteId) return false
+        const saveContext: EditorSaveContext = {
+            siteId,
+            pageId: currentPageId || null,
+        }
         // `isSaving` is also used by UI code. If it is set without a registered
         // task, preserve the existing anti-spam behavior instead of starting an
         // unowned request. Active queue tasks are safe to serialize behind.
@@ -729,6 +748,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
         const attemptSave = async (retryCount = 0): Promise<boolean> => {
+            if (!isEditorSaveContextCurrent(saveContext, get())) return false
+
             // Re-read all state each attempt to prevent stale closure after page switch
             const {
                 blocks,
@@ -930,19 +951,21 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     setSiteLocale: (locale) => set({ siteLocale: locale }),
 
     setLocaleOverride: (blockId, locale, fields) => {
-        const { localeOverrides } = get()
-        const existing = localeOverrides[blockId]?.[locale] ?? {}
-        set({
-            localeOverrides: {
-                ...localeOverrides,
-                [blockId]: {
-                    ...(localeOverrides[blockId] ?? { en: {}, ms: {} }),
-                    [locale]: { ...existing, ...fields },
+        set(state => {
+            const existing = state.localeOverrides[blockId]?.[locale] ?? {}
+            return {
+                localeOverrides: {
+                    ...state.localeOverrides,
+                    [blockId]: {
+                        ...(state.localeOverrides[blockId] ?? { en: {}, ms: {} }),
+                        [locale]: { ...existing, ...fields },
+                    },
                 },
-            },
-            // Mark dirty so auto-save + nav guard fire for non-EN edits
-            hasUnsavedChanges: true,
-            saveStatus: 'idle',
+                // Mark dirty so save + nav guard fire for non-EN edits.
+                hasUnsavedChanges: true,
+                saveStatus: 'idle',
+                contentRevision: state.contentRevision + 1,
+            }
         })
     },
 

@@ -31,6 +31,7 @@ import {
     useEditorStore,
     runSerializedEditorSave,
     hasPendingSerializedEditorSave,
+    isEditorSaveContextCurrent,
     BLOCK_TYPE_TO_KEY,
     PAGE_META_LOCALE_KEY,
     getDisplayPageTitle,
@@ -609,6 +610,10 @@ export default function EditorPage() {
 
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
+        const saveContext = {
+            siteId,
+            pageId: useEditorStore.getState().currentPageId || null,
+        }
 
         if (isSavingRef.current) {
             // A save is already in progress. Mutex lock.
@@ -646,6 +651,8 @@ export default function EditorPage() {
                 // Snapshot only when this queued write gets the lock. A snapshot captured
                 // while waiting could overwrite a newer edit saved by an earlier task.
                 const snapshot = useEditorStore.getState()
+                if (!isEditorSaveContextCurrent(saveContext, snapshot)) return false
+
                 const currentBlocks = snapshot.getDisplayBlocks()
                 const currentTheme = snapshot.theme
                 const savePageId = snapshot.currentPageId

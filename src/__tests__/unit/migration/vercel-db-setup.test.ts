@@ -359,17 +359,24 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
 })
 
 // ── TC-GH1640-PERF-04: duplicate index cleanup ──────────────────────────────
-describe('[TC-GH1640-PERF-04] duplicate index cleanup is fail-closed', () => {
+describe('[TC-GH1640-PERF-04] duplicate index cleanup is audited and deployment-safe', () => {
     const DB_SETUP_PATH = path.resolve(process.cwd(), 'scripts/db-setup.js')
     const {
         APPROVED_DUPLICATE_INDEX_PAIRS,
         buildDuplicateIndexCleanupPlan,
+        partitionDetectedDuplicateIndexPairs,
     } = require(DB_SETUP_PATH) as {
         APPROVED_DUPLICATE_INDEX_PAIRS: Array<{ table: string; keep: string; drop: string }>
         buildDuplicateIndexCleanupPlan: (
             indexRows: Array<Record<string, unknown>>,
             detectedPairs: Array<Record<string, unknown>>,
         ) => Array<{ table: string; keep: string; drop: string }>
+        partitionDetectedDuplicateIndexPairs: (
+            detectedPairs: Array<Record<string, unknown>>,
+        ) => {
+            approved: Array<Record<string, unknown>>
+            unapproved: Array<Record<string, unknown>>
+        }
     }
 
     const pair = APPROVED_DUPLICATE_INDEX_PAIRS[0]
@@ -425,6 +432,22 @@ describe('[TC-GH1640-PERF-04] duplicate index cleanup is fail-closed', () => {
             .toThrow(/unapproved exact duplicate indexes detected/)
     })
 
+    it('separates unapproved pairs so deployment can skip them before strict planning', () => {
+        // Arrange
+        const unknownPair = {
+            table_name: 'orders_items',
+            index_1: 'orders_items_parent_idx',
+            index_2: 'orders_items_parent_id_idx',
+        }
+
+        // Act
+        const result = partitionDetectedDuplicateIndexPairs([detectedApprovedPair, unknownPair])
+
+        // Assert
+        expect(result.approved).toEqual([detectedApprovedPair])
+        expect(result.unapproved).toEqual([unknownPair])
+    })
+
     it('rejects a drop candidate whose structure differs from the canonical index', () => {
         // Arrange
         const rows = [
@@ -475,7 +498,7 @@ describe('[TC-GH1640-PERF-04] duplicate index cleanup is fail-closed', () => {
         expect(actions).toEqual([])
     })
 
-    it('removes the redundant CREATE and uses concurrent fail-closed cleanup', () => {
+    it('removes the redundant CREATE and uses concurrent audited cleanup', () => {
         // Arrange
         const scriptContent = fs.readFileSync(DB_SETUP_PATH, 'utf-8')
 
@@ -486,6 +509,7 @@ describe('[TC-GH1640-PERF-04] duplicate index cleanup is fail-closed', () => {
         expect(scriptContent).toContain('DROP INDEX CONCURRENTLY IF EXISTS')
         expect(scriptContent).toContain('await cleanupApprovedDuplicateIndexes(pool)')
         expect(scriptContent).toContain('unapproved exact duplicate indexes detected')
+        expect(scriptContent).toContain('skipped unapproved exact duplicate indexes')
     })
 })
 

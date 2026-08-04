@@ -280,6 +280,81 @@ describe('EditorStore', () => {
             expect(useEditorStore.getState().blocks[0].heading).toBe('Newer revision')
         })
 
+        it('[TC-GH1640-PERF-02] keeps a newer locale edit dirty when an older save succeeds', async () => {
+            // Arrange
+            let resolveSave!: (response: { ok: boolean }) => void
+            ;(global.fetch as any).mockImplementationOnce(() => new Promise((resolve) => {
+                resolveSave = resolve
+            }))
+            useEditorStore.getState().updateBlock(0, { heading: 'First revision' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            // Act
+            useEditorStore.getState().setLocaleOverride('hero-1', 'ms', { heading: 'Tajuk baru' })
+            resolveSave({ ok: true })
+            await savePromise
+
+            // Assert
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+            expect(useEditorStore.getState().saveStatus).toBe('idle')
+            expect(useEditorStore.getState().localeOverrides['hero-1'].ms.heading).toBe('Tajuk baru')
+        })
+
+        it('[TC-GH1640-PERF-02] keeps a newer AI batch dirty when an older save succeeds', async () => {
+            // Arrange
+            let resolveSave!: (response: { ok: boolean }) => void
+            ;(global.fetch as any).mockImplementationOnce(() => new Promise((resolve) => {
+                resolveSave = resolve
+            }))
+            useEditorStore.getState().updateBlock(0, { heading: 'First revision' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            // Act
+            useEditorStore.getState().pushBatch(
+                [{ blockType: 'hero', heading: 'AI revision' }],
+                mockTheme,
+                'AI update',
+            )
+            resolveSave({ ok: true })
+            await savePromise
+
+            // Assert
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+            expect(useEditorStore.getState().saveStatus).toBe('idle')
+            expect(useEditorStore.getState().blocks[0].heading).toBe('AI revision')
+        })
+
+        it('[TC-GH1640-PERF-02] drops a queued save after the editor context changes', async () => {
+            // Arrange
+            let releaseFirstWrite!: () => void
+            const firstWriteGate = new Promise<void>((resolve) => {
+                releaseFirstWrite = resolve
+            })
+            const firstWrite = runSerializedEditorSave('site-1', async () => {
+                await firstWriteGate
+                return true
+            })
+            useEditorStore.getState().setCurrentPageId('page-1')
+            useEditorStore.getState().updateBlock(0, { heading: 'Site one edit' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            // Act
+            useEditorStore.getState().init('site-2', [{ blockType: 'hero', heading: 'Site two' }], mockTheme, 'Site Two')
+            useEditorStore.getState().setCurrentPageId('page-2')
+            releaseFirstWrite()
+            await firstWrite
+            const saved = await savePromise
+
+            // Assert
+            expect(saved).toBe(false)
+            expect(global.fetch).not.toHaveBeenCalled()
+            expect(useEditorStore.getState().siteId).toBe('site-2')
+            expect(useEditorStore.getState().currentPageId).toBe('page-2')
+        })
+
         it('TC-F12.06: should include isDraft, headerBlock, and footerBlock when saving', async () => {
             ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
 
@@ -608,28 +683,27 @@ describe('EditorStore', () => {
             expect(state.isAIStreaming).toBe(false)
         })
 
-        it('TC-CROSS-05: retry should re-read currentPageId from store (not stale closure)', async () => {
-            // Start on page-home
+        it('TC-CROSS-05: retry should stop when the editor page context changes', async () => {
+            // Arrange
             useEditorStore.setState({ currentPageId: 'page-home' })
             ;(global.fetch as any)
                 .mockRejectedValueOnce(new Error('Network error'))
-                .mockResolvedValueOnce({ ok: true })
 
             useEditorStore.getState().updateBlock(0, { heading: 'Will retry' })
             vi.advanceTimersByTime(3000)
             await Promise.resolve()
 
-            // First call should target page-home
+            // Assert
             expect((global.fetch as any).mock.calls[0][0]).toContain('pageId=page-home')
 
-            // Simulate page switch before retry fires
+            // Act
             useEditorStore.setState({ currentPageId: 'page-about' })
-
-            // Advance to retry (5s)
             await vi.advanceTimersByTimeAsync(5000)
 
-            // Retry should use fresh currentPageId (page-about), not stale page-home
-            expect((global.fetch as any).mock.calls[1][0]).toContain('pageId=page-about')
+            // Assert
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+            expect(useEditorStore.getState().currentPageId).toBe('page-about')
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
         })
 
         it('TC-CROSS-06: page switch should cancel debounce timer (no stale save)', () => {

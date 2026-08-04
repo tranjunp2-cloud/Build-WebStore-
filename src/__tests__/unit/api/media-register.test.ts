@@ -194,14 +194,55 @@ describe('TC-F30-HMO-019: failed direct-upload registration removes the S3 objec
         expect(mockRegisterUploadedMedia).not.toHaveBeenCalled()
     })
 
-    it('keeps an image when its stored bytes cannot be read for validation', async () => {
+    it('retries a transient image read and registers the original object', async () => {
         // Arrange
-        const key = 'u1-retry.png'
+        const key = 'u1-retry-success.png'
+        const media = {
+            id: 11,
+            url: 'https://cdn/retry-success.png',
+            filename: key,
+            mimeType: 'image/png',
+            filesize: 48_000,
+        }
+        let imageReadAttempts = 0
+        mockRegisterUploadedMedia.mockResolvedValue(media)
         mockS3Send.mockImplementation(async (command: unknown) => {
             if (command instanceof HeadObjectCommand) {
                 return { ContentLength: 48_000, ContentType: 'image/png' }
             }
             if (command instanceof GetObjectCommand) {
+                imageReadAttempts++
+                if (imageReadAttempts < 3) throw new Error('temporary storage failure')
+                return {
+                    Body: {
+                        transformToByteArray: async () =>
+                            Uint8Array.from([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]),
+                    },
+                }
+            }
+            return {}
+        })
+
+        // Act
+        const response = await POST(makeRequest(key))
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(imageReadAttempts).toBe(3)
+        expect(mockS3Send).not.toHaveBeenCalledWith(expect.any(DeleteObjectCommand))
+        expect(mockRegisterUploadedMedia).toHaveBeenCalledTimes(1)
+    })
+
+    it('deletes an image after all signature read attempts fail', async () => {
+        // Arrange
+        const key = 'u1-retry.png'
+        let imageReadAttempts = 0
+        mockS3Send.mockImplementation(async (command: unknown) => {
+            if (command instanceof HeadObjectCommand) {
+                return { ContentLength: 48_000, ContentType: 'image/png' }
+            }
+            if (command instanceof GetObjectCommand) {
+                imageReadAttempts++
                 throw new Error('temporary storage failure')
             }
             return {}
@@ -212,7 +253,8 @@ describe('TC-F30-HMO-019: failed direct-upload registration removes the S3 objec
 
         // Assert
         expect(response.status).toBe(500)
-        expect(mockS3Send).not.toHaveBeenCalledWith(expect.any(DeleteObjectCommand))
+        expect(imageReadAttempts).toBe(3)
+        expectDeleted(key)
         expect(mockRegisterUploadedMedia).not.toHaveBeenCalled()
     })
 })

@@ -14,6 +14,7 @@ import { hasValidImageSignature, SUPPORTED_IMAGE_MIMES } from '@/lib/media/image
 // a row for a file that was never uploaded, and we trust S3's real size/mime
 // over the client's claimed values.
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
+const IMAGE_SIGNATURE_READ_ATTEMPTS = 3
 
 export const maxDuration = 60
 
@@ -42,6 +43,21 @@ async function readImageSignature(
     } | undefined
     if (!body?.transformToByteArray) throw new Error('Image body unavailable')
     return body.transformToByteArray()
+}
+
+async function readImageSignatureWithRetry(
+    s3: NonNullable<ReturnType<typeof buildS3Client>>,
+    key: string,
+): Promise<Uint8Array> {
+    let lastError: unknown
+    for (let attempt = 0; attempt < IMAGE_SIGNATURE_READ_ATTEMPTS; attempt++) {
+        try {
+            return await readImageSignature(s3, key)
+        } catch (error) {
+            lastError = error
+        }
+    }
+    throw lastError
 }
 
 export async function POST(req: NextRequest) {
@@ -95,16 +111,14 @@ export async function POST(req: NextRequest) {
     }
     if (isImage) {
         try {
-            const signature = await readImageSignature(s3, key)
+            const signature = await readImageSignatureWithRetry(s3, key)
             if (!hasValidImageSignature(signature)) {
                 await deleteUnregisteredObject(s3, key)
                 return NextResponse.json({ error: 'Invalid image file' }, { status: 400 })
             }
         } catch (err) {
             console.error('[/api/media/register] Failed to validate uploaded image:', err)
-            // Keep the object when storage validation itself fails. The client
-            // can retry registration, and we avoid deleting a valid upload on
-            // a transient S3/Spaces read error.
+            await deleteUnregisteredObject(s3, key)
             return NextResponse.json({ error: 'Could not validate uploaded image' }, { status: 500 })
         }
     }
