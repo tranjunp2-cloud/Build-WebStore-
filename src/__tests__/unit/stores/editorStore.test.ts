@@ -355,6 +355,37 @@ describe('EditorStore', () => {
             expect(useEditorStore.getState().currentPageId).toBe('page-2')
         })
 
+        it('[TC-GH1640-PERF-02] does not mark a new page saved when an old response completes', async () => {
+            // Arrange: page A and page B deliberately reach the same revision number.
+            let resolveSave!: (response: { ok: boolean }) => void
+            ;(global.fetch as any).mockImplementationOnce(() => new Promise((resolve) => {
+                resolveSave = resolve
+            }))
+            useEditorStore.getState().setCurrentPageId('page-1')
+            useEditorStore.getState().updateBlock(0, { heading: 'Page A revision' })
+            const savePromise = useEditorStore.getState().performSave()
+            await Promise.resolve()
+
+            // Act: initialize page B while page A's request is still in flight.
+            useEditorStore.getState().init(
+                'site-1',
+                [{ blockType: 'hero', heading: 'Page B initial' }],
+                mockTheme,
+                'Test Site',
+            )
+            useEditorStore.getState().setCurrentPageId('page-2')
+            useEditorStore.getState().updateBlock(0, { heading: 'Page B revision' })
+            resolveSave({ ok: true })
+            const saved = await savePromise
+
+            // Assert: page A's response cannot clear page B's dirty state.
+            expect(saved).toBe(false)
+            expect(useEditorStore.getState().currentPageId).toBe('page-2')
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+            expect(useEditorStore.getState().saveStatus).toBe('idle')
+            expect(useEditorStore.getState().blocks[0].heading).toBe('Page B revision')
+        })
+
         it('TC-F12.06: should include isDraft, headerBlock, and footerBlock when saving', async () => {
             ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
 

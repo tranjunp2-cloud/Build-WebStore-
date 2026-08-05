@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { useI18n } from '@/i18n'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 import { updateValueAtPath } from '@/lib/editor/update-value-at-path'
@@ -239,6 +239,7 @@ function PreviewFrameInner({
     onLocaleSwitch,
 }: PreviewFrameProps) {
     const { t } = useI18n()
+    const { upload: uploadImage } = useUploadProgress()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
     const isCartLocked = useMemo(
         () => blocks.some(b => COMMERCE_BLOCK_TYPES.has((b as Record<string, unknown>).blockType as string ?? '')),
@@ -846,7 +847,7 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', t.editor.preview.altUploadedImage)
 
-            const uploadedMedia = await uploadMediaAction(formData)
+            const uploadedMedia = await uploadImage(formData)
             const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
@@ -1096,7 +1097,7 @@ function PreviewFrameInner({
         } finally {
             setIsImageProcessing(false)
         }
-    }, [blocks, imageClickData, onImageReplaced, updateBlock])
+    }, [blocks, imageClickData, onImageReplaced, updateBlock, uploadImage])
 
     const isDragging = dragState !== null
     const dragSourceIndex = dragState?.sourceIndex

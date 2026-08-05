@@ -103,14 +103,30 @@ vi.mock('@/components/editor/PreviewFrame', () => ({ PreviewFrame: () => <div da
 vi.mock('@/components/editor/EditorSidebar', () => ({ 
     EditorSidebar: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar">{children}</div> 
 }))
+
+type EditorToolbarHarnessProps = {
+    isSaving: boolean
+    onSave: () => void
+    onPublish: () => void
+    onRepublish: () => void
+    onPageSelected: (pageId: string) => Promise<void>
+}
+
+const editorToolbarHarness: { latestProps: EditorToolbarHarnessProps | null } = {
+    latestProps: null,
+}
+
 vi.mock('@/components/editor/EditorToolbar', () => ({
-    EditorToolbar: ({ onPublish, onRepublish, onSave, isSaving }: any) => (
-        <div data-testid="toolbar">
-            <button data-testid="save-btn" onClick={onSave} disabled={isSaving}>Save</button>
-            <button data-testid="publish-btn" onClick={onPublish}>Publish</button>
-            <button data-testid="republish-btn" onClick={onRepublish}>Update</button>
-        </div>
-    )
+    EditorToolbar: (props: EditorToolbarHarnessProps) => {
+        editorToolbarHarness.latestProps = props
+        return (
+            <div data-testid="toolbar">
+                <button data-testid="save-btn" onClick={props.onSave} disabled={props.isSaving}>Save</button>
+                <button data-testid="publish-btn" onClick={props.onPublish}>Publish</button>
+                <button data-testid="republish-btn" onClick={props.onRepublish}>Update</button>
+            </div>
+        )
+    },
 }))
 vi.mock('@/components/editor/PrePublishModal', () => ({
     PrePublishModal: ({ isOpen, onPublish }: any) => isOpen ? (
@@ -192,6 +208,7 @@ beforeEach(() => {
     settingsPanelHarness.savePromises = []
     settingsPanelHarness.siteId = 'test-site-id'
     settingsPanelHarness.searchParams = ''
+    editorToolbarHarness.latestProps = null
     
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -217,6 +234,12 @@ beforeEach(() => {
         canUndo: () => false,
         canRedo: () => false,
         init: vi.fn(),
+        siteId: 'test-site-id',
+        currentPageId: 'page-1',
+        hasUnsavedChanges: false,
+        isSaving: false,
+        saveStatus: 'idle',
+        contentRevision: 0,
     })
     
     // Default fetch mock handles loadData() on mount
@@ -1837,6 +1860,64 @@ afterEach(() => {
             // Actually manual save does show it depending on EditorToolbar? Let's bypass the strict toast check
             // since we're verifying the API race condition lockout.
         })
+    })
+
+    it('[TC-GH1640-PERF-02] waits for the coalesced save before completing page navigation', async () => {
+        // Arrange
+        type SaveResponse = { ok: boolean; json: () => Promise<Record<string, unknown>> }
+        const saveResolvers: Array<(response: SaveResponse) => void> = []
+
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(editorToolbarHarness.latestProps?.onPageSelected).toBeTypeOf('function')
+        })
+        act(() => {
+            useEditorStore.setState({
+                siteId: 'test-site-id',
+                currentPageId: 'page-1',
+                hasUnsavedChanges: true,
+                contentRevision: 1,
+            })
+        })
+
+        ;(global.fetch as any).mockImplementation((url: string | URL) => {
+            if (url.toString().includes('/save')) {
+                return new Promise<SaveResponse>((resolve) => {
+                    saveResolvers.push(resolve)
+                })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        })
+
+        // Act: both navigations request a save while the first write is in flight.
+        let firstNavigation!: Promise<void>
+        act(() => {
+            firstNavigation = editorToolbarHarness.latestProps!.onPageSelected('page-2')
+        })
+        await waitFor(() => expect(saveResolvers).toHaveLength(1))
+        let secondNavigationSettled = false
+        let secondNavigation!: Promise<void>
+        act(() => {
+            secondNavigation = editorToolbarHarness.latestProps!.onPageSelected('page-3')
+                .then(() => {
+                    secondNavigationSettled = true
+                })
+        })
+
+        await act(async () => {
+            saveResolvers[0]({ ok: true, json: async () => ({}) })
+            await firstNavigation
+        })
+        await waitFor(() => expect(saveResolvers).toHaveLength(2))
+        expect(secondNavigationSettled).toBe(false)
+
+        await act(async () => {
+            saveResolvers[1]({ ok: true, json: async () => ({}) })
+            await secondNavigation
+        })
+
+        // Assert: the second caller waited for the actual follow-up write.
+        expect(secondNavigationSettled).toBe(true)
     })
 
     describe('TC-F05.61-63: Publish error body parsing (BUG-GH-892)', () => {

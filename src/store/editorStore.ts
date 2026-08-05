@@ -777,8 +777,16 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                     body: JSON.stringify(body),
                 })
 
+                const current = get()
+                if (!isEditorSaveContextCurrent(saveContext, current)) {
+                    if (current.siteId === saveContext.siteId) {
+                        set({ isSaving: false })
+                    }
+                    return false
+                }
+
                 if (res.ok) {
-                    get().markSaved(savedRevision)
+                    current.markSaved(savedRevision)
                     set({ isSaving: false })
                     return true
                 } else {
@@ -789,6 +797,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                     throw new Error('Save failed')
                 }
             } catch (err) {
+                const current = get()
+                if (!isEditorSaveContextCurrent(saveContext, current)) {
+                    if (current.siteId === saveContext.siteId) {
+                        set({ isSaving: false })
+                    }
+                    return false
+                }
                 set({ saveStatus: 'error', isSaving: false })
                 if (retryCount < RETRY_DELAYS.length) {
                     const timer = setTimeout(() => {
