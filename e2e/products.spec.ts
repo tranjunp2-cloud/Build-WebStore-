@@ -41,6 +41,7 @@ test.describe('Products Management', () => {
         // Arrange
         const unauthenticatedRequest = await playwright.request.newContext({
             baseURL: process.env.BASE_URL || 'http://localhost:3000',
+            storageState: { cookies: [], origins: [] },
         })
 
         // Act
@@ -177,8 +178,11 @@ test.describe('Products Management', () => {
             name: 'Color',
             options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
         })
-        await expect(page.locator('.fixed.inset-0 input[type="text"]').first()).toHaveValue('T-Shirt')
-        await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
+        const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
+        await expect(reviewHeading).toBeVisible()
+        const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
+        await expect(reviewOverlay.getByLabel('Product name')).toHaveValue('T-Shirt')
+        await expect(reviewOverlay.getByText('White, Red, Grey', { exact: true })).toBeVisible()
     })
 
     test('[TC-F08-04-86] AI bulk draft creates localized two-tier Cartesian variants', async ({ page }) => {
@@ -239,6 +243,7 @@ async function createCategoryViaUi(page: Page, name: string) {
     await dialog.getByRole('button', { name: /save category/i }).click()
 
     await expect(dialog).toBeHidden()
+    await page.getByPlaceholder(/search categories/i).fill(name)
     await expect(page.getByText(name, { exact: true })).toBeVisible()
 }
 

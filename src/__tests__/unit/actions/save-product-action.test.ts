@@ -1071,7 +1071,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         expect(mockCreate).not.toHaveBeenCalled()
     })
 
-    it('writes the Product through the same bounded tenant-category transaction', async () => {
+    it('holds the bounded category lock while writing an independently committed Product', async () => {
         await saveAiProductAction({
             ...PRODUCT_WITH_IMAGES,
             category: [123],
@@ -1084,10 +1084,13 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
             expect.any(Function),
         )
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            req: { transactionID: 'category-tx' },
+            disableTransaction: true,
         }))
-        expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('disableTransaction')
-        expect(mockFindByID).not.toHaveBeenCalled()
+        expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('req')
+        expect(mockFindByID).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            id: 42,
+        }))
         expect(getCurrentUser).toHaveBeenCalledOnce()
         expect(tenantIdForQuery).toHaveBeenCalledOnce()
     })
@@ -1133,6 +1136,63 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
         expect(mockFind).toHaveBeenCalledTimes(2)
         expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('retries when a transaction returns success without a committed AI draft', async () => {
+        const stableSlug = 'test-product-ai-22222222222222222222222222222222'
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ committed: false }] })
+            .mockResolvedValueOnce({ rows: [{ committed: false }] })
+            .mockResolvedValueOnce({ rows: [{ committed: false }] })
+            .mockResolvedValueOnce({ rows: [{ committed: false }] })
+            .mockResolvedValueOnce({ rows: [{ committed: true }] })
+
+        await expect(saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [123],
+        })).resolves.toMatchObject({ id: 42 })
+
+        expect(mockWithActiveCategoryRowLock).toHaveBeenCalledTimes(2)
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+        expect(mockFind).toHaveBeenCalledOnce()
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(5)
+    })
+
+    it('does not report success when no AI draft is visible after bounded commit retries', async () => {
+        const stableSlug = 'test-product-ai-33333333333333333333333333333333'
+        mockDrizzleExecute.mockResolvedValue({ rows: [] })
+
+        await expect(saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [123],
+        })).rejects.toThrow('Product was not saved. Please try again.')
+
+        expect(mockWithActiveCategoryRowLock).toHaveBeenCalledTimes(3)
+        expect(mockCreate).toHaveBeenCalledTimes(3)
+        expect(mockFind).toHaveBeenCalledOnce()
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(12)
+    })
+
+    it('retries a verified auto-commit miss only when the stable slug makes it idempotent', async () => {
+        const stableSlug = 'test-product-ai-44444444444444444444444444444444'
+        mockFindByID
+            .mockRejectedValueOnce(new Error('Not Found'))
+            .mockResolvedValueOnce({ id: 43, slug: stableSlug })
+        mockCreate
+            .mockResolvedValueOnce({ id: 42, slug: stableSlug })
+            .mockResolvedValueOnce({ id: 43, slug: stableSlug })
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ committed: true }] })
+
+        await expect(saveAiProductAction({
+            ...PRODUCT_WITH_IMAGES,
+            slug: stableSlug,
+            category: [123],
+        })).resolves.toMatchObject({ id: 43, slug: stableSlug })
+
+        expect(mockWithActiveCategoryRowLock).toHaveBeenCalledTimes(2)
+        expect(mockCreate).toHaveBeenCalledTimes(2)
     })
 
     it('[TC-F08-04-113] rejects a different-category replay visible during the initial lookup', async () => {
