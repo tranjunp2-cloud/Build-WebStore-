@@ -63,6 +63,7 @@ Use only the parsed product name and trusted category path. Never use AI-generat
 - Tent/skincare and all ambiguous/adversarial cases return `categoryId: null`; serum/skincare retains the canonical ID.
 - Null result keeps the existing empty dropdown, validation message, and disabled Approve behavior.
 - Deterministic TC120–TC123 pass.
+- Playwright TC125 reaches the real authenticated bulk-parse route and verifies the tent negative-control review state without intercepting the endpoint.
 - Manual TC124: authenticated staging verifies tent/skincare stays uncategorized and serum/skincare retains the existing category; no category is created.
 - Focused/full tests, typecheck, lint, and staging QA pass with no DB/env changes.
 

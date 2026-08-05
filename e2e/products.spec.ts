@@ -247,6 +247,28 @@ async function createCategoryViaUi(page: Page, name: string) {
     await expect(page.getByText(name, { exact: true })).toBeVisible()
 }
 
+async function ensureCategoryViaUi(page: Page, name: string): Promise<boolean> {
+    await navigateTo(page, '/products/categories')
+    await expectNoServerError(page)
+
+    const search = page.getByPlaceholder(/search categories/i)
+    await search.fill(name)
+    const existingCategory = page.getByText(name, { exact: true }).first()
+    const emptyState = page.getByText(/no categories|no results found/i).last()
+    await expect(existingCategory.or(emptyState)).toBeVisible({ timeout: 10_000 })
+    if (await existingCategory.isVisible()) {
+        return false
+    }
+
+    await search.fill('')
+    await page.getByRole('button', { name: /add category/i }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('textbox').first().fill(name)
+    await dialog.getByRole('button', { name: /save category/i }).click()
+    await expect(dialog).toBeHidden()
+    return true
+}
+
 async function deleteProductViaUi(page: Page, name: string) {
     await navigateTo(page, '/products')
     const search = page.getByPlaceholder(/search by name or sku/i).last()
@@ -290,6 +312,8 @@ async function deleteCategoryViaUi(page: Page, name: string) {
 test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const fixtureCategoryName = `GH1588 Category ${runId}`
+    const liveCategoryName = 'QA Skincare'
+    let liveCategoryCreated = false
     const createdProductNames = [
         `GH1588 Draft A ${runId}`,
         `GH1588 Draft B ${runId}`,
@@ -311,6 +335,15 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             await deleteCategoryViaUi(page, fixtureCategoryName)
         } catch (error) {
             cleanupErrors.push(error)
+        }
+        if (liveCategoryCreated) {
+            try {
+                await deleteCategoryViaUi(page, liveCategoryName)
+            } catch (error) {
+                cleanupErrors.push(error)
+            } finally {
+                liveCategoryCreated = false
+            }
         }
         if (cleanupErrors.length > 0) {
             throw new AggregateError(cleanupErrors, 'GH-1588 E2E fixture cleanup failed')
@@ -388,6 +421,53 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             await expect(page.getByText(fixtureCategoryName, { exact: true }).last()).toBeVisible()
             await navigateTo(page, '/products')
         }
+    })
+
+    test('[TC-F08-04-125] real bulk-parse route keeps the reported negative control uncategorized', async ({ page }) => {
+        test.setTimeout(120_000)
+
+        // Arrange — use a real tenant category and do not intercept the production parse route.
+        await page.addInitScript(() => {
+            localStorage.setItem('prefer_lang', 'en')
+            document.cookie = 'prefer_lang=en; path=/; samesite=lax'
+        })
+        liveCategoryCreated = await ensureCategoryViaUi(page, liveCategoryName)
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+
+        const aiChatTextarea = page.locator('textarea').first()
+        await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
+        const parseResponsePromise = page.waitForResponse(
+            response => response.request().method() === 'POST'
+                && response.url().includes('/api/ai/products-bulk-parse'),
+            { timeout: 60_000 },
+        )
+
+        // Act — this request reaches the real route and model integration.
+        await aiChatTextarea.fill(
+            'Create exactly one draft product named "4-Person Camping Tent" with price RM 100.',
+        )
+        await aiChatTextarea.press('Enter')
+        const parseResponse = await parseResponsePromise
+        const body = await parseResponse.json() as {
+            products?: Array<{ categoryId?: string | number | null }>
+        }
+
+        // Assert — the route, then the browser review state, both fail closed.
+        expect(parseResponse.ok()).toBe(true)
+        expect(body.products).toHaveLength(1)
+        expect(body.products?.[0]?.categoryId).toBeNull()
+
+        const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
+        await expect(reviewHeading).toBeVisible()
+        const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
+        const categorySelect = reviewOverlay.getByTestId('ai-category-select-1')
+        await expect(categorySelect.getByRole('combobox')).toContainText('Select categories')
+        await expect(reviewOverlay.getByText('At least one category must be selected')).toBeVisible()
+        await expect(reviewOverlay.getByRole('button', { name: /approve all/i })).toBeDisabled()
+
+        await reviewOverlay.getByRole('button', { name: /discard/i }).click()
+        await expect(reviewHeading).toBeHidden()
     })
 })
 const LONG_PRODUCT_NAME = 'Premium Handcrafted Malaysian Travel Backpack With Extended Product Name and Waterproof Compartments Weekend Adventures'

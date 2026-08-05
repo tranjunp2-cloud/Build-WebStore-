@@ -7,7 +7,7 @@
 - QA evidence: [latest GH-1588 comment](https://github.com/primeproduction/ech-prime-web-v2/issues/1588#issuecomment-5175972635).
 - Current route checks tenant ownership/active status for candidate IDs, but an allowlisted yet unrelated ID survives canonicalization.
 - Existing modal coverage already proves `null`/stale IDs block Approve; the missing regression is the server semantic decision.
-- Follow `docs/TEST_CONVENTION.md`; TC115–TC119 belong to PR #1710, so this fix reserves TC120–TC124.
+- Follow `docs/TEST_CONVENTION.md`; TC115–TC119 belong to PR #1710, so this fix reserves TC120–TC125.
 
 ## Related files
 
@@ -33,6 +33,7 @@
    - **TC-F08-04-122 [ ] AUTO target, Blocker:** Phase 02 adds the production canonicalizer test for normalization, exact/equivalence matching, malformed/generic-only input, ambiguity, adversarial token pairs, and unknown ID, then promotes this row to `[x]`.
    - **TC-F08-04-123 [ ] AUTO target, High:** Phase 02 adds route coverage for shared production instructions/validator/guard and the one-call contract, then promotes this row to `[x]`.
    - **TC-F08-04-124 [ ] MANUAL/LIVE, Blocker:** verify the tent/skincare negative control and serum/skincare positive control through the authenticated staging review modal.
+   - **TC-F08-04-125 [x] PLAYWRIGHT/LIVE, High:** authenticated local browser reaches the real bulk-parse route for the tent/skincare negative control and verifies the fail-closed review state.
 2. Create versioned, data-only fixtures with stable case IDs, locale, product name, trusted candidate set, proposed category ID, expected category ID, and positive, hard-negative, or guard-control classification.
 3. Required controls:
    - accept: `Vitamin C Skin Serum → QA Skincare`, `Running Shoes → Fashion > Shoes`, and one Unicode/diacritic normalization case;
@@ -46,7 +47,7 @@
 
 - Assertions import the production canonicalizer; tests must not reproduce its algorithm.
 - Mocked prompt tests prove wiring only, not model semantic quality.
-- Use synthetic fixture text only and do not add a redundant browser E2E; existing TC101 covers the null-result UI state.
+- Keep TC120 as the deterministic semantic-guard proof; TC101 covers deterministic null-result UI/persistence, while TC125 is a real-route browser smoke added during PR review.
 
 ## Verification
 
@@ -63,6 +64,6 @@ npm test -- src/__tests__/api/ai.test.ts
 
 ## Exit criteria
 
-- TC120–TC124 are registered without colliding with PR #1710.
+- TC120–TC125 are registered without colliding with PR #1710.
 - Fixtures expose positive retention, hard negatives, adversarial tokens, and 0/>1 plausible candidates.
 - Helper inputs/outputs/reason enums and privacy exclusions are frozen before implementation.

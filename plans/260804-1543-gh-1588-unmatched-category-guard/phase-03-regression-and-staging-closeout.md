@@ -7,6 +7,7 @@
 **Modify**
 
 - `docs/qa/F08-product-crud.md`
+- `e2e/products.spec.ts`
 - `docs/CHANGELOG.md` only after staging gates pass
 - `plans/260710-1625-f08-category-integrity/phase-10-tests-qa-pr2.md` only after QA sign-off
 
@@ -15,6 +16,7 @@
 | Metric | Gate |
 |--------|------|
 | Deterministic TC120–TC123 | 100% |
+| Local Playwright TC125 real-route negative control | Pass |
 | Full Vitest, typecheck, and scoped lint | Pass |
 | Authenticated staging negative control | Tent remains uncategorized and Approve stays disabled |
 | Authenticated staging positive control | Serum retains the existing Skincare category |
@@ -26,11 +28,15 @@ npm test -- src/__tests__/unit/ai/bulk-category-matching.test.ts src/__tests__/a
 npm test
 npm run typecheck
 npm run lint
+BASE_URL=http://localhost:3010 npx playwright test e2e/products.spec.ts --project=chromium --grep 'TC-F08-04-125' --retries=0 --no-deps
 ```
 
 ## Execution evidence — 2026-08-05
 
 - Deterministic TC120–TC123 + dashboard regression: **155/155 passed**.
+- Post-review issue-scope check: matcher and dashboard suites passed **70/70**; the API suite passed **84/85** with the known unrelated 5-second generate-site timeout, and that timed-out case passed **1/1** in isolation.
+- Atomic-baseline restoration check, including the unchanged staging save/row-lock regressions: **220/220 passed**.
+- Local TC125 against the real bulk-parse route: **1/1 passed**; category fixture cleanup completed.
 - Full Vitest suite (serial): **11,619/11,619 passed**, 3 skipped.
 - Typecheck passed. Full lint exited 0 with existing repository warnings; scoped lint passed without warnings/errors.
 - Authenticated deployed staging flow and external QA sign-off remain open; no changelog or parent Phase 10 closeout is allowed yet.

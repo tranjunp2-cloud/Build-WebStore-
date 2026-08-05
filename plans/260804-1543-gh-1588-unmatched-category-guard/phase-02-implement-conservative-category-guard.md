@@ -57,7 +57,7 @@ npm run typecheck
 - Typecheck passed; lint exited 0 with only existing warnings.
 - Reviewer and debugger approved the implementation.
 - The intentionally strict fail-closed policy can produce false-null assignments; Phase 03 validates the reviewed negative and positive controls on authenticated staging.
-- No UI code changed in this phase, so a new E2E test is not warranted: TC101 already covers the existing null-category UI state, while TC124 owns the deployed end-to-end flow.
+- No UI code changed. TC101 keeps deterministic null-category UI coverage; post-review TC125 adds a live browser smoke through the real route, while TC120 remains the deterministic guard proof and TC124 owns full staging closeout.
 
 ## Exit criteria
 
