@@ -69,18 +69,18 @@ describe('PageManagerPanel', () => {
     })
 
     // TC-F05-02-14: GH-864 panel header + micro-copy + no search
-    it('TC-F05-02-14a: panel title reads "Page Library" (renamed from Page Manager)', () => {
+    it('TC-F05-02-14a: panel title reads "Page library" (renamed from Page Manager)', () => {
         // Arrange & Act
         render(<TestWrapper />)
         // Assert — title must reflect rename
-        expect(screen.getByText('Page Library')).toBeInTheDocument()
+        expect(screen.getByText('Page library')).toBeInTheDocument()
     })
 
     it('TC-F05-02-14b: micro-copy description is visible below the title', () => {
         // Arrange & Act
         render(<TestWrapper />)
         // Assert — micro-copy from i18n key pageManagerPanel.description
-        expect(screen.getByText(/internal editing/)).toBeInTheDocument()
+        expect(screen.getByText(/editing only/)).toBeInTheDocument()
     })
 
     it('TC-F05-02-14c: search input is NOT present (removed per GH-864)', () => {
@@ -173,7 +173,7 @@ describe('PageManagerPanel', () => {
         render(<TestWrapper />)
 
         // Act
-        fireEvent.click(screen.getByText('Add New Page'))
+        fireEvent.click(screen.getByText('Add new page'))
         
         const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
         fireEvent.change(input, { target: { value: 'Khuyến mãi' } })
@@ -204,7 +204,7 @@ describe('PageManagerPanel', () => {
         render(<TestWrapper />)
 
         // Act
-        fireEvent.click(screen.getByText('Add New Page'))
+        fireEvent.click(screen.getByText('Add new page'))
         const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
         fireEvent.change(input, { target: { value: 'Duplicate Slug' } })
         const form = input.closest('form')!
@@ -212,7 +212,7 @@ describe('PageManagerPanel', () => {
 
         // Assert
         await waitFor(() => {
-            expect(toast.error).toHaveBeenCalledWith('Page slug already exists in this site')
+            expect(toast.error).toHaveBeenCalledWith('A page with this slug already exists on this site.')
         })
         expect(useEditorStore.getState().pages).toHaveLength(2) // No new page added
     })

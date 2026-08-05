@@ -157,6 +157,6 @@ describe('[TC-F20.04] QnAPageClient Integration', () => {
         });
 
         expect(screen.getByText('No answers found')).toBeInTheDocument();
-        expect(screen.getByText(/Try different keywords or contact support/)).toBeInTheDocument();
+        expect(screen.getByText(/Try different keywords, or message us on WhatsApp/)).toBeInTheDocument();
     });
 });
