@@ -13,7 +13,7 @@ describe('welcomeEmail', () => {
         const result = welcomeEmail(baseData)
         expect(result.subject).toBe('Welcome to Web Store! 🎉')
         expect(result.html).toContain('Hi')
-        expect(result.html).toContain('Get Started →')
+        expect(result.html).toContain('Get started →')
         expect(result.html).toContain('lang="en"')
     })
 
@@ -28,9 +28,9 @@ describe('welcomeEmail', () => {
     it('renders MS locale correctly', () => {
         const result = welcomeEmail({ ...baseData, locale: 'ms' })
         expect(result.subject).toBe('Selamat Datang ke Web Store! 🎉')
-        expect(result.html).toContain('Selamat Datang! 🎉')
-        expect(result.html).toContain('Mula dalam 3 langkah')
-        expect(result.html).toContain('Mula Sekarang →')
+        expect(result.html).toContain('Selamat datang! 🎉')
+        expect(result.html).toContain('Mula dengan 3 langkah')
+        expect(result.html).toContain('Mula sekarang →')
         expect(result.html).toContain('lang="ms"')
     })
 
@@ -95,7 +95,7 @@ describe('orderConfirmationEmail', () => {
         const result = orderConfirmationEmail({ ...baseData, paymentMethod: 'stripe', total: 212 })
         // prepaid row shows total, cod row shows 0
         const html = result.html
-        const prepaidIdx = html.indexOf('Pra-bayar')
+        const prepaidIdx = html.indexOf('Bayar dahulu')
         const codIdx = html.indexOf('Bayar semasa')
         // Both rows exist
         expect(prepaidIdx).toBeGreaterThan(-1)
@@ -148,21 +148,21 @@ describe('orderStatusEmail', () => {
 
     it('defaults to EN locale', () => {
         const result = orderStatusEmail(baseData)
-        expect(result.subject).toContain('Order Shipped')
+        expect(result.subject).toContain('Order shipped')
         expect(result.html).toContain('Hi')
-        expect(result.html).toContain('Order Number')
+        expect(result.html).toContain('Order number')
         expect(result.html).toContain('lang="en"')
     })
 
     it('renders all EN statuses correctly', () => {
         const cases: Array<{ status: Parameters<typeof orderStatusEmail>[0]['status']; title: string }> = [
-            { status: 'confirmed', title: 'Order Confirmed' },
-            { status: 'ready_to_ship', title: 'Order Ready to Ship' },
-            { status: 'processing', title: 'Order is Processing' },
-            { status: 'shipped', title: 'Order Shipped' },
-            { status: 'completed', title: 'Order Completed' },
-            { status: 'cancelled', title: 'Order Cancelled' },
-            { status: 'refunded', title: 'Order Refunded' },
+            { status: 'confirmed', title: 'Order confirmed' },
+            { status: 'ready_to_ship', title: 'Order ready to ship' },
+            { status: 'processing', title: 'Order is processing' },
+            { status: 'shipped', title: 'Order shipped' },
+            { status: 'completed', title: 'Order completed' },
+            { status: 'cancelled', title: 'Order cancelled' },
+            { status: 'refunded', title: 'Order refunded' },
         ]
         cases.forEach(({ status, title }) => {
             const result = orderStatusEmail({ ...baseData, status, locale: 'en' })
@@ -172,13 +172,13 @@ describe('orderStatusEmail', () => {
 
     it('renders all MS statuses correctly', () => {
         const cases: Array<{ status: Parameters<typeof orderStatusEmail>[0]['status']; title: string }> = [
-            { status: 'confirmed', title: 'Pesanan Telah Disahkan' },
-            { status: 'ready_to_ship', title: 'Pesanan Siap Dihantar' },
-            { status: 'processing', title: 'Pesanan Sedang Diproses' },
-            { status: 'shipped', title: 'Pesanan Telah Dihantar' },
-            { status: 'completed', title: 'Pesanan Selesai' },
-            { status: 'cancelled', title: 'Pesanan Dibatalkan' },
-            { status: 'refunded', title: 'Pesanan Telah Dikembalikan' },
+            { status: 'confirmed', title: 'Pesanan disahkan' },
+            { status: 'ready_to_ship', title: 'Pesanan anda sedia untuk dihantar' },
+            { status: 'processing', title: 'Pesanan anda sedang diproses' },
+            { status: 'shipped', title: 'Pesanan dihantar' },
+            { status: 'completed', title: 'Pesanan selesai' },
+            { status: 'cancelled', title: 'Pesanan dibatalkan' },
+            { status: 'refunded', title: 'Pesanan dikembalikan' },
         ]
         cases.forEach(({ status, title }) => {
             const result = orderStatusEmail({ ...baseData, status, locale: 'ms' })
@@ -193,7 +193,7 @@ describe('orderStatusEmail', () => {
             trackingNumber: 'TRACK-123',
             trackingUrl: 'https://track.my/123',
         })
-        expect(result.html).toContain('Penjejakan')
+        expect(result.html).toContain('Status penghantaran')
         expect(result.html).toContain('TRACK-123')
         expect(result.html).toContain('https://track.my/123')
     })
@@ -213,16 +213,16 @@ describe('forgotPasswordEmail', () => {
     it('renders EN locale with correct content', () => {
         const result = forgotPasswordEmail({ ...baseData, locale: 'en' })
         expect(result.subject).toBe('Reset your Web Store password 🔐')
-        expect(result.html).toContain('Password Reset')
-        expect(result.html).toContain('Reset Password →')
-        expect(result.html).toContain('This link expires in 1 hour')
+        expect(result.html).toContain('Password reset')
+        expect(result.html).toContain('Reset password →')
+        expect(result.html).toContain('This link will expire in 1 hour.')
     })
 
     it('renders MS locale correctly (TC-F02.28: bilingual)', () => {
         const result = forgotPasswordEmail({ ...baseData, locale: 'ms' })
         expect(result.subject).toBe('Tetapkan semula kata laluan Web Store anda 🔐')
-        expect(result.html).toContain('Tetapan Semula Kata Laluan')
-        expect(result.html).toContain('Tetapkan Semula Kata Laluan →')
+        expect(result.html).toContain('Tetapan semula kata laluan')
+        expect(result.html).toContain('Tetapkan semula kata laluan →')
         expect(result.html).toContain('lang="ms"')
     })
 
@@ -259,7 +259,7 @@ describe('otpVerificationEmail', () => {
     it('renders EN locale with correct content (TC-F02.21)', () => {
         const result = otpVerificationEmail({ ...baseData, locale: 'en' })
         expect(result.subject).toBe('Your Web Store verification code 🔐')
-        expect(result.html).toContain('Email Verification')
+        expect(result.html).toContain('Email verification')
         expect(result.html).toContain('Verify your identity to continue')
         expect(result.html).toContain('This code expires in 5 minutes')
     })
@@ -267,8 +267,8 @@ describe('otpVerificationEmail', () => {
     it('renders MS locale correctly (bilingual)', () => {
         const result = otpVerificationEmail({ ...baseData, locale: 'ms' })
         expect(result.subject).toBe('Kod pengesahan Web Store anda 🔐')
-        expect(result.html).toContain('Pengesahan E-mel')
-        expect(result.html).toContain('Sahkan identiti anda untuk meneruskan')
+        expect(result.html).toContain('Pengesahan emel')
+        expect(result.html).toContain('Sahkan identiti anda untuk teruskan')
         expect(result.html).toContain('lang="ms"')
     })
 
@@ -283,7 +283,7 @@ describe('otpVerificationEmail', () => {
     it('includes security notice with amber styling', () => {
         const result = otpVerificationEmail({ ...baseData, locale: 'en' })
         expect(result.html).toContain('#fef3c7') // Amber background
-        expect(result.html).toContain("If you didn't request this code")
+        expect(result.html).toContain("Didn't ask for this code?")
     })
 
     it('includes teal gradient header and OTP box styling', () => {
@@ -300,4 +300,3 @@ describe('otpVerificationEmail', () => {
         )
     })
 })
-

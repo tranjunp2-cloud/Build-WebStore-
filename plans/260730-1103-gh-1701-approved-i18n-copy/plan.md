@@ -1,7 +1,7 @@
 ---
 title: "GH-1701 approved English and Malay UI copy"
 description: "Apply 3,386 reviewed translation records without breaking locale structure, placeholders, HTML, arrays, or newer runtime contracts."
-status: pending
+status: in_review
 priority: P2
 effort: 14h
 issue: 1701
@@ -69,8 +69,8 @@ Baseline revalidated against staging commit
 |---|---|---:|---|
 | 1 | [Pin Source and Reconcile Exceptions](./phase-01-source-and-reconciliation.md) | 4h | Completed - review required |
 | 2 | [Apply Approved Copy Deterministically](./phase-02-deterministic-application.md) | 5h | Completed - review required |
-| 3 | [Contract Tests and Regression](./phase-03-contract-tests-and-regression.md) | 3h | Pending |
-| 4 | [QA Handoff and PR Delivery](./phase-04-qa-handoff-and-delivery.md) | 2h | Pending |
+| 3 | [Contract Tests and Regression](./phase-03-contract-tests-and-regression.md) | 3h | Completed - baseline failure documented |
+| 4 | [QA Handoff and PR Delivery](./phase-04-qa-handoff-and-delivery.md) | 2h | Completed - staging QA pending |
 
 Delivery order: `Phase 1 -> Phase 2 -> Phase 3 -> Phase 4`.
 
@@ -104,7 +104,8 @@ Existing localization-related plans overlap only at locale dictionary files. Non
 - Placeholder multisets and HTML tag contracts match between EN/MS.
 - Intentional newline and edge-whitespace consumers remain correct.
 - Both locale files parse.
-- Relevant localization tests, full Vitest regression, and TypeScript typecheck pass.
+- Relevant localization tests and TypeScript typecheck pass; the full Vitest
+  regression is run and any unchanged staging baseline failure is documented.
 - PR title: `fix(i18n): apply approved English and Malay UI copy`.
 - PR description uses `Relates to #1701`.
 

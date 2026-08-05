@@ -49,13 +49,13 @@ describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
 })
 
 describe('[TC-CUST-28..29] CustomerSourceBadge', () => {
-    it('[TC-CUST-28] renders "Contact Forms" label with blue tinted color', () => {
+    it('[TC-CUST-28] renders "Contact forms" label with blue tinted color', () => {
         withI18n(<CustomerSourceBadge source="contact-form" />)
-        expect(screen.getByText('Contact Forms')).toHaveStyle({ color: '#3b82f6' })
+        expect(screen.getByText('Contact forms')).toHaveStyle({ color: '#3b82f6' })
     })
 
-    it('[TC-CUST-29] renders "Newsletter Subscriptions" label with violet tinted color', () => {
+    it('[TC-CUST-29] renders "Newsletter subscriptions" label with violet tinted color', () => {
         withI18n(<CustomerSourceBadge source="newsletter" />)
-        expect(screen.getByText('Newsletter Subscriptions')).toHaveStyle({ color: '#8a81f5' })
+        expect(screen.getByText('Newsletter subscriptions')).toHaveStyle({ color: '#8a81f5' })
     })
 })

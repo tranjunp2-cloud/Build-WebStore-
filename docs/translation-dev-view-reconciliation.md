@@ -78,6 +78,19 @@ Contract notes:
 | `dashboard.seo.fixAllButton` | Staging intentionally renamed the scoped action to `AI Fix Issues`; the CSV restores the removed all-issues wording. |
 | `help.qna.categories.aDashboardSeo` | The live help answer must match the staging CTA label `AI Fix Issues`; the CSV still references `AI Fix All Issues`. |
 
+### Source Content Conflict: Preserve Current Copy
+
+Phase 3/4 regression review found three Malay suggestions copied from the
+neighbouring Email field. They do not match their key or documented location:
+
+| Key | CSV suggestion | Preserved current copy |
+|---|---|---|
+| `dashboard.orders.detail.free` | `Email` | `Percuma` |
+| `dashboard.orders.detail.method` | `Email` | `Kaedah` |
+| `dashboard.orders.detail.name` | `Email` | `Nama` |
+
+These rows remain mapped to their current paths but are not applied.
+
 ### Branding Conflict: Product Decision Required
 
 Commit `9727de2e` explicitly rebranded PrimeWeb to Web Store. The CSV would reverse that decision for these 23 keys:
@@ -243,10 +256,11 @@ script, runtime dependency, or lockfile change to the project.
 | Result | Count |
 |---|---:|
 | Source rows accounted for | 3,386 |
-| Scalar rows changed | 2,147 |
+| Scalar rows changed | 2,144 |
 | Scalar rows already matching the approved suggestion | 1,112 |
 | String arrays mapped | 28 |
 | Context-changed scalar rows held | 15 |
+| Source-content conflict rows held | 3 |
 | Branding-conflict scalar rows held | 23 |
 | Missing obsolete/superseded rows held | 55 |
 | Ambiguous string arrays held | 1 |
@@ -291,16 +305,25 @@ prefix now retains its required trailing space. No additional consumer/context
 conflicts were found in the staging changes.
 
 The latest staging sync added 12 scalar locale leaves outside the source CSV.
-They remain untouched by the mapper; all CSV-target classifications and Phase
-2 application counts remain unchanged.
+They remain untouched by the mapper. The initial deterministic re-audit found
+no new staging conflicts. Phase 3 content review then caught three incorrect
+Malay suggestions in the source CSV: `dashboard.orders.detail.name`,
+`dashboard.orders.detail.method`, and `dashboard.orders.detail.free` all
+proposed `Email`. Those rows are now explicit source-content conflict holds,
+preserving `Nama`, `Kaedah`, and `Percuma`. The final application result is
+therefore 2,144 changed scalar rows and 2,166 total QA-matrix rows.
 
 Validation snapshot:
 
 - Full reconciliation audit: pass.
 - `git diff --check`: pass.
 - TypeScript `tsc --noEmit`: pass.
-- Focused localization tests: 31 passed. The two existing assertions for the
-  dashboard label now match the approved British English `Customise` copy.
+- GH-1701 contract suite: 5 passed.
+- Focused localization and order-copy regression: 82 passed.
+- Directly affected literal-copy regression files: 379 passed.
+- Full Vitest: 11,619 passed, 3 skipped, and 1 unchanged staging baseline
+  failure in `src/__tests__/unit/profile/api-users-me-avatar.test.ts`. The
+  failing test and its avatar route are both unchanged from `origin/staging`.
 
 ### Local QA Matrix
 
@@ -317,7 +340,7 @@ that changed, with these columns:
 - `old_ms`
 - `new_ms`
 
-The matrix contains `2,169` changed rows: `2,147` scalar values and `22`
+The matrix contains `2,166` changed rows: `2,144` scalar values and `22`
 arrays that produced an actual locale diff.
 
 | Local surface | Filter/prefix | Changed rows |
@@ -331,7 +354,7 @@ arrays that produced an actual locale diff.
 | `/settings/profile` | areas `profile`, `accountSettings` | 56 |
 | `/settings/staff` | area `Staff` | 64 |
 | `/blog` and blog editor | prefix `dashboard.blog` | 128 |
-| `/orders` and order details | prefix `dashboard.orders` | 110 |
+| `/orders` and order details | prefix `dashboard.orders` | 107 |
 | `/discounts` and discount forms | prefix `dashboard.discounts` | 75 |
 | `/customers` and customer details | prefixes `dashboard.customers`, `dashboard.shopCustomers` | 85 |
 | `/editor/[siteId]` | area `editor` | 379 |

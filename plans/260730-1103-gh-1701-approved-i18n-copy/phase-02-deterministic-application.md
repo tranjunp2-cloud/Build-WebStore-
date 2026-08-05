@@ -59,10 +59,11 @@ installing application tooling or dependencies in the repository.
 - Revalidated against staging commit
   `76793a02cb3a02846b30857d7f4ee06b1f5385b2` on 2026-08-05.
 - Accounted source records: `3,386 / 3,386`
-- Scalar rows changed: `2,147`
+- Scalar rows changed: `2,144`
 - Scalar rows already matching approved copy: `1,112`
 - String arrays mapped: `28`
 - Context-changed scalar rows held: `15`
+- Source-content conflict rows held: `3`
 - Branding-conflict scalar rows held: `23`
 - Missing obsolete/superseded rows held: `55`
 - Ambiguous string array held: `1`

@@ -35,9 +35,9 @@ describe('otpVerificationEmail — EN locale (TC-F02.21, TC-F02.23)', () => {
         expect(result.html).toContain('<strong>Ahmad</strong>')
     })
 
-    it('includes EN heading "Email Verification"', () => {
+    it('includes EN heading "Email verification"', () => {
         const result = otpVerificationEmail({ ...base, locale: 'en' })
-        expect(result.html).toContain('Email Verification')
+        expect(result.html).toContain('Email verification')
     })
 
     it('includes EN subheading "Verify your identity to continue"', () => {
@@ -57,7 +57,7 @@ describe('otpVerificationEmail — EN locale (TC-F02.21, TC-F02.23)', () => {
 
     it('includes EN security notice about unrequested code (TC-F02.24)', () => {
         const result = otpVerificationEmail({ ...base, locale: 'en' })
-        expect(result.html).toContain("If you didn't request this code")
+        expect(result.html).toContain("Didn't ask for this code?")
     })
 
     it('includes EN footer text', () => {
@@ -79,14 +79,14 @@ describe('otpVerificationEmail — MS locale (TC-F02.21, TC-F02.23)', () => {
         expect(result.subject).toBe('Kod pengesahan Web Store anda 🔐')
     })
 
-    it('includes MS heading "Pengesahan E-mel"', () => {
+    it('includes MS heading "Pengesahan emel"', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.html).toContain('Pengesahan E-mel')
+        expect(result.html).toContain('Pengesahan emel')
     })
 
-    it('includes MS subheading "Sahkan identiti anda untuk meneruskan"', () => {
+    it('includes MS subheading "Sahkan identiti anda untuk teruskan"', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.html).toContain('Sahkan identiti anda untuk meneruskan')
+        expect(result.html).toContain('Sahkan identiti anda untuk teruskan')
     })
 
     it('includes MS greeting "Hai"', () => {
@@ -101,7 +101,7 @@ describe('otpVerificationEmail — MS locale (TC-F02.21, TC-F02.23)', () => {
 
     it('includes MS expiry text in 5 minutes (TC-F02.25)', () => {
         const result = otpVerificationEmail({ ...base, locale: 'ms' })
-        expect(result.html).toContain('Kod ini tamat tempoh dalam 5 minit')
+        expect(result.html).toContain('Kod ini akan tamat dalam tempoh 5 minit')
     })
 
     it('includes MS security notice (TC-F02.24)', () => {

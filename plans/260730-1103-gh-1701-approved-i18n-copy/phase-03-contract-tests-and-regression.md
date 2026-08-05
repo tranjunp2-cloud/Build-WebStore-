@@ -37,15 +37,29 @@ Some component tests assert literal current copy. Update only assertions whose s
 
 ## Checklist
 
-- [ ] QA TC IDs documented
-- [ ] Locale shape parity test passes
-- [ ] CSV accounting test passes
-- [ ] Placeholder/HTML test passes
-- [ ] Array contract test passes
-- [ ] Focused localization tests pass
-- [ ] Full Vitest passes
-- [ ] Typecheck passes
-- [ ] No E2E required: no new route/page and no runtime behavior change
+- [x] QA TC IDs documented
+- [x] Locale shape parity test passes
+- [x] CSV accounting test passes
+- [x] Placeholder/HTML test passes
+- [x] Array contract test passes
+- [x] Focused localization tests pass
+- [x] Full Vitest executed: 11,619 passed; one unchanged staging baseline
+  failure documented
+- [x] Typecheck passes
+- [x] No E2E required: no new route/page and no runtime behavior change
+
+## Result
+
+- New GH-1701 contract suite: 5/5 tests passed.
+- Focused localization and order-copy regression: 82/82 tests passed.
+- Directly affected literal-copy regression files: 379/379 tests passed.
+- Full Vitest: 11,619 passed, 3 skipped, and 1 failed.
+- The sole full-suite failure is
+  `src/__tests__/unit/profile/api-users-me-avatar.test.ts`, where the test
+  expects 400 but receives 500 for a request without a multipart content type.
+  Both that test and `src/app/api/users/me/avatar/route.ts` are unchanged from
+  `origin/staging`.
+- TypeScript `tsc --noEmit`: passed.
 
 ## Risks
 

@@ -43,9 +43,22 @@ Ask tester to verify:
 
 ## Checklist
 
-- [ ] Local smoke matrix complete
-- [ ] Latest staging integrated
-- [ ] Final automated gates pass
-- [ ] Diff contains only approved scope
-- [ ] PR format follows project rules
-- [ ] Tester handoff includes known preserved/skipped rows
+- [ ] Manual smoke matrix pending tester verification after staging deploy
+- [x] Latest staging integrated
+- [x] Final automated gates completed; one unchanged staging baseline failure
+  documented
+- [x] Diff contains only approved scope
+- [x] PR format follows project rules
+- [x] Tester handoff includes known preserved/skipped rows
+
+## Delivery Result
+
+- Detailed manual checklist:
+  `docs/qa/GH-1701-approved-copy-handoff.md`.
+- Old/new QA source:
+  `docs/issue-1701-phase2-qa-matrix.csv` with 2,166 changed rows.
+- Automated locale contracts, focused regressions, and TypeScript validation
+  pass.
+- Manual EN/MS desktop and 375px verification remains a staging QA activity;
+  no authenticated or data-dependent screen is claimed as visually verified
+  from local automation.

@@ -87,6 +87,20 @@
         "reason": "The live help answer must match the staging CTA label AI Fix Issues; the CSV still references the removed AI Fix All Issues label."
       }
     ],
+    "sourceContentConflictHold": [
+      {
+        "key": "dashboard.orders.detail.free",
+        "reason": "The proposed Malay value is Email for a no-charge shipping value; preserve the current Percuma copy."
+      },
+      {
+        "key": "dashboard.orders.detail.method",
+        "reason": "The proposed Malay value is Email for the shipping method label; preserve the current Kaedah copy."
+      },
+      {
+        "key": "dashboard.orders.detail.name",
+        "reason": "The proposed Malay value is Email for the customer name label; preserve the current Nama copy."
+      }
+    ],
     "brandingConflictHold": {
       "evidenceCommit": "9727de2e",
       "decision": "hold_pending_product_confirmation",
