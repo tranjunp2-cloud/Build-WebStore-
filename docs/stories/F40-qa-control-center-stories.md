@@ -7,6 +7,53 @@
 
 ---
 
+## US-F40-00: Define QA Control Center Delivery Baseline
+
+**Wave 8** | **P1** | **S** | Status: Ready
+
+### Story
+
+```
+As a   QA Lead
+I want approve a single PRD and delivery backlog for QA Control Center
+So that every later implementation PR has one approved story, Acceptance Criteria, and GitHub Issue.
+```
+
+### Acceptance Criteria
+
+#### AC-1: One approved source of scope
+
+```gherkin
+GIVEN F40 is proposed
+WHEN this story is complete
+THEN one CMS-only PRD and one versioned story source define scope, exclusions, owners and Acceptance Criteria
+```
+
+#### AC-2: One issue per implementation story
+
+```gherkin
+GIVEN the F40 backlog contains implementation stories
+WHEN a developer starts work
+THEN each US-F40-01 through US-F40-07 has exactly one GitHub Issue
+AND each later branch and PR can link to exactly one story
+```
+
+#### AC-3: Documentation-only boundary
+
+```gherkin
+GIVEN this baseline PR is reviewed
+WHEN its changed files are inspected
+THEN it contains no application code, schema/migration, workflow or runtime credential
+```
+
+### Definition of Done
+
+- [ ] PRD and story source parse successfully.
+- [ ] Seven implementation issues exist and link to the source story.
+- [ ] Baseline PR uses `Relates to #1748` only.
+
+---
+
 ## US-F40-01: CMS Target Catalog and Project Health
 
 **Wave 8** | **P1** | **L** | Status: Ready
