@@ -48,18 +48,6 @@ export default defineConfig({
             dependencies: ['setup'],
             testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
-        // GH-1587 category UI rework uses authenticated, tenant-owned fixtures and
-        // cleans products before their assigned categories.
-        {
-            name: 'category-management-regression',
-            testDir: './tests',
-            testMatch: /category-management-rework\.spec\.ts/,
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: './e2e/.auth/user.json',
-            },
-            dependencies: ['setup'],
-        },
         // Public storefront regressions required by repo review rules live in
         // tests/*.spec.ts and render without authenticated browser state.
         {
