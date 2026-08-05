@@ -245,6 +245,55 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
         expect(screen.getByText('EP-CR0DW')).toBeInTheDocument()
     })
 
+    it('[TC-GH1734-UI] shows the Self-delivery courier in Shipping Information', () => {
+        // Arrange
+        const order = makeOrder({
+            status: 'shipped',
+            trackingNumber: 'LOCAL-GH1734-001',
+            shippingCourier: null,
+            shippingCourierName: null,
+            selfDeliveryCourier: 'Pos Laju',
+            shippingTrackingStatus: 'pending_pickup',
+            shippingTrackingHistory: [{
+                status: 'delivered',
+                description: 'Order marked as completed',
+                eventTime: '2026-08-05T03:00:00.000Z',
+            }],
+        })
+
+        // Act
+        render(<OrderTrackingClient order={order} slug="demo" />)
+
+        // Assert
+        expect(screen.getByText('Pos Laju')).toBeInTheDocument()
+        expect(screen.getByText('LOCAL-GH1734-001')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Delivery route' })).toBeInTheDocument()
+        expect(screen.getByText('Tracked shipment')).toBeInTheDocument()
+        expect(screen.queryByText('EasyParcel')).not.toBeInTheDocument()
+    })
+
+    it('[TC-GH1734-UI] shows Courier and Tracking placeholders while fulfillment is pending', () => {
+        // Arrange
+        const order = makeOrder({
+            status: 'confirmed',
+            trackingNumber: null,
+            awbNo: null,
+            shippingCourier: null,
+            shippingCourierName: null,
+            selfDeliveryCourier: null,
+            shippingTrackingHistory: [],
+        })
+
+        // Act
+        render(<OrderTrackingClient order={order} slug="demo" />)
+
+        // Assert
+        expect(screen.getByText('Courier')).toBeInTheDocument()
+        expect(screen.getByText('Tracking No.')).toBeInTheDocument()
+        expect(screen.getAllByText('Not yet assigned')).toHaveLength(2)
+        expect(screen.queryByText(/Your order is being prepared/i)).not.toBeInTheDocument()
+    })
+
     // TC-F36.198: "Shipping Information" and "Shipment Tracking" were two cards, and the AWB and
     // the tracking number are the same string for an EP shipment — so the buyer read it twice.
     it('[TC-F36.198] shows one shipping card with the tracking number printed once', () => {
@@ -308,7 +357,7 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
         expect(screen.queryByAltText('Pos Malaysia Berhad (Melplus)')).not.toBeInTheDocument()
     })
 
-    it('[TC-F36.195] a never-shipped order still shows the generic "being prepared" line', () => {
+    it('[TC-F36.195] a never-shipped order uses field placeholders without a generic preparation message', () => {
         // No EP cancel — shippingTrackingStatus null, no history yet.
         render(
             <OrderTrackingClient
@@ -317,7 +366,7 @@ describe('[TC-F36.195] buyer tracking — EP shipment cancelled', () => {
             />,
         )
 
-        expect(screen.getByText(PREPARING)).toBeInTheDocument()
+        expect(screen.queryByText(PREPARING)).not.toBeInTheDocument()
         expect(screen.queryByText(CANCELLED)).not.toBeInTheDocument()
     })
 })
