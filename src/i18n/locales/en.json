@@ -2021,6 +2021,8 @@
                     "newTitle": "Add New Category",
                     "editTitle": "Edit Category",
                     "addSubcategoryTitle": "Add Subcategory",
+                    "subcategoryContext": "Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.",
+                    "parentLockedHelp": "Locked — you are adding under this category.",
                     "name": "Category Name",
                     "namePlaceholder": "e.g. Electronics, Fashion",
                     "slug": "URL Slug",
