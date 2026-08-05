@@ -168,4 +168,3 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 ## Next Steps
 
 After all gates pass, request code review and open a scoped bugfix PR with a Conventional Commit title and `Relates to #1587`, never `Closes #1587`.
-

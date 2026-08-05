@@ -347,4 +347,3 @@ test.describe('GH-1587 category management rework regressions', () => {
         }
     })
 })
-
