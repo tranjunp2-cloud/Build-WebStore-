@@ -1,0 +1,697 @@
+{
+  "schemaVersion": 1,
+  "issue": 1701,
+  "source": {
+    "path": "docs/translation-dev-view.csv",
+    "attachmentId": "30530246",
+    "sha256": "85c0bc5829ed256e390393879b5d31dddf02dd67f00edfa7dbf839614e2bc0dd",
+    "recordCount": 3386,
+    "columnCount": 12
+  },
+  "scalarDrift": {
+    "sameContextApply": [
+      "dashboard.blog.categoryModal.removeConfirmMsg",
+      "dashboard.products.quickView.deleteProduct",
+      "dashboard.settings.payments.uploadError",
+      "help.overview.needHelpDesc",
+      "dashboard.products.bulkCreate.table.name",
+      "dashboard.products.bulkCreate.table.variants",
+      "dashboard.products.categories.form.newTitle",
+      "dashboard.products.quickView.editProduct",
+      "editor.settings.pricingFeaturesPlaceholder",
+      "storefront.checkout.payNow",
+      "dashboard.customers.colProfile",
+      "dashboard.products.list.fromPrefix",
+      "dashboard.sites.lastEdited",
+      "Staff.actions.you"
+    ],
+    "contextChangedHold": [
+      {
+        "key": "dashboard.products.bulkCreate.saveEmptyError",
+        "reason": "The redesigned drawer has no selected-product flow; it saves all remaining drafts."
+      },
+      {
+        "key": "dashboard.products.bulkCreate.title",
+        "reason": "The screen is now a draft review drawer, not a create-confirmation modal."
+      },
+      {
+        "key": "dashboard.products.categories.deleteModal.subCategoryWarning",
+        "reason": "Delete behavior now reparents children to top level; the approved copy says they are only unlinked."
+      },
+      {
+        "key": "auth.passwordPlaceholder",
+        "reason": "Current copy is an instructional input placeholder; the proposed bullet characters remove that instruction."
+      },
+      {
+        "key": "dashboard.blog.editor.uploadHint",
+        "reason": "Current copy exposes the 4:3 and minimum 1200px requirements; the proposed copy removes them."
+      },
+      {
+        "key": "dashboard.customers.subtitle",
+        "reason": "Current page scope is website-form inquiries; the proposed copy reintroduces newsletter subscribers."
+      },
+      {
+        "key": "dashboard.customers.timelineEntry",
+        "reason": "Current UI labels the entry as a message rather than a generic contact submission."
+      },
+      {
+        "key": "dashboard.products.bulkCreate.subtitle",
+        "reason": "Current copy explains that drafts are not published; the proposed copy removes this workflow guarantee."
+      },
+      {
+        "key": "dashboard.products.bulkCreate.table.price",
+        "reason": "Current label identifies RM currency; the proposed generic Price label drops currency context."
+      },
+      {
+        "key": "dashboard.products.list.aiChatBtn",
+        "reason": "The action now generates drafts; Create suggests immediate product creation."
+      },
+      {
+        "key": "dashboard.products.list.aiChatPlaceholder",
+        "reason": "Current example documents RM and stock syntax; the proposed older example uses ambiguous 500k/50k values."
+      },
+      {
+        "key": "dashboard.customers.timeline",
+        "reason": "Current surface is Message History, not the broader Activity Timeline."
+      },
+      {
+        "key": "dashboard.overview.seo.fixAll",
+        "reason": "Staging intentionally renamed this scoped action from AI Fix All Issues to AI Fix Issues; the CSV would restore the removed all-issues wording."
+      },
+      {
+        "key": "dashboard.seo.fixAllButton",
+        "reason": "Staging intentionally renamed this scoped action from AI Fix All Issues to AI Fix Issues; the CSV would restore the removed all-issues wording."
+      },
+      {
+        "key": "help.qna.categories.aDashboardSeo",
+        "reason": "The live help answer must match the staging CTA label AI Fix Issues; the CSV still references the removed AI Fix All Issues label."
+      }
+    ],
+    "brandingConflictHold": {
+      "evidenceCommit": "9727de2e",
+      "decision": "hold_pending_product_confirmation",
+      "reason": "The approved CSV restores PrimeWeb after the product was explicitly rebranded to Web Store.",
+      "keys": [
+        "dashboard.overview.welcomeTitle",
+        "dashboard.settings.payments.stripeConnectDesc",
+        "dashboard.settings.payments.xenditConnectDesc",
+        "dashboard.settings.payments.xenditModalSubtitle",
+        "email.forgotPassword.body",
+        "email.otp.copyright",
+        "email.welcome.body",
+        "landing.platform.cta",
+        "email.forgotPassword.footer",
+        "email.forgotPassword.subject",
+        "email.order.footer",
+        "email.otp.footer",
+        "email.otp.subject",
+        "email.passwordChanged.body",
+        "email.passwordChanged.footer",
+        "email.passwordChanged.subject",
+        "email.welcome.footer",
+        "email.welcome.subheading",
+        "email.welcome.subject",
+        "landing.heroDemo.homeCrumb",
+        "landing.platform.subtitle",
+        "landing.why.title",
+        "onboarding.welcome.title"
+      ]
+    }
+  },
+  "missingPathGroups": [
+    {
+      "classification": "obsolete_removed_ui",
+      "evidenceCommit": "e5082ce0",
+      "reason": "Suggestion chips and their AddSectionPromptChips component were removed.",
+      "keys": [
+        "editor.addSection.banner",
+        "editor.addSection.bannerCompact",
+        "editor.addSection.bannerPrompt",
+        "editor.addSection.cta",
+        "editor.addSection.ctaCompact",
+        "editor.addSection.ctaPrompt",
+        "editor.addSection.faq",
+        "editor.addSection.faqCompact",
+        "editor.addSection.faqPrompt",
+        "editor.addSection.features",
+        "editor.addSection.featuresCompact",
+        "editor.addSection.featuresPrompt",
+        "editor.addSection.gallery",
+        "editor.addSection.galleryCompact",
+        "editor.addSection.galleryPrompt",
+        "editor.addSection.newsletter",
+        "editor.addSection.newsletterCompact",
+        "editor.addSection.newsletterPrompt",
+        "editor.addSection.team",
+        "editor.addSection.teamCompact",
+        "editor.addSection.teamPrompt",
+        "editor.addSection.testimonials",
+        "editor.addSection.testimonialsCompact",
+        "editor.addSection.testimonialsPrompt",
+        "editor.aiChat.addSectionPrompt",
+        "editor.aiChat.changeColorPrompt"
+      ]
+    },
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "cc5dd32f",
+      "replacementPaths": [
+        "profile.general.title",
+        "profile.security.title",
+        "profile.sso.widgetTitle",
+        "profile.sso.widgetDescription",
+        "profile.sso.goToPortal"
+      ],
+      "reason": "Tabbed profile, global save bar, status badge, and duplicated SSO notices were replaced by a single-page profile and one SSO widget.",
+      "keys": [
+        "profile.errors.unsavedChanges",
+        "profile.sso.generalNotice",
+        "profile.sso.generalTitle",
+        "profile.sso.manageButton",
+        "profile.sso.notice",
+        "profile.sso.securityNotice",
+        "profile.banner.activeNow",
+        "profile.banner.status",
+        "profile.sso.generalLink",
+        "profile.sso.securityLink",
+        "profile.sso.securityTitle",
+        "profile.tabs.general",
+        "profile.tabs.security"
+      ]
+    },
+    {
+      "classification": "obsolete_removed_ui",
+      "evidenceCommit": "b81a3c94",
+      "replacementPaths": [
+        "dashboard.discounts.saveBar",
+        "dashboard.discounts.deleteDialog",
+        "dashboard.discounts.list.deleteSuccess",
+        "dashboard.discounts.list.deleteFailed"
+      ],
+      "reason": "Top Save/Edit Delete controls and their generic toasts were removed; current flows use explicit save bar, dialog, and code-aware messages.",
+      "keys": [
+        "dashboard.discounts.header.deleteBtn",
+        "dashboard.discounts.toast.deleted",
+        "dashboard.discounts.toast.deleteFailed",
+        "dashboard.discounts.header.save"
+      ]
+    },
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "7f1bc0c5",
+      "replacementPaths": [
+        "dashboard.products.bulkCreate.approveAll",
+        "dashboard.products.bulkCreate.draftCountOne",
+        "dashboard.products.bulkCreate.draftCountMany"
+      ],
+      "reason": "The selected-product modal became a bottom drawer where merchants remove unwanted drafts and approve all remaining drafts.",
+      "keys": [
+        "dashboard.products.bulkCreate.note.label",
+        "dashboard.products.bulkCreate.productsItem",
+        "dashboard.products.bulkCreate.saveButton",
+        "dashboard.products.bulkCreate.note.description"
+      ]
+    },
+    {
+      "classification": "superseded_structure",
+      "evidenceCommit": "db390c96",
+      "replacementPaths": [
+        "dashboard.products.bulkCreate.saveSuccessOne",
+        "dashboard.products.bulkCreate.saveSuccessMany"
+      ],
+      "reason": "One count-based message was split into singular and plural contracts.",
+      "keys": [
+        "dashboard.products.bulkCreate.saveSuccess"
+      ]
+    },
+    {
+      "classification": "obsolete_removed_field",
+      "evidenceCommit": "02a6b024",
+      "reason": "The unused Category Image field was removed end-to-end.",
+      "keys": [
+        "dashboard.products.categories.form.image"
+      ]
+    },
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "edd181d2",
+      "replacementPaths": [
+        "dashboard.products.form.sections.masterLockedTooltip"
+      ],
+      "reason": "Master fields are hidden/locked for variant products; the new copy covers stock and price per variant row.",
+      "keys": [
+        "dashboard.products.form.sections.autoFilledFromVariants"
+      ]
+    },
+    {
+      "classification": "obsolete_dead_key",
+      "evidenceCommit": "47ec2794",
+      "reason": "The customer last-saved label had no remaining consumer and was explicitly removed.",
+      "keys": [
+        "dashboard.shopCustomers.detail.lastSaved"
+      ]
+    },
+    {
+      "classification": "obsolete_removed_breadcrumb",
+      "evidenceCommit": "d230fafa",
+      "reason": "The Blog/Home breadcrumb labels were removed from the editor surface.",
+      "keys": [
+        "dashboard.blog.editor.blog",
+        "dashboard.blog.editor.home"
+      ]
+    },
+    {
+      "classification": "superseded_business_rule",
+      "evidenceCommit": "f13905b8",
+      "replacementPaths": [
+        "storefront.checkout.codNoCourier",
+        "storefront.checkout.codOverMax",
+        "storefront.checkout.codUnderMin"
+      ],
+      "reason": "West-Malaysia-only hardcoding was replaced by live courier route and COD limits.",
+      "keys": [
+        "storefront.checkout.westMalaysiaOnly"
+      ]
+    },
+    {
+      "classification": "superseded_structure",
+      "evidenceCommit": "cb4a9ddd",
+      "replacementPaths": [
+        "editor.settings.seoOverwriteDialog"
+      ],
+      "reason": "The native single-string SEO confirmation was replaced by a structured review dialog with separate title, description, current/proposed values, and actions.",
+      "keys": [
+        "editor.settingsValidation.seoConfirmReplace"
+      ]
+    }
+  ],
+  "arrays": {
+    "itemMapped": [
+      {
+        "key": "landing.why.cards.easyToUse.points",
+        "en": [
+          "Design with simple drag and drop",
+          "No coding needed",
+          "Get your site live in much less time"
+        ],
+        "ms": [
+          "Buat laman web dengan mudah.",
+          "Hanya seret dan lepas, tanpa perlu pengkodan.",
+          "Siapkan laman web anda dengan lebih cepat."
+        ]
+      },
+      {
+        "key": "landing.product.blocks.salesPayment.items",
+        "en": [
+          "Products, cart, and online payment",
+          "Multiple payment methods and delivery options",
+          "AI-written product descriptions, SEO-optimised"
+        ],
+        "ms": [
+          "Produk, troli dan pembayaran online.",
+          "Pelbagai pilihan pembayaran dan penghantaran.",
+          "Penerangan produk dijana oleh AI serta mesra SEO."
+        ]
+      },
+      {
+        "key": "landing.product.blocks.templateEditor.items",
+        "en": [
+          "Templates by industry: Retail, F&B, Admissions, Portfolio",
+          "Visual editing with inline block customisation",
+          "One-click publish to a subdomain or your own domain"
+        ],
+        "ms": [
+          "Templat mengikut industri: Runcit, F&B, Pendidikan, Portfolio.",
+          "Penyuntingan visual dengan penyesuaian blok secara terus.",
+          "Terbitkan laman web dengan satu klik menggunakan subdomain atau domain anda sendiri."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.admissions.block2.items",
+        "en": [
+          "Subject, Message",
+          "Send enquiry email"
+        ],
+        "ms": [
+          "Tajuk, Mesej",
+          "Hantar email pertanyaan"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.events.block2.items",
+        "en": [
+          "Send email",
+          "QR check-in"
+        ],
+        "ms": [
+          "Hantar email",
+          "Daftar masuk QR"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.fnb.block2.items",
+        "en": [
+          "Cart",
+          "Delivery address"
+        ],
+        "ms": [
+          "Troli",
+          "Alamat penghantaran"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.other.block1.items",
+        "en": [
+          "Hero,Form",
+          "Gallery",
+          "Button..."
+        ],
+        "ms": [
+          "Hero,Borang",
+          "Galeri",
+          "Butang..."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.other.block2.items",
+        "en": [
+          "Subject,Message",
+          "Send email"
+        ],
+        "ms": [
+          "Tajuk,Mesej",
+          "Hantar email"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.other.points",
+        "en": [
+          "Company profile, portfolio, and service websites",
+          "Blog, news, and content SEO",
+          "Contact forms and consultation booking",
+          "Customisable to any industry's needs"
+        ],
+        "ms": [
+          "Laman profil syarikat, portfolio, dan perkhidmatan",
+          "Blog, berita, dan SEO kandungan",
+          "Borang hubungi dan tempahan perundingan",
+          "Boleh disesuaikan mengikut keperluan mana-mana industri"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.retail.block2.items",
+        "en": [
+          "Delivery information",
+          "Payment"
+        ],
+        "ms": [
+          "Maklumat penghantaran",
+          "Pembayaran"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.training.block2.items",
+        "en": [
+          "Registration form",
+          "Payment schedule"
+        ],
+        "ms": [
+          "Borang pendaftaran",
+          "Jadual pembayaran"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.training.points",
+        "en": [
+          "Professional course website that's easy to update",
+          "Integrated registration, payment, and class scheduling",
+          "Automated reminders and material delivery",
+          "Student and revenue tracking reports"
+        ],
+        "ms": [
+          "Laman web kursus profesional yang mudah dikemas kini",
+          "Pendaftaran, pembayaran, dan penjadualan kelas bersepadu",
+          "Peringatan automatik dan penghantaran bahan",
+          "Laporan penjejakan pelajar dan hasil"
+        ]
+      },
+      {
+        "key": "landing.why.cards.dataSync.points",
+        "en": [
+          "Bring data from every channel into one place",
+          "Connect forms, email, and more"
+        ],
+        "ms": [
+          "Kumpulkan data dari semua saluran di satu tempat",
+          "Sambungkan borang, email, dan banyak lagi"
+        ]
+      },
+      {
+        "key": "landing.product.blocks.aiBuilder.items",
+        "en": [
+          "Chat with AI, describe your business → a full website in minutes",
+          "Over 900+ block templates: Hero, About, Products, Contact...",
+          "Drag-and-drop editing, optimised for every device",
+          "SEO-ready and fast loading"
+        ],
+        "ms": [
+          "Berbual dengan AI, huraikan perniagaan anda → laman web penuh dalam beberapa minit",
+          "Lebih 900+ templat blok: Hero, Tentang, Produk, Hubungi...",
+          "Penyuntingan seret dan lepas, dioptimumkan untuk setiap peranti",
+          "Mesra SEO dan pemuatan pantas"
+        ]
+      },
+      {
+        "key": "landing.product.blocks.seoAnalytics.items",
+        "en": [
+          "SEO score for each page, AI meta suggestions",
+          "JSON-LD and automatic sitemap",
+          "Dashboard that tracks orders and revenue"
+        ],
+        "ms": [
+          "Skor SEO untuk setiap halaman, cadangan meta oleh AI",
+          "JSON-LD dan peta laman automatik",
+          "Papan pemuka yang menjejak pesanan dan hasil"
+        ]
+      },
+      {
+        "key": "landing.product.hero.points",
+        "en": [
+          "Beautiful design with fast drag-and-drop, optimised for every device",
+          "Fast loading and SEO-ready",
+          "Over 900+ landing page templates ready to use",
+          "Multi-channel data sync from forms to your storage"
+        ],
+        "ms": [
+          "Reka bentuk cantik dengan \"drag-and-drop\" pantas, dioptimumkan untuk setiap peranti",
+          "Pemuatan pantas dan mesra SEO",
+          "Lebih 900+ templat landing page sedia digunakan",
+          "Penyegerakan data pelbagai saluran dari borang ke storan anda"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.admissions.block1.items",
+        "en": [
+          "Registration form",
+          "Course schedule",
+          "Course gallery..."
+        ],
+        "ms": [
+          "Borang pendaftaran",
+          "Jadual kelas",
+          "Galeri kursus..."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.admissions.points",
+        "en": [
+          "Attract students and boost registration conversions",
+          "Reach prospects at the right time and close more",
+          "Centralised data with optimised marketing campaigns",
+          "Manage courses, students, and programmes end-to-end"
+        ],
+        "ms": [
+          "menarik para pelajar dan daripada tarikan tersebut rebut peluang untuk mendaftarkan para pelajar tersebut",
+          "Jangkau prospek pada masa yang tepat dan tutup lebih banyak jualan",
+          "Data berpusat dengan kempen pemasaran yang dioptimumkan",
+          "Uruskan kursus, pelajar, dan program dari hujung ke hujung"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.events.block1.items",
+        "en": [
+          "Countdown",
+          "Ticket registration form",
+          "Schedule..."
+        ],
+        "ms": [
+          "Countdown",
+          "Borang pendaftaran tiket",
+          "Jadual..."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.events.points",
+        "en": [
+          "Event registration landing page, tickets, and lead capture forms",
+          "Countdown timer and automated notifications",
+          "Guest list management and check-in",
+          "Post-event reports"
+        ],
+        "ms": [
+          "Landing page pendaftaran acara, tiket, dan borang lead-capture",
+          "Countdown dan pemberitahuan automatik",
+          "Pengurusan senarai tetamu dan daftar masuk",
+          "Laporan selepas acara"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.fnb.block1.items",
+        "en": [
+          "Dish categories",
+          "Combos",
+          "Table booking..."
+        ],
+        "ms": [
+          "Kategori hidangan",
+          "Kombo",
+          "Tempahan meja..."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.fnb.points",
+        "en": [
+          "Online menu, table booking, and delivery ordering",
+          "Easy setup of promotions, combos, and vouchers",
+          "Integrated delivery services",
+          "Landing pages for events and new dishes"
+        ],
+        "ms": [
+          "Menu online, tempahan meja, dan pesanan penghantaran",
+          "Persediaan promosi, kombo, dan baucar yang mudah",
+          "Perkhidmatan penghantaran bersepadu",
+          "Landing page untuk acara dan hidangan baharu"
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.retail.block1.items",
+        "en": [
+          "Products",
+          "Cart",
+          "Filters..."
+        ],
+        "ms": [
+          "Produk",
+          "Troli",
+          "Penapis Carian..."
+        ]
+      },
+      {
+        "key": "landing.solutions.industries.training.block1.items",
+        "en": [
+          "Course list",
+          "Class schedule",
+          "Instructors..."
+        ],
+        "ms": [
+          "Senarai kursus",
+          "Jadual kelas",
+          "Tenaga pengajar..."
+        ]
+      },
+      {
+        "key": "landing.why.cards.automation.points",
+        "en": [
+          "Engage customers across every channel",
+          "Nurture them through the whole customer journey",
+          "Automate repetitive tasks"
+        ],
+        "ms": [
+          "Berhubung dengan pelanggan dalam setiap saluran",
+          "berikan pengalaman yang terbaik kepada mereka sebagai pelanggan",
+          "Automatikkan tugas berulang"
+        ]
+      },
+      {
+        "key": "landing.why.cards.fullAi.points",
+        "en": [
+          "Build websites by chatting",
+          "AI writes descriptions and optimises SEO",
+          "Automate content creation"
+        ],
+        "ms": [
+          "Bina laman web dengan berbual bersama AI",
+          "ia akan membantu menulis deskripsi dan optimumkan SEO",
+          "Automatikkan penciptaan kandungan"
+        ]
+      },
+      {
+        "key": "landing.why.cards.security.points",
+        "en": [
+          "Secure, performance-optimised infrastructure",
+          "Friendly interface on every device"
+        ],
+        "ms": [
+          "Infrastruktur terjamin, prestasi dioptimumkan",
+          "muka mesra di semua peranti"
+        ]
+      },
+      {
+        "key": "landing.why.cards.yourContent.points",
+        "en": [
+          "Visual editor for fast edits",
+          "AI description and SEO suggestions"
+        ],
+        "ms": [
+          "Editor visual bagi suntingan yang pantas",
+          "deskripsi AI dan saranan daripada SEO"
+        ]
+      }
+    ],
+    "needsBusinessConfirmation": [
+      {
+        "key": "landing.solutions.industries.retail.points",
+        "expectedItemCount": 4,
+        "reason": "The Malay suggestion contains five semantic lines for a four-item array. The likely merge is the first two lines, but the CSV does not encode that boundary."
+      }
+    ],
+    "preserveCurrentUnusableSource": [
+      {
+        "key": "help.modules.data.blog.steps",
+        "reason": "Suggested EN/MS values contain only [object Object] placeholders."
+      },
+      {
+        "key": "help.modules.data.builder.steps",
+        "reason": "Suggested EN/MS values contain only [object Object] placeholders."
+      },
+      {
+        "key": "help.modules.data.dashboard.steps",
+        "reason": "Suggested EN/MS values contain only [object Object] placeholders."
+      },
+      {
+        "key": "help.modules.data.settings.steps",
+        "reason": "Suggested EN/MS values contain only [object Object] placeholders."
+      }
+    ]
+  },
+  "contractOverrides": [
+    {
+      "key": "dashboard.settings.emailTemplates.lastEdited",
+      "decision": "preserve_placeholder",
+      "contextImpact": "meaning_changed_if_applied_verbatim",
+      "reason": "The Malay suggestion drops {time}, converting a relative-time sentence into a static label."
+    },
+    {
+      "key": "dashboard.settings.payments.uploadError",
+      "decision": "preserve_trailing_space",
+      "contextImpact": "rendering_broken_if_removed",
+      "reason": "PaymentsFormClient concatenates the translated prefix directly with the server error."
+    },
+    {
+      "key": "dashboard.blog.categoryModal.removeConfirmMsg",
+      "decision": "preserve_multiline_break",
+      "contextImpact": "formatting_changed_if_removed",
+      "reason": "The consumer uses whitespace-pre-line and the issue explicitly requires multiline compatibility."
+    }
+  ]
+}
