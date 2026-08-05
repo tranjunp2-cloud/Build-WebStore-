@@ -22,6 +22,7 @@ import {
     ensureDashboardFixture,
     type DashboardFixtureTenant,
 } from '@/lib/e2e/dashboard-fixture'
+import { normalizeTenants, type TenantMembership } from '@/lib/normalize-tenants'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -252,21 +253,30 @@ export async function POST(req: NextRequest) {
         })
 
         if (usersResult.docs.length > 0) {
-            // User exists — sync password and ensure tenant association
+            // User exists — sync password and make the provisioned fixture tenant primary.
+            // Dashboard Product actions resolve tenant context from `user.tenants[0]`, so merely
+            // appending this link can provision the category in a tenant the E2E session never uses.
             const existingUser = usersResult.docs[0]
-            const existingTenantLink = (existingUser.tenants || []).find((t: { tenant: unknown }) => {
-                const tid = typeof t.tenant === 'object' && t.tenant !== null
-                    ? (t.tenant as { id: string | number }).id
-                    : t.tenant
-                return tid === tenantId
-            })
-
-            const tenantsUpdate = existingTenantLink
-                ? existingUser.tenants // keep as-is
-                : [
-                    ...(existingUser.tenants || []),
-                    { tenant: tenantId, role: 'owner' as const, status: 'active' as const, permissions: [] },
-                ]
+            const existingTenantLinks = (existingUser.tenants || []) as TenantMembership[]
+            const tenantLinkId = (link: (typeof existingTenantLinks)[number]) => (
+                typeof link.tenant === 'object' && link.tenant !== null
+                    ? link.tenant.id
+                    : link.tenant
+            )
+            const existingTenantLink = existingTenantLinks.find(link => (
+                String(tenantLinkId(link)) === String(tenantId)
+            ))
+            const primaryTenantLink = {
+                ...(existingTenantLink ?? {}),
+                tenant: tenantId,
+                role: 'owner' as const,
+                status: 'active' as const,
+                permissions: existingTenantLink?.permissions ?? [],
+            }
+            const tenantsUpdate = normalizeTenants([
+                primaryTenantLink,
+                ...existingTenantLinks.filter(link => String(tenantLinkId(link)) !== String(tenantId)),
+            ])
 
             await payload.update({
                 collection: 'users',

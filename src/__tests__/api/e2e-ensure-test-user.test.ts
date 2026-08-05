@@ -162,7 +162,10 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
         const existingUser = {
             id: 84,
             roles: ['tenant-owner'],
-            tenants: [{ tenant: 42, role: 'owner', status: 'active', permissions: [] }],
+            tenants: [
+                { id: 'membership-7', tenant: { id: 7 }, role: 'owner', status: 'active', permissions: [] },
+                { tenant: { id: 42 }, role: 'owner', status: 'active', permissions: ['products'] },
+            ],
         }
         const payload = {
             find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
@@ -218,6 +221,22 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
                 slug: 'e2e-ai-products',
             },
         })
+        const userUpdate = payload.update.mock.calls.find(([args]) => args.collection === 'users')?.[0]
+        expect(userUpdate).toEqual(expect.objectContaining({
+            collection: 'users',
+            id: 84,
+            data: expect.objectContaining({
+                tenants: [
+                    expect.objectContaining({
+                        tenant: 42,
+                        role: 'owner',
+                        status: 'active',
+                        permissions: ['products'],
+                    }),
+                    expect.objectContaining({ id: 'membership-7', tenant: 7 }),
+                ],
+            }),
+        }))
         expect(body).toEqual(expect.objectContaining({ siteId: 77, categoryId: 88 }))
         expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
         expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'categories' }))

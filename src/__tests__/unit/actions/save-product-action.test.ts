@@ -1368,6 +1368,55 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         }
     })
 
+    it('[TC-F08-04-122] preserves the inner verification cause and classifies it as a persistence failure', async () => {
+        // Arrange
+        const verificationError = Object.assign(new Error('connection terminated during verification'), {
+            name: 'DatabaseError',
+            code: '57P01',
+        })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockFindByID.mockRejectedValueOnce(verificationError)
+
+        // Act
+        const result = await saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            name: 'Private Product Name',
+            sku: 'SECRET-SKU',
+            category: [123],
+        }, {
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: '12345678-90ab-4def-8234-567890abcdef',
+            skuAttempt: 1,
+        })
+
+        // Assert
+        expect(result).toMatchObject({
+            ok: false,
+            code: 'PERSISTENCE_VERIFY_FAILED',
+            retryable: true,
+            referenceId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        })
+        expect(mockSentryCaptureException).toHaveBeenCalledOnce()
+        const loggedContext = mockPayloadLoggerError.mock.calls[0][0]
+        const sentryContext = mockSentrySetContext.mock.calls[0][1]
+        for (const safeContext of [loggedContext, sentryContext]) {
+            expect(safeContext).toMatchObject({
+                tenantId: 68,
+                userId: 'u1',
+                generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                operationId: '12345678-90ab-4def-8234-567890abcdef',
+                stage: 'verify',
+                code: 'PERSISTENCE_VERIFY_FAILED',
+                causeName: 'DatabaseError',
+                causeCode: '57P01',
+            })
+            const serialized = JSON.stringify(safeContext)
+            expect(serialized).not.toContain('Private Product Name')
+            expect(serialized).not.toContain('SECRET-SKU')
+            expect(serialized).not.toContain('connection terminated during verification')
+        }
+    })
+
     it.each([
         ['wrong id', { ...VERIFIED_AI_PRODUCT, id: 43 }],
         ['wrong tenant', { ...VERIFIED_AI_PRODUCT, tenant: 69 }],
@@ -1415,6 +1464,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
             category: [123],
         })).resolves.toMatchObject({ ok: false, code: 'CATEGORY_BUSY_RETRY', retryable: true })
 
+        expect(mockFind).toHaveBeenCalledOnce()
         expect(mockCreate).not.toHaveBeenCalled()
     })
 

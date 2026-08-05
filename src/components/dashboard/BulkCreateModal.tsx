@@ -499,49 +499,38 @@ export function BulkCreateModal({
 
         try {
             const selectedCategoryIds = targetProducts.map(product => product.categoryId!)
-            let revalidatedCategories: { id: string | number }[]
+            let categoryById = new Map(selectedCategoryIds.map(categoryId => [String(categoryId), categoryId]))
             try {
-                revalidatedCategories = await getCategoriesByIdsAction(selectedCategoryIds)
-            } catch (error) {
-                void error
-                const failure: DraftSaveFailure = {
-                    code: 'SAVE_FAILED',
-                    message: t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products',
-                    retryable: true,
-                }
-                setSaveFailures(current => {
-                    const next = { ...current }
-                    for (const product of targetProducts) next[product._id] = failure
-                    return next
-                })
-                setSaveAnnouncement(t.dashboard?.products?.bulkCreate?.saveFailureSummary?.replace('{count}', String(targetProducts.length)) || `${targetProducts.length} drafts need attention.`)
-                toast.error(failure.message)
-                return
-            }
-
-            const categoryById = new Map(revalidatedCategories.map(category => [String(category.id), category.id]))
-            const unavailableCategoryIds = new Set(
-                selectedCategoryIds
-                    .filter(categoryId => !categoryById.has(String(categoryId)))
-                    .map(String),
-            )
-            if (unavailableCategoryIds.size > 0) {
-                invalidateCategories(Array.from(unavailableCategoryIds))
-                toast.error(categoryRequiredMessage)
-                if (targetProducts.every(product => !categoryById.has(String(product.categoryId)))) {
-                    const failure: DraftSaveFailure = {
-                        code: 'CATEGORY_INVALID',
-                        message: categoryRequiredMessage,
-                        retryable: false,
+                const revalidatedCategories = await getCategoriesByIdsAction(selectedCategoryIds)
+                categoryById = new Map(revalidatedCategories.map(category => [String(category.id), category.id]))
+                const unavailableCategoryIds = new Set(
+                    selectedCategoryIds
+                        .filter(categoryId => !categoryById.has(String(categoryId)))
+                        .map(String),
+                )
+                if (unavailableCategoryIds.size > 0) {
+                    invalidateCategories(Array.from(unavailableCategoryIds))
+                    toast.error(categoryRequiredMessage)
+                    if (targetProducts.every(product => !categoryById.has(String(product.categoryId)))) {
+                        const failure: DraftSaveFailure = {
+                            code: 'CATEGORY_INVALID',
+                            message: categoryRequiredMessage,
+                            retryable: false,
+                        }
+                        setSaveFailures(current => {
+                            const next = { ...current }
+                            for (const product of targetProducts) next[product._id] = failure
+                            return next
+                        })
+                        setSaveAnnouncement(t.dashboard?.products?.bulkCreate?.saveFailureSummary?.replace('{count}', String(targetProducts.length)) || `${targetProducts.length} drafts need attention.`)
+                        return
                     }
-                    setSaveFailures(current => {
-                        const next = { ...current }
-                        for (const product of targetProducts) next[product._id] = failure
-                        return next
-                    })
-                    setSaveAnnouncement(t.dashboard?.products?.bulkCreate?.saveFailureSummary?.replace('{count}', String(targetProducts.length)) || `${targetProducts.length} drafts need attention.`)
-                    return
                 }
+            } catch (error) {
+                // The Product save boundary is authoritative and carries generation/operation/
+                // reference correlation. Continue with the click-time category snapshot so a
+                // transient preflight failure cannot terminate before that observable boundary.
+                void error
             }
 
             let cartonMediaId: string | number | null = null

@@ -28,6 +28,18 @@ import { findDashboardProducts } from '@/lib/products/dashboard-product-list'
 //   2. The candidate query compares `lower(sku)` exactly. It deliberately does not use
 //      Payload's `like` operator: `_` and `%` are valid SKU characters but SQL wildcards.
 
+class ProductPersistenceVerificationError extends Error {
+    readonly code = 'PERSISTENCE_VERIFY_FAILED'
+
+    constructor(cause?: unknown) {
+        super(
+            'Product was not saved. Please try again.',
+            cause === undefined ? undefined : { cause },
+        )
+        this.name = 'ProductPersistenceVerificationError'
+    }
+}
+
 // Converts a DB-level unique-constraint rejection (the rare TOCTOU race that slips past
 // findConflictingSkus's non-atomic pre-check) into the same `{code:'FIELD_ERRORS', fieldErrors}`
 // JSON shape findConflictingSkus already throws, so every caller — including
@@ -366,15 +378,15 @@ async function saveProduct(rawData: unknown, id?: string | number, context?: Pro
                         if (context?.source !== 'ai') {
                             console.error('[products.create] persistence verification failed', { id: res?.id })
                         }
-                        throw new Error('Product was not saved. Please try again.')
+                        throw new ProductPersistenceVerificationError()
                     }
                 } catch (verifyErr) {
-                    if ((verifyErr as Error)?.message === 'Product was not saved. Please try again.') throw verifyErr
+                    if (verifyErr instanceof ProductPersistenceVerificationError) throw verifyErr
                     if (context?.source !== 'ai') {
                         const causeName = verifyErr instanceof Error ? verifyErr.name : 'UnknownError'
                         console.error('[products.create] persistence verification error', { id: res?.id, causeName })
                     }
-                    throw new Error('Product was not saved. Please try again.')
+                    throw new ProductPersistenceVerificationError(verifyErr)
                 }
             }
             return JSON.parse(JSON.stringify(res))
@@ -782,6 +794,24 @@ export async function saveAiProductAction(
             }, undefined, { user, tenantId, payload, source: 'ai' }),
         )
     } catch (error) {
+        // Every CATEGORY_LOCK_BUSY_ERROR source is pre-write: mutation-gate checkout, dedicated
+        // pool checkout, or the category row lock. Return before replay reconciliation so a pool
+        // outage cannot move the bounded wait into another unbounded lookup on the same pool.
+        if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
+            const context = telemetry('lock_or_create', 'failed', {
+                code: CATEGORY_LOCK_BUSY_ERROR,
+                retryable: true,
+                ...normalizeAiSaveCause(error),
+            })
+            logFailure(context)
+            return aiSaveFailure(
+                'CATEGORY_BUSY_RETRY',
+                'This category is busy. Please try again.',
+                true,
+                referenceId,
+            )
+        }
+
         // Also cover concurrent identical requests and ambiguous commit acknowledgements. If
         // the lookup itself is unavailable, preserve and report the original write failure.
         const committedReplay = await findReplay().catch(() => null)
@@ -794,16 +824,17 @@ export async function saveAiProductAction(
             }
         }
 
-        if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
-            const context = telemetry('lock_or_create', 'failed', {
-                code: CATEGORY_LOCK_BUSY_ERROR,
+        if (error instanceof ProductPersistenceVerificationError) {
+            const context = telemetry('verify', 'failed', {
+                code: 'PERSISTENCE_VERIFY_FAILED',
                 retryable: true,
-                ...normalizeAiSaveCause(error),
+                ...normalizeAiSaveCause(error.cause ?? error),
             })
             logFailure(context)
+            reportAiSaveFailure('PERSISTENCE_VERIFY_FAILED', context)
             return aiSaveFailure(
-                'CATEGORY_BUSY_RETRY',
-                'This category is busy. Please try again.',
+                'PERSISTENCE_VERIFY_FAILED',
+                'The product could not be verified after saving. Please try again.',
                 true,
                 referenceId,
             )

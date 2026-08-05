@@ -380,20 +380,35 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(mockSaveCategory).not.toHaveBeenCalled()
     })
 
-    it('TC-F08-04-102: aborts before carton and product side effects when selected-ID revalidation fails', async () => {
+    it('[TC-F08-04-127] falls through a transient category preflight failure to the correlated authoritative save', async () => {
+        // Arrange
         mockGetCategories.mockRejectedValue(new Error('category service unavailable'))
-        mockSaveProduct.mockResolvedValue(saveSuccess(123))
-        await renderAndWaitForProducts()
+        mockSaveProduct.mockResolvedValue(saveFailure(
+            'PERSISTENCE_VERIFY_FAILED',
+            'The product could not be verified after saving.',
+        ))
+        const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts()
 
         // Act
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
-        // Assert: gives up after MAX_SKU_ATTEMPTS (3) and surfaces the error
-        await waitFor(() => expect(mockToastError).toHaveBeenCalled())
-        expect(mockGetCrateCartonId).not.toHaveBeenCalled()
-        expect(mockSaveProduct).not.toHaveBeenCalled()
+        // Assert: the authoritative action returns a retryable, correlated failure instead of
+        // converting the preflight outage into an untraceable client-only error.
+        await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledOnce())
+        expect(mockSaveProduct.mock.calls[0][1]).toMatchObject({
+            generationId: TEST_GENERATION_ID,
+            operationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+            skuAttempt: 1,
+        })
+        expect(screen.getByTestId('ai-save-failure-1')).toBeInTheDocument()
+        expect(screen.getByText('BBBBBBBB')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /retry save/i })).toBeEnabled()
+        expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
+        expect(onPartialSuccess).not.toHaveBeenCalled()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
         expect(mockSaveCategory).not.toHaveBeenCalled()
     })
 

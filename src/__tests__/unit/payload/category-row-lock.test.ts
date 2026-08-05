@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
     CATEGORY_GATE_TIMEOUT_MS,
+    CATEGORY_POOL_CONNECT_TIMEOUT_MS,
     withActiveCategoryRowLock,
     withCategoryMutationGate,
 } from '@/lib/payload/category-row-lock'
@@ -83,6 +84,24 @@ describe('[TC-F08-04-120] withActiveCategoryRowLock', () => {
         expect(client.release).toHaveBeenCalledOnce()
     })
 
+    it('does not relabel a Product-operation lock error as a pre-write category wait', async () => {
+        const operationError = Object.assign(new Error('canceling statement due to lock timeout'), {
+            code: '55P03',
+        })
+        const client = createLockClient()
+        const pool = { options: { max: 2 }, connect: vi.fn().mockResolvedValue(client) }
+
+        await expect(withActiveCategoryRowLock(
+            { db: { pool } } as never,
+            123,
+            68,
+            async () => { throw operationError },
+        )).rejects.toBe(operationError)
+
+        expect(client.query).toHaveBeenLastCalledWith('ROLLBACK')
+        expect(client.release).toHaveBeenCalledOnce()
+    })
+
     it('propagates a final lock COMMIT failure after the Product operation for replay reconciliation', async () => {
         const commitFailure = new Error('commit acknowledgement lost')
         const client = createLockClient()
@@ -126,6 +145,65 @@ describe('[TC-F08-04-120] withActiveCategoryRowLock', () => {
 })
 
 describe('[TC-F08-04-121] category mutation waits', () => {
+    it('bounds pool checkout without accumulating retries, then recovers after the late checkout settles', async () => {
+        // Arrange
+        vi.useFakeTimers()
+        const lateClient = createLockClient()
+        const nextClient = createLockClient()
+        let resolveFirstConnection!: (client: ReturnType<typeof createLockClient>) => void
+        const firstConnection = new Promise<ReturnType<typeof createLockClient>>(resolve => {
+            resolveFirstConnection = resolve
+        })
+        const pool = {
+            options: { max: 2 },
+            connect: vi.fn()
+                .mockReturnValueOnce(firstConnection)
+                .mockResolvedValueOnce(nextClient),
+        }
+        const payload = { db: { pool } }
+        const firstOperation = vi.fn()
+
+        // Act
+        const firstSave = withActiveCategoryRowLock(
+            payload as never,
+            123,
+            68,
+            firstOperation,
+        )
+        const firstExpectation = expect(firstSave).rejects.toThrow('CATEGORY_BUSY_RETRY')
+        await vi.advanceTimersByTimeAsync(CATEGORY_POOL_CONNECT_TIMEOUT_MS)
+        await firstExpectation
+
+        // Assert
+        expect(firstOperation).not.toHaveBeenCalled()
+        const retryOperations = [vi.fn(), vi.fn(), vi.fn()]
+        for (const retryOperation of retryOperations) {
+            await expect(withActiveCategoryRowLock(
+                payload as never,
+                123,
+                68,
+                retryOperation,
+            )).rejects.toThrow('CATEGORY_BUSY_RETRY')
+        }
+        for (const retryOperation of retryOperations) expect(retryOperation).not.toHaveBeenCalled()
+        expect(pool.connect).toHaveBeenCalledOnce()
+
+        resolveFirstConnection(lateClient)
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(lateClient.query).not.toHaveBeenCalled()
+        expect(lateClient.release).toHaveBeenCalledOnce()
+
+        await expect(withActiveCategoryRowLock(
+            payload as never,
+            123,
+            68,
+            async () => 'saved',
+        )).resolves.toBe('saved')
+        expect(pool.connect).toHaveBeenCalledTimes(2)
+        expect(nextClient.release).toHaveBeenCalledOnce()
+    })
+
     it('bounds cross-instance row-lock waits and returns a retryable error', async () => {
         const lockTimeout = Object.assign(new Error('canceling statement due to lock timeout'), {
             code: '55P03',

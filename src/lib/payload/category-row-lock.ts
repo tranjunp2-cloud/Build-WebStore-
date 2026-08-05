@@ -25,10 +25,12 @@ type PoolMutationGate = {
 }
 
 const CATEGORY_LOCK_TIMEOUT_MS = 2_000
+export const CATEGORY_POOL_CONNECT_TIMEOUT_MS = 5_000
 export const CATEGORY_GATE_TIMEOUT_MS = 5_000
 export const CATEGORY_LOCK_BUSY_ERROR = 'CATEGORY_BUSY_RETRY'
 
 const poolMutationGates = new WeakMap<object, PoolMutationGate>()
+const stalledPoolCheckouts = new WeakMap<LockPool, Promise<LockClient>>()
 
 export function isCategoryLockTimeoutError(error: unknown): boolean {
     let current = error
@@ -95,6 +97,55 @@ function releaseMutationGate(gate: PoolMutationGate): void {
     gate.active = false
 }
 
+async function connectWithTimeout(pool: LockPool): Promise<LockClient> {
+    // `pg-pool` cannot cancel a Promise-based checkout unless its global
+    // connectionTimeoutMillis is configured. Do not enqueue another category checkout while a
+    // timed-out one is still pending; the late result below releases itself and clears this guard.
+    if (stalledPoolCheckouts.has(pool)) throw new Error(CATEGORY_LOCK_BUSY_ERROR)
+
+    let timedOut = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const pendingConnection = pool.connect()
+    let connection: Promise<LockClient>
+    connection = pendingConnection.then(
+        client => {
+            if (!timedOut) return client
+            try {
+                client.release()
+            } finally {
+                if (stalledPoolCheckouts.get(pool) === connection) {
+                    stalledPoolCheckouts.delete(pool)
+                }
+            }
+            throw new Error(CATEGORY_LOCK_BUSY_ERROR)
+        },
+        error => {
+            if (timedOut && stalledPoolCheckouts.get(pool) === connection) {
+                stalledPoolCheckouts.delete(pool)
+            }
+            throw error
+        }
+    )
+
+    try {
+        return await Promise.race([
+            connection,
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    timedOut = true
+                    stalledPoolCheckouts.set(pool, connection)
+                    reject(new Error(CATEGORY_LOCK_BUSY_ERROR))
+                }, CATEGORY_POOL_CONNECT_TIMEOUT_MS)
+            }),
+        ])
+    } finally {
+        if (timer) clearTimeout(timer)
+        // A checkout that resolves after the timeout is released by `connection` above. Attach
+        // a rejection handler so that late cleanup never becomes an unhandled rejection.
+        void connection.catch(() => undefined)
+    }
+}
+
 /** Serialize category lock/delete critical sections that share one Payload pool. */
 export async function withCategoryMutationGate<T>(
     payload: Payload,
@@ -124,8 +175,9 @@ export async function withActiveCategoryRowLock<T>(
 
     return withCategoryMutationGate(payload, async () => {
         let client: LockClient | undefined
+        let productOperationStarted = false
         try {
-            client = await database.pool.connect()
+            client = await connectWithTimeout(database.pool)
             await client.query('BEGIN')
             await client.query(
                 "SELECT set_config('lock_timeout', $1, true)",
@@ -148,6 +200,7 @@ export async function withActiveCategoryRowLock<T>(
                 return null
             }
 
+            productOperationStarted = true
             const value = await operation(canonicalCategoryId)
             await client.query('COMMIT')
             return value
@@ -159,7 +212,7 @@ export async function withActiveCategoryRowLock<T>(
                     void rollbackError
                 }
             }
-            if (isCategoryLockTimeoutError(error)) {
+            if (!productOperationStarted && isCategoryLockTimeoutError(error)) {
                 throw new Error(CATEGORY_LOCK_BUSY_ERROR)
             }
             throw error

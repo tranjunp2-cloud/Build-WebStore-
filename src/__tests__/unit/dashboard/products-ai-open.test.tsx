@@ -350,8 +350,9 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
             .mockReturnValueOnce(finalRequest)
         renderPage()
 
+        const prompt = await screen.findByPlaceholderText(/Leather jacket/)
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(prompt, {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
