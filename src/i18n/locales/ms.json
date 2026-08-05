@@ -1326,6 +1326,15 @@
                 "noteCanRefund": "Bayar balik kepada pembeli untuk pesanan yang telah dihantar ini.",
                 "noteDefault": "Bayaran balik tersedia setelah pesanan dihantar."
             },
+            "complete": {
+                "title": "Selesaikan pesanan #{orderNumber}?",
+                "description": "Sahkan bahawa pesanan penghantaran sendiri ini telah diterima oleh pembeli. Tindakan ini tidak boleh dibuat asal.",
+                "confirm": "Selesaikan Pesanan",
+                "back": "Kembali",
+                "success": "Pesanan ditandakan sebagai selesai.",
+                "failed": "Pesanan tidak dapat diselesaikan.",
+                "note": "Sahkan penyelesaian selepas pesanan penghantaran sendiri diterima oleh pembeli."
+            },
             "progress": {
                 "pending": "Menunggu",
                 "confirmed": "Disahkan",
@@ -1560,6 +1569,9 @@
                 "bannerBody": "EasyParcel tidak disambungkan — masukkan kurier & penjejakan secara manual untuk memenuhi pesanan ini.",
                 "courierLabel": "Kurier",
                 "courierPlaceholder": "Pilih kurier (cth. Pos Laju, J&T Express, DHL…)",
+                "courierOther": "Kurier lain",
+                "customCourierLabel": "Nama kurier",
+                "customCourierPlaceholder": "Masukkan nama kurier",
                 "trackingLabel": "Nombor penjejakan (AWB)",
                 "trackingPlaceholder": "Masukkan nombor penjejakan secara manual",
                 "shipOrder": "Hantar Pesanan",
@@ -2033,6 +2045,8 @@
                     "newTitle": "Tambah Kategori Baharu",
                     "editTitle": "Sunting Kategori",
                     "addSubcategoryTitle": "Tambah Subkategori",
+                    "subcategoryContext": "Menambah subkategori di bawah {parentName} (L{currentLevel}) → kategori baharu akan menjadi Tahap {newLevel}.",
+                    "parentLockedHelp": "Dikunci — anda sedang menambah di bawah kategori ini.",
                     "name": "Nama Kategori *",
                     "namePlaceholder": "cth. Elektronik, Fesyen",
                     "slug": "Slug URL",

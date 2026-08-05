@@ -6,6 +6,11 @@ import { randomUUID } from 'crypto'
 // filename-uniqueness can't cause two rows to collide on one object.
 
 const EXT_BY_MIME: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/x-icon': 'ico',
+    'image/vnd.microsoft.icon': 'ico',
     'video/mp4': 'mp4',
     'video/webm': 'webm',
 }
@@ -25,7 +30,7 @@ function sanitizeBase(name: string): string {
 }
 
 /**
- * Build the S3 object key (== stored filename) for a video upload.
+ * Build the S3 object key (== stored filename) for a media upload.
  * Format: `u{userId}-{safeBase}-{uuid}.{ext}` — flat, collision-safe, traceable.
  */
 export function buildMediaKey({

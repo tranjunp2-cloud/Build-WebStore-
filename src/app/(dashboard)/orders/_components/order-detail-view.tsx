@@ -35,6 +35,7 @@ interface RawOrder {
     notes?: string | null
     awbNo?: string | null
     shippingTrackingStatus?: string | null
+    selfDeliveryCourier?: string | null
 }
 
 function formatCreatedDate(iso?: string | null): string {
@@ -285,6 +286,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                             xenditChannelCode: order.xenditChannelCode ?? null,
                             awbNo: raw.awbNo ?? null,
                             shippingTrackingStatus: raw.shippingTrackingStatus ?? null,
+                            selfDeliveryCourier: raw.selfDeliveryCourier ?? null,
                         }}
                         onUpdate={() => { fetchOrder(); router.refresh() }}
                     />

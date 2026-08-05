@@ -1326,6 +1326,15 @@
                 "noteCanRefund": "Refund the buyer for this shipped order.",
                 "noteDefault": "Refunds become available once the order has shipped."
             },
+            "complete": {
+                "title": "Complete order #{orderNumber}?",
+                "description": "Confirm that this self-delivery order has reached the buyer. This action cannot be undone.",
+                "confirm": "Complete Order",
+                "back": "Back",
+                "success": "Order marked as completed.",
+                "failed": "Could not complete the order.",
+                "note": "Confirm completion after the self-delivery order reaches the buyer."
+            },
             "progress": {
                 "pending": "Pending",
                 "confirmed": "Confirmed",
@@ -1560,6 +1569,9 @@
                 "bannerBody": "EasyParcel isn't connected — enter courier & tracking manually to fulfill this order.",
                 "courierLabel": "Courier",
                 "courierPlaceholder": "Select courier (e.g. Pos Laju, J&T Express, DHL…)",
+                "courierOther": "Other courier",
+                "customCourierLabel": "Courier name",
+                "customCourierPlaceholder": "Enter courier name",
                 "trackingLabel": "Tracking number (AWB)",
                 "trackingPlaceholder": "Enter tracking number manually",
                 "shipOrder": "Ship Order",
@@ -2033,6 +2045,8 @@
                     "newTitle": "Add New Category",
                     "editTitle": "Edit Category",
                     "addSubcategoryTitle": "Add Subcategory",
+                    "subcategoryContext": "Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.",
+                    "parentLockedHelp": "Locked — you are adding under this category.",
                     "name": "Category Name",
                     "namePlaceholder": "e.g. Electronics, Fashion",
                     "slug": "URL Slug",

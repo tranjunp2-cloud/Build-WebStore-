@@ -27,7 +27,17 @@ import {
 } from '@/components/editor/local-business/normalization'
 import { countCompletedLocalBusinessFields } from '@/components/editor/local-business/completion-utils'
 import { trackEvent } from '@/lib/analytics/track-event'
-import { useEditorStore, BLOCK_TYPE_TO_KEY, PAGE_META_LOCALE_KEY, getDisplayPageTitle, type SiteLocale } from '@/store/editorStore'
+import {
+    useEditorStore,
+    runSerializedEditorSave,
+    hasPendingSerializedEditorSave,
+    isEditorSaveContextCurrent,
+    BLOCK_TYPE_TO_KEY,
+    PAGE_META_LOCALE_KEY,
+    getDisplayPageTitle,
+    type EditorSaveContext,
+    type SiteLocale,
+} from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
 import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
@@ -45,6 +55,13 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CompactEditorLayout, type PreviewFrameSharedProps } from '@/components/editor/CompactEditorLayout'
 import type { ToolsSheetPanelProps, ToolsSheetTab } from '@/components/editor/EditorToolsSheet'
 import { useEditorLayoutMode } from '@/hooks/useEditorLayoutMode'
+
+class SerializedSaveSetupError extends Error {
+    constructor(readonly originalError: unknown) {
+        super('Failed to start serialized editor save')
+        this.name = 'SerializedSaveSetupError'
+    }
+}
 
 export type SiteData = {
     id: string
@@ -97,6 +114,20 @@ import type { PageData, BlockData } from '@/store/editorStore'
 type SaveOptions = {
     showToast?: boolean
     refreshPreview?: boolean
+}
+
+type PendingSaveRequest = {
+    context: EditorSaveContext
+    options: SaveOptions
+    resolvers: Array<(saved: boolean) => void>
+}
+
+function mergeSaveOptions(current: SaveOptions | undefined, incoming: SaveOptions): SaveOptions {
+    if (!current) return { ...incoming }
+    return {
+        showToast: (current?.showToast ?? true) || (incoming.showToast ?? true),
+        refreshPreview: (current?.refreshPreview ?? true) || (incoming.refreshPreview ?? true),
+    }
 }
 
 type LocalBusinessSaveBatch = {
@@ -297,7 +328,7 @@ export default function EditorPage() {
     // Imperative handle to send postMessages to iframe without full reload (Gap B)
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
-    const pendingSaveRef = useRef<SaveOptions | null>(null)
+    const pendingSaveRef = useRef<PendingSaveRequest | null>(null)
     const contactSavePendingRef = useRef(false)
     const [isContactSavePending, setIsContactSavePending] = useState(false)
     const localBusinessBySiteRef = useRef(new Map<string, LocalBusinessSiteState>())
@@ -348,6 +379,7 @@ export default function EditorPage() {
     const canUndo = useEditorStore(state => state.canUndo)
     const canRedo = useEditorStore(state => state.canRedo)
     const markSaved = useEditorStore(state => state.markSaved)
+    const markDirty = useEditorStore(state => state.markDirty)
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
@@ -591,21 +623,35 @@ export default function EditorPage() {
 
     // User data is loaded from editor-data API in loadData useEffect above
 
-    const handleSave = useCallback(async (options: SaveOptions = {}) => {
+    const handleSave = useCallback(async (
+        options: SaveOptions = {},
+        queuedContext?: EditorSaveContext,
+    ): Promise<boolean> => {
         if (!siteId) return false
+        const saveContext = queuedContext ?? {
+            siteId,
+            pageId: useEditorStore.getState().currentPageId || null,
+        }
 
         if (isSavingRef.current) {
-            // A save is already in progress. Mutex lock.
-            // Queue this save request as "dirty" to fire after the current one completes.
-            pendingSaveRef.current = {
-                ...pendingSaveRef.current,
-                ...options,
-                showToast: options.showToast || pendingSaveRef.current?.showToast,
-                refreshPreview: options.refreshPreview === true || pendingSaveRef.current?.refreshPreview === true
-                    ? true
-                    : options.refreshPreview ?? pendingSaveRef.current?.refreshPreview
-            }
-            return true
+            // Coalesce callers for the same page into one follow-up write, but make
+            // every caller wait for that write instead of reporting success early.
+            return new Promise<boolean>((resolve) => {
+                const pending = pendingSaveRef.current
+                const sameContext = pending
+                    && pending.context.siteId === saveContext.siteId
+                    && pending.context.pageId === saveContext.pageId
+
+                if (pending && !sameContext) {
+                    pending.resolvers.forEach(resolvePending => resolvePending(false))
+                }
+
+                pendingSaveRef.current = {
+                    context: saveContext,
+                    options: mergeSaveOptions(sameContext ? pending.options : undefined, options),
+                    resolvers: [...(sameContext ? pending.resolvers : []), resolve],
+                }
+            })
         }
 
         isSavingRef.current = true
@@ -625,95 +671,109 @@ export default function EditorPage() {
             useEditorStore.setState({ autoSaveTimer: null })
         }
 
-        const snapshot = useEditorStore.getState()
-        const currentBlocks = snapshot.getDisplayBlocks()
-        const currentTheme = snapshot.theme
-        // Use pageId from store snapshot (not from closure) to prevent race condition
-        // when page switch happens during auto-save
-        const savePageId = snapshot.currentPageId
-
-        if (currentBlocks.length === 0 && !page) return false
-
-        setIsSaving(true)
-
         try {
-            const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (savePageId) {
-                saveUrl.searchParams.set('pageId', savePageId)
-            }
+            return await runSerializedEditorSave(saveContext.siteId, async () => {
+                // Snapshot only when this queued write gets the lock. A snapshot captured
+                // while waiting could overwrite a newer edit saved by an earlier task.
+                const snapshot = useEditorStore.getState()
+                if (!isEditorSaveContextCurrent(saveContext, snapshot)) return false
 
-            const res = await fetch(saveUrl.toString(), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    blocks: currentBlocks,
-                    theme: currentTheme,
-                    // F26-04: header/footer also serialized in display-locale so public site
-                    // renders the chosen language without needing locale resolution on read.
-                    headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
-                    footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
-                    // F26-04: global blocks also serialized in display locale
-                    ...(snapshot.globalBlocks !== null && {
-                        globalBlocks: {
-                            cartWidget: snapshot.globalBlocks.cartWidget
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
-                                : null,
-                            whatsappButton: snapshot.globalBlocks.whatsappButton
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
-                                : null,
-                            socialWidget: snapshot.globalBlocks.socialWidget
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
-                                : null,
-                        },
-                    }),
-                    // F-26: Persist locale overrides alongside blocks
-                    ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
-                    // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
-                    ...((snapshot.activeLocale === 'en' || snapshot.activeLocale === 'ms') && { locale: snapshot.activeLocale }),
-                    isDraft: true,
-                }),
+                const currentBlocks = snapshot.getDisplayBlocks()
+                const currentTheme = snapshot.theme
+                const savePageId = snapshot.currentPageId
+                const savedRevision = snapshot.contentRevision
+
+                if (currentBlocks.length === 0 && !page) return false
+
+                setIsSaving(true)
+
+                try {
+                    const saveUrl = new URL(`/api/sites/${saveContext.siteId}/save`, window.location.origin)
+                    if (savePageId) {
+                        saveUrl.searchParams.set('pageId', savePageId)
+                    }
+
+                    const res = await fetch(saveUrl.toString(), {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            blocks: currentBlocks,
+                            theme: currentTheme,
+                            // F26-04: header/footer also serialized in display-locale so public site
+                            // renders the chosen language without needing locale resolution on read.
+                            headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
+                            footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
+                            // F26-04: global blocks also serialized in display locale
+                            ...(snapshot.globalBlocks !== null && {
+                                globalBlocks: {
+                                    cartWidget: snapshot.globalBlocks.cartWidget
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
+                                        : null,
+                                    whatsappButton: snapshot.globalBlocks.whatsappButton
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
+                                        : null,
+                                    socialWidget: snapshot.globalBlocks.socialWidget
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
+                                        : null,
+                                },
+                            }),
+                            // F-26: Persist locale overrides alongside blocks
+                            ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
+                            // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
+                            ...((snapshot.activeLocale === 'en' || snapshot.activeLocale === 'ms') && { locale: snapshot.activeLocale }),
+                            isDraft: true,
+                        }),
+                    })
+
+                    if (!res.ok) {
+                        const payload = await res.json().catch(() => null)
+                        const fallback = typeof payload?.error === 'string'
+                            ? payload.error
+                            : payload?.error?.details?.formErrors?.[0]
+                                || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
+                                || payload?.error?.details?.fieldErrors?.blocks?.[0]
+                                || `Server returned ${res.status}`
+                        throw new Error(resolveApiError(payload, fallback, sub))
+                    }
+
+                    if (!isEditorSaveContextCurrent(saveContext, useEditorStore.getState())) {
+                        return false
+                    }
+
+                    markSaved(savedRevision)
+                    setSaveSuccess(true)
+
+                    if (options.refreshPreview ?? true) {
+                        setIframeKey(key => key + 1)
+                    }
+
+                    if (options.showToast ?? true) {
+                        toast.success(t.editor.toast.saveSuccess)
+                    }
+
+                    window.setTimeout(() => setSaveSuccess(false), 2000)
+                    return true
+                } catch (err) {
+                    if (!isEditorSaveContextCurrent(saveContext, useEditorStore.getState())) {
+                        return false
+                    }
+                    // BUG-F05-01: log sanitized error code (no internal details in production console)
+                    console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
+                    const errMsg = err instanceof Error ? err.message : null
+                    toast.error(errMsg || t.editor.toast.saveFailed)
+                    return false
+                }
             })
-
-            if (!res.ok) {
-                const payload = await res.json().catch(() => null)
-                const fallback = typeof payload?.error === 'string'
-                    ? payload.error
-                    : payload?.error?.details?.formErrors?.[0]
-                        || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
-                        || payload?.error?.details?.fieldErrors?.blocks?.[0]
-                        || `Server returned ${res.status}`
-                throw new Error(resolveApiError(payload, fallback, sub))
-            }
-
-            markSaved()
-            setSaveSuccess(true)
-
-            if (options.refreshPreview ?? true) {
-                setIframeKey(key => key + 1)
-            }
-
-            if (options.showToast ?? true) {
-                toast.success(t.editor.toast.saveSuccess)
-            }
-
-            window.setTimeout(() => setSaveSuccess(false), 2000)
-            return true
-        } catch (err) {
-            // BUG-F05-01: log sanitized error code (no internal details in production console)
-            console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
-            const errMsg = err instanceof Error ? err.message : null
-            toast.error(errMsg || t.editor.toast.saveFailed)
-            return false
         } finally {
             isSavingRef.current = false
-            if (pendingSaveRef.current) {
-                // There were unsaved changes queued while we were saving.
-                // Fetch the latest state and save again.
-                const nextOptions = pendingSaveRef.current
-                pendingSaveRef.current = null
-                void handleSave(nextOptions)
-            } else {
+            const pending = pendingSaveRef.current as PendingSaveRequest | null
+            pendingSaveRef.current = null
+            if (pending) {
+                void handleSave(pending.options, pending.context)
+                    .then(saved => pending.resolvers.forEach(resolve => resolve(saved)))
+                    .catch(() => pending.resolvers.forEach(resolve => resolve(false)))
+            } else if (useEditorStore.getState().siteId === saveContext.siteId) {
                 setIsSaving(false)
             }
         }
@@ -944,24 +1004,30 @@ export default function EditorPage() {
 
             let request: Promise<Response>
             try {
-                request = fetch(saveUrl.toString(), {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        ...(changes.name ? { siteName: changes.name } : {}),
-                        contactInfo: changes.contactInfo,
-                        localBusiness: changes.localBusiness,
-                        socialLinks: changes.socialLinks,
-                        branding: changes.branding,
-                        seo: changes.seo,
-                        // When name changes, persist updated headerBlock (logoText synced above).
-                        // When logo changes, persist synced header/footer blocks directly to DB.
-                        headerBlock: changes.name
-                            ? useEditorStore.getState().headerBlock
-                            : (logoSyncedHeaderBlock ?? changes.headerBlock),
-                        footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
-                    }),
+                request = runSerializedEditorSave(persistenceSiteId, () => {
+                    try {
+                        return fetch(saveUrl.toString(), {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                ...(changes.name ? { siteName: changes.name } : {}),
+                                contactInfo: changes.contactInfo,
+                                localBusiness: changes.localBusiness,
+                                socialLinks: changes.socialLinks,
+                                branding: changes.branding,
+                                seo: changes.seo,
+                                // When name changes, persist updated headerBlock (logoText synced above).
+                                // When logo changes, persist synced header/footer blocks directly to DB.
+                                headerBlock: changes.name
+                                    ? useEditorStore.getState().headerBlock
+                                    : (logoSyncedHeaderBlock ?? changes.headerBlock),
+                                footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
+                            }),
+                        })
+                    } catch (setupError) {
+                        throw new SerializedSaveSetupError(setupError)
+                    }
                 })
             } catch (setupError) {
                 throw setupError
@@ -971,6 +1037,9 @@ export default function EditorPage() {
             try {
                 response = await request
             } catch (transportError) {
+                if (transportError instanceof SerializedSaveSetupError) {
+                    throw transportError.originalError
+                }
                 if (changes.localBusiness) {
                     const reconcileController = new AbortController()
                     const reconcileTimeoutId = window.setTimeout(
@@ -1390,7 +1459,7 @@ export default function EditorPage() {
         // Immediate save persists the new active locale's display blocks to DB so
         // /preview and public sources don't show stale content until next auto-save.
         if (!isStandard) {
-            useEditorStore.setState({ hasUnsavedChanges: true })
+            markDirty(false)
             void saveWithRetry({ showToast: false, refreshPreview: false })
             return
         }
@@ -1594,19 +1663,19 @@ export default function EditorPage() {
         // Persist new locale to Sites.locale + mark unsaved so flushSavesBeforePublish
         // calls handleSave (which uses getDisplayBlocks) before promoting to published.
         try {
-            await fetch(`/api/sites/${siteId}/save`, {
+            await runSerializedEditorSave(siteId, () => fetch(`/api/sites/${siteId}/save`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ locale }),
-            })
+            }))
         } catch {
             // Non-fatal — locale preference stored in memory until next save
         }
         // Mark dirty so publish flow re-saves with the new locale's display blocks (fix: Greek site → switch MS → publish → shows MS)
-        useEditorStore.setState({ hasUnsavedChanges: true })
+        markDirty(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- saveWithRetry declared after this; refs are stable
-    }, [siteId, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride, updatePageInState])
+    }, [siteId, markDirty, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride, updatePageInState])
 
     // F-26-04: Translate a specific block instance (called after block drop when needsTranslation)
     const handleAutoTranslateBlock = useCallback(async (blockId: string, blockType: string) => {
@@ -2148,37 +2217,42 @@ export default function EditorPage() {
             }
             // Force re-save with fully-translated state to guarantee header/footer/globals
             // hit DB in the chosen language before publish reads them.
-            useEditorStore.setState({ hasUnsavedChanges: true })
+            markDirty(false)
         }
-        // Poll until in-flight save finishes (max 10s)
-        if (isSavingRef.current) {
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (!isSavingRef.current || Date.now() > deadline) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
+        const deadline = Date.now() + 10_000
+        const waitForSaveQueue = async (): Promise<boolean> => {
+            while (isSavingRef.current || hasPendingSerializedEditorSave(siteId)) {
+                const remaining = deadline - Date.now()
+                if (remaining <= 0) return false
+                await new Promise<void>((resolve) => {
+                    window.setTimeout(resolve, Math.min(100, remaining))
+                })
+            }
+            return true
         }
-        // Save any remaining unsaved changes
-        if (useEditorStore.getState().hasUnsavedChanges) {
-            const saved = await handleSave({ showToast: false, refreshPreview: false })
+
+        // A user action can create a new revision while the flush save is in flight.
+        // Keep flushing until both the queue and dirty state are stable.
+        while (Date.now() < deadline) {
+            if (!await waitForSaveQueue()) return false
+            if (!useEditorStore.getState().hasUnsavedChanges) return true
+
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) return false
+
+            let timeoutId: number | null = null
+            const saved = await Promise.race<boolean>([
+                handleSave({ showToast: false, refreshPreview: false }),
+                new Promise<boolean>((resolve) => {
+                    timeoutId = window.setTimeout(() => resolve(false), remaining)
+                }),
+            ])
+            if (timeoutId !== null) window.clearTimeout(timeoutId)
             if (!saved) return false
-            // Wait for that save to finish too
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (!isSavingRef.current || Date.now() > deadline) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
         }
-        return true
-    }, [handleSave])
+
+        return false
+    }, [handleSave, markDirty, siteId])
 
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return

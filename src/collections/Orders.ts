@@ -549,6 +549,35 @@ export const Orders: CollectionConfig = {
                     ],
                     admin: { description: 'Collection method snapshot for this tracking event' },
                 },
+                {
+                    name: 'source',
+                    type: 'select',
+                    options: [
+                        { label: 'EasyParcel', value: 'easyparcel' },
+                        { label: 'CMS Manual', value: 'cms_manual' },
+                    ],
+                    admin: { hidden: true, description: 'Origin of this fulfillment event' },
+                },
+                {
+                    name: 'actorId',
+                    type: 'text',
+                    admin: { hidden: true, description: 'User ID that performed a manual fulfillment action' },
+                },
+                {
+                    name: 'actorLabel',
+                    type: 'text',
+                    admin: { hidden: true, description: 'User label snapshot retained for fulfillment audit' },
+                },
+                {
+                    name: 'previousStatus',
+                    type: 'text',
+                    admin: { hidden: true, description: 'Order status before this manual fulfillment action' },
+                },
+                {
+                    name: 'nextStatus',
+                    type: 'text',
+                    admin: { hidden: true, description: 'Order status after this manual fulfillment action' },
+                },
             ],
         },
         // --- Cancellation ---
