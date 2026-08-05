@@ -170,7 +170,7 @@ test.describe('Products CRUD Flows', () => {
         await expect(aiChatTextarea).toHaveValue('Line 1\nLine 2')
     })
 
-    test('[TC-F08-05-13] category modal keeps input focus and does not submit on Enter', async ({ page }) => {
+    test('[TC-F08-05-17] category modal keeps input focus and does not submit on Enter', async ({ page }) => {
         await navigateTo(page, '/products/categories')
         await expectNoServerError(page)
 
@@ -192,7 +192,7 @@ test.describe('Products CRUD Flows', () => {
         await expect(page.getByRole('dialog')).toBeVisible()
     })
 
-    test('[TC-F08-05-19] normalizes parent and re-parents child on delete', async ({ page }) => {
+    test('[TC-F08-05-18][TC-F08-05-06] normalizes parent and re-parents child on delete', async ({ page }) => {
         // Arrange
         const uniqueSuffix = `${Date.now()}-${test.info().workerIndex}`
         const rootName = `000 E2E Root ${uniqueSuffix}`
