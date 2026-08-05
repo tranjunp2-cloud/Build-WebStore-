@@ -135,4 +135,4 @@ Make the existing per-level color mapping authoritative across themes, then comp
 
 ## Next Steps
 
-Proceed to Phase 02 for TC-ID reconciliation, unit coverage, authenticated Playwright coverage, and full regression gates.
+Proceed to Phase 02 for documented TC-ID traceability debt, unit coverage, authenticated Playwright coverage, and full regression gates. The existing E2E file was later kept unchanged by user direction.

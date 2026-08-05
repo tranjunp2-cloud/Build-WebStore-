@@ -19,7 +19,7 @@ effort: 4h
 
 ## Overview
 
-Add durable tests for all four rework cases, reconcile existing category E2E titles with their real QA cases, and keep production changes limited to the two currently failing UI behaviors. Tests import real source, use AAA structure, and clean all created fixtures.
+Add durable tests for all four rework cases, document the existing category E2E title mismatch without modifying that user-excluded file, and keep production changes limited to the two currently failing UI behaviors. Tests import real source, use AAA structure, and attempt cleanup for all created fixtures.
 
 ## Key Insights
 
@@ -45,13 +45,13 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 - Browser test creates an isolated hierarchy with two direct L2 children and an L3 under the first child, validates contextual copy at L1 and L2, and validates the exact primary/info/violet computed-token mapping in light and dark modes.
 - The same real hierarchy flow deletes L1, reloads, and proves both direct L2 children are now top-level/L1 while the former L3 remains attached beneath its original parent.
 - A separate browser flow creates a unique category and one assigned product, proves deletion is blocked with the exact count message, then removes the product before category cleanup.
-- Browser fixture cleanup runs in `finally`, uses unique names, deletes deepest-first, and surfaces cleanup failure when the test itself passed.
+- Browser fixture cleanup runs in `finally`, uses unique names, deletes deepest-first, and surfaces cleanup failures on both pass and failure while retaining the primary test failure as the first aggregated error.
 - Existing delete/re-parent and assigned-product hard-block suites remain green.
 
 ### QA traceability
 
 - Add new QA rows TC-F08-05-38 and TC-F08-05-39 for badge theming and contextual Add Subcategory guidance; mark automated only when the permanent tests exist.
-- Correct existing E2E titles to the QA cases they actually exercise. Do not repurpose TC-13 or TC-19.
+- Keep `e2e/products-crud.spec.ts` unchanged by user direction and record its legacy TC-13/TC-19 title mismatch as deferred traceability debt.
 - Preserve the exact TC-F08-05-06 assigned-product count requirement.
 
 ## Related Code Files
@@ -65,9 +65,6 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
   - Add AAA cases for subcategory context and normal create/edit absence.
   - Add class assertions for L1/L2/L3 if the real presentation helper remains in the component.
   - Add the exact assigned-product delete-message mapping and open-modal regression.
-- `/home/liam/data/ech-prime-web-v2/e2e/products-crud.spec.ts`
-  - Rename the existing focus case to TC-F08-05-17.
-  - Map the existing parent normalization/re-parent flow to TC-F08-05-18 and TC-F08-05-06 instead of TC-F08-05-19.
 - `/home/liam/data/ech-prime-web-v2/playwright.config.ts`
   - Register `category-management-regression` against the new `tests` file, using saved dashboard auth and depending on `setup`.
 - `/home/liam/data/ech-prime-web-v2/docs/qa/F08-product-crud.md`
@@ -82,6 +79,8 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 
 ### Read, Do Not Modify Unless a Regression Is Found
 
+- `/home/liam/data/ech-prime-web-v2/e2e/products-crud.spec.ts`
+  - User-excluded from this rework; retain its legacy TC-13/TC-19 titles and track the canonical TC-17/TC-18/TC-06 mapping in QA documentation.
 - `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts`
 - `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-delete-integrity.test.ts`
 
@@ -98,7 +97,7 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
    - Toolbar create/edit → no banner/helper.
    - L1/L2/L3 rendered classes carry their distinct important text tokens.
    - Assigned-product delete result with `count: 1` → exact requested toast, confirmation remains open, and no generic `Failed to delete category`.
-4. Correct the two mismatched titles in `e2e/products-crud.spec.ts`; do not change the tested behavior while relabeling.
+4. Leave `e2e/products-crud.spec.ts` unchanged by user direction; document that its focus and parent normalization/re-parent scenarios retain legacy TC-13/TC-19 labels.
 5. Add `tests/category-management-rework.spec.ts`:
    - Use unique timestamp/worker suffixes.
    - Register all fixture names before the first mutation.
@@ -112,9 +111,9 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
    - Delete the L1 parent and reload; assert both direct children are top-level with L1 badges and the first child's child remains nested with an L2 badge.
    - Add a second test that creates a unique category plus one draft product assigned through the real category relationship, attempts category deletion, and asserts the exact `There are 1 products...` message while the confirmation remains open.
    - Clean the assigned-product fixture in dependency order (product first, then category); clean hierarchy fixtures deepest-first.
-   - Preserve the first test failure and report cleanup errors according to the existing helper pattern.
+   - Aggregate cleanup errors on both pass and failure; when the test also fails, retain that primary failure as the first error.
 6. Add a dedicated authenticated Playwright project in `playwright.config.ts` with `testDir: './tests'`, exact `testMatch`, saved auth state, and `dependencies: ['setup']`.
-7. Run the targeted component/depth/delete tests, typecheck, the new Playwright project, corrected existing category E2E cases, and `git diff --check`.
+7. Run the targeted component/depth/delete tests, typecheck, the new Playwright project, and `git diff --check`.
 8. Review the final diff for forbidden scope:
    - No `src/collections/*.ts`.
    - No `scripts/db-setup.js`.
@@ -126,7 +125,7 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 - [x] Add TC-F08-05-38 and TC-F08-05-39.
 - [x] Extend modal/style component regressions.
 - [x] Add exact assigned-product delete-message component regression.
-- [x] Correct existing E2E TC-ID mappings.
+- [x] Document the deferred legacy E2E TC-ID mismatch without modifying the user-excluded file.
 - [x] Add authenticated browser regressions for all four rework cases.
 - [x] Register the Playwright project.
 - [x] Run delete/re-parent and exact-count regression gates.
@@ -143,9 +142,9 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 
 ## Success Criteria
 
-- New and existing category tests reference the behavior defined by their TC-ID.
+- New category regression tests reference the behavior defined by their TC-ID; the unchanged legacy E2E title mismatch remains explicitly documented.
 - Browser coverage fails on the currently reproduced gray badges and missing modal guidance, then passes after Phase 01.
-- No fixture category or product remains after a pass or failure.
+- Fixture cleanup is attempted after pass or failure, and every cleanup failure is surfaced without discarding the primary test failure.
 - TC-F08-05-06 proves all-direct-children promotion plus descendant retention after reload and the exact one-product deletion block in the browser.
 - Typecheck passes with EN/MS locale parity.
 
@@ -153,11 +152,11 @@ Add durable tests for all four rework cases, reconcile existing category E2E tit
 
 | Risk | Likelihood × Impact | Mitigation |
 |---|---|---|
-| Browser test leaves tenant data behind | Medium × High | Pre-register unique names; deepest-first `finally` cleanup; reject ambiguous lookup |
+| Browser test leaves tenant data behind | Medium × High | Pre-register unique names; deepest-first `finally` cleanup; surface every cleanup failure; reject ambiguous lookup |
 | Product/category cleanup order causes a false failure | Medium × High | Record IDs immediately; delete the product before its assigned category |
 | Theme transition creates flaky computed-style assertion | Low × Medium | Use Playwright web-first `toHaveCSS` assertions to retry until each semantic color settles |
 | Unit test mocks hide Radix disabled behavior | Medium × Medium | Forward disabled/accessibility props and rely on browser test for final behavior |
-| TC-ID cleanup obscures security coverage | Low × High | Relabel only the two mismatched browser titles; keep TC-13/19 security unit tests unchanged |
+| Legacy E2E titles obscure canonical coverage | Low × High | Keep the user-excluded E2E file unchanged; document the TC-13/TC-19 mismatch and treat the QA matrix as canonical |
 
 ## Security and Performance
 

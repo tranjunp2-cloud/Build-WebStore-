@@ -71,9 +71,12 @@ No blocking plan dependency. The completed Phase 05b in `plans/260710-1625-f08-c
 npm test -- --run src/__tests__/unit/dashboard/category-manager-modal-focus.test.tsx src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts src/__tests__/unit/dashboard/category-delete-integrity.test.ts
 npm run typecheck
 npx playwright test --project=category-management-regression
-npx playwright test e2e/products-crud.spec.ts --project=chromium --grep "TC-F08-05-(06|17|18)"
 git diff --check
 ```
+
+The pre-existing `e2e/products-crud.spec.ts` remains unchanged by user direction. Its
+modal-focus and parent-normalization scenarios still exercise the relevant behavior,
+but their legacy TC-13/TC-19 title mismatch is tracked as deferred traceability debt.
 
 ## Out of Scope
 

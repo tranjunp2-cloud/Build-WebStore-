@@ -13,9 +13,9 @@ Phase 2 turns the four GH-1587 rework cases into traceable regression gates afte
 
 - Expanded the Category Manager unit suite to cover L1→L2 and L2→L3 guidance, locked parent state, absence of guidance in toolbar-create/edit, authoritative L1/L2/L3 color classes, and the exact one-product delete error while the confirmation remains open.
 - Added an authenticated Playwright project and `tests/category-management-rework.spec.ts` for real L1→L2→L3 creation, computed badge colors in both themes, L3 action limits, delete/re-parent persistence, and assigned-product delete blocking with cleanup in dependency order.
-- Corrected the existing browser test mappings to TC-F08-05-17, TC-F08-05-18, and TC-F08-05-06.
+- Kept the existing browser test file unchanged by user direction and documented its legacy TC-13/TC-19 title mismatch as deferred traceability debt.
 - Added TC-F08-05-38 and TC-F08-05-39 plus the canonical automation mapping to the F08 QA matrix.
-- Incorporated tester corrections in the test harness: Select mocks now preserve disabled/value state, the confirmation mock exercises the real confirm path, and fixture cleanup preserves the primary test failure while deleting products before assigned categories.
+- Incorporated tester corrections in the test harness: Select mocks now preserve disabled/value state, the confirmation mock exercises the real confirm path, and fixture cleanup reports cleanup errors on both pass and failure while preserving any primary test failure as the first aggregated error.
 
 ## Validation
 

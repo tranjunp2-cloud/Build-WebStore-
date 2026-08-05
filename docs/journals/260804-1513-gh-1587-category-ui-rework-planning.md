@@ -13,7 +13,7 @@ Plan the smallest safe fix for the four Category Management cases reviewed from 
 
 - Browser QA confirmed two presentation failures: dark mode overrides the intended L1/L2/L3 level colors, and row-level Add Subcategory omits its parent/current-level/new-level guidance.
 - Parent deletion still promotes children to top level, and deletion with assigned products still returns the exact localized product count. Both remain regression gates rather than production fix scope.
-- Existing category E2E titles do not match their QA matrix behaviors, so the plan includes TC-ID reconciliation before adding new automated cases.
+- Existing category E2E titles do not match their QA matrix behaviors. A later user direction excluded that file from modification, so the mismatch is documented as deferred traceability debt.
 
 ## Reflection
 
@@ -26,7 +26,7 @@ The evidence supports a narrow frontend change. Expanding into delete logic, sch
 | Keep the badge correction category-local | The shared outline Badge supplies the conflicting dark text class and has unrelated consumers | Distinct level colors without a design-system-wide regression |
 | Reuse `useI18n().ti` for contextual copy | The repository already provides typed interpolation | English and Malay guidance remain type-compatible |
 | Leave delete/backend/schema/migrations unchanged | Both delete behaviors passed browser verification | Production work stays limited to the two confirmed UI failures |
-| Reconcile TC IDs and add dedicated cases for badge theming and subcategory guidance | Current E2E labels map to different QA behaviors | Permanent tests describe the behavior they actually cover |
+| Document legacy TC-ID debt and add dedicated cases for badge theming and subcategory guidance | Current E2E labels map to different QA behaviors, and later user direction excluded that file | New permanent tests use canonical IDs while the legacy mismatch remains explicit |
 
 ## Next Steps
 
