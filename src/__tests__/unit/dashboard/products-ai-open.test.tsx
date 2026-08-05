@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { bulkCreateProps, mockRouterPush } = vi.hoisted(() => ({
     bulkCreateProps: [] as Array<{
@@ -105,8 +105,13 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         bulkCreateProps.length = 0
-        vi.mocked(getProductsAction).mockResolvedValue([])
-        vi.mocked(getCategoriesAction).mockResolvedValue([])
+        vi.mocked(getProductsAction).mockReset().mockResolvedValue([])
+        vi.mocked(getCategoriesAction).mockReset().mockResolvedValue([])
+        vi.mocked(getAiCategoriesAction).mockReset()
+    })
+
+    afterEach(() => {
+        cleanup()
     })
 
     it('TC-F08-04-104: keeps a newer prompt when the submitted AI session completes', async () => {
@@ -115,6 +120,9 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         const categoryRequest = new Promise<typeof aiCategories>(resolve => {
             resolveCategories = resolve
         })
+        vi.mocked(getProductsAction).mockResolvedValue([
+            makeProduct('existing', 'Existing draft'),
+        ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
         vi.mocked(getAiCategoriesAction).mockReturnValue(categoryRequest)
         renderPage()
 
@@ -145,6 +153,64 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         })
 
         await waitFor(() => expect(screen.getByPlaceholderText(/Leather jacket/)).toHaveValue('prompt B'))
+        await waitFor(() => expect(getProductsAction).toHaveBeenCalledTimes(2))
+        expect(screen.getByRole('tab', { name: /Draft/ })).toHaveAttribute('data-state', 'active')
+        expect(getCategoriesAction).toHaveBeenCalledOnce()
+    })
+
+    it('[TC-F08-04-125] clears filters that could hide a verified AI Draft', async () => {
+        // Arrange
+        const excludedCategory = { id: 'excluded', name: 'Excluded category' }
+        const visibleDraft = {
+            ...makeProduct('visible-ai-draft', 'Visible AI draft'),
+            inventory: 10,
+            category: [],
+        }
+        vi.mocked(getCategoriesAction).mockResolvedValue([excludedCategory] as never)
+        vi.mocked(getAiCategoriesAction).mockResolvedValue([excludedCategory])
+        vi.mocked(getProductsAction)
+            .mockResolvedValueOnce([
+                makeProduct('existing', 'Existing draft'),
+            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
+            .mockResolvedValueOnce([
+                visibleDraft,
+            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
+        renderPage()
+
+        await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
+        await waitFor(() => expect(screen.getAllByPlaceholderText(/search by name or sku/i).length).toBeGreaterThan(0))
+        fireEvent.change(screen.getAllByPlaceholderText(/search by name or sku/i).at(-1)!, {
+            target: { value: 'does-not-match-the-created-draft' },
+        })
+
+        const filterButtons = screen.getAllByRole('button', { name: /^Filter/i })
+        fireEvent.click(filterButtons.at(-1)!)
+        await waitFor(() => expect(screen.getByText('Excluded category')).toBeInTheDocument())
+        fireEvent.click(screen.getByText('Excluded category'))
+        fireEvent.click(screen.getByText('On Sale'))
+        fireEvent.click(screen.getByText(/Show Low\/Out of Stock/i))
+        expect(screen.getByText(/Active Filters/i)).toBeInTheDocument()
+
+        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+            target: { value: 'prompt A' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
+        await waitFor(() => expect(screen.getByTestId('bulk-create-modal')).toBeInTheDocument())
+
+        // Act
+        act(() => {
+            bulkCreateProps.at(-1)?.onSuccess()
+        })
+
+        // Assert
+        await waitFor(() => expect(getProductsAction).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(screen.getAllByText('Visible AI draft').length).toBeGreaterThan(0))
+        for (const searchInput of screen.getAllByPlaceholderText(/search by name or sku/i)) {
+            expect(searchInput).toHaveValue('')
+        }
+        expect(screen.queryByText(/Active Filters/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Advanced Filters/i)).not.toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /Draft/ })).toHaveAttribute('data-state', 'active')
     })
 
     it('TC-F08-04-104: does not open the modal when tenant categories cannot be loaded', async () => {
@@ -168,7 +234,9 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         })
         vi.mocked(getAiCategoriesAction).mockResolvedValue([{ id: 123, name: 'Fashion' }])
         vi.mocked(getProductsAction)
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([
+                makeProduct('existing', 'Existing draft'),
+            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
             .mockReturnValueOnce(refreshRequest)
         renderPage()
 
@@ -184,6 +252,8 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         })
 
         await waitFor(() => expect(getProductsAction).toHaveBeenCalledTimes(2))
+        expect(screen.getByRole('tab', { name: /Draft/ })).toHaveAttribute('data-state', 'active')
+        expect(getCategoriesAction).toHaveBeenCalledOnce()
         expect(screen.getByTestId('bulk-create-modal')).toBeInTheDocument()
 
         await act(async () => {

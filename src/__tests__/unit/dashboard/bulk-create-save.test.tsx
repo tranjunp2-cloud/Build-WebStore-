@@ -101,6 +101,8 @@ beforeEach(() => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORIES = [{ id: 'cat-1', name: 'Shoes' }]
+const TEST_GENERATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const TEST_REFERENCE_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const BASE_PRODUCT = {
     name: 'Test Shirt',
     price: 50,
@@ -109,10 +111,23 @@ const BASE_PRODUCT = {
     sku: 'SHIRT-001',
 }
 
+function saveSuccess(productId: string | number, outcome: 'created' | 'replayed' = 'created') {
+    return { ok: true, productId, outcome, referenceId: TEST_REFERENCE_ID } as const
+}
+
+function saveFailure(
+    code: string,
+    message: string,
+    retryable = true,
+    referenceId = TEST_REFERENCE_ID,
+) {
+    return { ok: false, code, message, retryable, referenceId } as const
+}
+
 function mockParseApi(products = [BASE_PRODUCT]) {
     global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ products }),
+        json: async () => ({ generationId: TEST_GENERATION_ID, products }),
     }) as unknown as typeof fetch
 }
 
@@ -143,7 +158,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
     it('TC-F08-04-27: success 1 product — id returned → singular toast, onSuccess + onClose called', async () => {
         // Arrange
-        mockSaveProduct.mockResolvedValue({ id: 123, name: 'Test Shirt' })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         const { onClose, onSuccess } = await renderAndWaitForProducts()
 
         // Act
@@ -159,6 +174,13 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(mockToastSuccess.mock.calls[0][0]).not.toMatch(/\d+ draft products/)
         expect(onSuccess).toHaveBeenCalledOnce()
         expect(onClose).toHaveBeenCalledOnce()
+        const [savedPayload, metadata] = mockSaveProduct.mock.calls[0]
+        expect(metadata).toMatchObject({
+            generationId: TEST_GENERATION_ID,
+            operationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+            skuAttempt: 1,
+        })
+        expect(savedPayload.slug).toContain(metadata.operationId.replace(/-/g, ''))
         // TC-F08-04-27 (amend, GH-1502): router.refresh() removed — the parent's onSuccess()
         // callback (loadProducts()) now handles the refresh, avoiding a full page reload.
         expect(mockRouterRefresh).not.toHaveBeenCalled()
@@ -167,7 +189,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('TC-F08-04-28: success 2 products — plural toast "2 draft products"', async () => {
         // Arrange
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         const { onClose, onSuccess } = await renderAndWaitForProducts(two)
 
         // Act
@@ -184,19 +206,12 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(onClose).toHaveBeenCalledOnce()
     })
 
-    it('TC-F08-04-29: action throws JSON error → toast.error with parsed server message, loop continues for other products', async () => {
-        // Arrange: 2 products; first throws a JSON error, second succeeds
+    it('TC-F08-04-29: settled save failure keeps its draft while a verified success is removed', async () => {
+        // Arrange
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Second Product', sku: 'SECOND-001' }]
         mockSaveProduct
-            .mockRejectedValueOnce(
-                new Error(
-                    JSON.stringify({
-                        code: 'FIELD_ERRORS',
-                        message: 'SKU already in use: SHIRT-001',
-                    })
-                )
-            )
-            .mockResolvedValueOnce({ id: 456 })
+            .mockResolvedValueOnce(saveFailure('SAVE_FAILED', 'The product could not be saved. Please try again.'))
+            .mockResolvedValueOnce(saveSuccess(456))
         const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
 
         // Act
@@ -204,9 +219,9 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
             fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
-        // Assert: per-item error toast with parsed server message
+        // Assert
         await waitFor(() => {
-            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('SKU already in use'))
+            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('could not be saved'))
         })
 
         // Second product still saves, while only the failed draft remains for retry.
@@ -221,20 +236,10 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     })
 
     it('TC-F08-04-46: SKU conflict (real fieldErrors.baseSku shape) auto-retries with a regenerated SKU and succeeds silently', async () => {
-        // Arrange: first attempt rejects with a genuine baseSku conflict, retry (fresh SKU) succeeds
+        // Arrange
         mockSaveProduct
-            .mockRejectedValueOnce(
-                new Error(
-                    JSON.stringify({
-                        code: 'FIELD_ERRORS',
-                        fieldErrors: {
-                            baseSku: { code: 'SKU_ALREADY_IN_USE', values: ['SHIRT-001'] },
-                        },
-                        message: 'SKU already in use: SHIRT-001',
-                    })
-                )
-            )
-            .mockResolvedValueOnce({ id: 789 })
+            .mockResolvedValueOnce(saveFailure('SKU_CONFLICT', 'A generated SKU is already in use.'))
+            .mockResolvedValueOnce(saveSuccess(789))
         const { onSuccess, onClose } = await renderAndWaitForProducts()
 
         // Act
@@ -250,26 +255,22 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(mockSaveProduct).toHaveBeenCalledTimes(2)
         const firstSku = mockSaveProduct.mock.calls[0][0].sku
         const secondSku = mockSaveProduct.mock.calls[1][0].sku
+        expect(mockSaveProduct.mock.calls[0][1]).toMatchObject({
+            generationId: TEST_GENERATION_ID, skuAttempt: 1,
+        })
+        expect(mockSaveProduct.mock.calls[1][1]).toMatchObject({
+            generationId: TEST_GENERATION_ID, skuAttempt: 2,
+        })
+        expect(mockSaveProduct.mock.calls[1][1].operationId).toBe(mockSaveProduct.mock.calls[0][1].operationId)
         expect(secondSku).not.toBe(firstSku)
         expect(onSuccess).toHaveBeenCalledOnce()
         expect(onClose).toHaveBeenCalledOnce()
     })
 
     it('TC-F08-04-47: persistent SKU conflict exhausts retries then shows the error toast', async () => {
-        // Arrange: every attempt rejects with the same baseSku conflict
-        mockSaveProduct.mockRejectedValue(
-            new Error(
-                JSON.stringify({
-                    code: 'FIELD_ERRORS',
-                    fieldErrors: {
-                        baseSku: { code: 'SKU_ALREADY_IN_USE', values: ['SHIRT-001'] },
-                    },
-                    message: 'SKU already in use: SHIRT-001',
-                })
-            )
-        )
-    // Wait until the Approve All button is enabled (products loaded, not parsing/saving)
-    await renderAndWaitForProducts()
+        // Arrange
+        mockSaveProduct.mockResolvedValue(saveFailure('SKU_CONFLICT', 'A generated SKU is already in use.'))
+        await renderAndWaitForProducts()
 
         // Act
         await act(async () => {
@@ -278,15 +279,15 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Assert: category lookup failure aborts before every save-side effect.
         await waitFor(() => {
-            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('SKU already in use'))
+            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('generated SKU'))
         })
         expect(mockSaveProduct).toHaveBeenCalledTimes(3)
         expect(mockToastSuccess).not.toHaveBeenCalled()
     })
 
-    it('TC-F08-04-30: action returns object without id → NOT counted as success → toast.error(saveFailed)', async () => {
+    it('TC-F08-04-30: legacy object with a truthy id is not counted as verified success', async () => {
         // Arrange
-        mockSaveProduct.mockResolvedValue({})
+        mockSaveProduct.mockResolvedValue({ id: 999 })
         await renderAndWaitForProducts()
 
         // Act
@@ -313,13 +314,13 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Assert
         await waitFor(() => {
-            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('Product management'))
+            expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('could not be confirmed'))
         })
     })
 
     it('TC-F08-04-100: saves the canonical categoryId from selected-ID revalidation without auto-creating a category', async () => {
         mockGetCategories.mockResolvedValue([{ id: 42, name: 'Shoes' }])
-        mockSaveProduct.mockResolvedValue({ id: 123 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         await renderAndWaitForProducts([{ ...BASE_PRODUCT, categoryId: '42' }], {}, [{ id: 42, name: 'Shoes' }])
 
         // Act
@@ -337,7 +338,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('TC-F08-04-101: stale or null AI category requires selecting an existing category before Approve', async () => {
         // Arrange
         mockGetCategories.mockResolvedValue(DEFAULT_CATEGORIES)
-        mockSaveProduct.mockResolvedValue({ id: 123 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         await renderAndWaitForProducts([
             { ...BASE_PRODUCT, name: 'Stale Category', categoryId: 'deleted-cat' },
             { ...BASE_PRODUCT, name: 'No Category', categoryId: null },
@@ -381,7 +382,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
     it('TC-F08-04-102: aborts before carton and product side effects when selected-ID revalidation fails', async () => {
         mockGetCategories.mockRejectedValue(new Error('category service unavailable'))
-        mockSaveProduct.mockResolvedValue({ id: 123 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         await renderAndWaitForProducts()
 
         // Act
@@ -399,7 +400,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('TC-F08-04-102: category disappearing at revalidation clears selection and aborts all save side effects', async () => {
         // Arrange
         mockGetCategories.mockResolvedValue([])
-        mockSaveProduct.mockResolvedValue({ id: 123 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         await renderAndWaitForProducts()
 
         // Act
@@ -421,7 +422,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('TC-F08-04-102: CATEGORY_INVALID from persistence is surfaced without retrying without category', async () => {
         // Arrange
         mockGetCategories.mockResolvedValue(DEFAULT_CATEGORIES)
-        mockSaveProduct.mockResolvedValue({ ok: false, code: 'CATEGORY_INVALID' })
+        mockSaveProduct.mockResolvedValue(saveFailure('CATEGORY_INVALID', 'Please select an active category.', false))
         await renderAndWaitForProducts()
 
         // Act
@@ -443,8 +444,8 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('TC-F08-04-102: keeps only unsaved drafts when a later item loses its category during persistence', async () => {
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
         mockSaveProduct
-            .mockResolvedValueOnce({ id: 101 })
-            .mockResolvedValueOnce({ ok: false, code: 'CATEGORY_INVALID' })
+            .mockResolvedValueOnce(saveSuccess(101))
+            .mockResolvedValueOnce(saveFailure('CATEGORY_INVALID', 'Please select an active category.', false))
         const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
 
         await act(async () => {
@@ -464,11 +465,8 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
     it('[TC-F08-04-111] keeps a busy draft open when another item in the batch succeeds', async () => {
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
         mockSaveProduct
-            .mockRejectedValueOnce(new Error(JSON.stringify({
-                code: 'CATEGORY_BUSY_RETRY',
-                message: 'This category is busy. Please try again.',
-            })))
-            .mockResolvedValueOnce({ id: 202 })
+            .mockResolvedValueOnce(saveFailure('CATEGORY_BUSY_RETRY', 'This category is busy. Please try again.'))
+            .mockResolvedValueOnce(saveSuccess(202))
         const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
 
         await act(async () => {
@@ -476,7 +474,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         })
 
         await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledTimes(2))
-        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('Please try again'))
+        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('Retry this draft in a moment'))
         expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('Test Pants')).not.toBeInTheDocument()
         expect(screen.getByRole('combobox')).toHaveValue('cat-1')
@@ -489,8 +487,8 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         // Arrange
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
         mockSaveProduct
-            .mockResolvedValueOnce({ id: 202 })
-            .mockResolvedValueOnce({})
+            .mockResolvedValueOnce(saveSuccess(202))
+            .mockResolvedValueOnce(saveFailure('PERSISTENCE_VERIFY_FAILED', 'The product could not be verified.'))
         const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(two)
 
         // Act
@@ -510,6 +508,146 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(onClose).not.toHaveBeenCalled()
     })
 
+    it('[TC-F08-04-123] preserves correlation and stable slug through an explicit verification retry', async () => {
+        // Arrange
+        const fullReference = '12345678-1234-4abc-8def-1234567890ab'
+        const writeText = vi.fn().mockResolvedValue(undefined)
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText },
+        })
+        mockSaveProduct
+            .mockResolvedValueOnce(saveFailure(
+                'PERSISTENCE_VERIFY_FAILED',
+                'The product could not be verified after saving.',
+                true,
+                fullReference,
+            ))
+            .mockResolvedValueOnce(saveSuccess(123, 'replayed'))
+        const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts()
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+
+        // Assert
+        await waitFor(() => expect(screen.getByTestId('ai-save-failure-1')).toBeInTheDocument())
+        expect(screen.getByText('12345678')).toBeInTheDocument()
+        expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onPartialSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: /retry save/i })).toBeEnabled()
+
+        fireEvent.click(screen.getByRole('button', { name: /copy reference/i }))
+        await waitFor(() => expect(writeText).toHaveBeenCalledWith(fullReference))
+
+        const [firstPayload, firstMetadata] = mockSaveProduct.mock.calls[0]
+        fireEvent.change(screen.getByDisplayValue('Test Shirt'), {
+            target: { value: 'Renamed after ambiguous save' },
+        })
+        expect(screen.getByDisplayValue('Renamed after ambiguous save')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: /retry save/i }))
+        await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledTimes(2))
+        const [retryPayload, retryMetadata] = mockSaveProduct.mock.calls[1]
+        expect(retryPayload.name).toBe('Renamed after ambiguous save')
+        expect(retryMetadata).toEqual(firstMetadata)
+        expect(retryMetadata).toMatchObject({
+            generationId: TEST_GENERATION_ID,
+            operationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+            skuAttempt: 1,
+        })
+        expect(retryPayload.slug).toBe(firstPayload.slug)
+        expect(retryMetadata.operationId).toBe(firstMetadata.operationId)
+    })
+
+    it('[TC-F08-04-124] counts created and replayed once and retains only a failed mixed-batch draft', async () => {
+        // Arrange
+        const writeText = vi.fn().mockResolvedValue(undefined)
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText },
+        })
+        const three = [
+            BASE_PRODUCT,
+            { ...BASE_PRODUCT, name: 'Replayed Product', sku: 'REPLAY-001' },
+            { ...BASE_PRODUCT, name: 'Failed Product', sku: 'FAIL-001' },
+        ]
+        mockSaveProduct
+            .mockResolvedValueOnce(saveSuccess(101, 'created'))
+            .mockResolvedValueOnce(saveSuccess(102, 'replayed'))
+            .mockResolvedValueOnce(saveFailure('SAVE_FAILED', 'The product could not be saved.'))
+        const { onClose, onPartialSuccess, onSuccess } = await renderAndWaitForProducts(three)
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+
+        // Assert
+        await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledTimes(3))
+        expect(screen.queryByDisplayValue('Test Shirt')).not.toBeInTheDocument()
+        expect(screen.queryByDisplayValue('Replayed Product')).not.toBeInTheDocument()
+        expect(screen.getByDisplayValue('Failed Product')).toBeInTheDocument()
+        expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringContaining('2 draft products'))
+        expect(onPartialSuccess).toHaveBeenCalledOnce()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+        expect(screen.getByText('BBBBBBBB')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: /copy reference/i }))
+        await waitFor(() => expect(writeText).toHaveBeenCalledWith(TEST_REFERENCE_ID))
+        expect(screen.getByRole('button', { name: /retry failed drafts/i })).toBeEnabled()
+    })
+
+    it.each([
+        ['category busy', saveFailure('CATEGORY_BUSY_RETRY', 'This category is busy.')],
+        ['save failure', saveFailure('SAVE_FAILED', 'The product could not be saved.')],
+    ])('[TC-F08-04-125] %s clears loading and waits for explicit replay retry', async (_scenario, firstFailure) => {
+        // Arrange
+        mockSaveProduct
+            .mockResolvedValueOnce(firstFailure)
+            .mockResolvedValueOnce(saveSuccess(321, 'replayed'))
+        const { onClose, onSuccess } = await renderAndWaitForProducts()
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+
+        // Assert
+        await waitFor(() => expect(screen.getByRole('button', { name: /retry save/i })).toBeEnabled())
+        expect(mockSaveProduct).toHaveBeenCalledOnce()
+        expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+
+        const firstMetadata = mockSaveProduct.mock.calls[0][1]
+        fireEvent.click(screen.getByRole('button', { name: /retry save/i }))
+        await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledTimes(2))
+        expect(mockSaveProduct.mock.calls[1][1]).toEqual(firstMetadata)
+        await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
+        expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it('[TC-F08-04-125] network ambiguity clears loading and waits for explicit replay retry', async () => {
+        // Arrange
+        mockSaveProduct
+            .mockRejectedValueOnce(new Error('connection lost after submit'))
+            .mockResolvedValueOnce(saveSuccess(321, 'replayed'))
+        const { onClose, onSuccess } = await renderAndWaitForProducts()
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+
+        // Assert
+        await waitFor(() => expect(screen.getByRole('button', { name: /retry save/i })).toBeEnabled())
+        expect(mockSaveProduct).toHaveBeenCalledOnce()
+        expect(screen.getByDisplayValue('Test Shirt')).toBeInTheDocument()
+        expect(onSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+
+        const firstMetadata = mockSaveProduct.mock.calls[0][1]
+        fireEvent.click(screen.getByRole('button', { name: /retry save/i }))
+        await waitFor(() => expect(mockSaveProduct).toHaveBeenCalledTimes(2))
+        expect(mockSaveProduct.mock.calls[1][1]).toEqual(firstMetadata)
+    })
+
     it('TC-F08-04-109: freezes draft mutations while the save snapshot is pending', async () => {
         // Arrange
         let resolveCategories!: (value: typeof DEFAULT_CATEGORIES) => void
@@ -517,7 +655,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
             resolveCategories = resolve
         })
         mockGetCategories.mockReturnValue(pendingCategories)
-        mockSaveProduct.mockResolvedValue({ id: 123 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(123))
         await renderAndWaitForProducts(undefined, undefined, [
             ...DEFAULT_CATEGORIES,
             { id: 'cat-2', name: 'Accessories' },
@@ -558,7 +696,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
                 { name: 'Putih - M', price: 50, sku: 'SHIRT-WH-M', stock: 7 },
             ],
         }
-        mockSaveProduct.mockResolvedValue({ id: 321 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(321))
         await renderAndWaitForProducts([productWithVariants], {
             locale: 'ms',
             t: {
@@ -629,7 +767,7 @@ describe('BulkCreateModal — handleParse variant-name dedup [TC-F08-04-52 code-
                 { name: 'Blue', price: 39.9, sku: 'TS-B1', stock: 2 },
             ],
         }
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         await renderAndWaitForProducts([productWithDupeVariants])
 
         await act(async () => {
@@ -655,7 +793,7 @@ describe('BulkCreateModal — review drawer: remove-draft [TC-F08-04-55 design-a
 
     it('TC-F08-04-55: removing a draft excludes it from save — the review drawer has no select/deselect checkbox, only a per-draft remove button', async () => {
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         await renderAndWaitForProducts(two)
 
         expect(screen.getByText('2 drafts')).toBeInTheDocument()
@@ -699,7 +837,7 @@ describe('BulkCreateModal — review drawer: price coercion on parse [TC-F08-04-
         // invalid value (e.g. the design mockup's own "—" placeholder, which this must not mimic).
         expect(screen.getAllByDisplayValue('0')).toHaveLength(2)
 
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
@@ -722,7 +860,7 @@ describe('BulkCreateModal — review drawer: price coercion on parse [TC-F08-04-
             sku: 'WS-001',
             variants: [{ name: 'Default', price: 10, sku: 'WS-001-D', stock: 'N/A' }],
         }
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         await renderAndWaitForProducts([garbageStockProduct as unknown as typeof BASE_PRODUCT])
 
         // Stock input (second number input in the row, after Price) renders "0", not "N/A" or blank.
@@ -757,7 +895,7 @@ describe('BulkCreateModal — review drawer: variant-product Stock input [TC-F08
                 { name: 'Large', price: 39.9, sku: 'TS-L', stock: 0 },
             ],
         }
-        mockSaveProduct.mockResolvedValue({ id: 1 })
+        mockSaveProduct.mockResolvedValue(saveSuccess(1))
         await renderAndWaitForProducts([variantProduct as unknown as typeof BASE_PRODUCT])
 
         // The Stock input (not disabled) is the second number input in the row — Price is first.

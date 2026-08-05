@@ -35,7 +35,59 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
         process.env.APP_ENV = 'staging'
     })
 
-    it('provisions an active FREEMIUM subscription and Site prerequisite for an isolated tenant', async () => {
+    it('[TC-F08-04-126] rejects setup when the server secret is missing before Payload access', async () => {
+        // Arrange
+        delete process.env.E2E_SETUP_SECRET
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'benchmark@example.com', password: 'password123' }),
+        }))
+
+        // Assert
+        expect(response.status).toBe(503)
+        expect(getPayload).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-126] rejects a wrong setup secret before any tenant mutation', async () => {
+        // Arrange — the Payload mock must never be resolved for an unauthorized request.
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer wrong-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'benchmark@example.com', password: 'password123' }),
+        }))
+
+        // Assert
+        expect(response.status).toBe(401)
+        expect(getPayload).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-126] rejects arbitrary tenant or category identifiers', async () => {
+        // Arrange — callers may not redirect the fixed category fixture to another tenant.
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'benchmark@example.com',
+                password: 'password123',
+                tenantId: 'victim-tenant',
+                categoryId: 'victim-category',
+            }),
+        }))
+
+        // Assert
+        expect(response.status).toBe(400)
+        expect(getPayload).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-126] provisions active subscription, Site, and tenant-owned Product category', async () => {
+        // Arrange
         const payload = {
             find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
                 if (collection === 'tenants') return { docs: [{ id: 42 }] }
@@ -45,13 +97,14 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
                 return { docs: [] }
             }),
             create: vi.fn().mockImplementation(async ({ collection, data }: { collection: string; data: Record<string, unknown> }) => ({
-                id: collection === 'users' ? 84 : 21,
+                id: collection === 'users' ? 84 : collection === 'categories' ? 88 : 21,
                 ...data,
             })),
             update: vi.fn(),
         }
         vi.mocked(getPayload).mockResolvedValue(payload as never)
 
+        // Act
         const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
             method: 'POST',
             headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
@@ -61,7 +114,9 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
                 tenantSlug: 'e2e-generation-run',
             }),
         }))
+        const body = await response.json()
 
+        // Assert
         expect(response.status).toBe(200)
         expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'plan-subscriptions',
@@ -84,9 +139,26 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
                 siteType: 'ecommerce',
             },
         })
+        expect(payload.create).toHaveBeenCalledWith({
+            collection: 'categories',
+            overrideAccess: true,
+            data: {
+                tenant: 42,
+                site: 21,
+                name: 'E2E AI Products',
+                slug: 'e2e-ai-products',
+            },
+        })
+        expect(body).toEqual(expect.objectContaining({
+            tenantId: 42,
+            siteId: 21,
+            categoryId: 88,
+            categoryName: 'E2E AI Products',
+        }))
     })
 
-    it('reuses the existing Site instead of creating a duplicate prerequisite', async () => {
+    it('[TC-F08-04-126] reuses the Site and active category while excluding soft-deleted history', async () => {
+        // Arrange
         const existingUser = {
             id: 84,
             roles: ['tenant-owner'],
@@ -97,29 +169,103 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
                 if (collection === 'tenants') return { docs: [{ id: 42 }] }
                 if (collection === 'plan-subscriptions') return { docs: [{ id: 63 }] }
                 if (collection === 'sites') return { docs: [{ id: 77 }] }
+                if (collection === 'categories') return { docs: [{ id: 88, deletedAt: null }] }
                 if (collection === 'users') return { docs: [existingUser] }
                 return { docs: [] }
             }),
             create: vi.fn(),
-            update: vi.fn(),
+            update: vi.fn().mockImplementation(async ({ id, data }: { id: string | number; data: Record<string, unknown> }) => ({ id, ...data })),
         }
         vi.mocked(getPayload).mockResolvedValue(payload as never)
 
+        // Act
         const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
             method: 'POST',
             headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: 'benchmark@example.com', password: 'password123' }),
         }))
+        const body = await response.json()
 
+        // Assert
+        expect(response.status).toBe(200)
         expect(payload.find).toHaveBeenCalledWith({
             collection: 'sites',
             where: { tenant: { equals: 42 } },
             limit: 1,
             overrideAccess: true,
         })
-        expect(response.status).toBe(200)
-        expect(await response.json()).toEqual(expect.objectContaining({ siteId: 77 }))
+        expect(payload.find).toHaveBeenCalledWith({
+            collection: 'categories',
+            where: {
+                and: [
+                    { tenant: { equals: 42 } },
+                    { slug: { equals: 'e2e-ai-products' } },
+                    { deletedAt: { exists: false } },
+                ],
+            },
+            limit: 1,
+            sort: '-createdAt',
+            overrideAccess: true,
+        })
+        expect(payload.update).toHaveBeenCalledWith({
+            collection: 'categories',
+            id: 88,
+            overrideAccess: true,
+            data: {
+                tenant: 42,
+                site: 77,
+                name: 'E2E AI Products',
+                slug: 'e2e-ai-products',
+            },
+        })
+        expect(body).toEqual(expect.objectContaining({ siteId: 77, categoryId: 88 }))
         expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
+        expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'categories' }))
+    })
+
+    it('[TC-F08-04-126] recovers the active category created by a concurrent setup request', async () => {
+        // Arrange
+        let categoryReadCount = 0
+        const existingUser = {
+            id: 84,
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: 42, role: 'owner', status: 'active', permissions: [] }],
+        }
+        const payload = {
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 42 }] }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 63 }] }
+                if (collection === 'sites') return { docs: [{ id: 77 }] }
+                if (collection === 'categories') {
+                    categoryReadCount++
+                    return categoryReadCount === 1 ? { docs: [] } : { docs: [{ id: 88 }] }
+                }
+                if (collection === 'users') return { docs: [existingUser] }
+                return { docs: [] }
+            }),
+            create: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'categories') {
+                    throw new Error('duplicate key value violates categories_tenant_slug_uniq')
+                }
+                return { id: 84 }
+            }),
+            update: vi.fn().mockImplementation(async ({ id, data }: { id: string | number; data: Record<string, unknown> }) => ({ id, ...data })),
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'benchmark@example.com', password: 'password123' }),
+        }))
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(categoryReadCount).toBe(2)
+        expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({ collection: 'categories' }))
+        expect(body).toEqual(expect.objectContaining({ categoryId: 88 }))
     })
 
     it('TC-F03.57: recreates a current-period pending dashboard fixture when requested', async () => {
