@@ -21,6 +21,14 @@ type ReconciliationManifest = {
         needsBusinessConfirmation: Array<{ key: string }>
         preserveCurrentUnusableSource: Array<{ key: string }>
     }
+    retainedOutputHashes: {
+        algorithm: 'sha256-json'
+        values: Record<string, {
+            valueType: 'scalar' | 'array'
+            en: string
+            ms: string
+        }>
+    }
     contractOverrides: Array<{ key: string; decision: string }>
 }
 
@@ -164,6 +172,10 @@ function htmlContracts(value: string): string[] {
     return contracts.sort()
 }
 
+function jsonHash(value: JsonValue): string {
+    return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
 const contextHolds = new Set(manifest.scalarDrift.contextChangedHold.map(entry => entry.key))
 const sourceContentHolds = new Set(manifest.scalarDrift.sourceContentConflictHold.map(entry => entry.key))
 const brandingHolds = new Set(manifest.scalarDrift.brandingConflictHold.keys)
@@ -177,6 +189,9 @@ const runtimeHolds = new Set(
         .filter(entry => entry.decision === 'preserve_placeholder')
         .map(entry => entry.key),
 )
+const retainedOutputHashes = manifest.retainedOutputHashes.values
+const retainedScalarKeys = [...contextHolds, ...brandingHolds, ...runtimeHolds]
+const retainedArrayKeys = [...pendingArrays, ...preservedArrays]
 
 describe('GH-1701 approved English and Malay copy contracts', () => {
     it('[TC-GH1701-01] keeps identical recursive EN/MS path and value-type structure', () => {
@@ -236,6 +251,10 @@ describe('GH-1701 approved English and Malay copy contracts', () => {
             }
 
             if (contextHolds.has(key) || brandingHolds.has(key) || runtimeHolds.has(key)) {
+                const retained = retainedOutputHashes[key]
+                expect(retained?.valueType, `${key} retained output type`).toBe('scalar')
+                expect(jsonHash(enValue), `${key} retained English output`).toBe(retained?.en)
+                expect(jsonHash(msValue), `${key} retained Malay output`).toBe(retained?.ms)
                 accountedRows += 1
                 continue
             }
@@ -257,6 +276,11 @@ describe('GH-1701 approved English and Malay copy contracts', () => {
         expect(rows).toHaveLength(manifest.source.recordCount)
         expect(new Set(rowKeys).size).toBe(rows.length)
         expect(accountedRows).toBe(rows.length)
+        expect(manifest.retainedOutputHashes.algorithm).toBe('sha256-json')
+        expect(Object.keys(retainedOutputHashes).sort()).toEqual([
+            ...retainedScalarKeys,
+            ...retainedArrayKeys,
+        ].sort())
         expect(actualMissing.sort()).toEqual([...missingKeys].sort())
         expect(actualArrays.sort()).toEqual([
             ...mappedArrays.keys(),
@@ -292,6 +316,17 @@ describe('GH-1701 approved English and Malay copy contracts', () => {
             if (contract.mapping) {
                 expect(contract.enValue).toEqual(contract.mapping.en)
                 expect(contract.msValue).toEqual(contract.mapping.ms)
+            } else {
+                const retained = retainedOutputHashes[contract.key]
+                expect(retained?.valueType, `${contract.key} retained output type`).toBe('array')
+                expect(
+                    jsonHash(contract.enValue as JsonValue[]),
+                    `${contract.key} retained English output`,
+                ).toBe(retained?.en)
+                expect(
+                    jsonHash(contract.msValue as JsonValue[]),
+                    `${contract.key} retained Malay output`,
+                ).toBe(retained?.ms)
             }
         }
     })

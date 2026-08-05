@@ -271,6 +271,11 @@ The mapper preserved the locale key tree, value types, array lengths, key
 order, interpolation placeholders, HTML tags, intentional whitespace, and
 multiline values. Both locale files retain identical structures.
 
+The manifest also records `sha256-json` hashes for every retained output:
+39 context/branding/runtime scalar holds and five pending or unusable arrays.
+The contract suite validates the exact EN/MS content, not only its presence,
+type, or shape.
+
 ### Latest Staging Re-audit
 
 The full Phase 1 and Phase 2 audit was rerun after fast-forwarding this branch
@@ -319,6 +324,8 @@ Validation snapshot:
 - `git diff --check`: pass.
 - TypeScript `tsc --noEmit`: pass.
 - GH-1701 contract suite: 5 passed.
+- Retained-output mutation check: scalar and same-shaped array mutations both
+  fail their respective contract tests.
 - Focused localization and order-copy regression: 82 passed.
 - Directly affected literal-copy regression files: 379 passed.
 - Full Vitest: 11,619 passed, 3 skipped, and 1 unchanged staging baseline

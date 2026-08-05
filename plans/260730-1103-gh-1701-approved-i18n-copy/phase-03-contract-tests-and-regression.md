@@ -51,6 +51,8 @@ Some component tests assert literal current copy. Update only assertions whose s
 ## Result
 
 - New GH-1701 contract suite: 5/5 tests passed.
+- All 39 scalar holds and five preserved arrays are locked to exact EN/MS
+  output hashes; red-check mutations fail both accounting and array contracts.
 - Focused localization and order-copy regression: 82/82 tests passed.
 - Directly affected literal-copy regression files: 379/379 tests passed.
 - Full Vitest: 11,619 passed, 3 skipped, and 1 failed.
