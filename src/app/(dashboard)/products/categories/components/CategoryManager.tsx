@@ -16,6 +16,7 @@ import {
     FolderOpen,
     File,
     ArrowLeft,
+    Layers,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -62,6 +63,22 @@ const generateSlug = (text: string) => {
         .replace(/[đĐ]/g, 'd') // Handle Vietnamese 'đ'
         .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
         .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+}
+
+// Private-use markers preserve the translated placeholder boundary without HTML in locale files.
+const PARENT_NAME_EMPHASIS_TOKEN = '\uE000category-parent-name\uE001'
+
+const renderEmphasizedParentName = (text: string, parentName: string): React.ReactNode => {
+    const start = text.indexOf(PARENT_NAME_EMPHASIS_TOKEN)
+    if (start < 0) return text
+
+    return (
+        <>
+            {text.slice(0, start)}
+            <strong className="font-bold">{parentName}</strong>
+            {text.slice(start + PARENT_NAME_EMPHASIS_TOKEN.length)}
+        </>
+    )
 }
 
 // Helper to calculate depth of a category before saving. Capped at 5 hops — same safety
@@ -124,13 +141,13 @@ export const isDescendant = (candidateId: string | number | null, selfId: string
 // carries unrelated AI-feature meaning), so L3 references the underlying --p-violet-300 palette
 // primitive directly (same primitive layer --primary/--info are themselves built from).
 const levelTextColors = {
-    1: 'text-[hsl(var(--primary))]',
-    2: 'text-[hsl(var(--info))]',
-    3: 'text-[hsl(var(--p-violet-300))]',
+    1: '!text-[hsl(var(--primary))]',
+    2: '!text-[hsl(var(--info))]',
+    3: '!text-[hsl(var(--p-violet-300))]',
 } as const
 
 export default function CategoryManager() {
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
     const router = useRouter()
     const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -259,6 +276,22 @@ export default function CategoryManager() {
                 return { id: c.id, label: c.breadcrumbs || c.name, level }
             })
     }, [categories, formData.id])
+
+    const subcategoryContext = useMemo(() => {
+        if (!isSubcategoryMode || formData.parent == null) return null
+
+        const parent = categories.find(category => String(category.id) === String(formData.parent))
+        if (!parent) return null
+
+        const parentId = typeof parent.parent === 'object' && parent.parent
+            ? parent.parent.id
+            : (parent.parent ?? null)
+        const currentLevel = getCategoryDepth(parentId, categories)
+        const newLevel = currentLevel + 1
+        if (currentLevel < 1 || newLevel > 3) return null
+
+        return { parentName: parent.name, currentLevel, newLevel }
+    }, [categories, formData.parent, isSubcategoryMode])
 
     // GH-1579: snap back when deletions strand currentPage past the last page
     useTablePageClamp(currentPage, tree.length, pageSize, setCurrentPage)
@@ -669,6 +702,25 @@ export default function CategoryManager() {
 
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                             <form id="cat-form" onSubmit={handleSave} onKeyDown={handleFormKeyDown} className="flex flex-col gap-6">
+                                {subcategoryContext && (
+                                    <div
+                                        role="note"
+                                        className="flex items-start gap-3 rounded-[8px] [border:1px_solid_hsl(var(--info)/0.55)] bg-[hsl(var(--info)/0.12)] px-3 py-3 text-[hsl(var(--info))]"
+                                    >
+                                        <Layers className="mt-0.5 h-[18px] w-[18px] shrink-0" aria-hidden />
+                                        <p className="m-0 text-[13px] font-medium leading-5">
+                                            {renderEmphasizedParentName(
+                                                ti(t.dashboard.products.categories.form.subcategoryContext, {
+                                                    parentName: PARENT_NAME_EMPHASIS_TOKEN,
+                                                    currentLevel: subcategoryContext.currentLevel,
+                                                    newLevel: subcategoryContext.newLevel,
+                                                }),
+                                                subcategoryContext.parentName,
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="flex flex-col gap-2">
                                     <Label>
                                         {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[hsl(var(--destructive))]">*</span>
@@ -703,7 +755,7 @@ export default function CategoryManager() {
                                         onValueChange={val => setFormData({...formData, parent: val === '__none__' ? null : val})}
                                         disabled={isSubcategoryMode}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger aria-describedby={subcategoryContext ? 'category-parent-locked-help' : undefined}>
                                             <SelectValue placeholder={t.dashboard.products.categories.form.parentNone || '--None--'} />
                                         </SelectTrigger>
                                         {/* z-[110]: SelectContent portals to <body> with a default z-50, which renders
@@ -723,6 +775,14 @@ export default function CategoryManager() {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {subcategoryContext && (
+                                        <p
+                                            id="category-parent-locked-help"
+                                            className="m-0 text-[12px] leading-5 text-[var(--dash-text-muted)]"
+                                        >
+                                            {t.dashboard.products.categories.form.parentLockedHelp}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">
