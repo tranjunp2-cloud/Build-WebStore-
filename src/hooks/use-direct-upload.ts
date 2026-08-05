@@ -4,8 +4,14 @@ import { useState, useCallback } from 'react'
 
 type MediaDoc = { id: string | number; url: string; [key: string]: unknown }
 
-// GH-1284 — direct-to-S3 upload for large files (video) that exceed Vercel's
-// 4.5MB function body limit. Three steps, all from the browser:
+export class DirectUploadUnavailableError extends Error {
+    constructor(message = 'Direct upload unavailable') {
+        super(message)
+        this.name = 'DirectUploadUnavailableError'
+    }
+}
+
+// Direct-to-S3 upload for media files. Three steps, all from the browser:
 //   1. POST /api/media/presign  → presigned POST (url + fields) + minted key
 //   2. POST the file STRAIGHT to S3 (XHR, real progress) — never touches Vercel
 //   3. POST /api/media/register → create the Payload media row, returns { id, url }
@@ -30,7 +36,13 @@ export function useDirectUpload() {
                 body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
             })
             if (!presignRes.ok) {
-                const body = await presignRes.json().catch(() => ({}))
+                const body = await presignRes.json().catch(() => ({})) as {
+                    error?: string
+                    code?: string
+                }
+                if (body.code === 'DIRECT_UPLOAD_UNAVAILABLE') {
+                    throw new DirectUploadUnavailableError(body.error)
+                }
                 throw new Error(body.error ?? 'Could not prepare upload')
             }
             const { url, fields, key } = await presignRes.json()
@@ -73,7 +85,7 @@ function putToS3(url: string, form: FormData, onProgress: (n: number) => void): 
         })
         xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) return resolve()
-            if (/EntityTooLarge/i.test(xhr.responseText)) return reject(new Error('Video exceeds the size limit'))
+            if (/EntityTooLarge/i.test(xhr.responseText)) return reject(new Error('File exceeds the size limit'))
             reject(new Error(`Upload failed (${xhr.status})`))
         })
         xhr.addEventListener('error', () => reject(new Error('Network error during upload')))

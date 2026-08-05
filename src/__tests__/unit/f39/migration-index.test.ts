@@ -4,9 +4,24 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const DB_SETUP_PATH = path.resolve(process.cwd(), 'scripts/db-setup.js')
+const { normalizeIndexPredicate } = require(DB_SETUP_PATH) as {
+    normalizeIndexPredicate: (predicate: unknown) => string
+}
 
 // ── TC-F39-AC13: Fail-closed runtime issue uniqueness migration ─────────────
 describe('[TC-F39-AC13] runtime promotion unique index', () => {
+    it('normalizes PostgreSQL enum casts without weakening the predicate check', () => {
+        const postgresPredicate =
+            "((related_type = 'runtime'::enum_template_issues_related_type) AND (related_id IS NOT NULL))"
+
+        expect(normalizeIndexPredicate(postgresPredicate)).toBe(
+            "related_type = 'runtime' and related_id is not null",
+        )
+        expect(normalizeIndexPredicate(
+            "related_type = 'runtime'::text OR related_id IS NOT NULL",
+        )).not.toBe("related_type = 'runtime' and related_id is not null")
+    })
+
     it('creates the exact partial unique index without destructive SQL', () => {
         // Arrange
         const script = fs.readFileSync(DB_SETUP_PATH, 'utf8')

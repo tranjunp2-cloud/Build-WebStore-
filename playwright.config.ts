@@ -86,6 +86,16 @@ export default defineConfig({
             },
             dependencies: hasE2EAccount ? ['setup'] : [],
         },
+        {
+            name: 'gh-1640-performance',
+            testDir: './tests',
+            testMatch: /gh-1640-performance\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).
         {
