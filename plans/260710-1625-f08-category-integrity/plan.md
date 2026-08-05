@@ -6,6 +6,8 @@ priority: P1
 effort: ~18h
 branch: feat/f08-1587-category-integrity-fixes
 tags: [f08, categories, data-integrity, migration, storefront, ai]
+blockedBy: [260804-1543-gh-1588-unmatched-category-guard]
+blocks: []
 created: 2026-07-10
 ---
 
@@ -19,6 +21,9 @@ Split into **2 PRs**. PR-1 = backend core + data integrity (merge first). PR-2 =
 - A null/stale AI match must be resolved with an existing category before Approve; never save an uncategorized AI draft and never auto-create a category.
 - Do not add Category to the global publish guard or Product collection hooks for this scope.
 
+### Cross-plan dependency
+
+Phase 10 closeout is blocked by [GH-1588 fail-closed unmatched category guard](../260804-1543-gh-1588-unmatched-category-guard/plan.md), created from the latest QA bug 1 evidence. Phase 09 tenant-aware mapping remains complete; the focused plan owns semantic rejection and re-test.
 
 ## Issue mapping
 
@@ -46,7 +51,7 @@ Split into **2 PRs**. PR-1 = backend core + data integrity (merge first). PR-2 =
 | 07 | [Tests PR-1](phase-07-tests-pr1.md) | 1 | No | done | 01-05b |
 | 08 | [Storefront listing + sidebar filter](phase-08-storefront-listing.md) | 2 | No | pending | PR-1 merged |
 | 09 | [AI bulk-parse tenant-aware](phase-09-ai-bulk-parse-tenant-aware.md) | 2 | No | completed | PR-1 merged |
-| 10 | [Tests + QA PR-2](phase-10-tests-qa-pr2.md) | 2 | No | in progress | 09 |
+| 10 | [Tests + QA PR-2](phase-10-tests-qa-pr2.md) | 2 | No | blocked | 09 + `260804-1543-gh-1588-unmatched-category-guard` |
 
 **PR-1 Complete:** All phases 01–07 done. Ready for `git-manager` to open PR to staging with commit message `Relates to #5 #10 #11 #12 #14`.
 

@@ -1,11 +1,12 @@
 # Phase 10 — GH-1588 Scope 02 Tests + QA
 
-**PR:** 2 · **Migration:** No · **Priority:** P1 · **Status:** in progress · **Depends:** 09
+**PR:** 2 · **Migration:** No · **Priority:** P1 · **Status:** blocked · **Depends:** 09, [GH-1588 semantic guard](../260804-1543-gh-1588-unmatched-category-guard/plan.md)
 
 ## Context
 
 - Scope is tenant-aware AI Bulk Create only; storefront filtering remains owned by Phase 08.
 - Follow `docs/TEST_CONVENTION.md`: TC-IDs, AAA, and imports from source.
+- Latest QA bug 1 shows an allowlisted but unrelated `QA Skincare` ID survives for `4-Person Camping Tent`; closeout waits for the focused fail-closed guard and TC120–TC124 re-test.
 
 ## Overview
 
@@ -69,6 +70,7 @@ Unit-test tenant category prompt/mapping, AI review required selection, and the 
 - [x] Focused Scope 02 verification green (6 files / 128/128 tests); AI API file remains dependency-blocked
 - [x] Browser verification green (2/2); active product/category fixture residue 0/0
 - [ ] Manual QA checklist executed + signed off
+- [ ] GH-1588 bug 1 semantic guard TC120–TC124 passed and QA evidence attached
 - [x] TC-IDs referenced from updated F08 QA doc
 
 ## Success Criteria
