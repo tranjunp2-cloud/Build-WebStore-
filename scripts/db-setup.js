@@ -4913,6 +4913,11 @@ const MIGRATIONS = [
     description text,
     event_time timestamp with time zone,
     collection_method varchar,
+    source varchar,
+    actor_id varchar,
+    actor_label varchar,
+    previous_status varchar,
+    next_status varchar,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
   );` },
@@ -4977,6 +4982,12 @@ const MIGRATIONS = [
   { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
   { name: 'orders.collection_method', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_method varchar;` },
   { name: 'orders.shipping_tracking_history.collection_method', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  // ── GH-1734: structured audit metadata for manual Self-delivery completion ──
+  { name: 'orders.shipping_tracking_history.source', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS source varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_id', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_id varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_label', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_label varchar;` },
+  { name: 'orders.shipping_tracking_history.previous_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS previous_status varchar;` },
+  { name: 'orders.shipping_tracking_history.next_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS next_status varchar;` },
   // Freeze legacy rows to the title they render today. Missing order-level method currently
   // displays as Pickup, so use the same fallback instead of letting a future label rewrite it.
   { name: 'orders.shipping_tracking_history.collection_method_backfill', sql: `UPDATE orders_shipping_tracking_history AS history

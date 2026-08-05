@@ -17,6 +17,8 @@ const SELF_COURIERS = [
   'Teleport',
 ]
 
+const OTHER_COURIER = '__other__'
+
 interface SelfDeliveryZoneProps {
   orderId: string | number
   /** Already shipped via self-delivery — show locked read-only card */
@@ -38,6 +40,7 @@ export function SelfDeliveryZone({
   const { t } = useI18n()
   const sd = t.dashboard.orders.selfDelivery
   const [courier, setCourier] = useState('')
+  const [customCourier, setCustomCourier] = useState('')
   const [awb, setAwb] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -86,7 +89,8 @@ export function SelfDeliveryZone({
     )
   }
 
-  const canShip = courier.trim().length > 0 && awb.trim().length > 0
+  const selectedCourier = courier === OTHER_COURIER ? customCourier.trim() : courier.trim()
+  const canShip = selectedCourier.length > 0 && awb.trim().length > 0
 
   const handleShip = async () => {
     if (!canShip) return
@@ -95,7 +99,7 @@ export function SelfDeliveryZone({
       const res = await fetch(`/api/orders/${orderId}/self-deliver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courier: courier.trim(), trackingNumber: awb.trim() }),
+        body: JSON.stringify({ courier: selectedCourier, trackingNumber: awb.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -131,12 +135,29 @@ export function SelfDeliveryZone({
           >
             <option value="" disabled>{sd.courierPlaceholder}</option>
             {SELF_COURIERS.map(c => <option key={c} value={c}>{c}</option>)}
+            <option value={OTHER_COURIER}>{sd.courierOther}</option>
           </select>
           <svg className="chev" viewBox="0 0 16 16" fill="none" style={{ width: 16, height: 16 }}>
             <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>
+
+      {courier === OTHER_COURIER && (
+        <div className="od-field">
+          <label className="lbl" htmlFor="sd-custom-courier">{sd.customCourierLabel}</label>
+          <div className="inp">
+            <input
+              id="sd-custom-courier"
+              value={customCourier}
+              onChange={e => setCustomCourier(e.target.value)}
+              placeholder={sd.customCourierPlaceholder}
+              maxLength={100}
+              disabled={saving}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="od-field">
         <label className="lbl" htmlFor="sd-awb">{sd.trackingLabel}</label>

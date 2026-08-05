@@ -593,6 +593,9 @@ export function FulfillmentZone({
   // ── Shipping / Completed: tracking timeline ───────────────────────────────
   if (state === 'shipping' || state === 'completed') {
     const isCompleted = state === 'completed'
+    const isSelfDelivery = Boolean(order.selfDeliveryCourier)
+    const displayCourierName = order.selfDeliveryCourier ?? courierName
+    const displayTrackingNumber = isSelfDelivery ? order.trackingNumber : awbNo
     const events = order.shippingTrackingHistory ?? []
 
     return (
@@ -617,19 +620,22 @@ export function FulfillmentZone({
               <div className="st-field" style={{ gap: 6 }}>
                 <div className="od-info-l">{f.courier}</div>
                 <div className="st-courier">
-                  <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={22} />
-                  {courierName ?? f.courier}
+                  <CourierLogo courierId={courierId} courierName={displayCourierName} logoUrl={courierLogoUrl} size={22} />
+                  {displayCourierName ?? f.courier}
+                  {isSelfDelivery && (
+                    <span className="sd-self-badge">{t.dashboard.orders.selfDelivery.selfBadge}</span>
+                  )}
                 </div>
               </div>
 
-              {awbNo && (
+              {displayTrackingNumber && (
                 <div className="st-field grow">
                   <div className="od-info-l">{f.trackingAwb}</div>
                   <div className="copyfield">
-                    <span className="cf-v">{awbNo}</span>
+                    <span className="cf-v">{displayTrackingNumber}</span>
                     <button
                       className="cf-btn"
-                      onClick={() => { navigator.clipboard.writeText(awbNo); toast.success(f.copied) }}
+                      onClick={() => { navigator.clipboard.writeText(displayTrackingNumber); toast.success(f.copied) }}
                     >
                       <Copy style={{ width: 13, height: 13 }} /> {f.copy}
                     </button>
@@ -637,17 +643,19 @@ export function FulfillmentZone({
                 </div>
               )}
 
-              <div className="st-actions">
-                <Button
-                  variant="dashPrimary"
-                  className="w-full md:w-auto"
-                  onClick={() => setPrintOpen(true)}
-                  // PD-F13a: see success-branch comment above — gate on awbNo, not labelUrl.
-                  disabled={!awbNo}
-                >
-                  <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
-                </Button>
-              </div>
+              {!isSelfDelivery && (
+                <div className="st-actions">
+                  <Button
+                    variant="dashPrimary"
+                    className="w-full md:w-auto"
+                    onClick={() => setPrintOpen(true)}
+                    // PD-F13a: see success-branch comment above — gate on awbNo, not labelUrl.
+                    disabled={!awbNo}
+                  >
+                    <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Tracking timeline */}
@@ -655,7 +663,7 @@ export function FulfillmentZone({
           </div>
         </div>
 
-        {printOpen && (
+        {!isSelfDelivery && printOpen && (
           <PrintLabelModal
             orderId={order.id}
             awbNo={awbNo}
