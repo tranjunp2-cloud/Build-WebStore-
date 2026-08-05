@@ -19,84 +19,83 @@ vi.mock('sonner', () => ({
     toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/i18n', () => ({
-    useI18n: () => ({
-        ti: (template: string, values: Record<string, string | number>) => (
-            Object.entries(values).reduce(
-                (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
-                template,
-            )
-        ),
-        t: {
-            dashboard: {
-                products: {
-                    categories: {
-                        title: 'Category Management',
-                        subtitle: 'Manage product categories',
-                        addCategory: 'Add Category',
-                        backToProducts: 'Products',
-                        search: 'Search categories...',
-                        emptyState: 'Start by creating a new category.',
-                        form: {
-                            newTitle: 'New Category',
-                            editTitle: 'Edit Category',
-                            addSubcategoryTitle: 'Add Subcategory',
-                            name: 'Category Name',
-                            namePlaceholder: 'Type a category name',
-                            parent: 'Parent Category',
-                            parentNone: '--None--',
-                            subcategoryContext: 'Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.',
-                            parentLockedHelp: 'Locked — you are adding under this category.',
-                            description: 'Description',
-                            descriptionPlaceholder: 'Description',
-                            optional: '(Optional)',
-                            slug: 'URL Slug',
-                            slugPlaceholder: 'category-url',
-                            cancel: 'Cancel',
-                            save: 'Save',
-                            errors: {
-                                nameDuplicate: 'Category name already exists in this level.',
+vi.mock('@/i18n', async (importOriginal) => {
+    const { interpolateTranslation } = await importOriginal<typeof import('@/i18n')>()
+
+    return {
+        useI18n: () => ({
+            ti: interpolateTranslation,
+            t: {
+                dashboard: {
+                    products: {
+                        categories: {
+                            title: 'Category Management',
+                            subtitle: 'Manage product categories',
+                            addCategory: 'Add Category',
+                            backToProducts: 'Products',
+                            search: 'Search categories...',
+                            emptyState: 'Start by creating a new category.',
+                            form: {
+                                newTitle: 'New Category',
+                                editTitle: 'Edit Category',
+                                addSubcategoryTitle: 'Add Subcategory',
+                                name: 'Category Name',
+                                namePlaceholder: 'Type a category name',
+                                parent: 'Parent Category',
+                                parentNone: '--None--',
+                                subcategoryContext: 'Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.',
+                                parentLockedHelp: 'Locked — you are adding under this category.',
+                                description: 'Description',
+                                descriptionPlaceholder: 'Description',
+                                optional: '(Optional)',
+                                slug: 'URL Slug',
+                                slugPlaceholder: 'category-url',
+                                cancel: 'Cancel',
+                                save: 'Save',
+                                errors: {
+                                    nameDuplicate: 'Category name already exists in this level.',
+                                },
                             },
+                            table: {
+                                noCategories: 'No Categories',
+                                level: 'LEVEL',
+                                products: 'PRODUCTS',
+                                actions: 'ACTIONS',
+                                noResults: 'No results found',
+                                tryAdjusting: 'Try adjusting your search terms.',
+                            },
+                            toast: {
+                                loadError: 'Failed to load categories',
+                                created: 'Created {name}',
+                                updated: 'Updated {name}',
+                                saveError: 'Failed to save category',
+                                deleteError: 'Failed to delete category',
+                                cycleError: 'Cycle error',
+                                maxDepthError: 'Max depth error',
+                                parentTenantMismatch: 'Parent tenant mismatch',
+                                parentInvalid: 'The selected parent category is invalid. Please choose it again.',
+                                parentSoftDeleted: 'Parent soft deleted',
+                                deleted: 'Deleted {name}',
+                            },
+                            deleteModal: {
+                                title: 'Delete Category',
+                                confirm: 'Delete',
+                                cancel: 'Cancel',
+                                warning1: 'Are you sure you want to delete',
+                                hasProductsError: 'Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.',
+                                tooManyChildrenError: 'Too many children {count}',
+                                reparentNameConflictError: 'Name conflict {count}',
+                            },
+                            addSubcategory: 'Add Subcategory',
+                            edit: 'Edit',
+                            delete: 'Delete',
                         },
-                        table: {
-                            noCategories: 'No Categories',
-                            level: 'LEVEL',
-                            products: 'PRODUCTS',
-                            actions: 'ACTIONS',
-                            noResults: 'No results found',
-                            tryAdjusting: 'Try adjusting your search terms.',
-                        },
-                        toast: {
-                            loadError: 'Failed to load categories',
-                            created: 'Created {name}',
-                            updated: 'Updated {name}',
-                            saveError: 'Failed to save category',
-                            deleteError: 'Failed to delete category',
-                            cycleError: 'Cycle error',
-                            maxDepthError: 'Max depth error',
-                            parentTenantMismatch: 'Parent tenant mismatch',
-                            parentInvalid: 'The selected parent category is invalid. Please choose it again.',
-                            parentSoftDeleted: 'Parent soft deleted',
-                            deleted: 'Deleted {name}',
-                        },
-                        deleteModal: {
-                            title: 'Delete Category',
-                            confirm: 'Delete',
-                            cancel: 'Cancel',
-                            warning1: 'Are you sure you want to delete',
-                            hasProductsError: 'Cannot delete this category. There are {count} products still assigned to it. Please reassign your products first.',
-                            tooManyChildrenError: 'Too many children {count}',
-                            reparentNameConflictError: 'Name conflict {count}',
-                        },
-                        addSubcategory: 'Add Subcategory',
-                        edit: 'Edit',
-                        delete: 'Delete',
                     },
                 },
             },
-        },
-    }),
-}))
+        }),
+    }
+})
 
 vi.mock('@/lib/utils', () => ({
     cn: (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' '),

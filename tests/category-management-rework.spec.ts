@@ -195,6 +195,19 @@ async function createDraftProduct(
     await page.waitForURL(url => url.pathname === '/products', { timeout: 30_000 })
 }
 
+function reportCleanupErrors(
+    capturedFailure: { error: unknown } | undefined,
+    cleanupErrors: unknown[],
+    message: string,
+) {
+    if (cleanupErrors.length === 0) return
+
+    throw new AggregateError(
+        capturedFailure ? [capturedFailure.error, ...cleanupErrors] : cleanupErrors,
+        capturedFailure ? `${message}; primary test failure is the first error` : message,
+    )
+}
+
 test.describe('GH-1587 category management rework regressions', () => {
     test.beforeEach(async ({ page }) => {
         await page.addInitScript(() => {
@@ -213,7 +226,7 @@ test.describe('GH-1587 category management rework regressions', () => {
         const siblingName = `GH1587 Sibling ${suffix}`
         const grandchildName = `GH1587 Grandchild ${suffix}`
         const cleanupNames = [grandchildName, childName, siblingName, rootName]
-        let testFailure: unknown
+        let capturedFailure: { error: unknown } | undefined
 
         try {
             await openCategoryPage(page)
@@ -280,7 +293,7 @@ test.describe('GH-1587 category management rework regressions', () => {
             await expect(retainedGrandchildRow).toBeVisible()
             await expect(retainedGrandchildRow.getByText('L2', { exact: true })).toBeVisible()
         } catch (error) {
-            testFailure = error
+            capturedFailure = { error }
             throw error
         } finally {
             const cleanupErrors: unknown[] = []
@@ -291,9 +304,7 @@ test.describe('GH-1587 category management rework regressions', () => {
                     cleanupErrors.push(error)
                 }
             }
-            if (!testFailure && cleanupErrors.length > 0) {
-                throw new AggregateError(cleanupErrors, 'GH-1587 hierarchy fixture cleanup failed')
-            }
+            reportCleanupErrors(capturedFailure, cleanupErrors, 'GH-1587 hierarchy fixture cleanup failed')
         }
     })
 
@@ -305,7 +316,7 @@ test.describe('GH-1587 category management rework regressions', () => {
         const categoryName = `GH1587 Assigned ${suffix}`
         const productName = `GH1587 Product ${suffix}`
         const sku = `GH1587-${suffix}`
-        let testFailure: unknown
+        let capturedFailure: { error: unknown } | undefined
 
         try {
             await openCategoryPage(page)
@@ -327,7 +338,7 @@ test.describe('GH-1587 category management rework regressions', () => {
             await expect(dialog).toBeVisible()
             await dialog.getByRole('button', { name: /cancel/i }).click()
         } catch (error) {
-            testFailure = error
+            capturedFailure = { error }
             throw error
         } finally {
             const cleanupErrors: unknown[] = []
@@ -341,9 +352,7 @@ test.describe('GH-1587 category management rework regressions', () => {
             } catch (error) {
                 cleanupErrors.push(error)
             }
-            if (!testFailure && cleanupErrors.length > 0) {
-                throw new AggregateError(cleanupErrors, 'GH-1587 assigned-product fixture cleanup failed')
-            }
+            reportCleanupErrors(capturedFailure, cleanupErrors, 'GH-1587 assigned-product fixture cleanup failed')
         }
     })
 })
