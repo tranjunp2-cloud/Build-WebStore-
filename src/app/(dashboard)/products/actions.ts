@@ -343,17 +343,16 @@ async function saveProduct(rawData: unknown, id?: string | number, context?: Pro
                 data,
                 user,
                 overrideAccess: false,
-                // Manual creates remain auto-committed because Payload's adapter commit helper can
-                // swallow PostgreSQL commit failures. AI creates instead receive the category-lock
-                // transaction request, so the Product write and row lock finalize atomically through
-                // Drizzle's callback transaction.
+                // Product writes are auto-committed because Payload's adapter transaction helper can
+                // return an inserted document whose row is later rolled back. AI saves still hold the
+                // category's FOR KEY SHARE lock on a separate connection until this verified commit
+                // finishes, so category deletion cannot race past the Product relationship write.
                 ...(context?.req
                     ? { req: context.req }
                     : { disableTransaction: true }),
             })
             if (!context?.req) {
-                // Verify an independently auto-committed manual row before reporting success. An
-                // AI row is still uncommitted here and is verified by the outer transaction result.
+                // Verify an independently auto-committed row before reporting success.
                 try {
                     const verify = await payload.findByID({
                         collection: 'products',
@@ -490,26 +489,38 @@ export async function saveAiProductAction(rawData: unknown) {
         return JSON.parse(JSON.stringify(existingDraft))
     }
 
-    const savedProduct = await (async () => {
+    const saveOnce = async () => {
         try {
-            return await withActiveCategoryRowLock(
+            const product = await withActiveCategoryRowLock(
                 payload,
                 parsedCategory.data,
                 tenantId,
-                (canonicalCategoryId, req) => saveProduct({
+                canonicalCategoryId => saveProduct({
                     ...(rawData as Record<string, unknown>),
                     category: [canonicalCategoryId],
                     status: 'draft',
                     aiReviewPending: true,
-                }, undefined, { user, tenantId, payload, req }),
+                }, undefined, { user, tenantId, payload }),
             )
+            return product ? { product, independentlyVerified: false } : null
         } catch (error) {
             // Also cover concurrent identical requests and ambiguous commit acknowledgements. If
             // the lookup itself is unavailable, preserve and report the original write failure.
             const committedReplay = await findReplay().catch(() => null)
             if (committedReplay) {
                 if (!replayMatchesRequestedCategory(committedReplay)) throw replayCategoryConflict()
-                return JSON.parse(JSON.stringify(committedReplay))
+                return {
+                    product: JSON.parse(JSON.stringify(committedReplay)),
+                    independentlyVerified: true,
+                }
+            }
+
+            if (
+                canReplayAiDraft
+                && error instanceof Error
+                && error.message === 'Product was not saved. Please try again.'
+            ) {
+                return { product: null, independentlyVerified: false, ambiguousCommit: true }
             }
 
             if (error instanceof Error && error.message === CATEGORY_LOCK_BUSY_ERROR) {
@@ -520,9 +531,69 @@ export async function saveAiProductAction(rawData: unknown) {
             }
             throw error
         }
-    })()
+    }
 
-    return savedProduct ?? categoryInvalidResult()
+    const isCommittedAiDraft = async (product: unknown) => {
+        if (!canReplayAiDraft || !product || typeof product !== 'object' || !('id' in product)) {
+            return false
+        }
+        const productId = (product as { id?: unknown }).id
+        if (typeof productId !== 'string' && typeof productId !== 'number') return false
+
+        // Use an independent adapter query instead of Payload.find here. A Local API read issued
+        // immediately after the custom callback transaction can reuse request state that does not
+        // yet expose the commit, even though a fresh dashboard request does. This query is also
+        // stricter than an ID-only check: the committed draft must retain the tenant, slug, review
+        // state, and exact category relation that made the retry idempotent.
+        const result = await payload.db.drizzle.execute(sql`
+            SELECT EXISTS (
+                SELECT 1
+                FROM products p
+                INNER JOIN products_rels r
+                    ON r.parent_id = p.id
+                   AND r.path = 'category'
+                   AND r.categories_id = ${parsedCategory.data}
+                WHERE p.id = ${productId}
+                  AND p.tenant_id = ${tenantId}
+                  AND p.slug = ${requestedSlug}
+                  AND p.status = 'draft'
+                  AND p.ai_review_pending IS TRUE
+                  AND p.deleted_at IS NULL
+            ) AS committed
+        `) as { rows: Array<{ committed?: boolean }> }
+
+        return result.rows[0]?.committed === true
+    }
+
+    const waitForCommittedAiDraft = async (product: unknown) => {
+        const COMMIT_VISIBILITY_CHECKS = 4
+        const COMMIT_VISIBILITY_INTERVAL_MS = 100
+
+        for (let check = 1; check <= COMMIT_VISIBILITY_CHECKS; check++) {
+            if (await isCommittedAiDraft(product)) return true
+            if (check < COMMIT_VISIBILITY_CHECKS) {
+                await new Promise(resolve => setTimeout(resolve, COMMIT_VISIBILITY_INTERVAL_MS))
+            }
+        }
+        return false
+    }
+
+    // A successful callback result is not sufficient proof that the outer database transaction
+    // committed. Payload/Drizzle can return the inserted document even when the row is absent
+    // immediately afterwards (observed with consecutive AI drafts on Neon). Verify through a new
+    // read and retry only this ambiguous-success case. The stable AI slug makes every retry
+    // idempotent: a late/hidden first commit is recovered by findReplay or the slug constraint.
+    const MAX_COMMIT_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_COMMIT_ATTEMPTS; attempt++) {
+        const saveResult = await saveOnce()
+        if (!saveResult) return categoryInvalidResult()
+        if ('ambiguousCommit' in saveResult) continue
+        if (!canReplayAiDraft || saveResult.independentlyVerified) return saveResult.product
+
+        if (await waitForCommittedAiDraft(saveResult.product)) return saveResult.product
+    }
+
+    throw new Error('Product was not saved. Please try again.')
 }
 
 const ProductFieldUpdateSchema = z.union([
