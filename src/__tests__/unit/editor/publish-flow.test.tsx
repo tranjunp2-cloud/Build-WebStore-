@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import EditorPage from '@/app/(editor)/editor/[siteId]/page'
 import type { LocalBusinessData } from '@/components/editor/local-business/types'
 import { trackEvent } from '@/lib/analytics/track-event'
-import { useEditorStore } from '@/store/editorStore'
+import { hasPendingSerializedEditorSave, useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
 
@@ -1311,6 +1311,139 @@ afterEach(() => {
         // The Unpublish action is now inside the dropdown menu (separated from Publish).
         // Testing the dropdown interaction requires Radix Portal rendering which is complex in JSDOM.
         // The unpublish API call itself is tested in src/__tests__/api/publish.test.ts
+    })
+
+    it('[GH-1640] saves a revision created while publish is flushing before publishing', async () => {
+        // Arrange
+        let resolveFirstSave: ((response: {
+            ok: boolean
+            json: () => Promise<Record<string, never>>
+        }) => void) | undefined
+        const firstSaveResponse = new Promise<{
+            ok: boolean
+            json: () => Promise<Record<string, never>>
+        }>((resolve) => {
+            resolveFirstSave = resolve
+        })
+        const requestOrder: string[] = []
+        let saveCount = 0
+
+        global.fetch = vi.fn((input: string | URL) => {
+            const url = input.toString()
+            if (url.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: { id: 'test-site-id', name: 'Test Site', status: 'draft' },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                        blocks: [{ id: 'b1', type: 'hero' }],
+                    }),
+                })
+            }
+            if (url.includes('/pages')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        pages: [{ id: 'page-1', title: 'Home', slug: '/' }],
+                    }),
+                })
+            }
+            if (url.includes('/save')) {
+                requestOrder.push('save')
+                saveCount += 1
+                if (saveCount === 1) return firstSaveResponse
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            }
+            if (url.includes('/publish')) {
+                requestOrder.push('publish')
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        data: {
+                            url: 'https://coffee-shop.primeweb.app',
+                            domain: 'coffee-shop.primeweb.app',
+                        },
+                    }),
+                })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        }) as typeof fetch
+
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+        act(() => {
+            useEditorStore.setState({ hasUnsavedChanges: true, contentRevision: 1 })
+        })
+
+        // Act: publish starts a flush save, then a newer edit lands before it completes.
+        fireEvent.click(screen.getByTestId('publish-btn'))
+        fireEvent.click(await screen.findByRole('button', { name: /Publish now/i }))
+        await waitFor(() => expect(saveCount).toBe(1))
+
+        act(() => {
+            useEditorStore.getState().markDirty()
+        })
+        await act(async () => {
+            resolveFirstSave?.({ ok: true, json: async () => ({}) })
+            await firstSaveResponse
+        })
+
+        // Assert
+        await waitFor(() => expect(requestOrder).toContain('publish'))
+        expect(requestOrder).toEqual(['save', 'save', 'publish'])
+        expect(useEditorStore.getState().hasUnsavedChanges).toBe(false)
+    })
+
+    it('[GH-1640] blocks publish when the flush save exceeds its deadline', async () => {
+        // Arrange
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+
+        const requests: string[] = []
+        let resolveSave: ((response: Response) => void) | undefined
+        const stalledSave = new Promise<Response>((resolve) => {
+            resolveSave = resolve
+        })
+        global.fetch = vi.fn((input: string | URL) => {
+            const url = input.toString()
+            if (url.includes('/save')) {
+                requests.push('save')
+                return stalledSave
+            }
+            if (url.includes('/publish')) {
+                requests.push('publish')
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) }) as Promise<Response>
+        })
+        act(() => {
+            useEditorStore.setState({ hasUnsavedChanges: true, contentRevision: 1 })
+        })
+        vi.useFakeTimers()
+
+        // Act
+        fireEvent.click(screen.getByTestId('publish-btn'))
+        fireEvent.click(screen.getByRole('button', { name: /Publish now/i }))
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_001)
+        })
+
+        // Assert
+        expect(requests).toContain('save')
+        expect(requests).not.toContain('publish')
+
+        // Cleanup the intentionally stalled request so its serialized queue does
+        // not leak into later tests.
+        await act(async () => {
+            resolveSave?.({
+                ok: true,
+                json: async () => ({}),
+            } as Response)
+            await stalledSave
+        })
+        vi.useRealTimers()
+        await waitFor(() => {
+            expect(hasPendingSerializedEditorSave('test-site-id')).toBe(false)
+        })
     })
 
     it('TC-F05.50: handleRepublish refetches pages so new page shows Live instead of stale Draft (BUG-F05 update-new-page)', async () => {

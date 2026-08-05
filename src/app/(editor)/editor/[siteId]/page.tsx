@@ -2219,40 +2219,39 @@ export default function EditorPage() {
             // hit DB in the chosen language before publish reads them.
             markDirty(false)
         }
-        // Poll until in-flight save finishes (max 10s)
-        if (isSavingRef.current || hasPendingSerializedEditorSave(siteId)) {
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (
-                        (!isSavingRef.current && !hasPendingSerializedEditorSave(siteId))
-                        || Date.now() > deadline
-                    ) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
+        const deadline = Date.now() + 10_000
+        const waitForSaveQueue = async (): Promise<boolean> => {
+            while (isSavingRef.current || hasPendingSerializedEditorSave(siteId)) {
+                const remaining = deadline - Date.now()
+                if (remaining <= 0) return false
+                await new Promise<void>((resolve) => {
+                    window.setTimeout(resolve, Math.min(100, remaining))
+                })
+            }
+            return true
         }
-        // Save any remaining unsaved changes
-        if (useEditorStore.getState().hasUnsavedChanges) {
-            const saved = await handleSave({ showToast: false, refreshPreview: false })
+
+        // A user action can create a new revision while the flush save is in flight.
+        // Keep flushing until both the queue and dirty state are stable.
+        while (Date.now() < deadline) {
+            if (!await waitForSaveQueue()) return false
+            if (!useEditorStore.getState().hasUnsavedChanges) return true
+
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) return false
+
+            let timeoutId: number | null = null
+            const saved = await Promise.race<boolean>([
+                handleSave({ showToast: false, refreshPreview: false }),
+                new Promise<boolean>((resolve) => {
+                    timeoutId = window.setTimeout(() => resolve(false), remaining)
+                }),
+            ])
+            if (timeoutId !== null) window.clearTimeout(timeoutId)
             if (!saved) return false
-            // Wait for that save to finish too
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (
-                        (!isSavingRef.current && !hasPendingSerializedEditorSave(siteId))
-                        || Date.now() > deadline
-                    ) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
         }
-        return true
+
+        return false
     }, [handleSave, markDirty, siteId])
 
     const handlePublish = useCallback(async () => {
