@@ -35,7 +35,7 @@ function RerenderableWrapper({ onEnterStep1 }: { onEnterStep1: () => void }) {
     )
 }
 
-/** Page Library anchor only renders when `anchorPresent` — simulates the compact Tools sheet
+/** Page library anchor only renders when `anchorPresent` — simulates the compact Tools sheet
  * mounting its panel (and the anchor with it) some time after openTools() is called, instead
  * of it being present synchronously like the other wrappers assume. */
 function DelayedAnchorWrapper({ anchorPresent }: { anchorPresent: boolean }) {
@@ -114,7 +114,7 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
 
         // Assert — step 1 title and body visible; no skip/back at step 1
         expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
-        expect(screen.getByText(/internal pages/)).toBeInTheDocument()
+        expect(screen.getByText(/page library/)).toBeInTheDocument()
         expect(screen.queryByText('Skip')).not.toBeInTheDocument()
         expect(screen.queryByText('Back')).not.toBeInTheDocument()
         expect(screen.getByText('Next')).toBeInTheDocument()
@@ -132,7 +132,7 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
 
         // Assert
         expect(onEnterStep2).toHaveBeenCalledOnce()
-        expect(screen.getByText('Step 2: Control menu visibility here')).toBeInTheDocument()
+        expect(screen.getByText('Step 2: Manage menu visibility here')).toBeInTheDocument()
         expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
@@ -160,7 +160,7 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         await advanceCoachMarkTimers()
         fireEvent.click(screen.getByText('Next'))
         await advanceCoachMarkTimers()
-        expect(screen.getByText('Step 2: Control menu visibility here')).toBeInTheDocument()
+        expect(screen.getByText('Step 2: Manage menu visibility here')).toBeInTheDocument()
         onEnterStep1.mockClear() // clear calls from mount
 
         // Act

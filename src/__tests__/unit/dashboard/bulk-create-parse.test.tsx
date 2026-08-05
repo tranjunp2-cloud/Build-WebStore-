@@ -199,7 +199,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="long product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
 
         // Assert
         expect(nameField.tagName).toBe('TEXTAREA')
@@ -225,7 +225,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="overlong product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
 
         // Assert
         expect(nameField).not.toHaveAttribute('maxlength')
@@ -249,7 +249,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             }),
         }) as unknown as typeof fetch
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="editable unicode product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
         const combiningAcrossBoundary = `${'A'.repeat(119)}e\u0301`
         const zwjAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
 
@@ -286,7 +286,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="IME product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
         fireEvent.compositionStart(nameField)
         const composingEnterDispatched = fireEvent.keyDown(nameField, {
             key: 'Enter',

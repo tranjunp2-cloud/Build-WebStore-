@@ -187,8 +187,8 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         fireEvent.click(filterButtons.at(-1)!)
         await waitFor(() => expect(screen.getByText('Excluded category')).toBeInTheDocument())
         fireEvent.click(screen.getByText('Excluded category'))
-        fireEvent.click(screen.getByText('On Sale'))
-        fireEvent.click(screen.getByText(/Show Low\/Out of Stock/i))
+        fireEvent.click(screen.getByText(/On sale/i))
+        fireEvent.click(screen.getByText(/Show low or out of stock/i))
         expect(screen.getByText(/Active Filters/i)).toBeInTheDocument()
 
         fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {

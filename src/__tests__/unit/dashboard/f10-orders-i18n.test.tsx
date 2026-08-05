@@ -414,7 +414,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
     it('EN status labels match expected values', () => {
         expect(enOrders.status.pending).toBe('Pending')
         expect(enOrders.status.confirmed).toBe('Confirmed')
-        expect(enOrders.status.readyToShip).toBe('Ready to Ship')
+        expect(enOrders.status.readyToShip).toBe('Ready to ship')
         expect(enOrders.status.shipped).toBe('Shipping') // renamed from 'Shipped' (bug #22)
         expect(enOrders.status.completed).toBe('Completed')
         expect(enOrders.status.cancelled).toBe('Cancelled')
@@ -422,62 +422,59 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
     })
 
     it('MS status labels match expected values', () => {
-        expect(msOrders.status.pending).toBe('Menunggu')
-        expect(msOrders.status.confirmed).toBe('Disahkan')
-        // Shortened for the tablet/mobile status badge so the pill fits the column
-        // without overflow (MS runs longer than EN): 'Sedia untuk Dihantar' → 'Sedia
-        // Dihantar', 'Sedang Dihantar' → 'Dihantar'.
-        expect(msOrders.status.readyToShip).toBe('Sedia Dihantar')
-        expect(msOrders.status.shipped).toBe('Dihantar')
+        expect(msOrders.status.pending).toBe('Sedang diproses')
+        expect(msOrders.status.confirmed).toBe('Telah Disahkan')
+        expect(msOrders.status.readyToShip).toBe('Sedia untuk dihantar')
+        expect(msOrders.status.shipped).toBe('Sedang dihantar')
         expect(msOrders.status.completed).toBe('Selesai')
-        expect(msOrders.status.cancelled).toBe('Dibatalkan')
-        expect(msOrders.status.refunded).toBe('Dikembalikan')
+        expect(msOrders.status.cancelled).toBe('Telah Dibatalkan')
+        expect(msOrders.status.refunded).toBe('Telah dibayar balik')
     })
 
     it('EN action button labels match expected values', () => {
-        expect(enOrders.actions.confirmOrder).toBe('Confirm Order')
-        expect(enOrders.actions.readyToShip).toBe('Ready to Ship')
-        expect(enOrders.actions.shipOrder).toBe('Ship Order')
-        expect(enOrders.actions.cancelOrder).toBe('Cancel Order')
+        expect(enOrders.actions.confirmOrder).toBe('Confirm order')
+        expect(enOrders.actions.readyToShip).toBe('Ready to ship')
+        expect(enOrders.actions.shipOrder).toBe('Ship order')
+        expect(enOrders.actions.cancelOrder).toBe('Cancel order')
         expect(enOrders.actions.refund).toBe('Refund')
     })
 
     it('MS action button labels match expected values', () => {
-        expect(msOrders.actions.confirmOrder).toBe('Sahkan Pesanan')
-        expect(msOrders.actions.readyToShip).toBe('Sedia Dihantar')
-        expect(msOrders.actions.shipOrder).toBe('Hantar Pesanan')
-        expect(msOrders.actions.cancelOrder).toBe('Batal Pesanan')
-        expect(msOrders.actions.refund).toBe('Bayaran Balik')
+        expect(msOrders.actions.confirmOrder).toBe('Sahkan pesanan')
+        expect(msOrders.actions.readyToShip).toBe('Sedia untuk dihantar')
+        expect(msOrders.actions.shipOrder).toBe('Hantar pesanan')
+        expect(msOrders.actions.cancelOrder).toBe('Batal pesanan')
+        expect(msOrders.actions.refund).toBe('Pemulangan wang')
     })
 
     it('EN filterDates labels match expected values', () => {
-        expect(enOrders.filterDates.allDates).toBe('All Dates')
+        expect(enOrders.filterDates.allDates).toBe('All dates')
         expect(enOrders.filterDates.today).toBe('Today')
-        expect(enOrders.filterDates.thisWeek).toBe('This Week')
-        expect(enOrders.filterDates.thisMonth).toBe('This Month')
+        expect(enOrders.filterDates.thisWeek).toBe('This week')
+        expect(enOrders.filterDates.thisMonth).toBe('This month')
     })
 
     it('MS filterDates labels match expected values', () => {
-        expect(msOrders.filterDates.allDates).toBe('Semua Tarikh')
-        expect(msOrders.filterDates.today).toBe('Hari Ini')
-        expect(msOrders.filterDates.thisWeek).toBe('Minggu Ini')
-        expect(msOrders.filterDates.thisMonth).toBe('Bulan Ini')
+        expect(msOrders.filterDates.allDates).toBe('Kesemua tarikh')
+        expect(msOrders.filterDates.today).toBe('Hari ini')
+        expect(msOrders.filterDates.thisWeek).toBe('Minggu ini')
+        expect(msOrders.filterDates.thisMonth).toBe('Bulan ini')
     })
 
     it('EN detail section labels match expected values', () => {
-        expect(enOrders.detail.title).toBe('Order Details')
-        expect(enOrders.detail.customerInfo).toBe('CUSTOMER INFORMATION')
-        expect(enOrders.detail.paymentInfo).toBe('PAYMENT INFORMATION')
-        expect(enOrders.detail.orderItems).toBe('ORDER ITEMS')
-        expect(enOrders.detail.orderSummary).toBe('ORDER SUMMARY')
+        expect(enOrders.detail.title).toBe('Order details')
+        expect(enOrders.detail.customerInfo).toBe('Customer information')
+        expect(enOrders.detail.paymentInfo).toBe('Payment information')
+        expect(enOrders.detail.orderItems).toBe('Order items')
+        expect(enOrders.detail.orderSummary).toBe('Order summary')
     })
 
     it('MS detail section labels match expected values', () => {
-        expect(msOrders.detail.title).toBe('Butiran Pesanan')
-        expect(msOrders.detail.customerInfo).toBe('MAKLUMAT PELANGGAN')
-        expect(msOrders.detail.paymentInfo).toBe('MAKLUMAT PEMBAYARAN')
-        expect(msOrders.detail.orderItems).toBe('BARANGAN PESANAN')
-        expect(msOrders.detail.orderSummary).toBe('RINGKASAN PESANAN')
+        expect(msOrders.detail.title).toBe('Butiran pesanan')
+        expect(msOrders.detail.customerInfo).toBe('Butiran pelanggan')
+        expect(msOrders.detail.paymentInfo).toBe('Butiran pembayaran')
+        expect(msOrders.detail.orderItems).toBe('Senarai pesanan')
+        expect(msOrders.detail.orderSummary).toBe('Ringkasan pesanan')
     })
 
     it('EN progress step labels match expected values', () => {
@@ -492,7 +489,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
         expect(msOrders.progress.pending).toBe('Menunggu')
         expect(msOrders.progress.confirmed).toBe('Disahkan')
         expect(msOrders.progress.ready).toBe('Sedia')
-        expect(msOrders.progress.shipped).toBe('Sedang Dihantar') // renamed from 'Dihantar' (bug #22)
+        expect(msOrders.progress.shipped).toBe('Dalam penghantaran')
         expect(msOrders.progress.completed).toBe('Selesai')
     })
 
@@ -502,7 +499,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
     })
 
     it('MS pagination labels match expected values', () => {
-        expect(msOrders.pagination.previous).toBe('Sebelum')
+        expect(msOrders.pagination.previous).toBe('Sebelumnya')
         expect(msOrders.pagination.next).toBe('Seterusnya')
     })
 })

@@ -101,7 +101,7 @@ describe('[TC-F17-08] Blog editor — validation message i18n mapping', () => {
         const messages = buildValidationMessages(en)
 
         // Act & Assert
-        expect(messages['title_required']).toBe('Title is required')
+        expect(messages['title_required']).toBe('Title is required.')
     })
 
     it('maps title_max_length to en titleMaxLength translation key', () => {
@@ -109,7 +109,7 @@ describe('[TC-F17-08] Blog editor — validation message i18n mapping', () => {
         const messages = buildValidationMessages(en)
 
         // Act & Assert
-        expect(messages['title_max_length']).toBe('Title must be less than 255 characters')
+        expect(messages['title_max_length']).toBe('Title must be under 255 characters.')
     })
 })
 
@@ -194,12 +194,12 @@ describe('[TC-F17-10] Blog editor — breadcrumb home URL', () => {
 // ── TC-F17-11: SEO label i18n (Bug 11) ───────────────────────────────────────
 
 describe('[TC-F17-11] Blog editor — SEO label i18n', () => {
-    it('en.json has seoTitle = "SEO Settings"', () => {
+    it('en.json has seoTitle = "SEO settings"', () => {
         // Arrange & Act
         const seoTitle = en.dashboard.blog.editor.seoTitle
 
         // Assert
-        expect(seoTitle).toBe('SEO Settings')
+        expect(seoTitle).toBe('SEO settings')
     })
 
     it('ms.json has seoTitle = "Tetapan SEO"', () => {

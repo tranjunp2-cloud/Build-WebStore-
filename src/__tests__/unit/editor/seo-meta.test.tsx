@@ -57,11 +57,11 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             const titleInput = screen.getByDisplayValue('SEO Title') as HTMLInputElement
             
             fireEvent.change(titleInput, { target: { value: 'This is a very long title that exceeds the recommended sixty characters soft limit for google search engine optimization' }})
-            expect(screen.getByText('Title may be truncated on Google Search.')).toBeInTheDocument()
+            expect(screen.getByText('This title may be cut off in Google search results.')).toBeInTheDocument()
 
             const descInput = screen.getByDisplayValue('SEO Desc') as HTMLTextAreaElement
             fireEvent.change(descInput, { target: { value: 'A'.repeat(161) }})
-            expect(screen.getByText('Description may be truncated on Google Search.')).toBeInTheDocument()
+            expect(screen.getByText('This description may be cut short in Google Search.')).toBeInTheDocument()
         })
 
         it('TC-F05.29b: Auto-Gen AI LLM API Call flow', async () => {
@@ -83,7 +83,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             )
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
             
-            const aiButton = screen.getByText('Automatic SEO Optimization')
+            const aiButton = screen.getByText('Automatic SEO optimization')
             
             ;(global.fetch as Mock).mockResolvedValueOnce({
                 ok: true,
@@ -96,11 +96,11 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
 
             fireEvent.click(aiButton)
 
-            expect(toast.loading).toHaveBeenCalledWith('Generating SEO optimization using AI...')
+            expect(toast.loading).toHaveBeenCalledWith('Generating SEO with AI...')
             expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-1/pages/page-1/generate-seo', expect.any(Object))
 
             await waitFor(() => {
-                expect(toast.success).toHaveBeenCalledWith('SEO optimization successfully generated!', expect.any(Object))
+                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.', expect.any(Object))
             })
             
             // Because onPageUpdate resolves mocked state, local variables sync.
@@ -145,7 +145,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             })
 
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
-            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO Optimization' }))
+            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
 
             const dialog = await screen.findByRole('dialog', { name: 'Replace existing SEO metadata?' })
             expect(dialog).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                 expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
             })
             expect(onPageUpdate).not.toHaveBeenCalled()
-            expect(toast.info).toHaveBeenCalledWith('SEO changes cancelled')
+            expect(toast.info).toHaveBeenCalledWith('SEO changes discarded')
         })
 
         it('applies the proposed metadata only after overwrite confirmation', async () => {
@@ -210,14 +210,14 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             })
 
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
-            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO Optimization' }))
+            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
             fireEvent.click(await screen.findByRole('button', { name: 'Replace SEO' }))
 
             await waitFor(() => {
                 expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoTitle: 'Proposed Title' })
                 expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoDescription: 'Proposed Description' })
                 expect(onPageUpdate).toHaveBeenCalledWith('page-1', { slug: 'proposed-about' })
-                expect(toast.success).toHaveBeenCalledWith('SEO optimization successfully generated!')
+                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.')
             })
             expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
         })
