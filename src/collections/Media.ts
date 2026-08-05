@@ -2,6 +2,7 @@ import { basename, resolve } from 'path'
 
 import type { AccessArgs, CollectionConfig, PayloadHandler } from 'payload'
 import { APIError } from 'payload'
+import { hasValidImageSignature } from '@/lib/media/image-signature'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
 // survives missing-on-disk errors. Payload's default getFileHandler calls
@@ -71,18 +72,6 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     return new Response('File not found', { status: 404 })
 }
 
-/**
- * Magic byte signatures for server-side image validation (TC-F17-02-13).
- * offset: byte position where the signature starts (WebP = 'WEBP' at offset 8).
- * compressImage() may convert PNG→WebP on the client, so WebP must be accepted.
- */
-const IMAGE_SIGNATURES = [
-    { bytes: [0xFF, 0xD8, 0xFF], offset: 0 },                 // JPEG
-    { bytes: [0x89, 0x50, 0x4E, 0x47], offset: 0 },           // PNG
-    { bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },           // WebP (RIFF????WEBP)
-    { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0 },           // ICO
-]
-
 const STOCK_SOURCE_PROVIDERS = ['wikimedia', 'pixabay'] as const
 const SYSTEM_PROVENANCE_FIELD_ACCESS = {
     create: () => false,
@@ -114,10 +103,7 @@ export const Media: CollectionConfig = {
                         ? req.file.data.subarray(0, 12)
                         : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 12)
                     const head = new Uint8Array(raw)
-                    const valid = IMAGE_SIGNATURES.some(sig =>
-                        sig.bytes.every((b, i) => head[sig.offset + i] === b),
-                    )
-                    if (!valid) {
+                    if (!hasValidImageSignature(head)) {
                         throw new APIError('Invalid image file — only JPEG, PNG, WebP, and ICO are accepted', 400)
                     }
                 } catch (e) {

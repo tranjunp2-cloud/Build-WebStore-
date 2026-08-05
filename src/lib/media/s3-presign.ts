@@ -11,12 +11,12 @@ const EXPIRES_SECONDS = 300 // 5 min — enough to upload 100MB on a slow line
 export const S3_POST_MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 
 /**
- * Create a presigned POST that lets the browser upload one video directly to S3,
- * bypassing the Vercel function 4.5MB request-body limit (GH-1284).
+ * Create a presigned POST that lets the browser upload one media object directly
+ * to S3, bypassing the Vercel function request-body and binary processing path.
  * The policy pins the object key, Content-Type, and a size range that admits a
  * maxFileBytes object plus the multipart envelope.
  */
-export async function createVideoPresignedPost({
+export async function createMediaPresignedPost({
     key,
     contentType,
     maxFileBytes,

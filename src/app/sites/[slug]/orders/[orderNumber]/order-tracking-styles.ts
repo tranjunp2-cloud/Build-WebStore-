@@ -131,10 +131,11 @@ export const OT_CSS = `
 .ot-courier-icon svg{width:18px;height:18px;}
 .ot-courier-logo{width:34px;height:34px;flex-shrink:0;border-radius:9px;object-fit:contain;background:#fff;border:1px solid var(--bd2);}
 .ot-courier-name{font-size:14px;font-weight:700;color:var(--f1);min-width:0;overflow:hidden;text-overflow:ellipsis;}
-.ot-tracking-row{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--bd);border-radius:12px;}
+.ot-tracking-row{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;min-height:60px;padding:12px 14px;background:var(--card);border:1px solid var(--bd);border-radius:12px;}
 .ot-tr-label{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
 .ot-tr-label svg{width:12px;height:12px;color:var(--f4);}
 .ot-tr-value{font-family:var(--mf);font-size:13.5px;font-weight:700;color:var(--tl7);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ot-tr-value.pending{color:var(--f4);font-style:italic;font-weight:600;}
 .ot-tr-value a{color:inherit;text-decoration:none;transition:color 140ms ease;}
 .ot-tr-value a:hover{color:var(--tl);}
 .ot-tr-copy{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;font-size:11.5px;font-weight:700;color:var(--tl);background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;transition:all 140ms ease;flex-shrink:0;white-space:nowrap;cursor:pointer;}
@@ -148,19 +149,19 @@ export const OT_CSS = `
 .ot-eta-date{font-family:var(--hf);font-size:16px;font-weight:800;color:var(--f1);letter-spacing:-.01em;line-height:1.15;}
 .ot-eta-window{font-size:11.5px;color:var(--f3);margin-top:1px;}
 /* Mini map */
-.ot-mini-map{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--bd);align-self:stretch;background:radial-gradient(ellipse at 20% 30%,#dcefe4 0%,transparent 55%),radial-gradient(ellipse at 78% 72%,#ecf6f0 0%,transparent 60%),repeating-linear-gradient(45deg,#f5f7f9 0 12px,#eef1f4 12px 24px);display:flex;flex-direction:column;cursor:pointer;transition:transform 200ms ease,box-shadow 200ms ease;}
+.ot-mini-map{position:relative;min-height:130px;border-radius:12px;overflow:hidden;border:1px solid var(--bd);align-self:stretch;background:radial-gradient(ellipse at 20% 30%,#dcefe4 0%,transparent 55%),radial-gradient(ellipse at 78% 72%,#ecf6f0 0%,transparent 60%),repeating-linear-gradient(45deg,#f5f7f9 0 12px,#eef1f4 12px 24px);display:flex;flex-direction:column;cursor:pointer;transition:transform 200ms ease,box-shadow 200ms ease;}
 .ot-mini-map:hover{transform:translateY(-1px);box-shadow:var(--shp);}
 .ot-mini-map svg.roads{position:absolute;inset:0;width:100%;height:100%;}
 .ot-mini-map .map-route{fill:none;stroke:var(--tl);stroke-width:3;stroke-linecap:round;stroke-dasharray:0 6 200 9999;animation:otRouteDraw 1.6s ease-out forwards;}
 @keyframes otRouteDraw{to{stroke-dasharray:200 0 200 0;}}
 .ot-mini-map .map-pin-from,.ot-mini-map .map-pin-to{position:absolute;width:22px;height:22px;border-radius:999px 999px 999px 2px;transform:rotate(-45deg);display:grid;place-items:center;font-size:9px;font-weight:800;color:#fff;}
-.ot-mini-map .map-pin-from{top:22%;left:18%;background:var(--tl7);box-shadow:0 4px 10px -4px rgba(14,117,86,.55);}
-.ot-mini-map .map-pin-to{bottom:22%;right:14%;background:var(--tl);box-shadow:0 4px 10px -4px rgba(14,117,86,.55);animation:otPinPulse 1.8s ease-in-out infinite;}
+.ot-mini-map .map-pin-from{top:16%;left:18%;background:var(--tl7);box-shadow:0 4px 10px -4px rgba(14,117,86,.55);}
+.ot-mini-map .map-pin-to{bottom:44px;right:14%;background:var(--tl);box-shadow:0 4px 10px -4px rgba(14,117,86,.55);animation:otPinPulse 1.8s ease-in-out infinite;}
 @keyframes otPinPulse{0%,100%{transform:rotate(-45deg) scale(1);}50%{transform:rotate(-45deg) scale(1.12);}}
 .ot-mini-map .map-pin-from span,.ot-mini-map .map-pin-to span{transform:rotate(45deg);display:block;}
-.ot-mini-map .map-courier{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;background:#fff;border:2px solid var(--tl);border-radius:999px;display:grid;place-items:center;color:var(--tl);box-shadow:0 6px 14px -6px rgba(0,0,0,.18);animation:otCourierMove 4.5s ease-in-out infinite;}
+.ot-mini-map .map-courier{position:absolute;top:32%;left:36%;width:30px;height:30px;margin:-15px 0 0 -15px;background:#fff;border:2px solid var(--tl);border-radius:999px;display:grid;place-items:center;color:var(--tl);box-shadow:0 6px 14px -6px rgba(0,0,0,.18);animation:otCourierMove 4.5s ease-in-out infinite;}
 .ot-mini-map .map-courier svg{width:14px;height:14px;}
-@keyframes otCourierMove{0%{top:50%;left:50%;}50%{top:56%;left:60%;}100%{top:50%;left:50%;}}
+@keyframes otCourierMove{0%{top:32%;left:36%;}50%{top:48%;left:66%;}100%{top:32%;left:36%;}}
 .ot-mini-map-foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-top:1px solid rgba(0,0,0,.08);z-index:2;}
 .ot-mini-map-foot .mm-route{font-size:11px;color:var(--f2);display:flex;align-items:center;gap:6px;min-width:0;flex:1;}
 .ot-mini-map-foot .mm-route svg{width:11px;height:11px;color:var(--f4);flex-shrink:0;}
@@ -255,7 +256,7 @@ export const OT_CSS = `
 .ot-stage-date{font-size:9.5px;}
 .ot-card{padding:18px 16px;}
 .ot-ship-grid{grid-template-columns:1fr;}
-.ot-mini-map{min-height:160px;}
+.ot-mini-map{min-height:130px;}
 .ot-tracking-row{grid-template-columns:1fr auto;row-gap:6px;}
 .ot-tracking-row .ot-tr-label{grid-column:1/-1;}
 .ot-item{grid-template-columns:56px 1fr auto;}

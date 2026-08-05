@@ -256,6 +256,7 @@ Weight, Length, Width, Height -> Để chuẩn bị tính Shipping Rate F14.
   - **Add Category Modal (Issue GH-1587):** 
     - **Contextual Title:** "Add New Category" (từ toolbar); "Add Subcategory" (từ nút + trên dòng danh mục); "Edit Category" khi sửa.
     - **Parent Field:** Auto-filled khi mở từ nút + trên dòng; disabled/locked trong subcategory mode. Editable khi tạo từ toolbar hoặc edit category.
+    - **Subcategory Guidance:** Khi mở từ nút + trên dòng, hiển thị `Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.` và helper `Locked — you are adding under this category.` bên dưới Parent Field. Không hiển thị hai nội dung này trong luồng toolbar Add Category hoặc Edit Category.
     - **Parent Dropdown:** Thụt lề theo level (L1→L2→L3, visual hierarchy); L3 node hiển thị nhưng disabled (không thể chọn làm parent, max 3 levels); loại trừ self + toàn bộ descendants (cycle prevention).
     - **Single Add-Subcategory Affordance:** Chỉ có 1 nút "+" icon per row (ẩn ở L3). Không còn duplicate "+ Add subcategory" inline.
     - **Level Badges:** 3 màu riêng biệt — L1 teal, L2 blue, L3 violet.

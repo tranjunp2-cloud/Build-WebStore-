@@ -37,6 +37,16 @@ const LOCALE_KEY = 'prefer_lang' // QA doc: prefer_lang (was: primeweb-locale)
 const locales: Record<Locale, Translations> = { en, ms }
 const I18nContext = createContext<I18nContextType | null>(null)
 
+export function interpolateTranslation(
+    template: string,
+    vars: Record<string, string | number>,
+): string {
+    return Object.entries(vars).reduce(
+        (str, [key, value]) => str.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value)),
+        template,
+    )
+}
+
 // ─── Provider ───────────────────────────────────────────────────────────
 export function I18nProvider({ children, defaultLocale = 'en' }: { children: ReactNode; defaultLocale?: Locale }) {
     const [locale, setLocaleState] = useState<Locale>(defaultLocale)
@@ -77,12 +87,7 @@ export function I18nProvider({ children, defaultLocale = 'en' }: { children: Rea
     }, [])
 
     // General string interpolation — replaces {key} with vars[key]
-    const ti = useCallback((template: string, vars: Record<string, string | number>): string => {
-        return Object.entries(vars).reduce(
-            (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
-            template
-        )
-    }, [])
+    const ti = useCallback(interpolateTranslation, [])
 
     return (
         <I18nContext.Provider value={{ locale, t: locales[locale], setLocale, toggleLocale, tp, ti }}>
