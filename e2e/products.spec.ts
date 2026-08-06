@@ -419,6 +419,105 @@ test.describe('GH-1733 — verified AI Product persistence on staging', () => {
     })
 })
 
+async function ensureCategoryViaUi(page: Page, name: string): Promise<boolean> {
+    await navigateTo(page, '/products/categories')
+    await expectNoServerError(page)
+
+    const search = page.getByPlaceholder(/search categories/i)
+    await search.fill(name)
+    const existingCategory = page.getByText(name, { exact: true }).first()
+    const emptyState = page.getByText(/no categories|no results found/i).last()
+    await expect(existingCategory.or(emptyState)).toBeVisible({ timeout: 10_000 })
+    if (await existingCategory.isVisible()) return false
+
+    await search.fill('')
+    await page.getByRole('button', { name: /add category/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('textbox').first().fill(name)
+    await dialog.getByRole('button', { name: /save category/i }).click()
+    await expect(dialog).toBeHidden()
+    return true
+}
+
+async function deleteCategoryViaUi(page: Page, name: string) {
+    await navigateTo(page, '/products/categories')
+    const search = page.getByPlaceholder(/search categories/i)
+    await search.fill(name)
+
+    const row = page.locator('div.group').filter({
+        has: page.getByText(name, { exact: true }),
+    })
+    const emptyState = page.getByText(/no results found/i)
+    await expect(row.or(emptyState)).toBeVisible({ timeout: 10_000 })
+    if (!(await row.isVisible())) return
+
+    await row.getByRole('button', { name: /delete/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText(name)
+    await dialog.getByRole('button', { name: /delete category/i }).click()
+    await expect(dialog).toBeHidden()
+    await expect(row).toHaveCount(0)
+}
+
+test.describe('GH-1588 Bug 1 — fail-closed unmatched AI category', () => {
+    const liveCategoryName = 'QA Skincare'
+    let liveCategoryCreated = false
+
+    test.afterEach(async ({ page }) => {
+        if (!liveCategoryCreated) return
+        try {
+            await deleteCategoryViaUi(page, liveCategoryName)
+        } finally {
+            liveCategoryCreated = false
+        }
+    })
+
+    test('[TC-F08-04-125] real bulk-parse route keeps the reported negative control uncategorized', async ({ page }) => {
+        test.setTimeout(120_000)
+
+        await page.addInitScript(() => {
+            localStorage.setItem('prefer_lang', 'en')
+            document.cookie = 'prefer_lang=en; path=/; samesite=lax'
+        })
+        liveCategoryCreated = await ensureCategoryViaUi(page, liveCategoryName)
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+
+        const aiChatTextarea = page.locator('textarea').first()
+        await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
+        const parseResponsePromise = page.waitForResponse(
+            response => response.request().method() === 'POST'
+                && response.url().includes('/api/ai/products-bulk-parse'),
+            { timeout: 60_000 },
+        )
+
+        await aiChatTextarea.fill(
+            'Create exactly one draft product named "4-Person Camping Tent" with price RM 100.',
+        )
+        await aiChatTextarea.press('Enter')
+        const parseResponse = await parseResponsePromise
+        const body = await parseResponse.json() as {
+            products?: Array<{ categoryId?: string | number | null }>
+        }
+
+        expect(parseResponse.ok()).toBe(true)
+        expect(body.products).toHaveLength(1)
+        expect(body.products?.[0]?.categoryId).toBeNull()
+
+        const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
+        await expect(reviewHeading).toBeVisible()
+        const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
+        const categorySelect = reviewOverlay.getByTestId('ai-category-select-1')
+        await expect(categorySelect.getByRole('combobox')).toContainText('Select categories')
+        await expect(reviewOverlay.getByText(/pick at least one category|at least one category must be selected/i)).toBeVisible()
+        await expect(reviewOverlay.getByRole('button', { name: /approve all/i })).toBeDisabled()
+
+        await reviewOverlay.getByRole('button', { name: /discard/i }).click()
+        await expect(reviewHeading).toBeHidden()
+    })
+})
+
 const LONG_PRODUCT_NAME = 'Premium Handcrafted Malaysian Travel Backpack With Extended Product Name and Waterproof Compartments Weekend Adventures'
 const LONG_VARIANT_NAME = 'UltraLongVariantNameWithoutSpacesABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
