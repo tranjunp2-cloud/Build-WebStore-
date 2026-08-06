@@ -3,7 +3,7 @@ title: "GH-1312 F37-04 UI-first SEO Health"
 description: "Finish the unified SEO Health scorecard by closing post-scout UI, discovery, authorization, and release-evidence gaps."
 status: in-progress
 priority: P0
-effort: 32h
+effort: 34h
 issue: 1312
 branch: feat/F37-04-local-seo-score-checklist
 tags: [feature, frontend, backend, api, testing, critical]
@@ -13,9 +13,9 @@ externalBlockers:
   - authenticated-playwright-port-3000-owned-by-another-worktree
   - live-p95-canary-rollback-evidence
   - approved-story-sync-1312
-executionGate: phase-3-release-evidence-pending
+executionGate: phase-4-ac2-documentation-resolution-pending
 created: 2026-08-04
-updated: 2026-08-05
+updated: 2026-08-06
 ---
 
 # GH-1312 F37-04 UI-first SEO Health
@@ -27,7 +27,7 @@ Replace the legacy Dashboard SEO presentation with one PRD §12.3 card: one scor
 ## Contract Decisions
 
 - `docs/prd/F37-local-seo-search-performance.md` §5 and §12.3 is authoritative.
-- Before closeout, run approved Story Sync so issue #1312 removes OG image, bad slug, and at-most-three clauses.
+- P0 remediation contract confirmed: OG image and bad slug are Editor SEO concerns and do not affect the Local SEO score. Synchronize issue/PRD/QA wording; do not add score deductions or checklist actions.
 - Show all unresolved root causes after deduplication. Do not show completed checks, point gains, platform-only failures, or a second SEO card.
 - Never render a score in loading/error states.
 - UI actions are semantic and allowlisted; the API does not supply arbitrary URLs.
@@ -51,10 +51,17 @@ The PR #1728 entry gate passed: merge commit `f70c0d620` is an ancestor of curre
 | 1 | [Build the isolated UI contract and card](./phase-01-build-isolated-ui-contract-and-card.md) | Complete |
 | 2 | [Integrate the authoritative score and actions](./phase-02-integrate-authoritative-score-and-actions.md) | Implementation complete; post-scout hardening moved to Phase 3 |
 | 3 | [Verify, synchronize docs, and close staging](./phase-03-verify-docs-and-staging-closeout.md) | Local implementation and automated gates complete; browser/release evidence pending |
+| 4 | [Reconcile AC-2 OG image and bad slug scope](./phase-04-close-ac2-og-slug-gap.md) | Planned — documentation resolution |
 
 ## Execution Order
 
-`Phase 1 UI shell → PR #1728 accepted → Phase 2 runtime cutover complete → Phase 3 QA/docs/staging`
+`Phase 1 UI shell → PR #1728 accepted → Phase 2 runtime cutover complete → Phase 3 QA/docs/staging → Phase 4 AC-2 documentation resolution`
+
+
+
+## P0 Review Remediation
+
+PR review found that issue #1312 AC-2 wording conflicts with the confirmed scope: OG image and bad slug are Editor SEO concerns and do not affect Local SEO scoring. Phase 4 resolves this as a documentation correction; the existing 20/35/15/30 formula and score/checklist code remain unchanged.
 
 ## Post-Scout Remaining Scope
 
@@ -66,11 +73,12 @@ The PR #1728 entry gate passed: merge commit `f70c0d620` is an ancestor of curre
 | P1 | Apply batch can issue 100 concurrent read/update pairs; route duration/revision gates are incomplete | Bound concurrency, set `maxDuration <= 60`, and reject stale revision-bound mutations | Complete, including site-scoped per-target CAS |
 | P1 | Metadata detail can exceed its response schema bounds | Bound source-derived metadata labels, titles, and descriptions before response validation | Complete |
 | P1 | QA/architecture/plan evidence overclaims or is stale | TC registry matches actual tests; post-sync runs have durable artifacts | In progress |
-| Release | GitHub issue #1312 still has stale AC; p95/canary evidence is absent | Story Sync verified, representative p95 <2s recorded, rollback/canary documented | Pending |
+| P0 | AC-2 OG image/bad slug scope mismatch | Issue/story/PRD/QA docs synchronized; no score code changes | Pending |
+| Release | p95/canary evidence is absent | Representative p95 <2s recorded, rollback/canary documented | Pending |
 
 ## Scope
 
-In scope: existing `/dashboard` `SeoHealth`, stable UI DTO, four buckets, loading/error/complete states, root-cause dedupe, actor/CTA/deep-link behavior, metadata-only AI Fix, exact `20/35/15/30` API score, tests, and contract synchronization.
+In scope: existing `/dashboard` `SeoHealth`, stable UI DTO, four buckets, loading/error/complete states, root-cause dedupe, actor/CTA/deep-link behavior, metadata-only AI Fix, exact `20/35/15/30` API score, tests, contract synchronization, and AC-2 documentation resolution.
 
 Out of scope: new page/route, score history, Google Business Profile/activity, Search Console OAuth, crawler controls, arbitrary hrefs, database/environment changes, and unrelated F03 keyword tracking.
 
@@ -87,6 +95,8 @@ Out of scope: new page/route, score history, Google Business Profile/activity, S
 ## Red Team Review
 
 2026-08-04: 28 raw findings were deduplicated to 15. Accepted changes: early contract sync, explicit external gate, seven-root regression, exhaustive actions, runtime response validation, latest-request-wins/no-store, consistent snapshot, fixture recovery, deep-link readiness, and scale/latency proof.
+
+2026-08-06 Phase 4 review: corrected stale implementation language after scope confirmation; reduced effort to documentation-only work; clarified that the source story plus Story Sync must update issue #1312; kept all score/API/UI files explicitly out of scope.
 
 ## Validation Log
 

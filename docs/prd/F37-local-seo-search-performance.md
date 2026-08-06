@@ -88,6 +88,7 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 - Meta title and description each earn `floor(8 × completed / eligible)`; an empty eligible set earns 0.
 - Content Quality earns `floor(F03 contentQualityScore × 8 / 100)` after F03 loads real page layouts.
 - Technical SEO earns 3 points when Google verification is configured, plus `floor(3 × indexable / eligiblePages)`; an empty eligible page set earns 0.
+- OG image and page URL slug are Editor → SEO controls documented in §12.2; neither is an input to the Local SEO formula or a Technical Health deduction.
 - AI crawler access is a platform invariant and always earns 9 points; there is no seller setting or issue row.
 - Sitemap earns 5 points and llms.txt earns 1 point only when the storefront is published and each route is reachable.
 

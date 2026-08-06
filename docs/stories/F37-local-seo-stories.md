@@ -209,6 +209,8 @@ THEN each root cause appears once with an AI or You badge
   AND each row uses its approved CTA and destination
 ```
 
+> **Scope note:** OG image and page URL slug remain Editor → SEO controls. They are not Local SEO score inputs, Technical Health deductions, or SEO Health checklist root causes.
+
 #### AC-03: Handle unauthorized score requests
 
 ```gherkin
