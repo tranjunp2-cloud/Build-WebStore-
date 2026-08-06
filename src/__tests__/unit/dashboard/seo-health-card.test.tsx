@@ -193,7 +193,7 @@ describe('[TC-F37-04-11 / TC-F37-04-12] Issue ownership and actions', () => {
         // Act
         const issueActions = screen
             .getAllByRole('button')
-            .filter((button) => button.textContent !== 'AI Fix Issues')
+            .filter((button) => button.classList.contains('seo-target-issue-action'))
         issueActions.forEach((button) => fireEvent.click(button))
 
         // Assert
@@ -204,6 +204,30 @@ describe('[TC-F37-04-11 / TC-F37-04-12] Issue ownership and actions', () => {
             issues.map((issue) => issue.action),
         )
         expect(screen.queryByText(/crawler|organization|indexability/i)).not.toBeInTheDocument()
+    })
+
+    it('reveals issue guidance when the info button is clicked', () => {
+        // Arrange
+        renderCard(partialState)
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: /Business address incomplete:/i }))
+
+        // Assert
+        expect(screen.getAllByText('Complete the address, city, postcode, and country in Local Business Info.').length).toBeGreaterThan(0)
+    })
+
+    it('opens guidance on the first touch tap', () => {
+        // Arrange
+        renderCard(partialState)
+        const infoButton = screen.getByRole('button', { name: /Business address incomplete:/i })
+
+        // Act
+        fireEvent.touchStart(infoButton)
+        fireEvent.click(infoButton)
+
+        // Assert
+        expect(screen.getAllByText('Complete the address, city, postcode, and country in Local Business Info.').length).toBeGreaterThan(0)
     })
 
     it('shows the approved AI and You actor labels and distinct accessible CTA names', () => {

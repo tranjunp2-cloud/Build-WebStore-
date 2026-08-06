@@ -3221,6 +3221,22 @@
           },
           "fixAll": "AI Fix Issues",
           "fixNextBatch": "Fix next 100 with AI",
+          "issueGuidance": {
+            "storeName": "Add your business name in Global settings.",
+            "businessAddress": "Complete the address, city, postcode, and country in Local Business Info.",
+            "phone": "Add a contact phone number in Contact info.",
+            "schemaSubtype": "Select a business category and compatible schema subtype.",
+            "openingHours": "Save at least one valid opening-hours range, or mark selected days as closed.",
+            "mapLocation": "Add valid latitude and longitude coordinates from a Google Maps link.",
+            "priceRange": "Select a price range for the business.",
+            "primaryDomain": "Set a primary domain for this store.",
+            "storeUnpublished": "Publish the store so search engines can access it.",
+            "metaTitle": "Add a unique meta title to the affected page.",
+            "metaDescription": "Add a useful meta description to the affected page.",
+            "contentQuality": "Add a hero section and at least 300 words of meaningful page content.",
+            "imageAlt": "Add descriptive alt text to each affected product image.",
+            "searchVerification": "Add the Google Search Console verification token in SEO settings."
+          },
           "issues": {
             "storeName": {
               "one": "Store name missing",

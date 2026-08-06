@@ -3221,6 +3221,22 @@
           },
           "fixAll": "AI Baiki Isu",
           "fixNextBatch": "Baiki 100 seterusnya dengan AI",
+          "issueGuidance": {
+            "storeName": "Tambah nama perniagaan dalam Tetapan Global.",
+            "businessAddress": "Lengkapkan alamat, bandar, poskod dan negara dalam Maklumat Perniagaan Tempatan.",
+            "phone": "Tambah nombor telefon untuk dihubungi dalam Maklumat hubungan.",
+            "schemaSubtype": "Pilih kategori perniagaan dan subjenis skema yang serasi.",
+            "openingHours": "Simpan sekurang-kurangnya satu waktu operasi yang sah, atau tandakan hari sebagai ditutup.",
+            "mapLocation": "Tambah koordinat latitud dan longitud yang sah daripada pautan Google Maps.",
+            "priceRange": "Pilih julat harga untuk perniagaan.",
+            "primaryDomain": "Tetapkan domain utama untuk kedai ini.",
+            "storeUnpublished": "Terbitkan kedai supaya enjin carian boleh mengaksesnya.",
+            "metaTitle": "Tambah tajuk meta yang unik pada halaman terjejas.",
+            "metaDescription": "Tambah penerangan meta yang berguna pada halaman terjejas.",
+            "contentQuality": "Tambah seksyen hero dan sekurang-kurangnya 300 perkataan kandungan halaman yang bermakna.",
+            "imageAlt": "Tambah teks alt yang deskriptif pada setiap imej produk terjejas.",
+            "searchVerification": "Tambah token pengesahan Google Search Console dalam Tetapan SEO."
+          },
           "issues": {
             "storeName": {
               "one": "Nama kedai tiada",

@@ -9,10 +9,13 @@ import {
     Send,
     Settings,
     Sparkles,
+    Info,
     Wand2,
     type LucideIcon,
 } from 'lucide-react'
 import { useI18n, type Translations } from '@/i18n'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useTapToggleTooltip } from '@/hooks/use-tap-toggle-tooltip'
 import type {
     SeoHealthBucketKey,
     SeoHealthCardLoadState,
@@ -32,6 +35,8 @@ const BUCKET_ORDER: readonly SeoHealthBucketKey[] = [
 ]
 type SeoHealthIssueCopyKey =
     keyof Translations['dashboard']['revamp']['seo']['target']['issues']
+type SeoHealthIssueGuidanceKey =
+    keyof Translations['dashboard']['revamp']['seo']['target']['issueGuidance']
 
 const ISSUE_COPY_KEY = {
     'store-name': 'storeName',
@@ -50,7 +55,38 @@ const ISSUE_COPY_KEY = {
     'search-verification': 'searchVerification',
 } satisfies Record<SeoHealthIssueCode, SeoHealthIssueCopyKey>
 
+const ISSUE_GUIDANCE_KEY = ISSUE_COPY_KEY satisfies Record<SeoHealthIssueCode, SeoHealthIssueGuidanceKey>
+
 type ActionCopy = { fix: string; edit: string; setUp: string; publish: string }
+
+function IssueGuidanceTooltip({ issueLabel, guidance }: { issueLabel: string; guidance: string }) {
+    const { open, onOpenChange, onPointerDown, onTouchStart, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
+
+    return (
+        <TooltipProvider>
+            <Tooltip open={open} onOpenChange={onOpenChange}>
+            <TooltipTrigger asChild>
+                <button
+                    ref={ref}
+                    type="button"
+                    className="seo-target-issue-help"
+                    aria-label={issueLabel + ': ' + guidance}
+                    onPointerDown={onPointerDown}
+                    onTouchStart={onTouchStart}
+                    onFocus={onFocus}
+                    onClick={onClick}
+                >
+                    <Info className="h-3.5 w-3.5" aria-hidden />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center" className="seo-target-issue-guidance-popover">
+                <p className="seo-target-issue-guidance-title">{issueLabel}</p>
+                <p className="seo-target-issue-guidance-copy">{guidance}</p>
+            </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    )
+}
 
 function assertNever(value: never): never {
     throw new Error(`Unhandled SEO Health action: ${JSON.stringify(value)}`)
@@ -317,6 +353,10 @@ export function SeoHealthCard({
                                         <span className="seo-target-issue-copy">
                                             {issueLabel}
                                         </span>
+                                        <IssueGuidanceTooltip
+                                            issueLabel={issueLabel}
+                                            guidance={targetT.issueGuidance[ISSUE_GUIDANCE_KEY[issue.code]]}
+                                        />
                                         <button
                                             type="button"
                                             className="seo-target-issue-action"
