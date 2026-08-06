@@ -1,7 +1,14 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin, type TenantLike } from '@/lib/seo/canonical'
+import {
+    canSerializePublicLlmsTxt,
+    PUBLIC_DISCOVERY_SITE_LIMIT,
+    PUBLIC_DISCOVERY_SITE_SORT,
+    PUBLIC_STOREFRONT_STATUS,
+    publicDiscoverySiteWhere,
+} from '@/lib/seo/public-discovery-facts'
 import { dayOfWeekToSchema } from '@/lib/seo/schema-helpers'
 
 function markdownInline(value: unknown): string {
@@ -79,18 +86,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 
         const siteResults = await payload.find({
             collection: 'sites',
-            where: {
-                and: [
-                    { tenant: { equals: tenant.id } },
-                    { status: { equals: 'published' } },
-                ],
-            },
+            where: publicDiscoverySiteWhere(tenant.id),
             // Deterministic tie-break for tenants with 2+ published sites (schema
             // allows it, no unique constraint) — oldest site wins consistently
             // rather than an arbitrary DB-order pick. Real fix (domain-based
             // per-site resolution) tracked in OPEN_BLOCKERS.
-            sort: 'createdAt',
-            limit: 1,
+            sort: PUBLIC_DISCOVERY_SITE_SORT,
+            limit: PUBLIC_DISCOVERY_SITE_LIMIT,
         })
         const [site] = siteResults.docs
         if (!site) {
@@ -119,6 +121,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 where: {
                     and: [
                         { site: { equals: site.id } },
+                        { tenant: { equals: tenant.id } },
                         { status: { equals: 'active' } },
                         { deletedAt: { exists: false } },
                     ],
@@ -133,7 +136,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 where: {
                     and: [
                         { site: { equals: site.id } },
-                        { status: { equals: 'published' } },
+                        { tenant: { equals: tenant.id } },
+                        { status: { equals: PUBLIC_STOREFRONT_STATUS } },
                     ],
                 },
                 pagination: false,
@@ -143,7 +147,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
             }),
         ])
 
-        const baseUrl = resolveStorefrontOrigin(tenant as any, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
+        if (!canSerializePublicLlmsTxt({
+            pages: pagesResult.docs,
+            products: productsResult.docs,
+            blogs: blogsResult.docs,
+            openingHours: site.localBusiness?.openingHours,
+        })) {
+            throw new Error('llms.txt document cannot be serialized')
+        }
+
+        // Payload Local API uses a generic JsonObject here even though the queried collection is tenants.
+        const canonicalTenant = tenant as unknown as TenantLike
+        const baseUrl = resolveStorefrontOrigin(canonicalTenant, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
 
         // Start with the storefront home and add only content proven public by
         // the scoped queries above. Never advertise checkout or private order

@@ -48,18 +48,6 @@ export default defineConfig({
             dependencies: ['setup'],
             testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
-        // GH-1587 category UI rework uses authenticated, tenant-owned fixtures and
-        // cleans products before their assigned categories.
-        {
-            name: 'category-management-regression',
-            testDir: './tests',
-            testMatch: /category-management-rework\.spec\.ts/,
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: './e2e/.auth/user.json',
-            },
-            dependencies: ['setup'],
-        },
         // Public storefront regressions required by repo review rules live in
         // tests/*.spec.ts and render without authenticated browser state.
         {
@@ -97,6 +85,19 @@ export default defineConfig({
                 storageState: undefined,
             },
             dependencies: hasE2EAccount ? ['setup'] : [],
+        },
+        // US-F37-04 exercises the authenticated Dashboard → Editor flow.
+        // The spec validates its own account-owned fixture and fails fast when
+        // the required staging credentials or fixture shape are unavailable.
+        {
+            name: 'f37-seo-health-regression',
+            testDir: './tests',
+            testMatch: /f37-local-seo-score-checklist\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
         },
         {
             name: 'gh-1640-performance',

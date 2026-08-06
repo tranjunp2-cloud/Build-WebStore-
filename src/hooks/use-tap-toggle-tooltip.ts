@@ -31,8 +31,12 @@ export function useTapToggleTooltip<T extends HTMLElement = HTMLButtonElement>()
     const ref = useRef<T>(null)
     const wasOpenRef = useRef(false)
     const isPointerRef = useRef(false)
+    const touchActiveRef = useRef(false)
 
     const changeOpen = (next: boolean) => {
+        // Mobile browsers can synthesize mouseenter/hover after touchstart.
+        // Ignore that open event; the subsequent tap click owns the toggle.
+        if (next && touchActiveRef.current) return
         wasOpenRef.current = next
         setOpen(next)
     }
@@ -46,9 +50,16 @@ export function useTapToggleTooltip<T extends HTMLElement = HTMLButtonElement>()
         return () => document.removeEventListener('pointerdown', onOutside)
     }, [open])
 
-    const onPointerDown = () => {
+    const syncPointerState = () => {
         wasOpenRef.current = open
         isPointerRef.current = true
+    }
+
+    const onPointerDown = syncPointerState
+    // iOS/WebView variants may dispatch touchstart without a usable pointerdown.
+    const onTouchStart = () => {
+        touchActiveRef.current = true
+        syncPointerState()
     }
     const onFocus = () => {
         if (!isPointerRef.current) wasOpenRef.current = true
@@ -56,11 +67,12 @@ export function useTapToggleTooltip<T extends HTMLElement = HTMLButtonElement>()
     const onClick = (e: MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
+        touchActiveRef.current = false
         const next = !wasOpenRef.current
         wasOpenRef.current = next
         isPointerRef.current = false
         setOpen(next)
     }
 
-    return { open, onOpenChange: changeOpen, onPointerDown, onFocus, onClick, ref }
+    return { open, onOpenChange: changeOpen, onPointerDown, onTouchStart, onFocus, onClick, ref }
 }

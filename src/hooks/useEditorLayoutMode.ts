@@ -7,6 +7,7 @@ export type EditorLayoutMode = 'desktop' | 'compact'
 export interface EditorLayoutModeState {
     mode: EditorLayoutMode
     isCompact: boolean
+    isResolved: boolean
 }
 
 /**
@@ -24,14 +25,17 @@ export interface EditorLayoutModeState {
  */
 export function useEditorLayoutMode(): EditorLayoutModeState {
     const [isCompact, setIsCompact] = useState(false)
+    const [isResolved, setIsResolved] = useState(false)
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(max-width: 1279px)')
         const applyLayoutMode = (matches: boolean) => setIsCompact(matches)
 
         applyLayoutMode(mediaQuery.matches)
+        setIsResolved(true)
 
-        const handleChange = (event: MediaQueryListEvent) => applyLayoutMode(event.matches)
+        const handleChange = (event: MediaQueryListEvent) =>
+            applyLayoutMode(event.matches)
         mediaQuery.addEventListener('change', handleChange)
 
         return () => mediaQuery.removeEventListener('change', handleChange)
@@ -40,5 +44,6 @@ export function useEditorLayoutMode(): EditorLayoutModeState {
     return {
         mode: isCompact ? 'compact' : 'desktop',
         isCompact,
+        isResolved,
     }
 }

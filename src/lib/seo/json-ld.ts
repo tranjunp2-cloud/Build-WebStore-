@@ -264,11 +264,13 @@ export function generateLocalBusinessSchema(
         || getOptionalString(contactInfo?.email)
         || ''
 
-    const streetAddress = getOptionalString(localBusiness?.streetAddress)
+    const streetAddress = getOptionalString(contactInfo?.address)
+        || getOptionalString(localBusiness?.streetAddress)
+        || getOptionalString(contactBlock?.address)
     const city = getOptionalString(localBusiness?.city)
     const state = getOptionalString(localBusiness?.state)
     const postcode = getOptionalString(localBusiness?.postcode)
-    const country = getOptionalString(localBusiness?.country)
+    const country = 'MY'
 
     let address: Record<string, unknown> | undefined
     if (streetAddress) {
@@ -280,10 +282,6 @@ export function generateLocalBusinessSchema(
             ...(postcode && { postalCode: postcode }),
             ...(country && { addressCountry: country }),
         }
-    } else {
-        const legacyAddress = getOptionalString(contactBlock?.address)
-            || getOptionalString(contactInfo?.address)
-        if (legacyAddress) address = { '@type': 'PostalAddress', streetAddress: legacyAddress }
     }
 
     const sameAs = getHttpUrlValues(socialLinks)
@@ -330,7 +328,14 @@ export function generateV2LocalBusinessSchema(
     const localBusiness = isRecord(site.localBusiness)
         ? site.localBusiness
         : null
-    if (!hasCompleteStructuredAddress(localBusiness)) return null
+    const contactInfo = isRecord(site.contactInfo) ? site.contactInfo : null
+    const normalizedAddress = {
+        ...localBusiness,
+        streetAddress: getOptionalString(contactInfo?.address)
+            || getOptionalString(localBusiness?.streetAddress),
+        country: 'MY',
+    }
+    if (!hasCompleteStructuredAddress(normalizedAddress)) return null
 
     return generateLocalBusinessSchema(null, site)
 }

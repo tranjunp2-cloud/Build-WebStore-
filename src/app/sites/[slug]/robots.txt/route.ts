@@ -2,11 +2,12 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
 import { hasActiveCustomDomain } from '@/lib/seo/canonical'
+import { APPROVED_AI_CRAWLERS_ALLOWED } from '@/lib/seo/public-discovery-facts'
 
 // AI-assistant crawlers are platform-managed and always allowed (US-F37-03 / PR #1677).
 // F37-03 → #1312 score handoff: `approvedAiCrawlersAllowed=true` (9 points)
 // is a platform invariant and is independent of sitemap/llms.txt availability.
-const AI_ASSISTANT_BOTS = ['GPTBot', 'ClaudeBot', 'Google-Extended', 'PerplexityBot', 'CCBot']
+export const AI_ASSISTANT_BOTS = ['GPTBot', 'ClaudeBot', 'Google-Extended', 'PerplexityBot', 'CCBot']
 // Scraper/training bots remain blocked (out of scope for the approved assistant policy).
 const BLOCKED_SCRAPER_BOTS = ['Amazonbot', 'Applebot-Extended', 'Bytespider', 'CloudflareBrowserRenderingCrawler', 'meta-externalagent']
 
@@ -50,13 +51,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         // group and ignores `User-agent: *` entirely — so each named bot group
         // must repeat the /api//admin/ exclusions itself, or that bot would be
         // over-permissioned relative to the `*` group when allowed.
-        const aiBotLines = AI_ASSISTANT_BOTS.flatMap(bot => [
+        const aiBotLines = APPROVED_AI_CRAWLERS_ALLOWED ? AI_ASSISTANT_BOTS.flatMap(bot => [
             `User-agent: ${bot}`,
             'Allow: /',
             'Disallow: /api/',
             'Disallow: /admin/',
             '',
-        ])
+        ]) : []
         const scraperBotLines = BLOCKED_SCRAPER_BOTS.flatMap(bot => [
             `User-agent: ${bot}`,
             'Disallow: /',

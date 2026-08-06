@@ -282,6 +282,7 @@ interface SettingsPanelProps {
             metaTitle?: string
             metaDescription?: string
             ogImage?: string | number | null
+            googleVerificationToken?: string
         }
     } | null
     siteName: string
@@ -301,7 +302,7 @@ interface SettingsPanelProps {
         contactInfo?: { phone?: string; email?: string; address?: string }
         localBusiness?: LocalBusinessData
         socialLinks?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; tiktok?: string }
-        seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null }
+        seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null; googleVerificationToken?: string }
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
     }) => void | boolean | Promise<void | boolean>
@@ -312,7 +313,7 @@ interface SettingsPanelProps {
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
-    requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
+    requestedTab?: { tab: SettingsTab; key: number; section?: string; focus?: string } | null
     // F26: Multilingual panel in Menu settings
     siteLocale?: string
     navShowLanguageSwitcher?: boolean
@@ -465,6 +466,8 @@ function SettingsPanelInner({
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const footerSectionRef = React.useRef<HTMLDivElement>(null)
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const panelScrollRef = React.useRef<HTMLDivElement>(null)
+    const settingsTargetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
     useEffect(() => {
@@ -478,19 +481,32 @@ function SettingsPanelInner({
     useEffect(() => {
         if (requestedTab) {
             setActiveTab(requestedTab.tab)
-            if (requestedTab.section === 'breadcrumb') {
-                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
-                breadcrumbScrollTimerRef.current = setTimeout(() => {
-                    breadcrumbSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 80)
+            const section = requestedTab.section
+            if (requestedTab.tab === "global" && (section === "brand" || section === "contact" || section === "localBusiness")) {
+                setOpenGlobalSections(previous => ({ ...previous, [section]: true }))
             }
-            if (requestedTab.section === 'footer') {
-                if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
-                footerScrollTimerRef.current = setTimeout(() => {
-                    footerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 80)
-            }
+            if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
+            settingsTargetTimerRef.current = setTimeout(() => {
+                const root = panelScrollRef.current
+                const sectionTarget = section
+                    ? root?.querySelector<HTMLElement>("[data-settings-section=\"" + section + "\"]")
+                    : null
+                const focusTarget = requestedTab.focus
+                    ? sectionTarget?.querySelector<HTMLElement>("[data-settings-focus=\"" + requestedTab.focus + "\"]")
+                        || root?.querySelector<HTMLElement>("[data-settings-focus=\"" + requestedTab.focus + "\"]")
+                    : null
+                const legacyTarget = section === "breadcrumb"
+                    ? breadcrumbSectionRef.current
+                    : section === "footer" ? footerSectionRef.current : null
+                const target = focusTarget || sectionTarget || legacyTarget
+                target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+                const focusable = target?.matches("input, textarea, button, [tabindex]")
+                    ? target
+                    : target?.querySelector<HTMLElement>("input, textarea, button, [tabindex]")
+                focusable?.focus({ preventScroll: true })
+            }, 100)
             return () => {
+                if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
                 if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
                 if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
             }
@@ -504,6 +520,7 @@ function SettingsPanelInner({
 
     const siteContactInfo = site?.contactInfo || {}
     const siteLocalBusiness = site?.localBusiness || {}
+    const canonicalLocalBusinessAddress = siteContactInfo.address?.trim() || siteLocalBusiness.streetAddress
     const compatibleSchemaSubtypes = getCompatibleSchemaSubtypes(siteLocalBusiness.businessCategory)
     const hasBusinessCategory = Boolean(siteLocalBusiness.businessCategory)
     const hasCompatibleSchemaSubtypes = compatibleSchemaSubtypes.length > 0
@@ -585,9 +602,11 @@ function SettingsPanelInner({
         title: string,
         content: React.ReactNode,
     ) => (
-        <div className="rounded-xl">
+        <div className="rounded-xl" data-settings-section={id}>
             <button
                 type="button"
+                data-testid={`settings-section-toggle-${id}`}
+                aria-expanded={openGlobalSections[id]}
                 onClick={() => setOpenGlobalSections(prev => ({ ...prev, [id]: !prev[id] }))}
                 className={cn(
                     globalAccordionButtonCls,
@@ -733,6 +752,7 @@ function SettingsPanelInner({
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
                             <Input
                                 data-testid="settings-contact-phone"
+                                data-settings-focus="phone"
                                 defaultValue={siteContactInfo.phone || ''}
                                 key={`contact-phone-${siteContactInfo.phone || ''}`}
                                 disabled={isContactBusy}
@@ -781,6 +801,7 @@ function SettingsPanelInner({
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
                         <Textarea
                             data-testid="settings-contact-address"
+                            data-settings-focus="address"
                             defaultValue={siteContactInfo.address || ''}
                             key={`contact-address-${siteContactInfo.address || ''}`}
                             disabled={isContactBusy}
@@ -819,25 +840,14 @@ function SettingsPanelInner({
                         </div>
                     ) : null}
                     <fieldset
+                        data-testid="settings-local-business-fieldset"
                         disabled={isLocalBusinessSaveLocked}
                         aria-describedby={isLocalBusinessSaveLocked ? 'local-business-save-locked' : undefined}
-                        className="min-w-0 space-y-5 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <legend className="sr-only">{s.localBusinessInfo}</legend>
-                    <div className="space-y-4" data-testid="settings-local-business-address">
+                    <div className="space-y-4" data-testid="settings-local-business-address" data-settings-focus="address">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
-                        <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.streetAddress}</label>
-                            <Input
-                                data-testid="settings-local-business-street-address"
-                                defaultValue={siteLocalBusiness.streetAddress || ''}
-                                key={`lb-street-${siteLocalBusiness.streetAddress || ''}`}
-                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ streetAddress: sanitizeInput(e.target.value) })}
-                                variant="editor"
-                                className={editorInputClassName}
-                                placeholder={s.streetAddressPlaceholder}
-                            />
-                        </div>
                         {/* State drives the District/Postcode cascade, so it must be picked
                             first — a deliberate reorder from the old street→city→postcode→state
                             order (see plans/260710-1032-f37-local-business-geo-cascade). `key`
@@ -862,25 +872,14 @@ function SettingsPanelInner({
                                 }}
                             />
                         </div>
-                        <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
-                            <Input
-                                data-testid="settings-local-business-country"
-                                value={s.countryMalaysia}
-                                disabled
-                                readOnly
-                                variant="editor"
-                                className={editorInputClassName}
-                            />
-                        </div>
                     </div>
 
-                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4" data-settings-focus="map">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.coordinatesGroupLabel}</p>
                         <GeoLinkInput
                             latitude={siteLocalBusiness.latitude}
                             longitude={siteLocalBusiness.longitude}
-                            streetAddress={siteLocalBusiness.streetAddress}
+                            streetAddress={canonicalLocalBusinessAddress}
                             city={siteLocalBusiness.city}
                             fullWidth={fullWidth}
                             onCoordinatesChange={coords => void handleLocalBusinessChange(coords)}
@@ -953,6 +952,7 @@ function SettingsPanelInner({
                             >
                                 <SelectTrigger
                                     id="local-business-schema-subtype"
+                                    data-settings-focus="schemaSubtype"
                                     aria-describedby={schemaSubtypeDescriptionIds}
                                     aria-invalid={hasInvalidSchemaSubtype || undefined}
                                     className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
@@ -1001,7 +1001,7 @@ function SettingsPanelInner({
                                 value={siteLocalBusiness.priceRange || undefined}
                                 onValueChange={value => void handleLocalBusinessChange({ priceRange: value })}
                             >
-                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger data-settings-focus="priceRange" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
                                     <SelectValue placeholder={s.selectPriceRange} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
@@ -1024,7 +1024,7 @@ function SettingsPanelInner({
                         </div>
                     </div>
 
-                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4" data-settings-focus="openingHours">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.openingHoursGroupLabel}</p>
                         <OpeningHoursEditor
                             rows={siteLocalBusiness.openingHours}
@@ -1053,11 +1053,13 @@ function SettingsPanelInner({
                             invalidRangeLabel={s.openingHoursInvalidRange}
                             saveLabel={s.openingHoursSave}
                             cancelLabel={s.openingHoursCancel}
+                            notSetLabel={s.openingHoursNotSet}
+                            setLabel={s.openingHoursSet}
                         />
                     </div>
 
                     <CompletionChecklist
-                        data={siteLocalBusiness}
+                        data={{ ...siteLocalBusiness, streetAddress: canonicalLocalBusinessAddress }}
                         labels={{
                             title: s.checklistTitle,
                             addressSaved: s.checklistAddressSaved,
@@ -1219,17 +1221,51 @@ function SettingsPanelInner({
     const metaTitleWarning = seoTitleValue.length > 60 ? s.titleTruncated : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? s.descTruncated : null
 
+    const renderSearchVerification = () => (
+        <div
+            data-settings-section="searchVerification"
+            className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-4"
+        >
+            <label
+                className={labelCls}
+                htmlFor="settings-google-verification-token"
+            >
+                {s.searchVerificationTitle}
+            </label>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{s.searchVerificationDescription}</p>
+            <Input
+                id="settings-google-verification-token"
+                data-settings-focus="searchVerification"
+                data-testid="settings-google-verification-token"
+                defaultValue={siteSeo.googleVerificationToken || ""}
+                key={"google-verification-" + (siteSeo.googleVerificationToken || "")}
+                onBlur={(event: FieldBlurEvent) => {
+                    const googleVerificationToken = sanitizeInput(event.target.value)
+                    event.target.value = googleVerificationToken
+                    void onSiteSettingsChange?.({ seo: { ...siteSeo, googleVerificationToken } })
+                }}
+                variant="editor"
+                className={editorInputClassName}
+                placeholder={s.searchVerificationPlaceholder}
+            />
+        </div>
+    )
+
     const renderSeoContent = () => {
         if (!activePage) {
             return (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
-                    {s.selectPageSeo}
+                <div className="space-y-5">
+                    {renderSearchVerification()}
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
+                        {s.selectPageSeo}
+                    </div>
                 </div>
             )
         }
 
         return (
             <div className="space-y-5">
+                {renderSearchVerification()}
                 <div>
                     <label className={labelCls}>{s.urlSlug}</label>
                     <Input
@@ -1879,12 +1915,13 @@ function SettingsPanelInner({
 
     return (
         <div
+            data-testid="settings-panel"
             className={cn(
                 // GH-1511 #45.2 (PR #1522 review): panel cố ý KHÔNG paint bg — kế thừa nền shell
                 // (--editor-bg), y hệt EditorToolbar (nav) nên 2 surface liền một khối. Trước đây
                 // dùng `bg-[var(--editor-surface)]/90` nhưng Tailwind v3 không compile alpha trên
                 // var đục (class chết) — visual này là look QA đã duyệt, giờ code nói thật.
-                'flex h-full flex-col',
+                'flex h-full flex-col [contain:layout]',
                 // border-l bỏ theo cùng lý do: thiếu border-solid nên chưa từng paint (class chết).
                 fullWidth ? 'w-full flex-1' : 'shrink-0',
             )}
@@ -1940,7 +1977,7 @@ function SettingsPanelInner({
             </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+            <div ref={panelScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
                 {!hideChrome && (
                 <div className="mb-6">
                     <div className="flex items-start gap-4">

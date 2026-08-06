@@ -95,6 +95,17 @@ describe('saveSiteSchema', () => {
         expect(result.success).toBe(true)
     })
 
+    it('preserves and sanitizes Search Verification tokens', () => {
+        const result = saveSiteSchema.safeParse({
+            seo: { googleVerificationToken: '<b>google-site-verification=abc</b>' },
+        })
+
+        expect(result.success).toBe(true)
+        if (result.success) {
+            expect(result.data.seo?.googleVerificationToken).toBe('google-site-verification=abc')
+        }
+    })
+
     it('accepts valid locale (en)', () => {
         const result = saveSiteSchema.safeParse({ locale: 'en' })
         expect(result.success).toBe(true)

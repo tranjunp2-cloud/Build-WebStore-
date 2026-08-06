@@ -49,7 +49,7 @@ the external items below block QC handover.
 
 ## F37 (US-01) — Local Business Data Model
 
-- ⚠️ **SEO Health score rewire (US-F37-04)** — replace the legacy F37 engine with the approved 20/35/15/30 scorecard, then replace existing `SeoHealth` contents with the single unified score + max 3 actions. See F37 PRD §5 and §12.3.
+- 🟡 **SEO Health live closeout (US-F37-04):** the 20/35/15/30 engine, sole unified card, all deduplicated actions, active-membership guard, bounded metadata batch, and local regression/build gates are complete. Pending: account-owned fixture manifest/lock/reset/checksum, live Playwright including apply persistence, representative p95 below 2 seconds, canary/rollback, approved Story Sync #1312, and final rebase. No max-three issue cap remains.
 
 ## QC test backfill (post-merge)
 

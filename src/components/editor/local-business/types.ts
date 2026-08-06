@@ -6,8 +6,8 @@ import type { SchemaSubtype } from '@/lib/seo/local-business-constants'
 
 export interface OpeningHourRow {
     dayOfWeek?: string
-    opens?: string
-    closes?: string
+    opens?: string | null
+    closes?: string | null
     isClosed?: boolean
 }
 

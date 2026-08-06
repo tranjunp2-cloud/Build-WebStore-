@@ -511,11 +511,11 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-32: Blogs/products queries scope by site, not just tenant
-    // (regression: a tenant with multiple sites must not leak sibling
-    // site's blog/product URLs into this site's llms.txt)
+    // TC-F37-03-32: Blogs/products queries scope by both tenant and site
+    // (regression: public discovery must not leak records from another
+    // tenant or sibling site into this site's llms.txt)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-32: scopes blogs and products queries by site.id, not tenant.id alone', async () => {
+    it('TC-F37-03-32: scopes blogs and products queries by tenant.id and site.id', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -541,12 +541,13 @@ describe('[TC-F37-03] llms.txt content contract', () => {
             { params: Promise.resolve({ slug: 'mycafe' }) }
         )
 
-        // Assert — products call (3rd payload.find) and blogs call (4th) both scope by site.id
+        // Assert — products call (3rd payload.find) and blogs call (4th) both scope by tenant.id and site.id
         const productsCall = mockFind.mock.calls[3][0]
         const blogsCall = mockFind.mock.calls[4][0]
         expect(JSON.stringify(productsCall.where)).toContain('"site":{"equals":"site-1"}')
+        expect(JSON.stringify(productsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
         expect(JSON.stringify(blogsCall.where)).toContain('"site":{"equals":"site-1"}')
-        expect(JSON.stringify(blogsCall.where)).not.toContain('"tenant":{"equals":"tenant-1"}')
+        expect(JSON.stringify(blogsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
     })
 
     // ────────────────────────────────────────────────────────────────

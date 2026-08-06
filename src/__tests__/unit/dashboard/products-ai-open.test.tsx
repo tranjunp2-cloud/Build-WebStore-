@@ -128,7 +128,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
 
-        const prompt = screen.getByPlaceholderText(/Leather jacket/)
+        const prompt = await waitFor(() => screen.getByPlaceholderText(/Leather jacket/))
         fireEvent.change(prompt, { target: { value: 'prompt A' } })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
         fireEvent.change(prompt, { target: { value: 'prompt B' } })
@@ -191,7 +191,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         fireEvent.click(screen.getByText(/Show low or out of stock/i))
         expect(screen.getByText(/Active Filters/i)).toBeInTheDocument()
 
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await waitFor(() => screen.getByPlaceholderText(/Leather jacket/)), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
@@ -218,7 +218,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await waitFor(() => screen.getByPlaceholderText(/Leather jacket/)), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
@@ -241,7 +241,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await waitFor(() => screen.getByPlaceholderText(/Leather jacket/)), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
@@ -271,7 +271,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(await screen.findByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await waitFor(() => screen.getByPlaceholderText(/Leather jacket/)), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
@@ -300,7 +300,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await waitFor(() => screen.getByPlaceholderText(/Leather jacket/)), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
@@ -389,7 +389,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        const prompt = screen.getByPlaceholderText(/Leather jacket/)
+        const prompt = await waitFor(() => screen.getByPlaceholderText(/Leather jacket/))
         fireEvent.change(prompt, { target: { value: 'prompt without categories' } })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
 

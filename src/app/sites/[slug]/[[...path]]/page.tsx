@@ -211,6 +211,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const canonicalPath = pagePath ? `/${pagePath}` : ''
     const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
 
+    const rawGoogleVerification = (site.seo as { googleVerificationToken?: unknown } | undefined)?.googleVerificationToken
+    const googleVerification = typeof rawGoogleVerification === 'string'
+        ? rawGoogleVerification.trim().replace(/^google-site-verification=/i, '') || undefined
+        : undefined
+
     const DEFAULT_FAVICON = '/favicon.ico'
     const faviconUrl = (site.branding as { favicon?: string } | undefined)?.favicon || DEFAULT_FAVICON
 
@@ -218,6 +223,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title,
         description,
         icons: { icon: faviconUrl },
+        verification: googleVerification ? { google: googleVerification } : undefined,
         alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title: title ?? undefined,

@@ -26,15 +26,19 @@ const LABELS = {
     invalidRangeLabel: 'Closing time must be after opening time',
     saveLabel: 'Save',
     cancelLabel: 'Cancel',
+    notSetLabel: 'Opening hours are not set yet.',
+    setLabel: 'Set opening hours',
 }
 
 // ── TC-F37-02-22: list view renders 7 days, split-shift day shows N lines ──
 
 describe('[TC-F37-02-22] OpeningHoursEditor — list view renders 7 days incl. split-shift', () => {
-    it('renders all 7 day labels', () => {
+    it('shows an explicit unset state when no hours are saved', () => {
         render(<OpeningHoursEditor rows={undefined} onChange={vi.fn()} {...LABELS} />)
+        expect(screen.getByText('Opening hours are not set yet.')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Set opening hours' })).toBeInTheDocument()
         for (const label of Object.values(DAY_LABELS)) {
-            expect(screen.getByText(label)).toBeInTheDocument()
+            expect(screen.queryByText(label)).not.toBeInTheDocument()
         }
     })
 
@@ -54,8 +58,9 @@ describe('[TC-F37-02-22] OpeningHoursEditor — list view renders 7 days incl. s
         expect(screen.getByText('Closed')).toBeInTheDocument()
     })
 
-    it('renders all 3 quick-action buttons', () => {
-        render(<OpeningHoursEditor rows={undefined} onChange={vi.fn()} {...LABELS} />)
+    it('renders all 3 quick-action buttons for saved hours', () => {
+        const rows: OpeningHourRow[] = [{ dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false }]
+        render(<OpeningHoursEditor rows={rows} onChange={vi.fn()} {...LABELS} />)
         expect(screen.getByText('Edit all hours')).toBeInTheDocument()
         expect(screen.getByText('Edit Mon–Fri')).toBeInTheDocument()
         expect(screen.getByText('Edit Sat–Sun')).toBeInTheDocument()

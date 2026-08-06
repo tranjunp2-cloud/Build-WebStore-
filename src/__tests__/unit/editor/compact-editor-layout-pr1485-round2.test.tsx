@@ -334,6 +334,7 @@ describe('[TC-F05-15-04] useEditorLayoutMode — Compact/Desktop Threshold', () 
         // Assert: max-width 1279px should render compact mode
         expect(result.current.isCompact).toBe(true)
         expect(result.current.mode).toBe('compact')
+        expect(result.current.isResolved).toBe(true)
 
         // Now simulate desktop (≥1280px)
         matchMediaSpy.mockImplementation((query: string) => {
@@ -356,6 +357,7 @@ describe('[TC-F05-15-04] useEditorLayoutMode — Compact/Desktop Threshold', () 
         // Assert: ≥1280px should render desktop mode
         expect(result2.current.isCompact).toBe(false)
         expect(result2.current.mode).toBe('desktop')
+        expect(result2.current.isResolved).toBe(true)
     })
 })
 

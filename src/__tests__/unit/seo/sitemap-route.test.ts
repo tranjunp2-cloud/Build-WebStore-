@@ -67,14 +67,15 @@ describe('[TC-F37-03] sitemap public route contract', () => {
         const pagesCall = mockFind.mock.calls[2][0]
         const productsCall = mockFind.mock.calls[3][0]
         const blogsCall = mockFind.mock.calls[4][0]
-        expect(siteCall.sort).toBe('createdAt')
+        expect(siteCall.sort).toEqual(['createdAt', 'id'])
         expect(JSON.stringify(pagesCall.where)).toContain('"site":{"equals":"site-1"}')
         expect(JSON.stringify(pagesCall.where)).toContain('"seo.noIndex":{"not_equals":true}')
         expect(JSON.stringify(pagesCall.where)).toContain('"deletedAt":{"exists":false}')
         expect(JSON.stringify(productsCall.where)).toContain('"site":{"equals":"site-1"}')
+        expect(JSON.stringify(productsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
         expect(JSON.stringify(productsCall.where)).toContain('"deletedAt":{"exists":false}')
         expect(JSON.stringify(blogsCall.where)).toContain('"site":{"equals":"site-1"}')
-        expect(JSON.stringify(blogsCall.where)).not.toContain('"tenant":{"equals":"tenant-1"}')
+        expect(JSON.stringify(blogsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
         expect(body).not.toContain('/../admin')
         expect(body).toContain('/products/summer%20sale')
         expect(body).toContain('/blog/news%23today')

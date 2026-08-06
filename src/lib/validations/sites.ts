@@ -149,6 +149,7 @@ export const saveSiteSchema = z.object({
         metaTitle: nullableString,
         metaDescription: nullableString,
         ogImage: z.union([z.string(), z.number()]).nullable().optional(),
+        googleVerificationToken: sanitizedString,
     }).optional(),
     shippingConfig: z.object({
         westRate: z.number().min(0).max(100_000).optional(),
