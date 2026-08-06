@@ -8,6 +8,7 @@ import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
 import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
+import { parseEditorSettingsDeepLink } from '@/lib/editor/settings-deep-link'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -80,6 +81,7 @@ export type SiteData = {
         metaTitle?: string
         metaDescription?: string
         ogImage?: string | number | null
+        googleVerificationToken?: string
     }
     publishedAt?: string | null
     tenantSlug?: string | null
@@ -248,7 +250,10 @@ export default function EditorPage() {
     } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
-    const { isCompact: isCompactLayout } = useEditorLayoutMode()
+    const {
+        isCompact: isCompactLayout,
+        isResolved: isLayoutModeResolved,
+    } = useEditorLayoutMode()
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
@@ -258,6 +263,8 @@ export default function EditorPage() {
     const [toolsSheetTab, setToolsSheetTab] = useState<ToolsSheetTab>('chat')
     const [aiRunning, setAiRunning] = useState(false)
     const stopAIRef = useRef<(() => void) | null>(null)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string; focus?: string } | null>(null)
+    const settingsDeepLinkSignatureRef = useRef<string | null>(null)
 
     // PR #1485 review fix (I3): rotating/resizing across the 1280px compact↔desktop
     // boundary must not leave a sheet open from before the flip — reset both compact
@@ -288,7 +295,36 @@ export default function EditorPage() {
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
     useWorkspaceShortcuts()
-    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
+
+    useEffect(() => {
+        if (isLoading || !isLayoutModeResolved) return
+        const target = parseEditorSettingsDeepLink(new URLSearchParams(searchParams.toString()))
+        if (!target) return
+        const signature = JSON.stringify(target)
+        if (settingsDeepLinkSignatureRef.current === signature) return
+        settingsDeepLinkSignatureRef.current = signature
+        setSettingsRequestedTab({ ...target, key: Date.now() })
+        if (isCompactLayout) {
+            setIsMobileSettingsOpen(true)
+        } else if (!rightSidebarVisible) {
+            useWorkspaceStore.getState().toggleRight()
+        }
+
+        const next = new URLSearchParams(searchParams.toString())
+        next.delete('settingsTab')
+        next.delete('section')
+        next.delete('focus')
+        const query = next.toString()
+        router.replace('/editor/' + siteId + (query ? '?' + query : ''))
+    }, [
+        isCompactLayout,
+        isLayoutModeResolved,
+        isLoading,
+        rightSidebarVisible,
+        router,
+        searchParams,
+        siteId,
+    ])
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)

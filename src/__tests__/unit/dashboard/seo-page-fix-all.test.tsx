@@ -10,6 +10,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+    parseUndoContinuation,
+    saveUndoToStorage as persistUndoToStorage,
+    selectAppliedFixes,
+} from '@/components/dashboard/AIFixModal'
 
 // ─── sessionStorage mock ────────────────────────────────────────────
 
@@ -61,6 +66,25 @@ describe('SEO Fix-All Modal — Undo Persistence [TC-F03.39..44]', () => {
         // Assert
         expect(loaded).toHaveLength(2)
         expect(loaded![0].targetId).toBe('1')
+    })
+
+    it('does not throw when sessionStorage rejects an undo backup', () => {
+        const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('Storage quota exceeded')
+        })
+
+        try {
+            expect(
+                persistUndoToStorage(
+                    [],
+                    'site-1',
+                    'a'.repeat(64),
+                    '1785927600000.' + 'd'.repeat(64),
+                ),
+            ).toBe(false)
+        } finally {
+            setItem.mockRestore()
+        }
     })
 
     it('[TC-F03.43] undo expires after 5 minutes', () => {
@@ -134,6 +158,46 @@ describe('SEO Fix-All Modal — Undo Persistence [TC-F03.39..44]', () => {
             collection: 'pages',
             seo: { title: 'New T', description: 'New D' },
         })
+    })
+
+    it('counts only fulfilled fixes after a partial apply', () => {
+        const selected = [
+            { targetId: '1', collection: 'pages', name: 'Page A' },
+            { targetId: '2', collection: 'pages', name: 'Page B' },
+        ]
+
+        const applied = selectAppliedFixes(selected, [
+            { targetId: '2', collection: 'pages', seo: {} },
+        ])
+
+        expect(applied).toEqual([selected[1]])
+    })
+
+    it('keeps only a valid signed continuation after partial undo', () => {
+        const continuation = parseUndoContinuation({
+            failedCount: 1,
+            remainingUndoData: [
+                { targetId: '2', collection: 'pages', seo: { title: 'Old' } },
+            ],
+            revisionToken: 'c'.repeat(64),
+            undoToken: `1785927600000.${'d'.repeat(64)}`,
+        })
+
+        expect(continuation).toEqual({
+            data: [
+                { targetId: '2', collection: 'pages', seo: { title: 'Old' } },
+            ],
+            revisionToken: 'c'.repeat(64),
+            undoToken: `1785927600000.${'d'.repeat(64)}`,
+        })
+        expect(
+            parseUndoContinuation({
+                failedCount: 1,
+                remainingUndoData: [],
+                revisionToken: 'c'.repeat(64),
+                undoToken: `1785927600000.${'d'.repeat(64)}`,
+            }),
+        ).toBeNull()
     })
 
     it('[TC-F03.44] empty proposed fixes results in no batch fixes', () => {

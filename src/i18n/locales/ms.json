@@ -1047,6 +1047,7 @@
                 "fixResult": "Selesai {count} isu",
                 "undoLabel": "Batal (Ctrl+Z)",
                 "undoSuccess": "Pembaikan Batch telah dibatalkan",
+                "undoPartial": "Sesetengah pembaikan tidak dapat dibatalkan. Perubahan yang selebihnya sedia untuk dicuba semula.",
                 "errorTimeout": "AI Fix All tamat masa. Sila cuba lagi.",
                 "errorFailed": "Tidak dapat melengkapkan AI Fix All, sila cuba lagi"
             },
@@ -3146,6 +3147,8 @@
                 "allClear": "Semua selesai",
                 "allResolvedTitle": "Semua isu telah diselesaikan",
                 "allResolvedDesc": "Tiada isu SEO yang tertangguh — kedai anda dioptimumkan sepenuhnya. Kami akan menandakan isu baharu di sini apabila ia muncul.",
+                "noSellerActionTitle": "Tiada tindakan penjual diperlukan",
+                "noSellerActionDesc": "Isyarat skor yang selebihnya diurus secara automatik oleh platform.",
                 "fix": "Baiki",
                 "edit": "Sunting",
                 "altEditTip": "Penyuntingan teks Alt automatik dengan AI akan datang. Buat masa ini, klik untuk mengemas kini penerangan imej terus dalam pengurus produk anda.",
@@ -3160,6 +3163,96 @@
                 "issueTitle": {
                     "one": "item tiada tajuk meta",
                     "other": "item tiada tajuk meta"
+                },
+                "target": {
+                    "loading": "Memuatkan kesihatan SEO",
+                    "errorTitle": "Kesihatan SEO tidak tersedia",
+                    "errorDescription": "Kami tidak dapat memuatkan kesihatan SEO anda sekarang. Cuba lagi tanpa kehilangan kerja semasa.",
+                    "retry": "Cuba lagi",
+                    "buckets": {
+                        "business": "Data Perniagaan",
+                        "schema": "Skema",
+                        "aiDiscoverability": "Kebolehcarian AI",
+                        "technical": "Kesihatan Teknikal"
+                    },
+                    "status": {
+                        "good": "Baik",
+                        "needsWork": "Perlu dibaiki"
+                    },
+                    "actors": {
+                        "ai": "AI",
+                        "you": "Anda"
+                    },
+                    "actions": {
+                        "fix": "Baiki",
+                        "edit": "Sunting",
+                        "setUp": "Sediakan",
+                        "publish": "Terbitkan"
+                    },
+                    "aiCanFix": {
+                        "one": "AI boleh membaiki {count} isu secara automatik",
+                        "other": "AI boleh membaiki {count} isu secara automatik"
+                    },
+                    "fixAll": "Baiki semua dengan AI",
+                    "fixNextBatch": "Baiki 100 seterusnya dengan AI",
+                    "issues": {
+                        "storeName": {
+                            "one": "Nama kedai tiada",
+                            "other": "{count} nama kedai tiada"
+                        },
+                        "businessAddress": {
+                            "one": "Alamat perniagaan tidak lengkap",
+                            "other": "{count} alamat perniagaan tidak lengkap"
+                        },
+                        "phone": {
+                            "one": "Nombor telefon tiada",
+                            "other": "{count} nombor telefon tiada"
+                        },
+                        "schemaSubtype": {
+                            "one": "Subjenis perniagaan tiada",
+                            "other": "{count} subjenis perniagaan tiada"
+                        },
+                        "openingHours": {
+                            "one": "Waktu operasi tiada",
+                            "other": "{count} kumpulan waktu operasi tiada"
+                        },
+                        "mapLocation": {
+                            "one": "Lokasi peta tiada",
+                            "other": "{count} lokasi peta tiada"
+                        },
+                        "priceRange": {
+                            "one": "Julat harga tiada",
+                            "other": "{count} julat harga tiada"
+                        },
+                        "primaryDomain": {
+                            "one": "Domain utama tiada",
+                            "other": "{count} domain utama tiada"
+                        },
+                        "storeUnpublished": {
+                            "one": "Kedai belum diterbitkan",
+                            "other": "{count} kedai belum diterbitkan"
+                        },
+                        "metaTitle": {
+                            "one": "{count} item tiada tajuk meta",
+                            "other": "{count} item tiada tajuk meta"
+                        },
+                        "metaDescription": {
+                            "one": "{count} halaman tiada penerangan meta",
+                            "other": "{count} halaman tiada penerangan meta"
+                        },
+                        "contentQuality": {
+                            "one": "{count} halaman perlu penambahbaikan kandungan",
+                            "other": "{count} halaman perlu penambahbaikan kandungan"
+                        },
+                        "imageAlt": {
+                            "one": "{count} imej produk tiada teks alt",
+                            "other": "{count} imej produk tiada teks alt"
+                        },
+                        "searchVerification": {
+                            "one": "Pengesahan carian tiada",
+                            "other": "{count} pengesahan carian tiada"
+                        }
+                    }
                 }
             },
             "orders": {
@@ -4435,6 +4528,9 @@
             "metaDescription": "Penerangan Meta",
             "metaDescPlaceholder": "Beritahu enjin carian dan platform sosial tentang halaman ini.",
             "googlePreview": "Pratonton Google",
+            "searchVerificationTitle": "Pengesahan carian",
+            "searchVerificationDescription": "Tampal token pengesahan Google Search Console untuk kedai ini.",
+            "searchVerificationPlaceholder": "Token google-site-verification",
             "titleTruncated": "Tajuk mungkin dipotong di Carian Google.",
             "descTruncated": "Penerangan mungkin dipotong di Carian Google.",
             "characters": "aksara",

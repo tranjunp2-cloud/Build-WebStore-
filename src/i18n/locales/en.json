@@ -1047,6 +1047,7 @@
                 "fixResult": "Fixed {count} issues",
                 "undoLabel": "Undo (Ctrl+Z)",
                 "undoSuccess": "Batch Fix has been undone",
+                "undoPartial": "Some fixes could not be undone. The remaining changes are ready to retry.",
                 "errorTimeout": "AI Fix All timed out. Please try again.",
                 "errorFailed": "Cannot complete AI Fix All, please try again"
             },
@@ -3146,6 +3147,8 @@
                 "allClear": "All clear",
                 "allResolvedTitle": "All issues resolved",
                 "allResolvedDesc": "No outstanding SEO issues — your store is fully optimised. We'll flag new ones here as they appear.",
+                "noSellerActionTitle": "No seller action needed",
+                "noSellerActionDesc": "The remaining score signals are managed automatically by the platform.",
                 "fix": "Fix",
                 "edit": "Edit",
                 "altEditTip": "Automatic AI alt-text editing is coming soon. For now, click to update image descriptions directly in your product manager.",
@@ -3160,6 +3163,96 @@
                 "issueTitle": {
                     "one": "item missing a meta title",
                     "other": "items missing a meta title"
+                },
+                "target": {
+                    "loading": "Loading SEO health",
+                    "errorTitle": "SEO health is unavailable",
+                    "errorDescription": "We couldn't load your SEO health right now. Try again without losing your current work.",
+                    "retry": "Retry",
+                    "buckets": {
+                        "business": "Business Data",
+                        "schema": "Schema",
+                        "aiDiscoverability": "AI Discoverability",
+                        "technical": "Technical Health"
+                    },
+                    "status": {
+                        "good": "Good",
+                        "needsWork": "Needs work"
+                    },
+                    "actors": {
+                        "ai": "AI",
+                        "you": "You"
+                    },
+                    "actions": {
+                        "fix": "Fix",
+                        "edit": "Edit",
+                        "setUp": "Set up",
+                        "publish": "Publish"
+                    },
+                    "aiCanFix": {
+                        "one": "AI can fix {count} issue automatically",
+                        "other": "AI can fix {count} issues automatically"
+                    },
+                    "fixAll": "Fix all with AI",
+                    "fixNextBatch": "Fix next 100 with AI",
+                    "issues": {
+                        "storeName": {
+                            "one": "Store name missing",
+                            "other": "{count} store names missing"
+                        },
+                        "businessAddress": {
+                            "one": "Business address incomplete",
+                            "other": "{count} business addresses incomplete"
+                        },
+                        "phone": {
+                            "one": "Phone number missing",
+                            "other": "{count} phone numbers missing"
+                        },
+                        "schemaSubtype": {
+                            "one": "Business subtype missing",
+                            "other": "{count} business subtypes missing"
+                        },
+                        "openingHours": {
+                            "one": "Opening hours missing",
+                            "other": "{count} opening-hour groups missing"
+                        },
+                        "mapLocation": {
+                            "one": "Map location missing",
+                            "other": "{count} map locations missing"
+                        },
+                        "priceRange": {
+                            "one": "Price range missing",
+                            "other": "{count} price ranges missing"
+                        },
+                        "primaryDomain": {
+                            "one": "Primary domain missing",
+                            "other": "{count} primary domains missing"
+                        },
+                        "storeUnpublished": {
+                            "one": "Store is unpublished",
+                            "other": "{count} stores are unpublished"
+                        },
+                        "metaTitle": {
+                            "one": "{count} item missing a meta title",
+                            "other": "{count} items missing meta titles"
+                        },
+                        "metaDescription": {
+                            "one": "{count} page missing a meta description",
+                            "other": "{count} pages missing meta descriptions"
+                        },
+                        "contentQuality": {
+                            "one": "{count} page needs content improvements",
+                            "other": "{count} pages need content improvements"
+                        },
+                        "imageAlt": {
+                            "one": "{count} product image missing alt text",
+                            "other": "{count} product images missing alt text"
+                        },
+                        "searchVerification": {
+                            "one": "Search verification missing",
+                            "other": "{count} search verifications missing"
+                        }
+                    }
                 }
             },
             "orders": {
@@ -4435,6 +4528,9 @@
             "metaDescription": "Meta Description",
             "metaDescPlaceholder": "Tell search engines and social platforms what this page is about.",
             "googlePreview": "Google Preview",
+            "searchVerificationTitle": "Search verification",
+            "searchVerificationDescription": "Paste the Google Search Console verification token for this store.",
+            "searchVerificationPlaceholder": "google-site-verification token",
             "titleTruncated": "Title may be truncated on Google Search.",
             "descTruncated": "Description may be truncated on Google Search.",
             "characters": "characters",

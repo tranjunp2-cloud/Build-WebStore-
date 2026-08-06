@@ -213,6 +213,22 @@ describe('[TC-F37-02-26] sanitizeLegacyOpeningHours — normalizes rows saved be
         expect(sanitizeLegacyOpeningHours([row])).toEqual([row])
     })
 
+    it('normalizes Payload null times on a closed row before a full-snapshot save', () => {
+        const rows = [{
+            dayOfWeek: 'Sa',
+            opens: null,
+            closes: null,
+            isClosed: true,
+        }]
+
+        expect(sanitizeLegacyOpeningHours(rows)).toEqual([{
+            dayOfWeek: 'Sa',
+            opens: undefined,
+            closes: undefined,
+            isClosed: true,
+        }])
+    })
+
     it('handles a mixed array — only the invalid row is normalized', () => {
         const rows: OpeningHourRow[] = [
             { dayOfWeek: 'Mo', opens: '09:00', closes: '18:00', isClosed: false },

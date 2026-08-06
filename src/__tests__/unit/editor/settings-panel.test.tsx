@@ -63,11 +63,11 @@ describe('SettingsPanel', () => {
 
         // Assert
         expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
+        expect(screen.getByTestId('settings-panel')).toHaveClass('[contain:layout]')
     })
 
-    it('[TC-F37-01-27][TC-F37-01-30] sends a sparse street/MY patch for a legacy country', async () => {
+    it("[TC-F37-01-27][TC-F37-01-30] hides duplicate address/country fields and uses Contact Info address in the checklist", () => {
         // Arrange
-        const onSiteSettingsChange = vi.fn(() => false)
         render(
             <I18nProvider defaultLocale="en">
                 <SettingsPanel
@@ -77,35 +77,27 @@ describe('SettingsPanel', () => {
                     siteName="Legacy Site"
                     siteStatus="draft"
                     site={{
-                        id: 'site-1',
-                        name: 'Legacy Site',
-                        status: 'draft',
+                        id: "site-1",
+                        name: "Legacy Site",
+                        status: "draft",
+                        contactInfo: {
+                            address: "34 New Road",
+                        },
                         localBusiness: {
-                            streetAddress: '12 Old Road',
-                            city: 'Kuala Lumpur',
-                            state: 'Kuala Lumpur',
-                            postcode: '50450',
-                            country: '   ',
+                            city: "Kuala Lumpur",
+                            state: "Kuala Lumpur",
+                            postcode: "50450",
+                            country: "   ",
                         },
                     }}
-                    onSiteSettingsChange={onSiteSettingsChange}
                 />
             </I18nProvider>,
         )
-        const streetAddress = screen.getByTestId('settings-local-business-street-address')
-
-        // Act
-        fireEvent.blur(streetAddress, { target: { value: '34 New Road' } })
 
         // Assert
-        await waitFor(() => {
-            expect(onSiteSettingsChange).toHaveBeenCalledWith({
-                localBusiness: {
-                    streetAddress: '34 New Road',
-                    country: 'MY',
-                },
-            })
-        })
+        expect(screen.queryByTestId("settings-local-business-street-address")).not.toBeInTheDocument()
+        expect(screen.queryByTestId("settings-local-business-country")).not.toBeInTheDocument()
+        expect(screen.getByText("Address saved").closest("li")?.querySelector("svg")).not.toBeNull()
     })
 
     it('[TC-F37-01-26] restores the confirmed phone when a valid phone save fails', async () => {
@@ -808,7 +800,7 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
         expect(screen.getByRole('alert')).toHaveTextContent(
             'Local business editing is temporarily locked. Reload the editor to confirm the last save before continuing.',
         )
-        expect(screen.getByTestId('settings-local-business-street-address')).toBeDisabled()
+        expect(screen.getByTestId('settings-local-business-state')).toBeDisabled()
         expect(screen.getByRole('combobox', { name: 'Business Category' })).toBeDisabled()
         expect(screen.getByRole('combobox', { name: 'Schema subtype' })).toBeDisabled()
         expect(onSiteSettingsChange).not.toHaveBeenCalled()
@@ -921,5 +913,84 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
                 schemaSubtype: null,
             },
         })
+    })
+
+    it("[TC-F37-04-12] opens Search verification, focuses it, and autosaves the token", async () => {
+        // Arrange
+        const onSiteSettingsChange = vi.fn()
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="SEO Site"
+                    siteStatus="draft"
+                    site={{
+                        id: "site-1",
+                        name: "SEO Site",
+                        status: "draft",
+                        seo: { googleVerificationToken: "old-token" },
+                    }}
+                    requestedTab={{ tab: "seo", section: "searchVerification", key: 1 }}
+                    onSiteSettingsChange={onSiteSettingsChange}
+                />
+            </I18nProvider>,
+        )
+
+        // Act
+        const input = await screen.findByTestId("settings-google-verification-token")
+        const labelledInput = await screen.findByLabelText("Search verification")
+        expect(labelledInput).toBe(input)
+        await waitFor(() => expect(input).toHaveFocus())
+        fireEvent.blur(input, { target: { value: "  new-token  " } })
+
+        // Assert
+        expect(onSiteSettingsChange).toHaveBeenCalledWith({
+            seo: { googleVerificationToken: "new-token" },
+        })
+    })
+
+    it('[TC-F37-04-12] opens Contact Info and focuses the canonical address field', async () => {
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Contact Site"
+                    siteStatus="draft"
+                    site={{ id: "site-1", name: "Contact Site", status: "draft" }}
+                    requestedTab={{ tab: "global", section: "contact", focus: "address", key: 2 }}
+                />
+            </I18nProvider>,
+        )
+
+        const address = await screen.findByTestId("settings-contact-address")
+
+        await waitFor(() => expect(address).toHaveFocus())
+    })
+
+    it("[TC-F37-04-12] expands Local Business and focuses the address target", async () => {
+        // Arrange
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    siteName="Local Site"
+                    siteStatus="draft"
+                    site={{ id: "site-1", name: "Local Site", status: "draft" }}
+                    requestedTab={{ tab: "global", section: "localBusiness", focus: "address", key: 2 }}
+                />
+            </I18nProvider>,
+        )
+
+        // Act
+        const state = await screen.findByTestId("settings-local-business-state")
+
+        // Assert
+        await waitFor(() => expect(state).toHaveFocus())
     })
 })

@@ -1,25 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const CURRENT_REVISION = 'a'.repeat(64)
+const EXPECTED_UPDATED_AT = '2026-08-05T02:00:00.000Z'
+
 // ─── Mocks ────────────────────────────────────────────────────────────
 
 const mockUser = {
     id: 1,
     roles: [] as string[],
-    tenants: [{ tenant: 'tenant-1' }],
+    tenants: [{ tenant: 'tenant-1', status: 'active' }],
 }
+type AuthHandler = (
+    user: typeof mockUser,
+    request: Request,
+    context?: unknown,
+) => unknown
 vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
+    withAuth: vi.fn(
+        (handler: AuthHandler) => async (req: Request, ctx?: unknown) =>
+            handler(mockUser, req, ctx),
+    ),
 }))
 
 const mockFindByID = vi.fn()
 const mockFind = vi.fn()
 const mockUpdate = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({
-        findByID: mockFindByID,
-        find: mockFind,
-        update: mockUpdate,
-    })),
+    getPayload: vi.fn(() =>
+        Promise.resolve({
+            findByID: mockFindByID,
+            find: mockFind,
+            update: mockUpdate,
+        }),
+    ),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -39,7 +52,41 @@ vi.mock('@/lib/subscriptions/plan-subscription', () => ({
 }))
 
 vi.mock('@/lib/subscriptions/feature-guard', () => ({
-    withFeatureGuard: vi.fn(() => (h: any) => h),
+    withFeatureGuard: vi.fn(
+        () =>
+            <T>(handler: T): T =>
+                handler,
+    ),
+}))
+
+const mockCheckTwoTierRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 1, resetAt: Date.now() + 60_000 })
+vi.mock('@/lib/rateLimit', () => ({
+    checkTwoTierRateLimit: (...args: unknown[]) => mockCheckTwoTierRateLimit(...args),
+}))
+
+const mockEvaluateAuthoritativeLocalSeo = vi.fn().mockResolvedValue({
+    response: { revisionToken: CURRENT_REVISION },
+    metadataItems: [
+        {
+            collection: 'products',
+            id: 'prod-1',
+            missingFields: ['title', 'description'],
+        },
+        {
+            collection: 'blogs',
+            id: 'blog-1',
+            missingFields: ['title', 'description'],
+        },
+        {
+            collection: 'blogs',
+            id: 'blog-2',
+            missingFields: ['title', 'description'],
+        },
+    ],
+})
+vi.mock('@/lib/seo/local-seo-evaluation', () => ({
+    evaluateAuthoritativeLocalSeo: (...args: unknown[]) =>
+        mockEvaluateAuthoritativeLocalSeo(...args),
 }))
 
 import { POST as applyFixesPOST } from '@/app/api/seo/apply-fixes/route'
@@ -52,6 +99,7 @@ import { POST as sitemapPOST } from '@/app/api/seo/sitemap/route'
 describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        process.env.PAYLOAD_SECRET = 'seo-routes-test-secret'
         mockUser.roles = []
     })
 
@@ -59,22 +107,30 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         // Arrange
         mockFindByID.mockResolvedValue({
             id: 'prod-1',
+            site: 'prod-1',
             tenant: 'tenant-1',
+            updatedAt: EXPECTED_UPDATED_AT,
             seo: { title: 'Old Title', description: 'Old Desc' },
         })
-        mockUpdate.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({ docs: [{ id: 'prod-1' }], errors: [] })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'prod-1',
-                    collection: 'products',
-                    seo: { title: 'New SEO Title' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'prod-1',
+                            collection: 'products',
+                            seo: { title: 'New SEO Title' },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
         const body = await res.json()
 
         // Assert
@@ -87,24 +143,32 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         // Arrange — product belongs to different tenant
         mockFindByID.mockResolvedValue({
             id: 'prod-1',
+            site: 'prod-1',
             tenant: 'other-tenant',
             seo: {},
         })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'prod-1',
-                    collection: 'products',
-                    seo: { title: 'Hack' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'prod-1',
+                            collection: 'products',
+                            seo: { title: 'Hack' },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
 
         // Assert
-        expect(res.status).toBe(500) // throws internally → 500
+        expect(res.status).toBe(403)
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     it('allows super-admin to bypass IDOR', async () => {
@@ -112,62 +176,86 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         mockUser.roles = ['super-admin']
         mockFindByID.mockResolvedValue({
             id: 'prod-1',
+            site: 'prod-1',
             tenant: 'any-tenant',
+            updatedAt: EXPECTED_UPDATED_AT,
             seo: { title: 'Old' },
         })
-        mockUpdate.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({ docs: [{ id: 'prod-1' }], errors: [] })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'prod-1',
-                    collection: 'products',
-                    seo: { title: 'Admin Fix' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'prod-1',
+                            collection: 'products',
+                            seo: { title: 'Admin Fix' },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
         const body = await res.json()
 
         // Assert
         expect(body.success).toBe(true)
     })
 
-    // Route context unused by handler — `{} as any` follows existing test pattern (lines 58, 85, 111)
+    // Route context unused by handler — `{} as never` follows existing test pattern (lines 58, 85, 111)
     it('maps blog fields metaTitle/metaDescription on apply [TC-F03.40]', async () => {
         // Arrange — blog uses seo.metaTitle / seo.metaDescription
         mockFindByID.mockResolvedValue({
             id: 'blog-1',
+            site: 'blog-1',
             tenant: 'tenant-1',
-            seo: { metaTitle: 'Old Blog Title', metaDescription: 'Old blog desc' },
+            updatedAt: EXPECTED_UPDATED_AT,
+            seo: {
+                metaTitle: 'Old Blog Title',
+                metaDescription: 'Old blog desc',
+            },
         })
-        mockUpdate.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({ docs: [{ id: 'blog-1' }], errors: [] })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'blog-1',
-                    collection: 'blogs',
-                    seo: { title: 'New Blog SEO Title', description: 'New blog SEO desc' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'blog-1',
+                            collection: 'blogs',
+                            seo: {
+                                title: 'New Blog SEO Title',
+                                description: 'New blog SEO desc',
+                            },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
         const body = await res.json()
 
         // Assert — should write metaTitle/metaDescription, not title/description
         expect(body.success).toBe(true)
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'blogs',
-            data: {
-                seo: expect.objectContaining({
-                    metaTitle: 'New Blog SEO Title',
-                    metaDescription: 'New blog SEO desc',
-                }),
-            },
-        }))
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'blogs',
+                data: {
+                    seo: expect.objectContaining({
+                        metaTitle: 'New Blog SEO Title',
+                        metaDescription: 'New blog SEO desc',
+                    }),
+                },
+            }),
+        )
         // Undo data should map back to generic title/description
         expect(body.undoData[0].seo.title).toBe('Old Blog Title')
         expect(body.undoData[0].seo.description).toBe('Old blog desc')
@@ -177,22 +265,30 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         // Arrange — blog with no existing SEO
         mockFindByID.mockResolvedValue({
             id: 'blog-2',
+            site: 'blog-2',
             tenant: 'tenant-1',
+            updatedAt: EXPECTED_UPDATED_AT,
             seo: {},
         })
-        mockUpdate.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({ docs: [{ id: 'blog-2' }], errors: [] })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'blog-2',
-                    collection: 'blogs',
-                    seo: { title: 'Brand New Title' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'blog-2',
+                            collection: 'blogs',
+                            seo: { title: 'Brand New Title' },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
         const body = await res.json()
 
         // Assert
@@ -205,24 +301,53 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         // Arrange — blog belongs to different tenant
         mockFindByID.mockResolvedValue({
             id: 'blog-1',
+            site: 'blog-1',
             tenant: 'other-tenant',
             seo: {},
         })
 
         // Act
         const req = {
-            json: () => Promise.resolve({
-                fixes: [{
-                    targetId: 'blog-1',
-                    collection: 'blogs',
-                    seo: { title: 'Hack' },
-                }],
-            }),
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: [
+                        {
+                            targetId: 'blog-1',
+                            collection: 'blogs',
+                            seo: { title: 'Hack' },
+                        },
+                    ],
+                }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
 
         // Assert
-        expect(res.status).toBe(500) // throws internally → ALL_FAILED
+        expect(res.status).toBe(403)
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('rejects more than 100 fixes in one apply batch', async () => {
+        const req = {
+            json: () =>
+                Promise.resolve({
+                    operation: 'apply',
+                    siteId: 'site-1',
+                    revisionToken: CURRENT_REVISION,
+                    fixes: Array.from({ length: 101 }, (_, index) => ({
+                        targetId: String(index),
+                        collection: 'pages',
+                        seo: { title: 'Title ' + index },
+                    })),
+                }),
+        } as unknown as Request
+
+        const res = await applyFixesPOST(req, {} as never)
+
+        expect(res.status).toBe(400)
+        expect(mockFindByID).not.toHaveBeenCalled()
     })
 
     it('returns 400 for invalid schema', async () => {
@@ -230,7 +355,7 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         const req = {
             json: () => Promise.resolve({ fixes: 'not-an-array' }),
         } as unknown as Request
-        const res = await applyFixesPOST(req, {} as any)
+        const res = await applyFixesPOST(req, {} as never)
 
         // Assert
         expect(res.status).toBe(400)
@@ -244,7 +369,11 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
 
     it('generates sitemap XML with published pages', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ id: 'site-1', domain: 'mycafe.com', slug: 'mycafe' })
+        mockFindByID.mockResolvedValue({
+            id: 'site-1',
+            domain: 'mycafe.com',
+            slug: 'mycafe',
+        })
         mockFind.mockResolvedValue({
             docs: [
                 { slug: 'home', updatedAt: '2026-03-01T00:00:00Z' },
@@ -253,8 +382,10 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         })
 
         // Act
-        const req = { json: () => Promise.resolve({ siteId: 'site-1' }) } as unknown as Request
-        const res = await sitemapPOST(req, {} as any)
+        const req = {
+            json: () => Promise.resolve({ siteId: 'site-1' }),
+        } as unknown as Request
+        const res = await sitemapPOST(req, {} as never)
         const body = await res.json()
 
         // Assert
@@ -275,8 +406,10 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         })
 
         // Act
-        const req = { json: () => Promise.resolve({ siteId: 'site-1' }) } as unknown as Request
-        const res = await sitemapPOST(req, {} as any)
+        const req = {
+            json: () => Promise.resolve({ siteId: 'site-1' }),
+        } as unknown as Request
+        const res = await sitemapPOST(req, {} as never)
         const body = await res.json()
 
         // Assert
@@ -292,8 +425,10 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         })
 
         // Act
-        const req = { json: () => Promise.resolve({ siteId: 'site-1' }) } as unknown as Request
-        const res = await sitemapPOST(req, {} as any)
+        const req = {
+            json: () => Promise.resolve({ siteId: 'site-1' }),
+        } as unknown as Request
+        const res = await sitemapPOST(req, {} as never)
         const body = await res.json()
 
         // Assert — home should be https://test.com (not /home)
@@ -306,8 +441,10 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         mockFindByID.mockResolvedValue(null)
 
         // Act
-        const req = { json: () => Promise.resolve({ siteId: 'bad' }) } as unknown as Request
-        const res = await sitemapPOST(req, {} as any)
+        const req = {
+            json: () => Promise.resolve({ siteId: 'bad' }),
+        } as unknown as Request
+        const res = await sitemapPOST(req, {} as never)
 
         // Assert
         expect(res.status).toBe(404)
@@ -320,8 +457,10 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         process.env.NEXT_PUBLIC_SERVER_URL = 'https://app.primeweb.com'
 
         // Act
-        const req = { json: () => Promise.resolve({ siteId: 'site-1' }) } as unknown as Request
-        const res = await sitemapPOST(req, {} as any)
+        const req = {
+            json: () => Promise.resolve({ siteId: 'site-1' }),
+        } as unknown as Request
+        const res = await sitemapPOST(req, {} as never)
         const body = await res.json()
 
         // Assert

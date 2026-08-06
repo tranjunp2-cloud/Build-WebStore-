@@ -1,7 +1,14 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
-import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin, type TenantLike } from '@/lib/seo/canonical'
+import {
+    canSerializePublicSitemap,
+    PUBLIC_DISCOVERY_SITE_LIMIT,
+    PUBLIC_DISCOVERY_SITE_SORT,
+    PUBLIC_STOREFRONT_STATUS,
+    publicDiscoverySiteWhere,
+} from '@/lib/seo/public-discovery-facts'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
@@ -38,16 +45,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         
         const siteResults = await payload.find({
             collection: 'sites',
-            where: {
-                and: [
-                    { tenant: { equals: tenant.id } },
-                    { status: { equals: 'published' } },
-                ]
-            },
+            where: publicDiscoverySiteWhere(tenant.id),
             // A tenant may have more than one published site. Keep selection
             // stable until domain-to-site ownership is modelled explicitly.
-            sort: 'createdAt',
-            limit: 1,
+            sort: PUBLIC_DISCOVERY_SITE_SORT,
+            limit: PUBLIC_DISCOVERY_SITE_LIMIT,
         })
 
         const [site] = siteResults.docs
@@ -95,7 +97,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 where: {
                     and: [
                         { site: { equals: site.id } },
-                        { status: { equals: 'published' } },
+                        { status: { equals: PUBLIC_STOREFRONT_STATUS } },
                     ],
                 },
                 pagination: false,
@@ -108,9 +110,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         // `sitemapPresent=true` (5 points). A 404/500 withholds only this fact;
         // crawler policy and llms.txt reachability remain independent.
 
-        const baseUrl = resolveStorefrontOrigin(tenant as any, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
+        // Payload Local API uses a generic JsonObject here even though the queried collection is tenants.
+        const canonicalTenant = tenant as unknown as TenantLike
+        const baseUrl = resolveStorefrontOrigin(canonicalTenant, { fallbackHostname: slug === 'custom' ? hostname : null, slug })
 
-        const isoOrNow = (d: unknown) => (d ? new Date(d as string).toISOString() : new Date().toISOString())
+        if (!canSerializePublicSitemap({
+            pages: pagesResult.docs,
+            products: productsResult.docs,
+            blogs: blogsResult.docs,
+        })) {
+            throw new Error('Sitemap document cannot be serialized')
+        }
+
+        const isoOrNow = (d: unknown) => {
+            return d ? new Date(d as string).toISOString() : new Date().toISOString()
+        }
         // XML-escape & < > in URLs so a stray special char can't break the document.
         const xmlEscape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const urlNode = (path: string, lastMod: string) =>

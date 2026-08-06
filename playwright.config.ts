@@ -86,6 +86,19 @@ export default defineConfig({
             },
             dependencies: hasE2EAccount ? ['setup'] : [],
         },
+        // US-F37-04 exercises the authenticated Dashboard → Editor flow.
+        // The spec validates its own account-owned fixture and fails fast when
+        // the required staging credentials or fixture shape are unavailable.
+        {
+            name: 'f37-seo-health-regression',
+            testDir: './tests',
+            testMatch: /f37-local-seo-score-checklist\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).
         {

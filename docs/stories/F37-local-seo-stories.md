@@ -15,7 +15,7 @@
 
 ```
 As a   SME seller
-I want to enter my name, structured address, and phone in the Editor
+I want to enter my name, contact address, local area details, and phone in the Editor
 So that my site has the required local business facts and earns Business Data points
 ```
 
@@ -25,9 +25,11 @@ So that my site has the required local business facts and earns Business Data po
 
 ```gherkin
 GIVEN the seller is on Editor Settings Global
-WHEN they save a name, street, city, postcode, country, and phone
+WHEN they save a name, Contact Info address, city, state, postcode, and phone
 THEN Business Data points for those fields are earned on the next score calculation
   AND the fields persist on reload
+  AND Local Business Info does not duplicate Street Address or Country
+  AND schema country is implicitly Malaysia (`MY`)
 ```
 
 #### AC-2: Score partial business data
@@ -175,37 +177,39 @@ THEN the other available discovery endpoints keep their normal behavior
 
 ## US-F37-04: Score, Checklist, and Fix Loop
 
-**Wave 4** | **P0** | **M** | **Status:** Ready
+**Wave 4** | **P0** | **M** | **Status:** Implemented; Phase 3 local gates pass — live release closeout pending
+
+> **Phase 3 local verification (2026-08-06):** The production Dashboard consumes the authenticated authoritative 20/35/15/30 score, renders every deduplicated seller action without truncation, loads one field-filtered next-100 metadata-only AI batch, and deep-links to allowlisted Editor settings. Proposal/apply is active-membership, exact-site, revision, per-target-CAS, strict-request, user-wide 20/minute and 100/hour plus per-site 2/minute and 10/hour rate-limit guarded; partial Undo remains retryable through a newly signed continuation. The exact post-CAS state passes full local Vitest (701 files / 11,687 tests; one file / three tests skipped), typecheck, lint, an isolated 112/112-page build, the 1,001-record/28-query scale regression, and Playwright discovery. Current-code authenticated browser execution, fixture reset/checksum, p95, canary/rollback, and Story Sync #1312 remain pending.
 
 ### Story
 
 ```
 As a   SME seller
-I want a Local SEO score and up to three next actions
-So that I know what to edit in the Editor, or when F03 AI Fix All can improve page meta only, to improve the score
+I want one SEO Health score and a compact list of unresolved root causes
+So that I can use AI only for metadata and reach the exact destination for every seller-owned fix
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Show a complete score
+#### AC-01: Show a complete score
 
 ```gherkin
 GIVEN a site with all score criteria met
-WHEN the seller opens Dashboard > SEO
-THEN the Local SEO score is 100
-  AND the checklist has zero incomplete high-priority local items
+WHEN seller opens Dashboard > SEO
+THEN the single SEO Health score is 100
+  AND SEO Issues shows All clear
 ```
 
-#### AC-2: Identify technical deductions
+#### AC-02: Show every unresolved seller root cause
 
 ```gherkin
-GIVEN a missing OG image and one bad slug
+GIVEN unresolved metadata and seller-owned issues
 WHEN the score runs
-THEN Technical Health reflects only the OG and slug deductions
-  AND the checklist includes an item deep-linking to Editor SEO for the OG image or slug
+THEN each root cause appears once with an AI or You badge
+  AND each row uses its approved CTA and destination
 ```
 
-#### AC-3: Handle unauthorized score requests
+#### AC-03: Handle unauthorized score requests
 
 ```gherkin
 GIVEN the score API request is unauthorized
@@ -214,25 +218,45 @@ THEN the API returns 401 or 403
   AND Dashboard shows an error state without inventing a score number
 ```
 
-#### AC-4: Deep-link a Local Business fix
+#### AC-04: Deep-link a Local Business fix
 
 ```gherkin
-GIVEN a checklist item for a missing Local Business field
-WHEN the seller clicks its action
-THEN the Editor opens focused on the relevant Settings section
+GIVEN an issue for a missing business address
+WHEN the seller clicks Edit
+THEN the Editor opens focused on Contact Info Address
+  AND Local Business Info does not render duplicate Street Address or Country controls
 ```
 
-#### AC-5: Keep F03 AI Fix All meta-only
+#### AC-05: Keep F03 AI Fix All metadata-only
 
 ```gherkin
-GIVEN only page metadata is missing
+GIVEN at least one title or description is missing
 WHEN the seller runs F03 AI Fix All
-THEN page metadata is proposed or applied
+THEN only those metadata records are proposed or applied
   AND Local Business fields remain unchanged
+```
+
+#### AC-06: Deduplicate derived metrics
+
+```gherkin
+GIVEN multiple score metrics depend on one missing source field
+WHEN issues render
+THEN the seller sees one root-cause row
+  AND no duplicate row is created for derived schema metrics
+```
+
+#### AC-07: Hide unavailable AI actions
+
+```gherkin
+GIVEN no AI-fixable metadata issue remains
+WHEN issues render
+THEN the AI Fix All strip is hidden
 ```
 
 ### Definition of Done
 
-- [ ] FR-16 through FR-20 implement the PRD section 5 formula exactly and return score plus breakdown through the authenticated API.
-- [ ] Dashboard shows no more than three Editor deep-links and distinguishes its score checklist from the Editor completion checklist.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [x] FR-15 through FR-21 implement the PRD section 5 formula exactly and return score plus four-bucket breakdown through the authenticated API.
+- [x] Dashboard shows one score, four qualitative bucket bars, and every deduplicated unresolved seller root cause without per-issue point values or a max-three cap.
+- [x] Every issue uses the actor, CTA, and destination contract in PRD section 12.3; AI Fix is conditional, metadata-only, revision-bound, and capped to the next 100 records.
+- [x] AC-01 through AC-07 have local automated coverage and a discovered three-case authenticated Playwright spec.
+- [ ] Current-code authenticated and live score-100, more-than-seven-issues, API-error/race/apply, 375px, and fixture restoration evidence remain pending.

@@ -73,11 +73,20 @@ vi.mock('@/components/editor/PreviewFrame', () => ({
 }))
 
 const settingsPanelHarness = vi.hoisted(() => ({
-    latestProps: null as { isContactSavePending?: boolean } | null,
+    latestProps: null as {
+        isContactSavePending?: boolean
+        requestedTab?: { tab: string; key: number; section?: string; focus?: string } | null
+        site?: {
+            seo?: {
+                ogImage?: string | number | null
+                googleVerificationToken?: string
+            }
+        } | null
+    } | null,
 }))
 
 vi.mock('@/components/editor/SettingsPanel', () => ({
-    SettingsPanel: (props: { isContactSavePending?: boolean }) => {
+    SettingsPanel: (props: NonNullable<typeof settingsPanelHarness.latestProps>) => {
         settingsPanelHarness.latestProps = props
         return <div data-testid="settings-panel">Settings</div>
     },
@@ -245,6 +254,70 @@ describe('TC-GH1557-07-03: no block and no menu request keeps the sheet closed (
         )
 
         expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument()
+    })
+})
+
+describe('[TC-F37-04-12] compact Editor settings deep links without a selected block', () => {
+    it('mounts the SEO settings-only sheet and hides block-only actions', () => {
+        // Arrange
+        const requestedTab = { tab: 'seo' as const, key: 1, section: 'searchVerification' }
+
+        // Act
+        render(
+            <CompactEditorLayout
+                {...baseProps({
+                    isMobileSettingsOpen: true,
+                    currentBlock: null,
+                    selectedBlock: null,
+                    settingsRequestedTab: requestedTab,
+                })}
+            />,
+        )
+
+        // Assert
+        expect(screen.getByTestId('settings-panel')).toBeInTheDocument()
+        expect(screen.getByText('SEO')).toBeInTheDocument()
+        expect(settingsPanelHarness.latestProps?.requestedTab).toEqual(requestedTab)
+        expect(screen.queryByText('Move Up')).not.toBeInTheDocument()
+        expect(screen.queryByText('Move Down')).not.toBeInTheDocument()
+        expect(screen.queryByText('Delete Block')).not.toBeInTheDocument()
+    })
+
+    it('mounts Global settings and preserves SEO media beside verification data', () => {
+        // Arrange
+        const requestedTab = {
+            tab: 'global' as const,
+            key: 2,
+            section: 'localBusiness',
+            focus: 'address',
+        }
+        const site = {
+            id: 'site-1',
+            name: 'Test Site',
+            status: 'draft',
+            theme: {},
+            siteType: 'business',
+            seo: { ogImage: 42, googleVerificationToken: 'verification-token' },
+        }
+
+        // Act
+        render(
+            <CompactEditorLayout
+                {...baseProps({
+                    isMobileSettingsOpen: true,
+                    currentBlock: null,
+                    selectedBlock: null,
+                    settingsRequestedTab: requestedTab,
+                    site,
+                })}
+            />,
+        )
+
+        // Assert
+        expect(screen.getByTestId('settings-panel')).toBeInTheDocument()
+        expect(screen.getByText('Site')).toBeInTheDocument()
+        expect(settingsPanelHarness.latestProps?.requestedTab).toEqual(requestedTab)
+        expect(settingsPanelHarness.latestProps?.site?.seo).toEqual(site.seo)
     })
 })
 

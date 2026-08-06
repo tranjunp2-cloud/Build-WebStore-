@@ -14,7 +14,17 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn(),
     withAuth: vi.fn().mockImplementation((handler: any) => {
         return async (req: any, ctx: any) => {
-            const mockUser = { id: 'user-1', roles: [], tenants: [] }
+            const mockUser = {
+                id: 'user-1',
+                roles: [],
+                tenants: [
+                    {
+                        tenant: 'tenant-1',
+                        role: 'owner',
+                        status: 'active',
+                    },
+                ],
+            }
             return handler(mockUser, req, ctx)
         }
     }),
@@ -40,9 +50,25 @@ vi.mock('@payload-config', () => ({
 
 import { POST } from '@/app/api/seo/apply-fixes/route'
 import { getCurrentUser } from '@/lib/auth'
-import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import {
+    getActivePlanSubscription,
+    canUse,
+} from '@/lib/subscriptions/plan-subscription'
 
-const makeRequest = (body = { fixes: [] }) =>
+const makeRequest = (
+    body = {
+        operation: 'apply',
+        siteId: 'missing-site',
+        revisionToken: 'a'.repeat(64),
+        fixes: [
+            {
+                targetId: 'missing-page',
+                collection: 'pages',
+                seo: { title: 'Guard reached handler' },
+            },
+        ],
+    },
+) =>
     new NextRequest('http://localhost/api/seo/apply-fixes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,7 +119,9 @@ describe('withFeatureGuard — Pattern A enforcement (TC-SUB-060..063)', () => {
             tenants: [{ tenant: { id: 'tenant-1' }, role: 'owner' }],
         } as any)
         vi.mocked(getActivePlanSubscription).mockResolvedValue({
-            id: 'sub-1', plan: 'FREEMIUM', status: 'active',
+            id: 'sub-1',
+            plan: 'FREEMIUM',
+            status: 'active',
         } as any)
         vi.mocked(canUse).mockResolvedValue(false)
 
@@ -113,11 +141,13 @@ describe('withFeatureGuard — Pattern A enforcement (TC-SUB-060..063)', () => {
             tenants: [{ tenant: { id: 'tenant-1' }, role: 'owner' }],
         } as any)
         vi.mocked(getActivePlanSubscription).mockResolvedValue({
-            id: 'sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active',
+            id: 'sub-1',
+            plan: 'PROFESSIONAL_TM_USER',
+            status: 'active',
         } as any)
         vi.mocked(canUse).mockResolvedValue(true)
 
-        // Act — empty fixes array causes handler to return ALL_FAILED (not a guard error)
+        // Act — the valid request reaches the handler and its site lookup.
         const res = await POST(makeRequest())
         const body = await res.json()
 
@@ -125,7 +155,7 @@ describe('withFeatureGuard — Pattern A enforcement (TC-SUB-060..063)', () => {
         expect(body.error?.code).not.toBe('UNAUTHORIZED')
         expect(body.error?.code).not.toBe('SUBSCRIPTION_EXPIRED')
         expect(body.error?.code).not.toBe('FEATURE_LOCKED')
-        // Handler was reached — ALL_FAILED confirms handler executed with empty fixes
-        expect(body.error?.code).toBe('ALL_FAILED')
+        // SITE_NOT_FOUND is emitted by the handler after every guard passes.
+        expect(body.error?.code).toBe('SITE_NOT_FOUND')
     })
 })

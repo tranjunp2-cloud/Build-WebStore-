@@ -67,7 +67,7 @@ describe('[TC-F37-03] sitemap public route contract', () => {
         const pagesCall = mockFind.mock.calls[2][0]
         const productsCall = mockFind.mock.calls[3][0]
         const blogsCall = mockFind.mock.calls[4][0]
-        expect(siteCall.sort).toBe('createdAt')
+        expect(siteCall.sort).toEqual(['createdAt', 'id'])
         expect(JSON.stringify(pagesCall.where)).toContain('"site":{"equals":"site-1"}')
         expect(JSON.stringify(pagesCall.where)).toContain('"seo.noIndex":{"not_equals":true}')
         expect(JSON.stringify(pagesCall.where)).toContain('"deletedAt":{"exists":false}')

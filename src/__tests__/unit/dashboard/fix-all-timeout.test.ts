@@ -10,12 +10,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
-const mockUser = { id: 1, roles: [] as string[], tenants: [{ tenant: 'tenant-1' }] }
+const CURRENT_REVISION = 'a'.repeat(64)
+const mockUser = {
+    id: 1,
+    roles: [] as string[],
+    tenants: [{ tenant: 'tenant-1', status: 'active' }],
+}
+type AuthHandler = (user: typeof mockUser, request: Request) => unknown
 vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn((handler: any) => async (req: any) => handler(mockUser, req)),
+    withAuth: vi.fn(
+        (handler: AuthHandler) => async (req: Request) =>
+            handler(mockUser, req),
+    ),
 }))
 vi.mock('@/lib/subscriptions/feature-guard', () => ({
-    withFeatureGuard: vi.fn(() => (h: any) => h),
+    withFeatureGuard: vi.fn(
+        () =>
+            <T>(handler: T): T =>
+                handler,
+    ),
+}))
+
+const mockCheckTwoTierRateLimit = vi.fn()
+vi.mock('@/lib/rateLimit', () => ({
+    checkTwoTierRateLimit: (...args: unknown[]) => mockCheckTwoTierRateLimit(...args),
 }))
 
 const mockFindByID = vi.fn()
@@ -27,14 +45,37 @@ vi.mock('@payload-config', () => ({ default: {} }))
 // Slow AI generation to test timeout
 const mockGenerateAutoSEOMeta = vi.fn()
 vi.mock('@/lib/ai/generate-meta', () => ({
-    generateAutoSEOMeta: (...args: any[]) => mockGenerateAutoSEOMeta(...args),
+    generateAutoSEOMeta: (...args: unknown[]) =>
+        mockGenerateAutoSEOMeta(...args),
+}))
+
+const mockEvaluateAuthoritativeLocalSeo = vi.fn()
+vi.mock('@/lib/seo/local-seo-evaluation', () => ({
+    evaluateAuthoritativeLocalSeo: (...args: unknown[]) =>
+        mockEvaluateAuthoritativeLocalSeo(...args),
 }))
 
 import { POST } from '@/app/api/seo/fix-all/route'
 
-function makeRequest(missingSeo: any[]) {
+function makeRequest(
+    missingSeo: Array<{
+        collection: 'pages' | 'products' | 'blogs'
+        id: string
+        title: string
+        missingFields: Array<'title' | 'description'>
+    }>,
+) {
+    mockEvaluateAuthoritativeLocalSeo.mockResolvedValue({
+        response: { revisionToken: CURRENT_REVISION },
+        metadataItems: missingSeo,
+    })
     return {
-        json: () => Promise.resolve({ siteId: 'site-1', missingSeo }),
+        json: () =>
+            Promise.resolve({
+                siteId: 'site-1',
+                revisionToken: CURRENT_REVISION,
+                missingSeo,
+            }),
     } as unknown as Request
 }
 
@@ -54,14 +95,33 @@ async function readSSEStream(res: Response): Promise<string[]> {
 describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockCheckTwoTierRateLimit.mockResolvedValue({
+            allowed: true,
+            remaining: 4,
+            resetAt: Date.now() + 60_000,
+        })
         vi.useRealTimers()
-        mockFindByID.mockResolvedValue({ id: 'site-1', name: 'Store', tenant: 'tenant-1' })
+        mockFindByID.mockResolvedValue({
+            id: 'site-1',
+            name: 'Store',
+            tenant: 'tenant-1',
+        })
     })
 
     it('[TC-F03.39] sends retry:3000 directive as first SSE event', async () => {
         // Arrange
-        mockGenerateAutoSEOMeta.mockResolvedValue({ title: 'T', description: 'D' })
-        const req = makeRequest([{ collection: 'pages', id: '1', title: 'P', missingFields: ['title'] }])
+        mockGenerateAutoSEOMeta.mockResolvedValue({
+            title: 'T',
+            description: 'D',
+        })
+        const req = makeRequest([
+            {
+                collection: 'pages',
+                id: '1',
+                title: 'P',
+                missingFields: ['title'],
+            },
+        ])
 
         // Act
         const res = await POST(req, {} as any)
@@ -73,8 +133,18 @@ describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => 
 
     it('[TC-F03.39] returns SSE content type', async () => {
         // Arrange
-        mockGenerateAutoSEOMeta.mockResolvedValue({ title: 'T', description: 'D' })
-        const req = makeRequest([{ collection: 'pages', id: '1', title: 'P', missingFields: ['title'] }])
+        mockGenerateAutoSEOMeta.mockResolvedValue({
+            title: 'T',
+            description: 'D',
+        })
+        const req = makeRequest([
+            {
+                collection: 'pages',
+                id: '1',
+                title: 'P',
+                missingFields: ['title'],
+            },
+        ])
 
         // Act
         const res = await POST(req, {} as any)
@@ -86,10 +156,23 @@ describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => 
 
     it('[TC-F03.40] completes normally when AI responds fast', async () => {
         // Arrange
-        mockGenerateAutoSEOMeta.mockResolvedValue({ title: 'Generated', description: 'Desc' })
+        mockGenerateAutoSEOMeta.mockResolvedValue({
+            title: 'Generated',
+            description: 'Desc',
+        })
         const req = makeRequest([
-            { collection: 'pages', id: '1', title: 'Page 1', missingFields: ['title'] },
-            { collection: 'pages', id: '2', title: 'Page 2', missingFields: ['description'] },
+            {
+                collection: 'pages',
+                id: '1',
+                title: 'Page 1',
+                missingFields: ['title'],
+            },
+            {
+                collection: 'pages',
+                id: '2',
+                title: 'Page 2',
+                missingFields: ['description'],
+            },
         ])
 
         // Act
@@ -99,18 +182,33 @@ describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => 
 
         // Assert — should have retry + 2 data events
         expect(allText).toContain('retry: 3000')
-        const dataEvents = allText.split('data: ').filter(s => s.trim().length > 0)
+        const dataEvents = allText
+            .split('data: ')
+            .filter((s) => s.trim().length > 0)
         expect(dataEvents.length).toBeGreaterThanOrEqual(2)
     })
 
     it('[TC-F03.41] timeout sends error event after 15s', async () => {
         // Arrange — AI takes 20s per item
         vi.useFakeTimers()
-        mockGenerateAutoSEOMeta.mockImplementation(() =>
-            new Promise(resolve => setTimeout(() => resolve({ title: 'T', description: 'D' }), 20_000))
+        mockGenerateAutoSEOMeta.mockImplementation(
+            () =>
+                new Promise((resolve) =>
+                    setTimeout(
+                        () => resolve({ title: 'T', description: 'D' }),
+                        20_000,
+                    ),
+                ),
         )
 
-        const req = makeRequest([{ collection: 'pages', id: '1', title: 'Slow', missingFields: ['title'] }])
+        const req = makeRequest([
+            {
+                collection: 'pages',
+                id: '1',
+                title: 'Slow',
+                missingFields: ['title'],
+            },
+        ])
 
         // Act
         const res = await POST(req, {} as any)
