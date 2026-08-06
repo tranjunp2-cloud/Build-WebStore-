@@ -271,7 +271,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
-        fireEvent.change(screen.getByPlaceholderText(/Leather jacket/), {
+        fireEvent.change(await screen.findByPlaceholderText(/Leather jacket/), {
             target: { value: 'prompt A' },
         })
         fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))

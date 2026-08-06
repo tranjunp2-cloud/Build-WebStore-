@@ -1,5 +1,15 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F08 - Products CRUD
-> **Phiên bản:** 9.2 | **Cập nhật:** 2026-07-29 (GH-1588 Scope 02 tenant-aware AI categories) | **Thực hiện:** QA Team
+> **Phiên bản:** 9.7 | **Cập nhật:** 2026-08-06 (merge staging + GH-1588 fail-closed guard) | **Thực hiện:** QA Team
+
+> **Phiên bản:** 9.7 | **Cập nhật:** 2026-08-06 (merge staging + GH-1588 fail-closed guard) | **Thực hiện:** QA Team
+
+### GH-1588 Bug 1 addendum
+- The staging merge reserves TC-F08-04-120..127 for GH-1733. GH-1588 implementation labels remain TC120..125 in source/plan; this addendum uses the next free QA IDs to avoid overwriting staging evidence.
+- **TC-F08-04-128** (Unit): production canonicalizer passes the versioned exact-set fail-closed matrix, including tent/skincare negative and serum/skincare positive controls.
+- **TC-F08-04-129** (API): production prompt, validator, allowlist, and canonicalizer use the shared seam with one model call; unrelated/unknown/ambiguous IDs become null.
+- **TC-F08-04-130** (API): canonical numeric/string IDs and reason-count privacy logging remain valid after the staging merge.
+- **TC-F08-04-131** (Playwright/Live): real bulk-parse route keeps `4-Person Camping Tent` uncategorized and disables Approve All; debounce-safe category fixture cleanup is included.
+- **TC-F08-04-132** (Manual/Staging): tent/skincare negative and serum/skincare positive controls remain the external QA gate.
 
 ### Changelog
 - **v9.2 (2026-07-29)** — Bổ sung regression GH-1588 Scope 02: AI parser chỉ dùng active category của tenant; null/stale bắt buộc chọn category hiện có; không auto-create; ID lookup reject malformed/dedupe canonical IDs; zero-category tenant bị chặn trước parse; partial save giữ modal/draft chưa lưu; prompt mới không bị completion cũ xóa; AI Server Action revalidate đúng một category và manual Product flow không đổi.
