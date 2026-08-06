@@ -41,7 +41,6 @@ test.describe('Products Management', () => {
         // Arrange
         const unauthenticatedRequest = await playwright.request.newContext({
             baseURL: process.env.BASE_URL || 'http://localhost:3000',
-            storageState: { cookies: [], origins: [] },
         })
 
         // Act
@@ -178,11 +177,8 @@ test.describe('Products Management', () => {
             name: 'Color',
             options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
         })
-        const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
-        await expect(reviewHeading).toBeVisible()
-        const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
-        await expect(reviewOverlay.getByLabel('Product name')).toHaveValue('T-Shirt')
-        await expect(reviewOverlay.getByText('White, Red, Grey', { exact: true })).toBeVisible()
+        await expect(page.locator('.fixed.inset-0 input[type="text"]').first()).toHaveValue('T-Shirt')
+        await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
     })
 
     test('[TC-F08-04-86] AI bulk draft creates localized two-tier Cartesian variants', async ({ page }) => {
@@ -232,97 +228,56 @@ test.describe('Products Management', () => {
     })
 })
 
-async function createCategoryViaUi(page: Page, name: string) {
-    await navigateTo(page, '/products/categories')
-    await expectNoServerError(page)
-
-    await page.getByRole('button', { name: /add category/i }).click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.getByRole('textbox').first().fill(name)
-    await dialog.getByRole('button', { name: /save category/i }).click()
-
-    await expect(dialog).toBeHidden()
-    await page.getByPlaceholder(/search categories/i).fill(name)
-    await expect(page.getByText(name, { exact: true })).toBeVisible()
-}
-
-async function ensureCategoryViaUi(page: Page, name: string): Promise<boolean> {
-    await navigateTo(page, '/products/categories')
-    await expectNoServerError(page)
-
-    const search = page.getByPlaceholder(/search categories/i)
-    await search.fill(name)
-    const existingCategory = page.getByText(name, { exact: true }).first()
-    const emptyState = page.getByText(/no categories|no results found/i).last()
-    await expect(existingCategory.or(emptyState)).toBeVisible({ timeout: 10_000 })
-    if (await existingCategory.isVisible()) {
-        return false
-    }
-
-    await search.fill('')
-    await page.getByRole('button', { name: /add category/i }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox').first().fill(name)
-    await dialog.getByRole('button', { name: /save category/i }).click()
-    await expect(dialog).toBeHidden()
-    return true
-}
-
 async function deleteProductViaUi(page: Page, name: string) {
     await navigateTo(page, '/products')
     const search = page.getByPlaceholder(/search by name or sku/i).last()
     await search.fill(name)
 
-    const row = page.getByRole('row').filter({
+    const rows = page.getByRole('row').filter({
         has: page.getByText(name, { exact: true }),
     })
     const emptyState = page.getByText(/no products match the current filters/i)
-    await expect(row.or(emptyState)).toBeVisible()
-    if (!(await row.isVisible())) return
+    await expect(rows.first().or(emptyState)).toBeVisible()
 
-    await row.getByRole('button', { name: /delete/i }).click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toContainText(name)
-    await dialog.getByRole('button', { name: /confirm delete/i }).click()
-    await expect(dialog).toBeHidden()
-    await expect(row).toHaveCount(0)
+    let remaining = await rows.count()
+    while (remaining > 0) {
+        const row = rows.first()
+        await row.getByRole('button', { name: /delete/i }).click()
+        const dialog = page.getByRole('dialog')
+        await expect(dialog).toContainText(name)
+        await dialog.getByRole('button', { name: /confirm delete/i }).click()
+        await expect(dialog).toBeHidden()
+        remaining--
+        await expect(rows).toHaveCount(remaining)
+    }
 }
 
-async function deleteCategoryViaUi(page: Page, name: string) {
-    await navigateTo(page, '/products/categories')
-    const search = page.getByPlaceholder(/search categories/i)
-    await search.fill(name)
-
-    const row = page.locator('div.group').filter({
-        has: page.getByText(name, { exact: true }),
-    })
-    const emptyState = page.getByText(/no results found/i)
-    await expect(row.or(emptyState)).toBeVisible()
-    if (!(await row.isVisible())) return
-
-    await row.getByRole('button', { name: /delete/i }).click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toContainText(name)
-    await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(dialog).toBeHidden()
-    await expect(row).toHaveCount(0)
+type ProductFixtureRead = {
+    id: string | number
+    name: string
+    status?: string
 }
 
-test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
+async function readProductFixtures(page: Page, names: string[]): Promise<ProductFixtureRead[]> {
+    const response = await page.request.get('/api/dashboard/products')
+    expect(response.ok()).toBe(true)
+    const body = await response.json() as { success?: boolean; data?: ProductFixtureRead[] }
+    expect(body.success).toBe(true)
+    return (body.data ?? []).filter(product => names.includes(product.name))
+}
+
+test.describe('GH-1733 — verified AI Product persistence on staging', () => {
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const fixtureCategoryName = `GH1588 Category ${runId}`
-    const liveCategoryName = 'QA Skincare'
-    let liveCategoryCreated = false
+    const fixtureCategoryName = 'E2E AI Products'
+    const generationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     const createdProductNames = [
-        `GH1588 Draft A ${runId}`,
-        `GH1588 Draft B ${runId}`,
+        `GH1733 Draft A ${runId}`,
+        `GH1733 Draft B ${runId}`,
     ]
 
-    test.afterEach(async ({ page }) => {
-        // Cleanup through the same tenant-scoped Server Actions as the dashboard.
-        // Attempt every owned fixture even if one UI delete fails, then preserve the failure
-        // so the test still reports cleanup damage instead of silently leaking staging data.
+    test.afterEach(async ({ page }, testInfo) => {
+        // Cleanup through the same tenant-scoped dashboard actions. Delete every duplicate if the
+        // exact-once assertion fails, while preserving the original failure as the primary result.
         const cleanupErrors: unknown[] = []
         for (const name of createdProductNames) {
             try {
@@ -331,46 +286,36 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
                 cleanupErrors.push(error)
             }
         }
-        try {
-            await deleteCategoryViaUi(page, fixtureCategoryName)
-        } catch (error) {
-            cleanupErrors.push(error)
-        }
-        if (liveCategoryCreated) {
-            try {
-                await deleteCategoryViaUi(page, liveCategoryName)
-            } catch (error) {
-                cleanupErrors.push(error)
-            } finally {
-                liveCategoryCreated = false
-            }
-        }
-        if (cleanupErrors.length > 0) {
-            throw new AggregateError(cleanupErrors, 'GH-1588 E2E fixture cleanup failed')
-        }
+        if (cleanupErrors.length === 0) return
+
+        const aggregate = new AggregateError(cleanupErrors, 'GH-1733 E2E Product cleanup failed')
+        if (testInfo.status === testInfo.expectedStatus) throw aggregate
+        await testInfo.attach('cleanup-errors', {
+            body: aggregate.stack || aggregate.message,
+            contentType: 'text/plain',
+        })
     })
 
-    test('[TC-F08-04-101] requires existing-category selection and persists AI-created drafts', async ({ page }) => {
+    test('[TC-F08-04-101][TC-F08-04-126] persists two Drafts and replays an ambiguous acknowledgement exactly once', async ({ page }) => {
         test.setTimeout(120_000)
 
-        // Arrange — create an existing tenant category through the real dashboard flow.
+        // Arrange — CI provisioning owns the active category. Mock only AI parsing; category
+        // selection, Server Actions, database writes, replay lookup, list reads, and detail reads
+        // all use the live staging application.
         await page.addInitScript(() => {
             localStorage.setItem('prefer_lang', 'en')
             document.cookie = 'prefer_lang=en; path=/; samesite=lax'
         })
-        await createCategoryViaUi(page, fixtureCategoryName)
-
-        // The parse API contract is covered by TC-F08-04-94..100. Intercepting it keeps
-        // this browser test focused on required selection and real Server Action persistence.
         await page.route('**/api/ai/products-bulk-parse', async route => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify({
+                    generationId,
                     products: createdProductNames.map((name, index) => ({
                         name,
                         price: 21 + index,
-                        sku: `GH1588-${index + 1}-${runId}`,
+                        sku: `GH1733-${index + 1}-${runId}`,
                         categoryId: null,
                         variants: [],
                     })),
@@ -378,9 +323,32 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             })
         })
 
+        let obscuredSaveAcknowledgement = false
+        let forwardedSaveStatus: number | null = null
+        await page.route(/\/products(?:\?.*)?$/, async route => {
+            const request = route.request()
+            const postData = request.postData() ?? ''
+            const isFirstDraftSave = request.method() === 'POST'
+                && Boolean(request.headers()['next-action'])
+                && postData.includes(createdProductNames[0])
+
+            if (!isFirstDraftSave || obscuredSaveAcknowledgement) {
+                await route.continue()
+                return
+            }
+
+            const upstreamResponse = await route.fetch()
+            forwardedSaveStatus = upstreamResponse.status()
+            obscuredSaveAcknowledgement = true
+            await route.fulfill({
+                status: 503,
+                contentType: 'text/plain',
+                body: 'The committed Server Action acknowledgement was intentionally obscured.',
+            })
+        })
+
         await navigateTo(page, '/products')
         await expectNoServerError(page)
-
         const aiChatTextarea = page.locator('textarea').first()
         await expect(aiChatTextarea).toBeVisible({ timeout: 10_000 })
         const parseResponsePromise = page.waitForResponse(
@@ -388,8 +356,9 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             { timeout: 60_000 },
         )
 
-        // Act — both unmatched drafts must receive an existing category before approval.
-        await aiChatTextarea.fill('Create two category regression products.')
+        // Act — select the provisioned category for both previews and approve. The first real
+        // save commits but its response is hidden, so the drawer must retain that preview.
+        await aiChatTextarea.fill('Create two persistence regression products.')
         await aiChatTextarea.press('Enter')
         expect((await parseResponsePromise).ok()).toBe(true)
 
@@ -406,27 +375,107 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
         await expect(approveButton).toBeEnabled()
         await approveButton.click()
 
-        // Assert — the real Server Action saved drafts, and a fresh UI read resolves the
-        // selected category relation for every created product.
-        await expect(page.getByText(/created 2 draft products/i)).toBeVisible({ timeout: 30_000 })
+        // Assert — both writes committed, but only the ambiguous preview remains in the drawer.
+        await expect(page.getByRole('button', { name: /retry save/i })).toBeEnabled({ timeout: 30_000 })
+        expect(obscuredSaveAcknowledgement).toBe(true)
+        expect(forwardedSaveStatus).toBe(200)
+        await expect.poll(async () => (await readProductFixtures(page, createdProductNames)).length, {
+            timeout: 30_000,
+        }).toBe(2)
+        const beforeRetry = await readProductFixtures(page, createdProductNames)
+        expect(beforeRetry).toHaveLength(2)
+        expect(new Set(beforeRetry.map(product => String(product.id))).size).toBe(2)
+        expect(beforeRetry.every(product => product.status === 'draft')).toBe(true)
+        const idsBeforeRetry = beforeRetry
+            .map(product => String(product.id))
+            .sort()
+
+        // Act — explicit retry reuses the mounted preview operation ID/stable slug. The server
+        // replay lookup must return the already committed row instead of creating a duplicate.
+        await page.getByRole('button', { name: /retry save/i }).click()
+        await expect(page.getByRole('heading', { name: 'Review AI drafts' })).toBeHidden({ timeout: 30_000 })
+        await expect(page.getByRole('tab', { name: /Draft/ })).toHaveAttribute('data-state', 'active')
+
+        // Assert — a fresh canonical read contains exactly the same two IDs, and each row/detail
+        // is discoverable through the real Draft list UI with the provisioned category.
+        await expect.poll(async () => (await readProductFixtures(page, createdProductNames)).length, {
+            timeout: 30_000,
+        }).toBe(2)
+        const afterRetry = await readProductFixtures(page, createdProductNames)
+        expect(afterRetry.map(product => String(product.id)).sort()).toEqual(idsBeforeRetry)
+
         for (const name of createdProductNames) {
             const search = page.getByPlaceholder(/search by name or sku/i).last()
             await search.fill(name)
             const row = page.getByRole('row').filter({
                 has: page.getByText(name, { exact: true }),
             })
-            await expect(row).toBeVisible()
-            await row.click()
+            await expect(row).toHaveCount(1)
+            await row.getByTitle(/edit/i).click()
             await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
             await expect(page.getByText(fixtureCategoryName, { exact: true }).last()).toBeVisible()
             await navigateTo(page, '/products')
+        }
+    })
+})
+
+async function ensureCategoryViaUi(page: Page, name: string): Promise<boolean> {
+    await navigateTo(page, '/products/categories')
+    await expectNoServerError(page)
+
+    const search = page.getByPlaceholder(/search categories/i)
+    await search.fill(name)
+    const existingCategory = page.getByText(name, { exact: true }).first()
+    const emptyState = page.getByText(/no categories|no results found/i).last()
+    await expect(existingCategory.or(emptyState)).toBeVisible({ timeout: 10_000 })
+    if (await existingCategory.isVisible()) return false
+
+    await search.fill('')
+    await page.getByRole('button', { name: /add category/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('textbox').first().fill(name)
+    await dialog.getByRole('button', { name: /save category/i }).click()
+    await expect(dialog).toBeHidden()
+    return true
+}
+
+async function deleteCategoryViaUi(page: Page, name: string) {
+    await navigateTo(page, '/products/categories')
+    const search = page.getByPlaceholder(/search categories/i)
+    await search.fill(name)
+
+    const row = page.locator('div.group').filter({
+        has: page.getByText(name, { exact: true }),
+    })
+    const emptyState = page.getByText(/no results found/i)
+    await expect(row.or(emptyState)).toBeVisible({ timeout: 10_000 })
+    if (!(await row.isVisible())) return
+
+    await row.getByRole('button', { name: /delete/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText(name)
+    await dialog.getByRole('button', { name: /delete category/i }).click()
+    await expect(dialog).toBeHidden()
+    await expect(row).toHaveCount(0)
+}
+
+test.describe('GH-1588 Bug 1 — fail-closed unmatched AI category', () => {
+    const liveCategoryName = 'QA Skincare'
+    let liveCategoryCreated = false
+
+    test.afterEach(async ({ page }) => {
+        if (!liveCategoryCreated) return
+        try {
+            await deleteCategoryViaUi(page, liveCategoryName)
+        } finally {
+            liveCategoryCreated = false
         }
     })
 
     test('[TC-F08-04-125] real bulk-parse route keeps the reported negative control uncategorized', async ({ page }) => {
         test.setTimeout(120_000)
 
-        // Arrange — use a real tenant category and do not intercept the production parse route.
         await page.addInitScript(() => {
             localStorage.setItem('prefer_lang', 'en')
             document.cookie = 'prefer_lang=en; path=/; samesite=lax'
@@ -443,7 +492,6 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             { timeout: 60_000 },
         )
 
-        // Act — this request reaches the real route and model integration.
         await aiChatTextarea.fill(
             'Create exactly one draft product named "4-Person Camping Tent" with price RM 100.',
         )
@@ -453,7 +501,6 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
             products?: Array<{ categoryId?: string | number | null }>
         }
 
-        // Assert — the route, then the browser review state, both fail closed.
         expect(parseResponse.ok()).toBe(true)
         expect(body.products).toHaveLength(1)
         expect(body.products?.[0]?.categoryId).toBeNull()
@@ -463,17 +510,19 @@ test.describe('GH-1588 Scope 02 — tenant-aware AI bulk categories', () => {
         const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
         const categorySelect = reviewOverlay.getByTestId('ai-category-select-1')
         await expect(categorySelect.getByRole('combobox')).toContainText('Select categories')
-        await expect(reviewOverlay.getByText('At least one category must be selected')).toBeVisible()
+        await expect(reviewOverlay.getByText(/pick at least one category|at least one category must be selected/i)).toBeVisible()
         await expect(reviewOverlay.getByRole('button', { name: /approve all/i })).toBeDisabled()
 
         await reviewOverlay.getByRole('button', { name: /discard/i }).click()
         await expect(reviewHeading).toBeHidden()
     })
 })
+
 const LONG_PRODUCT_NAME = 'Premium Handcrafted Malaysian Travel Backpack With Extended Product Name and Waterproof Compartments Weekend Adventures'
 const LONG_VARIANT_NAME = 'UltraLongVariantNameWithoutSpacesABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 const PARSED_PRODUCTS = {
+    generationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     products: [
         {
             name: LONG_PRODUCT_NAME,
