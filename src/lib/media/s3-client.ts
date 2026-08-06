@@ -1,5 +1,9 @@
 import { S3Client } from '@aws-sdk/client-s3'
 
+export function isS3Configured(): boolean {
+    return Boolean(process.env.S3_ENDPOINT && process.env.S3_BUCKET)
+}
+
 // Shared S3 client builder — same config the s3Storage plugin and
 // carton-placeholder use (forcePathStyle for MinIO/dev; works on AWS too).
 // Returns null when S3 is not configured (local without storage env).

@@ -20,6 +20,7 @@ interface BuyerTrackingOrder {
     shippingCourier?: string | null
     shippingCourierName?: string | null
     shippingCourierLogo?: string | null
+    selfDeliveryCourier?: string | null
     collectionMethod?: 'pickup' | 'dropoff' | null
     shippingTrackingStatus?: string | null
     shippingTrackingHistory?: Array<{
@@ -39,6 +40,7 @@ function buyerTrackingState(order: BuyerTrackingOrder) {
         shippingCourier: order.shippingCourier ?? null,
         shippingCourierName: order.shippingCourierName ?? null,
         shippingCourierLogo: order.shippingCourierLogo ?? null,
+        selfDeliveryCourier: order.selfDeliveryCourier ?? null,
         collectionMethod: order.collectionMethod ?? null,
         shippingTrackingStatus: order.shippingTrackingStatus ?? null,
         shippingTrackingHistory: (order.shippingTrackingHistory ?? []).map((entry) => ({

@@ -400,11 +400,11 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
     })
 
     // ─────────────────────────────────────────────────────────────────────
-    describe('Plans Management Section', () => {
-        it('TC-F05-891.17: renders Plans Management section header', () => {
+    describe('Plans management Section', () => {
+        it('TC-F05-891.17: renders Plans management section header', () => {
             render(<PricingSettings block={mockBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            expect(screen.getByText('Plans Management')).toBeVisible()
+            expect(screen.getByText('Plans management')).toBeVisible()
         })
 
         it('TC-F05-891.18: section is always visible (not collapsible)', () => {
@@ -417,8 +417,8 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
         it('TC-F05-891.19: header is plain text, not a button (no toggle behavior)', () => {
             render(<PricingSettings block={mockBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // Plans Management header should be visible as text/span, not a clickable button
-            const header = screen.getByText('Plans Management')
+            // Plans management header should be visible as text/span, not a clickable button
+            const header = screen.getByText('Plans management')
             expect(header).toBeVisible()
             // The header is not a button with toggle behavior
             const headerParent = header.parentElement
@@ -430,7 +430,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
 
             // All form fields should always be visible
             expect(screen.getByPlaceholderText('e.g. Starter')).toBeVisible()
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
     })
 
@@ -509,7 +509,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const discountLabel = screen.getByText('Discount Percentage:')
+            const discountLabel = screen.getByText('Discount percentage:')
             expect(discountLabel).toBeVisible()
         })
 
@@ -580,7 +580,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
             // No checkbox — section is always visible; discount input shows 0
-            expect(screen.getByText('Discount Percentage:')).toBeVisible()
+            expect(screen.getByText('Discount percentage:')).toBeVisible()
             expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
             const numberInputs = screen.getAllByRole('spinbutton')
             expect(numberInputs).toHaveLength(1)
@@ -595,7 +595,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            expect(screen.getByText('Discount Percentage:')).toBeVisible()
+            expect(screen.getByText('Discount percentage:')).toBeVisible()
             const numberInput = screen.getByRole('spinbutton')
             expect(numberInput).toHaveValue(15)
         })
@@ -715,7 +715,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
 
             // When variant is toggle, PlanFields renders with unified price field (not separate monthly/yearly)
             // Toggle variant pricing is managed at PricingSettings level, not within PlanFields
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.78: yearlyDiscount value is reflected in spinbutton for toggle variant', () => {
@@ -806,7 +806,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
     // ── TC-F05-891 Phase 4+5: Feature Editor Modal Integration ──────────────
 
     describe('[TC-F05-891] PricingSettings — Feature Editor Modal (Phase 4+5)', () => {
-        it('TC-F05-891.113: "Edit Features" button visible when variant === "table"', () => {
+        it('TC-F05-891.113: "Edit features" button visible when variant === "table"', () => {
             const tableBlock = {
                 ...mockBlock,
                 variant: 'table' as const,
@@ -817,11 +817,11 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             }
             render(<PricingSettings block={tableBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             expect(editFeaturesBtn).toBeVisible()
         })
 
-        it('TC-F05-891.114: "Edit Features" button visible when variant === "comparison"', () => {
+        it('TC-F05-891.114: "Edit features" button visible when variant === "comparison"', () => {
             const comparisonBlock = {
                 ...mockBlock,
                 variant: 'comparison' as const,
@@ -832,29 +832,29 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             }
             render(<PricingSettings block={comparisonBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             expect(editFeaturesBtn).toBeVisible()
         })
 
-        it('TC-F05-891.115: "Edit Features" button NOT visible when variant === "cards"', () => {
+        it('TC-F05-891.115: "Edit features" button NOT visible when variant === "cards"', () => {
             const cardsBlock = {
                 ...mockBlock,
                 variant: 'cards' as const,
             }
             render(<PricingSettings block={cardsBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const editFeaturesBtn = screen.queryByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.queryByRole('button', { name: /Edit features/ })
             expect(editFeaturesBtn).not.toBeInTheDocument()
         })
 
-        it('TC-F05-891.116: "Edit Features" button NOT visible when variant === "toggle"', () => {
+        it('TC-F05-891.116: "Edit features" button NOT visible when variant === "toggle"', () => {
             const toggleBlock = {
                 ...mockBlock,
                 variant: 'toggle' as const,
             }
             render(<PricingSettings block={toggleBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const editFeaturesBtn = screen.queryByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.queryByRole('button', { name: /Edit features/ })
             expect(editFeaturesBtn).not.toBeInTheDocument()
         })
 
@@ -875,7 +875,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             const dialogRoot = container.querySelector('[data-testid="dialog-content"]')
             // Note: Dialog conditionally renders, so it may be null when open=false
             // We verify it exists by clicking the button to open it
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             fireEvent.click(editFeaturesBtn)
 
             // After click, modal should open (if dialog mock is wired correctly)
@@ -883,7 +883,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             expect(editFeaturesBtn).toBeVisible()
         })
 
-        it('TC-F05-891.118: "Edit Features" button passes block.featureMatrix to modal', async () => {
+        it('TC-F05-891.118: "Edit features" button passes block.featureMatrix to modal', async () => {
             const featureMatrix = [
                 { featureName: 'Feature A', values: [{ included: true }, { included: false }] },
             ]
@@ -898,7 +898,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             }
             render(<PricingSettings block={tableBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             fireEvent.click(editFeaturesBtn)
 
             // Modal should receive matrix and be open
@@ -906,7 +906,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             expect(editFeaturesBtn).toBeVisible()
         })
 
-        it('TC-F05-891.119: "Edit Features" button passes planNames derived from plan.name values', async () => {
+        it('TC-F05-891.119: "Edit features" button passes planNames derived from plan.name values', async () => {
             const tableBlock = {
                 ...mockBlock,
                 variant: 'table' as const,
@@ -918,7 +918,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             render(<PricingSettings block={tableBlock} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
             // Click to open modal — plan names should be passed as ['Starter Plan', 'Professional']
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             fireEvent.click(editFeaturesBtn)
 
             // Test passes if no error; planNames are derived via .map(p => p.name || 'Plan')
@@ -938,7 +938,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
 
             // Note: Full modal interaction is tested in pricing-feature-editor-modal.test.tsx
             // Here we just verify the wiring: button opens modal + modal calls onSave callback
-            const editFeaturesBtn = screen.getByRole('button', { name: /Edit Features/ })
+            const editFeaturesBtn = screen.getByRole('button', { name: /Edit features/ })
             expect(editFeaturesBtn).toBeVisible()
 
             // When modal.onSave is called, it should invoke:

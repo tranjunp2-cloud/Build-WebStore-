@@ -14,7 +14,7 @@ import { LogoEditor } from './LogoEditor'
 import { FaviconEditor } from './FaviconEditor'
 import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
@@ -358,6 +358,7 @@ function SettingsPanelInner({
     hideChrome = false,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
+    const { upload: uploadFooterLogo, isUploading: isUploadingFooterLogo } = useUploadProgress()
     const pm = t.editor.pageManager
     const s = t.editor.settings
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
@@ -439,7 +440,6 @@ function SettingsPanelInner({
         const sl = b?.showLink
         setAnnShowLink(sl === true || (sl === undefined && !!(b?.linkText || b?.linkUrl)))
     }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
-    const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
     const [pendingSeoOverwrite, setPendingSeoOverwrite] = useState<PendingSeoOverwrite | null>(null)
@@ -1428,18 +1428,16 @@ function SettingsPanelInner({
     const handleFooterLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        setIsUploadingFooterLogo(true)
         try {
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', 'Logo')
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await uploadFooterLogo(formData)
             if (!uploaded?.url) throw new Error('Upload succeeded but no URL returned')
             onFooterUpdate?.({ logo: { url: uploaded.url, alt: (footerBlock?.logo as { alt?: string } | undefined)?.alt || '' } })
         } catch {
             toast.error('Failed to upload logo')
         } finally {
-            setIsUploadingFooterLogo(false)
             if (footerLogoRef.current) footerLogoRef.current.value = ''
         }
     }

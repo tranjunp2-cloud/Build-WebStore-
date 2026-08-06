@@ -144,7 +144,7 @@ describe('NavigationEditor', () => {
             target: { value: '   ' },
         })
 
-        expect(toast.error).toHaveBeenCalledWith('Link URL is required')
+        expect(toast.error).toHaveBeenCalledWith('Enter the link URL')
         expect(onUpdate).not.toHaveBeenCalled()
     })
 
@@ -174,7 +174,7 @@ describe('NavigationEditor', () => {
             target: { value: 'https://asdasd' },
         })
 
-        expect(toast.error).toHaveBeenCalledWith('Please enter a valid URL starting with http:// or https://')
+        expect(toast.error).toHaveBeenCalledWith('Enter a valid URL starting with http:// or https://')
         expect(onUpdate).not.toHaveBeenCalled()
     })
 })

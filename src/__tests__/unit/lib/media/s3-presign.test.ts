@@ -1,5 +1,5 @@
 /**
- * Unit Tests: createVideoPresignedPost — the presigned POST policy must pin the
+ * Unit Tests: createMediaPresignedPost — the presigned POST policy must pin the
  * key, Content-Type, and a hard 0..maxBytes size range so the client cannot
  * upload beyond the limit (GH-1284, server-authoritative cap).
  * TC-IDs: TC-F30-HMO-014
@@ -15,9 +15,9 @@ vi.mock('@/lib/media/s3-client', () => ({
     buildS3Client: () => ({ client: { __fake: true }, bucket: 'test-bucket' }),
 }))
 
-import { createVideoPresignedPost, S3_POST_MULTIPART_OVERHEAD_BYTES } from '@/lib/media/s3-presign'
+import { createMediaPresignedPost, S3_POST_MULTIPART_OVERHEAD_BYTES } from '@/lib/media/s3-presign'
 
-describe('TC-F30-HMO-015: createVideoPresignedPost enforces size + type in the policy', () => {
+describe('TC-F30-HMO-015: createMediaPresignedPost enforces size + type in the policy', () => {
     beforeEach(() => {
         createPresignedPostMock.mockReset()
         createPresignedPostMock.mockResolvedValue({ url: 'https://s3/test-bucket', fields: {} })
@@ -28,7 +28,7 @@ describe('TC-F30-HMO-015: createVideoPresignedPost enforces size + type in the p
         const maxFileBytes = 100 * 1024 * 1024
 
         // Act
-        await createVideoPresignedPost({ key: 'u1-v.mp4', contentType: 'video/mp4', maxFileBytes })
+        await createMediaPresignedPost({ key: 'u1-v.mp4', contentType: 'video/mp4', maxFileBytes })
 
         // Assert
         const [, params] = createPresignedPostMock.mock.calls[0] as [unknown, Record<string, unknown>]
@@ -45,7 +45,7 @@ describe('TC-F30-HMO-015: createVideoPresignedPost enforces size + type in the p
         const maxFileBytes = 12345
 
         // Act
-        await createVideoPresignedPost({ key: 'k.webm', contentType: 'video/webm', maxFileBytes })
+        await createMediaPresignedPost({ key: 'k.webp', contentType: 'image/webp', maxFileBytes })
 
         // Assert
         const [, params] = createPresignedPostMock.mock.calls[0] as [unknown, Record<string, unknown>]

@@ -3405,13 +3405,8 @@ const MIGRATIONS = [
   },
 
   // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
-  // Composite index on template_quality_scores(template_id, scored_at DESC)
-  // Note: template_quality_scores_template_scored_idx covers (template_id, scored_at DESC)
-  // so idx_tqs_template_scored is a safe alias — CREATE INDEX IF NOT EXISTS skips if identical.
-  {
-    name: 'template_quality_scores.idx_tqs_template_scored',
-    sql: `CREATE INDEX IF NOT EXISTS idx_tqs_template_scored ON template_quality_scores(template_id, scored_at DESC);`,
-  },
+  // template_quality_scores_template_scored_idx above already covers
+  // (template_id, scored_at DESC). PERF-04 cleanup removes the old alias.
   // Composite index on ai_generation_records(created_at DESC, status)
   {
     name: 'ai_generation_records.idx_agr_created_status',
@@ -4918,6 +4913,11 @@ const MIGRATIONS = [
     description text,
     event_time timestamp with time zone,
     collection_method varchar,
+    source varchar,
+    actor_id varchar,
+    actor_label varchar,
+    previous_status varchar,
+    next_status varchar,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
   );` },
@@ -4982,6 +4982,12 @@ const MIGRATIONS = [
   { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
   { name: 'orders.collection_method', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_method varchar;` },
   { name: 'orders.shipping_tracking_history.collection_method', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  // ── GH-1734: structured audit metadata for manual Self-delivery completion ──
+  { name: 'orders.shipping_tracking_history.source', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS source varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_id', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_id varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_label', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_label varchar;` },
+  { name: 'orders.shipping_tracking_history.previous_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS previous_status varchar;` },
+  { name: 'orders.shipping_tracking_history.next_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS next_status varchar;` },
   // Freeze legacy rows to the title they render today. Missing order-level method currently
   // displays as Pickup, so use the same fallback instead of letting a future label rewrite it.
   { name: 'orders.shipping_tracking_history.collection_method_backfill', sql: `UPDATE orders_shipping_tracking_history AS history
@@ -5100,6 +5106,280 @@ async function runMigrations(pool) {
   }
 }
 
+// PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the
+// deployment before any DROP runs so staging can never be modified from a stale report.
+const APPROVED_DUPLICATE_INDEX_PAIRS = [
+  {
+    table: 'template_quality_scores',
+    keep: 'template_quality_scores_template_scored_idx',
+    drop: 'idx_tqs_template_scored',
+  },
+];
+
+const DUPLICATE_INDEX_CLEANUP_ERROR = 'DUPLICATE_INDEX_CLEANUP_FAILED';
+const INDEX_IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/;
+
+function duplicateIndexCleanupError(message) {
+  const error = new Error(`[PERF-04] ${message}`);
+  error.code = DUPLICATE_INDEX_CLEANUP_ERROR;
+  return error;
+}
+
+function duplicateIndexFingerprint(index) {
+  return [
+    index.table_name,
+    index.access_method,
+    index.indisunique,
+    index.indisexclusion,
+    index.indnullsnotdistinct,
+    index.indnkeyatts,
+    index.indnatts,
+    index.index_keys,
+    index.operator_classes,
+    index.collations,
+    index.options,
+    index.expressions ?? '',
+    index.predicate ?? '',
+  ].map((value) => String(value)).join('|');
+}
+
+function approvedDuplicateGroupMap(approvedPairs) {
+  const groups = new Map();
+  for (const pair of approvedPairs) {
+    for (const identifier of [pair.table, pair.keep, pair.drop]) {
+      if (!INDEX_IDENTIFIER_PATTERN.test(identifier)) {
+        throw duplicateIndexCleanupError(`unsafe index cleanup identifier: ${identifier}`);
+      }
+    }
+
+    const group = `${pair.table}:${pair.keep}`;
+    for (const indexName of [pair.keep, pair.drop]) {
+      const key = `${pair.table}:${indexName}`;
+      const existingGroup = groups.get(key);
+      if (existingGroup && existingGroup !== group) {
+        throw duplicateIndexCleanupError(`${indexName} belongs to multiple cleanup groups`);
+      }
+      groups.set(key, group);
+    }
+  }
+  return groups;
+}
+
+function partitionDetectedDuplicateIndexPairs(
+  detectedPairs,
+  approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS
+) {
+  const approvedGroups = approvedDuplicateGroupMap(approvedPairs);
+  const approved = [];
+  const unapproved = [];
+  for (const pair of detectedPairs) {
+    const firstGroup = approvedGroups.get(`${pair.table_name}:${pair.index_1}`);
+    const secondGroup = approvedGroups.get(`${pair.table_name}:${pair.index_2}`);
+    if (firstGroup && firstGroup === secondGroup) {
+      approved.push(pair);
+    } else {
+      unapproved.push(pair);
+    }
+  }
+  return { approved, unapproved };
+}
+
+function buildDuplicateIndexCleanupPlan(indexRows, detectedPairs, approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS) {
+  const { unapproved: unknownPairs } = partitionDetectedDuplicateIndexPairs(detectedPairs, approvedPairs);
+  if (unknownPairs.length > 0) {
+    const names = unknownPairs
+      .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
+      .join(', ');
+    throw duplicateIndexCleanupError(
+      `unapproved exact duplicate indexes detected; audit staging and add explicit keep/drop pairs: ${names}`
+    );
+  }
+
+  const indexByName = new Map(indexRows.map((index) => [index.index_name, index]));
+  const actions = [];
+  for (const pair of approvedPairs) {
+    const keep = indexByName.get(pair.keep);
+    const drop = indexByName.get(pair.drop);
+
+    if (!keep || keep.table_name !== pair.table || !keep.indisvalid || !keep.indisready) {
+      throw duplicateIndexCleanupError(
+        `canonical index ${pair.keep} is missing, invalid, or belongs to the wrong table`
+      );
+    }
+
+    // Already-clean databases are valid and remain idempotent.
+    if (!drop) continue;
+
+    if (drop.table_name !== pair.table) {
+      throw duplicateIndexCleanupError(`${pair.drop} belongs to unexpected table ${drop.table_name}`);
+    }
+    if (drop.indisprimary || drop.indisunique || drop.indisexclusion || drop.constraint_backed) {
+      throw duplicateIndexCleanupError(`${pair.drop} backs a uniqueness/constraint contract and cannot be dropped`);
+    }
+    if (duplicateIndexFingerprint(keep) !== duplicateIndexFingerprint(drop)) {
+      throw duplicateIndexCleanupError(`${pair.keep} and ${pair.drop} are not structurally identical`);
+    }
+
+    actions.push(pair);
+  }
+  return actions;
+}
+
+async function loadApprovedIndexMetadata(client) {
+  const indexNames = [...new Set(
+    APPROVED_DUPLICATE_INDEX_PAIRS.flatMap((pair) => [pair.keep, pair.drop])
+  )];
+  const { rows } = await client.query(
+    `SELECT
+       index_class.relname AS index_name,
+       table_class.relname AS table_name,
+       access_method.amname AS access_method,
+       index_metadata.indisvalid,
+       index_metadata.indisready,
+       index_metadata.indisunique,
+       index_metadata.indisprimary,
+       index_metadata.indisexclusion,
+       index_metadata.indnullsnotdistinct,
+       index_metadata.indnkeyatts,
+       index_metadata.indnatts,
+       index_metadata.indkey::text AS index_keys,
+       index_metadata.indclass::text AS operator_classes,
+       index_metadata.indcollation::text AS collations,
+       index_metadata.indoption::text AS options,
+       pg_get_expr(index_metadata.indexprs, index_metadata.indrelid, true) AS expressions,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate,
+       EXISTS (
+         SELECT 1 FROM pg_constraint
+         WHERE pg_constraint.conindid = index_metadata.indexrelid
+       ) AS constraint_backed
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     JOIN pg_am AS access_method ON access_method.oid = index_class.relam
+     WHERE table_namespace.nspname = 'public'
+       AND index_class.relname = ANY($1::text[])`,
+    [indexNames]
+  );
+  return rows;
+}
+
+async function detectExactDuplicateIndexPairs(client) {
+  const { rows } = await client.query(
+    `SELECT
+       table_class.relname AS table_name,
+       first_index_class.relname AS index_1,
+       second_index_class.relname AS index_2
+     FROM pg_index AS first_index
+     JOIN pg_index AS second_index
+       ON first_index.indrelid = second_index.indrelid
+      AND first_index.indexrelid < second_index.indexrelid
+      AND first_index.indkey = second_index.indkey
+      AND first_index.indclass = second_index.indclass
+      AND first_index.indcollation = second_index.indcollation
+      AND first_index.indoption = second_index.indoption
+      AND first_index.indnkeyatts = second_index.indnkeyatts
+      AND first_index.indnatts = second_index.indnatts
+      AND first_index.indisunique = second_index.indisunique
+      AND first_index.indisexclusion = second_index.indisexclusion
+      AND first_index.indnullsnotdistinct = second_index.indnullsnotdistinct
+      AND COALESCE(first_index.indexprs::text, '') = COALESCE(second_index.indexprs::text, '')
+      AND COALESCE(first_index.indpred::text, '') = COALESCE(second_index.indpred::text, '')
+     JOIN pg_class AS table_class ON table_class.oid = first_index.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     JOIN pg_class AS first_index_class ON first_index_class.oid = first_index.indexrelid
+     JOIN pg_class AS second_index_class ON second_index_class.oid = second_index.indexrelid
+     WHERE table_namespace.nspname = 'public'
+       AND first_index.indisvalid
+       AND second_index.indisvalid
+       AND NOT first_index.indisprimary
+       AND NOT second_index.indisprimary
+       AND NOT first_index.indisunique
+       AND NOT second_index.indisunique
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_constraint
+         WHERE pg_constraint.conindid IN (first_index.indexrelid, second_index.indexrelid)
+       )
+     ORDER BY table_class.relname, first_index_class.relname, second_index_class.relname`
+  );
+  return rows;
+}
+
+function quoteIndexIdentifier(identifier) {
+  if (!INDEX_IDENTIFIER_PATTERN.test(identifier)) {
+    throw duplicateIndexCleanupError(`unsafe index identifier: ${identifier}`);
+  }
+  return `"${identifier}"`;
+}
+
+async function cleanupApprovedDuplicateIndexes(pool) {
+  const client = await pool.connect();
+  let lockAcquired = false;
+  try {
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_lock(hashtext($1)) AS locked`,
+      ['db-setup:perf-04-duplicate-index-cleanup']
+    );
+    lockAcquired = lockResult.rows[0]?.locked === true;
+    if (!lockAcquired) {
+      throw duplicateIndexCleanupError('another duplicate-index cleanup is already running');
+    }
+
+    const detectedPairs = await detectExactDuplicateIndexPairs(client);
+    const {
+      approved: approvedDetectedPairs,
+      unapproved: unapprovedDetectedPairs,
+    } = partitionDetectedDuplicateIndexPairs(detectedPairs);
+    if (unapprovedDetectedPairs.length > 0) {
+      const names = unapprovedDetectedPairs
+        .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
+        .join(', ');
+      console.warn(
+        `[db-setup] ⚠️ PERF-04 skipped unapproved exact duplicate indexes; audit before cleanup: ${names}`
+      );
+    }
+    const beforeRows = await loadApprovedIndexMetadata(client);
+    const actions = buildDuplicateIndexCleanupPlan(beforeRows, approvedDetectedPairs);
+
+    if (actions.length === 0) {
+      console.log('[db-setup] ✅ PERF-04 duplicate indexes already clean');
+      return;
+    }
+
+    // CONCURRENTLY cannot run inside a transaction. Session timeouts keep a busy
+    // staging database from holding the build indefinitely.
+    await client.query(`SET lock_timeout = '5s'`);
+    await client.query(`SET statement_timeout = '60s'`);
+    for (const action of actions) {
+      await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${quoteIndexIdentifier(action.drop)}`);
+      console.log(`[db-setup] ✅ PERF-04 dropped duplicate index ${action.drop}; kept ${action.keep}`);
+    }
+
+    const afterRows = await loadApprovedIndexMetadata(client);
+    const afterByName = new Map(afterRows.map((index) => [index.index_name, index]));
+    for (const pair of APPROVED_DUPLICATE_INDEX_PAIRS) {
+      const keep = afterByName.get(pair.keep);
+      if (!keep || !keep.indisvalid || !keep.indisready || afterByName.has(pair.drop)) {
+        throw duplicateIndexCleanupError(`post-cleanup verification failed for ${pair.table}`);
+      }
+    }
+    console.log('[db-setup] ✅ PERF-04 duplicate-index cleanup verified');
+  } catch (error) {
+    if (error?.code === DUPLICATE_INDEX_CLEANUP_ERROR) throw error;
+    throw duplicateIndexCleanupError(error instanceof Error ? error.message : String(error));
+  } finally {
+    await client.query('RESET lock_timeout').catch(() => {});
+    await client.query('RESET statement_timeout').catch(() => {});
+    if (lockAcquired) {
+      await client.query(
+        `SELECT pg_advisory_unlock(hashtext($1))`,
+        ['db-setup:perf-04-duplicate-index-cleanup']
+      ).catch(() => {});
+    }
+    client.release();
+  }
+}
+
 /**
  * F08 issue #14 / GH-1587: category slug uniqueness global → per-tenant. Dedupe existing
  * rows (keep newest, soft-delete older duplicates), drop the old global unique index, then
@@ -5198,6 +5478,20 @@ async function ensureRuntimeIssueUniqueIndex(pool) {
   console.log('[db-setup] ✅ template_issues.runtime_related_unique_idx (fail-closed)');
 }
 
+function normalizeIndexPredicate(predicate) {
+  return String(predicate ?? '')
+    .replaceAll('"', '')
+    // PostgreSQL renders enum columns with their concrete type cast (for
+    // example ::enum_template_issues_related_type). Casts do not change the
+    // predicate semantics and vary by schema/type, so remove them before the
+    // exact normalized expression comparison below.
+    .replace(/::[a-z_][a-z0-9_.]*/gi, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 /**
  * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
  * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
@@ -5254,13 +5548,7 @@ async function verifyCriticalIndexes(pool) {
        AND table_class.relname = 'template_issues'`
   );
   const runtimeIndex = runtimeIssueIndex.rows[0];
-  const runtimePredicate = String(runtimeIndex?.predicate ?? '')
-    .replaceAll('"', '')
-    .replace(/::text/g, '')
-    .replace(/[()]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  const runtimePredicate = normalizeIndexPredicate(runtimeIndex?.predicate);
   if (
     !runtimeIndex?.indisunique ||
     !runtimeIndex?.indisvalid ||
@@ -5473,6 +5761,7 @@ async function checkDB() {
     // Run direct SQL migrations (idempotent — always safe)
     if (tableCount > 0) {
       await runMigrations(pool);
+      await cleanupApprovedDuplicateIndexes(pool);
       await runCategorySlugTenantMigration(pool);
       await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
@@ -5491,6 +5780,7 @@ async function checkDB() {
   } catch (e) {
     console.error('[db-setup] DB check failed:', e.message);
     await pool.end().catch(() => { });
+    if (e?.code === DUPLICATE_INDEX_CLEANUP_ERROR) throw e;
     return { needsPush: false, tableCount: -1 };
   }
 }
@@ -5685,6 +5975,7 @@ async function main() {
 
       if (tableCount > 0) {
         await runMigrations(pool);
+        await cleanupApprovedDuplicateIndexes(pool);
         await runCategorySlugTenantMigration(pool);
         await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
@@ -5868,4 +6159,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = { MIGRATIONS };
+module.exports = {
+  MIGRATIONS,
+  APPROVED_DUPLICATE_INDEX_PAIRS,
+  buildDuplicateIndexCleanupPlan,
+  cleanupApprovedDuplicateIndexes,
+  partitionDetectedDuplicateIndexPairs,
+  normalizeIndexPredicate,
+};

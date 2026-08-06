@@ -86,7 +86,34 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
         if (notes) updateData.notes = notes
         if (newStatus === 'cancelled' && notes) updateData.cancelReason = notes
 
+        // GH-1734: Self-delivery has no courier webhook to close the lifecycle.
+        // Keep the visible event buyer-safe while retaining structured audit metadata.
+        const isSelfDeliveryCompletion =
+            currentStatus === 'shipped'
+            && newStatus === 'completed'
+            && Boolean((order as any).selfDeliveryCourier)
+        if (isSelfDeliveryCompletion) {
+            const actor = user as { id?: string | number; email?: string | null; name?: string | null }
+            const eventTime = new Date().toISOString()
+            const currentHistory = Array.isArray((order as any).shippingTrackingHistory)
+                ? (order as any).shippingTrackingHistory
+                : []
 
+            updateData.shippingTrackingStatus = 'delivered'
+            updateData.shippingTrackingHistory = [
+                ...currentHistory,
+                {
+                    status: 'delivered',
+                    description: 'Order marked as completed',
+                    eventTime,
+                    source: 'cms_manual',
+                    actorId: actor.id != null ? String(actor.id) : null,
+                    actorLabel: actor.email ?? actor.name ?? 'Authenticated merchant',
+                    previousStatus: currentStatus,
+                    nextStatus: newStatus,
+                },
+            ]
+        }
 
         const updated = await payload.update({
             collection: 'orders',
