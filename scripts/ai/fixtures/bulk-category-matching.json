@@ -1,0 +1,597 @@
+{
+  "version": 5,
+  "contract": {
+    "inputs": [
+      "parsed product name",
+      "model-returned category id",
+      "tenant-scoped category candidates with trusted id and path"
+    ],
+    "excludedEvidence": [
+      "description",
+      "seoTitle",
+      "seoDescription",
+      "sku",
+      "variants",
+      "merchant prompt",
+      "model confidence"
+    ],
+    "reasons": [
+      "matched",
+      "modelNull",
+      "unknownId",
+      "semanticRejected",
+      "ambiguous"
+    ],
+    "output": {
+      "categoryId": "the canonical tenant candidate id or null",
+      "reason": "exactly one value from contract.reasons"
+    },
+    "normalization": [
+      "Unicode NFKD",
+      "diacritic removal",
+      "lowercase",
+      "punctuation to spaces",
+      "fail closed when character or token bounds are exceeded"
+    ],
+    "bounds": {
+      "productNameMaxChars": 120,
+      "categoryPathMaxChars": 240,
+      "maxTokensPerValue": 32,
+      "minimumIdentityTokenLength": 3
+    },
+    "noiseTokens": {
+      "generic": ["category", "categories", "general", "item", "items", "product", "products"],
+      "qa": ["qa", "test", "testing"],
+      "materials": ["cotton", "fabric", "leather", "metal", "plastic", "steel", "wood", "wooden"],
+      "colors": ["black", "blue", "brown", "green", "grey", "gray", "orange", "pink", "purple", "red", "white", "yellow"],
+      "sizes": ["xs", "small", "medium", "large", "xl", "xxl"],
+      "brandLike": ["brand", "official"],
+      "meta": ["color", "generic", "material", "number", "size"],
+      "reviewedModifiers": ["running"],
+      "numeric": ["tokens containing only ASCII digits"]
+    },
+    "pluralRules": [
+      "singularize only exact entries in reviewedPluralTokens; unlisted words remain unchanged"
+    ],
+    "reviewedPluralTokens": {
+      "bags": "bag", "books": "book", "bottles": "bottle", "boxes": "box",
+      "bracelets": "bracelet", "carpets": "carpet", "cases": "case", "categories": "category",
+      "chairs": "chair", "coats": "coat", "colors": "color", "cups": "cup",
+      "dresses": "dress", "hats": "hat", "items": "item", "jackets": "jacket",
+      "lamps": "lamp", "materials": "material", "mugs": "mug", "necklaces": "necklace",
+      "numbers": "number", "phones": "phone", "products": "product", "rings": "ring",
+      "sandals": "sandal", "shirts": "shirt", "shoes": "shoe", "sizes": "size",
+      "skirts": "skirt", "sofas": "sofa", "socks": "sock", "tables": "table",
+      "tests": "test", "toys": "toy", "wallets": "wallet", "watches": "watch"
+    },
+    "equivalences": [],
+    "contextualHeadEquivalences": [
+      {
+        "productHead": "serum",
+        "candidateTokens": ["skincare"],
+        "requiredProductTokens": ["skin"],
+        "allowedProductTokens": ["skin", "serum", "vitamin"],
+        "allowedProductShortTokens": ["c"]
+      }
+    ],
+    "identityRules": [
+      "remove only the finite noiseTokens listed in this contract",
+      "preserve non-noise short identity tokens when at least one longer identity token exists; reject short-token-only identities",
+      "allow exact overlap only when the complete normalized product and candidate identity token sets are equal",
+      "do not allow unrestricted token equivalences",
+      "require exact equality between normalized product and candidate leaf identity-token sets",
+      "allow only finite directional contextual rules with exact candidate tokens, required product tokens, and allowed product tokens",
+      "allow only the pluralRules listed in this contract",
+      "allow only the explicit equivalences listed in this contract",
+      "never use arbitrary prefix, substring, edit-distance, or fuzzy matching",
+      "treat finite material, color, size, and numeric qualifiers as insufficient positive evidence",
+      "reject a match when both sides contain conflicting values in the same finite qualifier group",
+      "retain the proposed allowlisted id only when it is the unique plausible candidate"
+    ]
+  },
+  "cases": [
+    {
+      "id": "hard-negative-tent-skincare",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "4-Person Camping Tent",
+      "candidates": [{ "id": "category-skincare", "path": "QA Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-collision-tv-stand",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "TV Stand",
+      "candidates": [{ "id": "category-vr-stand", "path": "Furniture > VR Stand" }],
+      "proposedCategoryId": "category-vr-stand",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-collision-ai-camera",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI Camera",
+      "candidates": [{ "id": "category-ip-camera", "path": "Security > IP Camera" }],
+      "proposedCategoryId": "category-ip-camera",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-ai-serum",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-vr-serum",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "VR Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-vitamin-b",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Vitamin B Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-only-identity",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI",
+      "candidates": [{ "id": "category-vr", "path": "VR" }],
+      "proposedCategoryId": "category-vr",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "positive-serum-skincare",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Vitamin C Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "QA Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": "category-skincare",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "positive-running-shoes",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Running Shoes",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": "category-shoes",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "positive-unicode-cafe-mug",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Café Mug",
+      "candidates": [{ "id": "category-cafe-mugs", "path": "Home > Cafe Mugs" }],
+      "proposedCategoryId": "category-cafe-mugs",
+      "expectedCategoryId": "category-cafe-mugs",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "hard-negative-shared-material",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Leather Sofa",
+      "candidates": [{ "id": "category-leather-shoes", "path": "Fashion > Leather Shoes" }],
+      "proposedCategoryId": "category-leather-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-car-carpet",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Family Car",
+      "candidates": [{ "id": "category-carpets", "path": "Home > Carpets" }],
+      "proposedCategoryId": "category-carpets",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-size-token-only",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "XL Camping Tent",
+      "candidates": [{ "id": "category-xl-shirts", "path": "Fashion > XL Shirts" }],
+      "proposedCategoryId": "category-xl-shirts",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-generic-category",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Portable Camping Stove",
+      "candidates": [{ "id": "category-general-items", "path": "Products > General Items" }],
+      "proposedCategoryId": "category-general-items",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-malformed-path",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Running Shoes",
+      "candidates": [{ "id": "category-empty-path", "path": "" }],
+      "proposedCategoryId": "category-empty-path",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-model-null",
+      "locale": "en",
+      "kind": "guard-control",
+      "productName": "Running Shoes",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": null,
+      "expectedCategoryId": null,
+      "expectedReason": "modelNull"
+    },
+    {
+      "id": "hard-negative-unknown-id",
+      "locale": "en",
+      "kind": "guard-control",
+      "productName": "Running Shoes",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-foreign",
+      "expectedCategoryId": null,
+      "expectedReason": "unknownId"
+    },
+    {
+      "id": "hard-negative-ambiguous-shoes",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Running Shoes",
+      "candidates": [
+        { "id": "category-shoes", "path": "Fashion > Shoes" },
+        { "id": "category-running-shoes", "path": "Sports > Running Shoes" }
+      ],
+      "proposedCategoryId": "category-running-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "ambiguous"
+    },
+    {
+      "id": "hard-negative-shared-descriptor-running",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Running Watch",
+      "candidates": [{ "id": "category-running-shoes", "path": "Sports > Running Shoes" }],
+      "proposedCategoryId": "category-running-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-shared-context-care",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Shoe Care Kit",
+      "candidates": [{ "id": "category-skin-care", "path": "Beauty > Skin Care" }],
+      "proposedCategoryId": "category-skin-care",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-non-head-product-type-overlap",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Shoe Rack",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-extra-domain-toy-car-accessories",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Toy Car Accessories",
+      "candidates": [{ "id": "category-car-accessories", "path": "Automotive > Car Accessories" }],
+      "proposedCategoryId": "category-car-accessories",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-extra-domain-phone-skin-care",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Phone Skin Care",
+      "candidates": [{ "id": "category-skin-care", "path": "Beauty > Skin Care" }],
+      "proposedCategoryId": "category-skin-care",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-head-unreviewed-qualifier",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Phone Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-chicken-skin-skincare",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Crispy Chicken Skin",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-salmon-skin-skincare",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Fried Salmon Skin",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-replacement-phone-skin-skincare",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Replacement Phone Skin",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-non-head-candidate-equivalence",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Phone Skincare Care",
+      "candidates": [{ "id": "category-skin-care", "path": "Beauty > Skin Care" }],
+      "proposedCategoryId": "category-skin-care",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-non-head-equivalence-phone-skin",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Phone Skin Case",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-non-head-equivalence-laptop-skin",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Laptop Skin Sticker",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-head-missing-evidence",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Hair Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-non-head-exact-equivalence-token",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Skincare Gift Set",
+      "candidates": [{ "id": "category-skincare", "path": "Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-two-letter-identity",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "VR",
+      "candidates": [{ "id": "category-vr", "path": "VR" }],
+      "proposedCategoryId": "category-vr",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-meta-token-size",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Size Guide",
+      "candidates": [{ "id": "category-size", "path": "Fashion > Size" }],
+      "proposedCategoryId": "category-size",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-phone-phonecase-compound",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Smart Phone",
+      "candidates": [{ "id": "category-phonecases", "path": "Accessories > Phonecases" }],
+      "proposedCategoryId": "category-phonecases",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-overlong-product-suffix",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "product product product product product product product product product product product product product product Shoes Rack",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-too-many-product-tokens",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa qa Shoes Rack",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-overlong-category-path-suffix",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Shoes",
+      "candidates": [{ "id": "category-rack", "path": "QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > QA > Shoes Rack" }],
+      "proposedCategoryId": "category-rack",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-material-qualifier-conflict",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Plastic Shoes",
+      "candidates": [{ "id": "category-leather-shoes", "path": "Fashion > Leather Shoes" }],
+      "proposedCategoryId": "category-leather-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-color-qualifier-conflict",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Red Shirt",
+      "candidates": [{ "id": "category-blue-shirts", "path": "Fashion > Blue Shirts" }],
+      "proposedCategoryId": "category-blue-shirts",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-size-qualifier-conflict",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Small Shirt",
+      "candidates": [{ "id": "category-large-shirts", "path": "Fashion > Large Shirts" }],
+      "proposedCategoryId": "category-large-shirts",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-numeric-qualifier-conflict",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "PlayStation 4",
+      "candidates": [{ "id": "category-playstation-5", "path": "Gaming > PlayStation 5" }],
+      "proposedCategoryId": "category-playstation-5",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-partial-color-qualifier-conflict",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Red Green Shirts",
+      "candidates": [{ "id": "category-red-blue-shirts", "path": "Fashion > Red Blue Shirts" }],
+      "proposedCategoryId": "category-red-blue-shirts",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-canvas-canva-singularization",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Canvas",
+      "candidates": [{ "id": "category-canva", "path": "Canva" }],
+      "proposedCategoryId": "category-canva",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-news-new-singularization",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "News",
+      "candidates": [{ "id": "category-new", "path": "New" }],
+      "proposedCategoryId": "category-new",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "positive-one-sided-product-qualifier",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Plastic Shoes",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": "category-shoes",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "positive-material-qualifier-alias",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Wooden Tables",
+      "candidates": [{ "id": "category-wood-tables", "path": "Home > Wood Tables" }],
+      "proposedCategoryId": "category-wood-tables",
+      "expectedCategoryId": "category-wood-tables",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "positive-color-qualifier-alias",
+      "locale": "en",
+      "kind": "positive",
+      "productName": "Grey Shirts",
+      "candidates": [{ "id": "category-gray-shirts", "path": "Fashion > Gray Shirts" }],
+      "proposedCategoryId": "category-gray-shirts",
+      "expectedCategoryId": "category-gray-shirts",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "hard-negative-prototype-key-token",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Constructor Shoes",
+      "candidates": [{ "id": "category-shoes", "path": "Fashion > Shoes" }],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-broad-fnb-control",
+      "locale": "vi",
+      "kind": "hard-negative",
+      "productName": "Cafe Chồn",
+      "candidates": [{ "id": "category-fnb", "path": "Fnb" }],
+      "proposedCategoryId": "category-fnb",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    }
+  ]
+}

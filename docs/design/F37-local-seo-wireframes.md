@@ -1,6 +1,6 @@
 # F37 Local SEO Wireframes
 
-> Approved direction. HTML wireframe follows this markdown.
+> Current US-F37-04 direction, reconciled with the implemented Dashboard on 2026-08-04. Future GBP/Analytics concepts remain roadmap-only.
 
 ## 1. Design System Fit
 
@@ -134,80 +134,78 @@ MY 78% · Mobile 82% · google 40%
 
 ## 5. Screen B - Dashboard > SEO Tab
 
-Purpose: show Local SEO as an extension of the existing SEO dashboard, not a separate product area.
+Purpose: show one authoritative SEO Health surface. The previous side-by-side legacy SEO Health + Local SEO cards, Score History, Action Tools, and max-three issue list are retired.
 
 ### Desktop
 
 ```text
 [F18 Sidebar]                     [F18 Top Header]
 Dashboard *                       Store selector / bell / avatar
-My Website
-Core Operations
-CRM
-SETTINGS
 
 Main Content
-SEO Dashboard                                      [7 days v]
+SEO Dashboard
+[Overview] [Analytics] [SEO *]
 
-[Overview] [Analytics] [SEO *]                     existing tabs
-
-+-----------------------------+ +-----------------------------+
-| SEO Health Overview         | | Local SEO                   |
-| existing card               | | Help nearby customers find  |
-|                             | | your business               |
-| Score: 75/100               | |                             |
-| [AI Fix All Issues]         | | 45/100  Needs setup         |
-|                             | | Missing: address, hours,    |
-|                             | | Google connection           |
-+-----------------------------+ |                             |
-                                | [Continue setup]            |
-                                +-----------------------------+
-
-+-------------------------------------------------------------+
-| Next steps                                                  |
-| 1. Add business info                         [Continue]     |
-| 2. Connect Google Business Profile           [Connect]      |
-+-------------------------------------------------------------+
-
-+-------------------------------------------------------------+
-| Google activity                                             |
-| Calls --        Directions --        Website visits --       |
-+-------------------------------------------------------------+
++------------------------------------------------------------------+
+| SEO Health                                                       |
+|                                                                  |
+|      67 / 100            Business Data      [======----] Needs work |
+|      Needs work          Schema             [========--] Good       |
+|                          AI Discoverability [==========] Good       |
+|                          Technical Health   [=====-----] Needs work |
+|                                                                  |
+|  AI can fix 101 metadata issues          [Fix next 100 with AI]   |
+|                                                                  |
+|  SEO Issues                                      7 open           |
+|  [AI] Missing meta titles (12)                       [Fix]         |
+|  [AI] Missing meta descriptions (8)                  [Fix]         |
+|  [You] Business address incomplete                   [Edit]        |
+|  [You] Opening hours missing                         [Edit]        |
+|  [You] Primary domain missing                        [Set up]      |
+|  [You] Store is not published                       [Publish]     |
+|  [You] Search verification missing                  [Set up]      |
++------------------------------------------------------------------+
 ```
 
-### Mobile
+### Mobile (375px)
 
 ```text
 Dashboard
 [Overview] [Analytics] [SEO *]
 
-SEO Health Overview
-[existing SEO score card]
-
-Local SEO
+SEO Health
 +--------------------------------------+
-| 45/100                               |
-| Needs setup                          |
-| Missing: address, hours, Google      |
-| [Continue setup]                     |
+| 67 / 100          Needs work         |
+|                                      |
+| Business Data       [======----]     |
+| Schema              [========--]     |
+| AI Discoverability  [==========]     |
+| Technical Health    [=====-----]     |
+|                                      |
+| AI can fix 101 metadata issues       |
+| [Fix next 100 with AI]               |
+|                                      |
+| SEO Issues                    7 open  |
+| [AI] Missing meta titles             |
+| [Fix — full width, >=44px]           |
+| [You] Business address incomplete    |
+| [Edit — full width, >=44px]          |
+| ...every remaining root cause...     |
 +--------------------------------------+
-
-Next steps
-1. Add business info          [Continue]
-2. Connect Google             [Connect]
-
-Google activity
-Calls --   Directions --   Website visits --
 ```
 
 ### Rules
 
-- Reuse the current SEO tab, card style, and action button style.
-- Do not introduce a new dashboard top tab unless product explicitly approves later.
-- Show only seller-actionable next steps.
-- No formula, no crawler list, no technical score breakdown.
-- AI crawler access is platform-managed and never appears as a setting or next step.
-- Google activity uses Google Business Profile only.
+- Exactly one score card and one score source; no second Local SEO card or Score History.
+- Four bucket bars show qualitative status, not point values or seller-facing formula details.
+- Render all deduplicated seller-owned root causes; never truncate to three.
+- Platform-managed crawler, Organization, and indexability signals never render seller controls.
+- Metadata title/description issues use actor `AI`; seller-owned issues use actor `You`.
+- AI action appears only for metadata gaps. Backlogs over 100 use “Fix next 100 with AI”; Local Business data never enters the AI proposal/apply flow.
+- Actions use the allowlisted destination map: focused Editor settings, Domains, publish flow, page content, or product image alt.
+- The `business-address` Edit action targets Contact Info Address, the single seller-edited street-address control.
+- At 375px, issue actions are single-column, full-width, at least 44px high, with no horizontal overflow.
+- Loading and error states show no numeric score.
 
 ## 6. Screen C - Settings > Business Info
 
@@ -252,9 +250,10 @@ Used on your website and Google
 
 +-------------------------------------------------------------+
 | Address                                                     |
-| Street                                                      |
-| City                          Postcode                      |
-| State dropdown                 Country: Malaysia             |
+| Contact Info address                                        |
+| City                          Postcode                       |
+| State dropdown                                               |
+| Country is implicit Malaysia (MY); no Country control        |
 +-------------------------------------------------------------+
 
 +-------------------------------------------------------------+
@@ -293,10 +292,10 @@ Location
 [Open Google Maps] [Navigate with Waze]
 
 Address
-[Street]
+[Contact Info address]
 [City] [Postcode]
 [State dropdown]
-[Country: Malaysia]
+[Country is implicit MY; no field]
 
 Opening hours
 Mon [09:00] [18:00]
@@ -382,7 +381,7 @@ Do not create seller screens for:
 - AI crawler rules
 - GBP token refresh
 - Analytics event capture (Vercel auto / Payload track)
-- Score bucket calculation
+- Raw score formula and per-issue point values (the four qualitative bucket bars remain visible)
 
 Only show these when seller action is needed.
 

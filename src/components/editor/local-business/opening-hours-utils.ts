@@ -99,11 +99,17 @@ export function defaultWeek(): OpeningHourRow[] {
 export function sanitizeLegacyOpeningHours(rows: OpeningHourRow[]): OpeningHourRow[] {
     return rows
         .filter(r => r.dayOfWeek)
-        .map(r =>
-            (!r.isClosed && (!r.opens || !r.closes))
-                ? { ...r, isClosed: true, opens: undefined, closes: undefined }
-                : r
-        )
+        .map(r => {
+            // Payload persists empty optional array fields as null. Strip them
+            // before a full-snapshot save so the PATCH schema receives either
+            // a valid HH:MM string or no field at all.
+            const opens = r.opens || undefined
+            const closes = r.closes || undefined
+            if (!r.isClosed && (!opens || !closes)) {
+                return { ...r, isClosed: true, opens: undefined, closes: undefined }
+            }
+            return { ...r, opens, closes }
+        })
 }
 
 /** Display strings for one day's rows: one line per time range (split-shift =

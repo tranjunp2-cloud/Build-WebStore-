@@ -53,6 +53,28 @@ describe('[TC-F37-01-05] generateLocalBusinessSchema — full structured output 
         expect(schema.priceRange).toBe('$$')
         expect(schema.areaServed).toBe('Petaling Jaya, Shah Alam')
     })
+
+    it('uses Contact Info address and defaults the fixed country to Malaysia', () => {
+        const schema = generateLocalBusinessSchema(null, {
+            name: 'Kedai Kopi ABC',
+            contactInfo: { address: '88 Jalan Contact' },
+            localBusiness: {
+                streetAddress: 'Legacy Local Business Address',
+                city: 'Petaling Jaya',
+                state: 'Selangor',
+                postcode: '47300',
+            },
+        })!
+
+        expect(schema.address).toEqual({
+            '@type': 'PostalAddress',
+            streetAddress: '88 Jalan Contact',
+            addressLocality: 'Petaling Jaya',
+            addressRegion: 'Selangor',
+            postalCode: '47300',
+            addressCountry: 'MY',
+        })
+    })
 })
 
 // ── TC-F37-01-22: geo-cascade output (plain strings) still maps to PostalAddress (Phase 04) ─
@@ -304,10 +326,6 @@ describe('[TC-F37-02-33/46] generateV2LocalBusinessSchema — strict v2 identity
             name: 'Kedai Kopi ABC',
             localBusiness: { ...siteWithLocalBusiness.localBusiness, postcode: null },
         }],
-        ['country', {
-            name: 'Kedai Kopi ABC',
-            localBusiness: { ...siteWithLocalBusiness.localBusiness, country: 60 },
-        }],
     ])('returns null when required identity field %s is incomplete', (_field, site) => {
         // Arrange — site supplied by the table.
 
@@ -386,6 +404,7 @@ describe('[TC-F37-02-33/46] generateV2LocalBusinessSchema — strict v2 identity
         expect(localBusinesses[0]?.address).toEqual({
             '@type': 'PostalAddress',
             streetAddress: 'Structured but incomplete',
+            addressCountry: 'MY',
         })
     })
 

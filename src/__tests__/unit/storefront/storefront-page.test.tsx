@@ -123,6 +123,22 @@ describe('TenantSitePage', () => {
         expect(result).toBeTruthy()
     })
 
+    it('emits a configured Google Search verification token', async () => {
+        mockSite = {
+            id: 'site-1',
+            name: 'Test Site',
+            status: 'published',
+            seo: { googleVerificationToken: 'google-site-verification=abc123' },
+        }
+
+        const metadata = await generateMetadata({
+            params: Promise.resolve({ slug: 'my-site' }),
+            searchParams: Promise.resolve({}),
+        })
+
+        expect(metadata.verification).toEqual({ google: 'abc123' })
+    })
+
     it('[TC-GH-1717] resolves a populated SEO image in public metadata', async () => {
         // Arrange
         mockSite = {

@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-08-03
+last_updated: 2026-08-05
 ---
 
 # Project Changelog
@@ -14,6 +14,16 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F37 — Unified SEO Health Score + Checklist (US-F37-04, GH-1312)
+
+- **Authoritative score:** Dashboard > SEO now has one validated 100-point surface: Business 20 + Schema 35 + AI Discoverability 15 + Technical Health 30. Loading and failure states never display a stale or invented number.
+- **Single address source:** Local Business Info no longer duplicates Street Address or Country. Sellers edit `contactInfo.address`; legacy `localBusiness.streetAddress` remains a compatibility fallback, JSON-LD emits implicit `addressCountry: "MY"`, and Business Address actions focus Contact Info Address.
+- **Actionable issues:** all deduplicated seller-owned root causes render with AI/You ownership, issue-specific accessible action names, and allowlisted Editor/Domain/publish/content/image destinations; platform-only signals remain hidden.
+- **Bounded metadata AI:** detail requests filter title/description before pagination, proposal/apply batches cap at 100, and backlogs disclose “Fix next 100 with AI.” Local Business data is excluded.
+- **Mutation safety:** proposal/apply requires active membership, exact-site ownership, and a current score revision. Apply uses per-target `updatedAt` CAS with site scope (plus tenant scope for products/blogs), so concurrent edits become stale results instead of being overwritten; Undo is available only with a post-apply revision token.
+- **Security and scale:** only active tenant memberships may read score/detail; the evaluator uses narrow Payload projections, deterministic 100-row pagination, stable double-read fingerprints, and a 10,000-record ceiling. TC-F37-04-19 verifies 1,001 pages with 28 collection reads across two snapshots.
+- **Local verification:** the exact post-CAS state passes 701 Vitest files / 11,687 tests (one file / three tests skipped), typecheck, lint, `git diff --check`, an isolated production build with 112/112 pages, and Playwright discovery. Current-code authenticated browser execution is blocked by the exact localhost:3000 allowlist while that port belongs to another worktree. Live staging fixture/reset/apply evidence, p95 below 2 seconds, canary/rollback, and Story Sync #1312 remain pending.
 
 ### F37 — Platform-managed AI Discoverability (US-F37-03, GH-1311)
 

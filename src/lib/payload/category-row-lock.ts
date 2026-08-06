@@ -1,33 +1,36 @@
-import { sql } from 'drizzle-orm'
-import type { Payload, PayloadRequest } from 'payload'
+import type { Payload } from 'payload'
 
-type TransactionRequest = Pick<PayloadRequest, 'transactionID'>
-type TransactionSessionDb = {
-    execute: (query: unknown) => Promise<unknown>
+type LockClient = {
+    query: (
+        text: string,
+        values?: Array<string | number>,
+    ) => Promise<{ rows: Array<{ id: string | number }> }>
+    release: () => void
 }
 
 type LockPool = {
-    connect: () => Promise<unknown>
+    connect: () => Promise<LockClient>
     options?: { max?: number }
 }
 
-type LockDatabase = {
-    pool: LockPool
-    drizzle: {
-        transaction: <T>(
-            operation: (transaction: TransactionSessionDb) => Promise<T>,
-            options?: unknown,
-        ) => Promise<T>
-    }
-    sessions: Record<string, { db: TransactionSessionDb }>
-    transactionOptions?: unknown
+type LockDatabase = { pool: LockPool }
+type GateWaiter = {
+    active: boolean
+    resolve: () => void
+    timer: ReturnType<typeof setTimeout>
 }
-type PoolMutationGate = { active: boolean; waiters: Array<() => void> }
+type PoolMutationGate = {
+    active: boolean
+    waiters: GateWaiter[]
+}
 
 const CATEGORY_LOCK_TIMEOUT_MS = 2_000
+export const CATEGORY_POOL_CONNECT_TIMEOUT_MS = 5_000
+export const CATEGORY_GATE_TIMEOUT_MS = 5_000
 export const CATEGORY_LOCK_BUSY_ERROR = 'CATEGORY_BUSY_RETRY'
 
 const poolMutationGates = new WeakMap<object, PoolMutationGate>()
+const stalledPoolCheckouts = new WeakMap<LockPool, Promise<LockClient>>()
 
 export function isCategoryLockTimeoutError(error: unknown): boolean {
     let current = error
@@ -63,16 +66,84 @@ async function acquireMutationGate(gate: PoolMutationGate): Promise<void> {
         gate.active = true
         return
     }
-    await new Promise<void>(resolve => gate.waiters.push(resolve))
+
+    await new Promise<void>((resolve, reject) => {
+        const waiter = {} as GateWaiter
+        waiter.active = true
+        waiter.resolve = () => {
+            if (!waiter.active) return
+            waiter.active = false
+            clearTimeout(waiter.timer)
+            resolve()
+        }
+        waiter.timer = setTimeout(() => {
+            if (!waiter.active) return
+            waiter.active = false
+            const waiterIndex = gate.waiters.indexOf(waiter)
+            if (waiterIndex >= 0) gate.waiters.splice(waiterIndex, 1)
+            reject(new Error(CATEGORY_LOCK_BUSY_ERROR))
+        }, CATEGORY_GATE_TIMEOUT_MS)
+        gate.waiters.push(waiter)
+    })
 }
 
 function releaseMutationGate(gate: PoolMutationGate): void {
-    const next = gate.waiters.shift()
-    if (next) {
-        next()
+    while (gate.waiters.length > 0) {
+        const next = gate.waiters.shift()
+        if (!next?.active) continue
+        next.resolve()
         return
     }
     gate.active = false
+}
+
+async function connectWithTimeout(pool: LockPool): Promise<LockClient> {
+    // `pg-pool` cannot cancel a Promise-based checkout unless its global
+    // connectionTimeoutMillis is configured. Do not enqueue another category checkout while a
+    // timed-out one is still pending; the late result below releases itself and clears this guard.
+    if (stalledPoolCheckouts.has(pool)) throw new Error(CATEGORY_LOCK_BUSY_ERROR)
+
+    let timedOut = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const pendingConnection = pool.connect()
+    let connection: Promise<LockClient>
+    connection = pendingConnection.then(
+        client => {
+            if (!timedOut) return client
+            try {
+                client.release()
+            } finally {
+                if (stalledPoolCheckouts.get(pool) === connection) {
+                    stalledPoolCheckouts.delete(pool)
+                }
+            }
+            throw new Error(CATEGORY_LOCK_BUSY_ERROR)
+        },
+        error => {
+            if (timedOut && stalledPoolCheckouts.get(pool) === connection) {
+                stalledPoolCheckouts.delete(pool)
+            }
+            throw error
+        }
+    )
+
+    try {
+        return await Promise.race([
+            connection,
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    timedOut = true
+                    stalledPoolCheckouts.set(pool, connection)
+                    reject(new Error(CATEGORY_LOCK_BUSY_ERROR))
+                }, CATEGORY_POOL_CONNECT_TIMEOUT_MS)
+            }),
+        ])
+    } finally {
+        if (timer) clearTimeout(timer)
+        // A checkout that resolves after the timeout is released by `connection` above. Attach
+        // a rejection handler so that late cleanup never becomes an unhandled rejection.
+        void connection.catch(() => undefined)
+    }
 }
 
 /** Serialize category lock/delete critical sections that share one Payload pool. */
@@ -92,63 +163,61 @@ export async function withCategoryMutationGate<T>(
     }
 }
 
-/** Hold an active tenant category row and write its dependent Product in one transaction. */
+/** Hold an active tenant category row while its dependent Product is auto-committed. */
 export async function withActiveCategoryRowLock<T>(
     payload: Payload,
     categoryId: string | number,
     tenantId: string | number,
-    operation: (
-        canonicalCategoryId: string | number,
-        req: TransactionRequest,
-    ) => Promise<T>,
+    operation: (canonicalCategoryId: string | number) => Promise<T>,
 ): Promise<T | null> {
     const database = payload.db as unknown as LockDatabase
-    if (!database.drizzle?.transaction) throw new Error('Database transactions are unavailable')
+    if (!database.pool?.connect) throw new Error('Database row locking is unavailable')
 
     return withCategoryMutationGate(payload, async () => {
+        let client: LockClient | undefined
+        let productOperationStarted = false
         try {
-            // Payload's adapter commit helper swallows PostgreSQL COMMIT errors. Use the
-            // Drizzle callback transaction directly so a failed final commit rejects, while
-            // registering the transaction as a temporary Payload session lets Local API writes
-            // participate through req.transactionID.
-            return await database.drizzle.transaction(async transaction => {
-                const transactionID = crypto.randomUUID()
-                database.sessions[transactionID] = { db: transaction }
+            client = await connectWithTimeout(database.pool)
+            await client.query('BEGIN')
+            await client.query(
+                "SELECT set_config('lock_timeout', $1, true)",
+                [`${CATEGORY_LOCK_TIMEOUT_MS}ms`],
+            )
+            const result = await client.query(
+                `
+                SELECT id
+                FROM categories
+                WHERE id = $1
+                  AND tenant_id = $2
+                  AND deleted_at IS NULL
+                FOR KEY SHARE
+                `,
+                [categoryId, tenantId],
+            )
+            const canonicalCategoryId = result.rows[0]?.id
+            if (canonicalCategoryId == null) {
+                await client.query('COMMIT')
+                return null
+            }
 
-                try {
-                    await transaction.execute(sql`
-                        SELECT set_config(
-                            'lock_timeout',
-                            ${`${CATEGORY_LOCK_TIMEOUT_MS}ms`},
-                            true
-                        )
-                    `)
-                    const result = await transaction.execute(sql`
-                        SELECT id
-                        FROM categories
-                        WHERE id = ${categoryId}
-                          AND tenant_id = ${tenantId}
-                          AND deleted_at IS NULL
-                        FOR KEY SHARE
-                    `) as { rows: Array<{ id: string | number }> }
-                    const canonicalCategoryId = result.rows[0]?.id
-                    if (canonicalCategoryId == null) return null
-
-                    // Bound only the category lock acquisition. Product creation can legitimately
-                    // wait on unrelated indexes/rows and must not be mislabeled as CATEGORY_BUSY.
-                    await transaction.execute(sql`
-                        SELECT set_config('lock_timeout', ${'0'}, true)
-                    `)
-                    return await operation(canonicalCategoryId, { transactionID })
-                } finally {
-                    delete database.sessions[transactionID]
-                }
-            }, database.transactionOptions)
+            productOperationStarted = true
+            const value = await operation(canonicalCategoryId)
+            await client.query('COMMIT')
+            return value
         } catch (error) {
-            if (isCategoryLockTimeoutError(error)) {
+            if (client) {
+                try {
+                    await client.query('ROLLBACK')
+                } catch (rollbackError) {
+                    void rollbackError
+                }
+            }
+            if (!productOperationStarted && isCategoryLockTimeoutError(error)) {
                 throw new Error(CATEGORY_LOCK_BUSY_ERROR)
             }
             throw error
+        } finally {
+            client?.release()
         }
     })
 }

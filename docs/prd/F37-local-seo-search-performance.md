@@ -1,6 +1,6 @@
 # PRD: Local SEO Score & Storefront Discoverability (F37)
 
-> **Version:** 2.6 | **Status:** Phase 2 — platform-managed discoverability + issue-action UI approved 2026-07-22 | **Priority:** P0 | **Size:** L
+> **Version:** 2.7 | **Status:** Phase 2 — Contact Info address contract reconciled 2026-08-05 | **Priority:** P0 | **Size:** L
 > **Depends on:** F03 Dashboard Suite, F02 Auth, F05 Editor  
 > **Replaces:** F37 PRD v1.0 (target-state rewrite)
 
@@ -63,7 +63,7 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 | Bucket                      | Tiêu chí                    | Điểm | Mô tả brief                                                                 | Editable by              | Route / file                                                                                             | Màn hình                                       |
 | --------------------------- | --------------------------- | ---- | --------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | **Business Data** (20)      | Name                        | 7    | Tên shop — required for LocalBusiness `name`                                | Human only               | `Sites.name` · `local-seo-score.ts` · `api/sites/[siteId]/local-seo-score/route.ts`                      | Editor → Settings → Global → Brand             |
-| Business Data               | Address                     | 8    | PostalAddress: street + city + postcode + country                           | Human only               | `Sites.localBusiness.{streetAddress,city,postcode,country,state}` · `components/editor/local-business/*` | Editor → Global → Local Business               |
+| Business Data               | Address                     | 8    | PostalAddress: Contact Info street + Local Business city/state/postcode + implicit `MY` | Human only | `Sites.contactInfo.address` + `Sites.localBusiness.{city,state,postcode}`; legacy `streetAddress` is fallback-only | Editor → Global → Contact + Local Business |
 | Business Data               | Phone                       | 5    | Contact telephone                                                           | Human only               | `Sites.contactInfo.phone`                                                                                | Editor → Global → Contact                      |
 | **Schema** (35)             | LocalBusiness JSON-LD       | 10   | Valid emit when name + address present                                      | Human (data) → auto emit | `src/lib/seo/json-ld.ts` → `generateLocalBusinessSchema`                                                 | Storefront head; data from Local Business form |
 | Schema                      | `@type` subtype             | 4    | Compatible specific subtype selected after business category                | Human only               | `localBusiness.schemaSubtype` · versioned category→subtype mapping                                     | Editor → Local Business → Category → Subtype   |
@@ -88,6 +88,7 @@ Every criterion listed in §5 appears in the score formula. No decoration-only f
 - Meta title and description each earn `floor(8 × completed / eligible)`; an empty eligible set earns 0.
 - Content Quality earns `floor(F03 contentQualityScore × 8 / 100)` after F03 loads real page layouts.
 - Technical SEO earns 3 points when Google verification is configured, plus `floor(3 × indexable / eligiblePages)`; an empty eligible page set earns 0.
+- OG image and page URL slug are Editor → SEO controls documented in §12.2; neither is an input to the Local SEO formula or a Technical Health deduction.
 - AI crawler access is a platform invariant and always earns 9 points; there is no seller setting or issue row.
 - Sitemap earns 5 points and llms.txt earns 1 point only when the storefront is published and each route is reachable.
 
@@ -101,7 +102,7 @@ Aligned with [schema.org/LocalBusiness](https://schema.org/LocalBusiness) and [G
 | Property                    | Source              | Score link                  |
 | --------------------------- | ------------------- | --------------------------- |
 | `name`                      | `site.name`         | Business Name 7             |
-| `address` (PostalAddress)   | `localBusiness.*`   | Address 8 + LocalBusiness 10 |
+| `address` (PostalAddress)   | canonical `contactInfo.address` + `localBusiness.{city,state,postcode}` + implicit `MY`; legacy street fallback | Address 8 + LocalBusiness 10 |
 | `telephone`                 | `contactInfo.phone` | Phone 5 + telephone 3       |
 | `url`                       | `site.domain`       | url 3                       |
 | `@type` subtype             | `localBusiness.schemaSubtype` | subtype 4                |
@@ -198,7 +199,7 @@ flowchart TB
 
 **AC**
 
-- **Happy — AC-01:** GIVEN seller is on Editor Settings Global WHEN they save name, street+city+postcode+country, and phone THEN Business Data points for those fields are earned on next score calculation AND fields persist on reload.
+- **Happy — AC-01:** GIVEN seller is on Editor Settings Global WHEN they save name, Contact Info address, Local Business city/state/postcode, and phone THEN Business Data points for those fields are earned on next score calculation with country implicitly `MY` AND fields persist on reload.
 - **Edge — AC-02:** GIVEN only name and phone are set WHEN score runs THEN Address points are 0 AND Name and Phone points are earned.
 - **Error — AC-03:** GIVEN invalid phone characters WHEN seller blurs phone field THEN save is rejected with validation feedback AND previous valid phone remains.
 
@@ -269,7 +270,7 @@ flowchart TB
 | FR-ID | Requirement                                                                                                                                         | US        | Priority |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- |
 | FR-01 | Sites MUST store `name` editable in Editor Brand; missing → 0 of 7 Name points                                                                      | US-F37-01 | P0       |
-| FR-02 | Sites MUST store structured `localBusiness` address (street, city, postcode, country; state if used); all required parts present → 8 Address points | US-F37-01 | P0       |
+| FR-02 | Sites MUST use `contactInfo.address` as the canonical seller-edited street, combine it with `localBusiness` city/state/postcode, and implicitly emit `MY`; legacy `localBusiness.streetAddress` is fallback-only; complete address → 8 points | US-F37-01 | P0 |
 | FR-03 | Sites MUST store `contactInfo.phone`; present → 5 Phone points                                                                                      | US-F37-01 | P0       |
 | FR-04 | System MUST emit LocalBusiness JSON-LD when name + address present → 10 points                                                                      | US-F37-02 | P0       |
 | FR-05 | Editor MUST filter `schemaSubtype` by `businessCategory`; server validates the pair; compatible specific subtype emits as `@type` → 4 points       | US-F37-02 | P0       |
@@ -386,18 +387,15 @@ flowchart TB
 │ ▾ Contact                                              │
 │   Phone          [                              ]      │
 │   Email          [                              ]      │
-│   Address        [ legacy free-text             ]      │
+│   Address        [ canonical street address      ]      │
 │                                                        │
 │ ▾ Local Business                         ← default open│
 │   ADDRESS                                              │
-│   Street                                               │
-│   [                                              ]     │
 │   State (cascade first)                                │
 │   [ select state                              ▾ ]      │
 │   City / District          Postcode                    │
 │   [ select city         ▾ ] [ select / type   ]        │
-│   Country                                              │
-│   [ Malaysia ] (readonly)                              │
+│   Country is implicit Malaysia (MY); no input          │
 │   ───────────────────────────────────────────          │
 │   COORDINATES                                          │
 │   Paste Google Maps link                               │
@@ -540,7 +538,7 @@ Same field order inside Tools sheet Settings tab; full width; touch targets ≥4
 | Score metric(s) | Root-cause issue | Owner | CTA | Destination / behavior |
 |---|---|---|---|---|
 | Name | Store name missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=brand` |
-| Address + LocalBusiness JSON-LD | Business address incomplete | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=address` |
+| Address + LocalBusiness JSON-LD | Business address incomplete | You | Edit | `/editor/[siteId]?settingsTab=global&section=contact&focus=address` |
 | Phone + schema telephone | Phone number missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=contact&focus=phone` |
 | Schema subtype | Business subtype missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=schemaSubtype` |
 | Opening hours | Opening hours missing | You | Edit | `/editor/[siteId]?settingsTab=global&section=localBusiness&focus=openingHours` |

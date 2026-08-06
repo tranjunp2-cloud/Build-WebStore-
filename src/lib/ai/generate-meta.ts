@@ -19,7 +19,9 @@ export async function generateAutoSEOMeta(
     siteName: string,
     context?: string,
     keywords?: string[],
+    signal?: AbortSignal,
 ): Promise<SEOMetaOutput> {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     const promptSummary = `${type}:${itemName} | site:${siteName}`
     const cap = await startCapture({ endpoint: 'generate-meta', prompt: promptSummary, category: type })
 
@@ -71,7 +73,7 @@ Rules:
             temperature: 0.7,
             max_tokens: 300,
             response_format: { type: 'json_object' },
-        }, { timeout: 15000 }) // 15 second timeout so it fails fast for the queue
+        }, { timeout: 15000, signal }) // 15 second timeout so it fails fast for the queue
 
         const content = completion.choices[0]?.message?.content
         if (!content) throw new Error('Empty AI response')
@@ -85,6 +87,11 @@ Rules:
         await finishCapture(cap, { status: 'success', outputSnapshot: { path: 'openai', ...output } })
         return output
     } catch (error: unknown) {
+        if (signal?.aborted) {
+            await finishCapture(cap, { status: 'failed', error: 'aborted' })
+            throw new DOMException('Aborted', 'AbortError')
+        }
+
         const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('[AI] SEO Meta Generation failed:', message)
 

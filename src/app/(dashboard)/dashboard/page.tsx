@@ -5,7 +5,6 @@ import config from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { normalizeDashboardBlocks, parsePeriod, type DashboardBlockId } from '@/lib/dashboard-utils'
 import { getGlanceData, emptyGlanceData } from '@/lib/dashboard/glance-data'
-import { getSeoData } from '@/lib/dashboard/seo-data'
 import { canReadPendingOrders, getPendingOrdersData } from '@/lib/dashboard/pending-orders-data'
 import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
@@ -149,13 +148,12 @@ export default async function DashboardRoot({ searchParams }: Props) {
             : Promise.resolve(emptyPendingOrders)
 
     // Fetch independent block data in parallel only when the store has a usable site.
-    const [glance, seo, pendingOrders] = hasUsableSites
+    const [glance, pendingOrders] = hasUsableSites
         ? await Promise.all([
             getGlanceData(period, { user }),
-            getSeoData(),
             pendingOrdersPromise,
         ])
-        : [emptyGlanceData(), null, emptyPendingOrders]
+        : [emptyGlanceData(), emptyPendingOrders]
 
     const renderBlocks = canViewOrders ? blocks : blocks.filter(id => id !== 'orders')
 
@@ -168,7 +166,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'traffic':
                 return <TrafficPerformanceClient key="traffic" period={period} />
             case 'seo':
-                return seo ? <SeoHealth key="seo" data={seo} /> : null
+                return siteId ? <SeoHealth key="seo" siteId={siteId} /> : null
             case 'orders':
                 return <PendingOrders key="orders" data={pendingOrders} />
             default:

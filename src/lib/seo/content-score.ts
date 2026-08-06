@@ -31,6 +31,11 @@ function estimateWordCount(blocks: PageLayout[]): number {
     return text.split(/\s+/).filter(Boolean).length
 }
 
+export function pageNeedsContentImprovement(layout: PageLayout[] | undefined): boolean {
+    const blocks = layout || []
+    return !blocks.some(b => b.blockType === 'hero') || estimateWordCount(blocks) < 300
+}
+
 export function calculateContentQualityScore(input: ContentScoreInput): number {
     let score = 100
 
