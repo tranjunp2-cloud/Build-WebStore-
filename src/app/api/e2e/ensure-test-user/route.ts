@@ -22,11 +22,15 @@ import {
     ensureDashboardFixture,
     type DashboardFixtureTenant,
 } from '@/lib/e2e/dashboard-fixture'
+import { normalizeTenants, type TenantMembership } from '@/lib/normalize-tenants'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const E2E_TENANT_NAME = 'E2E Test Workspace'
 const E2E_TENANT_SLUG = 'e2e-test'
+const E2E_PRODUCT_CATEGORY_NAME = 'E2E AI Products'
+const E2E_PRODUCT_CATEGORY_SLUG = 'e2e-ai-products'
 export async function POST(req: NextRequest) {
     // Guard 1: endpoint must be explicitly enabled via env var
     const expectedSecret = process.env.E2E_SETUP_SECRET
@@ -67,6 +71,18 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password } = body
+    const rawBody = body as Record<string, unknown>
+    if (
+        'tenantId' in rawBody
+        || 'categoryId' in rawBody
+        || 'categoryName' in rawBody
+        || 'categorySlug' in rawBody
+    ) {
+        return NextResponse.json(
+            { error: 'tenant/category IDs and category overrides are not accepted' },
+            { status: 400 },
+        )
+    }
     if (!email || !password) {
         return NextResponse.json(
             { error: 'email and password are required' },
@@ -176,12 +192,59 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Step 4: optionally seed dashboard fixtures
+        // Step 4: ensure the deterministic active category used by Product persistence E2E.
+        // Soft-deleted history is excluded because the per-tenant slug index is unique only for
+        // active rows. A concurrent setup winner is recovered by re-reading that active row.
+        const findActiveProductCategory = () => payload.find({
+            collection: 'categories',
+            where: {
+                and: [
+                    { tenant: { equals: tenantId } },
+                    { slug: { equals: E2E_PRODUCT_CATEGORY_SLUG } },
+                    { deletedAt: { exists: false } },
+                ],
+            },
+            limit: 1,
+            sort: '-createdAt',
+            overrideAccess: true,
+        })
+        let category = (await findActiveProductCategory()).docs[0]
+        if (category) {
+            category = await payload.update({
+                collection: 'categories',
+                id: category.id,
+                overrideAccess: true,
+                data: {
+                    tenant: tenantId,
+                    site: site.id,
+                    name: E2E_PRODUCT_CATEGORY_NAME,
+                    slug: E2E_PRODUCT_CATEGORY_SLUG,
+                },
+            })
+        } else {
+            try {
+                category = await payload.create({
+                    collection: 'categories',
+                    overrideAccess: true,
+                    data: {
+                        tenant: tenantId,
+                        site: site.id,
+                        name: E2E_PRODUCT_CATEGORY_NAME,
+                        slug: E2E_PRODUCT_CATEGORY_SLUG,
+                    },
+                })
+            } catch (createError) {
+                category = (await findActiveProductCategory()).docs[0]
+                if (!category) throw createError
+            }
+        }
+
+        // Step 5: optionally seed dashboard fixtures
         const dashboardFixture = body.seedDashboardFixture === true
             ? await ensureDashboardFixture(payload, tenant)
             : undefined
 
-        // Step 5: find or create user
+        // Step 6: find or create user
         const usersResult = await payload.find({
             collection: 'users',
             where: { email: { equals: email } },
@@ -190,21 +253,30 @@ export async function POST(req: NextRequest) {
         })
 
         if (usersResult.docs.length > 0) {
-            // User exists — sync password and ensure tenant association
+            // User exists — sync password and make the provisioned fixture tenant primary.
+            // Dashboard Product actions resolve tenant context from `user.tenants[0]`, so merely
+            // appending this link can provision the category in a tenant the E2E session never uses.
             const existingUser = usersResult.docs[0]
-            const existingTenantLink = (existingUser.tenants || []).find((t: { tenant: unknown }) => {
-                const tid = typeof t.tenant === 'object' && t.tenant !== null
-                    ? (t.tenant as { id: string | number }).id
-                    : t.tenant
-                return tid === tenantId
-            })
-
-            const tenantsUpdate = existingTenantLink
-                ? existingUser.tenants // keep as-is
-                : [
-                    ...(existingUser.tenants || []),
-                    { tenant: tenantId, role: 'owner' as const, status: 'active' as const, permissions: [] },
-                ]
+            const existingTenantLinks = (existingUser.tenants || []) as TenantMembership[]
+            const tenantLinkId = (link: (typeof existingTenantLinks)[number]) => (
+                typeof link.tenant === 'object' && link.tenant !== null
+                    ? link.tenant.id
+                    : link.tenant
+            )
+            const existingTenantLink = existingTenantLinks.find(link => (
+                String(tenantLinkId(link)) === String(tenantId)
+            ))
+            const primaryTenantLink = {
+                ...(existingTenantLink ?? {}),
+                tenant: tenantId,
+                role: 'owner' as const,
+                status: 'active' as const,
+                permissions: existingTenantLink?.permissions ?? [],
+            }
+            const tenantsUpdate = normalizeTenants([
+                primaryTenantLink,
+                ...existingTenantLinks.filter(link => String(tenantLinkId(link)) !== String(tenantId)),
+            ])
 
             await payload.update({
                 collection: 'users',
@@ -225,6 +297,8 @@ export async function POST(req: NextRequest) {
                 userId: existingUser.id,
                 tenantId,
                 siteId: site.id,
+                categoryId: category.id,
+                categoryName: E2E_PRODUCT_CATEGORY_NAME,
                 action: 'password synced + tenant ensured',
                 ...(dashboardFixture ? { dashboardFixture } : {}),
             })
@@ -257,6 +331,8 @@ export async function POST(req: NextRequest) {
             userId: newUser.id,
             tenantId,
             siteId: site.id,
+            categoryId: category.id,
+            categoryName: E2E_PRODUCT_CATEGORY_NAME,
             ...(dashboardFixture ? { dashboardFixture } : {}),
         })
     } catch (error: unknown) {

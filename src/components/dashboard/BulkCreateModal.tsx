@@ -3,9 +3,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Loader2, Sparkles, X, ImageIcon } from 'lucide-react'
+import { AlertTriangle, Copy, ImageIcon, Loader2, RotateCcw, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { saveAiProductAction } from '@/app/(dashboard)/products/actions'
+import {
+    saveAiProductAction,
+    type AiProductSaveResult,
+} from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
@@ -27,7 +30,7 @@ interface VariantPayload {
 }
 
 interface ParsedProduct {
-    _id: string // stable parse-local identity for state updates and grid keys
+    _id: string // client-issued operation ID; stable across save/replay attempts and state updates
     _draftOrdinal: number // stable accessible-name discriminator within this parse result
     // No longer read — the review drawer removes an unwanted draft outright (removeProduct)
     // instead of a select/deselect checkbox. Left optional rather than deleted so existing
@@ -60,6 +63,13 @@ interface BulkCreateModalProps {
     onSuccess?: () => void
     initialPrompt?: string
     categories?: Category[]
+}
+
+type DraftSaveFailure = {
+    code: string
+    message: string
+    retryable: boolean
+    referenceId?: string
 }
 
 export function slugify(text: string) {
@@ -110,26 +120,8 @@ const textToLexical = (text: string) => {
     }
 }
 
-// True when saveAiProductAction rejected specifically because a generated SKU already exists
-// for this tenant (base sku and/or one or more variant skus) — the one case worth an
-// automatic retry with freshly regenerated SKUs, since the AI/fallback generator can't see
-// the merchant's existing catalog and occasionally collides with it.
-function isSkuConflictError(err: unknown): boolean {
-    if (!(err instanceof Error)) return false
-    try {
-        const parsed = JSON.parse(err.message)
-        if (parsed?.code !== 'FIELD_ERRORS') return false
-        return Object.keys(parsed.fieldErrors || {}).some(f => f === 'baseSku' || /^variants\.\d+\.skuCode$/.test(f))
-    } catch {
-        return false
-    }
-}
-
-function isCategoryInvalidResult(result: unknown): result is { ok: false; code: 'CATEGORY_INVALID' } {
-    return typeof result === 'object' &&
-        result !== null &&
-        'ok' in result && result.ok === false &&
-        'code' in result && result.code === 'CATEGORY_INVALID'
+function isAiSaveFailure(result: AiProductSaveResult): result is Extract<AiProductSaveResult, { ok: false }> {
+    return result.ok === false
 }
 
 export function sanitizeXSS(text: string) {
@@ -291,6 +283,9 @@ export function BulkCreateModal({
     const [isParsing, setIsParsing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [products, setProducts] = useState<ParsedProduct[]>([])
+    const [generationId, setGenerationId] = useState<string | null>(null)
+    const [saveFailures, setSaveFailures] = useState<Record<string, DraftSaveFailure>>({})
+    const [saveAnnouncement, setSaveAnnouncement] = useState('')
     const [hasParsed, setHasParsed] = useState(false)
     const [canRetryParse, setCanRetryParse] = useState(false)
     const [mounted, setMounted] = useState(false)
@@ -334,9 +329,22 @@ export function BulkCreateModal({
             if (!res.ok) throw new Error(JSON.stringify(data))
 
             if (data.products && Array.isArray(data.products)) {
+                const responseGenerationId = typeof data.generationId === 'string'
+                    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.generationId)
+                    ? data.generationId
+                    : null
+                if (!responseGenerationId) {
+                    setGenerationId(null)
+                    setProducts([])
+                    toast.error(t.dashboard?.products?.bulkCreate?.parseInvalidData || 'Invalid products format received from AI')
+                    return
+                }
                 const initProducts = data.products.map((rawProduct: ParsedProduct & { category?: unknown }, draftIndex: number) => {
                     // Discard the legacy name-based contract before spreading normalized data.
                     const { category: _legacyCategory, ...p } = rawProduct
+                    const normalizedName = normalizeDraftProductName(p.name || '')
+                    // Freeze the slug base so an explicit retry remains idempotent after a name edit.
+                    const stableSlugBase = slugify(p.slug || normalizedName) || 'product'
                     let cleanedVariants = p.variants
                     if (cleanedVariants && cleanedVariants.length > 0) {
                         // Case-insensitive dedup — DB has a case-insensitive unique index
@@ -365,7 +373,8 @@ export function BulkCreateModal({
                     }
                     return {
                         ...p,
-                        name: normalizeDraftProductName(p.name || ''),
+                        name: normalizedName,
+                        slug: stableSlugBase,
                         variants: cleanedVariants,
                         _id: crypto.randomUUID(),
                         _draftOrdinal: draftIndex + 1,
@@ -380,6 +389,8 @@ export function BulkCreateModal({
                         stock: coerceFiniteNumber(p.stock),
                     }
                 })
+                setGenerationId(responseGenerationId)
+                setSaveFailures({})
                 setProducts(initProducts)
             } else {
                 toast.error(t.dashboard?.products?.bulkCreate?.parseInvalidData || 'Invalid products format received from AI')
@@ -435,147 +446,224 @@ export function BulkCreateModal({
         )))
     }
 
-    const handleSave = async () => {
-        if (products.length === 0) {
+    const localizedFailureMessage = (failure: DraftSaveFailure) => {
+        const copy = t.dashboard?.products?.bulkCreate
+        switch (failure.code) {
+            case 'PERSISTENCE_VERIFY_FAILED':
+                return copy?.persistenceVerifyFailed || 'The saved product could not be verified. Retry to check for the existing draft.'
+            case 'CATEGORY_BUSY_RETRY':
+                return copy?.categoryBusy || 'This category is busy. Retry this draft in a moment.'
+            case 'SKU_CONFLICT':
+                return copy?.skuConflictExhausted || 'A generated SKU is already in use. Retry to generate a new one.'
+            case 'NETWORK_AMBIGUOUS':
+                return copy?.networkAmbiguous || 'The result could not be confirmed. Retry to check for the existing draft.'
+            default:
+                return failure.message || copy?.saveFailed || 'Failed to create products'
+        }
+    }
+
+    const handleCopyReference = async (referenceId: string) => {
+        try {
+            await navigator.clipboard.writeText(referenceId)
+            toast.success(t.dashboard?.products?.bulkCreate?.referenceCopied || 'Reference copied')
+        } catch {
+            toast.error(t.dashboard?.products?.bulkCreate?.copyReferenceFailed || 'Could not copy the reference')
+        }
+    }
+
+    const handleSave = async (targetDraftId?: string) => {
+        const targetProducts = targetDraftId
+            ? products.filter(product => product._id === targetDraftId)
+            : products
+        if (targetProducts.length === 0) {
             toast.error(t.dashboard?.products?.bulkCreate?.saveEmptyError || 'Please select at least 1 product')
             return
         }
-        if (hasMissingCategories) {
+        if (targetProducts.some(product => !isAvailableCategoryId(product.categoryId))) {
             toast.error(categoryRequiredMessage)
             return
         }
+        if (!generationId) {
+            toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
+            return
+        }
 
+        const targetIds = new Set(targetProducts.map(product => product._id))
+        setSaveFailures(current => {
+            const next = { ...current }
+            for (const id of targetIds) delete next[id]
+            return next
+        })
+        setSaveAnnouncement('')
         setIsSaving(true)
-        let successCount = 0
 
         try {
-            // Revalidate only selected category IDs before any save-side effect. If this fails,
-            // fail the batch closed: no carton placeholder and no partial products.
-            const selectedCategoryIds = products.map(product => product.categoryId!)
-            let revalidatedCategories: { id: string | number }[]
+            const selectedCategoryIds = targetProducts.map(product => product.categoryId!)
+            let categoryById = new Map(selectedCategoryIds.map(categoryId => [String(categoryId), categoryId]))
             try {
-                revalidatedCategories = await getCategoriesByIdsAction(selectedCategoryIds)
-            } catch (err) {
-                console.warn('Could not fetch categories', err)
-                toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
-                return
+                const revalidatedCategories = await getCategoriesByIdsAction(selectedCategoryIds)
+                categoryById = new Map(revalidatedCategories.map(category => [String(category.id), category.id]))
+                const unavailableCategoryIds = new Set(
+                    selectedCategoryIds
+                        .filter(categoryId => !categoryById.has(String(categoryId)))
+                        .map(String),
+                )
+                if (unavailableCategoryIds.size > 0) {
+                    invalidateCategories(Array.from(unavailableCategoryIds))
+                    toast.error(categoryRequiredMessage)
+                    if (targetProducts.every(product => !categoryById.has(String(product.categoryId)))) {
+                        const failure: DraftSaveFailure = {
+                            code: 'CATEGORY_INVALID',
+                            message: categoryRequiredMessage,
+                            retryable: false,
+                        }
+                        setSaveFailures(current => {
+                            const next = { ...current }
+                            for (const product of targetProducts) next[product._id] = failure
+                            return next
+                        })
+                        setSaveAnnouncement(t.dashboard?.products?.bulkCreate?.saveFailureSummary?.replace('{count}', String(targetProducts.length)) || `${targetProducts.length} drafts need attention.`)
+                        return
+                    }
+                }
+            } catch (error) {
+                // The Product save boundary is authoritative and carries generation/operation/
+                // reference correlation. Continue with the click-time category snapshot so a
+                // transient preflight failure cannot terminate before that observable boundary.
+                void error
             }
-            const categoryById = new Map(revalidatedCategories.map(category => [String(category.id), category.id]))
 
-            const unavailableCategoryIds = new Set(selectedCategoryIds.filter(categoryId => !categoryById.has(String(categoryId))).map(String))
-
-            if (unavailableCategoryIds.size > 0) {
-                invalidateCategories(Array.from(unavailableCategoryIds))
-                toast.error(categoryRequiredMessage)
-                return
-            }
-
-            // Get Crate Carton placeholder ID
-            let cartonMediaId = null
+            let cartonMediaId: string | number | null = null
             try {
-                cartonMediaId = await getOrCreateCrateCartonIdAction() // Update list to prevent duplicate creation for next items
-            } catch (err) {
-                console.warn('Could not get default crate carton placeholder', err)
+                cartonMediaId = await getOrCreateCrateCartonIdAction()
+            } catch (error) {
+                void error
             }
 
             const savedDraftIds = new Set<string>()
-            let categoryBecameInvalid = false
-            let hasSaveFailure = false
-            for (const prod of products) {
-                // Persist the canonical tenant-owned category returned by pre-save revalidation.
-                const categoryId = categoryById.get(String(prod.categoryId))!
+            const nextFailures: Record<string, DraftSaveFailure> = {}
+            const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
+            const tierLabels = {
+                first: t.dashboard?.products?.form?.sections?.color || DEFAULT_VARIANT_TIER_LABELS.first,
+                second: t.dashboard?.products?.form?.sections?.size || DEFAULT_VARIANT_TIER_LABELS.second,
+            }
 
-                const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
-                const tierLabels = {
-                    first: t.dashboard?.products?.form?.sections?.color || DEFAULT_VARIANT_TIER_LABELS.first,
-                    second: t.dashboard?.products?.form?.sections?.size || DEFAULT_VARIANT_TIER_LABELS.second,
-                }
-                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName, tierLabels)
+            for (const prod of targetProducts) {
+                try {
+                    const categoryId = categoryById.get(String(prod.categoryId))
+                    if (categoryId == null) {
+                        nextFailures[prod._id] = {
+                            code: 'CATEGORY_INVALID',
+                            message: categoryRequiredMessage,
+                            retryable: false,
+                        }
+                        continue
+                    }
 
-                // Retry with freshly regenerated SKUs on a uniqueness conflict — the AI/fallback
-                // generator can't see the merchant's existing catalog, so an occasional collision
-                // is expected. A handful of attempts resolves it without bothering the merchant.
-                const MAX_SKU_ATTEMPTS = 3
-                let skuAttempt = 1
-                while (skuAttempt <= MAX_SKU_ATTEMPTS) {
-                    try {
-                        const res = await saveAiProductAction(payload)
-                        if (isCategoryInvalidResult(res)) {
-                            invalidateCategories([categoryId])
-                            categoryBecameInvalid = true
-                            toast.error(categoryRequiredMessage)
+                    let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName, tierLabels)
+                    const MAX_SKU_ATTEMPTS = 3
+                    let skuAttempt = 1
+
+                    while (skuAttempt <= MAX_SKU_ATTEMPTS) {
+                        let result: AiProductSaveResult
+                        try {
+                            result = await saveAiProductAction(payload, {
+                                generationId,
+                                operationId: prod._id,
+                                skuAttempt,
+                            })
+                        } catch (error) {
+                            void error
+                            const failure: DraftSaveFailure = {
+                                code: 'NETWORK_AMBIGUOUS',
+                                message: t.dashboard?.products?.bulkCreate?.networkAmbiguous || 'The result could not be confirmed. Retry to check for the existing draft.',
+                                retryable: true,
+                                referenceId: prod._id,
+                            }
+                            nextFailures[prod._id] = failure
+                            toast.error(`${prod.name}: ${failure.message}`)
                             break
                         }
 
-                        if (res?.id) {
-                            successCount++
+                        if (result.ok === true) {
                             savedDraftIds.add(prod._id)
-                        } else {
-                            const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
-                            hasSaveFailure = true
-                            toast.error(`${prod.name}: ${fallback}`)
-                            console.error('[bulk-create] saveAiProductAction returned no id', { name: prod.name, res })
+                            break
                         }
-                        break
-                    } catch (err) {
-                        if (isSkuConflictError(err) && skuAttempt < MAX_SKU_ATTEMPTS) {
+
+                        if (isAiSaveFailure(result) && result.code === 'SKU_CONFLICT' && skuAttempt < MAX_SKU_ATTEMPTS) {
                             skuAttempt++
                             const retrySkus = new Set<string>()
                             payload = {
                                 ...payload,
                                 sku: generateUniqueSku(payload.name, retrySkus),
-                                variants: payload.variants?.map(v => ({
-                                    ...v,
-                                    sku: generateUniqueSku(`${payload.name}-${v.name}`, retrySkus),
+                                variants: payload.variants?.map(variant => ({
+                                    ...variant,
+                                    sku: generateUniqueSku(`${payload.name}-${variant.name}`, retrySkus),
                                 })),
                             }
                             continue
                         }
-                        hasSaveFailure = true
-                        let msg: string
-                        try {
-                            msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
-                        } catch {
-                            msg = err instanceof Error ? err.message : ''
-                        }
-                        toast.error(`${prod.name}: ${msg || t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'}`)
-                        console.warn('Failed to save product', prod.name, err)
+
+                        const failure: DraftSaveFailure = isAiSaveFailure(result)
+                            ? {
+                                code: result.code,
+                                message: result.message,
+                                retryable: result.retryable,
+                                referenceId: result.referenceId,
+                            }
+                            : {
+                                code: 'PERSISTENCE_VERIFY_FAILED',
+                                message: t.dashboard?.products?.bulkCreate?.persistenceVerifyFailed || 'The saved product could not be verified. Retry to check for the existing draft.',
+                                retryable: true,
+                                referenceId: prod._id,
+                            }
+                        if (failure.code === 'CATEGORY_INVALID') invalidateCategories([categoryId])
+                        failure.message = localizedFailureMessage(failure)
+                        nextFailures[prod._id] = failure
+                        toast.error(`${prod.name}: ${failure.message}`)
                         break
                     }
+                } catch (error) {
+                    void error
+                    const failure: DraftSaveFailure = {
+                        code: 'SAVE_FAILED',
+                        message: t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products',
+                        retryable: true,
+                        referenceId: prod._id,
+                    }
+                    nextFailures[prod._id] = failure
+                    toast.error(`${prod.name}: ${failure.message}`)
                 }
-                if (categoryBecameInvalid) break
             }
 
-            if (categoryBecameInvalid || hasSaveFailure) {
-                // Keep only unsaved drafts in the drawer. Otherwise retrying after any terminal
-                // per-product failure would duplicate products already committed in this
-                // sequential batch, while closing would discard the failed drafts.
-                if (savedDraftIds.size > 0) {
-                    setProducts(current => current.filter(product => !savedDraftIds.has(product._id)))
-                    if (successCount > 0) {
-                        const tmpl = successCount === 1
-                            ? t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.'
-                            : t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`
-                        toast.success(tmpl)
-                    }
+            setSaveFailures(current => {
+                const next = { ...current }
+                for (const id of targetIds) delete next[id]
+                for (const id of savedDraftIds) delete next[id]
+                return { ...next, ...nextFailures }
+            })
+
+            if (savedDraftIds.size > 0) {
+                setProducts(current => current.filter(product => !savedDraftIds.has(product._id)))
+                const successCount = savedDraftIds.size
+                const successMessage = successCount === 1
+                    ? t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.'
+                    : t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', String(successCount)) || `Created ${successCount} draft products. Please add images before publishing.`
+                toast.success(successMessage)
+
+                const remainingDraftCount = products.length - savedDraftIds.size
+                if (remainingDraftCount === 0 && Object.keys(nextFailures).length === 0) {
+                    onSuccess?.()
+                    onClose()
+                } else {
                     onPartialSuccess?.()
                 }
-                return
             }
 
-            if (successCount > 0) {
-                const tmpl = successCount === 1
-                    ? t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.' : t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`
-                toast.success(tmpl)
-                if (onSuccess) onSuccess()
-                onClose()
-            } else {
-                toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
+            const failureCount = Object.keys(nextFailures).length
+            if (failureCount > 0) {
+                setSaveAnnouncement(t.dashboard?.products?.bulkCreate?.saveFailureSummary?.replace('{count}', String(failureCount)) || `${failureCount} drafts need attention.`)
             }
-
-        } catch (error) {
-            console.error('Bulk save error:', error)
-            toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
         } finally {
             setIsSaving(false)
         }
@@ -583,7 +671,14 @@ export function BulkCreateModal({
 
     const updateProduct = (id: string, field: keyof ParsedProduct, value: string | number | boolean | null) => {
         if (isSaving) return
-        setProducts(prev => prev.map(p => (p._id === id ? { ...p, [field]: value } : p)))
+        setProducts(prev => prev.map(product => (product._id === id ? { ...product, [field]: value } : product)))
+        if (field === 'categoryId') {
+            setSaveFailures(current => {
+                const next = { ...current }
+                delete next[id]
+                return next
+            })
+        }
     }
 
     // Stock for a variant product is edited here as one shared value distributed to every
@@ -593,13 +688,21 @@ export function BulkCreateModal({
     // (Products.ts beforeChange hook), matching the manual Add/Edit Product form's convention.
     const updateAllVariantsStock = (id: string, stock: number) => {
         if (isSaving) return
-        setProducts(prev => prev.map(p => (p._id === id ? { ...p, variants: p.variants.map(v => ({ ...v, stock })) } : p
+        setProducts(prev => prev.map(product => (
+            product._id === id
+                ? { ...product, variants: product.variants.map(variant => ({ ...variant, stock })) }
+                : product
         )))
     }
 
     const removeProduct = (id: string) => {
         if (isSaving) return
-        setProducts(prev => prev.filter(p => p._id !== id))
+        setProducts(prev => prev.filter(product => product._id !== id))
+        setSaveFailures(current => {
+            const next = { ...current }
+            delete next[id]
+            return next
+        })
     }
 
     const handleClose = () => {
@@ -611,6 +714,7 @@ export function BulkCreateModal({
     }
 
     const draftCount = products.length
+    const hasRetryableSaveFailures = Object.values(saveFailures).some(failure => failure.retryable)
 
     if (!mounted) return null
 
@@ -628,7 +732,7 @@ export function BulkCreateModal({
             {/* Design-system tokens (not the design mockup's raw hex) — bg/border/text/focus all
                 resolve to the same --card/--border/--muted-foreground/--ring vars used by the
                 shared <Input> and every other dashboard form (ProductForm, discount-form). */}
-            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] overflow-hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="ai-bulk-dialog-title" aria-describedby="ai-bulk-dialog-description" className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] overflow-hidden">
                 {/* Header — title + subtitle (left), close button (right) */}
                 <div className="flex items-start justify-between gap-3 p-[18px_22px_14px] border-b border-solid border-[hsl(var(--border))]/30">
                     <div className="flex flex-col gap-[3px]">
@@ -637,11 +741,11 @@ export function BulkCreateModal({
                                 <path d="M10 2L12.5 8.5L19 11L12.5 13.5L10 20L7.5 13.5L1 11L7.5 8.5L10 2Z" stroke="#2DD4BF" strokeWidth="2" strokeLinejoin="round"/>
                                 <path d="M19 2L20.25 5.25L23.5 6.5L20.25 7.75L19 11L17.75 7.75L14.5 6.5L17.75 5.25L19 2Z" fill="#FBBF24"/>
                             </svg>
-                            <h2 className="text-[15px] font-bold text-[hsl(var(--foreground))]">
+                            <h2 id="ai-bulk-dialog-title" className="text-[15px] font-bold text-[hsl(var(--foreground))]">
                                 {t.dashboard?.products?.bulkCreate?.title || 'Review AI drafts'}
                             </h2>
                         </div>
-                        <p className="text-[12px] text-[hsl(var(--muted-foreground))]">
+                        <p id="ai-bulk-dialog-description" className="text-[12px] text-[hsl(var(--muted-foreground))]">
                             {t.dashboard?.products?.bulkCreate?.subtitle || 'Edit anything before adding these to your store. Nothing is published yet.'}
                         </p>
                     </div>
@@ -690,8 +794,11 @@ export function BulkCreateModal({
                                         const categoryTriggerId = `ai-category-trigger-${p._draftOrdinal}`
                                         const categoryErrorId = `ai-category-error-${p._draftOrdinal}`
                                         const categoryHasError = !isAvailableCategoryId(p.categoryId)
+                                        const failure = saveFailures[p._id]
+                                        const failureId = `ai-save-failure-${p._draftOrdinal}`
+                                        const shortReference = failure?.referenceId?.slice(0, 8).toUpperCase()
                                         return (
-                                            <div key={p._id} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
+                                            <div key={p._id} role="group" aria-describedby={failure ? failureId : undefined} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-3 rounded-xl border border-solid border-[hsl(var(--border))] p-3 md:grid-cols-[52px_minmax(0,1fr)_28px]">
                                                 <div className="col-start-1 row-start-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[10px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
                                                     <ImageIcon className="w-5 h-5" />
                                                 </div>
@@ -778,6 +885,49 @@ export function BulkCreateModal({
                                                 >
                                                     <X className="w-4 h-4" />
                                                 </button>
+                                                {failure ? (
+                                                    <div
+                                                        id={failureId}
+                                                        data-testid={`ai-save-failure-${p._draftOrdinal}`}
+                                                        className="col-span-full flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-[hsl(var(--foreground))]"
+                                                    >
+                                                        <div className="flex items-start gap-2">
+                                                            <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                                            <p className="min-w-0 leading-5">{failure.message}</p>
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            {shortReference && failure.referenceId ? (
+                                                                <>
+                                                                    <span className="text-[hsl(var(--muted-foreground))]">
+                                                                        {t.dashboard?.products?.bulkCreate?.referenceLabel || 'Reference'}:{' '}
+                                                                        <code className="font-mono text-[hsl(var(--foreground))]">{shortReference}</code>
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isSaving}
+                                                                        onClick={() => void handleCopyReference(failure.referenceId!)}
+                                                                        className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 disabled:opacity-50"
+                                                                        aria-label={`${t.dashboard?.products?.bulkCreate?.copyReference || 'Copy reference'} ${shortReference}`}
+                                                                    >
+                                                                        <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                                                                        {t.dashboard?.products?.bulkCreate?.copyReference || 'Copy reference'}
+                                                                    </button>
+                                                                </>
+                                                            ) : null}
+                                                            {failure.retryable && isAvailableCategoryId(p.categoryId) ? (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isSaving}
+                                                                    onClick={() => void handleSave(p._id)}
+                                                                    className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 font-semibold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/10 disabled:opacity-50"
+                                                                >
+                                                                    <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+                                                                    {t.dashboard?.products?.bulkCreate?.retrySave || 'Retry save'}
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         )
                                     })
@@ -789,6 +939,7 @@ export function BulkCreateModal({
 
                 {/* Footer — draft count (left), Discard/Approve All (right) */}
                 <div className="flex w-full items-center justify-between gap-3 p-[18px_24px_18px] border-t border-solid border-[hsl(var(--border))]/30">
+                    <span className="sr-only" aria-live="polite">{saveAnnouncement}</span>
                     <span className="text-[13px] text-[hsl(var(--muted-foreground))]">
                         {draftCount === 1
                             ? t.dashboard?.products?.bulkCreate?.draftCountOne || '1 draft' : t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`}
@@ -797,9 +948,13 @@ export function BulkCreateModal({
                         <Button variant="dashSecondary" size="dash" onClick={handleClose} disabled={isSaving}>
                             {t.dashboard?.products?.bulkCreate?.discard || 'Discard'}
                         </Button>
-                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={isSaving || isParsing || draftCount === 0 || hasMissingCategories}>
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                            {t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
+                        <Button variant="dashPrimary" size="dash" onClick={() => void handleSave()} disabled={isSaving || isParsing || draftCount === 0 || hasMissingCategories}>
+                            {isSaving ? <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> : null}
+                            {isSaving
+                                ? t.dashboard?.products?.bulkCreate?.saving || 'Saving…'
+                                : hasRetryableSaveFailures
+                                    ? t.dashboard?.products?.bulkCreate?.retryFailed || 'Retry failed drafts'
+                                    : t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
                         </Button>
                     </div>
                 </div>

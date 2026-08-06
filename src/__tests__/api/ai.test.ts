@@ -2174,6 +2174,7 @@ describe('AI Streaming APIs', () => {
             const res = await BulkParsePOST(req)
             const json = await res.json()
             expect(res.status).toBe(200)
+            expect(json.generationId).toMatch(/^[0-9a-f-]{36}$/)
             expect(json.products[0].name).toContain('No API Key')
             expect(json.products[0].variants[0].name).toBe('Black - M')
             expect(json.products.every(
@@ -2214,6 +2215,8 @@ describe('AI Streaming APIs', () => {
             }))
 
             expect(res.status).toBe(200)
+            const json = await res.json()
+            expect(json.generationId).toMatch(/^[0-9a-f-]{36}$/)
             const payload = await getPayload({
                 config: Promise.resolve({}) as Parameters<typeof getPayload>[0]['config'],
             })
