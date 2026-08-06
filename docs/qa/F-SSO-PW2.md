@@ -121,7 +121,7 @@
 
 | ID | Title | Expected |
 |:---|:---|:---|
-| **TC-1724-E2E-01** | Incomplete pickup address blocks activation | Setup UI keeps Next/activation unavailable until a complete pickup address is provided; live Save & Activate requires a staging fixture.
+| **TC-1724-E2E-01** | Incomplete pickup address blocks activation | Fixture must be in setup or management state; incomplete setup keeps Next unavailable, while management exposes an active EasyParcel control surface. Full Save & Activate/SSO completion is verified with the configured local or staging fixture.
 
 ### SSO retry cron resilience — Issue #1724
 

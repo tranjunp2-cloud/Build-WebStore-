@@ -58,31 +58,24 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
         })
     }
 
-    test('[TC-1724 E2E] incomplete pickup address keeps activation blocked', async ({
-        page,
-    }) => {
+    test('[TC-1724 E2E] configured EasyParcel fixture exposes an activation-safe state', async ({ page }) => {
         await navigateTo(page, '/settings/shipping?tab=easyparcel')
         await expectPageLoaded(page)
 
-        const statePanel = page
-            .locator('[data-easyparcel-state="setup"]')
-            .first()
-        test.skip(
-            (await statePanel.count()) === 0,
-            'Authenticated fixture is not in EasyParcel setup state',
-        )
+        const statePanel = page.locator('[data-easyparcel-state]').first()
+        await expect(statePanel).toBeVisible()
 
-        // The setup fixture must start with an empty pickup form. If it has a
-        // pre-seeded warehouse, the deterministic route tests cover validation.
-        const addressForm = statePanel.locator('[data-pickup-address-form]')
-        test.skip(
-            (await addressForm.count()) === 0,
-            'Fixture has a pre-seeded pickup address',
-        )
+        const state = await statePanel.getAttribute('data-easyparcel-state')
+        expect(['setup', 'management']).toContain(state)
 
-        await expect(
-            statePanel.getByRole('button', { name: /next/i }),
-        ).toBeDisabled()
+        if (state === 'setup') {
+            const addressForm = statePanel.locator('[data-pickup-address-form]')
+            await expect(addressForm).toBeVisible()
+            await expect(statePanel.getByRole('button', { name: /next/i })).toBeDisabled()
+        } else {
+            await expect(statePanel.locator('[role="switch"]')).toBeChecked()
+            await expect(statePanel.getByRole('button', { name: /sync/i })).toBeVisible()
+        }
     })
 
     test('[TC-F36.206] active EasyParcel state exposes its expected primary controls', async ({

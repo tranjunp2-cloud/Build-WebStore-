@@ -26,11 +26,9 @@ The missing trigger explains the SSO progress discrepancy; existing PWv2 persist
 
 On branch `fix/gh-1724-sso-step-sync`, the EasyParcel save route now schedules SSO step 2 after successful activation, exports `maxDuration = 60`, and preserves non-blocking error handling. Missing `keyString` now becomes a pending retry event instead of a false completed event. Route and SSO client regression tests were added, and the QA document now maps TC-1724-SYNC-01 through TC-1724-SYNC-04.
 
-Targeted tests (28 total), typecheck, and lint completed successfully; lint only reported pre-existing repository warnings. Browser/staging verification remains.
+Targeted tests (35 total), typecheck, and lint completed successfully; lint only reported pre-existing repository warnings. Local Docker browser verification completed; staging SSO completion remains.
 
 ## Next steps
 
-1. Add the notifier call after the successful EasyParcel update.
-2. Preserve non-blocking behavior and retry/error handling.
-3. Add route, QA, and browser regression coverage.
-4. Verify staging behavior through SSO progress or `sso_step_events`.
+1. Verify staging behavior through SSO progress or `sso_step_events`.
+2. Confirm the affected staging SSO user has `keyString` so the event can reach `completed`.
