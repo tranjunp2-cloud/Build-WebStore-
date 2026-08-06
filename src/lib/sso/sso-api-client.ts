@@ -17,14 +17,20 @@ const SSO_FETCH_TIMEOUT_MS = 30_000
 function getEncryptionKey(): Buffer {
     const key = process.env.SSO_ENCRYPTION_KEY
     if (!key) throw new Error('SSO_ENCRYPTION_KEY env var missing')
-    if (key.length !== 64) throw new Error(`SSO_ENCRYPTION_KEY must be 64 hex chars (32 bytes), got ${key.length}`)
+    if (key.length !== 64)
+        throw new Error(
+            `SSO_ENCRYPTION_KEY must be 64 hex chars (32 bytes), got ${key.length}`,
+        )
     return Buffer.from(key, 'hex')
 }
 
 export function encryptPassword(plaintext: string): string {
     const iv = crypto.randomBytes(IV_LENGTH)
     const cipher = crypto.createCipheriv(ALGORITHM, getEncryptionKey(), iv)
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+    const encrypted = Buffer.concat([
+        cipher.update(plaintext, 'utf8'),
+        cipher.final(),
+    ])
     return `${iv.toString('hex')}:${encrypted.toString('hex')}`
 }
 
@@ -34,25 +40,45 @@ export function decryptPassword(ciphertext: string): string {
     const iv = Buffer.from(ivHex, 'hex')
     const encrypted = Buffer.from(encHex, 'hex')
     const decipher = crypto.createDecipheriv(ALGORITHM, getEncryptionKey(), iv)
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8')
+    return Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final(),
+    ]).toString('utf8')
 }
 
-function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+function fetchWithTimeout(
+    url: string,
+    init: RequestInit,
+    timeoutMs = SSO_FETCH_TIMEOUT_MS,
+): Promise<Response> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), SSO_FETCH_TIMEOUT_MS)
-    return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+        clearTimeout(timer),
+    )
 }
 
-async function getSSOToken(email: string, keyString: string): Promise<string> {
+async function getSSOToken(
+    email: string,
+    keyString: string,
+    timeoutMs = SSO_FETCH_TIMEOUT_MS,
+): Promise<string> {
     const password = decryptPassword(keyString)
     const base = (process.env.SSO_API_BASE_URL ?? '').replace(/\/$/, '')
     if (!base) throw new Error('SSO_API_BASE_URL env var not configured')
-    const res = await fetchWithTimeout(`${base}/api/v1/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        // SSO API: `username` field maps to email; `is_system: 1` bypasses MFA OTP check
-        body: JSON.stringify({ username: email, password, is_system: 1 }),
-    })
+    const res = await fetchWithTimeout(
+        `${base}/api/v1/login`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            // SSO API: `username` field maps to email; `is_system: 1` bypasses MFA OTP check
+            body: JSON.stringify({ username: email, password, is_system: 1 }),
+        },
+        timeoutMs,
+    )
     if (!res.ok) {
         // Never log the response body here — this request's own body carries the
         // user's real plaintext password, and a Hub-side error page (e.g. a debug-mode
@@ -65,10 +91,16 @@ async function getSSOToken(email: string, keyString: string): Promise<string> {
     const body = await res.json()
     // SSO API returns HTTP 200 for all responses; check envelope status for real errors
     if (body?.status && body.status !== 200) {
-        throw new Error(`SSO login failed: ${body.status} — ${body.message ?? 'unknown'}`)
+        throw new Error(
+            `SSO login failed: ${body.status} — ${body.message ?? 'unknown'}`,
+        )
     }
     // Token is nested inside data envelope: { status, message, data: { access_token } }
-    const token = body?.data?.access_token ?? body?.data?.token ?? body?.access_token ?? body?.token
+    const token =
+        body?.data?.access_token ??
+        body?.data?.token ??
+        body?.access_token ??
+        body?.token
     if (!token) throw new Error('SSO login: no access_token in response')
     return token as string
 }
@@ -104,7 +136,17 @@ export async function sendSSOStepNotification(
     payload: BasePayload,
     userId: number | string,
     step: 1 | 2 | 3,
+    options: { loginTimeoutMs?: number; patchTimeoutMs?: number } = {},
 ): Promise<void> {
+    const loginTimeoutMs = options.loginTimeoutMs ?? SSO_FETCH_TIMEOUT_MS
+    const patchTimeoutMs = options.patchTimeoutMs ?? SSO_FETCH_TIMEOUT_MS
+    if (
+        ![loginTimeoutMs, patchTimeoutMs].every(
+            (timeout) => Number.isFinite(timeout) && timeout > 0,
+        )
+    )
+        throw new Error('SSO timeouts must be positive numbers')
+
     // overrideAccess:true required — keyString has access:{read:()=>false} which Local API
     // enforces unless bypassed. Same pattern as xenditSecretKey reads elsewhere.
     const user = await payload.findByID({
@@ -115,22 +157,32 @@ export async function sendSSOStepNotification(
     })
 
     if (!user?.keyString) {
-        // User provisioned before keyString was introduced — skip silently
-        console.warn(`[SSO Step] User ${userId} has no keyString — step ${step} not notified`)
-        return
+        // User provisioned before keyString was introduced — retain retry visibility
+        // instead of marking the step completed without notifying the SSO Hub.
+        throw new Error(
+            `SSO user ${userId} has no keyString — step ${step} not notified`,
+        )
     }
 
-    const token = await getSSOToken(user.email as string, user.keyString as string)
+    const token = await getSSOToken(
+        user.email as string,
+        user.keyString as string,
+        loginTimeoutMs,
+    )
 
     const base = (process.env.SSO_API_BASE_URL ?? '').replace(/\/$/, '')
-    const res = await fetchWithTimeout(`${base}/api/v1/product/8/step-status`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+    const res = await fetchWithTimeout(
+        `${base}/api/v1/product/8/step-status`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ [`step${step}_status`]: 1 }),
         },
-        body: JSON.stringify({ [`step${step}_status`]: 1 }),
-    })
+        patchTimeoutMs,
+    )
 
     if (!res.ok) {
         const bodyText = await res.text().catch(() => '')
@@ -139,7 +191,9 @@ export async function sendSSOStepNotification(
         // that call, this request body carries no secret, only the Authorization header
         // does, so the response body itself is still safe and useful to surface.
         const safeBodyText = bodyText.split(token).join('[redacted]')
-        throw new Error(`step-status PATCH failed: ${res.status} — ${safeBodyText.slice(0, 500)}`)
+        throw new Error(
+            `step-status PATCH failed: ${res.status} — ${safeBodyText.slice(0, 500)}`,
+        )
     }
     console.info(`[SSO Step] step${step}_status=1 sent for user ${userId}`)
 }
@@ -167,13 +221,18 @@ export async function notifyStepComplete(
                 sql`SELECT 1 FROM sso_step_events WHERE user_id = ${Number(userId)} AND step = ${step} AND status = 'completed' LIMIT 1`,
             )
             if (existing.rows?.length > 0) {
-                console.info(`[SSO Step] step${step} already completed for user ${userId} — skipping`)
+                console.info(
+                    `[SSO Step] step${step} already completed for user ${userId} — skipping`,
+                )
                 return
             }
         }
     } catch (checkErr) {
         // Fail-open: if check errors, proceed with notification
-        console.warn(`[SSO Step] completed-check failed for user ${userId} step ${step}:`, checkErr)
+        console.warn(
+            `[SSO Step] completed-check failed for user ${userId} step ${step}:`,
+            checkErr,
+        )
     }
 
     try {
@@ -185,9 +244,12 @@ export async function notifyStepComplete(
         )
     } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        console.error(`[SSO Step] notifyStepComplete failed for user ${userId} step ${step}:`, errMsg)
-        await persistStepEvent(payload, userId, step, 'pending', errMsg).catch((e) =>
-            console.error('[SSO Step] Failed to persist step event:', e),
+        console.error(
+            `[SSO Step] notifyStepComplete failed for user ${userId} step ${step}:`,
+            errMsg,
+        )
+        await persistStepEvent(payload, userId, step, 'pending', errMsg).catch(
+            (e) => console.error('[SSO Step] Failed to persist step event:', e),
         )
     }
 }

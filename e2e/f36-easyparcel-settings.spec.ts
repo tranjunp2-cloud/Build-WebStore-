@@ -3,15 +3,21 @@ import { expectPageLoaded } from './helpers/assertions'
 import { navigateTo } from './helpers/navigation'
 
 test.describe('F36 EasyParcel settings — GH-1652', () => {
-    test('[TC-F36.201] query parameter opens the EasyParcel tab', async ({ page }) => {
+    test('[TC-F36.201] query parameter opens the EasyParcel tab', async ({
+        page,
+    }) => {
         await navigateTo(page, '/settings/shipping?tab=easyparcel')
         await expectPageLoaded(page)
 
-        await expect(page.getByRole('tab', { name: /EasyParcel/i })).toHaveAttribute('data-state', 'active')
+        await expect(
+            page.getByRole('tab', { name: /EasyParcel/i }),
+        ).toHaveAttribute('data-state', 'active')
     })
 
     for (const width of [375, 390]) {
-        test(`[TC-F36.206] shipping settings stays visible and usable at ${width}px`, async ({ page }) => {
+        test(`[TC-F36.206] shipping settings stays visible and usable at ${width}px`, async ({
+            page,
+        }) => {
             await page.setViewportSize({ width, height: 844 })
             await navigateTo(page, '/settings/shipping?tab=easyparcel')
             await expectPageLoaded(page)
@@ -21,9 +27,11 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
             await expect(activeTab).toBeVisible()
             await expect(statePanel).toBeVisible()
 
-            const hasOverflow = await page.evaluate(() => (
-                document.documentElement.scrollWidth > document.documentElement.clientWidth
-            ))
+            const hasOverflow = await page.evaluate(
+                () =>
+                    document.documentElement.scrollWidth >
+                    document.documentElement.clientWidth,
+            )
             expect(hasOverflow).toBe(false)
 
             for (const locator of [activeTab, statePanel]) {
@@ -33,9 +41,15 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
                 expect(box!.x + box!.width).toBeLessThanOrEqual(width)
             }
 
-            const visibleControls = statePanel.locator('button:visible, input:visible, [role="switch"]:visible')
+            const visibleControls = statePanel.locator(
+                'button:visible, input:visible, [role="switch"]:visible',
+            )
             expect(await visibleControls.count()).toBeGreaterThan(0)
-            for (let index = 0; index < await visibleControls.count(); index += 1) {
+            for (
+                let index = 0;
+                index < (await visibleControls.count());
+                index += 1
+            ) {
                 const box = await visibleControls.nth(index).boundingBox()
                 if (!box) continue
                 expect(box.x).toBeGreaterThanOrEqual(0)
@@ -44,7 +58,36 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
         })
     }
 
-    test('[TC-F36.206] active EasyParcel state exposes its expected primary controls', async ({ page }) => {
+    test('[TC-1724 E2E] incomplete pickup address keeps activation blocked', async ({
+        page,
+    }) => {
+        await navigateTo(page, '/settings/shipping?tab=easyparcel')
+        await expectPageLoaded(page)
+
+        const statePanel = page
+            .locator('[data-easyparcel-state="setup"]')
+            .first()
+        test.skip(
+            (await statePanel.count()) === 0,
+            'Authenticated fixture is not in EasyParcel setup state',
+        )
+
+        // The setup fixture must start with an empty pickup form. If it has a
+        // pre-seeded warehouse, the deterministic route tests cover validation.
+        const addressForm = statePanel.locator('[data-pickup-address-form]')
+        test.skip(
+            (await addressForm.count()) === 0,
+            'Fixture has a pre-seeded pickup address',
+        )
+
+        await expect(
+            statePanel.getByRole('button', { name: /next/i }),
+        ).toBeDisabled()
+    })
+
+    test('[TC-F36.206] active EasyParcel state exposes its expected primary controls', async ({
+        page,
+    }) => {
         await page.setViewportSize({ width: 390, height: 844 })
         await navigateTo(page, '/settings/shipping?tab=easyparcel')
         await expectPageLoaded(page)
@@ -61,11 +104,17 @@ test.describe('F36 EasyParcel settings — GH-1652', () => {
             expect(box!.width).toBe(42)
             expect(box!.height).toBe(42)
         } else if (state === 'setup') {
-            await expect(statePanel.locator('[aria-current="step"]')).toBeVisible()
-            await expect(statePanel.getByRole('button', { name: /next/i })).toBeVisible()
+            await expect(
+                statePanel.locator('[aria-current="step"]'),
+            ).toBeVisible()
+            await expect(
+                statePanel.getByRole('button', { name: /next/i }),
+            ).toBeVisible()
         } else {
             await expect(statePanel.locator('[role="switch"]')).toBeVisible()
-            await expect(statePanel.getByRole('button', { name: /sync/i })).toBeVisible()
+            await expect(
+                statePanel.getByRole('button', { name: /sync/i }),
+            ).toBeVisible()
             const brandMark = statePanel.getByTestId('easyparcel-brand-mark')
             const box = await brandMark.boundingBox()
             expect(box).not.toBeNull()

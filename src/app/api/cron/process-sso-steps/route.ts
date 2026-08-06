@@ -8,7 +8,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const MAX_RETRIES = 5
-const BATCH_SIZE = 20
+const BATCH_SIZE = 2
+const MAX_CONCURRENCY = 2
+const WORKER_DEADLINE_MS = 50_000
+const LOGIN_TIMEOUT_MS = 20_000
+const PATCH_TIMEOUT_MS = 25_000
+const FINALIZE_HEADROOM_MS = 5_000
+const MAX_BACKOFF_MINUTES = 4
 
 /**
  * GET /api/cron/process-sso-steps
@@ -34,61 +40,73 @@ export async function GET(req: Request) {
     // Atomically claim pending rows (or stuck 'processing' rows older than 5 min).
     // Two concurrent crons cannot claim the same row — SKIP LOCKED skips rows already locked.
     const claimed = await db.execute(sql`
-        UPDATE sso_step_events
-        SET status = 'processing', updated_at = now()
-        WHERE id IN (
-            SELECT id FROM sso_step_events
+        WITH candidates AS (
+            SELECT id, user_id, step, status AS previous_status
+            FROM sso_step_events
             WHERE (
-                status = 'pending'
+                (status = 'pending' AND updated_at <= now() - (LEAST(retry_count, ${MAX_BACKOFF_MINUTES}) * interval '1 minute'))
                 OR (status = 'processing' AND updated_at < now() - interval '5 minutes')
             )
             AND retry_count < ${MAX_RETRIES}
-            ORDER BY created_at ASC
+            ORDER BY retry_count ASC, created_at ASC
             LIMIT ${BATCH_SIZE}
             FOR UPDATE SKIP LOCKED
+        ), claimed AS (
+            UPDATE sso_step_events AS events
+            SET status = 'processing', updated_at = now()
+            FROM candidates
+            WHERE events.id = candidates.id
+            RETURNING events.id, events.user_id, events.step, candidates.previous_status
         )
-        RETURNING id, user_id, step
+        SELECT id, user_id, step, (previous_status = 'processing') AS was_reclaimed
+        FROM claimed
     `)
 
-    const events = (claimed.rows ?? []) as Array<{ id: number; user_id: number; step: number }>
+    const events = (claimed.rows ?? []) as Array<{
+        id: number
+        user_id: number
+        step: number
+        was_reclaimed?: boolean
+    }>
+    const deadline = Date.now() + WORKER_DEADLINE_MS
     let succeeded = 0
     let failed = 0
     let raced = 0
+    let deferred = 0
+    const reclaimed = events.filter((event) => event.was_reclaimed).length
 
-    for (const event of events) {
+    const processEvent = async (event: (typeof events)[number]) => {
+        if (deadline - Date.now() <= FINALIZE_HEADROOM_MS) {
+            deferred++
+            return
+        }
+
         try {
-            // sendSSOStepNotification throws on failure — cron catch handles retry/fail state
-            await sendSSOStepNotification(payload, event.user_id, event.step as 1 | 2 | 3)
+            await sendSSOStepNotification(
+                payload,
+                event.user_id,
+                event.step as 1 | 2 | 3,
+                {
+                    loginTimeoutMs: LOGIN_TIMEOUT_MS,
+                    patchTimeoutMs: PATCH_TIMEOUT_MS,
+                },
+            )
 
-            // GH-1293: guard on status='processing' — a concurrent user-triggered retry
-            // (persistStepEvent's upsert) may have already moved this row to 'completed'
-            // while this cron attempt was in flight. Without this guard, a stale cron
-            // finalize would clobber that newer 'completed' state back to pending/failed.
-            // Residual (accepted) gap: if that concurrent retry instead FAILS and moves
-            // status to 'pending' while this cron attempt is succeeding, this UPDATE
-            // no-ops (0 rows matched) and the success is "lost" for this cycle — the row
-            // stays 'pending' and the next cron tick retries a call that already
-            // succeeded server-side. Self-healing (SSO Hub's step-status flip is
-            // idempotent) and narrow (requires both paths racing the same row within the
-            // same in-flight window), so not worth a full CAS/version-token mechanism.
-            // Check rowCount (not just "did the UPDATE run") so the response's counters
-            // don't silently overreport when this exact race fires — a raced attempt is
-            // tracked separately rather than miscounted as succeeded.
+            // GH-1293: only the worker that still owns processing may finalize.
             const result = await db.execute(sql`
                 UPDATE sso_step_events
                 SET status = 'completed', updated_at = now()
                 WHERE id = ${event.id} AND status = 'processing'
             `)
-            if ((result.rowCount ?? 0) > 0) {
-                succeeded++
-            } else {
-                raced++
-            }
+            if ((result.rowCount ?? 0) > 0) succeeded++
+            else raced++
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err)
+            if (deadline - Date.now() <= FINALIZE_HEADROOM_MS) {
+                deferred++
+                return
+            }
 
-            // retry_count + 1 >= MAX_RETRIES → mark permanently failed
-            // Same status='processing' guard and rowCount check as the success branch above.
             const result = await db.execute(sql`
                 UPDATE sso_step_events
                 SET retry_count = retry_count + 1,
@@ -97,12 +115,35 @@ export async function GET(req: Request) {
                     updated_at = now()
                 WHERE id = ${event.id} AND status = 'processing'
             `)
-            if ((result.rowCount ?? 0) > 0) {
-                failed++
-            } else {
-                raced++
-            }
+            if ((result.rowCount ?? 0) > 0) failed++
+            else raced++
         }
+    }
+
+    await Promise.all(events.slice(0, MAX_CONCURRENCY).map(processEvent))
+
+    let remaining = 0
+    let oldestPendingAgeSeconds = 0
+    try {
+        const queueState = await db.execute(sql`
+            SELECT
+                COUNT(*) FILTER (WHERE status IN ('pending', 'processing') AND retry_count < ${MAX_RETRIES})::int AS remaining,
+                COALESCE(EXTRACT(EPOCH FROM (now() - MIN(created_at) FILTER (WHERE status IN ('pending', 'processing') AND retry_count < ${MAX_RETRIES})))::int, 0) AS oldest_pending_age_seconds
+            FROM sso_step_events
+        `)
+        const queueRow = (queueState.rows?.[0] ?? {}) as {
+            remaining?: number
+            oldest_pending_age_seconds?: number
+        }
+        remaining = Number(queueRow.remaining ?? 0)
+        oldestPendingAgeSeconds = Number(
+            queueRow.oldest_pending_age_seconds ?? 0,
+        )
+    } catch (queueError) {
+        console.error(
+            '[SSO Cron] Failed to read queue summary:',
+            queueError instanceof Error ? queueError.message : 'unknown',
+        )
     }
 
     return NextResponse.json({
@@ -110,6 +151,11 @@ export async function GET(req: Request) {
         succeeded,
         failed,
         raced,
+        deferred,
+        reclaimed,
+        remaining,
+        oldestPendingAgeSeconds,
+        concurrency: Math.min(events.length, MAX_CONCURRENCY),
         timestamp: new Date().toISOString(),
     })
 }

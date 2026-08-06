@@ -19,7 +19,7 @@ function sqlToText(sqlObj: any): string {
         .join('')
 }
 
-function createMockPayload(opts: { completedCheckHasRow?: boolean } = {}) {
+function createMockPayload(opts: { completedCheckHasRow?: boolean; hasKeyString?: boolean } = {}) {
     const execute = vi.fn(async (sqlObj: any) => {
         const text = sqlToText(sqlObj)
         if (text.includes('SELECT 1 FROM sso_step_events')) {
@@ -30,7 +30,7 @@ function createMockPayload(opts: { completedCheckHasRow?: boolean } = {}) {
     return {
         findByID: vi.fn().mockResolvedValue({
             email: 'user@test.com',
-            keyString: encryptPassword('test-password'),
+            keyString: opts.hasKeyString === false ? null : encryptPassword('test-password'),
         }),
         db: { drizzle: { execute } },
     } as any
@@ -156,6 +156,21 @@ describe('[TC-1293-SYNC] sso-api-client', () => {
         await notifyStepComplete(payload, 1, 1)
 
         expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('[TC-1724-SYNC-04] missing keyString persists pending instead of false completed', async () => {
+        const payload = createMockPayload({ hasKeyString: false })
+        vi.stubGlobal('fetch', vi.fn())
+
+        await expect(notifyStepComplete(payload, 1, 2)).resolves.toBeUndefined()
+
+        const insertCall = payload.db.drizzle.execute.mock.calls.find(([sqlObj]: any[]) =>
+            sqlToText(sqlObj).includes('INSERT INTO sso_step_events'),
+        )
+        expect(insertCall).toBeDefined()
+        const text = sqlToText(insertCall[0])
+        expect(text).toContain('pending')
+        expect(text).not.toContain('completed')
     })
 
     it('[TC-1293-SYNC-06] a failing body read on an error response still throws a status-bearing error (no unhandled rejection)', async () => {
