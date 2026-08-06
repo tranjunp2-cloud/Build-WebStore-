@@ -4511,6 +4511,8 @@
       "openingHoursEditDayAria": "Edit {day}",
       "openingHoursSave": "Save",
       "openingHoursCancel": "Cancel",
+      "openingHoursNotSet": "Opening hours are not set yet.",
+      "openingHoursSet": "Set opening hours",
       "checklistTitle": "Local SEO essentials",
       "checklistAddressSaved": "Address saved",
       "checklistHoursSaved": "Opening hours saved",

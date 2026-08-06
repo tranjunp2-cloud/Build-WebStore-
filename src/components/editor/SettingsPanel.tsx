@@ -1053,6 +1053,8 @@ function SettingsPanelInner({
                             invalidRangeLabel={s.openingHoursInvalidRange}
                             saveLabel={s.openingHoursSave}
                             cancelLabel={s.openingHoursCancel}
+                            notSetLabel={s.openingHoursNotSet}
+                            setLabel={s.openingHoursSet}
                         />
                     </div>
 

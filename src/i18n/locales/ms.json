@@ -4511,6 +4511,8 @@
       "openingHoursEditDayAria": "Edit {day}",
       "openingHoursSave": "Simpan",
       "openingHoursCancel": "Batal",
+      "openingHoursNotSet": "Waktu operasi belum ditetapkan.",
+      "openingHoursSet": "Tetapkan waktu operasi",
       "checklistTitle": "Asas SEO Tempatan",
       "checklistAddressSaved": "Alamat disimpan",
       "checklistHoursSaved": "Waktu operasi disimpan",
