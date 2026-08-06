@@ -104,9 +104,9 @@ describe('CongratsModal', () => {
             expect(screen.getByText(/My Coffee Shop/)).toBeInTheDocument()
         })
 
-        it('shows "is now live and published" message', () => {
+        it('shows "is now live online" message', () => {
             renderModal()
-            expect(screen.getByText(/is now live and published/i)).toBeInTheDocument()
+            expect(screen.getByText(/is now live online/i)).toBeInTheDocument()
         })
 
         it('displays the site URL in the domain display', () => {
@@ -173,7 +173,7 @@ describe('CongratsModal', () => {
             renderModal()
             fireEvent.click(screen.getByRole('button', { name: /Copy Link/i }))
             await waitFor(() => {
-                expect(mockToastError).toHaveBeenCalledWith('Failed to copy link')
+                expect(mockToastError).toHaveBeenCalledWith("Couldn't copy the link. Try again.")
             })
         })
 

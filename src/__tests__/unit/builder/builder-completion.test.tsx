@@ -114,8 +114,8 @@ describe('BuilderCompletionView', () => {
     describe('Rendering — success state (TC-F01.12)', () => {
         it('renders step screen with correct title and subtitle', () => {
             renderCompletion()
-            expect(screen.getByText('Create Website with AI')).toBeInTheDocument()
-            expect(screen.getByText('Website Generation')).toBeInTheDocument()
+            expect(screen.getByText('Create website with AI')).toBeInTheDocument()
+            expect(screen.getByText('Website generation')).toBeInTheDocument()
         })
 
         it('displays site name in the success message', () => {
@@ -133,15 +133,15 @@ describe('BuilderCompletionView', () => {
             expect(screen.getByText(/\+32s/)).toBeInTheDocument()
         })
 
-        it('displays "has been created successfully!" message', () => {
+        it('displays "is ready!" message', () => {
             renderCompletion()
-            expect(screen.getByText(/has been created successfully/i)).toBeInTheDocument()
+            expect(screen.getByText(/is ready!/i)).toBeInTheDocument()
         })
 
         it('shows instructional hint text after creation', () => {
             renderCompletion()
             expect(
-                screen.getByText(/View the Preview.*open the Editor.*Publish/i),
+                screen.getByText(/See the preview.*open the editor.*publish now/i),
             ).toBeInTheDocument()
         })
     })
@@ -242,9 +242,9 @@ describe('BuilderCompletionView', () => {
             expect(screen.getByTestId('preview-mode-toggle')).toBeInTheDocument()
         })
 
-        it('displays "Website Preview" heading in right pane', () => {
+        it('displays "Website preview" heading in right pane', () => {
             renderCompletion()
-            expect(screen.getByText('Website Preview')).toBeInTheDocument()
+            expect(screen.getByText('Website preview')).toBeInTheDocument()
         })
 
         it('displays "Your AI-generated website" subtitle', () => {

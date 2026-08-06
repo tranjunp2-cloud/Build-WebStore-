@@ -121,6 +121,21 @@ Vet can toan bo AC cua F21, dac biet: Vi tri chinh xac Switcher (Auth vs CMS vs 
 
 ---
 
+### GH-1701: Approved English and Malay Dev View Copy
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-GH1701-01** | `[Contract]` | EN/MS giu cung recursive path/type structure | 1. Load locale JSON that.<br>2. Flatten object, array va scalar path/type.<br>3. So sanh EN voi MS. | Hai locale co cung key, value type, array length va nested object shape. | Blocker | [x] |
+| **TC-GH1701-02** | `[Contract]` | Tat ca 3,386 CSV rows duoc apply hoac co reconciliation decision | 1. Parse source CSV theo RFC-style quoting.<br>2. Resolve tung `key_or_element`.<br>3. Doi chieu output va manifest. | Khong co duplicate, orphan, silently skipped row; moi row duoc apply, hold, map array, hoac classify missing. | Blocker | [x] |
+| **TC-GH1701-03** | `[Contract]` | Array giu dung type, item count va nested shape | 1. Lay 33 CSV array paths.<br>2. Doi chieu mapped/pending/preserved groups.<br>3. So sanh EN/MS shape. | 28 string arrays dung explicit mapping; 1 ambiguous array va 4 object arrays giu nguyen structure. | Blocker | [x] |
+| **TC-GH1701-04** | `[Contract]` | Placeholder va HTML tags tuong thich giua EN/MS | 1. Lay scalar CSV targets con ton tai.<br>2. Extract placeholder multiset va HTML tag multiset.<br>3. So sanh hai locale. | Khong mat interpolation token, opening/closing HTML contract, hoac khac placeholder giua locale. | Blocker | [x] |
+| **TC-GH1701-05** | `[Contract]` | Whitespace, multiline va `{time}` runtime contracts duoc bao toan | 1. Kiem tra payment upload prefix.<br>2. Kiem tra category delete multiline copy.<br>3. Kiem tra email last-edited interpolation. | Upload prefix giu trailing space; locale-specific newline dung; EN/MS deu giu `{time}`. | Blocker | [x] |
+
+Manual visual/content coverage for GH-1701 is tracked in
+`docs/qa/GH-1701-approved-copy-handoff.md`.
+
+---
+
 ## 4. Bien Ban Kiem Dinh — 10-Point Checklist (Sign-Off)
 
 | # | Tieu Chi | Trang Thai |

@@ -183,6 +183,7 @@ export const POST = withAuth(async (user, req) => {
         if (tenantId == null) {
             return NextResponse.json({ error: 'tenantRequired' }, { status: 403 })
         }
+        const generationId = crypto.randomUUID()
 
         const openai = getOpenAI()
 
@@ -216,7 +217,7 @@ export const POST = withAuth(async (user, req) => {
                               categoryId: null, sku: 'SS-SAMPLE', variants: [],
                           },
                       ]
-            return NextResponse.json({ products: fallbackProducts })
+            return NextResponse.json({ generationId, products: fallbackProducts })
         }
 
         const payload = await getPayload({ config: configPromise })
@@ -387,7 +388,7 @@ ${buildBulkCategoryInstructions(categoryCandidateData)}
                 { error: 'merchantLanguageMismatch', retryable: true },
                 { status: 422 })
         }
-        return NextResponse.json(canonicalResult)
+        return NextResponse.json({ generationId, ...canonicalResult })
     } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         

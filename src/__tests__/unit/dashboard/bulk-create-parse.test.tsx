@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import enLocale from '@/i18n/locales/en.json'
 
+const TEST_GENERATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
 // ── Mocks (must be top-level, before imports) ─────────────────────────────────
 
 vi.mock('next/navigation', () => ({
@@ -160,6 +162,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
+                    generationId: TEST_GENERATION_ID,
                     products: [{ name: 'Recovered Hat', price: 10, stock: 0, category: '', variants: [],
                         },
                     ],
@@ -183,6 +186,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             ok: true,
             status: 200,
             json: async () => ({
+                generationId: TEST_GENERATION_ID,
                 products: [{
                     name: 'Premium Backpack\r\nWith Extended\u2028Product\u2029Name',
                     price: 10,
@@ -195,7 +199,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="long product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
 
         // Assert
         expect(nameField.tagName).toBe('TEXTAREA')
@@ -208,6 +212,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             ok: true,
             status: 200,
             json: async () => ({
+                generationId: TEST_GENERATION_ID,
                 products: [{
                     name: 'A'.repeat(121),
                     price: 10,
@@ -220,7 +225,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="overlong product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
 
         // Assert
         expect(nameField).not.toHaveAttribute('maxlength')
@@ -233,6 +238,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             ok: true,
             status: 200,
             json: async () => ({
+                generationId: TEST_GENERATION_ID,
                 products: [{
                     name: 'Editable product name',
                     price: 10,
@@ -243,7 +249,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             }),
         }) as unknown as typeof fetch
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="editable unicode product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
         const combiningAcrossBoundary = `${'A'.repeat(119)}e\u0301`
         const zwjAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
 
@@ -267,6 +273,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
             ok: true,
             status: 200,
             json: async () => ({
+                generationId: TEST_GENERATION_ID,
                 products: [{
                     name: 'Vietnamese product',
                     price: 10,
@@ -279,7 +286,7 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
 
         // Act
         render(<BulkCreateModal onClose={vi.fn()} initialPrompt="IME product name" />)
-        const nameField = await screen.findByLabelText('Product name')
+        const nameField = await screen.findByLabelText('Name')
         fireEvent.compositionStart(nameField)
         const composingEnterDispatched = fireEvent.keyDown(nameField, {
             key: 'Enter',

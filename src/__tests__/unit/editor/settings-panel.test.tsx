@@ -57,12 +57,12 @@ describe('SettingsPanel', () => {
 
     // ── Empty state ──────────────────────────────────────────────────────
 
-    it('defaults to Global Site Settings when no block is selected', () => {
+    it('defaults to Global site settings when no block is selected', () => {
         // Arrange & Act
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} /></I18nProvider>)
 
         // Assert
-        expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
+        expect(screen.getByText('Global site settings')).toBeInTheDocument()
     })
 
     it('[TC-F37-01-27][TC-F37-01-30] sends a sparse street/MY patch for a legacy country', async () => {
@@ -456,13 +456,13 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert
-        expect(screen.getByLabelText('Primary color picker')).toBeInTheDocument()
+        expect(screen.getByLabelText('Primary colour picker')).toBeInTheDocument()
     })
 
     it('color picker change calls onThemeChange with primaryColor', () => {
         // Arrange — render without block to stay on Global tab
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
-        const colorPicker = screen.getByLabelText('Primary color picker')
+        const colorPicker = screen.getByLabelText('Primary colour picker')
 
         // Act
         fireEvent.change(colorPicker, { target: { value: '#22c55e' } })
@@ -476,12 +476,12 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert — FontSelect renders a Radix Select trigger with role="combobox"
-        const headingLabel = screen.getByText('Heading Font')
+        const headingLabel = screen.getByText('Heading font')
 
         // F37 US-01 added the Local Business accordion's own comboboxes (state/
         // category/priceRange <Select>s) earlier in the Global tab, so font
         // selectors can no longer be found by absolute index — scope to the
-        // combobox rendered right next to the "Heading Font" label instead.
+        // combobox rendered right next to the "Heading font" label instead.
         const headingFontCombobox = headingLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
         expect(headingFontCombobox.textContent).toContain('Outfit')
     })
@@ -491,7 +491,7 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Find the heading font selector, scoped by its label (see note above)
-        const headingLabel = screen.getByText('Heading Font')
+        const headingLabel = screen.getByText('Heading font')
         const headingFontCombobox = headingLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
         expect(headingFontCombobox.textContent).toContain('Outfit')
 
@@ -515,7 +515,7 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert — FontSelect renders a Radix Select trigger with role="combobox"
-        const bodyLabel = screen.getByText('Body Font')
+        const bodyLabel = screen.getByText('Body font')
 
         // Scope by label (see "renders heading font selector" test note above) —
         // the Local Business accordion's <Select>s shift absolute combobox indices.
@@ -528,7 +528,7 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Find the body font selector, scoped by its label (see note above)
-        const bodyLabel = screen.getByText('Body Font')
+        const bodyLabel = screen.getByText('Body font')
         const bodyFontCombobox = bodyLabel.parentElement!.querySelector('[role="combobox"]') as HTMLElement
         expect(bodyFontCombobox.textContent).toContain('Inter')
 
@@ -603,7 +603,7 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} theme={undefined} /></I18nProvider>)
 
         // Assert
-        expect(screen.queryByLabelText('Primary color picker')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('Primary colour picker')).not.toBeInTheDocument()
     })
 })
 
@@ -661,7 +661,7 @@ describe('SettingsPanel CRUD — menu-food [TC-F08-CRUD-MENUFOOD]', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
 
         // Act
-        fireEvent.click(screen.getByText('+ Add Category'))
+        fireEvent.click(screen.getByText('+ Add category'))
 
         // Assert
         expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
@@ -686,7 +686,7 @@ describe('SettingsPanel CRUD — menu-food [TC-F08-CRUD-MENUFOOD]', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
 
         // Act
-        fireEvent.click(screen.getByText('+ Add Item'))
+        fireEvent.click(screen.getByText('+ Add item'))
 
         // Assert
         expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {

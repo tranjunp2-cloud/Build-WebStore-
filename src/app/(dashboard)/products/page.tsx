@@ -222,35 +222,60 @@ export default function ProductsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const loadProducts = async ({ showSkeleton = true }: { showSkeleton?: boolean } = {}) => {
+    const loadProducts = async ({
+        showSkeleton = true,
+        refreshCategories = true,
+    }: {
+        showSkeleton?: boolean
+        refreshCategories?: boolean
+    } = {}) => {
         const requestId = ++productsLoadRequestId.current
         if (showSkeleton) {
             setIsLoading(true)
             setError(null)
         }
+
+        const categoriesRequest = refreshCategories
+            ? getCategoriesAction()
+                .then(categoryDocs => categoryDocs as Category[] || [])
+                .catch(() => null)
+            : Promise.resolve<Category[] | null>(null)
+
         try {
             const fetchedDocs = await getProductsAction()
-
-            let loadedCategories: Category[] | null = null
-            // Fetch categories for filter panel
-            try {
-                const catDocs = await getCategoriesAction()
-                loadedCategories = catDocs as Category[] || []
-            } catch (ignore) { }
-
             if (requestId !== productsLoadRequestId.current) return
-            if (loadedCategories) setCategories(loadedCategories)
             setProducts(fetchedDocs as Product[])
+
+            void categoriesRequest.then(loadedCategories => {
+                if (requestId === productsLoadRequestId.current && loadedCategories) {
+                    setCategories(loadedCategories)
+                }
+            })
         } catch (err) {
             if (requestId !== productsLoadRequestId.current) return
             const message = err instanceof Error ? err.message : t.dashboard.products.list.failedToLoad
             if (showSkeleton) setError(message)
             toast.error(t.dashboard.products.list.failedToLoad, {
-                action: { label: t.dashboard.products.list.retry, onClick: () => loadProducts({ showSkeleton }) },
+                action: {
+                    label: t.dashboard.products.list.retry,
+                    onClick: () => loadProducts({ showSkeleton, refreshCategories }),
+                },
             })
         } finally {
             if (showSkeleton && requestId === productsLoadRequestId.current) setIsLoading(false)
         }
+    }
+
+    const refreshVerifiedAiDrafts = () => {
+        setFilterStatus('draft')
+        setSearchQuery('')
+        setSortBy('Latest')
+        setSelectedCategories([])
+        setSaleStatus('All Products')
+        setShowLowStock(false)
+        setIsAdvancedFiltersOpen(false)
+        setCurrentPage(1)
+        void loadProducts({ showSkeleton: false, refreshCategories: false })
     }
 
     const filteredAndSortedProducts = products
@@ -1226,12 +1251,10 @@ export default function ProductsPage() {
                     initialPrompt={aiModalPrompt}
                     categories={aiCategories}
                     onClose={() => setShowBulkCreate(false)}
-                    onPartialSuccess={() => loadProducts({ showSkeleton: false })}
+                    onPartialSuccess={refreshVerifiedAiDrafts}
                     onSuccess={() => {
                         setAiPrompt(currentPrompt => currentPrompt.trim() === aiModalPrompt ? '' : currentPrompt)
-                        setFilterStatus('draft')
-                        setSortBy('Latest')
-                        loadProducts()
+                        refreshVerifiedAiDrafts()
                     }}
                 />
             )}
