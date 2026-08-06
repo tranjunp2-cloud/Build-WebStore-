@@ -203,7 +203,9 @@ export function SeoHealthCard({
     }
 
     const aiFixableItemCount = data.aiFixableItemCount
-    const criticalIssue = data.issues[0]
+    const criticalIssue = data.issues.find(
+        issue => issue.action.kind === 'fix-meta-title' || issue.action.kind === 'fix-meta-description',
+    )
     const criticalIssueText = criticalIssue
         ? (criticalIssue.count === 1
               ? targetT.issues[ISSUE_COPY_KEY[criticalIssue.code]].one

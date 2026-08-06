@@ -84,6 +84,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 where: {
                     and: [
                         { site: { equals: site.id } },
+                        { tenant: { equals: tenant.id } },
                         { status: { equals: 'active' } },
                         { deletedAt: { exists: false } },
                     ],
@@ -97,6 +98,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
                 where: {
                     and: [
                         { site: { equals: site.id } },
+                        { tenant: { equals: tenant.id } },
                         { status: { equals: PUBLIC_STOREFRONT_STATUS } },
                     ],
                 },

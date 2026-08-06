@@ -275,6 +275,18 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         expect(onFixAllMetadata).toHaveBeenCalledTimes(1)
     })
 
+    it('uses a metadata issue for AI copy when a seller issue is listed first', () => {
+        const sellerFirstState = {
+            ...partialState,
+            issues: [issues[1], issues[0], issues[6]],
+        }
+
+        renderCard(sellerFirstState)
+
+        expect(screen.getByText(/Most critical issue: 2 items missing meta titles/)).toBeInTheDocument()
+        expect(screen.queryByText(/Business address incomplete/)).toBeInTheDocument()
+    })
+
     it('labels a backlog over 100 as the next bounded batch and keeps the callback', () => {
         // Arrange
         const onFixAllMetadata = vi.fn()
