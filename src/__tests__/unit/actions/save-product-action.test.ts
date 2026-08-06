@@ -9,6 +9,11 @@ const {
     mockDrizzleExecute,
     mockWithActiveCategoryRowLock,
     mockGetOrCreateCrateCartonId,
+    mockPayloadLoggerInfo,
+    mockPayloadLoggerError,
+    mockSentryCaptureException,
+    mockSentrySetTag,
+    mockSentrySetContext,
 } = vi.hoisted(() => ({
     mockFind: vi.fn(),
     mockCreate: vi.fn(),
@@ -17,8 +22,20 @@ const {
     mockDrizzleExecute: vi.fn(),
     mockWithActiveCategoryRowLock: vi.fn(),
     mockGetOrCreateCrateCartonId: vi.fn(),
+    mockPayloadLoggerInfo: vi.fn(),
+    mockPayloadLoggerError: vi.fn(),
+    mockSentryCaptureException: vi.fn(),
+    mockSentrySetTag: vi.fn(),
+    mockSentrySetContext: vi.fn(),
 }))
 
+vi.mock('@sentry/nextjs', () => ({
+    captureException: mockSentryCaptureException,
+    withScope: vi.fn((callback: (scope: { setTag: ReturnType<typeof vi.fn>; setContext: ReturnType<typeof vi.fn> }) => void) => callback({
+        setTag: mockSentrySetTag,
+        setContext: mockSentrySetContext,
+    })),
+}))
 vi.mock('payload', () => ({
     getPayload: vi.fn().mockResolvedValue({
         find: mockFind,
@@ -29,6 +46,10 @@ vi.mock('payload', () => ({
             drizzle: {
                 execute: mockDrizzleExecute,
             },
+        },
+        logger: {
+            info: mockPayloadLoggerInfo,
+            error: mockPayloadLoggerError,
         },
     }),
 }))
@@ -56,7 +77,7 @@ vi.mock('@/app/(dashboard)/actions/media', () => ({
 }))
 
 import {
-    saveAiProductAction,
+    saveAiProductAction as sourceSaveAiProductAction,
     saveProductAction,
     updateProductFieldAction,
     getProductAction,
@@ -68,6 +89,29 @@ const VALID_PRODUCT = { name: 'Test Product', price: 100 }
 const PRODUCT_WITH_IMAGES = {
     name: 'Test Product',
     images: [{ image: 10, alt: 'some image' }],
+}
+const AI_STABLE_SLUG = 'test-product-ai-1234567890ab4def8234567890abcdef'
+const AI_PRODUCT_WITH_IMAGES = {
+    ...PRODUCT_WITH_IMAGES,
+    slug: AI_STABLE_SLUG,
+}
+const AI_SAVE_METADATA = {
+    generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    operationId: '12345678-90ab-4def-8234-567890abcdef',
+    skuAttempt: 1,
+}
+function saveAiProductAction(rawData: unknown, rawMetadata: unknown = AI_SAVE_METADATA) {
+    return sourceSaveAiProductAction(rawData, rawMetadata)
+}
+
+const VERIFIED_AI_PRODUCT = {
+    id: 42,
+    name: 'Test Product',
+    slug: AI_STABLE_SLUG,
+    tenant: 68,
+    category: [123],
+    status: 'draft',
+    aiReviewPending: true,
 }
 
 describe('getProductsAction [TC-GH1432-PERF-01]', () => {
@@ -209,7 +253,7 @@ describe('saveProductAction', () => {
             expect(mockCreate).toHaveBeenCalledOnce()
             expect(consoleSpy).toHaveBeenCalledWith(
                 expect.stringContaining('Failed to attach placeholder image'),
-                expect.any(Error),
+                { causeName: 'Error' },
             )
         } finally {
             consoleSpy.mockRestore()
@@ -1003,20 +1047,23 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         vi.clearAllMocks()
         vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
         vi.mocked(tenantIdForQuery).mockReturnValue(68)
-        mockFind.mockResolvedValue({ docs: [] })
-        mockCreate.mockResolvedValue({ id: 42, name: 'Test Product' })
+        mockFind.mockImplementation(async (args: { where?: { and?: Array<Record<string, unknown>> } }) => {
+            const isExactVerification = args?.where?.and?.some(condition => 'id' in condition)
+            return { docs: isExactVerification ? [VERIFIED_AI_PRODUCT] : [] }
+        })
+        mockCreate.mockResolvedValue(VERIFIED_AI_PRODUCT)
         mockUpdate.mockResolvedValue({ id: 42, deletedAt: '2026-07-29T00:00:00.000Z' })
-        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product' })
+        mockFindByID.mockResolvedValue(VERIFIED_AI_PRODUCT)
         mockDrizzleExecute.mockResolvedValue({ rows: [] })
         mockWithActiveCategoryRowLock.mockImplementation(
-            async (_payload, _categoryId, _tenantId, operation) => operation(123, { transactionID: 'category-tx' }),
+            async (_payload, _categoryId, _tenantId, operation) => operation(123),
         )
         mockGetOrCreateCrateCartonId.mockResolvedValue(null)
     })
 
     it('accepts exactly one active tenant category and forces an AI draft', async () => {
         await saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             category: ['123'],
             status: 'active',
             aiReviewPending: false,
@@ -1046,7 +1093,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         [2_147_483_648],
     ])('returns CATEGORY_INVALID for malformed category selection before querying or creating: %j', async category => {
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             category,
         })).resolves.toMatchObject({
             ok: false,
@@ -1061,7 +1108,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         mockWithActiveCategoryRowLock.mockResolvedValue(null)
 
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             category: [123],
         })).resolves.toMatchObject({
             ok: false,
@@ -1071,9 +1118,9 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         expect(mockCreate).not.toHaveBeenCalled()
     })
 
-    it('writes the Product through the same bounded tenant-category transaction', async () => {
+    it('[TC-F08-04-122] auto-commits the Product under the category lock and verifies it independently', async () => {
         await saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             category: [123],
         })
 
@@ -1084,23 +1131,38 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
             expect.any(Function),
         )
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            req: { transactionID: 'category-tx' },
+            disableTransaction: true,
         }))
-        expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('disableTransaction')
-        expect(mockFindByID).not.toHaveBeenCalled()
+        expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('req')
+        expect(mockFindByID).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            id: 42,
+        }))
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                and: [
+                    { id: { equals: 42 } },
+                    { deletedAt: { exists: false } },
+                    { tenant: { equals: 68 } },
+                    { slug: { equals: AI_STABLE_SLUG } },
+                    { status: { equals: 'draft' } },
+                    { aiReviewPending: { equals: true } },
+                ],
+            },
+        }))
         expect(getCurrentUser).toHaveBeenCalledOnce()
         expect(tenantIdForQuery).toHaveBeenCalledOnce()
     })
 
     it('returns the existing AI draft for a stable-slug replay without creating a duplicate', async () => {
-        const stableSlug = 'test-product-ai-1234567890abcdef1234567890abcdef'
-        mockFind.mockResolvedValueOnce({ docs: [{ id: 42, slug: stableSlug, aiReviewPending: true, category: [123] }] })
+        const stableSlug = AI_STABLE_SLUG
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 42, slug: stableSlug, tenant: 68, status: 'draft', aiReviewPending: true, category: [123] }] })
 
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             slug: stableSlug,
             category: [123],
-        })).resolves.toMatchObject({ id: 42, slug: stableSlug })
+        })).resolves.toMatchObject({ ok: true, productId: 42, outcome: 'replayed' })
 
         expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'products',
@@ -1109,6 +1171,7 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
                     { deletedAt: { exists: false } },
                     { tenant: { equals: 68 } },
                     { slug: { equals: stableSlug } },
+                    { status: { equals: 'draft' } },
                     { aiReviewPending: { equals: true } },
                 ],
             },
@@ -1119,17 +1182,17 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
     })
 
     it('recovers an AI draft committed before an ambiguous transaction error', async () => {
-        const stableSlug = 'test-product-ai-fedcba0987654321fedcba0987654321'
+        const stableSlug = AI_STABLE_SLUG
         mockFind
             .mockResolvedValueOnce({ docs: [] })
-            .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableSlug, aiReviewPending: true, category: [123] }] })
+            .mockResolvedValueOnce({ docs: [{ id: 43, slug: stableSlug, tenant: 68, status: 'draft', aiReviewPending: true, category: [123] }] })
         mockWithActiveCategoryRowLock.mockRejectedValueOnce(new Error('commit acknowledgement lost'))
 
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             slug: stableSlug,
             category: [123],
-        })).resolves.toMatchObject({ id: 43, slug: stableSlug })
+        })).resolves.toMatchObject({ ok: true, productId: 43, outcome: 'replayed' })
 
         expect(mockFind).toHaveBeenCalledTimes(2)
         expect(mockCreate).not.toHaveBeenCalled()
@@ -1137,21 +1200,23 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
     it('[TC-F08-04-113] rejects a different-category replay visible during the initial lookup', async () => {
         // Arrange
-        const stableSlug = 'test-product-ai-abcdef1234567890abcdef1234567890'
+        const stableSlug = AI_STABLE_SLUG
         const committedInCategoryA = {
             id: 43,
             slug: stableSlug,
             aiReviewPending: true,
+            status: 'draft',
+            tenant: 68,
             category: [123],
         }
         mockFind.mockResolvedValueOnce({ docs: [committedInCategoryA] })
 
         // Act & Assert
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             slug: stableSlug,
             category: [456],
-        })).rejects.toThrow('This AI draft was already saved to a different category')
+        })).resolves.toMatchObject({ ok: false, code: 'AI_DRAFT_CATEGORY_CONFLICT', retryable: false })
 
         expect(mockFind).toHaveBeenCalledOnce()
         expect(mockWithActiveCategoryRowLock).not.toHaveBeenCalled()
@@ -1160,11 +1225,13 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
     it('[TC-F08-04-113] rejects a different-category winner found after a concurrent unique collision', async () => {
         // Arrange
-        const stableSlug = 'test-product-ai-0123456789abcdef0123456789abcdef'
+        const stableSlug = AI_STABLE_SLUG
         const committedInCategoryA = {
             id: 44,
             slug: stableSlug,
             aiReviewPending: true,
+            status: 'draft',
+            tenant: 68,
             category: [123],
         }
         mockFind
@@ -1174,10 +1241,10 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
         // Act & Assert
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             slug: stableSlug,
             category: [456],
-        })).rejects.toThrow('This AI draft was already saved to a different category')
+        })).resolves.toMatchObject({ ok: false, code: 'AI_DRAFT_CATEGORY_CONFLICT', retryable: false })
 
         expect(mockFind).toHaveBeenCalledTimes(2)
         expect(mockWithActiveCategoryRowLock).toHaveBeenCalledWith(
@@ -1193,11 +1260,13 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
     it('[TC-F08-04-114] replays a same-category winner after a concurrent unique collision', async () => {
         // Arrange
-        const stableSlug = 'test-product-ai-11111111111111111111111111111111'
+        const stableSlug = AI_STABLE_SLUG
         const committedInSameCategory = {
             id: 45,
             slug: stableSlug,
             aiReviewPending: true,
+            status: 'draft',
+            tenant: 68,
             category: [123],
         }
         mockFind
@@ -1207,13 +1276,13 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
 
         // Act
         const result = await saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             slug: stableSlug,
             category: [123],
         })
 
         // Assert
-        expect(result).toMatchObject({ id: 45, slug: stableSlug })
+        expect(result).toMatchObject({ ok: true, productId: 45, outcome: 'replayed' })
         expect(mockFind).toHaveBeenCalledTimes(2)
         expect(mockWithActiveCategoryRowLock).toHaveBeenCalledWith(
             expect.anything(),
@@ -1226,14 +1295,176 @@ describe('[TC-F08-04-105] saveAiProductAction category boundary', () => {
         }))
     })
 
+    it('[TC-F08-04-122] returns a correlated created result only after exact persistence verification', async () => {
+        const result = await saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            category: [123],
+        }, {
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: '12345678-90ab-4def-8234-567890abcdef',
+            skuAttempt: 2,
+        })
+
+        expect(result).toMatchObject({
+            ok: true,
+            productId: 42,
+            outcome: 'created',
+            referenceId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        })
+        expect(mockPayloadLoggerInfo).toHaveBeenCalledWith(expect.objectContaining({
+            tenantId: 68,
+            userId: 'u1',
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: '12345678-90ab-4def-8234-567890abcdef',
+            skuAttempt: 2,
+            categoryId: 123,
+            stage: 'verify',
+            outcome: 'created',
+        }), '[ai-product-save] completed')
+    })
+
+    it('[TC-F08-04-122] returns PERSISTENCE_VERIFY_FAILED with a reference and reports it directly', async () => {
+        mockFind
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+
+        const result = await saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            name: 'Private Product Name',
+            sku: 'SECRET-SKU',
+            description: 'Private merchant description',
+            category: [123],
+        }, {
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: '12345678-90ab-4def-8234-567890abcdef',
+            skuAttempt: 1,
+        })
+
+        expect(result).toMatchObject({
+            ok: false,
+            code: 'PERSISTENCE_VERIFY_FAILED',
+            retryable: true,
+            referenceId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        })
+        expect(mockSentryCaptureException).toHaveBeenCalledOnce()
+        expect(mockSentrySetTag).toHaveBeenCalledWith('reference_id', result.referenceId)
+        expect(mockSentrySetTag).toHaveBeenCalledWith(
+            'operation_id',
+            '12345678-90ab-4def-8234-567890abcdef',
+        )
+        const loggedContext = mockPayloadLoggerError.mock.calls[0][0]
+        const sentryContext = mockSentrySetContext.mock.calls[0][1]
+        for (const safeContext of [loggedContext, sentryContext]) {
+            const serialized = JSON.stringify(safeContext)
+            expect(serialized).not.toContain('Private Product Name')
+            expect(serialized).not.toContain('SECRET-SKU')
+            expect(serialized).not.toContain('Private merchant description')
+            expect(safeContext).toMatchObject({
+                generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                operationId: '12345678-90ab-4def-8234-567890abcdef',
+                code: 'PERSISTENCE_VERIFY_FAILED',
+                stage: 'verify',
+            })
+        }
+    })
+
+    it('[TC-F08-04-122] preserves the inner verification cause and classifies it as a persistence failure', async () => {
+        // Arrange
+        const verificationError = Object.assign(new Error('connection terminated during verification'), {
+            name: 'DatabaseError',
+            code: '57P01',
+        })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockFindByID.mockRejectedValueOnce(verificationError)
+
+        // Act
+        const result = await saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            name: 'Private Product Name',
+            sku: 'SECRET-SKU',
+            category: [123],
+        }, {
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: '12345678-90ab-4def-8234-567890abcdef',
+            skuAttempt: 1,
+        })
+
+        // Assert
+        expect(result).toMatchObject({
+            ok: false,
+            code: 'PERSISTENCE_VERIFY_FAILED',
+            retryable: true,
+            referenceId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        })
+        expect(mockSentryCaptureException).toHaveBeenCalledOnce()
+        const loggedContext = mockPayloadLoggerError.mock.calls[0][0]
+        const sentryContext = mockSentrySetContext.mock.calls[0][1]
+        for (const safeContext of [loggedContext, sentryContext]) {
+            expect(safeContext).toMatchObject({
+                tenantId: 68,
+                userId: 'u1',
+                generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                operationId: '12345678-90ab-4def-8234-567890abcdef',
+                stage: 'verify',
+                code: 'PERSISTENCE_VERIFY_FAILED',
+                causeName: 'DatabaseError',
+                causeCode: '57P01',
+            })
+            const serialized = JSON.stringify(safeContext)
+            expect(serialized).not.toContain('Private Product Name')
+            expect(serialized).not.toContain('SECRET-SKU')
+            expect(serialized).not.toContain('connection terminated during verification')
+        }
+    })
+
+    it.each([
+        ['wrong id', { ...VERIFIED_AI_PRODUCT, id: 43 }],
+        ['wrong tenant', { ...VERIFIED_AI_PRODUCT, tenant: 69 }],
+        ['wrong slug', { ...VERIFIED_AI_PRODUCT, slug: 'other-product-ai-1234567890abcdef1234567890abcdef' }],
+        ['wrong status', { ...VERIFIED_AI_PRODUCT, status: 'active' }],
+        ['review flag cleared', { ...VERIFIED_AI_PRODUCT, aiReviewPending: false }],
+        ['wrong category', { ...VERIFIED_AI_PRODUCT, category: [456] }],
+        ['soft deleted', { ...VERIFIED_AI_PRODUCT, deletedAt: '2026-08-04T00:00:00.000Z' }],
+    ])('[TC-F08-04-122] refuses a verification row with %s', async (_case, wrongProduct) => {
+        mockFind
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [wrongProduct] })
+
+        await expect(saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            category: [123],
+        })).resolves.toMatchObject({
+            ok: false,
+            code: 'PERSISTENCE_VERIFY_FAILED',
+        })
+    })
+
+    it('rejects metadata whose operationId does not match the stable slug suffix', async () => {
+        await expect(saveAiProductAction({
+            ...AI_PRODUCT_WITH_IMAGES,
+            category: [123],
+        }, {
+            generationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            operationId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            skuAttempt: 1,
+        })).resolves.toMatchObject({
+            ok: false,
+            code: 'REQUEST_INVALID',
+            retryable: false,
+        })
+
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
     it('[TC-F08-04-111] exposes a clear retry message when the category lock is busy', async () => {
         mockWithActiveCategoryRowLock.mockRejectedValue(new Error('CATEGORY_BUSY_RETRY'))
 
         await expect(saveAiProductAction({
-            ...PRODUCT_WITH_IMAGES,
+            ...AI_PRODUCT_WITH_IMAGES,
             category: [123],
-        })).rejects.toThrow('This category is busy. Please try again.')
+        })).resolves.toMatchObject({ ok: false, code: 'CATEGORY_BUSY_RETRY', retryable: true })
 
+        expect(mockFind).toHaveBeenCalledOnce()
         expect(mockCreate).not.toHaveBeenCalled()
     })
 
