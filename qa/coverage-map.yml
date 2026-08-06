@@ -1,0 +1,127 @@
+# v1 is intentionally conservative: partial means known automated evidence exists;
+# planned means the Targeted Test Pack project must create or map it before claiming coverage.
+version: 1
+defaultForUnmappedProductionPath:
+  status: unmapped
+  action: create_coverage_gap
+  owner: qa-lead
+rules:
+  - {
+      source: "src/app/(auth)/**",
+      targets: [identity-login-otp, identity-password-recovery],
+      evidence: [e2e/auth-flow.spec.ts, docs/qa/F02-auth.md],
+    }
+  - {
+      source: "src/app/(builder)/**",
+      targets:
+        [
+          builder-generate-site,
+          builder-draft-recovery,
+          builder-preview-completion,
+        ],
+      evidence: [e2e/builder.spec.ts, docs/qa/F01-ai-chat-builder.md],
+    }
+  - {
+      source: "src/app/(editor)/**",
+      targets:
+        [
+          editor-load-and-tenant-access,
+          editor-block-content,
+          editor-pages-navigation,
+          editor-publish-lifecycle,
+        ],
+      evidence: [e2e/editor.spec.ts, docs/qa/F05-ai-editor-testcases.md],
+    }
+  - {
+      source: "src/app/(dashboard)/products/**",
+      targets:
+        [
+          products-list-search-filter,
+          products-crud-publish-guard,
+          products-variants-inventory,
+          products-bulk-create,
+          product-categories,
+        ],
+      evidence: [docs/qa/F08-product-crud.md],
+    }
+  - {
+      source: "src/app/(dashboard)/orders/**",
+      targets:
+        [
+          orders-list-search-metrics,
+          order-payment-verification,
+          order-refund-cancel-retry,
+          order-fulfilment-self-delivery,
+          order-shipping-label,
+          order-tracking-stream,
+        ],
+      evidence:
+        [
+          e2e/orders.spec.ts,
+          tests/f36-print-label-mobile.spec.ts,
+          docs/qa/F10-orders-management.md,
+        ],
+    }
+  - {
+      source: "src/app/(dashboard)/settings/**",
+      targets:
+        [
+          payment-settings-manual,
+          stripe-connect-lifecycle,
+          xendit-connect-checkout,
+          shipping-rates-pickup-config,
+          easyparcel-oauth-lifecycle,
+          domains-custom-domain-primary,
+          email-template-management,
+          staff-rbac-management,
+        ],
+      evidence: [e2e/settings.spec.ts, docs/qa/F13-payment-gateway.md],
+    }
+  - {
+      source: "src/app/sites/**",
+      targets:
+        [
+          public-page-routing,
+          storefront-product-discovery,
+          storefront-cart,
+          storefront-discount-checkout,
+          storefront-order-confirm-track,
+          storefront-blog-contact,
+          public-seo-discovery,
+          tenant-domain-routing,
+        ],
+      evidence:
+        [
+          tests/cart-drawer.spec.ts,
+          tests/f37-ai-discoverability.spec.ts,
+          docs/qa/F09-storefront-commerce.md,
+        ],
+    }
+  - {
+      source: "src/app/api/orders/**",
+      targets:
+        [
+          order-payment-verification,
+          order-refund-cancel-retry,
+          order-fulfilment-self-delivery,
+          order-shipping-label,
+          order-tracking-stream,
+          storefront-discount-checkout,
+        ],
+      evidence: [docs/qa/F10-orders-management.md],
+    }
+  - {
+      source: "src/app/api/seo/**",
+      targets:
+        [editor-seo-local-business, public-seo-discovery, seo-tools-automation],
+      evidence: [docs/qa/F37-local-seo.md],
+    }
+  - {
+      source: "src/app/api/webhooks/**",
+      targets: [webhook-contracts],
+      evidence: [docs/qa/F13-payment-gateway.md, docs/qa/F14-shipping.md],
+    }
+governance:
+  precedence: most_specific_source_glob
+  exclusionsRequire: [reason, owner, expiry]
+  targetRetirement: retain_id_and_mark_deprecated
