@@ -3404,6 +3404,99 @@ const MIGRATIONS = [
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
   },
 
+  // ── F40: QA run / result / immutable deploy-impact snapshot ──────────────
+  {
+    name: 'qa_test_runs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_test_runs (
+      id serial PRIMARY KEY,
+      workflow_run_id varchar NOT NULL,
+      attempt integer NOT NULL,
+      ingest_digest varchar NOT NULL,
+      target_id varchar NOT NULL,
+      suite varchar NOT NULL,
+      profile varchar NOT NULL,
+      environment varchar NOT NULL,
+      status varchar NOT NULL,
+      pull_request numeric,
+      commit_sha varchar NOT NULL,
+      started_at timestamptz NOT NULL,
+      finished_at timestamptz NOT NULL,
+      summary_passed numeric NOT NULL DEFAULT 0,
+      summary_failed numeric NOT NULL DEFAULT 0,
+      summary_skipped numeric NOT NULL DEFAULT 0,
+      summary_blocked numeric NOT NULL DEFAULT 0,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_test_runs.unique_execution',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_test_runs_execution_uniq ON qa_test_runs (workflow_run_id, attempt, target_id, suite);`,
+  },
+  {
+    name: 'qa_test_runs.target_finished_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_runs_target_finished_idx ON qa_test_runs (target_id, finished_at DESC);`,
+  },
+  { name: 'qa_test_runs.alter_ingest_digest', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS ingest_digest varchar;` },
+  { name: 'qa_test_runs.alter_summary_passed', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_passed numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_failed', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_failed numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_skipped', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_skipped numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_blocked', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_blocked numeric NOT NULL DEFAULT 0;` },
+  {
+    name: 'qa_test_runs.ingest_digest_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_runs_ingest_digest_idx ON qa_test_runs (ingest_digest);`,
+  },
+  {
+    name: 'qa_test_results.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_test_results (
+      id serial PRIMARY KEY,
+      run_id integer NOT NULL REFERENCES qa_test_runs(id) ON DELETE CASCADE,
+      suite varchar NOT NULL,
+      test_case_id varchar NOT NULL,
+      status varchar NOT NULL,
+      duration_ms numeric,
+      assertion_code varchar,
+      expected_count numeric,
+      actual_count numeric,
+      artifact_url varchar,
+      artifact_expires_at timestamptz,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_test_results.unique_run_suite_case',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_test_results_run_suite_case_uniq ON qa_test_results (run_id, suite, test_case_id);`,
+  },
+  {
+    name: 'qa_test_results.run_status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_results_run_status_idx ON qa_test_results (run_id, status);`,
+  },
+  { name: 'qa_test_results.alter_assertion_code', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS assertion_code varchar;` },
+  { name: 'qa_test_results.alter_expected_count', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS expected_count numeric;` },
+  { name: 'qa_test_results.alter_actual_count', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS actual_count numeric;` },
+  {
+    name: 'qa_change_snapshots.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_change_snapshots (
+      id serial PRIMARY KEY,
+      pull_request numeric NOT NULL,
+      commit_sha varchar NOT NULL,
+      environment varchar NOT NULL,
+      changed_paths jsonb NOT NULL,
+      mapped_target_ids jsonb NOT NULL,
+      unmapped_paths jsonb NOT NULL,
+      coverage_map_version varchar NOT NULL,
+      snapshot_digest varchar NOT NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_change_snapshots.immutable_key',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_change_snapshots_pr_sha_uniq ON qa_change_snapshots (pull_request, commit_sha, environment);`,
+  },
+  { name: 'qa_change_snapshots.alter_snapshot_digest', sql: `ALTER TABLE IF EXISTS qa_change_snapshots ADD COLUMN IF NOT EXISTS snapshot_digest varchar;` },
+
   // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
   // template_quality_scores_template_scored_idx above already covers
   // (template_id, scored_at DESC). PERF-04 cleanup removes the old alias.
@@ -5662,6 +5755,9 @@ const COLLECTION_SLUGS = [
   'discounts',
   'discount_usage_history',
   'sso-step-events',
+  'qa_test_runs',
+  'qa_test_results',
+  'qa_change_snapshots',
 
 ];
 
