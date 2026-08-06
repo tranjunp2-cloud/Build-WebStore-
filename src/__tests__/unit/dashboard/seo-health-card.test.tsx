@@ -193,7 +193,7 @@ describe('[TC-F37-04-11 / TC-F37-04-12] Issue ownership and actions', () => {
         // Act
         const issueActions = screen
             .getAllByRole('button')
-            .filter((button) => button.textContent !== 'Fix all with AI')
+            .filter((button) => button.textContent !== 'AI Fix Issues')
         issueActions.forEach((button) => fireEvent.click(button))
 
         // Assert
@@ -241,10 +241,10 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         renderCard(partialState, { onFixAllMetadata })
 
         // Act
-        fireEvent.click(screen.getByRole('button', { name: 'Fix all with AI' }))
+        fireEvent.click(screen.getByRole('button', { name: 'AI Fix Issues' }))
 
         // Assert
-        const aiFixCopy = screen.getByText('AI can fix 3 issues automatically')
+        const aiFixCopy = screen.getByText(/Most critical issue: 2 items missing meta titles/)
         expect(aiFixCopy).toBeInTheDocument()
         expect(aiFixCopy.closest('.seo-footer')).not.toBeNull()
         expect(aiFixCopy.closest('.seo-target-ai-strip')).toBeNull()
@@ -266,8 +266,8 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Fix next 100 with AI' }))
 
         // Assert
-        expect(screen.getByText('AI can fix 101 issues automatically')).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Fix all with AI' })).not.toBeInTheDocument()
+        expect(screen.getByText(/Most critical issue: 2 items missing meta titles/) ).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'AI Fix Issues' })).not.toBeInTheDocument()
         expect(onFixAllMetadata).toHaveBeenCalledTimes(1)
     })
 
@@ -285,7 +285,7 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         // Assert
         expect(screen.getByText('Business address incomplete')).toBeInTheDocument()
         expect(screen.getByText('1 open')).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Fix all with AI' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'AI Fix Issues' })).not.toBeInTheDocument()
     })
 
     it('hides AI Fix when no metadata issue remains and shows All clear at 100', () => {
@@ -309,7 +309,7 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         // Assert
         expect(screen.getByText('All clear')).toBeInTheDocument()
         expect(screen.getByText('All issues resolved')).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Fix all with AI' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'AI Fix Issues' })).not.toBeInTheDocument()
         expect(screen.queryByText(/\bopen\b/i)).not.toBeInTheDocument()
     })
 

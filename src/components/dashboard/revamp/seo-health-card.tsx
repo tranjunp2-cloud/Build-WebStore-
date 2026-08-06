@@ -167,6 +167,19 @@ export function SeoHealthCard({
     }
 
     const aiFixableItemCount = data.aiFixableItemCount
+    const criticalIssue = data.issues[0]
+    const criticalIssueText = criticalIssue
+        ? (criticalIssue.count === 1
+              ? targetT.issues[ISSUE_COPY_KEY[criticalIssue.code]].one
+              : targetT.issues[ISSUE_COPY_KEY[criticalIssue.code]].other
+          ).replace('{count}', '').trim()
+        : tp(targetT.aiCanFix, aiFixableItemCount)
+    const criticalIssueCopy = criticalIssue
+        ? ti(seoT.criticalIssue, {
+              count: criticalIssue.count,
+              text: criticalIssueText,
+          })
+        : criticalIssueText
     const allClear = data.score === 100 && data.issues.length === 0
     const hasNoSellerActions = !allClear && data.issues.length === 0
 
@@ -233,7 +246,7 @@ export function SeoHealthCard({
                             <AlertTriangle aria-hidden />
                         </span>
                         <span className="warn-txt">
-                            {tp(targetT.aiCanFix, aiFixableItemCount)}
+                            {criticalIssueCopy}
                         </span>
                         <Button
                             variant="dashPrimary"

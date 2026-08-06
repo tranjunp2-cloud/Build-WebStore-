@@ -3193,7 +3193,7 @@
                         "one": "AI can fix {count} issue automatically",
                         "other": "AI can fix {count} issues automatically"
                     },
-                    "fixAll": "Fix all with AI",
+                    "fixAll": "AI Fix Issues",
                     "fixNextBatch": "Fix next 100 with AI",
                     "issues": {
                         "storeName": {

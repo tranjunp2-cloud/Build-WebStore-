@@ -3193,7 +3193,7 @@
                         "one": "AI boleh membaiki {count} isu secara automatik",
                         "other": "AI boleh membaiki {count} isu secara automatik"
                     },
-                    "fixAll": "Baiki semua dengan AI",
+                    "fixAll": "AI Baiki Isu",
                     "fixNextBatch": "Baiki 100 seterusnya dengan AI",
                     "issues": {
                         "storeName": {
