@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "contract": {
     "inputs": [
       "parsed product name",
@@ -70,12 +70,14 @@
         "productHead": "serum",
         "candidateTokens": ["skincare"],
         "requiredProductTokens": ["skin"],
-        "allowedProductTokens": ["skin", "serum", "vitamin"]
+        "allowedProductTokens": ["skin", "serum", "vitamin"],
+        "allowedProductShortTokens": ["c"]
       }
     ],
     "identityRules": [
       "remove only the finite noiseTokens listed in this contract",
-      "allow exact overlap only between the final non-noise product token and final non-noise candidate leaf token",
+      "preserve non-noise short identity tokens when at least one longer identity token exists; reject short-token-only identities",
+      "allow exact overlap only when the complete normalized product and candidate identity token sets are equal",
       "do not allow unrestricted token equivalences",
       "require exact equality between normalized product and candidate leaf identity-token sets",
       "allow only finite directional contextual rules with exact candidate tokens, required product tokens, and allowed product tokens",
@@ -95,6 +97,66 @@
       "productName": "4-Person Camping Tent",
       "candidates": [{ "id": "category-skincare", "path": "QA Skincare" }],
       "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-collision-tv-stand",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "TV Stand",
+      "candidates": [{ "id": "category-vr-stand", "path": "Furniture > VR Stand" }],
+      "proposedCategoryId": "category-vr-stand",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-collision-ai-camera",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI Camera",
+      "candidates": [{ "id": "category-ip-camera", "path": "Security > IP Camera" }],
+      "proposedCategoryId": "category-ip-camera",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-ai-serum",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-vr-serum",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "VR Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-contextual-short-token-vitamin-b",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "Vitamin B Skin Serum",
+      "candidates": [{ "id": "category-skincare", "path": "Beauty > Skincare" }],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": null,
+      "expectedReason": "semanticRejected"
+    },
+    {
+      "id": "hard-negative-short-token-only-identity",
+      "locale": "en",
+      "kind": "hard-negative",
+      "productName": "AI",
+      "candidates": [{ "id": "category-vr", "path": "VR" }],
+      "proposedCategoryId": "category-vr",
       "expectedCategoryId": null,
       "expectedReason": "semanticRejected"
     },

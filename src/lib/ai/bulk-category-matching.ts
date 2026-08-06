@@ -85,6 +85,7 @@ const CONTEXTUAL_MATCH_RULES = [{
     candidateTokens: ['skincare'],
     requiredProductTokens: ['skin'],
     allowedProductTokens: ['skin', 'serum', 'vitamin'],
+    allowedProductShortTokens: ['c'],
 }] as const
 const REVIEWED_PLURAL_TOKENS = new Map<string, string>([
     ['bags', 'bag'], ['books', 'book'], ['bottles', 'bottle'],
@@ -131,11 +132,15 @@ function identityEvidence(value: string, maxChars: number): IdentityEvidence {
                 : undefined
         if (qualifier) qualifierSets[qualifier[0]].add(qualifier[1])
     }
+    const identityTokens = normalizedTokens
+        .filter(token => !/^\d+$/u.test(token))
+        .filter(token => !NOISE_TOKENS.has(token))
+    const hasLongIdentityToken = identityTokens.some(token => token.length >= MIN_IDENTITY_TOKEN_LENGTH)
     return {
         valid: true,
-        tokens: [...new Set(normalizedTokens
-        .filter(token => !/^\d+$/u.test(token))
-        .filter(token => token.length >= MIN_IDENTITY_TOKEN_LENGTH && !NOISE_TOKENS.has(token)))],
+        // Short tokens distinguish names such as "TV Stand" and "VR Stand" when a
+        // longer identity token exists, but short-token-only identities remain invalid.
+        tokens: hasLongIdentityToken ? [...new Set(identityTokens)] : [],
         qualifiers: {
             material: [...qualifierSets.material],
             color: [...qualifierSets.color],
@@ -173,6 +178,8 @@ export function createBulkCategoryMatcher(candidates: readonly BulkCategoryCandi
         if (canonicalId === undefined) return { categoryId: null, reason: 'unknownId' }
         const productEvidence = identityEvidence(productName, PRODUCT_NAME_MAX_CHARS)
         const productTokens = productEvidence.tokens
+        const longProductTokens = productTokens.filter(token => token.length >= MIN_IDENTITY_TOKEN_LENGTH)
+        const shortProductTokens = productTokens.filter(token => token.length < MIN_IDENTITY_TOKEN_LENGTH)
         const productHead = productTokens.at(-1)
         const plausible = prepared.filter(({ evidence }) => {
             if (!productEvidence.valid || !evidence.valid ||
@@ -188,7 +195,8 @@ export function createBulkCategoryMatcher(candidates: readonly BulkCategoryCandi
                 rule.candidateTokens.length === tokens.length &&
                 rule.candidateTokens.every(token => tokens.includes(token)) &&
                 rule.requiredProductTokens.every(token => productTokens.includes(token)) &&
-                productTokens.every(token => rule.allowedProductTokens.some(allowed => allowed === token)),
+                longProductTokens.every(token => rule.allowedProductTokens.some(allowed => allowed === token)) &&
+                shortProductTokens.every(token => rule.allowedProductShortTokens.some(allowed => allowed === token)),
             )
             return exactMatch || contextualMatch
         })
