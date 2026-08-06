@@ -107,6 +107,30 @@
 | **TC-1293-SYNC-07** | `persistStepEvent` upserts via `ON CONFLICT (user_id, step)` on every attempt, never a plain insert | Two sequential calls for the same `(userId, step)` both produce an `ON CONFLICT` upsert |
 | **TC-1293-SYNC-08** | Upsert resets `retry_count` to 0 on both the insert default and the conflict-update path | SQL contains `retry_count = 0` (DO UPDATE) and `, 0) ON CONFLICT` (VALUES default) |
 
+### EasyParcel activation trigger — Issue #1724
+
+| ID | Title | Expected |
+|:---|:---|:---|
+| **TC-1724-SYNC-01** | Enabled EasyParcel activation schedules Shipping step 2 | After successful tenant persistence, PWv2 invokes `notifyStepComplete(payload, user.id, 2)` and sends `{ step2_status: 1 }` |
+| **TC-1724-SYNC-02** | Disabled EasyParcel save does not complete SSO Shipping step | No SSO notification is scheduled when `enabled=false` |
+| **TC-1724-SYNC-03** | SSO outage does not fail EasyParcel activation | Save returns 200; notifier failure is contained and retryable through `sso_step_events` |
+| **TC-1724-SYNC-04** | Missing SSO key material is not marked completed | Missing `keyString` produces a pending event, never a completed event |
+| **TC-1724-SYNC-05** | Missing `after()` request context uses safe fallback | Save remains successful and invokes the notifier immediately when `after()` cannot be scheduled |
+
+### EasyParcel browser acceptance — Issue #1724
+
+| ID | Title | Expected |
+|:---|:---|:---|
+| **TC-1724-E2E-01** | Incomplete pickup address blocks activation | Fixture must be in setup or management state; incomplete setup keeps Next unavailable, while management exposes an active EasyParcel control surface. Full Save & Activate/SSO completion is verified with the configured local or staging fixture.
+
+### SSO retry cron resilience — Issue #1724
+
+| ID | Title | Expected |
+|:---|:---|:---|
+| **TC-1724-CRON-01** | Cron requires authorization | Missing or invalid CRON_SECRET returns 401 without database work |
+| **TC-1724-CRON-02** | Cron claims bounded work | One invocation claims at most two events and processes at most two concurrently |
+| **TC-1724-CRON-03** | Slow SSO stays within worker budget | Cron uses 20s login/25s PATCH budgets and leaves unfinished processing rows reclaimable |
+| **TC-1724-CRON-04** | Queue summary is observable | Response/log includes queue count, oldest age, concurrency/outcome counters, and no secrets |
 ### process-sso-steps/route.ts (retry cron finalize guard)
 
 | ID | Title | Expected |

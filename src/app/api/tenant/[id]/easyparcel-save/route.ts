@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { hasUsablePhone } from '@/lib/shipping/easyparcel/phone'
 import { getDefaultWarehouse, isWarehouseComplete, normalizeWarehouses } from '@/lib/shipping/easyparcel/warehouse'
 import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 
 type RouteContext = { params: Promise<{ id: string }> }
+
+export const maxDuration = 60
 
 const MAX_WAREHOUSES = 20
 const MAX_WAREHOUSE_FIELD_LENGTH = 200
@@ -148,6 +151,22 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             return null
         })
         if (saveResult) return saveResult
+
+        if (enabled) {
+            const _notifyStep2 = () =>
+                notifyStepComplete(payload, user.id, 2, {
+                    loginTimeoutMs: 20_000,
+                    patchTimeoutMs: 25_000,
+                }).catch((err) =>
+                    console.error('[EasyParcelSave] SSO step 2 notify failed:', err),
+                )
+            try {
+                after(_notifyStep2)
+            } catch (scheduleError) {
+                console.warn('[EasyParcelSave] after() unavailable; running SSO step 2 notification immediately:', scheduleError instanceof Error ? scheduleError.message : 'unknown')
+                void _notifyStep2()
+            }
+        }
 
         return NextResponse.json({ success: true, data: { enabled, warehouses } })
     } catch (error: unknown) {
