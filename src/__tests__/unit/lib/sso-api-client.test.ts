@@ -230,4 +230,51 @@ describe('[TC-1293-SYNC] sso-api-client', () => {
         // VALUES (..., 0) default, right before ON CONFLICT
         expect(text).toMatch(/,\s*0\)\s*ON CONFLICT/)
     })
+    it('[TC-1724-SYNC-06] PATCH body consumption is covered by the stage timeout', async () => {
+        vi.useFakeTimers()
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({ status: 200, data: { access_token: 'tok123' } }),
+            })
+            .mockImplementationOnce((_url: string, init: RequestInit) => ({
+                ok: true,
+                status: 200,
+                text: () => new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener('abort', () =>
+                        reject(new DOMException('This operation was aborted', 'AbortError')),
+                    )
+                }),
+            }))
+        vi.stubGlobal('fetch', fetchMock)
+        const promise = sendSSOStepNotification(createMockPayload(), 1, 2, {
+            loginTimeoutMs: 100,
+            patchTimeoutMs: 100,
+        })
+        promise.catch(() => {})
+        await vi.advanceTimersByTimeAsync(99)
+        await vi.advanceTimersByTimeAsync(1)
+        await expect(promise).rejects.toThrow(/aborted/i)
+    })
+
+    it('[TC-1724-SYNC-07] deadline caps each network stage by remaining budget', async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+                init.signal?.addEventListener('abort', () =>
+                    reject(new DOMException('This operation was aborted', 'AbortError')),
+                )
+            }),
+        ))
+        const promise = sendSSOStepNotification(createMockPayload(), 1, 2, {
+            loginTimeoutMs: 20_000,
+            patchTimeoutMs: 25_000,
+            deadlineMs: Date.now() + 250,
+        })
+        promise.catch(() => {})
+        await vi.advanceTimersByTimeAsync(250)
+        await expect(promise).rejects.toThrow(/aborted/i)
+    })
 })

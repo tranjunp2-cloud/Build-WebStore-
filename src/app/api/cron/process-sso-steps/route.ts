@@ -25,6 +25,7 @@ const MAX_BACKOFF_MINUTES = 4
  * Stuck 'processing' rows (cron crash) are reclaimed after 5 minutes.
  */
 export async function GET(req: Request) {
+    const deadline = Date.now() + WORKER_DEADLINE_MS
     const authHeader = req.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
@@ -68,7 +69,6 @@ export async function GET(req: Request) {
         step: number
         was_reclaimed?: boolean
     }>
-    const deadline = Date.now() + WORKER_DEADLINE_MS
     let succeeded = 0
     let failed = 0
     let raced = 0
@@ -89,6 +89,7 @@ export async function GET(req: Request) {
                 {
                     loginTimeoutMs: LOGIN_TIMEOUT_MS,
                     patchTimeoutMs: PATCH_TIMEOUT_MS,
+                    deadlineMs: deadline - FINALIZE_HEADROOM_MS,
                 },
             )
 

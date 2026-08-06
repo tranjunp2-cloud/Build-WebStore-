@@ -178,7 +178,7 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         })
         expect(mockAfter).toHaveBeenCalledTimes(1)
         await scheduledAfter?.()
-        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2)
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
         // NO selectedCouriers or selectedCourier in new spec
     })
 
@@ -196,7 +196,7 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
 
         await scheduledAfter?.()
 
-        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2)
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
     })
 
     it('[TC-1724-SYNC-02] disabled EasyParcel save does not notify SSO step 2', async () => {
@@ -223,7 +223,7 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
 
         expect(res.status).toBe(200)
         await scheduledAfter?.()
-        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2)
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
     })
 
     it('[TC-1724-SYNC-05] falls back to immediate notification when after() is unavailable', async () => {
@@ -239,7 +239,7 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
 
         expect(res.status).toBe(200)
         await Promise.resolve()
-        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2)
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
     })
 
     // TC-F14.141 variant: multiple warehouses

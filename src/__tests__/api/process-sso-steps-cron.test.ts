@@ -92,10 +92,10 @@ describe('[TC-1293-SYNC] GET /api/cron/process-sso-steps', () => {
         expect(body.deferred).toBe(0)
         expect(body.reclaimed).toBe(0)
         expect(body.remaining).toBe(0)
-        expect(mockNotify).toHaveBeenCalledWith(expect.anything(), 10, 2, {
+        expect(mockNotify).toHaveBeenCalledWith(expect.anything(), 10, 2, expect.objectContaining({
             loginTimeoutMs: 20_000,
             patchTimeoutMs: 25_000,
-        })
+        }))
     })
 
     it('[TC-1724-CRON-01] rejects requests without the cron secret', async () => {

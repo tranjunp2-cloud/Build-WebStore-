@@ -3,15 +3,7 @@ import type { BasePayload } from 'payload'
 
 const ALGORITHM = 'aes-256-cbc'
 const IV_LENGTH = 16
-// 30s — shipping-config/route.ts has the tightest maxDuration (60s). Two sequential
-// fetchWithTimeout calls (login + PATCH) worst-case to 60s of fetch time alone; after()
-// shares that same maxDuration budget with the handler work done before it (payload
-// reads/writes), so real headroom is a bit under 60s. In the rare case both calls hang
-// their full 30s, Vercel can kill the invocation before the catch branch's
-// persistStepEvent('pending', ...) runs — no retry-queue row gets written for that
-// attempt (worse than "delayed retry": no row exists for the cron to find). Accepted:
-// low-likelihood (both calls would need to hang simultaneously) and no worse than any
-// other single failed attempt from the user's perspective (still requires a manual retry).
+// 30s is retained for standalone callers. Time-bounded callers pass tighter per-stage budgets.
 const SSO_FETCH_TIMEOUT_MS = 30_000
 
 function getEncryptionKey(): Buffer {
@@ -46,16 +38,21 @@ export function decryptPassword(ciphertext: string): string {
     ]).toString('utf8')
 }
 
-function fetchWithTimeout(
+async function fetchWithTimeout<T>(
     url: string,
     init: RequestInit,
+    consume: (response: Response) => Promise<T>,
     timeoutMs = SSO_FETCH_TIMEOUT_MS,
-): Promise<Response> {
+): Promise<{ response: Response; body: T }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
-    return fetch(url, { ...init, signal: controller.signal }).finally(() =>
-        clearTimeout(timer),
-    )
+    try {
+        const response = await fetch(url, { ...init, signal: controller.signal })
+        const body = await consume(response)
+        return { response, body }
+    } finally {
+        clearTimeout(timer)
+    }
 }
 
 async function getSSOToken(
@@ -66,7 +63,7 @@ async function getSSOToken(
     const password = decryptPassword(keyString)
     const base = (process.env.SSO_API_BASE_URL ?? '').replace(/\/$/, '')
     if (!base) throw new Error('SSO_API_BASE_URL env var not configured')
-    const res = await fetchWithTimeout(
+    const { response: res, body } = await fetchWithTimeout(
         `${base}/api/v1/login`,
         {
             method: 'POST',
@@ -77,6 +74,13 @@ async function getSSOToken(
             // SSO API: `username` field maps to email; `is_system: 1` bypasses MFA OTP check
             body: JSON.stringify({ username: email, password, is_system: 1 }),
         },
+        async (response) => {
+            if (!response.ok) {
+                await response.body?.cancel().catch(() => {})
+                return null
+            }
+            return response.json()
+        },
         timeoutMs,
     )
     if (!res.ok) {
@@ -85,10 +89,8 @@ async function getSSOToken(
         // stack trace) could echo the submitted payload back, leaking it into our logs.
         // Still drain (never read into a variable) so the connection can return to
         // undici's keep-alive pool instead of waiting on GC/timeout.
-        await res.body?.cancel().catch(() => {})
         throw new Error(`SSO login failed: ${res.status}`)
     }
-    const body = await res.json()
     // SSO API returns HTTP 200 for all responses; check envelope status for real errors
     if (body?.status && body.status !== 200) {
         throw new Error(
@@ -136,9 +138,21 @@ export async function sendSSOStepNotification(
     payload: BasePayload,
     userId: number | string,
     step: 1 | 2 | 3,
-    options: { loginTimeoutMs?: number; patchTimeoutMs?: number } = {},
+    options: {
+        loginTimeoutMs?: number
+        patchTimeoutMs?: number
+        deadlineMs?: number
+    } = {},
 ): Promise<void> {
-    const loginTimeoutMs = options.loginTimeoutMs ?? SSO_FETCH_TIMEOUT_MS
+    const timeoutForStage = (configured: number): number => {
+        const timeout = options.deadlineMs
+            ? Math.min(configured, options.deadlineMs - Date.now())
+            : configured
+        if (!Number.isFinite(timeout) || timeout <= 0)
+            throw new Error('SSO deadline exceeded')
+        return timeout
+    }
+    const loginTimeoutMs = timeoutForStage(options.loginTimeoutMs ?? SSO_FETCH_TIMEOUT_MS)
     const patchTimeoutMs = options.patchTimeoutMs ?? SSO_FETCH_TIMEOUT_MS
     if (
         ![loginTimeoutMs, patchTimeoutMs].every(
@@ -171,7 +185,7 @@ export async function sendSSOStepNotification(
     )
 
     const base = (process.env.SSO_API_BASE_URL ?? '').replace(/\/$/, '')
-    const res = await fetchWithTimeout(
+    const { response: res, body: bodyText } = await fetchWithTimeout(
         `${base}/api/v1/product/8/step-status`,
         {
             method: 'PATCH',
@@ -181,11 +195,14 @@ export async function sendSSOStepNotification(
             },
             body: JSON.stringify({ [`step${step}_status`]: 1 }),
         },
-        patchTimeoutMs,
+        (response) => response.text().catch((error) => {
+            if (!response.ok) return ''
+            throw error
+        }),
+        timeoutForStage(patchTimeoutMs),
     )
 
     if (!res.ok) {
-        const bodyText = await res.text().catch(() => '')
         // Redact our own bearer token in case Hub's error response ever echoes request
         // context/headers back (same class of risk as the login call above) — unlike
         // that call, this request body carries no secret, only the Authorization header
@@ -211,6 +228,7 @@ export async function notifyStepComplete(
     payload: BasePayload,
     userId: number | string,
     step: 1 | 2 | 3,
+    options: { loginTimeoutMs?: number; patchTimeoutMs?: number; deadlineMs?: number } = {},
 ): Promise<void> {
     // Guard: skip if already completed — prevents duplicate SSO calls on repeat actions
     try {
@@ -236,7 +254,7 @@ export async function notifyStepComplete(
     }
 
     try {
-        await sendSSOStepNotification(payload, userId, step)
+        await sendSSOStepNotification(payload, userId, step, options)
         // Awaited so callers wrapping notifyStepComplete in after() (or similar
         // keep-alive mechanisms) actually cover this write, not just the network call.
         await persistStepEvent(payload, userId, step, 'completed').catch((e) =>

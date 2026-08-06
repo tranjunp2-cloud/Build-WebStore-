@@ -154,7 +154,10 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
 
         if (enabled) {
             const _notifyStep2 = () =>
-                notifyStepComplete(payload, user.id, 2).catch((err) =>
+                notifyStepComplete(payload, user.id, 2, {
+                    loginTimeoutMs: 20_000,
+                    patchTimeoutMs: 25_000,
+                }).catch((err) =>
                     console.error('[EasyParcelSave] SSO step 2 notify failed:', err),
                 )
             try {
