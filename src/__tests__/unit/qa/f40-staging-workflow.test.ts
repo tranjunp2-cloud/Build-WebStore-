@@ -19,5 +19,12 @@ describe("[TC-F40-02-09] staging QA workflow safety guards", () => {
     expect(workflow).toContain("steps.staging_deploy.outcome == 'success'");
     expect(workflow).toContain("No source PR could be resolved");
     expect(workflow).toContain("more than 500 paths");
+    expect(workflow).toContain(
+      "const assertionCode = status === 'failed' ? 'STAGING_E2E_TERMINAL_FAILURE' : undefined",
+    );
+    expect(workflow).toContain("...(assertionCode ? { assertionCode } : {})");
+    expect(workflow).not.toContain(
+      "...(failed ? { assertionCode: 'STAGING_E2E_FAILURE' } : {})",
+    );
   });
 });

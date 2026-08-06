@@ -51,7 +51,7 @@ describe("[TC-F40-02-04] QA run summary contract", () => {
     );
   });
 
-  it("accepts Next.js route-group and dynamic paths in an immutable change snapshot", () => {
+  it("accepts route groups, dynamic segments, and tracked paths with spaces", () => {
     // Arrange
     const payload = {
       workflowRunId: "run-paths",
@@ -70,15 +70,72 @@ describe("[TC-F40-02-04] QA run summary contract", () => {
         pullRequest: 1741,
         commitSha: "abcdef1",
         environment: "staging",
-        changedPaths: ["src/app/(dashboard)/orders/[id]/page.tsx"],
+        changedPaths: [
+          "src/app/(dashboard)/orders/[id]/page.tsx",
+          "docs/design/UX Audit/F01-UX-Audit.md",
+        ],
         mappedTargetIds: ["orders.shipping"],
-        unmappedPaths: [],
+        unmappedPaths: ["docs/design/UX Audit/F01-UX-Audit.md"],
         coverageMapVersion: "v1",
       },
     };
 
     // Act
     const result = QaRunSummarySchema.safeParse(payload);
+
+    // Assert
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts only machine identifiers for persisted run fields", () => {
+    // Arrange: this is the format emitted by GitHub Actions in the staging workflow.
+    const payload = {
+      workflowRunId: "123456789-2",
+      attempt: 2,
+      targetId: "cms.staging.e2e",
+      suite: "staging-e2e",
+      profile: "staging-e2e",
+      environment: "staging",
+      commitSha: "abcdef1",
+      startedAt: "2026-08-06T01:00:00.000Z",
+      finishedAt: "2026-08-06T01:01:00.000Z",
+      summary: { passed: 1, failed: 0, skipped: 0, blocked: 0 },
+      results: [{ testCaseId: "TC-F40-02-04", status: "passed" }],
+    };
+
+    // Act / Assert: header-shaped free text must never become persisted metadata.
+    expect(QaRunSummarySchema.safeParse(payload).success).toBe(true);
+    for (const field of ["workflowRunId", "suite", "profile"] as const) {
+      expect(
+        QaRunSummarySchema.safeParse({
+          ...payload,
+          [field]: "Authorization:Bearer sensitive-token",
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("accepts a failed terminal sentinel even when Playwright emitted no failed count", () => {
+    // Arrange / Act: the workflow normalizes any non-success terminal outcome.
+    const result = QaRunSummarySchema.safeParse({
+      workflowRunId: "123456789-2",
+      attempt: 2,
+      targetId: "cms.staging.e2e",
+      suite: "staging-e2e",
+      profile: "staging-e2e",
+      environment: "staging",
+      commitSha: "abcdef1",
+      startedAt: "2026-08-06T01:00:00.000Z",
+      finishedAt: "2026-08-06T01:01:00.000Z",
+      summary: { passed: 0, failed: 1, skipped: 0, blocked: 0 },
+      results: [
+        {
+          testCaseId: "TC-F40-STAGING-E2E",
+          status: "failed",
+          assertionCode: "STAGING_E2E_TERMINAL_FAILURE",
+        },
+      ],
+    });
 
     // Assert
     expect(result.success).toBe(true);

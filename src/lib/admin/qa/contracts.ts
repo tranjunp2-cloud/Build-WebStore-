@@ -1,20 +1,28 @@
 import crypto from "crypto";
 import { z } from "zod";
 
-// Next.js source paths legitimately contain route groups `(dashboard)` and dynamic
-// segments `[id]`; allow only those path characters, never query strings or payloads.
+// Next.js source paths legitimately contain route groups `(dashboard)`, dynamic
+// segments `[id]`, and repository filenames with spaces. Keep the allow-list
+// narrow so query strings, control characters, and payload text cannot persist.
 const SafePath = z
   .string()
   .trim()
   .min(1)
   .max(500)
-  .regex(/^[A-Za-z0-9_./@()[\]-]+$/);
+  .regex(/^[A-Za-z0-9 _./@()[\]-]+$/);
 const SafeTargetId = z
   .string()
   .trim()
   .min(1)
   .max(160)
   .regex(/^[A-Za-z0-9_.:-]+$/);
+const safeMachineIdentifier = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
 const AssertionCode = z
   .string()
   .trim()
@@ -22,11 +30,11 @@ const AssertionCode = z
 
 export const QaRunSummarySchema = z
   .object({
-    workflowRunId: z.string().trim().min(1).max(100),
+    workflowRunId: safeMachineIdentifier(100),
     attempt: z.number().int().min(1).max(100),
     targetId: SafeTargetId,
-    suite: z.string().trim().min(1).max(120),
-    profile: z.string().trim().min(1).max(120),
+    suite: safeMachineIdentifier(120),
+    profile: safeMachineIdentifier(120),
     environment: z.enum(["staging", "production", "local"]),
     pullRequest: z.number().int().positive().optional(),
     commitSha: z

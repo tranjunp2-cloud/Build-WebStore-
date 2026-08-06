@@ -189,7 +189,10 @@ jobs:
           const changedPaths = fs.readFileSync('/tmp/qa-changed-paths.txt', 'utf8').trim().split('\n').filter(Boolean)
           const now = new Date()
           const status = process.env.E2E_OUTCOME === 'success' ? 'passed' : 'failed'
-          const failed = Number(process.env.E2E_FAILED || 0)
+          // Setup/provisioning failures can end the step before Playwright prints
+          // a failed-count. Every non-passed terminal sentinel still needs a safe
+          // assertion code to satisfy the ingest contract.
+          const assertionCode = status === 'failed' ? 'STAGING_E2E_TERMINAL_FAILURE' : undefined
           const pullRequest = Number(process.env.QA_PULL_REQUEST || 0)
           const body = {
             workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
@@ -197,8 +200,8 @@ jobs:
             targetId: 'cms.staging.e2e', suite: 'staging-e2e', profile: 'staging-e2e', environment: 'staging',
             ...(pullRequest > 0 ? { pullRequest } : {}), commitSha: process.env.GITHUB_SHA,
             startedAt: new Date(now.getTime() - 1000).toISOString(), finishedAt: now.toISOString(),
-            summary: { passed: Number(process.env.E2E_PASSED || 0), failed, skipped: Number(process.env.E2E_SKIPPED || 0), blocked: 0 },
-            results: [{ testCaseId: 'TC-F40-STAGING-E2E', status, ...(failed ? { assertionCode: 'STAGING_E2E_FAILURE' } : {}) }],
+            summary: { passed: Number(process.env.E2E_PASSED || 0), failed: Number(process.env.E2E_FAILED || 0), skipped: Number(process.env.E2E_SKIPPED || 0), blocked: 0 },
+            results: [{ testCaseId: 'TC-F40-STAGING-E2E', status, ...(assertionCode ? { assertionCode } : {}) }],
           }
           if (pullRequest > 0) body.changeSnapshot = {
             pullRequest, commitSha: process.env.GITHUB_SHA, environment: 'staging',
