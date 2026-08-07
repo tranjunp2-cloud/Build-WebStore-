@@ -537,7 +537,16 @@ function SettingsPanelInner({
         hasInvalidSchemaSubtype ? 'local-business-schema-subtype-validation' : null,
     ].filter(Boolean).join(' ') || undefined
     const siteSocialLinks = site?.socialLinks || {}
-    const siteSeo = site?.seo || {}
+    const siteSeoRaw = site?.seo || {}
+    // Normalize ogImage: Payload populates upload fields as full objects ({id, url, ...})
+    // but the save schema expects string | number | null. Extract the raw ID to prevent
+    // VALIDATION_ERROR 400 when spreading siteSeo into save payloads.
+    const siteSeo = {
+        ...siteSeoRaw,
+        ogImage: siteSeoRaw.ogImage && typeof siteSeoRaw.ogImage === 'object'
+            ? (siteSeoRaw.ogImage as { id?: string | number }).id ?? null
+            : siteSeoRaw.ogImage ?? null,
+    }
     const siteBranding = site?.branding || {}
     const contactSavePendingRef = useRef(false)
     const [isContactSaving, setIsContactSaving] = useState(false)

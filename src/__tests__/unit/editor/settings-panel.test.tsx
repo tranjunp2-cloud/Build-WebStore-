@@ -947,7 +947,7 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
 
         // Assert
         expect(onSiteSettingsChange).toHaveBeenCalledWith({
-            seo: { googleVerificationToken: "new-token" },
+            seo: { googleVerificationToken: "new-token", ogImage: null },
         })
     })
 
