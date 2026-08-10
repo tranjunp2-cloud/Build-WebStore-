@@ -4,7 +4,8 @@
 # Note: workflow_dispatch and workflow_run require file on default branch (main).
 # Until this workflow lands on main, we trigger via `push` on staging.
 #
-# Runs Playwright tests against live staging: https://web-v2.dev.ecommercehub.my
+# Runs browser/admin API checks against live CMS staging. Storefront fixtures
+# resolve their own tenant subdomain separately.
 name: E2E Staging
 
 on:
@@ -14,7 +15,7 @@ on:
     inputs:
       base_url:
         description: "Staging URL to test"
-        default: "https://web-v2.dev.ecommercehub.my"
+        default: "https://web-cms-v2.dev.ecommercehub.my"
         required: false
 
 concurrency:
@@ -45,13 +46,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Install Chromium for targeted Smoke API boundary checks
         run: npx playwright install --with-deps chromium
 
       - name: Wait for NEW staging deploy to be ready
         id: staging_deploy
         run: |
-          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
           echo "Waiting for Vercel deploy: $URL"
           # The staging alias can point to the prior deployment while Vercel builds.
           # Poll the deployed commit identity; route existence/status alone cannot
@@ -74,7 +75,7 @@ jobs:
 
       - name: Ensure E2E test user exists
         run: |
-          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          BASE_URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
           if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
             echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
             exit 0
@@ -134,7 +135,7 @@ jobs:
           echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
@@ -168,78 +169,45 @@ jobs:
           echo "mapped_targets=$(jq '.mappedTargetIds | length' /tmp/qa-change-impact.json)" >> "$GITHUB_OUTPUT"
           echo "unmapped_paths=$(jq '.unmappedPaths | length' /tmp/qa-change-impact.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish staging QA summary and deploy impact
+      - name: Dispatch allow-listed targeted Smoke packs
         if: always() && steps.staging_deploy.outcome == 'success' && steps.qa_context.outcome == 'success' && steps.qa_impact.outcome == 'success'
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
-          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
-          E2E_OUTCOME: ${{ steps.e2e.outcome }}
-          E2E_PASSED: ${{ steps.e2e.outputs.passed }}
-          E2E_FAILED: ${{ steps.e2e.outputs.failed }}
-          E2E_SKIPPED: ${{ steps.e2e.outputs.skipped }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET }}
+          F40_TARGETED_SMOKE_ENABLED: ${{ vars.F40_TARGETED_SMOKE_ENABLED || 'false' }}
           QA_PULL_REQUEST: ${{ steps.qa_context.outputs.pull_request }}
         run: |
-          if [ -z "$QA_INGEST_SECRET" ]; then
-            echo 'QA_INGEST_SECRET is not configured; no QA summary was published.'
+          if [ "$F40_TARGETED_SMOKE_ENABLED" != 'true' ]; then
+            echo 'F40 targeted Smoke rollout is disabled; dispatch intentionally skipped.'
             exit 0
+          fi
+          if [ -z "$QA_TARGETED_DISPATCH_SECRET" ]; then
+            echo '::error::QA_TARGETED_DISPATCH_SECRET is required when targeted Smoke is enabled.'
+            exit 1
           fi
           node <<'NODE'
           const crypto = require('crypto')
           const fs = require('fs')
-          const impact = JSON.parse(fs.readFileSync('/tmp/qa-change-impact.json', 'utf8'))
           const changedPaths = fs.readFileSync('/tmp/qa-changed-paths.txt', 'utf8').trim().split('\n').filter(Boolean)
-          const now = new Date()
-          const status = process.env.E2E_OUTCOME === 'success' ? 'passed' : 'failed'
-          // Setup/provisioning failures can end the step before Playwright prints
-          // a failed-count. Every non-passed terminal sentinel still needs a safe
-          // assertion code to satisfy the ingest contract.
-          const assertionCode = status === 'failed' ? 'STAGING_E2E_TERMINAL_FAILURE' : undefined
           const pullRequest = Number(process.env.QA_PULL_REQUEST || 0)
-          const body = {
-            workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
-            attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
-            targetId: 'cms.staging.e2e', suite: 'staging-e2e', profile: 'staging-e2e', environment: 'staging',
-            ...(pullRequest > 0 ? { pullRequest } : {}), commitSha: process.env.GITHUB_SHA,
-            startedAt: new Date(now.getTime() - 1000).toISOString(), finishedAt: now.toISOString(),
-            summary: { passed: Number(process.env.E2E_PASSED || 0), failed: Number(process.env.E2E_FAILED || 0), skipped: Number(process.env.E2E_SKIPPED || 0), blocked: 0 },
-            results: [{ testCaseId: 'TC-F40-STAGING-E2E', status, ...(assertionCode ? { assertionCode } : {}) }],
-          }
-          if (pullRequest > 0) body.changeSnapshot = {
-            pullRequest, commitSha: process.env.GITHUB_SHA, environment: 'staging',
-            changedPaths,
-            mappedTargetIds: impact.mappedTargetIds,
-            unmappedPaths: impact.unmappedPaths,
-            coverageMapVersion: impact.coverageMapVersion,
-          }
-          // Contract requires one result per reported aggregate. Keep this terminal delivery compact and internally consistent.
-          body.summary = status === 'passed' ? { passed: 1, failed: 0, skipped: 0, blocked: 0 } : { passed: 0, failed: 1, skipped: 0, blocked: 0 }
+          if (!Number.isInteger(pullRequest) || pullRequest < 1) throw new Error('A source PR is required')
+          const body = { pullRequest, commitSha: process.env.GITHUB_SHA, environment: 'staging', changedPaths }
           const raw = JSON.stringify(body)
           const timestamp = Date.now().toString()
-          const signature = crypto.createHmac('sha256', process.env.QA_INGEST_SECRET).update(`${timestamp}.${raw}`).digest('hex')
-          require('fs').writeFileSync('/tmp/qa-ingest-body.json', raw)
-          require('fs').writeFileSync('/tmp/qa-ingest-headers.txt', `${timestamp}\n${signature}`)
+          const signature = crypto.createHmac('sha256', process.env.QA_TARGETED_DISPATCH_SECRET).update(`${timestamp}.${raw}`).digest('hex')
+          require('fs').writeFileSync('/tmp/qa-targeted-dispatch-body.json', raw)
+          require('fs').writeFileSync('/tmp/qa-targeted-dispatch-headers.txt', `${timestamp}\n${signature}`)
           NODE
-          QA_TIMESTAMP=$(sed -n '1p' /tmp/qa-ingest-headers.txt)
-          QA_SIGNATURE=$(sed -n '2p' /tmp/qa-ingest-headers.txt)
-          curl --fail-with-body --retry 3 --retry-all-errors -X POST "$BASE_URL/api/admin/qa/ingest" \
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/qa-targeted-dispatch-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/qa-targeted-dispatch-headers.txt)
+          curl --fail-with-body --retry 3 --retry-all-errors -X POST "$BASE_URL/api/internal/qa/targeted-dispatch" \
             -H 'Content-Type: application/json' -H "x-qa-timestamp: $QA_TIMESTAMP" -H "x-qa-signature: sha256=$QA_SIGNATURE" \
-            --data-binary @/tmp/qa-ingest-body.json
+            --data-binary @/tmp/qa-targeted-dispatch-body.json
 
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 3
+      - name: Verify targeted Smoke API security boundaries
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+        run: npx playwright test tests/f40-targeted-smoke-api.spec.ts --project=f40-targeted-smoke-api
 
       - name: Prepare notification info
         if: always()

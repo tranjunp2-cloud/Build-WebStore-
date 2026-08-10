@@ -1,0 +1,63 @@
+import crypto from "crypto";
+import { sql } from "drizzle-orm";
+import type { Payload, PayloadRequest } from "payload";
+
+type TransactionRequest = Pick<PayloadRequest, "transactionID">;
+type TransactionSessionDb = { execute: (query: unknown) => Promise<unknown> };
+type TransactionCapableDb = {
+  drizzle: {
+    transaction: <T>(
+      operation: (transaction: TransactionSessionDb) => Promise<T>,
+      options?: unknown,
+    ) => Promise<T>;
+  };
+  sessions: Record<string, { db: TransactionSessionDb }>;
+  transactionOptions?: unknown;
+};
+
+/**
+ * Serializes capacity decisions for one staging fixture. PostgreSQL advisory
+ * transaction locks are released on commit/rollback, including process errors,
+ * and avoid an expiring-row uniqueness predicate (which PostgreSQL forbids).
+ */
+export async function withQaTargetedDispatchTransaction<T>(
+  payload: Payload,
+  environment: "staging",
+  fixtureKey: string,
+  operation: (req: TransactionRequest) => Promise<T>,
+): Promise<T> {
+  const db = payload.db as unknown as TransactionCapableDb;
+  if (!db.drizzle?.transaction)
+    throw new Error("Database transactions are unavailable");
+
+  return db.drizzle.transaction(async (transaction) => {
+    const transactionID = crypto.randomUUID();
+    db.sessions[transactionID] = { db: transaction };
+    try {
+      await transaction.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`${environment}:${fixtureKey}`}))`,
+      );
+      return await operation({ transactionID });
+    } finally {
+      delete db.sessions[transactionID];
+    }
+  }, db.transactionOptions);
+}
+
+/** Acquires the same fixture lock inside an existing Payload transaction. */
+export async function lockQaTargetedFixture(
+  payload: Payload,
+  environment: "staging",
+  fixtureKey: string,
+  req: TransactionRequest,
+): Promise<void> {
+  const db = payload.db as unknown as TransactionCapableDb;
+  const transactionID = await req.transactionID;
+  if (typeof transactionID !== "string")
+    throw new Error("Targeted fixture lock requires a transaction ID");
+  const session = db.sessions[transactionID];
+  if (!session) throw new Error("Targeted fixture lock requires an active transaction");
+  await session.db.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${`${environment}:${fixtureKey}`}))`,
+  );
+}

@@ -19,12 +19,13 @@ describe("[TC-F40-02-09] staging QA workflow safety guards", () => {
     expect(workflow).toContain("steps.staging_deploy.outcome == 'success'");
     expect(workflow).toContain("No source PR could be resolved");
     expect(workflow).toContain("more than 500 paths");
-    expect(workflow).toContain(
-      "const assertionCode = status === 'failed' ? 'STAGING_E2E_TERMINAL_FAILURE' : undefined",
-    );
-    expect(workflow).toContain("...(assertionCode ? { assertionCode } : {})");
+    expect(workflow).toContain("Dispatch allow-listed targeted Smoke packs");
+    expect(workflow).toContain("F40_TARGETED_SMOKE_ENABLED");
+    expect(workflow).toContain("QA_TARGETED_DISPATCH_SECRET");
+    expect(workflow).toContain("/api/internal/qa/targeted-dispatch");
+    expect(workflow).toContain("Verify targeted Smoke API security boundaries");
     expect(workflow).not.toContain(
-      "...(failed ? { assertionCode: 'STAGING_E2E_FAILURE' } : {})",
+      "STAGING_E2E_TERMINAL_FAILURE",
     );
   });
 });

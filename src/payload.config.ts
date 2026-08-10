@@ -46,6 +46,8 @@ import { SsoStepEvents } from './collections/SsoStepEvents'
 import { QaTestRuns } from './collections/QaTestRuns'
 import { QaTestResults } from './collections/QaTestResults'
 import { QaChangeSnapshots } from './collections/QaChangeSnapshots'
+import { QaSmokeDispatches } from './collections/QaSmokeDispatches'
+import { QaFixtureLeases } from './collections/QaFixtureLeases'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -163,6 +165,8 @@ export default buildConfig({
     QaTestRuns,
     QaTestResults,
     QaChangeSnapshots,
+    QaSmokeDispatches,
+    QaFixtureLeases,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

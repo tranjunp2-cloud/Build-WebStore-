@@ -88,6 +88,14 @@ export const QaRunSummarySchema = z
       })
       .strict()
       .optional(),
+    targetedDispatch: z
+      .object({
+        dispatchId: z.number().int().positive(),
+        packId: safeMachineIdentifier(120),
+        packVersion: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -142,6 +150,12 @@ export const QaRunSummarySchema = z
         code: z.ZodIssueCode.custom,
         message: "changeSnapshot must match run PR/SHA/environment",
         path: ["changeSnapshot"],
+      });
+    if (value.suite === "targeted-smoke" && !value.targetedDispatch)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "targetedDispatch is required for targeted Smoke evidence",
+        path: ["targetedDispatch"],
       });
   });
 
@@ -210,4 +224,14 @@ export function deriveQaRunStatus(
   if (results.some((result) => result.status === "blocked")) return "blocked";
   if (results.some((result) => result.status === "passed")) return "passed";
   return "cancelled";
+}
+
+/** A targeted critical-flow run is never healthy if any declared case did not pass. */
+export function deriveQaRunStatusForSuite(
+  suite: string,
+  results: QaRunSummary["results"],
+): "passed" | "failed" | "cancelled" | "blocked" {
+  if (suite === "targeted-smoke" && results.some((result) => result.status !== "passed"))
+    return "blocked";
+  return deriveQaRunStatus(results);
 }

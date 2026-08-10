@@ -129,6 +129,20 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // F40-03 runs only an allow-listed spec selected by the server-owned
+        // dispatch ledger. It intentionally has no broad tests/ fallback.
+        {
+            name: 'f40-targeted-smoke',
+            testDir: './tests/targeted-smoke',
+            testMatch: /\.smoke\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                // The fixture endpoint is deliberately admin-authenticated. Public
+                // storefront assertions create their own clean browser context.
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'f40-project-health',
             testDir: './tests',
@@ -138,6 +152,14 @@ export default defineConfig({
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
+        },
+        // Browser-level boundary tests for every server endpoint introduced by
+        // US-F40-03. They deliberately use no privileged secret.
+        {
+            name: 'f40-targeted-smoke-api',
+            testDir: './tests',
+            testMatch: /f40-targeted-smoke-api\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], storageState: undefined },
         },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).

@@ -3497,6 +3497,73 @@ const MIGRATIONS = [
   },
   { name: 'qa_change_snapshots.alter_snapshot_digest', sql: `ALTER TABLE IF EXISTS qa_change_snapshots ADD COLUMN IF NOT EXISTS snapshot_digest varchar;` },
 
+  // ── F40-03: automatic targeted Smoke dispatch ledger + fixture leases ───
+  {
+    name: 'qa_smoke_dispatches.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_smoke_dispatches (
+      id serial PRIMARY KEY,
+      dispatch_key varchar NOT NULL,
+      request_digest varchar NOT NULL,
+      workflow_nonce varchar NOT NULL,
+      target_id varchar NOT NULL,
+      pack_id varchar NOT NULL,
+      pack_version integer NOT NULL,
+      fixture_key varchar NOT NULL,
+      fixture_capacity integer NOT NULL,
+      environment varchar NOT NULL,
+      pull_request numeric NOT NULL,
+      commit_sha varchar NOT NULL,
+      status varchar NOT NULL,
+      block_code varchar,
+      recovery_hint varchar,
+      workflow_run_id varchar,
+      workflow_attempt integer,
+      terminal_run_id integer REFERENCES qa_test_runs(id) ON DELETE SET NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_smoke_dispatches.unique_dispatch_key',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_smoke_dispatches_dispatch_key_uniq ON qa_smoke_dispatches (dispatch_key);`,
+  },
+  { name: 'qa_smoke_dispatches.alter_workflow_nonce', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS workflow_nonce varchar;` },
+  {
+    name: 'qa_smoke_dispatches.workflow_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_workflow_idx ON qa_smoke_dispatches (workflow_run_id, workflow_attempt);`,
+  },
+  {
+    name: 'qa_smoke_dispatches.state_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_state_idx ON qa_smoke_dispatches (status, created_at DESC);`,
+  },
+  {
+    name: 'qa_fixture_leases.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_fixture_leases (
+      id serial PRIMARY KEY,
+      dispatch_id integer NOT NULL REFERENCES qa_smoke_dispatches(id) ON DELETE CASCADE,
+      environment varchar NOT NULL,
+      fixture_key varchar NOT NULL,
+      capacity_slot integer NOT NULL,
+      status varchar NOT NULL,
+      acquired_at timestamptz NOT NULL,
+      expires_at timestamptz NOT NULL,
+      released_at timestamptz,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  // Capacity is protected by withQaTargetedDispatchTransaction's per-fixture
+  // pg_advisory_xact_lock. A partial unique index cannot use now() in its
+  // predicate, so expiry is checked while holding that transaction lock.
+  {
+    name: 'qa_fixture_leases.capacity_lookup_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_fixture_leases_capacity_lookup_idx ON qa_fixture_leases (environment, fixture_key, status, expires_at);`,
+  },
+  {
+    name: 'qa_fixture_leases.dispatch_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_fixture_leases_dispatch_idx ON qa_fixture_leases (dispatch_id);`,
+  },
+
   // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
   // template_quality_scores_template_scored_idx above already covers
   // (template_id, scored_at DESC). PERF-04 cleanup removes the old alias.
@@ -5758,6 +5825,8 @@ const COLLECTION_SLUGS = [
   'qa_test_runs',
   'qa_test_results',
   'qa_change_snapshots',
+  'qa_smoke_dispatches',
+  'qa_fixture_leases',
 
 ];
 

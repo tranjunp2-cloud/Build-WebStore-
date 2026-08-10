@@ -1,0 +1,228 @@
+name: Targeted Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      dispatch_id:
+        description: Server-created targeted Smoke dispatch ID
+        required: true
+        type: string
+      commit_sha:
+        description: Exact staging commit to test
+        required: true
+        type: string
+      pack_id:
+        description: Allow-listed targeted Smoke pack
+        required: true
+        type: choice
+        options:
+          - product-variants-critical-flow
+          - order-payment-verification-critical-flow
+          - storefront-checkout-critical-flow
+      workflow_nonce:
+        description: Server-issued one-time workflow claim nonce
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-smoke:
+    name: Targeted critical-flow Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate immutable dispatch inputs
+        shell: bash
+        run: |
+          [[ '${{ inputs.dispatch_id }}' =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
+          [[ '${{ inputs.commit_sha }}' =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
+          [[ '${{ inputs.workflow_nonce }}' =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
+          case '${{ inputs.pack_id }}' in
+            product-variants-critical-flow)
+              echo 'spec=tests/targeted-smoke/product-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.64' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.64' >> "$GITHUB_OUTPUT"
+              ;;
+            order-payment-verification-critical-flow)
+              echo 'spec=tests/targeted-smoke/order-payment-verification.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10-06-41' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10-06-41' >> "$GITHUB_OUTPUT"
+              ;;
+            storefront-checkout-critical-flow)
+              echo 'spec=tests/targeted-smoke/storefront-checkout.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.32,TC-F09.30' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.32|TC-F09\.30' >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo 'Pack is not allow-listed'; exit 1 ;;
+          esac
+        id: contract
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Provision isolated targeted-Smoke tenant
+        shell: bash
+        run: |
+          curl --fail-with-body -X POST "${BASE_URL}/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${E2E_SETUP_SECRET}" \
+            -H 'Content-Type: application/json' \
+            --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
+      - name: Claim the fixture dispatch once
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('crypto')
+          const fs = require('fs')
+          const body = JSON.stringify({
+            dispatchId: Number(process.env.DISPATCH_ID), workflowNonce: process.env.WORKFLOW_NONCE,
+            workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+          })
+          const timestamp = Date.now().toString()
+          const signature = crypto.createHmac('sha256', process.env.QA_INGEST_SECRET).update(`${timestamp}.${body}`).digest('hex')
+          fs.writeFileSync('/tmp/targeted-start-body.json', body)
+          fs.writeFileSync('/tmp/targeted-start-headers.txt', `${timestamp}\n${signature}`)
+          NODE
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/targeted-start-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/targeted-start-headers.txt)
+          curl --fail-with-body -X POST "${BASE_URL}/api/admin/qa/targeted-start" \
+            -H 'Content-Type: application/json' \
+            -H "x-qa-timestamp: $QA_TIMESTAMP" \
+            -H "x-qa-signature: sha256=$QA_SIGNATURE" \
+            --data-binary @/tmp/targeted-start-body.json
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
+          DISPATCH_ID: ${{ inputs.dispatch_id }}
+          WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
+
+      - name: Execute exactly one registered critical-flow pack
+        id: playwright
+        shell: bash
+        run: |
+          set +e
+          npx playwright test '${{ steps.contract.outputs.spec }}' \
+            --project=f40-targeted-smoke \
+            --grep '${{ steps.contract.outputs.grep }}' \
+            --reporter=json > /tmp/targeted-smoke-report.json
+          EXIT_CODE=$?
+          node <<'NODE'
+          const fs = require('fs')
+          const ids = process.env.TC_IDS.split(',')
+          const report = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-report.json', 'utf8'))
+          const observed = new Map()
+          function walk(suite) {
+            for (const spec of suite.specs || []) {
+              for (const id of ids) {
+                if (!spec.title.includes(id)) continue
+                const test = (spec.tests || []).find(test => Array.isArray(test.results) && test.results.length > 0)
+                const last = test?.results.at(-1)
+                const status = last?.status === 'passed' ? 'passed' : 'failed'
+                if (observed.has(id)) throw new Error(`Duplicate declared test case in report: ${id}`)
+                observed.set(id, { testCaseId: id, status, ...(status === 'passed' ? {} : { assertionCode: `TARGETED_SMOKE_${String(last?.status || 'MISSING').toUpperCase()}_OR_MISSING` }) })
+              }
+            }
+            for (const child of suite.suites || []) walk(child)
+          }
+          for (const suite of report.suites || []) walk(suite)
+          const results = ids.map(id => observed.get(id) || { testCaseId: id, status: 'failed', assertionCode: 'TARGETED_SMOKE_MISSING_RESULT' })
+          fs.writeFileSync('/tmp/targeted-smoke-results.json', JSON.stringify(results))
+          if (results.length !== ids.length || results.some(result => result.status !== 'passed')) process.exitCode = 1
+          NODE
+          if [ "$?" != '0' ]; then EXIT_CODE=1; fi
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
+
+      - name: Publish signed terminal evidence
+        if: always()
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('crypto')
+          const fs = require('fs')
+          let results
+          try {
+            results = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-results.json', 'utf8'))
+          } catch {
+            results = process.env.TC_IDS.split(',').map(testCaseId => ({
+              testCaseId, status: 'failed', assertionCode: 'TARGETED_SMOKE_REPORT_UNAVAILABLE',
+            }))
+          }
+          const body = {
+            workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            targetId: process.env.TARGET_ID,
+            suite: 'targeted-smoke', profile: 'targeted-smoke', environment: 'staging',
+            commitSha: process.env.COMMIT_SHA,
+            startedAt: new Date(Date.now() - 1000).toISOString(), finishedAt: new Date().toISOString(),
+            summary: {
+              passed: results.filter(result => result.status === 'passed').length,
+              failed: results.filter(result => result.status === 'failed').length,
+              skipped: results.filter(result => result.status === 'skipped').length,
+              blocked: results.filter(result => result.status === 'blocked').length,
+            },
+            results,
+            targetedDispatch: {
+              dispatchId: Number(process.env.DISPATCH_ID),
+              packId: process.env.PACK_ID,
+              packVersion: 1,
+            },
+          }
+          const raw = JSON.stringify(body)
+          const timestamp = Date.now().toString()
+          const signature = crypto.createHmac('sha256', process.env.QA_INGEST_SECRET).update(`${timestamp}.${raw}`).digest('hex')
+          fs.writeFileSync('/tmp/targeted-smoke-body.json', raw)
+          fs.writeFileSync('/tmp/targeted-smoke-headers.txt', `${timestamp}\n${signature}`)
+          NODE
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/targeted-smoke-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/targeted-smoke-headers.txt)
+          curl --fail-with-body --retry 3 --retry-all-errors -X POST "${BASE_URL}/api/admin/qa/ingest" \
+            -H 'Content-Type: application/json' \
+            -H "x-qa-timestamp: $QA_TIMESTAMP" \
+            -H "x-qa-signature: sha256=$QA_SIGNATURE" \
+            --data-binary @/tmp/targeted-smoke-body.json
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
+          DISPATCH_ID: ${{ inputs.dispatch_id }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          PACK_ID: ${{ inputs.pack_id }}
+          WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
+          TC_IDS: ${{ steps.contract.outputs.tc_ids }}
+          PLAYWRIGHT_EXIT_CODE: ${{ steps.playwright.outputs.exit_code }}
+          TARGET_ID: ${{ inputs.pack_id == 'product-variants-critical-flow' && 'products-variants-inventory' || inputs.pack_id == 'order-payment-verification-critical-flow' && 'order-payment-verification' || 'storefront-discount-checkout' }}
+
+      - name: Upload raw Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: targeted-smoke-${{ inputs.dispatch_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+
+      - name: Fail when the critical-flow pack did not pass
+        if: always() && steps.playwright.outputs.exit_code != '0'
+        run: exit 1

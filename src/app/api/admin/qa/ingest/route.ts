@@ -4,12 +4,15 @@ import { getPayload, type Where } from "payload";
 import config from "@payload-config";
 import {
   QaRunSummarySchema,
-  deriveQaRunStatus,
+  deriveQaRunStatusForSuite,
   hasApprovedArtifactUrl,
   verifyQaIngestSignature,
   type QaRunSummary,
 } from "@/lib/admin/qa/contracts";
 import { withQaIngestTransaction } from "@/lib/payload/qa-ingest-transaction";
+import { TARGETED_SMOKE_PACKS } from "@/lib/admin/qa/targeted-smoke-registry";
+import { createQaEvidenceUrl } from "@/lib/admin/qa/safe-evidence";
+import { lockQaTargetedFixture } from "@/lib/payload/qa-targeted-dispatch-transaction";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -180,7 +183,7 @@ export async function POST(req: NextRequest) {
             suite: summary.suite,
             profile: summary.profile,
             environment: summary.environment,
-            status: deriveQaRunStatus(summary.results),
+            status: deriveQaRunStatusForSuite(summary.suite, summary.results),
             pullRequest: summary.pullRequest,
             commitSha: summary.commitSha,
             startedAt: summary.startedAt,
@@ -189,6 +192,121 @@ export async function POST(req: NextRequest) {
           },
           ...options,
         });
+        const evidenceBaseUrl = process.env.QA_EVIDENCE_BASE_URL;
+        const evidenceSecret = process.env.QA_INGEST_SECRET;
+        const generatedEvidence =
+          evidenceBaseUrl && evidenceSecret
+            ? createQaEvidenceUrl(createdRun.id, evidenceBaseUrl, evidenceSecret)
+            : undefined;
+        if (summary.targetedDispatch) {
+          let dispatch = await payload.findByID({
+            collection: "qa_smoke_dispatches",
+            id: summary.targetedDispatch.dispatchId,
+            ...options,
+          }) as {
+            id: string | number;
+            status?: string;
+            targetId?: string;
+            packId?: string;
+            packVersion?: number;
+            pullRequest?: number;
+            workflowRunId?: string;
+            workflowAttempt?: number;
+            commitSha?: string;
+            environment?: string;
+            fixtureKey?: string;
+          };
+          if (!dispatch.fixtureKey)
+            throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
+          // Reconciliation and terminal binding share this advisory lock. The
+          // second read below prevents the cron from overwriting a terminal run.
+          await lockQaTargetedFixture(payload, "staging", dispatch.fixtureKey, transactionReq);
+          dispatch = await payload.findByID({
+            collection: "qa_smoke_dispatches",
+            id: summary.targetedDispatch.dispatchId,
+            ...options,
+          }) as typeof dispatch;
+          if (
+            dispatch.status !== "dispatched" ||
+            dispatch.targetId !== summary.targetId ||
+            dispatch.packId !== summary.targetedDispatch.packId ||
+            dispatch.packVersion !== summary.targetedDispatch.packVersion ||
+            dispatch.commitSha !== summary.commitSha ||
+            dispatch.environment !== summary.environment
+          )
+            throw new IngestConflictError(
+              "Targeted Smoke terminal result does not match its dispatch",
+            );
+          if (
+            dispatch.workflowRunId !== summary.workflowRunId ||
+            dispatch.workflowAttempt !== summary.attempt
+          )
+            throw new IngestConflictError(
+              "Targeted Smoke terminal result was not claimed by this workflow",
+            );
+          if (
+            summary.pullRequest !== undefined &&
+            summary.pullRequest !== dispatch.pullRequest
+          )
+            throw new IngestConflictError(
+              "Targeted Smoke terminal result has a different pull request",
+            );
+          const expectedPack = TARGETED_SMOKE_PACKS.find(
+            (pack) =>
+              pack.packId === summary.targetedDispatch?.packId &&
+              pack.packVersion === summary.targetedDispatch?.packVersion &&
+              pack.targetId === summary.targetId,
+          );
+          const expectedTestCaseIds = expectedPack?.testCases.map((testCase) => testCase.id).sort();
+          const receivedTestCaseIds = summary.results.map((result) => result.testCaseId).sort();
+          if (
+            !expectedTestCaseIds ||
+            expectedTestCaseIds.length !== receivedTestCaseIds.length ||
+            expectedTestCaseIds.some((id, index) => id !== receivedTestCaseIds[index])
+          )
+            throw new IngestConflictError(
+              "Targeted Smoke terminal result must include exactly its declared test cases",
+            );
+          await payload.update({
+            collection: "qa_smoke_dispatches",
+            id: dispatch.id,
+            data: {
+              status: "terminal",
+              workflowRunId: summary.workflowRunId,
+              workflowAttempt: summary.attempt,
+              terminalRun: createdRun.id,
+            },
+            ...options,
+          });
+          // The server-owned dispatch is the PR authority. GitHub Actions does
+          // not receive a mutable PR input, so evidence cannot be relabelled.
+          if (dispatch.pullRequest !== undefined)
+            await payload.update({
+              collection: "qa_test_runs",
+              id: createdRun.id,
+              data: { pullRequest: dispatch.pullRequest },
+              ...options,
+            });
+          const activeLeases = await payload.find({
+            collection: "qa_fixture_leases",
+            where: {
+              and: [
+                { dispatch: { equals: dispatch.id } },
+                { status: { equals: "active" } },
+              ],
+            },
+            limit: 10,
+            ...options,
+          });
+          for (const lease of activeLeases.docs) {
+            await payload.update({
+              collection: "qa_fixture_leases",
+              id: lease.id,
+              data: { status: "released", releasedAt: summary.finishedAt },
+              ...options,
+            });
+          }
+        }
         for (const result of summary.results) {
           await payload.create({
             collection: "qa_test_results",
@@ -201,8 +319,8 @@ export async function POST(req: NextRequest) {
               assertionCode: result.assertionCode,
               expectedCount: result.expectedCount,
               actualCount: result.actualCount,
-              artifactUrl: result.artifactUrl,
-              artifactExpiresAt: result.artifactExpiresAt,
+              artifactUrl: generatedEvidence?.url ?? result.artifactUrl,
+              artifactExpiresAt: generatedEvidence?.expiresAt ?? result.artifactExpiresAt,
             },
             ...options,
           });
