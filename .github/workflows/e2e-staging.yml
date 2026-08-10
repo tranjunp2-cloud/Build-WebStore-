@@ -117,7 +117,8 @@ jobs:
             tests/cart-drawer.spec.ts \
             tests/gh-1734-self-delivery-complete.spec.ts \
             tests/f40-qa-ingest.spec.ts \
-            --project=smoke --project=setup --project=chromium --project=storefront-regression --project=gh-1734-self-delivery --project=f40-qa-ingest 2>&1 | tee e2e-output.log
+            tests/f40-project-health.spec.ts \
+            --project=smoke --project=setup --project=chromium --project=storefront-regression --project=gh-1734-self-delivery --project=f40-qa-ingest --project=f40-project-health 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
           PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")

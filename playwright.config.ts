@@ -129,6 +129,16 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        {
+            name: 'f40-project-health',
+            testDir: './tests',
+            testMatch: /f40-project-health\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).
         {
