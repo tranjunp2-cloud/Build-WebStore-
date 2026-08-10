@@ -216,7 +216,7 @@ test.describe('GH-1587 category management rework regressions', () => {
         })
     })
 
-    test('[TC-F08-05-38][TC-F08-05-39][TC-F08-05-06] preserves hierarchy guidance, badge themes, and re-parenting', async ({ page }) => {
+    test('[TC-F08-05-38][TC-F08-05-39][TC-F08-05-40][TC-F08-05-06] preserves hierarchy guidance, parent ordering, badge themes, and re-parenting', async ({ page }) => {
         test.setTimeout(120_000)
 
         // Arrange
@@ -256,6 +256,27 @@ test.describe('GH-1587 category management rework regressions', () => {
             const grandchildRow = categoryRow(page, grandchildName)
             await expect(grandchildRow).toBeVisible()
             await expect(grandchildRow.getByRole('button', { name: /add subcategory/i })).toHaveCount(0)
+
+            // Assert (TC-F08-05-40): the real Parent Category dropdown keeps each
+            // hierarchy branch contiguous even though the categories were created
+            // root → child → sibling → grandchild.
+            await page.getByRole('button', { name: /add category/i }).click()
+            standardDialog = await expectStandardCategoryDialog(page, 'Add New Category')
+            await standardDialog.getByRole('combobox').click()
+
+            const fixtureOptions = page.getByRole('option').filter({ hasText: suffix })
+            await expect(fixtureOptions).toHaveCount(4)
+            await expect(fixtureOptions).toHaveText([
+                rootName,
+                `${rootName} > ${childName}`,
+                `${rootName} > ${childName} > ${grandchildName}`,
+                `${rootName} > ${siblingName}`,
+            ])
+            await expect(fixtureOptions.nth(2)).toHaveAttribute('aria-disabled', 'true')
+
+            await page.keyboard.press('Escape')
+            await standardDialog.getByRole('button', { name: /^cancel$/i }).click()
+            await expect(standardDialog).toBeHidden()
 
             // Assert: browser-computed colors resolve to the required semantic tokens in both themes.
             await setTheme(page, 'light')

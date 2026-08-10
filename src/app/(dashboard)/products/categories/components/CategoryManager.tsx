@@ -136,6 +136,55 @@ export const isDescendant = (candidateId: string | number | null, selfId: string
     return false
 }
 
+const getParentId = (category: Category): string | null => {
+    const rawParent = category.parent
+    const parentId = rawParent && typeof rawParent === 'object' ? rawParent.id : rawParent
+    return parentId == null ? null : String(parentId)
+}
+
+const compareCategories = (a: Category, b: Category): number => {
+    return a.name.localeCompare(b.name) || String(a.id).localeCompare(String(b.id))
+}
+
+// Parent dropdown options must follow tree preorder, regardless of the flat order returned by
+// Payload. Only root-reachable categories belong to this UI contract; malformed orphan/cycle
+// display policy remains outside this focused ordering fix.
+export const flattenCategoryHierarchy = (flatList: Category[]): Category[] => {
+    const childrenByParent = new Map<string | null, Category[]>()
+
+    for (const category of flatList) {
+        const parentId = getParentId(category)
+        const siblings = childrenByParent.get(parentId) ?? []
+        siblings.push(category)
+        childrenByParent.set(parentId, siblings)
+    }
+
+    for (const siblings of childrenByParent.values()) {
+        siblings.sort(compareCategories)
+    }
+
+    const ordered: Category[] = []
+    const visited = new Set<string>()
+
+    const visit = (category: Category, level: number) => {
+        const id = String(category.id)
+        if (visited.has(id)) return
+
+        visited.add(id)
+        ordered.push({ ...category, level })
+
+        for (const child of childrenByParent.get(id) ?? []) {
+            visit(child, level + 1)
+        }
+    }
+
+    for (const root of childrenByParent.get(null) ?? []) {
+        visit(root, 1)
+    }
+
+    return ordered
+}
+
 // Level text colors — semantic accents, not surface tokens. L1 teal (--primary), L2 blue
 // (--info), L3 violet — no dedicated semantic token for violet exists yet (only --ai-glow, which
 // carries unrelated AI-feature meaning), so L3 references the underlying --p-violet-300 palette
@@ -263,18 +312,12 @@ export default function CategoryManager() {
         return buildTree(categories, null, 1)
     }, [categories, searchQuery])
 
-    // Parent <Select> options for the Add/Edit modal — level-annotated (for indentation +
-    // L3-disable) and excludes self + descendants (cycle prevention, Phase 03). Level of an
-    // EXISTING category equals the depth a NEW child of its own parent would get — reuses
-    // getCategoryDepth with the category's own parentId for that reason.
+    // Parent <Select> options for the Add/Edit modal — tree-ordered, level-annotated (for
+    // indentation + L3-disable), and excludes self + descendants (cycle prevention, Phase 03).
     const parentOptions = useMemo(() => {
-        return categories
+        return flattenCategoryHierarchy(categories)
             .filter(c => !formData.id || !isDescendant(c.id, formData.id, categories))
-            .map(c => {
-                const cParentId = typeof c.parent === 'object' && c.parent ? c.parent.id : (c.parent ?? null)
-                const level = getCategoryDepth(cParentId, categories)
-                return { id: c.id, label: c.breadcrumbs || c.name, level }
-            })
+            .map(c => ({ id: c.id, label: c.breadcrumbs || c.name, level: c.level ?? 1 }))
     }, [categories, formData.id])
 
     const subcategoryContext = useMemo(() => {

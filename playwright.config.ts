@@ -109,6 +109,19 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // GH-1687: authenticated category-management flow that verifies the
+        // Parent Category dropdown follows tree preorder instead of API order.
+        {
+            name: 'gh-1687-category-order',
+            testDir: './tests',
+            testMatch: /category-management-rework\.spec\.ts/,
+            grep: /\[TC-F08-05-40\]/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'gh-1734-self-delivery',
             testDir: './tests',
