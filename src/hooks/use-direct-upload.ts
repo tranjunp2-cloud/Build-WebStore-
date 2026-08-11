@@ -4,6 +4,39 @@ import { useState, useCallback } from 'react'
 
 type MediaDoc = { id: string | number; url: string; [key: string]: unknown }
 
+const S3_ERROR_BODY_MAX_LENGTH = 4_000
+
+function readS3ErrorField(responseText: string, field: string) {
+    const match = responseText.match(new RegExp(`<${field}>([^<]*)</${field}>`, 'i'))
+    return match?.[1]
+}
+
+function redactS3ErrorBody(responseText: string) {
+    return responseText
+        .replace(
+            /<(Policy|X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token|AWSAccessKeyId|Signature)>[\s\S]*?<\/\1>/gi,
+            '<$1>[redacted]</$1>',
+        )
+        .replace(
+            /\b(Policy|X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token|AWSAccessKeyId|Signature)=([^&\s<]+)/gi,
+            '$1=[redacted]',
+        )
+        .trim()
+        .slice(0, S3_ERROR_BODY_MAX_LENGTH)
+}
+
+function logS3UploadFailure(xhr: XMLHttpRequest) {
+    const responseBody = redactS3ErrorBody(xhr.responseText ?? '')
+    console.error('[media:direct-upload] S3 POST failed', {
+        status: xhr.status,
+        s3Code: readS3ErrorField(responseBody, 'Code'),
+        s3Message: readS3ErrorField(responseBody, 'Message'),
+        requestId: readS3ErrorField(responseBody, 'RequestId'),
+        hostId: readS3ErrorField(responseBody, 'HostId'),
+        responseBody,
+    })
+}
+
 export class DirectUploadUnavailableError extends Error {
     constructor(message = 'Direct upload unavailable') {
         super(message)
@@ -85,6 +118,7 @@ function putToS3(url: string, form: FormData, onProgress: (n: number) => void): 
         })
         xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) return resolve()
+            logS3UploadFailure(xhr)
             if (/EntityTooLarge/i.test(xhr.responseText)) return reject(new Error('File exceeds the size limit'))
             reject(new Error(`Upload failed (${xhr.status})`))
         })
