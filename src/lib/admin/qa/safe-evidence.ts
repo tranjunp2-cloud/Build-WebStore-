@@ -28,3 +28,27 @@ export function verifyQaEvidenceLink(
   const expected = crypto.createHmac("sha256", secret).update(`${runId}.${expiresAt}`).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(signature, "hex"));
 }
+
+/** Validates the server-issued metadata evidence URL before exposing it in Studio. */
+export function isApprovedQaEvidenceUrl(
+  value: string,
+  expiresAt: string,
+  baseUrl: string | undefined,
+  secret: string | undefined,
+  now = Date.now(),
+): boolean {
+  if (!baseUrl || !secret) return false;
+  try {
+    const url = new URL(value);
+    const expected = new URL(baseUrl);
+    const match = url.pathname.match(/^\/api\/admin\/qa\/evidence\/(\d+)$/);
+    return (
+      url.origin === expected.origin &&
+      Boolean(match) &&
+      url.searchParams.get("expiresAt") === expiresAt &&
+      verifyQaEvidenceLink(match![1], expiresAt, url.searchParams.get("signature"), secret, now)
+    );
+  } catch {
+    return false;
+  }
+}

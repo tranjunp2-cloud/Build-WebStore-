@@ -17,12 +17,20 @@ on:
         type: choice
         options:
           - product-variants-critical-flow
+          - editor-product-grid-variants-smoke
           - order-payment-verification-critical-flow
           - storefront-checkout-critical-flow
       workflow_nonce:
         description: Server-issued one-time workflow claim nonce
         required: true
         type: string
+      run_profile:
+        description: Server-selected QA run provenance
+        required: true
+        type: choice
+        options:
+          - targeted-smoke
+          - manual-retest
 
 permissions:
   contents: read
@@ -39,21 +47,33 @@ jobs:
           [[ '${{ inputs.dispatch_id }}' =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
           [[ '${{ inputs.commit_sha }}' =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
           [[ '${{ inputs.workflow_nonce }}' =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
+          [[ '${{ inputs.run_profile }}' =~ ^(targeted-smoke|manual-retest)$ ]] || { echo 'Invalid run profile'; exit 1; }
           case '${{ inputs.pack_id }}' in
             product-variants-critical-flow)
               echo 'spec=tests/targeted-smoke/product-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
               echo 'tc_ids=TC-F09.64' >> "$GITHUB_OUTPUT"
               echo 'grep=TC-F09\.64' >> "$GITHUB_OUTPUT"
+              echo 'fixture=QA-Tshirt-SML' >> "$GITHUB_OUTPUT"
+              ;;
+            editor-product-grid-variants-smoke)
+              echo 'spec=tests/targeted-smoke/editor-product-grid-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F40-04-02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F40-04-02' >> "$GITHUB_OUTPUT"
+              echo 'fixture=QA-Tshirt-SML' >> "$GITHUB_OUTPUT"
+              echo 'expected_count=3' >> "$GITHUB_OUTPUT"
+              echo 'expected_summary=Product Grid binds QA-Tshirt-SML and its three selectable variants.' >> "$GITHUB_OUTPUT"
               ;;
             order-payment-verification-critical-flow)
               echo 'spec=tests/targeted-smoke/order-payment-verification.smoke.spec.ts' >> "$GITHUB_OUTPUT"
               echo 'tc_ids=TC-F10-06-41' >> "$GITHUB_OUTPUT"
               echo 'grep=TC-F10-06-41' >> "$GITHUB_OUTPUT"
+              echo 'fixture=E2E-TARGETED-PAYMENT' >> "$GITHUB_OUTPUT"
               ;;
             storefront-checkout-critical-flow)
               echo 'spec=tests/targeted-smoke/storefront-checkout.smoke.spec.ts' >> "$GITHUB_OUTPUT"
               echo 'tc_ids=TC-F09.32,TC-F09.30' >> "$GITHUB_OUTPUT"
               echo 'grep=TC-F09\.32|TC-F09\.30' >> "$GITHUB_OUTPUT"
+              echo 'fixture=QA-Tshirt-SML' >> "$GITHUB_OUTPUT"
               ;;
             *) echo 'Pack is not allow-listed'; exit 1 ;;
           esac
@@ -127,6 +147,8 @@ jobs:
           const fs = require('fs')
           const ids = process.env.TC_IDS.split(',')
           const report = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-report.json', 'utf8'))
+          let observations = {}
+          try { observations = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-observations.json', 'utf8')) } catch {}
           const observed = new Map()
           function walk(suite) {
             for (const spec of suite.specs || []) {
@@ -136,7 +158,27 @@ jobs:
                 const last = test?.results.at(-1)
                 const status = last?.status === 'passed' ? 'passed' : 'failed'
                 if (observed.has(id)) throw new Error(`Duplicate declared test case in report: ${id}`)
-                observed.set(id, { testCaseId: id, status, ...(status === 'passed' ? {} : { assertionCode: `TARGETED_SMOKE_${String(last?.status || 'MISSING').toUpperCase()}_OR_MISSING` }) })
+                const observation = observations[id]
+                const metadata = {
+                  fixtureReference: process.env.FIXTURE_REFERENCE,
+                  classification: 'product',
+                  evidenceKind: 'report',
+                }
+                const fallbackEvidence = process.env.EXPECTED_COUNT
+                  ? { expectedCount: Number(process.env.EXPECTED_COUNT), expectedSummary: process.env.EXPECTED_SUMMARY, actualSummary: 'Measurement unavailable because the test flow stopped before observation.' }
+                  : {}
+                const measuredEvidence = observation && Number.isInteger(observation.expectedCount) && Number.isInteger(observation.actualCount)
+                  ? {
+                      fixtureReference: observation.fixtureReference || metadata.fixtureReference,
+                      expectedCount: observation.expectedCount,
+                      actualCount: observation.actualCount,
+                      expectedSummary: observation.expectedSummary,
+                      actualSummary: observation.actualSummary,
+                      classification: observation.classification || metadata.classification,
+                      evidenceKind: observation.evidenceKind || metadata.evidenceKind,
+                    }
+                  : { ...fallbackEvidence, ...observation }
+                observed.set(id, { testCaseId: id, status, ...metadata, ...measuredEvidence, ...(status === 'passed' ? {} : { assertionCode: `TARGETED_SMOKE_${String(last?.status || 'MISSING').toUpperCase()}_OR_MISSING` }) })
               }
             }
             for (const child of suite.suites || []) walk(child)
@@ -153,6 +195,10 @@ jobs:
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
+          QA_RESULT_OBSERVATIONS_PATH: /tmp/targeted-smoke-observations.json
+          FIXTURE_REFERENCE: ${{ steps.contract.outputs.fixture }}
+          EXPECTED_COUNT: ${{ steps.contract.outputs.expected_count }}
+          EXPECTED_SUMMARY: ${{ steps.contract.outputs.expected_summary }}
 
       - name: Publish signed terminal evidence
         if: always()
@@ -173,7 +219,7 @@ jobs:
             workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
             attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
             targetId: process.env.TARGET_ID,
-            suite: 'targeted-smoke', profile: 'targeted-smoke', environment: 'staging',
+            suite: 'targeted-smoke', profile: process.env.RUN_PROFILE, environment: 'staging',
             commitSha: process.env.COMMIT_SHA,
             startedAt: new Date(Date.now() - 1000).toISOString(), finishedAt: new Date().toISOString(),
             summary: {
@@ -210,8 +256,9 @@ jobs:
           PACK_ID: ${{ inputs.pack_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
           TC_IDS: ${{ steps.contract.outputs.tc_ids }}
+          RUN_PROFILE: ${{ inputs.run_profile }}
           PLAYWRIGHT_EXIT_CODE: ${{ steps.playwright.outputs.exit_code }}
-          TARGET_ID: ${{ inputs.pack_id == 'product-variants-critical-flow' && 'products-variants-inventory' || inputs.pack_id == 'order-payment-verification-critical-flow' && 'order-payment-verification' || 'storefront-discount-checkout' }}
+          TARGET_ID: ${{ inputs.pack_id == 'editor-product-grid-variants-smoke' && 'editor-productgrid-variants' || inputs.pack_id == 'product-variants-critical-flow' && 'products-variants-inventory' || inputs.pack_id == 'order-payment-verification-critical-flow' && 'order-payment-verification' || 'storefront-discount-checkout' }}
 
       - name: Upload raw Playwright artifacts
         if: always()

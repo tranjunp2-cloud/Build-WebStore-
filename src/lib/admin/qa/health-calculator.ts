@@ -47,6 +47,8 @@ export interface QaRunInput {
   finishedAt: string;
   pullRequest?: number;
   commitSha?: string;
+  /** Ingestion-owned provenance; does not affect health precedence. */
+  profile?: string;
   summary?: {
     passed: number;
     failed: number;
@@ -152,7 +154,7 @@ export function calculateTargetHealth(
       coverage: target.coverage,
       state: "Needs attention",
       reasonCode: "LATEST_RUN_FAILED",
-      reasonMessage: `Latest test run failed on ${new Date(latestRun.finishedAt).toLocaleString()}`,
+      reasonMessage: `Lần chạy test gần nhất thất bại lúc ${new Date(latestRun.finishedAt).toLocaleString("vi-VN")}`,
       lastRunAt: latestRun.finishedAt,
       lastRunStatus: latestRun.status,
       links,
@@ -176,7 +178,7 @@ export function calculateTargetHealth(
       coverage: target.coverage,
       state: "Watch",
       reasonCode: "RUN_BLOCKED",
-      reasonMessage: "Latest test execution was blocked by missing precondition or fixture lease",
+      reasonMessage: "Lần chạy gần nhất bị chặn do thiếu điều kiện hoặc fixture lease",
       lastRunAt: latestRun.finishedAt,
       lastRunStatus: latestRun.status,
       links,
@@ -198,7 +200,7 @@ export function calculateTargetHealth(
       coverage: target.coverage,
       state: "Watch",
       reasonCode: "CHANGE_IMPACT_UNTESTED",
-      reasonMessage: `Recent staging deploy in PR #${latestImpact.pullRequest} affected this target`,
+      reasonMessage: `Deploy staging gần đây của PR #${latestImpact.pullRequest} ảnh hưởng target này`,
       lastRunAt: latestRun?.finishedAt,
       lastRunStatus: latestRun?.status,
       links,
@@ -223,7 +225,7 @@ export function calculateTargetHealth(
         coverage: target.coverage,
         state: "Watch",
         reasonCode: "EVIDENCE_STALE",
-        reasonMessage: `Test run evidence is over 7 days old (${Math.round(ageMs / (24 * 3600 * 1000))} days)`,
+        reasonMessage: `Evidence test đã quá 7 ngày (${Math.round(ageMs / (24 * 3600 * 1000))} ngày)`,
         lastRunAt: latestRun.finishedAt,
         lastRunStatus: latestRun.status,
         links,
@@ -253,7 +255,7 @@ export function calculateTargetHealth(
           ? "UNMAPPED_TARGET_GAP"
           : "NO_EVIDENCE_RECORDED",
       reasonMessage:
-        "No reliable test run evidence recorded yet for this target",
+        "Chưa có evidence test đáng tin cậy cho target này",
       links,
     };
   }
@@ -275,7 +277,7 @@ export function calculateTargetHealth(
       coverage: target.coverage,
       state: "Healthy",
       reasonCode: "SMOKE_PASSED",
-      reasonMessage: "Target has automated test suite passing cleanly with recent evidence",
+      reasonMessage: "Target có test tự động pass với evidence gần đây",
       lastRunAt: latestRun.finishedAt,
       lastRunStatus: latestRun.status,
       links,
@@ -291,7 +293,7 @@ export function calculateTargetHealth(
     coverage: target.coverage,
     state: "Unknown",
     reasonCode: "NO_EVIDENCE_RECORDED",
-    reasonMessage: "Target has incomplete test execution evidence",
+    reasonMessage: "Target có evidence chạy test chưa đầy đủ",
     links,
   };
 }

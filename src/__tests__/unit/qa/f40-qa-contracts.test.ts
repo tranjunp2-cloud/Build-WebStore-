@@ -179,4 +179,55 @@ describe("[TC-F40-02-04] QA run summary contract", () => {
       ),
     ).toBe(false);
   });
+
+  it("TC-F40-04-01: accepts complete safe visual evidence but rejects unsafe detail text", () => {
+    // Arrange
+    const expiry = new Date(Date.now() + 60 * 60_000).toISOString();
+    const safeArtifact = (name: string) => ({
+      url: `https://artifacts.example.com/sanitized/${name}?expiresAt=${encodeURIComponent(expiry)}`,
+      expiresAt: expiry,
+    });
+    const payload = {
+      workflowRunId: "visual-run-1",
+      attempt: 1,
+      targetId: "editor.product-grid.variants",
+      suite: "visual",
+      profile: "visual-regression",
+      environment: "staging",
+      commitSha: "abcdef1",
+      startedAt: "2026-08-10T01:00:00.000Z",
+      finishedAt: "2026-08-10T01:01:00.000Z",
+      summary: { passed: 0, failed: 1, skipped: 0, blocked: 0 },
+      results: [
+        {
+          testCaseId: "TC-F40-04-01",
+          status: "failed",
+          assertionCode: "VISUAL_THRESHOLD_EXCEEDED",
+          fixtureReference: "QA-Tshirt-SML",
+          expectedSummary: "Product grid keeps three visible variants",
+          actualSummary: "Product grid renders one visible variant",
+          classification: "product",
+          evidenceKind: "screenshot",
+          visualComparison: {
+            baseline: safeArtifact("baseline"),
+            current: safeArtifact("current"),
+            diff: safeArtifact("diff"),
+            thresholdPercent: 0.5,
+            differencePercent: 1,
+          },
+        },
+      ],
+    };
+
+    // Act
+    const valid = QaRunSummarySchema.safeParse(payload);
+    const unsafe = QaRunSummarySchema.safeParse({
+      ...payload,
+      results: [{ ...payload.results[0], actualSummary: "<script>alert(1)</script>" }],
+    });
+
+    // Assert
+    expect(valid.success).toBe(true);
+    expect(unsafe.success).toBe(false);
+  });
 });

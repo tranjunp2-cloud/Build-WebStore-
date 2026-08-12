@@ -395,6 +395,57 @@
     color: var(--text-3);
 }
 
+/* Mobile Studio shell: preserve icon navigation while reserving the content
+   viewport for the active tool. The desktop breadcrumb/search combination
+   otherwise forces a horizontal document scroll at 375px. */
+@media (max-width: 768px) {
+    .studio-shell,
+    .studio-shell.sidebar-collapsed {
+        grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+    }
+
+    .studio-sidebar {
+        min-width: 0;
+    }
+
+    .studio-sidebar .sidebar-label,
+    .studio-sidebar .nav-section-title,
+    .studio-sidebar .nav-label,
+    .studio-sidebar .count,
+    .studio-sidebar .who {
+        display: none;
+    }
+
+    .studio-sidebar .sidebar-head,
+    .studio-sidebar .sidebar-foot,
+    .studio-sidebar .nav-item {
+        justify-content: center;
+        padding-left: 7px;
+        padding-right: 7px;
+    }
+
+    .studio-topbar {
+        min-width: 0;
+        padding: 0 10px;
+        gap: 6px;
+    }
+
+    .crumbs {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .crumbs .current,
+    .crumbs .sep,
+    .topbar-search {
+        display: none;
+    }
+
+    .avatar-menu .avatar-dropdown {
+        right: 0;
+    }
+}
+
 /* Icon button (32×32) */
 .icon-btn {
     width: 32px;
@@ -6200,4 +6251,3 @@
 .b-insp-docs-link {
     white-space: nowrap;
 }
-

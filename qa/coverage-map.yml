@@ -29,6 +29,7 @@ rules:
           editor-block-content,
           editor-pages-navigation,
           editor-publish-lifecycle,
+          editor-productgrid-variants,
         ],
       evidence: [e2e/editor.spec.ts, docs/qa/F05-ai-editor-testcases.md],
     }

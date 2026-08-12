@@ -288,4 +288,55 @@ describe("[TC-F40-02-01–03] POST /api/admin/qa/ingest", () => {
     expect(response.status).toBe(200);
     expect((await response.json()).created).toBe(false);
   });
+
+  it("TC-F40-04-01: persists a complete approved visual triplet as pending tester review", async () => {
+    // Arrange
+    mocks.find.mockResolvedValue({ docs: [] });
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    const artifact = (name: string) => ({
+      url: `https://artifacts.example.com/sanitized/${name}?expiresAt=${encodeURIComponent(expiresAt)}`,
+      expiresAt,
+    });
+    const visualSummary = {
+      ...validSummary,
+      workflowRunId: "visual-run-1",
+      results: [
+        {
+          ...validSummary.results[1],
+          assertionCode: "VISUAL_THRESHOLD_EXCEEDED",
+          fixtureReference: "QA-Tshirt-SML",
+          expectedSummary: "Product grid keeps three visible variants",
+          actualSummary: "Product grid renders one visible variant",
+          classification: "product",
+          evidenceKind: "screenshot",
+          visualComparison: {
+            baseline: artifact("baseline"),
+            current: artifact("current"),
+            diff: artifact("diff"),
+            thresholdPercent: 0.5,
+            differencePercent: 1,
+          },
+        },
+      ],
+      summary: { passed: 0, failed: 1, skipped: 0, blocked: 0 },
+    };
+
+    // Act
+    const response = await POST(signedRequest(visualSummary));
+
+    // Assert
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "qa_test_results",
+        data: expect.objectContaining({
+          fixtureReference: "QA-Tshirt-SML",
+          visualBaselineUrl: artifact("baseline").url,
+          visualCurrentUrl: artifact("current").url,
+          visualDiffUrl: artifact("diff").url,
+          visualReviewStatus: "pending_review",
+        }),
+      }),
+    );
+  });
 });

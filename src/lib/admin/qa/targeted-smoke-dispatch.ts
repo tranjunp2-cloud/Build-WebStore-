@@ -8,7 +8,10 @@ export type TargetedSmokeDispatchRequest = {
   commitSha: string;
   environment: "staging";
   requestDigest: string;
+  profile: "targeted-smoke" | "manual-retest";
   pack: TargetedSmokePack;
+  /** Present only for an explicitly requested manual retest. */
+  retestNonce?: string;
 };
 
 type DispatchRecord = {
@@ -39,6 +42,7 @@ export function targetedSmokeDispatchKey(
     pack.targetId,
     pack.packId,
     pack.packVersion,
+    request.retestNonce ?? "auto",
   ].join(":");
 }
 
@@ -100,7 +104,8 @@ export async function claimTargetedSmokeDispatch(
       });
       const active: LeaseRecord[] = [];
       for (const lease of activeLeases.docs as LeaseRecord[]) {
-        const expires = (lease as LeaseRecord & { expiresAt?: string }).expiresAt;
+        const expires = (lease as LeaseRecord & { expiresAt?: string })
+          .expiresAt;
         if (!expires || new Date(expires).getTime() <= now.getTime()) {
           await payload.update({
             collection: "qa_fixture_leases",
@@ -120,6 +125,7 @@ export async function claimTargetedSmokeDispatch(
         targetId: request.pack.targetId,
         packId: request.pack.packId,
         packVersion: request.pack.packVersion,
+        profile: request.profile,
         fixtureKey: request.pack.fixtureKey,
         fixtureCapacity: request.pack.fixtureCapacity,
         environment: request.environment,
@@ -133,7 +139,8 @@ export async function claimTargetedSmokeDispatch(
             ...baseData,
             status: "blocked",
             blockCode: "FIXTURE_CAPACITY_EXHAUSTED",
-            recoveryHint: "Wait for the active fixture lease to finish or expire, then trigger a new staging deploy revision.",
+            recoveryHint:
+              "Wait for the active fixture lease to finish or expire, then trigger a new staging deploy revision.",
           },
           ...options,
         })) as DispatchRecord;
@@ -177,14 +184,18 @@ export async function blockTargetedSmokeDispatch(
     dispatch.fixtureKey,
     async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
-      const current = await payload.findByID({
+      const current = (await payload.findByID({
         collection: "qa_smoke_dispatches",
         id: dispatch.id,
         ...options,
-      }) as { status?: string };
-      // Terminal ingestion may win the race after the cron's initial query.
-      // Never relabel that verified outcome as blocked.
-      if (current.status !== "dispatched") return;
+      })) as { status?: string };
+      // A known GitHub rejection may happen immediately after the dispatch was
+      // created but before it was marked `dispatched`. Both `queued` and
+      // `dispatched` are therefore safe to compensate. A terminal ingestion
+      // may win the race, and must never be relabelled or have its lease
+      // released here.
+      if (current.status !== "queued" && current.status !== "dispatched")
+        return;
       await payload.update({
         collection: "qa_smoke_dispatches",
         id: dispatch.id,
@@ -228,7 +239,12 @@ export async function recordTargetedSmokeCoverageGap(
     fixtureCapacity: 1,
     spec: "tests/targeted-smoke/coverage-gap.smoke.spec.ts",
     project: "f40-targeted-smoke",
-    testCases: [{ id: "TC-F40-03-COVERAGE-GAP", assertion: "No active Smoke pack is registered." }],
+    testCases: [
+      {
+        id: "TC-F40-03-COVERAGE-GAP",
+        assertion: "No active Smoke pack is registered.",
+      },
+    ],
   };
   const dispatchKey = targetedSmokeDispatchKey({ ...request, pack });
   return withQaTargetedDispatchTransaction(
@@ -260,6 +276,7 @@ export async function recordTargetedSmokeCoverageGap(
           targetId: request.targetId,
           packId: pack.packId,
           packVersion: pack.packVersion,
+          profile: request.profile,
           fixtureKey,
           fixtureCapacity: pack.fixtureCapacity,
           environment: request.environment,
@@ -267,7 +284,8 @@ export async function recordTargetedSmokeCoverageGap(
           commitSha: request.commitSha,
           status: "blocked",
           blockCode: "NO_ACTIVE_SMOKE_PACK",
-          recoveryHint: "Create and approve a fixture-backed critical-flow Smoke pack for this target.",
+          recoveryHint:
+            "Create and approve a fixture-backed critical-flow Smoke pack for this target.",
         },
         ...options,
       })) as DispatchRecord;

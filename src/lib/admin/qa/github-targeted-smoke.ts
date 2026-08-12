@@ -45,7 +45,13 @@ async function readJson(response: Response): Promise<unknown> {
 /** Server-only GitHub App client. It never exposes an installation token. */
 export async function dispatchTargetedSmokeWorkflow(
   config: GitHubAppConfig,
-  input: { dispatchId: string; commitSha: string; packId: string; workflowNonce: string },
+  input: {
+    dispatchId: string;
+    commitSha: string;
+    packId: string;
+    workflowNonce: string;
+    runProfile?: "targeted-smoke" | "manual-retest";
+  },
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
   const { owner, repo } = parseRepository(config.repository);
@@ -95,6 +101,7 @@ export async function dispatchTargetedSmokeWorkflow(
           commit_sha: input.commitSha,
           pack_id: input.packId,
           workflow_nonce: input.workflowNonce,
+          run_profile: input.runProfile ?? "targeted-smoke",
         },
       }),
     },

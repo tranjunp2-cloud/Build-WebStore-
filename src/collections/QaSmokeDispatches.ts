@@ -23,6 +23,13 @@ export const QaSmokeDispatches: CollectionConfig = {
     { name: "targetId", type: "text", required: true, index: true },
     { name: "packId", type: "text", required: true, index: true },
     { name: "packVersion", type: "number", required: true, min: 1 },
+    {
+      name: "profile",
+      type: "select",
+      required: true,
+      options: ["targeted-smoke", "manual-retest"],
+      index: true,
+    },
     { name: "fixtureKey", type: "text", required: true, index: true },
     { name: "fixtureCapacity", type: "number", required: true, min: 1 },
     {

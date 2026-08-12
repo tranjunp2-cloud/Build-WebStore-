@@ -141,6 +141,27 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
   }
+  if (
+    summary.results.some((result) => {
+      const visual = result.visualComparison;
+      return (
+        visual &&
+        [visual.baseline, visual.current, visual.diff].some(
+          (artifact) =>
+            !hasApprovedArtifactUrl(
+              artifact.url,
+              allowedArtifactHosts,
+              artifact.expiresAt,
+            ),
+        )
+      );
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Visual evidence must use approved, expiring sanitized URLs" },
+      { status: 422 },
+    );
+  }
 
   const digest = crypto.createHash("sha256").update(rawBody).digest("hex");
   const runWhere: Where = {
@@ -215,6 +236,7 @@ export async function POST(req: NextRequest) {
             commitSha?: string;
             environment?: string;
             fixtureKey?: string;
+            profile?: string;
           };
           if (!dispatch.fixtureKey)
             throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
@@ -236,6 +258,10 @@ export async function POST(req: NextRequest) {
           )
             throw new IngestConflictError(
               "Targeted Smoke terminal result does not match its dispatch",
+            );
+          if (dispatch.profile !== summary.profile)
+            throw new IngestConflictError(
+              "Targeted Smoke terminal result has a different provenance profile",
             );
           if (
             dispatch.workflowRunId !== summary.workflowRunId ||
@@ -319,8 +345,22 @@ export async function POST(req: NextRequest) {
               assertionCode: result.assertionCode,
               expectedCount: result.expectedCount,
               actualCount: result.actualCount,
+              fixtureReference: result.fixtureReference,
+              expectedSummary: result.expectedSummary,
+              actualSummary: result.actualSummary,
+              classification: result.classification,
+              evidenceKind: result.evidenceKind,
               artifactUrl: generatedEvidence?.url ?? result.artifactUrl,
               artifactExpiresAt: generatedEvidence?.expiresAt ?? result.artifactExpiresAt,
+              visualBaselineUrl: result.visualComparison?.baseline.url,
+              visualBaselineExpiresAt: result.visualComparison?.baseline.expiresAt,
+              visualCurrentUrl: result.visualComparison?.current.url,
+              visualCurrentExpiresAt: result.visualComparison?.current.expiresAt,
+              visualDiffUrl: result.visualComparison?.diff.url,
+              visualDiffExpiresAt: result.visualComparison?.diff.expiresAt,
+              visualThresholdPercent: result.visualComparison?.thresholdPercent,
+              visualDifferencePercent: result.visualComparison?.differencePercent,
+              visualReviewStatus: result.visualComparison ? "pending_review" : undefined,
             },
             ...options,
           });

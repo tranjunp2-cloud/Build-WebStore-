@@ -7,6 +7,7 @@ import {
 } from "@/lib/admin/qa/targeted-smoke-registry";
 
 const knownTargetIds = new Set([
+  "editor-productgrid-variants",
   "products-variants-inventory",
   "order-payment-verification",
   "storefront-discount-checkout",
@@ -18,6 +19,7 @@ describe("[TC-F40-03-01] Targeted critical-flow Smoke registry", () => {
     const targetIds = [
       "storefront-discount-checkout",
       "unknown-target",
+      "editor-productgrid-variants",
       "products-variants-inventory",
     ];
 
@@ -26,6 +28,7 @@ describe("[TC-F40-03-01] Targeted critical-flow Smoke registry", () => {
 
     // Assert
     expect(packs.map((pack) => pack.targetId)).toEqual([
+      "editor-productgrid-variants",
       "products-variants-inventory",
       "storefront-discount-checkout",
     ]);

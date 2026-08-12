@@ -43,7 +43,16 @@ setup('authenticate', async ({ page }, testInfo) => {
     // Handle OTP verification
     const currentUrl = page.url()
     if (currentUrl.includes('/verify-otp')) {
-        const otpCode = process.env.E2E_TEST_OTP_CODE
+        const configuredOtpCode = process.env.E2E_TEST_OTP_CODE
+        const isLocalTarget = testInfo.project.use.baseURL?.includes('localhost')
+        // Local development intentionally accepts any six-digit OTP. This
+        // keeps the harness deterministic when a non-numeric CI placeholder
+        // exists in .env.local, without weakening a deployed environment.
+        const otpCode = /^\d{6}$/.test(configuredOtpCode ?? '')
+            ? configuredOtpCode
+            : isLocalTarget
+                ? '000000'
+                : undefined
         if (!otpCode) {
             console.warn('[Auth Setup] OTP page reached but E2E_TEST_OTP_CODE not set — cannot auto-verify')
             await page.context().storageState({ path: AUTH_FILE })

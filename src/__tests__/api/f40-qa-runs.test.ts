@@ -54,7 +54,7 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
   it("filters a super-admin summary list and omits result evidence", async () => {
     // Arrange
     const request = new NextRequest(
-      "http://localhost/api/admin/qa/runs?targetId=editor.product-grid&status=passed&page=2",
+      "http://localhost/api/admin/qa/runs?targetId=editor.product-grid&suite=smoke&status=passed&page=2",
     );
 
     // Act
@@ -69,6 +69,7 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
         limit: 50,
         where: {
           targetId: { equals: "editor.product-grid" },
+          suite: { equals: "smoke" },
           status: { equals: "passed" },
         },
       }),
@@ -89,6 +90,102 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
 
     // Assert
     expect(response.status).toBe(401);
+    expect(mocks.find).not.toHaveBeenCalled();
+  });
+
+  it("limits an explicit history window to a safe maximum of 30 days", async () => {
+    // Arrange
+    const request = new NextRequest(
+      "http://localhost/api/admin/qa/runs?days=7",
+    );
+
+    // Act
+    const response = await GET(request);
+
+    // Assert
+    expect(response.status).toBe(200);
+    expect(mocks.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          finishedAt: {
+            greater_than_equal: expect.any(String),
+          },
+        },
+      }),
+    );
+  });
+
+  it("uses a stable keyset cursor from the first 50 matching runs", async () => {
+    // Arrange
+    mocks.find.mockResolvedValueOnce({
+      docs: Array.from({ length: 51 }, (_, index) => ({
+        id: 100 - index,
+        finishedAt: `2026-08-06T01:${String(59 - index).padStart(2, "0")}:00.000Z`,
+      })),
+      totalDocs: 150,
+      totalPages: 3,
+    });
+
+    // Act
+    const response = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?suite=smoke"),
+    );
+    const body = await response.json();
+
+    // Assert
+    expect(response.status).toBe(200);
+    expect(mocks.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 51,
+        sort: "-finishedAt,-id",
+        where: { suite: { equals: "smoke" } },
+      }),
+    );
+    expect(body.data).toHaveLength(50);
+    expect(body.meta.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+
+    mocks.find.mockResolvedValueOnce({ docs: [], totalDocs: 0, totalPages: 0 });
+    const secondResponse = await GET(
+      new NextRequest(
+        `http://localhost/api/admin/qa/runs?cursor=${body.meta.nextCursor}&suite=smoke`,
+      ),
+    );
+    expect(secondResponse.status).toBe(200);
+    expect(mocks.find).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 51,
+        sort: "-finishedAt,-id",
+        where: expect.objectContaining({ and: expect.any(Array) }),
+      }),
+    );
+  });
+
+  it("rejects invalid status and unbounded page offsets", async () => {
+    // Arrange / Act
+    const invalidStatus = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?status=all"),
+    );
+    const hugePage = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?page=2147483647"),
+    );
+    const malformedDays = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?days=7junk"),
+    );
+    const invalidSuite = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?suite=smoke%20pack"),
+    );
+    const invalidCursor = await GET(
+      new NextRequest("http://localhost/api/admin/qa/runs?cursor=not-a-cursor"),
+    );
+
+    // Assert
+    expect(invalidStatus.status).toBe(422);
+    expect(hugePage.status).toBe(422);
+    expect(malformedDays.status).toBe(422);
+    expect(invalidSuite.status).toBe(422);
+    expect(invalidCursor.status).toBe(422);
     expect(mocks.find).not.toHaveBeenCalled();
   });
 

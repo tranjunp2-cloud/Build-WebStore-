@@ -1107,6 +1107,10 @@ export const Users: CollectionConfig = {
                     email: user.email,
                     collection: 'users',
                     mfa_verified: true,
+                    // Studio's edge guard can only inspect the signed JWT. Keep
+                    // the persisted roles so an OTP-verified super-admin is not
+                    // redirected away from /studio before server RBAC runs.
+                    roles: Array.isArray(user.roles) ? user.roles : [],
                 })
                     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
                     .setIssuedAt(now)

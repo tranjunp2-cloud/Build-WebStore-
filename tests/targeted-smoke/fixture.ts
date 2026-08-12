@@ -2,6 +2,8 @@ import { expect, type Page } from "@playwright/test";
 
 export type TargetedSmokeFixture = {
   productPath: string;
+  productGridPath: string;
+  editorPath: string;
   checkoutPath: string;
   paymentOrderPath: string;
 };
@@ -13,11 +15,13 @@ export async function prepareTargetedSmokeFixture(page: Page): Promise<TargetedS
   });
   expect(response.ok(), await response.text()).toBe(true);
   const fixture = await response.json() as Partial<TargetedSmokeFixture>;
-  if (!fixture.productPath || !fixture.checkoutPath || !fixture.paymentOrderPath) {
+  if (!fixture.productPath || !fixture.productGridPath || !fixture.editorPath || !fixture.checkoutPath || !fixture.paymentOrderPath) {
     throw new Error("Targeted Smoke fixture response is incomplete");
   }
   return {
     productPath: fixture.productPath,
+    productGridPath: fixture.productGridPath,
+    editorPath: fixture.editorPath,
     checkoutPath: fixture.checkoutPath,
     paymentOrderPath: fixture.paymentOrderPath,
   };

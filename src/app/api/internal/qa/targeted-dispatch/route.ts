@@ -163,6 +163,7 @@ export async function POST(req: NextRequest) {
       pullRequest: event.data.pullRequest,
       commitSha: event.data.commitSha,
       environment: event.data.environment,
+      profile: "targeted-smoke",
       requestDigest,
       targetId,
     });
@@ -178,6 +179,7 @@ export async function POST(req: NextRequest) {
       pullRequest: event.data.pullRequest,
       commitSha: event.data.commitSha,
       environment: event.data.environment,
+      profile: "targeted-smoke",
       requestDigest,
       pack,
     });
@@ -197,6 +199,7 @@ export async function POST(req: NextRequest) {
           commitSha: event.data.commitSha,
           packId: pack.packId,
           workflowNonce: outcome.dispatch.workflowNonce ?? "",
+          runProfile: "targeted-smoke",
         });
       } catch (error) {
         if (error instanceof GitHubWorkflowDispatchRejectedError) {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   claimTargetedSmokeDispatch,
+  recordTargetedSmokeCoverageGap,
   targetedSmokeDispatchKey,
 } from "@/lib/admin/qa/targeted-smoke-dispatch";
 import { TARGETED_SMOKE_PACKS } from "@/lib/admin/qa/targeted-smoke-registry";
@@ -10,6 +11,7 @@ const request = {
   pullRequest: 1742,
   commitSha: "abcdef1234567",
   environment: "staging" as const,
+  profile: "targeted-smoke" as const,
   requestDigest: "request-digest",
   pack: TARGETED_SMOKE_PACKS[0],
 };
@@ -107,5 +109,28 @@ describe("[TC-F40-03-02] Targeted Smoke fixture capacity", () => {
     // Assert
     expect(outcome).toEqual({ dispatch: existing, created: false, blocked: false });
     expect(payload.create).not.toHaveBeenCalled();
+  });
+
+  it("persists server-owned provenance for an unmapped coverage gap", async () => {
+    // Arrange
+    const created: Array<Record<string, unknown>> = [];
+    const payload = payloadFor([{ docs: [] }], created);
+
+    // Act
+    await recordTargetedSmokeCoverageGap(payload as never, {
+      pullRequest: 1742,
+      commitSha: "abcdef1234567",
+      environment: "staging",
+      profile: "targeted-smoke",
+      requestDigest: "coverage-gap-digest",
+      targetId: "unmapped-target",
+    });
+
+    // Assert
+    expect(created[0]).toMatchObject({
+      status: "blocked",
+      profile: "targeted-smoke",
+      blockCode: "NO_ACTIVE_SMOKE_PACK",
+    });
   });
 });

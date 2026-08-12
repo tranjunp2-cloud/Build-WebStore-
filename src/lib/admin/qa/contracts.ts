@@ -27,6 +27,28 @@ const AssertionCode = z
   .string()
   .trim()
   .regex(/^[A-Z][A-Z0-9_]{0,63}$/);
+const SafeEvidenceSummary = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  // Rendered as text in Studio. Exclude control characters and HTML delimiters
+  // rather than trying to sanitize untrusted CI output in the browser.
+  .regex(/^[^\u0000-\u001F<>]+$/);
+const FixtureReference = safeMachineIdentifier(160);
+const EvidenceKind = z.enum(["screenshot", "trace", "report"]);
+const ResultClassification = z.enum([
+  "product",
+  "infrastructure",
+  "flaky",
+  "blocked",
+]);
+const ApprovedArtifactReference = z
+  .object({
+    url: z.string().url().max(2000),
+    expiresAt: z.string().datetime(),
+  })
+  .strict();
 
 export const QaRunSummarySchema = z
   .object({
@@ -66,8 +88,23 @@ export const QaRunSummarySchema = z
             assertionCode: AssertionCode.optional(),
             expectedCount: z.number().int().min(0).max(1_000_000).optional(),
             actualCount: z.number().int().min(0).max(1_000_000).optional(),
+            fixtureReference: FixtureReference.optional(),
+            expectedSummary: SafeEvidenceSummary.optional(),
+            actualSummary: SafeEvidenceSummary.optional(),
+            classification: ResultClassification.optional(),
+            evidenceKind: EvidenceKind.optional(),
             artifactUrl: z.string().url().max(2000).optional(),
             artifactExpiresAt: z.string().datetime().optional(),
+            visualComparison: z
+              .object({
+                baseline: ApprovedArtifactReference,
+                current: ApprovedArtifactReference,
+                diff: ApprovedArtifactReference,
+                thresholdPercent: z.number().min(0).max(100),
+                differencePercent: z.number().min(0).max(100),
+              })
+              .strict()
+              .optional(),
           })
           .strict(),
       )
@@ -121,6 +158,25 @@ export const QaRunSummarySchema = z
           message: "assertionCode is required for a non-passed testcase",
           path: ["results"],
         });
+      if (
+        (result.expectedSummary && !result.actualSummary) ||
+        (!result.expectedSummary && result.actualSummary)
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "expectedSummary and actualSummary must be supplied together",
+          path: ["results"],
+        });
+      if (
+        result.visualComparison &&
+        result.visualComparison.differencePercent <= result.visualComparison.thresholdPercent
+      )
+        context.addIssue({ code: z.ZodIssueCode.custom, message: "visual difference must exceed its approved threshold", path: ["results"] });
+      if (
+        result.visualComparison &&
+        (result.status !== "failed" || result.assertionCode !== "VISUAL_THRESHOLD_EXCEEDED")
+      )
+        context.addIssue({ code: z.ZodIssueCode.custom, message: "visual review requires a failed VISUAL_THRESHOLD_EXCEEDED testcase", path: ["results"] });
     }
     if (
       new Date(value.finishedAt).getTime() < new Date(value.startedAt).getTime()

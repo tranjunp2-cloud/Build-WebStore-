@@ -67,6 +67,31 @@ export const QaTestResults: CollectionConfig = {
     { name: "expectedCount", type: "number", min: 0 },
     { name: "actualCount", type: "number", min: 0 },
     {
+      name: "fixtureReference",
+      type: "text",
+      admin: { description: "Stable, non-secret QC fixture identifier only." },
+    },
+    {
+      name: "expectedSummary",
+      type: "text",
+      admin: { description: "Bounded safe expectation summary; never raw CI output." },
+    },
+    {
+      name: "actualSummary",
+      type: "text",
+      admin: { description: "Bounded safe actual summary; never raw CI output." },
+    },
+    {
+      name: "classification",
+      type: "select",
+      options: ["product", "infrastructure", "flaky", "blocked"],
+    },
+    {
+      name: "evidenceKind",
+      type: "select",
+      options: ["screenshot", "trace", "report"],
+    },
+    {
       name: "artifactUrl",
       type: "text",
       validate: (
@@ -89,6 +114,39 @@ export const QaTestResults: CollectionConfig = {
       },
     },
     { name: "artifactExpiresAt", type: "date" },
+    {
+      name: "visualBaselineUrl",
+      type: "text",
+      admin: { description: "Approved expiring sanitized visual baseline URL only." },
+    },
+    { name: "visualBaselineExpiresAt", type: "date" },
+    {
+      name: "visualCurrentUrl",
+      type: "text",
+      admin: { description: "Approved expiring sanitized visual current URL only." },
+    },
+    { name: "visualCurrentExpiresAt", type: "date" },
+    {
+      name: "visualDiffUrl",
+      type: "text",
+      admin: { description: "Approved expiring sanitized visual diff URL only." },
+    },
+    { name: "visualDiffExpiresAt", type: "date" },
+    { name: "visualThresholdPercent", type: "number", min: 0, max: 100 },
+    { name: "visualDifferencePercent", type: "number", min: 0, max: 100 },
+    {
+      name: "visualReviewStatus",
+      type: "select",
+      options: ["pending_review", "confirmed_regression", "expected_change"],
+      admin: { description: "Tester review state. It never creates a GitHub issue." },
+    },
+    {
+      name: "visualReviewedBy",
+      type: "relationship",
+      relationTo: "users",
+      admin: { readOnly: true },
+    },
+    { name: "visualReviewedAt", type: "date", admin: { readOnly: true } },
   ],
   timestamps: true,
 };
