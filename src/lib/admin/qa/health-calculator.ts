@@ -8,6 +8,7 @@ export type HealthState =
   | "Unknown";
 
 export type HealthReasonCode =
+  | "CONFIRMED_GITHUB_P1_ISSUE"
   | "LATEST_RUN_FAILED"
   | "CHANGE_IMPACT_UNTESTED"
   | "EVIDENCE_STALE"
@@ -65,10 +66,23 @@ export interface ChangeImpactInput {
   createdAt: string;
 }
 
+/** Only a confirmed, open P1 mirror is allowed to influence target health. */
+export interface ConfirmedGithubIssueInput {
+  id: string;
+  issueNumber: number;
+  url: string;
+  title: string;
+  targetId: string;
+  state: "open" | "closed";
+  severity: "P1" | "other" | "unknown";
+  mappingStatus: "confirmed" | "unknown";
+}
+
 export interface CalculateHealthOptions {
   now?: number;
   runs?: QaRunInput[];
   changeImpacts?: ChangeImpactInput[];
+  githubIssues?: ConfirmedGithubIssueInput[];
 }
 
 const STALE_EVIDENCE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -95,13 +109,11 @@ function qaChangeSnapshotAdminUrl(snapshotId?: string): string | undefined {
 /**
  * Deterministic Health Calculation for a single CMS target based on strict precedence rules:
  * Precedence Order:
- * 1. Needs attention: Latest run failed.
- * 2. Watch: Untested change impact, stale evidence (>7 days), or blocked run.
- * 3. Unknown: No valid pack or run result (NO false green).
- * 4. Healthy: Valid recent passing run with no newer failure evidence.
- *
- * Confirmed GitHub issue mapping is intentionally owned by US-F40-05. This
- * F40-01 calculator only accepts evidence persisted by its run/impact contract.
+ * 1. Critical: confirmed, open P1 GitHub issue.
+ * 2. Needs attention: Latest run failed.
+ * 3. Watch: Untested change impact, stale evidence (>7 days), or blocked run.
+ * 4. Unknown: No valid pack or run result (NO false green).
+ * 5. Healthy: Valid recent passing run with no newer failure evidence.
  */
 export function calculateTargetHealth(
   target: CmsTarget,
@@ -137,7 +149,36 @@ export function calculateTargetHealth(
 
   const links: HealthExplainableLink[] = [];
 
-  // Precedence Rule 1: NEEDS ATTENTION
+  const criticalIssues = (options.githubIssues ?? [])
+    .filter((issue) => issue.targetId === target.id && issue.mappingStatus === "confirmed" && issue.state === "open" && issue.severity === "P1")
+    .sort((a, b) => a.issueNumber - b.issueNumber);
+  if (criticalIssues.length > 0) {
+    for (const issue of criticalIssues) {
+      links.push({
+        label: `Open P1 GitHub issue #${issue.issueNumber}: ${issue.title}`,
+        url: issue.url,
+        targetId: target.id,
+        issueNumber: issue.issueNumber,
+        type: "issue",
+      });
+    }
+    const [criticalIssue] = criticalIssues;
+    return {
+      targetId: target.id,
+      targetName: target.name,
+      domain: target.domain,
+      type: target.type,
+      coverage: target.coverage,
+      state: "Critical",
+      reasonCode: "CONFIRMED_GITHUB_P1_ISSUE",
+      reasonMessage: `Confirmed open P1 GitHub issue #${criticalIssue.issueNumber} affects this target`,
+      lastRunAt: latestRun?.finishedAt,
+      lastRunStatus: latestRun?.status,
+      links,
+    };
+  }
+
+  // Precedence Rule 2: NEEDS ATTENTION
   if (latestRun && latestRun.status === "failed") {
     links.push({
       label: `Failed Test Run ${latestRun.id}`,

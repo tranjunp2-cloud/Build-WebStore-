@@ -7,6 +7,7 @@ import {
   calculateProjectHealthSummary,
   calculateTargetHealth,
   type ChangeImpactInput,
+  type ConfirmedGithubIssueInput,
   type QaRunInput,
 } from "@/lib/admin/qa/health-calculator";
 
@@ -48,7 +49,7 @@ export const GET = withSuperAdmin(async (_req: NextRequest) => {
   // Fetch recent change impact snapshots
   const snapshotsResult = await payload.find({
     collection: "qa_change_snapshots",
-    limit: 100,
+    pagination: false,
     sort: "-createdAt",
     depth: 0,
   });
@@ -67,11 +68,22 @@ export const GET = withSuperAdmin(async (_req: NextRequest) => {
     }
   }
 
+  const githubIssuesResult = await payload.find({
+    collection: "qa_github_issues",
+    where: { and: [{ state: { equals: "open" } }, { severity: { equals: "P1" } }, { mappingStatus: { equals: "confirmed" } }] },
+    pagination: false,
+    depth: 0,
+  });
+  const githubIssues: ConfirmedGithubIssueInput[] = (githubIssuesResult.docs as Array<Record<string, unknown>>)
+    .filter((doc) => typeof doc.targetId === "string" && typeof doc.issueNumber === "number" && typeof doc.url === "string" && typeof doc.title === "string")
+    .map((doc) => ({ id: String(doc.id), issueNumber: doc.issueNumber as number, url: doc.url as string, title: doc.title as string, targetId: doc.targetId as string, state: "open", severity: "P1", mappingStatus: "confirmed" }));
+
   const activeTargets = getAllActiveTargets();
   const targetHealthResults = activeTargets.map((target) =>
     calculateTargetHealth(target, {
       runs,
       changeImpacts,
+      githubIssues,
     }),
   );
 

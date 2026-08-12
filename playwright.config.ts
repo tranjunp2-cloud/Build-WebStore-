@@ -178,6 +178,12 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        {
+            name: 'f40-github-issues',
+            testDir: './tests',
+            testMatch: /f40-github-issues\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], storageState: undefined },
+        },
         // Browser-level boundary tests for every server endpoint introduced by
         // US-F40-03. They deliberately use no privileged secret.
         {

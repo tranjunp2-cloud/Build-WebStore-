@@ -3529,6 +3529,50 @@ const MIGRATIONS = [
   },
   { name: 'qa_change_snapshots.alter_snapshot_digest', sql: `ALTER TABLE IF EXISTS qa_change_snapshots ADD COLUMN IF NOT EXISTS snapshot_digest varchar;` },
 
+  // ── F40-05: sanitized GitHub issue mirror and confirmed target mapping ──
+  {
+    name: 'qa_github_issues.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_github_issues (
+      id serial PRIMARY KEY,
+      issue_number numeric NOT NULL,
+      url varchar NOT NULL,
+      title varchar NOT NULL,
+      state varchar NOT NULL,
+      labels jsonb NOT NULL,
+      severity varchar NOT NULL,
+      github_updated_at timestamptz NOT NULL,
+      last_synced_at timestamptz NOT NULL,
+      target_id varchar,
+      mapping_status varchar NOT NULL DEFAULT 'unknown',
+      mapping_dismiss_reason varchar,
+      suggested_target_id varchar,
+      mapping_confirmed_at timestamptz,
+      mapping_confirmed_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      mapping_history jsonb NOT NULL DEFAULT '[]'::jsonb,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_github_issues.unique_number', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_github_issues_number_uniq ON qa_github_issues (issue_number);` },
+  { name: 'qa_github_issues.health_idx', sql: `CREATE INDEX IF NOT EXISTS qa_github_issues_health_idx ON qa_github_issues (state, severity, mapping_status, target_id);` },
+  { name: 'qa_github_issues.alter_mapping_history', sql: `ALTER TABLE IF EXISTS qa_github_issues ADD COLUMN IF NOT EXISTS mapping_history jsonb NOT NULL DEFAULT '[]'::jsonb;` },
+  { name: 'qa_github_issues.alter_mapping_dismiss_reason', sql: `ALTER TABLE IF EXISTS qa_github_issues ADD COLUMN IF NOT EXISTS mapping_dismiss_reason varchar;` },
+  {
+    name: 'qa_github_issue_mapping_events.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_github_issue_mapping_events (
+      id serial PRIMARY KEY,
+      github_issue_id integer NOT NULL REFERENCES qa_github_issues(id) ON DELETE CASCADE,
+      action varchar NOT NULL,
+      target_id varchar,
+      reason varchar,
+      actor_id integer NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      occurred_at timestamptz NOT NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_github_issue_mapping_events.issue_time_idx', sql: `CREATE INDEX IF NOT EXISTS qa_github_issue_mapping_events_issue_time_idx ON qa_github_issue_mapping_events (github_issue_id, occurred_at DESC);` },
+
   // ── F40-03: automatic targeted Smoke dispatch ledger + fixture leases ───
   {
     name: 'qa_smoke_dispatches.create_table',
@@ -5861,6 +5905,8 @@ const COLLECTION_SLUGS = [
   'qa_change_snapshots',
   'qa_smoke_dispatches',
   'qa_fixture_leases',
+  'qa_github_issues',
+  'qa_github_issue_mapping_events',
 
 ];
 

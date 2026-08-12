@@ -48,6 +48,8 @@ import { QaTestResults } from './collections/QaTestResults'
 import { QaChangeSnapshots } from './collections/QaChangeSnapshots'
 import { QaSmokeDispatches } from './collections/QaSmokeDispatches'
 import { QaFixtureLeases } from './collections/QaFixtureLeases'
+import { QaGithubIssues } from './collections/QaGithubIssues'
+import { QaGithubIssueMappingEvents } from './collections/QaGithubIssueMappingEvents'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -167,6 +169,8 @@ export default buildConfig({
     QaChangeSnapshots,
     QaSmokeDispatches,
     QaFixtureLeases,
+    QaGithubIssues,
+    QaGithubIssueMappingEvents,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

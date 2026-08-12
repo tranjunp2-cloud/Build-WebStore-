@@ -230,3 +230,36 @@ describe("[US-F40-01] CMS Target Catalog & Project Health", () => {
     expect(summary.domainStats.length).toBeGreaterThan(5);
   });
 });
+
+describe("[TC-F40-05-05] Confirmed GitHub issue health precedence", () => {
+  it("marks a target Critical for a confirmed open P1 issue ahead of a failed run", () => {
+    // Arrange
+    const target = getTargetById("editor-publish-lifecycle")!;
+
+    // Act
+    const result = calculateTargetHealth(target, {
+      runs: [{ id: "failed-run", targetId: target.id, status: "failed", finishedAt: "2026-08-11T01:00:00.000Z" }],
+      githubIssues: [{ id: "issue-1744", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744", title: "P1 regression", targetId: target.id, state: "open", severity: "P1", mappingStatus: "confirmed" }],
+    });
+
+    // Assert
+    expect(result).toMatchObject({ state: "Critical", reasonCode: "CONFIRMED_GITHUB_P1_ISSUE" });
+    expect(result.links[0]).toMatchObject({ type: "issue", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744" });
+  });
+
+  it("keeps unknown, closed, or remapped P1 issues from affecting their former target", () => {
+    // Arrange
+    const target = getTargetById("editor-publish-lifecycle")!;
+    const issue = { id: "issue-1744", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744", title: "P1 regression", severity: "P1" as const };
+
+    // Act
+    const unknown = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: target.id, state: "open", mappingStatus: "unknown" }] });
+    const closed = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: target.id, state: "closed", mappingStatus: "confirmed" }] });
+    const remapped = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: "identity-login-otp", state: "open", mappingStatus: "confirmed" }] });
+
+    // Assert
+    expect(unknown.state).toBe("Unknown");
+    expect(closed.state).toBe("Unknown");
+    expect(remapped.state).toBe("Unknown");
+  });
+});

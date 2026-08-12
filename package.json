@@ -25,6 +25,8 @@
     "qc:reset": "bash scripts/qc-remote.sh db:reset-qc",
     "qc:seed-functional": "bash scripts/qc-remote.sh db:seed-qc-functional",
     "db:seed-qc-functional": "tsx --require ./scripts/seed-preload.cjs scripts/qc-seed-functional.ts",
+    "db:seed-f40-github-issues": "tsx --require ./scripts/seed-preload.cjs scripts/f40-github-issue-fixture.ts seed",
+    "db:reset-f40-github-issues": "tsx --require ./scripts/seed-preload.cjs scripts/f40-github-issue-fixture.ts reset",
     "db:migrate:global-blocks": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-global-blocks-from-inline.ts",
     "test": "vitest run",
     "test:watch": "vitest",
