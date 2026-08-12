@@ -915,7 +915,7 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
         })
     })
 
-    it("[TC-F37-04-12] opens Search verification, focuses it, and autosaves the token", async () => {
+    it("[TC-F37-04-12][TC-F37-10-04] normalizes a hydrated OG image while autosaving Search verification", async () => {
         // Arrange
         const onSiteSettingsChange = vi.fn()
         render(
@@ -930,7 +930,13 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
                         id: "site-1",
                         name: "SEO Site",
                         status: "draft",
-                        seo: { googleVerificationToken: "old-token" },
+                        seo: {
+                            googleVerificationToken: "old-token",
+                            ogImage: {
+                                id: "media-42",
+                                url: "https://cdn.example.test/og-image.jpg",
+                            } as unknown as string,
+                        },
                     }}
                     requestedTab={{ tab: "seo", section: "searchVerification", key: 1 }}
                     onSiteSettingsChange={onSiteSettingsChange}
@@ -946,9 +952,9 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
         fireEvent.blur(input, { target: { value: "  new-token  " } })
 
         // Assert
-        expect(onSiteSettingsChange).toHaveBeenCalledWith({
-            seo: { googleVerificationToken: "new-token", ogImage: null },
-        })
+        expect(onSiteSettingsChange.mock.calls).toEqual([[
+            { seo: { googleVerificationToken: "new-token", ogImage: "media-42" } },
+        ]])
     })
 
     it('[TC-F37-04-12] opens Contact Info and focuses the canonical address field', async () => {

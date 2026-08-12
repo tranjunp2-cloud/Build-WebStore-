@@ -99,6 +99,18 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // GH-1757 is an authenticated manual/local-only acceptance gate. Keep
+        // this exact-spec project out of CI workflow selection.
+        {
+            name: 'gh-1757-local-business',
+            testDir: './tests',
+            testMatch: /gh-1757-local-business-settings\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'gh-1640-performance',
             testDir: './tests',

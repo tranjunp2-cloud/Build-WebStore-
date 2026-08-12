@@ -74,19 +74,21 @@ export function OpeningHoursEditModal({ open, initialDays, initialMode, initialR
     }
 
     const hasInvalidRange = mode === 'custom' && ranges.some(r => !isRangeOrderValid(r))
+    const hasIncompleteRange = mode === 'custom' && ranges.some(r => !r.opens || !r.closes)
+    const isSaveDisabled = selectedDays.size === 0 || hasIncompleteRange || hasInvalidRange
 
     function handleSave() {
-        if (selectedDays.size === 0 || hasInvalidRange) return
+        if (isSaveDisabled) return
         onSave(selectedDays, mode, ranges)
     }
 
     return (
         <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
             <DialogContent
-                className="editor-portal w-[440px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-[var(--editor-surface-elevated)] border-white/10 rounded-2xl p-6"
+                className="editor-portal w-[440px] max-w-[95vw] max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 !bg-white p-6 text-[#22313f] dark:border-slate-700 dark:!bg-slate-800 dark:text-slate-50"
                 onEscapeKeyDown={e => { e.preventDefault(); onClose() }}
             >
-                <DialogTitle className="text-base font-semibold text-white">{s.title}</DialogTitle>
+                <DialogTitle className="text-base font-semibold text-[#22313f] dark:text-slate-50">{s.title}</DialogTitle>
 
                 <div className="mt-4 flex flex-wrap justify-between gap-2">
                     {DAY_OF_WEEK_OPTIONS.map(({ value: day }) => (
@@ -96,10 +98,10 @@ export function OpeningHoursEditModal({ open, initialDays, initialMode, initialR
                             onClick={() => toggleDay(day)}
                             aria-pressed={selectedDays.has(day)}
                             className={cn(
-                                'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition-colors',
+                                'flex h-9 w-9 items-center justify-center rounded-full border border-solid text-xs font-medium',
                                 selectedDays.has(day)
-                                    ? 'border-blue-400/50 bg-blue-500/20 text-blue-300'
-                                    : 'border-white/10 bg-white/[0.02] text-slate-300 hover:bg-white/[0.06]',
+                                    ? 'border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
                             )}
                         >
                             {dayLabels[day] || day}
@@ -108,19 +110,19 @@ export function OpeningHoursEditModal({ open, initialDays, initialMode, initialR
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
                         <Checkbox
                             checked={mode === 'open24h'}
                             onCheckedChange={c => setMode(c === true ? 'open24h' : 'custom')}
-                            className="border-white/30 bg-white/5 data-[state=checked]:border-blue-400 data-[state=checked]:bg-blue-500"
+                            className="h-5 w-5 rounded-md border-2 border-solid border-slate-500 bg-slate-50 shadow-sm data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:border-slate-500 dark:bg-slate-900 dark:data-[state=checked]:border-blue-500 dark:data-[state=checked]:bg-blue-500"
                         />
                         {s.open24h}
                     </label>
-                    <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
                         <Checkbox
                             checked={mode === 'closed'}
                             onCheckedChange={c => setMode(c === true ? 'closed' : 'custom')}
-                            className="border-white/30 bg-white/5 data-[state=checked]:border-blue-400 data-[state=checked]:bg-blue-500"
+                            className="h-5 w-5 rounded-md border-2 border-solid border-slate-500 bg-slate-50 shadow-sm data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:border-slate-500 dark:bg-slate-900 dark:data-[state=checked]:border-blue-500 dark:data-[state=checked]:bg-blue-500"
                         />
                         {s.closed}
                     </label>
@@ -146,7 +148,7 @@ export function OpeningHoursEditModal({ open, initialDays, initialMode, initialR
                             <button
                                 type="button"
                                 onClick={addRange}
-                                className="rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300 transition-colors hover:bg-blue-500/20"
+                                className="rounded-full border border-solid border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
                             >
                                 {s.addRange}
                             </button>
@@ -158,15 +160,15 @@ export function OpeningHoursEditModal({ open, initialDays, initialMode, initialR
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-white/5"
+                        className="h-9 rounded-lg border border-solid border-slate-300 bg-white px-4 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                         {s.cancel}
                     </button>
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={selectedDays.size === 0 || hasInvalidRange}
-                        className="rounded-lg bg-blue-500 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={isSaveDisabled}
+                        className={cn('h-9 rounded-lg border border-solid px-4 text-xs font-medium', isSaveDisabled ? 'cursor-not-allowed border-slate-400 bg-slate-300 text-slate-700 dark:border-slate-500 dark:bg-slate-600 dark:text-slate-100' : 'border-blue-600 bg-blue-600 text-blue-50 hover:border-blue-700 hover:bg-blue-700')}
                     >
                         {s.save}
                     </button>
