@@ -107,6 +107,9 @@ jobs:
           git fetch origin staging --depth=1
           node scripts/check-migrations.js origin/staging
 
+      - name: Check environment variable manifests
+        run: node scripts/check-env-vars.js origin/staging
+
       - name: Lint
         run: npm run lint
 
