@@ -179,6 +179,16 @@ export default defineConfig({
             dependencies: ['setup'],
         },
         {
+            name: 'f40-findings',
+            testDir: './tests',
+            testMatch: /f40-findings\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
             name: 'f40-github-issues',
             testDir: './tests',
             testMatch: /f40-github-issues\.spec\.ts/,

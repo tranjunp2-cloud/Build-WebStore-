@@ -328,6 +328,12 @@ describe("[TC-F40-02-01–03] POST /api/admin/qa/ingest", () => {
     expect(response.status).toBe(201);
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
+        collection: "qa_findings",
+        data: expect.objectContaining({ owner: "qa-unassigned" }),
+      }),
+    );
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
         collection: "qa_test_results",
         data: expect.objectContaining({
           fixtureReference: "QA-Tshirt-SML",

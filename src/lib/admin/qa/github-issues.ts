@@ -12,7 +12,7 @@ export type GithubIssueMirror = {
 };
 
 type GithubConfig = { appId: string; installationId: string; privateKey: string; repository: string };
-type GithubApiIssue = { number?: unknown; html_url?: unknown; title?: unknown; state?: unknown; updated_at?: unknown; pull_request?: unknown; labels?: unknown };
+type GithubApiIssue = { number?: unknown; html_url?: unknown; title?: unknown; state?: unknown; updated_at?: unknown; pull_request?: unknown; labels?: unknown; body?: unknown };
 
 function base64Url(value: string): string { return Buffer.from(value).toString("base64url"); }
 
@@ -121,4 +121,46 @@ export async function synchronizeGithubIssueMirrors(payload: Payload, issues: Gi
   for (let index = 0; index < issues.length; index += concurrency) {
     await Promise.all(issues.slice(index, index + concurrency).map((issue) => synchronizeGithubIssueMirror(payload, issue)));
   }
+}
+
+async function githubAccessToken(fetcher: typeof fetch, config: GithubConfig): Promise<string> {
+  const tokenResponse = await requestWithRetry(fetcher, `https://api.github.com/app/installations/${config.installationId}/access_tokens`, { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${appJwt(config)}`, "X-GitHub-Api-Version": "2022-11-28" } });
+  const tokenJson = await tokenResponse.json().catch(() => null) as { token?: unknown } | null;
+  if (!tokenResponse.ok || typeof tokenJson?.token !== "string") throw new Error("GitHub App token request failed");
+  return tokenJson.token;
+}
+
+/** Finds a previously-created issue by its immutable, finding-specific body marker. */
+export async function findGithubFindingIssue(marker: string, fetcher: typeof fetch = fetch): Promise<GithubIssueMirror | null> {
+  const config = configFromEnv();
+  if (!config) throw new Error("GitHub App is not configured");
+  if (!/^qa-finding:\d+:qaf_v1_[a-f0-9]{64}$/.test(marker)) throw new Error("Invalid GitHub finding marker");
+  const token = await githubAccessToken(fetcher, config);
+  const query = encodeURIComponent(`repo:${config.repository} in:body "${marker}"`);
+  const response = await requestWithRetry(fetcher, `https://api.github.com/search/issues?q=${query}&per_page=2`, { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" } });
+  const json = await response.json().catch(() => null) as { items?: unknown } | null;
+  if (!response.ok || !Array.isArray(json?.items)) throw new Error("GitHub issue reconciliation failed");
+  const expectedUrlPrefix = `https://github.com/${config.repository}/issues/`;
+  const exactMarker = `<!-- ${marker} -->`;
+  const matches = json.items
+    .filter((item): item is GithubApiIssue => {
+      if (!item || typeof item !== "object" || "pull_request" in item) return false;
+      const body = (item as GithubApiIssue).body;
+      return typeof body === "string" && body.includes(exactMarker);
+    })
+    .map(normalizeGithubIssue)
+    .filter((issue): issue is GithubIssueMirror => issue !== null && issue.url.startsWith(expectedUrlPrefix));
+  if (matches.length > 1) throw new Error("GitHub finding marker matched multiple issues");
+  return matches[0] ?? null;
+}
+
+/** Sends exactly one non-idempotent POST after callers reconcile the marker. */
+export async function createGithubFindingIssue(input: { title: string; body: string; marker: string }, fetcher: typeof fetch = fetch): Promise<GithubIssueMirror> {
+  const config = configFromEnv();
+  if (!config) throw new Error("GitHub App is not configured");
+  const token = await githubAccessToken(fetcher, config);
+  const response = await fetcher(`https://api.github.com/repos/${config.repository}/issues`, { method: "POST", signal: AbortSignal.timeout(10_000), headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" }, body: JSON.stringify({ title: input.title.slice(0, 240), body: `${input.body}\n\n<!-- ${input.marker} -->` }) });
+  const issue = normalizeGithubIssue(await response.json().catch(() => null) as GithubApiIssue);
+  if (!response.ok || !issue || !issue.url.startsWith(`https://github.com/${config.repository}/issues/`)) throw new Error("GitHub issue creation failed");
+  return issue;
 }

@@ -85,7 +85,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
 
       - run: npm ci
@@ -150,6 +150,9 @@ jobs:
           let observations = {}
           try { observations = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-observations.json', 'utf8')) } catch {}
           const observed = new Map()
+          // Stable contract identity is emitted for both pass and failure so a
+          // later required-pack pass can verify the exact finding it retests.
+          const assertionCodeFor = id => `TARGETED_SMOKE_${id.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
           function walk(suite) {
             for (const spec of suite.specs || []) {
               for (const id of ids) {
@@ -178,13 +181,13 @@ jobs:
                       evidenceKind: observation.evidenceKind || metadata.evidenceKind,
                     }
                   : { ...fallbackEvidence, ...observation }
-                observed.set(id, { testCaseId: id, status, ...metadata, ...measuredEvidence, ...(status === 'passed' ? {} : { assertionCode: `TARGETED_SMOKE_${String(last?.status || 'MISSING').toUpperCase()}_OR_MISSING` }) })
+                observed.set(id, { testCaseId: id, status, assertionCode: assertionCodeFor(id), ...metadata, ...measuredEvidence })
               }
             }
             for (const child of suite.suites || []) walk(child)
           }
           for (const suite of report.suites || []) walk(suite)
-          const results = ids.map(id => observed.get(id) || { testCaseId: id, status: 'failed', assertionCode: 'TARGETED_SMOKE_MISSING_RESULT' })
+          const results = ids.map(id => observed.get(id) || { testCaseId: id, status: 'failed', assertionCode: assertionCodeFor(id) })
           fs.writeFileSync('/tmp/targeted-smoke-results.json', JSON.stringify(results))
           if (results.length !== ids.length || results.some(result => result.status !== 'passed')) process.exitCode = 1
           NODE

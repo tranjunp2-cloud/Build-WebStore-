@@ -9,6 +9,7 @@ export type HealthState =
 
 export type HealthReasonCode =
   | "CONFIRMED_GITHUB_P1_ISSUE"
+  | "ACTIVE_QA_FINDING"
   | "LATEST_RUN_FAILED"
   | "CHANGE_IMPACT_UNTESTED"
   | "EVIDENCE_STALE"
@@ -24,7 +25,13 @@ export interface HealthExplainableLink {
   targetId?: string;
   runId?: string;
   issueNumber?: number;
-  type: "run" | "finding" | "issue" | "coverage_gap" | "evidence" | "stale_evidence";
+  type:
+    | "run"
+    | "finding"
+    | "issue"
+    | "coverage_gap"
+    | "evidence"
+    | "stale_evidence";
 }
 
 export interface TargetHealthResult {
@@ -78,11 +85,20 @@ export interface ConfirmedGithubIssueInput {
   mappingStatus: "confirmed" | "unknown";
 }
 
+/** An unresolved internal finding must prevent a newer unrelated pass from masking risk. */
+export interface ActiveQaFindingInput {
+  id: string;
+  targetId: string;
+  lifecycle: "needs_review" | "promoting" | "github_created";
+  updatedAt: string;
+}
+
 export interface CalculateHealthOptions {
   now?: number;
   runs?: QaRunInput[];
   changeImpacts?: ChangeImpactInput[];
   githubIssues?: ConfirmedGithubIssueInput[];
+  activeFindings?: ActiveQaFindingInput[];
 }
 
 const STALE_EVIDENCE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -178,6 +194,38 @@ export function calculateTargetHealth(
     };
   }
 
+  const activeFinding = (options.activeFindings ?? [])
+    .filter(
+      (finding) =>
+        finding.targetId === target.id &&
+        parseValidTimestamp(finding.updatedAt) !== undefined,
+    )
+    .sort(
+      (a, b) =>
+        parseValidTimestamp(b.updatedAt)! - parseValidTimestamp(a.updatedAt)!,
+    )[0];
+  if (activeFinding) {
+    links.push({
+      label: `Active QA finding #${activeFinding.id}`,
+      url: `/studio/qa?tab=findings`,
+      targetId: target.id,
+      type: "finding",
+    });
+    return {
+      targetId: target.id,
+      targetName: target.name,
+      domain: target.domain,
+      type: target.type,
+      coverage: target.coverage,
+      state: "Needs attention",
+      reasonCode: "ACTIVE_QA_FINDING",
+      reasonMessage: `QA finding #${activeFinding.id} vẫn đang ${activeFinding.lifecycle.replaceAll("_", " ")}`,
+      lastRunAt: latestRun?.finishedAt,
+      lastRunStatus: latestRun?.status,
+      links,
+    };
+  }
+
   // Precedence Rule 2: NEEDS ATTENTION
   if (latestRun && latestRun.status === "failed") {
     links.push({
@@ -219,7 +267,8 @@ export function calculateTargetHealth(
       coverage: target.coverage,
       state: "Watch",
       reasonCode: "RUN_BLOCKED",
-      reasonMessage: "Lần chạy gần nhất bị chặn do thiếu điều kiện hoặc fixture lease",
+      reasonMessage:
+        "Lần chạy gần nhất bị chặn do thiếu điều kiện hoặc fixture lease",
       lastRunAt: latestRun.finishedAt,
       lastRunStatus: latestRun.status,
       links,
@@ -295,8 +344,7 @@ export function calculateTargetHealth(
         target.coverage === "unknown"
           ? "UNMAPPED_TARGET_GAP"
           : "NO_EVIDENCE_RECORDED",
-      reasonMessage:
-        "Chưa có evidence test đáng tin cậy cho target này",
+      reasonMessage: "Chưa có evidence test đáng tin cậy cho target này",
       links,
     };
   }

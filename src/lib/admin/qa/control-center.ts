@@ -7,6 +7,8 @@ import {
   type QaRunInput,
   type TargetHealthResult,
   type ChangeImpactInput,
+  type ActiveQaFindingInput,
+  type ConfirmedGithubIssueInput,
 } from "@/lib/admin/qa/health-calculator";
 import { hasApprovedArtifactUrl } from "@/lib/admin/qa/contracts";
 import { isApprovedQaEvidenceUrl } from "@/lib/admin/qa/safe-evidence";
@@ -99,12 +101,47 @@ export interface QaInboxItem {
   detail: QaFeatureDetail;
 }
 
+/**
+ * Bounded, safe projection consumed by the Studio finding-review inbox. The
+ * finding API intentionally exposes summaries only: evidence remains a signed
+ * link projection rather than an arbitrary CI artifact or raw assertion text.
+ */
+export interface QaFindingSummary {
+  id: string;
+  fingerprint: string;
+  targetId: string;
+  targetName?: string;
+  lifecycle:
+    | "needs_review"
+    | "promoting"
+    | "github_created"
+    | "verify_fix"
+    | "cancelled";
+  owner?: string;
+  severity?: "P0" | "P1" | "P2" | "P3";
+  testCaseId?: string;
+  expectedSummary?: string;
+  actualSummary?: string;
+  run?: Pick<
+    NonNullable<QaFeatureDetail["run"]>,
+    "id" | "pullRequest" | "commitSha" | "finishedAt"
+  >;
+  evidence?: QaEvidenceLink;
+  githubIssue?: {
+    issueNumber: number;
+    url: string;
+    title?: string;
+  };
+}
+
 export interface QaControlCenterData {
   targets: TargetHealthResult[];
   summary: ProjectHealthSummary;
   inbox: { items: QaInboxItem[]; nextCursor?: string };
   /** Detail data for every active target so Health never fabricates a fallback. */
   detailsByTarget: Record<string, QaFeatureDetail>;
+  /** Optional until finding persistence is deployed; the client also loads it from the protected API. */
+  findings?: { items: QaFindingSummary[]; nextCursor?: string };
 }
 
 function getAllowedArtifactHosts(): string[] {
@@ -337,20 +374,41 @@ export async function getQaControlCenterData(
   payload: Payload,
   options: { cursor?: string } = {},
 ): Promise<QaControlCenterData> {
-  const [runsResult, snapshotsResult] = await Promise.all([
-    payload.find({
-      collection: "qa_test_runs",
-      limit: RUN_LIMIT,
-      sort: "-finishedAt",
-      depth: 0,
-    }),
-    payload.find({
-      collection: "qa_change_snapshots",
-      limit: 100,
-      sort: "-createdAt",
-      depth: 0,
-    }),
-  ]);
+  const [runsResult, snapshotsResult, findingsResult, githubIssuesResult] =
+    await Promise.all([
+      payload.find({
+        collection: "qa_test_runs",
+        limit: RUN_LIMIT,
+        sort: "-finishedAt",
+        depth: 0,
+      }),
+      payload.find({
+        collection: "qa_change_snapshots",
+        limit: 100,
+        sort: "-createdAt",
+        depth: 0,
+      }),
+      payload.find({
+        collection: "qa_findings",
+        where: {
+          lifecycle: { in: ["needs_review", "promoting", "github_created"] },
+        },
+        pagination: false,
+        depth: 0,
+      }),
+      payload.find({
+        collection: "qa_github_issues",
+        where: {
+          and: [
+            { state: { equals: "open" } },
+            { severity: { equals: "P1" } },
+            { mappingStatus: { equals: "confirmed" } },
+          ],
+        },
+        pagination: false,
+        depth: 0,
+      }),
+    ]);
   const runs = (runsResult.docs as Array<Record<string, unknown>>).map(mapRun);
   const changeImpacts: ChangeImpactInput[] = [];
   for (const doc of snapshotsResult.docs as Array<Record<string, unknown>>) {
@@ -363,8 +421,50 @@ export async function getQaControlCenterData(
         createdAt: String(doc.createdAt ?? ""),
       });
   }
+  const activeFindings: ActiveQaFindingInput[] = (
+    findingsResult.docs as Array<Record<string, unknown>>
+  )
+    .filter(
+      (doc) =>
+        typeof doc.targetId === "string" &&
+        typeof doc.updatedAt === "string" &&
+        ["needs_review", "promoting", "github_created"].includes(
+          String(doc.lifecycle),
+        ),
+    )
+    .map((doc) => ({
+      id: String(doc.id),
+      targetId: doc.targetId as string,
+      lifecycle: doc.lifecycle as ActiveQaFindingInput["lifecycle"],
+      updatedAt: doc.updatedAt as string,
+    }));
+  const githubIssues: ConfirmedGithubIssueInput[] = (
+    githubIssuesResult.docs as Array<Record<string, unknown>>
+  )
+    .filter(
+      (doc) =>
+        typeof doc.targetId === "string" &&
+        typeof doc.issueNumber === "number" &&
+        typeof doc.url === "string" &&
+        typeof doc.title === "string",
+    )
+    .map((doc) => ({
+      id: String(doc.id),
+      issueNumber: doc.issueNumber as number,
+      url: doc.url as string,
+      title: doc.title as string,
+      targetId: doc.targetId as string,
+      state: "open",
+      severity: "P1",
+      mappingStatus: "confirmed",
+    }));
   const targets = getAllActiveTargets().map((target) =>
-    calculateTargetHealth(target, { runs, changeImpacts }),
+    calculateTargetHealth(target, {
+      runs,
+      changeImpacts,
+      activeFindings,
+      githubIssues,
+    }),
   );
   // A target merely lacking a historical run belongs in Project Health, not an
   // endlessly noisy Inbox. Inbox Unknown is specifically the mapping queue.

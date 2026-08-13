@@ -8,6 +8,7 @@ import {
   calculateTargetHealth,
   type ChangeImpactInput,
   type ConfirmedGithubIssueInput,
+  type ActiveQaFindingInput,
   type QaRunInput,
 } from "@/lib/admin/qa/health-calculator";
 
@@ -70,13 +71,61 @@ export const GET = withSuperAdmin(async (_req: NextRequest) => {
 
   const githubIssuesResult = await payload.find({
     collection: "qa_github_issues",
-    where: { and: [{ state: { equals: "open" } }, { severity: { equals: "P1" } }, { mappingStatus: { equals: "confirmed" } }] },
+    where: {
+      and: [
+        { state: { equals: "open" } },
+        { severity: { equals: "P1" } },
+        { mappingStatus: { equals: "confirmed" } },
+      ],
+    },
     pagination: false,
     depth: 0,
   });
-  const githubIssues: ConfirmedGithubIssueInput[] = (githubIssuesResult.docs as Array<Record<string, unknown>>)
-    .filter((doc) => typeof doc.targetId === "string" && typeof doc.issueNumber === "number" && typeof doc.url === "string" && typeof doc.title === "string")
-    .map((doc) => ({ id: String(doc.id), issueNumber: doc.issueNumber as number, url: doc.url as string, title: doc.title as string, targetId: doc.targetId as string, state: "open", severity: "P1", mappingStatus: "confirmed" }));
+  const githubIssues: ConfirmedGithubIssueInput[] = (
+    githubIssuesResult.docs as Array<Record<string, unknown>>
+  )
+    .filter(
+      (doc) =>
+        typeof doc.targetId === "string" &&
+        typeof doc.issueNumber === "number" &&
+        typeof doc.url === "string" &&
+        typeof doc.title === "string",
+    )
+    .map((doc) => ({
+      id: String(doc.id),
+      issueNumber: doc.issueNumber as number,
+      url: doc.url as string,
+      title: doc.title as string,
+      targetId: doc.targetId as string,
+      state: "open",
+      severity: "P1",
+      mappingStatus: "confirmed",
+    }));
+  const findingsResult = await payload.find({
+    collection: "qa_findings",
+    where: {
+      lifecycle: { in: ["needs_review", "promoting", "github_created"] },
+    },
+    pagination: false,
+    depth: 0,
+  });
+  const activeFindings: ActiveQaFindingInput[] = (
+    findingsResult.docs as Array<Record<string, unknown>>
+  )
+    .filter(
+      (doc) =>
+        typeof doc.targetId === "string" &&
+        typeof doc.updatedAt === "string" &&
+        ["needs_review", "promoting", "github_created"].includes(
+          String(doc.lifecycle),
+        ),
+    )
+    .map((doc) => ({
+      id: String(doc.id),
+      targetId: doc.targetId as string,
+      lifecycle: doc.lifecycle as ActiveQaFindingInput["lifecycle"],
+      updatedAt: doc.updatedAt as string,
+    }));
 
   const activeTargets = getAllActiveTargets();
   const targetHealthResults = activeTargets.map((target) =>
@@ -84,6 +133,7 @@ export const GET = withSuperAdmin(async (_req: NextRequest) => {
       runs,
       changeImpacts,
       githubIssues,
+      activeFindings,
     }),
   );
 

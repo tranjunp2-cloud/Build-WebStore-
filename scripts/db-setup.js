@@ -3573,6 +3573,45 @@ const MIGRATIONS = [
   },
   { name: 'qa_github_issue_mapping_events.issue_time_idx', sql: `CREATE INDEX IF NOT EXISTS qa_github_issue_mapping_events_issue_time_idx ON qa_github_issue_mapping_events (github_issue_id, occurred_at DESC);` },
 
+  // ── F40-06: durable failed-test findings and manual GitHub promotion ─────
+  {
+    name: 'qa_findings.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_findings (
+      id serial PRIMARY KEY,
+      fingerprint varchar NOT NULL,
+      target_id varchar NOT NULL,
+      suite varchar NOT NULL,
+      test_case_id varchar NOT NULL,
+      assertion_code varchar NOT NULL,
+      expected_count numeric,
+      actual_count numeric,
+      severity varchar NOT NULL,
+      lifecycle varchar NOT NULL,
+      owner_id integer REFERENCES users(id) ON DELETE SET NULL,
+      owner varchar NOT NULL DEFAULT 'qa-unassigned',
+      latest_run_id integer NOT NULL REFERENCES qa_test_runs(id) ON DELETE RESTRICT,
+      latest_result_id integer NOT NULL REFERENCES qa_test_results(id) ON DELETE RESTRICT,
+      latest_evidence_expires_at timestamptz,
+      promotion_state varchar NOT NULL DEFAULT 'not_requested',
+      promotion_lease_expires_at timestamptz,
+      github_issue_id integer REFERENCES qa_github_issues(id) ON DELETE SET NULL,
+      github_marker varchar,
+      verified_at timestamptz,
+      lifecycle_audit jsonb NOT NULL DEFAULT '[]'::jsonb,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_findings.unique_fingerprint', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_findings_fingerprint_uniq ON qa_findings (fingerprint);` },
+  { name: 'qa_findings.target_lifecycle_idx', sql: `CREATE INDEX IF NOT EXISTS qa_findings_target_lifecycle_idx ON qa_findings (target_id, lifecycle);` },
+  { name: 'qa_findings.latest_result_idx', sql: `CREATE INDEX IF NOT EXISTS qa_findings_latest_result_idx ON qa_findings (latest_result_id);` },
+  { name: 'qa_findings.github_marker_uniq', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_findings_github_marker_uniq ON qa_findings (github_marker) WHERE github_marker IS NOT NULL;` },
+  { name: 'qa_findings.owner', sql: `ALTER TABLE IF EXISTS qa_findings ADD COLUMN IF NOT EXISTS owner varchar NOT NULL DEFAULT 'qa-unassigned';` },
+  { name: 'qa_findings.owner.default', sql: `ALTER TABLE IF EXISTS qa_findings ALTER COLUMN owner SET DEFAULT 'qa-unassigned';` },
+  { name: 'qa_findings.owner.backfill', sql: `UPDATE qa_findings SET owner = 'qa-unassigned' WHERE owner IS NULL OR btrim(owner) = '';` },
+  { name: 'qa_findings.owner.not_null', sql: `ALTER TABLE IF EXISTS qa_findings ALTER COLUMN owner SET NOT NULL;` },
+  { name: 'qa_findings.alter_lifecycle_audit', sql: `ALTER TABLE IF EXISTS qa_findings ADD COLUMN IF NOT EXISTS lifecycle_audit jsonb NOT NULL DEFAULT '[]'::jsonb;` },
+
   // ── F40-03: automatic targeted Smoke dispatch ledger + fixture leases ───
   {
     name: 'qa_smoke_dispatches.create_table',
@@ -5907,6 +5946,7 @@ const COLLECTION_SLUGS = [
   'qa_fixture_leases',
   'qa_github_issues',
   'qa_github_issue_mapping_events',
+  'qa_findings',
 
 ];
 

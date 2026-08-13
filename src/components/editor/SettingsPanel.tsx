@@ -468,6 +468,8 @@ function SettingsPanelInner({
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const panelScrollRef = React.useRef<HTMLDivElement>(null)
     const settingsTargetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const settingsFocusObserverRef = React.useRef<MutationObserver | null>(null)
+    const settingsFocusFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
     useEffect(() => {
@@ -486,6 +488,8 @@ function SettingsPanelInner({
                 setOpenGlobalSections(previous => ({ ...previous, [section]: true }))
             }
             if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
+            settingsFocusObserverRef.current?.disconnect()
+            if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
             settingsTargetTimerRef.current = setTimeout(() => {
                 const root = panelScrollRef.current
                 const sectionTarget = section
@@ -500,13 +504,43 @@ function SettingsPanelInner({
                     : section === "footer" ? footerSectionRef.current : null
                 const target = focusTarget || sectionTarget || legacyTarget
                 target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
-                const focusable = target?.matches("input, textarea, button, [tabindex]")
-                    ? target
-                    : target?.querySelector<HTMLElement>("input, textarea, button, [tabindex]")
-                focusable?.focus({ preventScroll: true })
+                const focusWhenEnabled = () => {
+                    const focusable = target?.matches("input, textarea, button, [tabindex]")
+                        ? target
+                        : target?.querySelector<HTMLElement>("input, textarea, button, [tabindex]")
+                    if (!focusable || focusable.matches(":disabled")) return false
+                    focusable.focus({ preventScroll: true })
+                    return document.activeElement === focusable
+                }
+
+                if (focusWhenEnabled() || !root || typeof MutationObserver === "undefined") return
+
+                // Geo-backed controls can still be disabled when navigation finishes.
+                // Retry precisely when their loading state changes rather than losing focus
+                // permanently after this one navigation attempt.
+                const stopWaitingForFocus = () => {
+                    settingsFocusObserverRef.current?.disconnect()
+                    settingsFocusObserverRef.current = null
+                    if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
+                    settingsFocusFallbackTimerRef.current = null
+                }
+                settingsFocusObserverRef.current = new MutationObserver(() => {
+                    if (focusWhenEnabled()) stopWaitingForFocus()
+                })
+                settingsFocusObserverRef.current.observe(root, {
+                    attributes: true,
+                    attributeFilter: ["disabled"],
+                    childList: true,
+                    subtree: true,
+                })
+                settingsFocusFallbackTimerRef.current = setTimeout(stopWaitingForFocus, 5000)
             }, 100)
             return () => {
                 if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
+                settingsFocusObserverRef.current?.disconnect()
+                settingsFocusObserverRef.current = null
+                if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
+                settingsFocusFallbackTimerRef.current = null
                 if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
                 if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
             }

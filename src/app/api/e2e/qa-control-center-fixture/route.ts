@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { createQaFindingFingerprint } from "@/lib/admin/qa/findings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,7 +21,10 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
   if (process.env.NODE_ENV !== "development")
     return NextResponse.json({ error: "Local fixture only" }, { status: 403 });
   if (user.email?.toLowerCase() !== process.env.TEST_EMAIL?.toLowerCase())
-    return NextResponse.json({ error: "Dedicated test account required" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Dedicated test account required" },
+      { status: 403 },
+    );
 
   const payload = await getPayload({ config });
   const workflowRunId = "local-f40-04-product-grid-failure";
@@ -49,12 +53,26 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     summary: { passed: 0, failed: 1, skipped: 0, blocked: 0 },
   };
   const run = existing.docs[0]
-    ? await payload.update({ collection: "qa_test_runs", id: existing.docs[0].id, data: runData, overrideAccess: true })
-    : await payload.create({ collection: "qa_test_runs", data: runData, overrideAccess: true });
+    ? await payload.update({
+        collection: "qa_test_runs",
+        id: existing.docs[0].id,
+        data: runData,
+        overrideAccess: true,
+      })
+    : await payload.create({
+        collection: "qa_test_runs",
+        data: runData,
+        overrideAccess: true,
+      });
 
   const prior = await payload.find({
     collection: "qa_test_results",
-    where: { and: [{ run: { equals: run.id } }, { testCaseId: { equals: TEST_CASE_ID } }] },
+    where: {
+      and: [
+        { run: { equals: run.id } },
+        { testCaseId: { equals: TEST_CASE_ID } },
+      ],
+    },
     limit: 1,
     depth: 0,
     overrideAccess: true,
@@ -69,6 +87,7 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     fixtureReference: "QA-Tshirt-SML",
     expectedCount: 3,
     actualCount: 2,
+    owner: "qa-editor-team",
     expectedSummary: "S, M và L xuất hiện đúng một lần",
     actualSummary: "Chỉ thấy S và M",
     classification: "product" as const,
@@ -81,10 +100,76 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     visualThresholdPercent: 1,
     visualDifferencePercent: 2,
     visualReviewStatus: "pending_review" as const,
+    artifactUrl: `https://qa-e2e.local/sanitized/report?expiresAt=${encodeURIComponent(visualExpiresAt)}`,
+    artifactExpiresAt: visualExpiresAt,
   };
   const result = prior.docs[0]
-    ? await payload.update({ collection: "qa_test_results", id: prior.docs[0].id, data: resultData, overrideAccess: true })
-    : await payload.create({ collection: "qa_test_results", data: resultData, overrideAccess: true });
+    ? await payload.update({
+        collection: "qa_test_results",
+        id: prior.docs[0].id,
+        data: resultData,
+        overrideAccess: true,
+      })
+    : await payload.create({
+        collection: "qa_test_results",
+        data: resultData,
+        overrideAccess: true,
+      });
+
+  const fingerprint = createQaFindingFingerprint({
+    targetId: TARGET_ID,
+    suite: SUITE,
+    testCaseId: TEST_CASE_ID,
+    assertionCode: "VISUAL_THRESHOLD_EXCEEDED",
+  });
+  const existingFinding = await payload.find({
+    collection: "qa_findings",
+    where: { fingerprint: { equals: fingerprint } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const findingData = {
+    fingerprint,
+    targetId: TARGET_ID,
+    suite: SUITE,
+    testCaseId: TEST_CASE_ID,
+    assertionCode: "VISUAL_THRESHOLD_EXCEEDED",
+    expectedCount: 3,
+    actualCount: 2,
+    severity: "P1" as const,
+    lifecycle: "needs_review" as const,
+    latestRun: run.id,
+    latestResult: result.id,
+    latestEvidenceExpiresAt: visualExpiresAt,
+    promotionState: "not_requested" as const,
+    promotionLeaseExpiresAt: undefined,
+    githubIssue: undefined,
+    githubMarker: undefined,
+    lifecycleAudit: [
+      { at: now, from: null, to: "needs_review", reason: "local_e2e_seed" },
+    ],
+  };
+  let finding;
+  try {
+    finding = existingFinding.docs[0]
+      ? await payload.update({
+          collection: "qa_findings",
+          id: existingFinding.docs[0].id,
+          data: findingData,
+          overrideAccess: true,
+        })
+      : await payload.create({
+          collection: "qa_findings",
+          data: findingData,
+          overrideAccess: true,
+        });
+  } catch (error) {
+    // This local-only fixture must make setup errors diagnosable without
+    // exposing them to the browser or any deployed environment.
+    console.error("[F40-06 E2E fixture] finding seed failed", error);
+    return NextResponse.json({ error: "Local fixture seed failed" }, { status: 500 });
+  }
 
   // Seed a second, lower-priority action so the browser contract proves that
   // a concrete failed scenario is listed before an untested deploy impact.
@@ -107,8 +192,24 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     snapshotDigest,
   };
   const snapshot = existingSnapshot.docs[0]
-    ? await payload.update({ collection: "qa_change_snapshots", id: existingSnapshot.docs[0].id, data: snapshotData, overrideAccess: true })
-    : await payload.create({ collection: "qa_change_snapshots", data: snapshotData, overrideAccess: true });
+    ? await payload.update({
+        collection: "qa_change_snapshots",
+        id: existingSnapshot.docs[0].id,
+        data: snapshotData,
+        overrideAccess: true,
+      })
+    : await payload.create({
+        collection: "qa_change_snapshots",
+        data: snapshotData,
+        overrideAccess: true,
+      });
 
-  return NextResponse.json({ data: { runId: run.id, resultId: result.id, snapshotId: snapshot.id } });
+  return NextResponse.json({
+    data: {
+      runId: run.id,
+      resultId: result.id,
+      snapshotId: snapshot.id,
+      findingId: finding.id,
+    },
+  });
 });

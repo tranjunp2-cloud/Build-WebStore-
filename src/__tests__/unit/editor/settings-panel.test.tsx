@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
@@ -998,5 +998,46 @@ describe('[TC-F37-02-29/30] SettingsPanel Local Business schema subtype', () => 
 
         // Assert
         await waitFor(() => expect(state).toHaveFocus())
+    })
+
+    it("[TC-F37-04-12] focuses Local Business State after its geo options finish loading", async () => {
+        // Arrange
+        let resolveStates: ((response: Response) => void) | undefined
+        const originalFetch = global.fetch
+        global.fetch = vi.fn(() => new Promise<Response>((resolve) => {
+            resolveStates = resolve
+        })) as unknown as typeof fetch
+
+        try {
+            render(
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        {...defaultProps}
+                        block={null}
+                        blockIndex={null}
+                        siteName="Local Site"
+                        siteStatus="draft"
+                        site={{ id: "site-1", name: "Local Site", status: "draft" }}
+                        requestedTab={{ tab: "global", section: "localBusiness", focus: "address", key: 3 }}
+                    />
+                </I18nProvider>,
+            )
+
+            const state = await screen.findByTestId("settings-local-business-state")
+            expect(state).toBeDisabled()
+
+            // Act — ensure the initial navigation focus attempt happens while the control is disabled.
+            await new Promise(resolve => setTimeout(resolve, 150))
+            await act(async () => {
+                resolveStates?.(new Response(JSON.stringify([]), {
+                    headers: { "Content-Type": "application/json" },
+                }))
+            })
+
+            // Assert
+            await waitFor(() => expect(state).toHaveFocus())
+        } finally {
+            global.fetch = originalFetch
+        }
     })
 })

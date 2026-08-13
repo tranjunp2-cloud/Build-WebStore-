@@ -52,3 +52,13 @@ The fixture never calls GitHub. It creates one `unknown` open `P1` issue and one
 ### CI/release follow-up
 
 The stateful test intentionally skips when its fixture variables are absent. Before making it a required CI gate, provision the QC-only password, run the seed command before the `f40-github-issues` Playwright project, and always run reset in an `always()` cleanup step. Never run this fixture on staging or production.
+
+## US-F40-06 — Finding Review and Manual GitHub Ticket Creation
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-06-01 | Unit | Critical | A failed product testcase creates one stable-fingerprint finding; repeat and concurrent deliveries update the same finding. | [x] AUTO | `src/__tests__/unit/qa/f40-findings.test.ts` |
+| TC-F40-06-02 | Unit | High | An eligible same-target pack pass verifies a finding; a later matching failure reopens it with latest safe evidence. | [x] AUTO | `src/__tests__/unit/qa/f40-findings.test.ts` |
+| TC-F40-06-03 | API | Critical | Finding reads/promotions require super-admin, validate strictly, and cancel never contacts GitHub. | [x] AUTO | `src/__tests__/api/f40-findings.test.ts` |
+| TC-F40-06-04 | API | Critical | Confirming promotion creates/reconciles exactly one marked GitHub issue; remote failure retains the internal finding safely. | [x] AUTO | `src/__tests__/api/f40-findings.test.ts` |
+| TC-F40-06-05 | E2E | Critical | QA reviews a finding, cancels without issue creation, then confirms one linked GitHub ticket. | [x] AUTO | `tests/f40-findings.spec.ts` |

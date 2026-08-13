@@ -35,9 +35,7 @@ describe("[US-F40-01] CMS Target Catalog & Project Health", () => {
     expect(editorTarget).toBeDefined();
     expect(editorTarget?.name).toBe("Page Publish & Rollback");
     expect(editorDomainTargets.length).toBeGreaterThan(0);
-    expect(
-      editorDomainTargets.every((t) => t.domain === "Editor"),
-    ).toBe(true);
+    expect(editorDomainTargets.every((t) => t.domain === "Editor")).toBe(true);
   });
 
   // ── AC-2: No False Green State ───────────────────────────────────────────
@@ -140,7 +138,9 @@ describe("[US-F40-01] CMS Target Catalog & Project Health", () => {
     );
 
     // Act 2: Stale evidence (>7 days old)
-    const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const oldDate = new Date(
+      Date.now() - 10 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const resultStale = calculateTargetHealth(target, {
       runs: [
         {
@@ -238,28 +238,120 @@ describe("[TC-F40-05-05] Confirmed GitHub issue health precedence", () => {
 
     // Act
     const result = calculateTargetHealth(target, {
-      runs: [{ id: "failed-run", targetId: target.id, status: "failed", finishedAt: "2026-08-11T01:00:00.000Z" }],
-      githubIssues: [{ id: "issue-1744", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744", title: "P1 regression", targetId: target.id, state: "open", severity: "P1", mappingStatus: "confirmed" }],
+      runs: [
+        {
+          id: "failed-run",
+          targetId: target.id,
+          status: "failed",
+          finishedAt: "2026-08-11T01:00:00.000Z",
+        },
+      ],
+      githubIssues: [
+        {
+          id: "issue-1744",
+          issueNumber: 1744,
+          url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744",
+          title: "P1 regression",
+          targetId: target.id,
+          state: "open",
+          severity: "P1",
+          mappingStatus: "confirmed",
+        },
+      ],
     });
 
     // Assert
-    expect(result).toMatchObject({ state: "Critical", reasonCode: "CONFIRMED_GITHUB_P1_ISSUE" });
-    expect(result.links[0]).toMatchObject({ type: "issue", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744" });
+    expect(result).toMatchObject({
+      state: "Critical",
+      reasonCode: "CONFIRMED_GITHUB_P1_ISSUE",
+    });
+    expect(result.links[0]).toMatchObject({
+      type: "issue",
+      issueNumber: 1744,
+      url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744",
+    });
   });
 
   it("keeps unknown, closed, or remapped P1 issues from affecting their former target", () => {
     // Arrange
     const target = getTargetById("editor-publish-lifecycle")!;
-    const issue = { id: "issue-1744", issueNumber: 1744, url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744", title: "P1 regression", severity: "P1" as const };
+    const issue = {
+      id: "issue-1744",
+      issueNumber: 1744,
+      url: "https://github.com/primeproduction/ech-prime-web-v2/issues/1744",
+      title: "P1 regression",
+      severity: "P1" as const,
+    };
 
     // Act
-    const unknown = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: target.id, state: "open", mappingStatus: "unknown" }] });
-    const closed = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: target.id, state: "closed", mappingStatus: "confirmed" }] });
-    const remapped = calculateTargetHealth(target, { githubIssues: [{ ...issue, targetId: "identity-login-otp", state: "open", mappingStatus: "confirmed" }] });
+    const unknown = calculateTargetHealth(target, {
+      githubIssues: [
+        {
+          ...issue,
+          targetId: target.id,
+          state: "open",
+          mappingStatus: "unknown",
+        },
+      ],
+    });
+    const closed = calculateTargetHealth(target, {
+      githubIssues: [
+        {
+          ...issue,
+          targetId: target.id,
+          state: "closed",
+          mappingStatus: "confirmed",
+        },
+      ],
+    });
+    const remapped = calculateTargetHealth(target, {
+      githubIssues: [
+        {
+          ...issue,
+          targetId: "identity-login-otp",
+          state: "open",
+          mappingStatus: "confirmed",
+        },
+      ],
+    });
 
     // Assert
     expect(unknown.state).toBe("Unknown");
     expect(closed.state).toBe("Unknown");
     expect(remapped.state).toBe("Unknown");
+  });
+});
+
+describe("[TC-F40-06-02] Active finding health precedence", () => {
+  it("keeps a target needing attention when a newer unrelated run passes but its finding remains open", () => {
+    // Arrange
+    const target = getTargetById("editor-productgrid-variants")!;
+
+    // Act
+    const result = calculateTargetHealth(target, {
+      runs: [
+        {
+          id: "newer-pass",
+          targetId: target.id,
+          status: "passed",
+          finishedAt: "2026-08-12T10:00:00.000Z",
+        },
+      ],
+      activeFindings: [
+        {
+          id: "91",
+          targetId: target.id,
+          lifecycle: "needs_review",
+          updatedAt: "2026-08-12T09:00:00.000Z",
+        },
+      ],
+    });
+
+    // Assert
+    expect(result).toMatchObject({
+      state: "Needs attention",
+      reasonCode: "ACTIVE_QA_FINDING",
+    });
+    expect(result.links[0]).toMatchObject({ type: "finding" });
   });
 });

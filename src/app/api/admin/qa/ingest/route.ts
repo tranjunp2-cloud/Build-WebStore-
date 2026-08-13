@@ -13,6 +13,9 @@ import { withQaIngestTransaction } from "@/lib/payload/qa-ingest-transaction";
 import { TARGETED_SMOKE_PACKS } from "@/lib/admin/qa/targeted-smoke-registry";
 import { createQaEvidenceUrl } from "@/lib/admin/qa/safe-evidence";
 import { lockQaTargetedFixture } from "@/lib/payload/qa-targeted-dispatch-transaction";
+import { createQaFindingFingerprint } from "@/lib/admin/qa/findings";
+import { lockQaFindingFingerprint } from "@/lib/payload/qa-finding-lock";
+import { getTargetById } from "@/lib/admin/qa/target-registry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -334,7 +337,7 @@ export async function POST(req: NextRequest) {
           }
         }
         for (const result of summary.results) {
-          await payload.create({
+          const createdResult = await payload.create({
             collection: "qa_test_results",
             data: {
               run: createdRun.id,
@@ -364,6 +367,35 @@ export async function POST(req: NextRequest) {
             },
             ...options,
           });
+          // Only a classified product failure becomes a defect finding. Runner
+          // delivery never creates a GitHub issue; that remains a QA action.
+          if (result.status === "failed" && result.classification === "product" && result.assertionCode) {
+            const fingerprint = createQaFindingFingerprint({ targetId: summary.targetId, suite: summary.suite, testCaseId: result.testCaseId, assertionCode: result.assertionCode });
+            await lockQaFindingFingerprint(payload, fingerprint, transactionReq);
+            const existingFindings = await payload.find({ collection: "qa_findings", where: { fingerprint: { equals: fingerprint } }, limit: 1, ...options });
+            const existingFinding = existingFindings.docs[0] as Record<string, unknown> | undefined;
+            const findingData = { latestRun: createdRun.id, latestResult: createdResult.id, expectedCount: result.expectedCount, actualCount: result.actualCount, latestEvidenceExpiresAt: generatedEvidence?.expiresAt ?? result.artifactExpiresAt };
+            if (existingFinding) {
+              const lifecycle = existingFinding.lifecycle === "verify_fix" || existingFinding.lifecycle === "cancelled" ? "needs_review" : existingFinding.lifecycle;
+              const audit = Array.isArray(existingFinding.lifecycleAudit) ? existingFinding.lifecycleAudit : [];
+              await payload.update({ collection: "qa_findings", id: existingFinding.id as string | number, data: { ...findingData, lifecycle, lifecycleAudit: lifecycle === "needs_review" && lifecycle !== existingFinding.lifecycle ? [...audit, { at: summary.finishedAt, from: existingFinding.lifecycle, to: "needs_review", reason: "failed_reopened" }] : audit }, ...options });
+            } else {
+            // Legacy runners may report a stable target before it is added to
+            // the versioned registry. Retain the finding for QA triage instead
+            // of rejecting the entire signed terminal run.
+            const owner = getTargetById(summary.targetId)?.owner ?? "qa-unassigned";
+            await payload.create({ collection: "qa_findings", data: { fingerprint, targetId: summary.targetId, suite: summary.suite, testCaseId: result.testCaseId, assertionCode: result.assertionCode, owner, severity: "P1", lifecycle: "needs_review", promotionState: "not_requested", lifecycleAudit: [{ at: summary.finishedAt, from: null, to: "needs_review", reason: "failed_product_result" }], ...findingData }, ...options });
+            }
+          }
+          if (result.status === "passed" && result.assertionCode && summary.suite === "targeted-smoke" && summary.targetedDispatch) {
+            const fingerprint = createQaFindingFingerprint({ targetId: summary.targetId, suite: summary.suite, testCaseId: result.testCaseId, assertionCode: result.assertionCode });
+            await lockQaFindingFingerprint(payload, fingerprint, transactionReq);
+            const candidates = await payload.find({ collection: "qa_findings", where: { and: [{ fingerprint: { equals: fingerprint } }, { lifecycle: { in: ["needs_review", "promoting", "github_created"] } }] }, limit: 1, ...options });
+            for (const candidate of candidates.docs as Array<Record<string, unknown>>) {
+              const audit = Array.isArray(candidate.lifecycleAudit) ? candidate.lifecycleAudit : [];
+              await payload.update({ collection: "qa_findings", id: candidate.id as string | number, data: { latestRun: createdRun.id, latestResult: createdResult.id, lifecycle: "verify_fix", verifiedAt: summary.finishedAt, lifecycleAudit: [...audit, { at: summary.finishedAt, from: candidate.lifecycle, to: "verify_fix", reason: "required_pack_passed" }] }, ...options });
+            }
+          }
         }
         if (summary.changeSnapshot) {
           const snapshot = normalizeSnapshot(summary.changeSnapshot);
