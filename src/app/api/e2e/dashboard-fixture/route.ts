@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+import { z } from 'zod'
 import config from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import {
@@ -7,9 +8,28 @@ import {
     ensureDashboardFixture,
     type DashboardFixtureTenant,
 } from '@/lib/e2e/dashboard-fixture'
+import {
+    DASHBOARD_SHIPPING_FIXTURE_CAPABILITY,
+    DashboardShippingPrerequisiteError,
+    prepareDashboardEasyParcelOnlyState,
+} from '@/lib/e2e/dashboard-shipping-fixture'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+
+const fixtureActionSchema = z.object({
+    action: z.literal('prepare-gh1700-easyparcel-only'),
+}).strict()
+
+async function readFixtureAction(req: NextRequest) {
+    const rawBody = await req.text()
+    if (!rawBody.trim()) return null
+    try {
+        return fixtureActionSchema.parse(JSON.parse(rawBody))
+    } catch {
+        return undefined
+    }
+}
 
 export async function POST(req: NextRequest) {
     if (process.env.APP_ENV !== 'staging') {
@@ -49,6 +69,18 @@ export async function POST(req: NextRequest) {
 
     try {
         const payload = await getPayload({ config })
+        const fixtureAction = await readFixtureAction(req)
+        if (fixtureAction === undefined) {
+            return NextResponse.json({ error: 'Invalid dashboard fixture action' }, { status: 400 })
+        }
+        if (fixtureAction) {
+            const result = await prepareDashboardEasyParcelOnlyState(payload, tenantId)
+            return NextResponse.json({
+                status: 'shipping-state-ready',
+                ...result,
+                shippingSetupCapability: DASHBOARD_SHIPPING_FIXTURE_CAPABILITY,
+            })
+        }
         const tenant = await payload.findByID({
             collection: 'tenants',
             id: tenantId,
@@ -64,6 +96,15 @@ export async function POST(req: NextRequest) {
             dashboardFixture,
         })
     } catch (error: unknown) {
+        if (error instanceof DashboardShippingPrerequisiteError) {
+            return NextResponse.json(
+                {
+                    error: 'Dashboard shipping fixture prerequisites not met',
+                    code: error.code,
+                },
+                { status: 409 },
+            )
+        }
         console.error('[E2E Dashboard Fixture] Error:', error)
         return NextResponse.json(
             { error: 'Dashboard fixture provisioning failed' },

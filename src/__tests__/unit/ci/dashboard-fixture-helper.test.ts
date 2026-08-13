@@ -1,6 +1,7 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { provisionDashboardFixture } from '../../../../e2e/helpers/dashboard-fixture'
+import { prepareDashboardEasyParcelOnlyFixture } from '../../../../e2e/helpers/dashboard-shipping-fixture'
 
 function mockResponse(status: number, body: unknown): APIResponse {
     return {
@@ -113,5 +114,127 @@ describe('[TC-F03.57] dashboard fixture provisioning helper', () => {
             retryDelayMs: 0,
         })).rejects.toThrow('rejected (401)')
         expect(postMock).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('[TC-F03.78] dashboard shipping fixture helper', () => {
+    const postMock = vi.fn()
+    const request = { post: postMock } as unknown as APIRequestContext
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('prepares the canonical fixture and validates the capability contract', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(200, {
+            status: 'shipping-state-ready',
+            shippingSetupCapability: 'dashboard-shipping-fixture-v2',
+            siteIds: ['51', '52'],
+        }))
+
+        // Act
+        const result = await prepareDashboardEasyParcelOnlyFixture(request)
+
+        // Assert
+        expect(result).toEqual({ siteIds: ['51', '52'] })
+        expect(postMock).toHaveBeenCalledWith('/api/e2e/dashboard-fixture', {
+            headers: { 'x-e2e-fixture-intent': 'dashboard-fixture-v2' },
+            data: { action: 'prepare-gh1700-easyparcel-only' },
+            timeout: 15_000,
+        })
+    })
+
+    it('fails immediately when the dedicated fixture is unavailable', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(409, {
+            error: 'Dashboard shipping fixture prerequisites not met',
+            code: 'EASYPARCEL_NOT_READY',
+        }))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request))
+            .rejects.toThrow('staging prerequisite rejected (409): EASYPARCEL_NOT_READY')
+        expect(postMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not echo unexpected response bodies into the Playwright error', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(500, 'internal-token-value'))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request, { maxAttempts: 1 }))
+            .rejects.toThrow(/^GH-1700 staging prerequisite rejected \(500\)$/)
+    })
+
+    it('does not retry a commit-ambiguous timeout or socket failure', async () => {
+        // Arrange
+        postMock.mockRejectedValue(new Error('Request timed out after 15000ms'))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request, {
+            maxAttempts: 3,
+            retryDelayMs: 0,
+        })).rejects.toThrow('staging prerequisite rejected: network error')
+        expect(postMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not retry a commit-ambiguous 5xx response', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(503, { error: 'temporary' }))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request, {
+            maxAttempts: 3,
+            retryDelayMs: 0,
+        })).rejects.toThrow('rejected (503)')
+        expect(postMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('retries a safe rate-limit response', async () => {
+        // Arrange
+        postMock
+            .mockResolvedValueOnce(mockResponse(429, { error: 'rate limited' }))
+            .mockResolvedValueOnce(mockResponse(200, {
+                status: 'shipping-state-ready',
+                shippingSetupCapability: 'dashboard-shipping-fixture-v2',
+                siteIds: ['51'],
+            }))
+
+        // Act
+        const result = await prepareDashboardEasyParcelOnlyFixture(request, {
+            maxAttempts: 2,
+            retryDelayMs: 0,
+        })
+
+        // Assert
+        expect(result).toEqual({ siteIds: ['51'] })
+        expect(postMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('rejects the stale read-only capability contract', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(200, {
+            status: 'shipping-state-ready',
+            shippingSetupCapability: 'dashboard-shipping-fixture-v1',
+            siteIds: ['51'],
+        }))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request))
+            .rejects.toThrow('invalid response contract')
+    })
+
+    it('rejects duplicate site identities in a nominal success response', async () => {
+        // Arrange
+        postMock.mockResolvedValue(mockResponse(200, {
+            status: 'shipping-state-ready',
+            shippingSetupCapability: 'dashboard-shipping-fixture-v2',
+            siteIds: ['51', '51'],
+        }))
+
+        // Act + Assert
+        await expect(prepareDashboardEasyParcelOnlyFixture(request))
+            .rejects.toThrow('invalid response contract')
     })
 })

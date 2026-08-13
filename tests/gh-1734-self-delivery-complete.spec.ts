@@ -1,5 +1,42 @@
 import { expect, test } from '@playwright/test'
 import { provisionDashboardFixture } from '../e2e/helpers/dashboard-fixture'
+import { prepareDashboardEasyParcelOnlyFixture } from '../e2e/helpers/dashboard-shipping-fixture'
+
+test.describe('GH-1700 Dashboard shipping onboarding status', () => {
+    // Fixture preparation mutates canonical staging state. A timeout or 5xx can
+    // be commit-ambiguous, so never replay the entire test at the runner level.
+    test.describe.configure({ retries: 0 })
+
+    test('[TC-F03.78] EasyParcel-only renders Shipping as complete', async ({ page }) => {
+        test.setTimeout(180_000)
+
+        // Arrange — fail closed unless the active primary tenant is the
+        // production-valid, dedicated EasyParcel-only staging fixture.
+        const fixture = await prepareDashboardEasyParcelOnlyFixture(page.request)
+
+        // Act
+        await page.goto('/dashboard')
+        await page.waitForLoadState('networkidle')
+        const shippingStep = page.locator('.onb-step').filter({
+            has: page.locator('a[href="/settings/shipping"]'),
+        })
+        const editorHrefs = await page.locator('.onb-step a[href^="/editor/"]')
+            .evaluateAll(links => links.flatMap(link => link.getAttribute('href') ?? []))
+        const renderedSiteIds = [...new Set(editorHrefs.flatMap((href) => {
+            const match = href.match(/^\/editor\/([^/?#]+)(?:\?[^#]*)?$/)
+            return match ? [match[1]] : []
+        }))]
+
+        // Assert — prove the real Dashboard rendered a site owned by the
+        // prepared tenant, then verify the real Shipping row and tick.
+        expect(renderedSiteIds.length).toBeGreaterThan(0)
+        expect(renderedSiteIds.every(siteId => fixture.siteIds.includes(siteId))).toBe(true)
+        await expect(shippingStep).toHaveCount(1)
+        await expect(shippingStep).toHaveClass(/\bdone\b/)
+        await expect(shippingStep).toHaveAttribute('data-completion-source', 'easyparcel')
+        await expect(shippingStep.locator('.step-tick svg')).toBeVisible()
+    })
+})
 
 test.describe('GH-1734 Self-delivery completion', () => {
     test('[TC-GH1734-E2E] merchant fulfills and completes a Self-delivery order', async ({ page }) => {

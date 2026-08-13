@@ -3,11 +3,13 @@
  * Coverage Map:
  *   TC-F03.73 → tenant, usable-site, block, and permission gates
  *   TC-F03.74 → fail-soft Pending Orders loading
+ *   TC-F03.78–80 → Self Delivery/EasyParcel shipping setup truth table
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
+import type { OnboardingStep } from '@/components/dashboard/revamp/onboarding-card'
 
 const mocks = vi.hoisted(() => ({
     getCurrentUser: vi.fn(),
@@ -49,7 +51,18 @@ vi.mock('@/components/dashboard/revamp/customize-modal', () => ({
     CustomizeModal: () => <div data-testid="customize-modal" />,
 }))
 vi.mock('@/components/dashboard/revamp/onboarding-card', () => ({
-    OnboardingCard: () => <div data-testid="onboarding-block" />,
+    OnboardingCard: ({ steps }: { steps: OnboardingStep[] }) => (
+        <div data-testid="onboarding-block">
+            {steps.map(step => (
+                <div
+                    key={step.id}
+                    data-testid={'onboarding-step-' + step.id}
+                    data-done={String(step.done)}
+                    data-completion-source={step.completionSource}
+                />
+            ))}
+        </div>
+    ),
 }))
 vi.mock('@/components/dashboard/revamp/at-a-glance', () => ({
     AtAGlance: () => <div data-testid="glance-block" />,
@@ -229,5 +242,95 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         expect(errorSpy).toHaveBeenCalledWith('[Dashboard] Pending Orders data is unavailable')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('ORD-SECRET')
         expect(errorSpy.mock.calls.flat().join(' ')).not.toContain('tenant 42')
+    })
+
+    it('[TC-F03.78] marks Shipping complete when only EasyParcel is enabled', async () => {
+        // Arrange
+        mocks.findByID.mockResolvedValue({
+            settings: { dashboardPreferences: ['onboarding', 'glance'] },
+            easyParcelIntegration: { enabled: true },
+        })
+        mocks.find.mockResolvedValue({
+            docs: [{
+                id: 'site-1',
+                themeCustomized: false,
+                status: 'published',
+                shippingConfig: { shippingSetupConfirmed: false },
+            }],
+        })
+
+        // Act
+        await renderDashboard()
+
+        // Assert
+        const shippingStep = screen.getByTestId('onboarding-step-shipping')
+        expect(shippingStep).toHaveAttribute('data-done', 'true')
+        expect(shippingStep).toHaveAttribute('data-completion-source', 'easyparcel')
+    })
+
+    it('[TC-F03.79] marks Shipping complete when only Self Delivery is confirmed', async () => {
+        // Arrange
+        mocks.findByID.mockResolvedValue({
+            settings: { dashboardPreferences: ['onboarding', 'glance'] },
+            easyParcelIntegration: { enabled: false },
+        })
+        mocks.find.mockResolvedValue({
+            docs: [{
+                id: 'site-1',
+                themeCustomized: false,
+                status: 'published',
+                shippingConfig: { shippingSetupConfirmed: true },
+            }],
+        })
+
+        // Act
+        await renderDashboard()
+
+        // Assert
+        const shippingStep = screen.getByTestId('onboarding-step-shipping')
+        expect(shippingStep).toHaveAttribute('data-done', 'true')
+        expect(shippingStep).toHaveAttribute('data-completion-source', 'self-delivery')
+    })
+
+    it('[TC-F03.80] keeps Shipping incomplete when neither method is configured', async () => {
+        // Arrange
+        mocks.findByID.mockResolvedValue({
+            settings: { dashboardPreferences: ['onboarding', 'glance'] },
+            easyParcelIntegration: { enabled: false },
+        })
+        mocks.find.mockResolvedValue({
+            docs: [{
+                id: 'site-1',
+                themeCustomized: false,
+                status: 'published',
+                shippingConfig: { shippingSetupConfirmed: false },
+            }],
+        })
+
+        // Act
+        await renderDashboard()
+
+        // Assert
+        expect(screen.getByTestId('onboarding-step-shipping')).toHaveAttribute('data-done', 'false')
+    })
+
+    it('[TC-F03.80] keeps Shipping incomplete when optional setup groups are missing', async () => {
+        // Arrange
+        mocks.findByID.mockResolvedValue({
+            settings: { dashboardPreferences: ['onboarding', 'glance'] },
+        })
+        mocks.find.mockResolvedValue({
+            docs: [{
+                id: 'site-1',
+                themeCustomized: false,
+                status: 'published',
+            }],
+        })
+
+        // Act
+        await renderDashboard()
+
+        // Assert
+        expect(screen.getByTestId('onboarding-step-shipping')).toHaveAttribute('data-done', 'false')
     })
 })

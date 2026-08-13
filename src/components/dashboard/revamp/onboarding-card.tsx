@@ -14,6 +14,7 @@ export interface OnboardingStep {
     id: 'products' | 'design' | 'shipping' | 'launch'
     done: boolean
     href: string
+    completionSource?: 'easyparcel' | 'self-delivery' | 'both'
 }
 
 export function OnboardingCard({ steps }: { steps: OnboardingStep[] }) {
@@ -55,7 +56,11 @@ export function OnboardingCard({ steps }: { steps: OnboardingStep[] }) {
                     const Ico = s.id === 'design' ? Pencil : Eye
                     const stepT = r.onboarding.steps[s.id]
                     return (
-                        <div key={s.id} className={`onb-step ${s.done ? 'done' : isNext ? 'next' : ''}`}>
+                        <div
+                            key={s.id}
+                            className={`onb-step ${s.done ? 'done' : isNext ? 'next' : ''}`}
+                            data-completion-source={s.completionSource}
+                        >
                             <span className="step-tick">{s.done ? <Check aria-hidden /> : null}</span>
                             <div className="step-body">
                                 <div className="step-name">{stepT.name}</div>

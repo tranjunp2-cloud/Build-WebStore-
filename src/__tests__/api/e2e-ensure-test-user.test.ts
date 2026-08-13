@@ -169,7 +169,18 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
         }
         const payload = {
             find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
-                if (collection === 'tenants') return { docs: [{ id: 42 }] }
+                if (collection === 'tenants') {
+                    return {
+                        docs: [{
+                            id: 42,
+                            easyParcelIntegration: {
+                                enabled: true,
+                                accessToken: 'existing-hidden-access',
+                                refreshToken: 'existing-hidden-refresh',
+                            },
+                        }],
+                    }
+                }
                 if (collection === 'plan-subscriptions') return { docs: [{ id: 63 }] }
                 if (collection === 'sites') return { docs: [{ id: 77 }] }
                 if (collection === 'categories') return { docs: [{ id: 88, deletedAt: null }] }
@@ -240,6 +251,9 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
         expect(body).toEqual(expect.objectContaining({ siteId: 77, categoryId: 88 }))
         expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
         expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'categories' }))
+        expect(payload.update.mock.calls.some(([args]) => (
+            args.collection === 'tenants'
+        ))).toBe(false)
     })
 
     it('[TC-F08-04-126] recovers the active category created by a concurrent setup request', async () => {

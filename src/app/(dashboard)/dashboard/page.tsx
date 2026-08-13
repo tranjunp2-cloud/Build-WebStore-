@@ -50,6 +50,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
     let isDesignCustomized = false
     let hasProducts = false
     let hasShippingConfigured = false
+    let shippingCompletionSource: OnboardingStep['completionSource']
 
     const user = await getCurrentUser()
     const tenantId = tenantIdForQuery(user)
@@ -109,7 +110,18 @@ export default async function DashboardRoot({ searchParams }: Props) {
             isDesignCustomized = !!(siteDoc as { themeCustomized?: boolean })?.themeCustomized
             hasPublishedSite = (siteDoc as { status?: string })?.status === 'published'
             hasProducts = onboardingProductsCount.totalDocs > 0
-            hasShippingConfigured = !!(siteDoc as { shippingConfig?: { shippingSetupConfirmed?: boolean } })?.shippingConfig?.shippingSetupConfirmed
+            const hasSelfDeliveryShipping = (siteDoc as {
+                shippingConfig?: { shippingSetupConfirmed?: boolean }
+            })?.shippingConfig?.shippingSetupConfirmed === true
+            const hasEasyParcelShipping = (tenantResult as {
+                easyParcelIntegration?: { enabled?: boolean }
+            })?.easyParcelIntegration?.enabled === true
+            hasShippingConfigured = hasSelfDeliveryShipping || hasEasyParcelShipping
+            shippingCompletionSource = hasSelfDeliveryShipping && hasEasyParcelShipping
+                ? 'both'
+                : hasEasyParcelShipping
+                    ? 'easyparcel'
+                    : hasSelfDeliveryShipping ? 'self-delivery' : undefined
         }
     }
 
@@ -119,11 +131,16 @@ export default async function DashboardRoot({ searchParams }: Props) {
     // "Publish" step opens the editor with the publish modal pre-opened (only when a site exists)
     const launchHref = siteId ? `/editor/${siteId}?publish=1` : '/builder/new'
 
-    // Onboarding steps — id/done/href only; name/desc/cta come from i18n in OnboardingCard
+    // Step text comes from i18n; completionSource is non-secret diagnostic metadata for Shipping.
     const steps: OnboardingStep[] = [
         { id: 'products', done: hasProducts, href: '/products' },
         { id: 'design', done: isDesignCustomized, href: editHref },
-        { id: 'shipping', done: hasShippingConfigured, href: '/settings/shipping' },
+        {
+            id: 'shipping',
+            done: hasShippingConfigured,
+            href: '/settings/shipping',
+            completionSource: shippingCompletionSource,
+        },
         { id: 'launch', done: hasPublishedSite, href: launchHref },
     ]
     const allStepsDone = steps.every(s => s.done)
