@@ -56,7 +56,7 @@ describe("[TC-F40-03-02] Targeted Smoke fixture capacity", () => {
   it("creates a queued dispatch and active lease when capacity is available", async () => {
     // Arrange
     const created: Array<Record<string, unknown>> = [];
-    const payload = payloadFor([{ docs: [] }, { docs: [] }], created);
+    const payload = payloadFor([{ docs: [] }, { docs: [] }, { docs: [] }], created);
 
     // Act
     const outcome = await claimTargetedSmokeDispatch(
@@ -78,6 +78,7 @@ describe("[TC-F40-03-02] Targeted Smoke fixture capacity", () => {
     const created: Array<Record<string, unknown>> = [];
     const payload = payloadFor([
       { docs: [] },
+      { docs: [] },
       { docs: [{ id: 99, expiresAt: "2026-08-10T01:00:00.000Z" }] },
     ], created);
 
@@ -96,6 +97,23 @@ describe("[TC-F40-03-02] Targeted Smoke fixture capacity", () => {
         blockCode: "FIXTURE_CAPACITY_EXHAUSTED",
       }),
     ]);
+  });
+
+  it("TC-F40-07-03: enforces the global Smoke quota before claiming another fixture", async () => {
+    // Arrange: two Smoke runs on different fixtures already consume the PRD quota.
+    const created: Array<Record<string, unknown>> = [];
+    const payload = payloadFor([
+      { docs: [] },
+      { docs: [{ id: 71 }, { id: 72 }] },
+      { docs: [] },
+    ], created);
+
+    // Act
+    const outcome = await claimTargetedSmokeDispatch(payload as never, request);
+
+    // Assert
+    expect(outcome).toMatchObject({ created: true, blocked: true });
+    expect(created[0]).toMatchObject({ status: "blocked", blockCode: "PROFILE_CAPACITY_EXHAUSTED" });
   });
 
   it("TC-F40-03-02: returns the same durable decision for a retry", async () => {

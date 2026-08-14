@@ -25,6 +25,7 @@ export async function withQaTargetedDispatchTransaction<T>(
   environment: "staging",
   fixtureKey: string,
   operation: (req: TransactionRequest) => Promise<T>,
+  quotaProfile?: "smoke" | "regression",
 ): Promise<T> {
   const db = payload.db as unknown as TransactionCapableDb;
   if (!db.drizzle?.transaction)
@@ -34,6 +35,10 @@ export async function withQaTargetedDispatchTransaction<T>(
     const transactionID = crypto.randomUUID();
     db.sessions[transactionID] = { db: transaction };
     try {
+      if (quotaProfile)
+        await transaction.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext(${`${environment}:qa-profile:${quotaProfile}`}))`,
+        );
       await transaction.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${environment}:${fixtureKey}`}))`,
       );

@@ -8,6 +8,17 @@ export type TargetedSmokeTestCase = {
   assertion: string;
 };
 
+/** Browser clients choose one of these labels, never a spec or command. */
+export type ManualQaProfile = "smoke" | "regression";
+
+export type TargetedQaPackProfile = {
+  testType: "e2e" | "api" | "unit";
+  estimatedDurationMinutes: number;
+  prerequisites: readonly string[];
+  manualChecklistCount: number;
+  testCases: readonly TargetedSmokeTestCase[];
+};
+
 export type TargetedSmokePack = {
   targetId: string;
   packId: string;
@@ -17,6 +28,8 @@ export type TargetedSmokePack = {
   spec: string;
   project: string;
   testCases: readonly TargetedSmokeTestCase[];
+  /** Only checked-in profile contracts are executable. Missing Regression blocks preflight. */
+  manualProfiles?: Partial<Record<ManualQaProfile, TargetedQaPackProfile>>;
 };
 
 const TEST_CASE_ID = /^TC-[A-Za-z0-9_.-]+$/;
@@ -34,6 +47,15 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
     spec: "tests/targeted-smoke/editor-product-grid-variants.smoke.spec.ts",
     project: "f40-targeted-smoke",
     testCases: [{ id: "TC-F40-04-02", assertion: "QA-Tshirt-SML exposes S, M and L exactly once." }],
+    manualProfiles: {
+      smoke: {
+        testType: "e2e",
+        estimatedDurationMinutes: 4,
+        prerequisites: ["QA-Tshirt-SML fixture is resettable", "Desktop Chromium is available"],
+        manualChecklistCount: 0,
+        testCases: [{ id: "TC-F40-04-02", assertion: "QA-Tshirt-SML exposes S, M and L exactly once." }],
+      },
+    },
   },
   {
     targetId: "products-variants-inventory",
@@ -50,6 +72,15 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
           "A variant product cannot be added before selection; after selecting an in-stock variant, the cart records that variant.",
       },
     ],
+    manualProfiles: {
+      smoke: {
+        testType: "e2e",
+        estimatedDurationMinutes: 5,
+        prerequisites: ["Dedicated targeted Smoke tenant is available"],
+        manualChecklistCount: 0,
+        testCases: [{ id: "TC-F09.64", assertion: "A variant product cannot be added before selection; after selecting an in-stock variant, the cart records that variant." }],
+      },
+    },
   },
   {
     targetId: "order-payment-verification",
@@ -66,6 +97,15 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
           "A staged bank-transfer fixture can be approved only through the staff verification flow and persists the verified payment state.",
       },
     ],
+    manualProfiles: {
+      smoke: {
+        testType: "e2e",
+        estimatedDurationMinutes: 6,
+        prerequisites: ["E2E-TARGETED-PAYMENT fixture is resettable"],
+        manualChecklistCount: 0,
+        testCases: [{ id: "TC-F10-06-41", assertion: "A staged bank-transfer fixture can be approved only through the staff verification flow and persists the verified payment state." }],
+      },
+    },
   },
   {
     targetId: "storefront-discount-checkout",
@@ -87,6 +127,18 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
           "A valid fixture checkout creates exactly one order, clears the cart, and reaches its confirmation state.",
       },
     ],
+    manualProfiles: {
+      smoke: {
+        testType: "e2e",
+        estimatedDurationMinutes: 7,
+        prerequisites: ["QA-Tshirt-SML fixture is resettable", "Guest checkout fixture is available"],
+        manualChecklistCount: 0,
+        testCases: [
+          { id: "TC-F09.32", assertion: "A guest can reach checkout for the dedicated fixture without an authentication redirect." },
+          { id: "TC-F09.30", assertion: "A valid fixture checkout creates exactly one order, clears the cart, and reaches its confirmation state." },
+        ],
+      },
+    },
   },
 ] as const;
 
@@ -138,6 +190,21 @@ export function validateTargetedSmokePacks(
         throw new Error(`Duplicate test case ID in pack: ${testCase.id}`);
       testCaseIds.add(testCase.id);
     }
+    for (const [profile, contract] of Object.entries(pack.manualProfiles ?? {})) {
+      if (profile !== "smoke" && profile !== "regression")
+        throw new Error(`Unknown manual profile for pack: ${pack.packId}`);
+      if (!contract || !Number.isSafeInteger(contract.estimatedDurationMinutes) || contract.estimatedDurationMinutes < 1 || contract.estimatedDurationMinutes > 30)
+        throw new Error(`Invalid manual profile duration: ${pack.packId}`);
+      if (!contract.prerequisites.length || !contract.testCases.length)
+        throw new Error(`Incomplete manual profile contract: ${pack.packId}`);
+      const profileIds = new Set(contract.testCases.map((testCase) => testCase.id));
+      // The workflow executes the static pack spec, not a profile-specific
+      // subset. Keep the preview contract identical to what Actions runs.
+      if (profileIds.size !== contract.testCases.length || profileIds.size !== testCaseIds.size || [...profileIds].some((id) => !testCaseIds.has(id)))
+        throw new Error(`Manual profile test cases must match pack contract: ${pack.packId}`);
+      if (contract.testCases.some((testCase) => !TEST_CASE_ID.test(testCase.id) || !testCase.assertion.trim()))
+        throw new Error(`Invalid manual profile test case: ${pack.packId}`);
+    }
 
     identities.add(identity);
     packIds.add(pack.packId);
@@ -158,4 +225,15 @@ export function resolveTargetedSmokePacks(
     .filter((pack) => requested.has(pack.targetId))
     .slice()
     .sort((left, right) => left.targetId.localeCompare(right.targetId));
+}
+
+/** Returns a target-specific approved manual profile; undefined is a safe coverage gap. */
+export function resolveManualQaPack(
+  targetId: string,
+  profile: ManualQaProfile,
+  packs: readonly TargetedSmokePack[] = TARGETED_SMOKE_PACKS,
+): { pack: TargetedSmokePack; profile: TargetedQaPackProfile } | undefined {
+  const pack = packs.find((candidate) => candidate.targetId === targetId);
+  const profileContract = pack?.manualProfiles?.[profile];
+  return pack && profileContract ? { pack, profile: profileContract } : undefined;
 }

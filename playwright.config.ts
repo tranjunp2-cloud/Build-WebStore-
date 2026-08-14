@@ -178,6 +178,18 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // US-F40-07 validates the authenticated Studio preflight/confirmation
+        // flow against deterministic local-only QA fixture data.
+        {
+            name: 'f40-manual-runs',
+            testDir: './tests',
+            testMatch: /f40-manual-runs\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'f40-findings',
             testDir: './tests',

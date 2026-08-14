@@ -17,6 +17,7 @@ import type {
   HealthState,
   TargetHealthResult,
 } from "@/lib/admin/qa/health-calculator";
+import { ManualRunPanel } from "./ManualRunPanel";
 
 interface ProjectHealthClientProps {
   initialData: QaControlCenterData;
@@ -1705,7 +1706,13 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-labelledby="qa-runs-tab"
         >
           <h2 className="mb-3 text-lg font-bold">Lịch sử chạy</h2>
-          <RunHistory />
+          <ManualRunPanel
+            targets={initialData.targets.map((target) => ({
+              id: target.targetId,
+              name: target.targetName,
+              domain: target.domain,
+            }))}
+          />
         </section>
       )}
       {selected && (

@@ -31,6 +31,8 @@ on:
         options:
           - targeted-smoke
           - manual-retest
+          - manual-smoke
+          - manual-regression
 
 permissions:
   contents: read
@@ -47,7 +49,7 @@ jobs:
           [[ '${{ inputs.dispatch_id }}' =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
           [[ '${{ inputs.commit_sha }}' =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
           [[ '${{ inputs.workflow_nonce }}' =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
-          [[ '${{ inputs.run_profile }}' =~ ^(targeted-smoke|manual-retest)$ ]] || { echo 'Invalid run profile'; exit 1; }
+          [[ '${{ inputs.run_profile }}' =~ ^(targeted-smoke|manual-retest|manual-smoke|manual-regression)$ ]] || { echo 'Invalid run profile'; exit 1; }
           case '${{ inputs.pack_id }}' in
             product-variants-critical-flow)
               echo 'spec=tests/targeted-smoke/product-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
@@ -91,20 +93,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
 
-      - name: Provision isolated targeted-Smoke tenant
-        shell: bash
-        run: |
-          curl --fail-with-body -X POST "${BASE_URL}/api/e2e/ensure-test-user" \
-            -H "Authorization: Bearer ${E2E_SETUP_SECRET}" \
-            -H 'Content-Type: application/json' \
-            --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
-        env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
-          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
-          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-
       - name: Claim the fixture dispatch once
+        id: claim
         shell: bash
         run: |
           node <<'NODE'
@@ -122,18 +112,42 @@ jobs:
           NODE
           QA_TIMESTAMP=$(sed -n '1p' /tmp/targeted-start-headers.txt)
           QA_SIGNATURE=$(sed -n '2p' /tmp/targeted-start-headers.txt)
-          curl --fail-with-body -X POST "${BASE_URL}/api/admin/qa/targeted-start" \
+          STATUS=$(curl --silent --show-error --output /tmp/targeted-start-response.json --write-out '%{http_code}' -X POST "${BASE_URL}/api/admin/qa/targeted-start" \
             -H 'Content-Type: application/json' \
             -H "x-qa-timestamp: $QA_TIMESTAMP" \
             -H "x-qa-signature: sha256=$QA_SIGNATURE" \
-            --data-binary @/tmp/targeted-start-body.json
+            --data-binary @/tmp/targeted-start-body.json)
+          if [[ "$STATUS" != "200" ]]; then
+            cat /tmp/targeted-start-response.json
+            exit 1
+          fi
+          if grep -q '"cancelled":true' /tmp/targeted-start-response.json; then
+            echo 'cancelled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'cancelled=false' >> "$GITHUB_OUTPUT"
+          fi
         env:
           BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
           DISPATCH_ID: ${{ inputs.dispatch_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
 
+      - name: Provision isolated targeted-Smoke tenant
+        if: steps.claim.outputs.cancelled != 'true'
+        shell: bash
+        run: |
+          curl --fail-with-body -X POST "${BASE_URL}/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${E2E_SETUP_SECRET}" \
+            -H 'Content-Type: application/json' \
+            --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
       - name: Execute exactly one registered critical-flow pack
+        if: steps.claim.outputs.cancelled != 'true'
         id: playwright
         shell: bash
         run: |
@@ -204,7 +218,7 @@ jobs:
           EXPECTED_SUMMARY: ${{ steps.contract.outputs.expected_summary }}
 
       - name: Publish signed terminal evidence
-        if: always()
+        if: always() && steps.claim.outputs.cancelled != 'true'
         shell: bash
         run: |
           node <<'NODE'

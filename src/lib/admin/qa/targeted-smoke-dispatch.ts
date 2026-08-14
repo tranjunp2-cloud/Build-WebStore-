@@ -8,16 +8,18 @@ export type TargetedSmokeDispatchRequest = {
   commitSha: string;
   environment: "staging";
   requestDigest: string;
-  profile: "targeted-smoke" | "manual-retest";
+  profile: "targeted-smoke" | "manual-retest" | "manual-smoke" | "manual-regression";
   pack: TargetedSmokePack;
   /** Present only for an explicitly requested manual retest. */
   retestNonce?: string;
+  idempotencyKey?: string;
+  requestedBy?: string | number;
 };
 
 type DispatchRecord = {
   id: string | number;
   requestDigest?: string;
-  status?: "queued" | "dispatched" | "blocked" | "terminal";
+  status?: "queued" | "dispatched" | "cancel_requested" | "cancelled" | "blocked" | "terminal";
   workflowNonce?: string;
 };
 
@@ -42,7 +44,7 @@ export function targetedSmokeDispatchKey(
     pack.targetId,
     pack.packId,
     pack.packVersion,
-    request.retestNonce ?? "auto",
+    request.idempotencyKey ?? request.retestNonce ?? "auto",
   ].join(":");
 }
 
@@ -64,6 +66,8 @@ export async function claimTargetedSmokeDispatch(
 
   const dispatchKey = targetedSmokeDispatchKey(request);
   const expiresAt = new Date(now.getTime() + leaseDurationMs).toISOString();
+  const quotaProfile = request.profile === "manual-regression" ? "regression" : "smoke";
+  const quotaLimit = quotaProfile === "regression" ? 1 : 2;
 
   return withQaTargetedDispatchTransaction(
     payload,
@@ -89,6 +93,26 @@ export async function claimTargetedSmokeDispatch(
           blocked: existingDispatch.status === "blocked",
         };
       }
+
+      const activeForProfile = await payload.find({
+        collection: "qa_smoke_dispatches",
+        where: {
+          and: [
+            { environment: { equals: request.environment } },
+            {
+              profile: {
+                in:
+                  quotaProfile === "regression"
+                    ? ["manual-regression"]
+                    : ["targeted-smoke", "manual-retest", "manual-smoke"],
+              },
+            },
+            { status: { in: ["queued", "dispatched", "cancel_requested"] } },
+          ],
+        },
+        limit: quotaLimit,
+        ...options,
+      });
 
       const activeLeases = await payload.find({
         collection: "qa_fixture_leases",
@@ -131,7 +155,22 @@ export async function claimTargetedSmokeDispatch(
         environment: request.environment,
         pullRequest: request.pullRequest,
         commitSha: request.commitSha,
+        ...(request.idempotencyKey ? { idempotencyKey: request.idempotencyKey } : {}),
+        ...(request.requestedBy ? { requestedBy: request.requestedBy } : {}),
       };
+      if (activeForProfile.docs.length >= quotaLimit) {
+        const dispatch = (await payload.create({
+          collection: "qa_smoke_dispatches",
+          data: {
+            ...baseData,
+            status: "blocked",
+            blockCode: "PROFILE_CAPACITY_EXHAUSTED",
+            recoveryHint: `Wait for an active ${quotaProfile} run to finish before retrying.`,
+          },
+          ...options,
+        })) as DispatchRecord;
+        return { dispatch, created: true, blocked: true };
+      }
       if (active.length >= request.pack.fixtureCapacity) {
         const dispatch = (await payload.create({
           collection: "qa_smoke_dispatches",
@@ -167,6 +206,7 @@ export async function claimTargetedSmokeDispatch(
       });
       return { dispatch, created: true, blocked: false };
     },
+    quotaProfile,
   );
 }
 

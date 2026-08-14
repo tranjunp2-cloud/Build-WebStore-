@@ -58,7 +58,7 @@ describe("[TC-F40-02-07] QA collection write boundary", () => {
     expect(profile).toMatchObject({
       type: "select",
       required: true,
-      options: ["targeted-smoke", "manual-retest"],
+      options: ["targeted-smoke", "manual-retest", "manual-smoke", "manual-regression"],
     });
   });
 });

@@ -30,6 +30,24 @@ AND the terminal run records target editor-productgrid-variants, fixture QA-Tshi
 | TC-F40-05-04 | API | Critical | Mapping validates input and records actor/time/history on confirmation. | [x] AUTO | `src/__tests__/api/f40-github-issues.test.ts` |
 | TC-F40-05-05 | Unit/E2E | Critical | Unknown mapping has no health effect; confirmed open P1 is Critical with a GitHub link; closed/remapped issue clears the old target. | [x] AUTO | `src/__tests__/unit/qa/f40-project-health.test.ts`, `tests/f40-github-issues.spec.ts` |
 
+## US-F40-07 — Targeted Manual Runs and Run History
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-07-01 | Unit | Critical | A target/profile resolves only its approved allow-listed pack; an unsupported Regression returns a coverage-gap block. | [x] AUTO | `src/__tests__/unit/qa/f40-manual-runs.test.ts` |
+| TC-F40-07-02 | API | Critical | Preflight and dispatch require super-admin, validate paired PR/SHA and cannot accept arbitrary execution input. | [x] AUTO | `src/__tests__/api/f40-manual-runs.test.ts` |
+| TC-F40-07-03 | API | Critical | One confirmation idempotency key produces one dispatch; fixture/profile capacity blocks safely. | [x] AUTO | `src/__tests__/api/f40-manual-runs.test.ts` |
+| TC-F40-07-04 | API | Critical | Only a non-terminal dispatch can be cancelled; cancellation keeps a possibly running fixture lease until terminal reconciliation. | [x] AUTO | `src/__tests__/api/f40-manual-run-cancel.test.ts` |
+| TC-F40-07-05 | API/E2E | High | Seven-day run history filters target/profile/PR/SHA and presents only safe evidence availability. | [x] AUTO | `src/__tests__/api/f40-qa-runs.test.ts`, `tests/f40-manual-runs.spec.ts` |
+
+### US-F40-07 operational contract
+
+- `GET /api/admin/qa/manual-runs/preflight` and `POST /api/admin/qa/manual-runs` accept one allow-listed `targetId` and `smoke` or `regression` profile only. Both require a super-admin session; a PR number and immutable SHA are optional as a pair, never independently. The server resolves the Staging (QC) context and pack metadata—clients cannot supply a command, test list, fixture, environment or pack version.
+- A dispatch is confirmed by an idempotency key. Reusing it with the same request returns the original ledger entry; using it for a different request returns `409`. Only an approved pack with available fixture and profile capacity can reach GitHub Actions. There is intentionally no “Run All” endpoint or workflow input.
+- `GET /api/admin/qa/runs` defaults to the prior seven days. It accepts `targetId`, `status`, `profile`, `packId`, `pullRequest`, `commitSha` and `testCaseId`, returning terminal summaries with a keyset cursor plus separately-labelled active summaries. It exposes evidence availability (`available`, `expiring`, `expired` or `unavailable`), never artifact URLs or evidence bodies.
+- `POST /api/admin/qa/manual-runs/:id/cancel` accepts a bounded reason and only permits `queued`, `dispatched` or `cancel_requested` ledger entries. A queued run is released immediately; a dispatched run remains `cancel_requested` until GitHub or reconciliation determines its terminal state, so an in-use fixture is never prematurely reused.
+- Vercel invokes `GET /api/cron/reconcile-qa-targeted-smoke` every ten minutes. It requires `Authorization: Bearer $CRON_SECRET` and conservatively blocks/release-expired ambiguous runs; it never retries or re-dispatches a workflow. `CRON_SECRET` is already required in both staging and production environment templates.
+
 ## QC browser verification runbook
 
 `tests/f40-github-issues.spec.ts` has a public authorization-boundary check and a stateful browser/API flow. Run the stateful flow only against the isolated QC database: the seed and reset commands refuse any environment other than `APP_ENV=qc-test` (or `NEXT_PUBLIC_APP_ENV=qc-test`) and reject known staging/production hosts.

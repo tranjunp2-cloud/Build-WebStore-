@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     overrideAccess: true,
   }) as { id: string | number; fixtureKey?: string };
   if (!initial.fixtureKey) return NextResponse.json({ error: "Unknown dispatch" }, { status: 409 });
+  let cancelled = false;
   try {
     await withQaTargetedDispatchTransaction(payload, "staging", initial.fixtureKey, async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
@@ -90,7 +91,35 @@ export async function POST(req: NextRequest) {
         workflowRunId?: string;
         workflowAttempt?: number;
       };
-      if (dispatch.status !== "dispatched" || dispatch.workflowNonce !== parsed.data.workflowNonce)
+      if (dispatch.workflowNonce !== parsed.data.workflowNonce)
+        throw new Error("Dispatch is not claimable");
+      // A cancellation can land after Actions has been dispatched but before it
+      // reaches this claim endpoint.  Complete that cancellation here, before
+      // any provisioning or Playwright step can touch the fixture.
+      if (dispatch.status === "cancel_requested") {
+        const now = new Date().toISOString();
+        await payload.update({
+          collection: "qa_smoke_dispatches",
+          id: dispatch.id,
+          data: { status: "cancelled", cancelledAt: now },
+          ...options,
+        });
+        const activeLeases = await payload.find({
+          collection: "qa_fixture_leases",
+          where: { and: [{ dispatch: { equals: dispatch.id } }, { status: { equals: "active" } }] },
+          limit: 10,
+          ...options,
+        });
+        await Promise.all(activeLeases.docs.map((lease) => payload.update({
+          collection: "qa_fixture_leases",
+          id: lease.id,
+          data: { status: "released", releasedAt: now },
+          ...options,
+        })));
+        cancelled = true;
+        return;
+      }
+      if (dispatch.status !== "dispatched")
         throw new Error("Dispatch is not claimable");
       if (
         dispatch.workflowRunId &&
@@ -128,5 +157,5 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Dispatch is not claimable" }, { status: 409 });
   }
-  return NextResponse.json({ claimed: true });
+  return NextResponse.json(cancelled ? { claimed: false, cancelled: true } : { claimed: true, cancelled: false });
 }

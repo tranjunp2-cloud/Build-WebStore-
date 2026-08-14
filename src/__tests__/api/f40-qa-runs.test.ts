@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     } | null,
   },
   find: vi.fn(),
+  execute: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -47,6 +48,7 @@ beforeEach(() => {
     totalDocs: 1,
     totalPages: 1,
   });
+  mocks.execute.mockReset();
 });
 
 // ── TC-F40-02-05: Studio receives only the safe run summary ────────────────
@@ -67,11 +69,11 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
       expect.objectContaining({
         page: 2,
         limit: 50,
-        where: {
+        where: expect.objectContaining({
           targetId: { equals: "editor.product-grid" },
           suite: { equals: "smoke" },
           status: { equals: "passed" },
-        },
+        }),
       }),
     );
     expect(body.data[0]).not.toHaveProperty("artifactUrl");
@@ -139,7 +141,7 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
         page: 1,
         limit: 51,
         sort: "-finishedAt,-id",
-        where: { suite: { equals: "smoke" } },
+        where: expect.objectContaining({ suite: { equals: "smoke" } }),
       }),
     );
     expect(body.data).toHaveLength(50);
@@ -152,14 +154,15 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
       ),
     );
     expect(secondResponse.status).toBe(200);
-    expect(mocks.find).toHaveBeenLastCalledWith(
+    expect(mocks.find.mock.calls).toContainEqual([
       expect.objectContaining({
+        collection: "qa_test_runs",
         page: 1,
         limit: 51,
         sort: "-finishedAt,-id",
         where: expect.objectContaining({ and: expect.any(Array) }),
       }),
-    );
+    ]);
   });
 
   it("rejects invalid status and unbounded page offsets", async () => {
@@ -201,5 +204,23 @@ describe("[TC-F40-02-05] GET /api/admin/qa/runs", () => {
     // Assert
     expect(response.status).toBe(403);
     expect(mocks.find).not.toHaveBeenCalled();
+  });
+
+  it("uses the complete source-aware cursor for a mixed terminal and dispatch page", async () => {
+    const original = (await import("payload")).getPayload as unknown as { mockResolvedValue: (value: unknown) => void };
+    original.mockResolvedValue({ find: mocks.find, db: { drizzle: { execute: mocks.execute } } });
+    mocks.execute.mockResolvedValueOnce({ rows: Array.from({ length: 51 }, (_, index) => ({ source: index % 2 ? "run" : "dispatch", id: 100 - index, target_id: "editor-productgrid-variants", pack_id: "editor-product-grid-variants-smoke", pack_version: 1, profile: "manual-smoke", status: index % 2 ? "passed" : "dispatched", pull_request: 1746, commit_sha: "abcdef1", started_at: "2026-08-13T01:00:00.000Z", finished_at: null, cursor_at: "2026-08-13T01:00:00.000Z", evidence_state: "unavailable" })) });
+    const response = await GET(new NextRequest("http://localhost/api/admin/qa/runs"));
+    const body = await response.json();
+    expect(body.data).toHaveLength(50);
+    const decoded = JSON.parse(Buffer.from(body.meta.nextCursor, "base64url").toString("utf8"));
+    expect(decoded).toEqual(expect.objectContaining({ at: "2026-08-13T01:00:00.000Z", source: expect.stringMatching(/dispatch|run/), id: expect.any(String) }));
+    expect(body.data.some((row: { status: string }) => row.status === "passed")).toBe(true);
+    mocks.execute.mockResolvedValueOnce({ rows: [{ source: "run", id: 49, target_id: "editor-productgrid-variants", pack_id: null, pack_version: null, profile: "smoke", status: "failed", pull_request: 1746, commit_sha: "abcdef1", started_at: "2026-08-13T00:59:00.000Z", finished_at: "2026-08-13T00:59:30.000Z", cursor_at: "2026-08-13T00:59:00.000Z", evidence_state: "available" }] });
+    const second = await GET(new NextRequest(`http://localhost/api/admin/qa/runs?cursor=${body.meta.nextCursor}`));
+    const secondBody = await second.json();
+    const pageOneIds = new Set(body.data.map((row: { id: string }) => row.id));
+    expect(secondBody.data.every((row: { id: string }) => !pageOneIds.has(row.id))).toBe(true);
+    expect(secondBody.data[0]).toMatchObject({ id: "run-49", status: "failed" });
   });
 });

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-type GitHubAppConfig = {
+export type GitHubAppConfig = {
   appId: string;
   installationId: string;
   privateKey: string;
@@ -9,6 +9,20 @@ type GitHubAppConfig = {
 
 /** A non-2xx GitHub response proves no workflow dispatch was accepted. */
 export class GitHubWorkflowDispatchRejectedError extends Error {}
+const GITHUB_REQUEST_TIMEOUT_MS = 10_000;
+
+async function githubFetch(fetcher: typeof fetch, input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetcher(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new GitHubWorkflowDispatchRejectedError("GitHub API request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function base64Url(value: string): string {
   return Buffer.from(value).toString("base64url");
@@ -35,10 +49,16 @@ function createAppJwt(config: GitHubAppConfig, now = Date.now()): string {
 }
 
 async function readJson(response: Response): Promise<unknown> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await response.json();
+    return await Promise.race([
+      response.json(),
+      new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new GitHubWorkflowDispatchRejectedError("GitHub API response timed out")), GITHUB_REQUEST_TIMEOUT_MS); }),
+    ]);
   } catch {
     return null;
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 
@@ -50,7 +70,7 @@ export async function dispatchTargetedSmokeWorkflow(
     commitSha: string;
     packId: string;
     workflowNonce: string;
-    runProfile?: "targeted-smoke" | "manual-retest";
+    runProfile?: "targeted-smoke" | "manual-retest" | "manual-smoke" | "manual-regression";
   },
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
@@ -67,7 +87,7 @@ export async function dispatchTargetedSmokeWorkflow(
     throw new Error("Invalid workflow nonce");
 
   const appJwt = createAppJwt(config);
-  const tokenResponse = await fetcher(
+  const tokenResponse = await githubFetch(fetcher,
     `https://api.github.com/app/installations/${config.installationId}/access_tokens`,
     {
       method: "POST",
@@ -82,7 +102,7 @@ export async function dispatchTargetedSmokeWorkflow(
   if (!tokenResponse.ok || typeof tokenBody?.token !== "string")
     throw new GitHubWorkflowDispatchRejectedError("GitHub App installation token request failed");
 
-  const workflowResponse = await fetcher(
+  const workflowResponse = await githubFetch(fetcher,
     `https://api.github.com/repos/${owner}/${repo}/actions/workflows/targeted-smoke.yml/dispatches`,
     {
       method: "POST",
@@ -108,6 +128,56 @@ export async function dispatchTargetedSmokeWorkflow(
   );
   if (!workflowResponse.ok)
     throw new GitHubWorkflowDispatchRejectedError("GitHub targeted Smoke workflow dispatch failed");
+}
+
+/** Requests cancellation only after a server-bound Actions workflow run exists. */
+export async function cancelTargetedSmokeWorkflow(
+  config: GitHubAppConfig,
+  workflowRunId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  if (!/^\d+(?:-\d+)?$/.test(workflowRunId))
+    throw new Error("Invalid workflow run ID");
+  const { owner, repo } = parseRepository(config.repository);
+  const appJwt = createAppJwt(config);
+  const tokenResponse = await githubFetch(fetcher,
+    `https://api.github.com/app/installations/${config.installationId}/access_tokens`,
+    { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${appJwt}`, "X-GitHub-Api-Version": "2022-11-28" } },
+  );
+  const tokenBody = await readJson(tokenResponse) as { token?: unknown } | null;
+  if (!tokenResponse.ok || typeof tokenBody?.token !== "string")
+    throw new GitHubWorkflowDispatchRejectedError("GitHub App installation token request failed");
+  const runId = workflowRunId.split("-")[0];
+  const response = await githubFetch(fetcher,
+    `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/cancel`,
+    { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${tokenBody.token}`, "X-GitHub-Api-Version": "2022-11-28" } },
+  );
+  if (!response.ok && response.status !== 409)
+    throw new GitHubWorkflowDispatchRejectedError("GitHub workflow cancellation failed");
+}
+
+/** Returns the safe Actions lifecycle state for reconciliation; never exposes logs or tokens. */
+export async function getTargetedSmokeWorkflowState(
+  config: GitHubAppConfig,
+  workflowRunId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<"completed" | "in_progress" | "queued" | null> {
+  if (!/^\d+(?:-\d+)?$/.test(workflowRunId)) throw new Error("Invalid workflow run ID");
+  const { owner, repo } = parseRepository(config.repository);
+  const appJwt = createAppJwt(config);
+  const tokenResponse = await githubFetch(fetcher,
+    `https://api.github.com/app/installations/${config.installationId}/access_tokens`,
+    { method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${appJwt}`, "X-GitHub-Api-Version": "2022-11-28" } },
+  );
+  const tokenBody = await readJson(tokenResponse) as { token?: unknown } | null;
+  if (!tokenResponse.ok || typeof tokenBody?.token !== "string") return null;
+  const runId = workflowRunId.split("-")[0];
+  const response = await githubFetch(fetcher,
+    `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}`,
+    { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${tokenBody.token}`, "X-GitHub-Api-Version": "2022-11-28" } },
+  );
+  const body = await readJson(response) as { status?: unknown } | null;
+  return response.ok && (body?.status === "completed" || body?.status === "in_progress" || body?.status === "queued") ? body.status : null;
 }
 
 export function githubAppConfigFromEnv(): GitHubAppConfig | null {

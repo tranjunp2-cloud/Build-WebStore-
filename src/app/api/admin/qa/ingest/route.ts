@@ -182,6 +182,19 @@ export async function POST(req: NextRequest) {
       payload,
       async (transactionReq) => {
         const options = { overrideAccess: true, req: transactionReq };
+        // A signed targeted terminal payload wins over timeout reconciliation.
+        // Take the same fixture lock before creating its immutable run record,
+        // not merely before binding the ledger below.
+        if (summary.targetedDispatch) {
+          const dispatch = await payload.findByID({
+            collection: "qa_smoke_dispatches",
+            id: summary.targetedDispatch.dispatchId,
+            ...options,
+          }) as { fixtureKey?: string };
+          if (!dispatch.fixtureKey)
+            throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
+          await lockQaTargetedFixture(payload, "staging", dispatch.fixtureKey, transactionReq);
+        }
         const existingRun = await payload.find({
           collection: "qa_test_runs",
           where: runWhere,
@@ -243,16 +256,14 @@ export async function POST(req: NextRequest) {
           };
           if (!dispatch.fixtureKey)
             throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
-          // Reconciliation and terminal binding share this advisory lock. The
-          // second read below prevents the cron from overwriting a terminal run.
-          await lockQaTargetedFixture(payload, "staging", dispatch.fixtureKey, transactionReq);
+          // Re-read after the fixture lock acquired at transaction entry.
           dispatch = await payload.findByID({
             collection: "qa_smoke_dispatches",
             id: summary.targetedDispatch.dispatchId,
             ...options,
           }) as typeof dispatch;
           if (
-            dispatch.status !== "dispatched" ||
+            (dispatch.status !== "dispatched" && dispatch.status !== "cancel_requested") ||
             dispatch.targetId !== summary.targetId ||
             dispatch.packId !== summary.targetedDispatch.packId ||
             dispatch.packVersion !== summary.targetedDispatch.packVersion ||

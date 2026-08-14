@@ -11,6 +11,7 @@ const TARGET_ID = "editor-productgrid-variants";
 const SUITE = "editor-product-grid-variants-smoke";
 const TEST_CASE_ID = "TC-F40-04-02";
 const IMPACT_TARGET_ID = "editor-publish-lifecycle";
+const MANUAL_CONTEXT_RUN = "local-f40-07-manual-context";
 
 /**
  * Deterministic local-only test data for the browser contract of F40-04.
@@ -64,6 +65,36 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
         data: runData,
         overrideAccess: true,
       });
+
+  // A verified immutable staging context lets the manual-run browser flow
+  // preflight without using a real GitHub deployment.
+  const existingManualContext = await payload.find({
+    collection: "qa_test_runs",
+    where: { workflowRunId: { equals: MANUAL_CONTEXT_RUN } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const manualContextData = {
+    workflowRunId: MANUAL_CONTEXT_RUN,
+    attempt: 1,
+    ingestDigest: "local-f40-07-manual-context-v1",
+    targetId: TARGET_ID,
+    suite: SUITE,
+    profile: "manual-smoke",
+    environment: "staging" as const,
+    status: "passed" as const,
+    pullRequest: 1746,
+    commitSha: "abcdef1",
+    startedAt: now,
+    finishedAt: now,
+    summary: { passed: 1, failed: 0, skipped: 0, blocked: 0 },
+  };
+  if (existingManualContext.docs[0]) {
+    await payload.update({ collection: "qa_test_runs", id: existingManualContext.docs[0].id, data: manualContextData, overrideAccess: true });
+  } else {
+    await payload.create({ collection: "qa_test_runs", data: manualContextData, overrideAccess: true });
+  }
 
   const prior = await payload.find({
     collection: "qa_test_results",
