@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { CourierLogo, courierById } from './courier-logo'
 import { useCourierLogos, useEpWallet, invalidateEpShippingInfo } from './use-ep-shipping-info'
-import { CreateLabelFlow } from './create-label-flow'
+import { CreateLabelFlow, type CreateLabelFlowHandle } from './create-label-flow'
 import { PrintLabelModal } from './print-label-modal'
 import { SelfDeliveryZone } from './self-delivery-zone'
 import { CodRecovery } from './cod-recovery'
@@ -186,6 +186,8 @@ export function FulfillmentZone({
   order,
   onUpdate,
   onLabelCreated,
+  mobileShippingActionRef,
+  hideMobileConfirmAction = false,
 }: {
   order: FulfillmentOrder
   onUpdate: () => void
@@ -194,6 +196,9 @@ export function FulfillmentZone({
   // optimistically and the AWB fills in via polling, so no reload is needed. Falls
   // back to onUpdate when not provided.
   onLabelCreated?: () => void
+  mobileShippingActionRef?: React.RefObject<CreateLabelFlowHandle | null>
+  // The fixed mobile action bar owns this CTA so it is not duplicated in the body.
+  hideMobileConfirmAction?: boolean
 }) {
   const { t, ti } = useI18n()
   const f = t.dashboard.orders.fulfillment
@@ -321,7 +326,7 @@ export function FulfillmentZone({
           )}
         </div>
 
-        <div className="ship-foot">
+        <div className={hideMobileConfirmAction ? 'od-mobile-confirm-action-hidden ship-foot' : 'ship-foot'}>
           <div className="help">
             <Info style={{ width: 12, height: 12 }} />
             {f.confirmHint}
@@ -443,6 +448,7 @@ export function FulfillmentZone({
     return (
       <>
         <CreateLabelFlow
+          ref={mobileShippingActionRef}
           orderId={order.id}
           courierId={courierId}
           courierName={courierName}

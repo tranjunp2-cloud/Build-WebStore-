@@ -324,13 +324,59 @@
 .od-not-found h2 { font-size: 18px; font-weight: 700; color: var(--dash-text); margin: 0; }
 .od-not-found p { font-size: 13.5px; margin: 0; }
 
+/* Mobile-only actions stay reachable without bypassing the fulfillment workflow. */
+.od-mobile-actions { display: none; }
+
 /* ── Responsive: collapse to single column on mobile ──────────────────────── */
 @media (max-width: 768px) {
-  .od-page { padding: 16px 16px 80px; }
+  .od-page { padding: 16px; }
+  .od-page.od-has-mobile-actions { padding-bottom: calc(var(--od-mobile-actions-height, 152px) + 12px); }
   .od2 { grid-template-columns: 1fr; gap: 14px; }
   .od2-main, .od2-side { gap: 14px; }
   .od-title-row { gap: 8px; }
   .od-title-row h1 { font-size: 20px; }
   .od-date { margin-left: 0; flex-basis: 100%; }
   .od-progress { margin-bottom: 0; }
+  .od-mobile-action-card-hidden { display: none; }
+  .od-mobile-confirm-action-hidden { display: none; }
+
+  .od-mobile-actions {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--dash-border);
+    background: color-mix(in srgb, var(--dash-surface) 94%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 -8px 24px hsl(var(--foreground) / 0.08);
+  }
+
+  .od-mobile-action-note {
+    display: flex;
+    flex: 0 0 100%;
+    align-items: flex-start;
+    gap: 7px;
+    margin: 0;
+    color: var(--dash-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .od-mobile-action-note svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+
+  .od-mobile-action {
+    min-width: 0;
+    flex: 1;
+    min-height: 44px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+  }
+  .od-mobile-action:disabled { cursor: not-allowed; opacity: 0.6; }
+  .od-mobile-action.primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+  .od-mobile-action.danger { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive) / 0.3); }
 }
