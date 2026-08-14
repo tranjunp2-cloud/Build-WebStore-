@@ -4056,6 +4056,7 @@
       "saving": "Menyimpan…",
       "unsaved": "Belum disimpan",
       "saved": "Disimpan",
+      "savedJustNow": "Baru disimpan",
       "menu": "Menu pilihan",
       "templates": "Templat",
       "undo": "Undur",
@@ -4135,6 +4136,7 @@
       "updateSuccess": "Laman web dikemas kini",
       "viewAction": "Lihat",
       "saveSuccess": "Perubahan disimpan",
+      "manualSaveSuccess": "Disimpan!",
       "saveFailed": "Tidak dapat menyimpan. Cuba lagi."
     },
     "maintenance": {

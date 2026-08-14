@@ -155,6 +155,19 @@ function WorkspaceLayoutControls() {
 }
 
 export type PublishState = 'draft' | 'publishing' | 'live' | 'live-dirty' | 'updating'
+export type SaveStatus = 'saving' | 'unsaved' | 'savedJustNow' | 'saved'
+
+export function deriveSaveStatus(opts: {
+    isSaving: boolean
+    hasUnsavedChanges: boolean
+    lastSavedAt: number | null
+    now: number
+}): SaveStatus {
+    if (opts.isSaving) return 'saving'
+    if (opts.hasUnsavedChanges) return 'unsaved'
+    if (opts.lastSavedAt && opts.now - opts.lastSavedAt < 60_000) return 'savedJustNow'
+    return 'saved'
+}
 
 export function derivePublishState(opts: {
     isPublished: boolean
@@ -179,6 +192,7 @@ interface EditorToolbarProps {
     isSaving: boolean
     saveSuccess: boolean
     hasUnsavedChanges: boolean
+    lastSavedAt: number | null
     hasUnpublishedChanges?: boolean
     isPublishing: boolean
     publishSuccess: boolean
@@ -219,6 +233,7 @@ export function EditorToolbar({
     isSaving,
     saveSuccess,
     hasUnsavedChanges,
+    lastSavedAt,
     hasUnpublishedChanges = false,
     isPublishing,
     publishSuccess,
@@ -246,6 +261,24 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
     const { t } = useI18n()
     const et = t.editor.toolbar
+    const [statusNow, setStatusNow] = React.useState(() => Date.now())
+
+    React.useEffect(() => {
+        setStatusNow(Date.now())
+        if (!lastSavedAt) return
+
+        const remaining = 60_000 - (Date.now() - lastSavedAt)
+        if (remaining <= 0) return
+        const timer = window.setTimeout(() => setStatusNow(Date.now()), remaining)
+        return () => window.clearTimeout(timer)
+    }, [lastSavedAt])
+
+    const saveStatusLabel = et[deriveSaveStatus({
+        isSaving,
+        hasUnsavedChanges,
+        lastSavedAt,
+        now: statusNow,
+    })]
 
     // F26-04: Preview/Publish disabled while translation or save in flight so users can't
     // open a tab against stale DB state. Once everything settles, buttons re-enable.
@@ -316,7 +349,7 @@ export function EditorToolbar({
 
                     <div className="flex min-w-0 items-center gap-1">
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', aiRunning ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{aiRunning ? processingLabel : isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
+                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{aiRunning ? processingLabel : saveStatusLabel}</span>
                     </div>
                 </div>
 
@@ -577,10 +610,10 @@ export function EditorToolbar({
             <div className="flex shrink-0 items-center gap-2.5">
                 <div
                     className="inline-flex shrink-0 items-center gap-0 text-[11px] transition-all min-[1366px]:gap-1.5"
-                    title={isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}
+                    title={saveStatusLabel}
                 >
                     <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                    <span className="hidden text-slate-400 min-[1366px]:inline">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
+                    <span className="hidden text-slate-400 min-[1366px]:inline">{saveStatusLabel}</span>
                 </div>
 
                 <div className="hidden h-4 w-px shrink-0 bg-white/[0.08] min-[1366px]:block" />

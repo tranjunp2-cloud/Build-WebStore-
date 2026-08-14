@@ -66,6 +66,7 @@ vi.mock('@/i18n', () => ({
                     publishSuccessDomain: 'Live at {domain}',
                     publishFailed: 'Publish thất bại',
                     saveSuccess: 'Đã lưu thành công!',
+                    manualSaveSuccess: 'Saved!',
                     saveFailed: 'Lưu thất bại',
                     unpublishSuccess: 'Đã gỡ website',
                     unpublishFailed: 'Gỡ website thất bại',
@@ -1944,6 +1945,32 @@ afterEach(() => {
             // Verify 409 toast fires with server error message (not generic saveFailed)
             expect(toast.error).toHaveBeenCalledWith('Version conflict')
         })
+    })
+
+    it('TC-F12-113-04: Ctrl+S saves immediately while focus is in an input and shows the manual-save toast', async () => {
+        // Arrange
+        render(<EditorPage />)
+        await waitFor(() => {
+            expect(screen.getByTestId('toolbar')).toBeInTheDocument()
+        })
+        const input = document.createElement('input')
+        document.body.appendChild(input)
+        input.addEventListener('blur', () => {
+            useEditorStore.getState().updateBlock(0, { headline: 'Committed by Cmd+S' })
+        })
+        input.focus()
+
+        // Act
+        fireEvent.keyDown(input, { key: 's', ctrlKey: true })
+
+        // Assert
+        await waitFor(() => {
+            const saveCalls = vi.mocked(global.fetch).mock.calls.filter(([url]) => String(url).includes('/save'))
+            expect(saveCalls).toHaveLength(1)
+            expect(toast.success).toHaveBeenCalledWith('Saved!')
+            expect(String(saveCalls[0]?.[1]?.body)).toContain('Committed by Cmd+S')
+        })
+        input.remove()
     })
 
     it('TC-F05.40: Race Condition Check (Prevent overlapping saves)', async () => {

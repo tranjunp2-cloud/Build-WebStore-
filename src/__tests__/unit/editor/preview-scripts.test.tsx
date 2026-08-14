@@ -117,6 +117,27 @@ describe('PreviewScripts', () => {
         removeEventListenerSpy.mockRestore()
     })
 
+    it('TC-F12-113-02: sends an immediate manual-save request for Cmd/Ctrl+S in the canvas', () => {
+        // Arrange
+        render(<PreviewScripts />)
+        const event = new KeyboardEvent('keydown', {
+            key: 's',
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+        })
+
+        // Act
+        document.dispatchEvent(event)
+
+        // Assert
+        expect(event.defaultPrevented).toBe(true)
+        expect(mockPostMessage).toHaveBeenCalledWith(
+            { type: 'MANUAL_SAVE_REQUEST', source: 'iframe' },
+            expect.any(String),
+        )
+    })
+
     // TC-F05-06-09: contentEditable must not activate on table-scroll wrapper divs
     it('should not set contenteditable on a div that directly wraps a <table> (overflow-x-auto fix)', () => {
         // Arrange — feature-comparison table variant DOM structure

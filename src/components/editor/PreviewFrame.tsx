@@ -54,6 +54,8 @@ interface PreviewFrameProps {
     hideBlockActionBar?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
+    /** Called by an explicit Cmd/Ctrl+S inside the preview iframe. */
+    onManualSave?: (source: 'iframe' | 'footer') => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
     onHandleReady?: (handle: PreviewFrameHandle | null) => void
     /** Called when a footer field is edited inline in the preview — dedicated footer channel. */
@@ -232,6 +234,7 @@ function PreviewFrameInner({
     disableDragDrop = false,
     hideBlockActionBar = false,
     onInlineEditSave,
+    onManualSave,
     onHandleReady,
     onFooterUpdate,
     onFooterInlineEdit,
@@ -251,6 +254,8 @@ function PreviewFrameInner({
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const onInlineEditSaveRef = useRef(onInlineEditSave)
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
+    const onManualSaveRef = useRef(onManualSave)
+    useEffect(() => { onManualSaveRef.current = onManualSave }, [onManualSave])
     const onFooterUpdateRef = useRef(onFooterUpdate)
     useEffect(() => { onFooterUpdateRef.current = onFooterUpdate }, [onFooterUpdate])
     const onFooterInlineEditRef = useRef(onFooterInlineEdit)
@@ -681,6 +686,9 @@ function PreviewFrameInner({
                 try { if (href && safeProtocols.has(new URL(href).protocol)) window.open(href, '_blank', 'noopener,noreferrer') } catch { /* invalid URL */ }
             } else if (e.data?.type === 'SAVE_CHECKPOINT') {
                 void (onInlineEditSaveRef.current?.() ?? performSave(false))
+            } else if (e.data?.type === 'MANUAL_SAVE_REQUEST') {
+                const source = e.data.source === 'footer' ? 'footer' : 'iframe'
+                void (onManualSaveRef.current?.(source) ?? onInlineEditSaveRef.current?.() ?? performSave(true))
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
                 // GH-1381: ACK back to the iframe overlay so it toasts success only after the

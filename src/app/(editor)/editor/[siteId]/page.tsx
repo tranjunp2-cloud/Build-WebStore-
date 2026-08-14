@@ -116,6 +116,7 @@ import type { PageData, BlockData } from '@/store/editorStore'
 type SaveOptions = {
     showToast?: boolean
     refreshPreview?: boolean
+    successToast?: string
 }
 
 type PendingSaveRequest = {
@@ -129,6 +130,7 @@ function mergeSaveOptions(current: SaveOptions | undefined, incoming: SaveOption
     return {
         showToast: (current?.showToast ?? true) || (incoming.showToast ?? true),
         refreshPreview: (current?.refreshPreview ?? true) || (incoming.refreshPreview ?? true),
+        successToast: incoming.successToast ?? current.successToast,
     }
 }
 
@@ -459,14 +461,6 @@ export default function EditorPage() {
         return `https://${slug}.${domain}`
     }, [site?.primaryDomain, site?.tenantSlug])
 
-    const lastSavedLabel = useMemo(() => {
-        if (!lastSavedAt) return null
-        return new Date(lastSavedAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-        })
-    }, [lastSavedAt])
-
     const currentPageTitle = useMemo(() => {
         // Prefer the pages[] entry (carries localeContent → locale-aware title); fall back to
         // the lightweight `page` state (no localeContent) then a default.
@@ -785,7 +779,7 @@ export default function EditorPage() {
                     }
 
                     if (options.showToast ?? true) {
-                        toast.success(t.editor.toast.saveSuccess)
+                        toast.success(options.successToast ?? t.editor.toast.saveSuccess)
                     }
 
                     window.setTimeout(() => setSaveSuccess(false), 2000)
@@ -814,6 +808,39 @@ export default function EditorPage() {
             }
         }
     }, [markSaved, page, setIsSaving, siteId])
+
+    const handleManualSave = useCallback(async (source: 'shell' | 'iframe' | 'footer' = 'shell') => {
+        if (templateApplied) {
+            setShowSaveGuard(true)
+            return false
+        }
+
+        // Most settings fields commit on blur. Flush the focused field before taking the
+        // manual-save snapshot so Cmd/Ctrl+S persists the value the user is still editing.
+        if (source === 'shell') {
+            const activeElement = document.activeElement
+            if (
+                activeElement instanceof HTMLInputElement
+                || activeElement instanceof HTMLTextAreaElement
+                || (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+            ) {
+                activeElement.blur()
+                await Promise.resolve()
+            }
+        }
+
+        // The footer keeps its own short debounce to preserve the contentEditable cursor.
+        // A manual save must cancel that deferred duplicate after PreviewFrame flushes its value.
+        if (source === 'footer' && footerUpdateSaveTimerRef.current) {
+            clearTimeout(footerUpdateSaveTimerRef.current)
+            footerUpdateSaveTimerRef.current = null
+        }
+
+        return await handleSave({
+            showToast: true,
+            successToast: t.editor.toast.manualSaveSuccess,
+        })
+    }, [handleSave, t.editor.toast.manualSaveSuccess, templateApplied])
 
     // Suspend store auto-save while a template is applied (user must confirm first)
     useEffect(() => {
@@ -876,6 +903,12 @@ export default function EditorPage() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                void handleManualSave()
+                return
+            }
+
             const target = e.target as HTMLElement
             if (target && target.closest('input, textarea, [contenteditable="true"]')) {
                 return
@@ -906,19 +939,11 @@ export default function EditorPage() {
                 }
             }
 
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-                e.preventDefault()
-                if (templateApplied) {
-                    setShowSaveGuard(true)
-                } else {
-                    void handleSave()
-                }
-            }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [canRedo, canUndo, handleSave, redo, undo])
+    }, [canRedo, canUndo, handleManualSave, redo, undo])
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
@@ -2888,6 +2913,9 @@ export default function EditorPage() {
             // Reloading here causes visible jank while user is still editing.
             await handleSave({ showToast: false, refreshPreview: false })
         },
+        onManualSave: async (source) => {
+            await handleManualSave(source)
+        },
         onFooterUpdate: (changes) => {
             updateFooterBlock(changes)
             const s = useEditorStore.getState()
@@ -2972,6 +3000,7 @@ export default function EditorPage() {
                 isSaving={isSaving}
                 saveSuccess={saveSuccess}
                 hasUnsavedChanges={hasUnsavedChanges}
+                lastSavedAt={lastSavedAt}
                 hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishSuccess={publishSuccess}
@@ -2985,13 +3014,7 @@ export default function EditorPage() {
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                onSave={() => {
-                    if (templateApplied) {
-                        setShowSaveGuard(true)
-                    } else {
-                        void handleSave()
-                    }
-                }}
+                onSave={() => { void handleManualSave() }}
                 onPublish={() => setIsPublishModalOpen(true)}
                 onRepublish={handleRepublish}
                 onUnpublish={() => setIsUnpublishModalOpen(true)}

@@ -4056,6 +4056,7 @@
       "saving": "Saving…",
       "unsaved": "Unsaved",
       "saved": "Saved",
+      "savedJustNow": "Saved just now",
       "menu": "Menu",
       "templates": "Templates",
       "undo": "Undo",
@@ -4135,6 +4136,7 @@
       "updateSuccess": "Website updated",
       "viewAction": "View",
       "saveSuccess": "Changes saved",
+      "manualSaveSuccess": "Saved!",
       "saveFailed": "Couldn't save. Try again."
     },
     "maintenance": {
