@@ -1966,6 +1966,8 @@
         "rateLimitExceeded": "Anda telah menggunakan semua percubaan penjanaan AI untuk jam ini. Cuba lagi dalam {minutes} minit.",
         "noCategoriesTitle": "Cipta kategori sebelum menjana draf AI",
         "noCategoriesDescription": "Produk AI memerlukan kategori sedia ada. Tambah satu, kemudian cuba lagi.",
+        "tooManyCategoriesTitle": "Terlalu banyak kategori untuk semakan draf AI",
+        "tooManyCategoriesDescription": "Semakan draf AI menyokong sehingga {count} kategori aktif. Kurangkan bilangan kategori aktif, kemudian cuba lagi.",
         "manageCategories": "Urus Kategori",
         "previewTitle": "Pratonton (Dijana oleh AI).",
         "previewSubtitle": "Produk yang tiada imej akan dipaparkan dengan ikon set semula selepas disimpan.",

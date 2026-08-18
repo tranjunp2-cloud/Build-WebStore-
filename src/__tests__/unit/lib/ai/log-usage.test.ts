@@ -15,10 +15,10 @@ describe('estimateCostUsd', () => {
     })
 
     it('computes gpt-4.1-mini cost (primary post-phase-03a)', () => {
-        // $0.20 per 1M input, $0.80 per 1M output
-        // 4000 in + 8000 out = 0.0008 + 0.0064 = 0.0072
+        // $0.40 per 1M input, $1.60 per 1M output
+        // 4000 in + 8000 out = 0.0016 + 0.0128 = 0.0144
         const cost = estimateCostUsd('gpt-4.1-mini', 4000, 8000)
-        expect(cost).toBeCloseTo(0.0072, 6)
+        expect(cost).toBeCloseTo(0.0144, 6)
     })
 
     it('computes gpt-4.1-nano cost (cheapest tier)', () => {
@@ -30,7 +30,7 @@ describe('estimateCostUsd', () => {
 
     it('strips date suffix from model name (gpt-4.1-mini-2025-04-14)', () => {
         const cost = estimateCostUsd('gpt-4.1-mini-2025-04-14', 1000, 1000)
-        expect(cost).toBeCloseTo(0.001, 6) // 0.0002 + 0.0008
+        expect(cost).toBeCloseTo(0.002, 6) // 0.0004 + 0.0016
     })
 
     it('returns 0 for unknown model', () => {
@@ -48,9 +48,9 @@ describe('estimateCostUsd', () => {
     it('phase-03a savings proof: 4.1-mini vs 4o on same workload', () => {
         const workload4o = estimateCostUsd('gpt-4o', 4000, 8000)
         const workload41 = estimateCostUsd('gpt-4.1-mini', 4000, 8000)
-        // Expect ~10x cheaper
+        // Expect ~6.25x cheaper
         const ratio = workload4o / workload41
-        expect(ratio).toBeGreaterThan(9)
-        expect(ratio).toBeLessThan(13)
+        expect(ratio).toBeGreaterThan(6)
+        expect(ratio).toBeLessThan(7)
     })
 })

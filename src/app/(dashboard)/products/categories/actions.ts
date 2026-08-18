@@ -119,8 +119,14 @@ export type AiCategoryOption = {
     parent?: string | number | { id: string | number } | null
 }
 
-/** Lightweight category contract for the AI review modal. */
-export async function getAiCategoriesAction(): Promise<AiCategoryOption[]> {
+const MAX_AI_REVIEW_CATEGORIES = 1000
+
+export type AiCategoryLoadResult =
+    | { status: 'ready'; categories: AiCategoryOption[] }
+    | { status: 'overflow'; maxCategories: number }
+
+/** Complete-or-overflow category contract for the AI review modal. */
+export async function getAiCategoriesAction(): Promise<AiCategoryLoadResult> {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
@@ -139,7 +145,8 @@ export async function getAiCategoriesAction(): Promise<AiCategoryOption[]> {
             ],
         },
         depth: 0,
-        limit: 1000,
+        // Fetch one sentinel row so the modal never receives a truncated hierarchy.
+        limit: MAX_AI_REVIEW_CATEGORIES + 1,
         sort: ['breadcrumbs', 'id'],
         select: {
             name: true,
@@ -147,6 +154,20 @@ export async function getAiCategoriesAction(): Promise<AiCategoryOption[]> {
             breadcrumbs: true,
         },
     })
+
+    if (
+        result.docs.length > MAX_AI_REVIEW_CATEGORIES
+        || result.hasNextPage === true
+        || (
+            typeof result.totalDocs === 'number'
+            && result.totalDocs > MAX_AI_REVIEW_CATEGORIES
+        )
+    ) {
+        return {
+            status: 'overflow',
+            maxCategories: MAX_AI_REVIEW_CATEGORIES,
+        }
+    }
 
     const options: AiCategoryOption[] = []
     for (const category of result.docs) {
@@ -173,7 +194,7 @@ export async function getAiCategoriesAction(): Promise<AiCategoryOption[]> {
         })
     }
 
-    return options
+    return { status: 'ready', categories: options }
 }
 
 /** Revalidate selected categories against the current tenant before any AI save side effect. */

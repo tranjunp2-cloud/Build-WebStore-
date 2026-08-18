@@ -166,7 +166,7 @@ function parsePublishBlockedError(e: unknown): string[] | null {
 }
 
 export default function ProductsPage() {
-    const { t } = useI18n()
+    const { t, ti, locale } = useI18n()
     const sub = t.common.subscriptionErrors
     const router = useRouter()
     const [products, setProducts] = useState<Product[]>([])
@@ -344,7 +344,25 @@ export default function ProductsPage() {
         setIsPreparingAi(true)
         try {
             // Keep AI category data independent from the general/manual category state.
-            const categoryOptions = await getAiCategoriesAction()
+            const categoryResult = await getAiCategoriesAction()
+            if (categoryResult.status === 'overflow') {
+                toast.error(t.dashboard.products.bulkCreate.tooManyCategoriesTitle, {
+                    description: ti(
+                        t.dashboard.products.bulkCreate.tooManyCategoriesDescription,
+                        {
+                            count: new Intl.NumberFormat(
+                                locale === 'ms' ? 'ms-MY' : 'en-MY',
+                            ).format(categoryResult.maxCategories),
+                        },
+                    ),
+                    action: {
+                        label: t.dashboard.products.bulkCreate.manageCategories,
+                        onClick: () => router.push('/products/categories'),
+                    },
+                })
+                return
+            }
+            const categoryOptions = categoryResult.categories
             if (categoryOptions.length === 0) {
                 toast.error(t.dashboard.products.bulkCreate.noCategoriesTitle, {
                     description: t.dashboard.products.bulkCreate.noCategoriesDescription,

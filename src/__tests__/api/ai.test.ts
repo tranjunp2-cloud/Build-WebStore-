@@ -1991,7 +1991,10 @@ describe('AI Streaming APIs', () => {
         it('TC-F08-04-94: queries the tenant category allowlist and injects it into the prompt', async () => {
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
-            mockCategoryDB = [{ id: 42, name: 'Shoes', breadcrumbs: 'Fashion / Shoes' }]
+            mockCategoryDB = [
+                { id: 1, name: 'Fashion', breadcrumbs: 'Fashion', parent: null },
+                { id: 42, name: 'Shoes', breadcrumbs: 'Fashion / Shoes', parent: 1 },
+            ]
             const OpenAIMod = await import('openai')
             const OpenAI = OpenAIMod.default as unknown as { prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } } }
             OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
@@ -2020,16 +2023,122 @@ describe('AI Streaming APIs', () => {
                     ],
                 },
                 depth: 0,
-                limit: 200,
+                limit: 501,
                 sort: ['breadcrumbs', 'id'],
-                select: { name: true, breadcrumbs: true },
+                select: { name: true, breadcrumbs: true, parent: true },
             }))
             const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0]
             expect(call.messages[0].content).toContain('<CATEGORY_CANDIDATES>')
             expect(call.messages[0].content).toContain('[{"id":42,"path":"Fashion / Shoes"}]')
         })
 
-        it('TC-F08-04-99: caps large prompt-like category data by path and total bytes', async () => {
+        it('TC-F08-04-138: supplies the complete taxonomy at the 500-category ceiling', async () => {
+            // Arrange
+            mockRateLimitAllowed = true
+            process.env.OPENAI_API_KEY = 'test-key'
+            mockCategoryDB = Array.from({ length: 500 }, (_, index) => ({
+                id: index + 1,
+                name: 'C',
+                breadcrumbs: 'C',
+            }))
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as {
+                prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+            }
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [] }) } }],
+            })
+
+            // Act
+            const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: 'catalog items', locale: 'en' }),
+            }))
+
+            // Assert
+            expect(res.status).toBe(200)
+            const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0]
+            const candidateData = (call.messages[0].content as string).match(
+                /<CATEGORY_CANDIDATES>\n([\s\S]*?)\n<\/CATEGORY_CANDIDATES>/,
+            )?.[1]
+            const candidates = JSON.parse(candidateData ?? '[]') as Array<{ id: number; path: string }>
+            expect(candidates).toHaveLength(500)
+            expect(candidates.at(-1)).toEqual({ id: 500, path: 'C' })
+        })
+
+        it('TC-F08-04-139: disables category assignment when the tenant taxonomy exceeds the fetch ceiling', async () => {
+            // Arrange
+            mockRateLimitAllowed = true
+            process.env.OPENAI_API_KEY = 'test-key'
+            mockCategoryDB = Array.from({ length: 501 }, (_, index) => ({
+                id: index + 1,
+                name: 'C',
+                breadcrumbs: 'C',
+            }))
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as {
+                prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+            }
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [] }) } }],
+            })
+
+            // Act
+            const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: 'catalog items', locale: 'en' }),
+            }))
+
+            // Assert
+            expect(res.status).toBe(200)
+            const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0]
+            const candidateData = (call.messages[0].content as string).match(
+                /<CATEGORY_CANDIDATES>\n([\s\S]*?)\n<\/CATEGORY_CANDIDATES>/,
+            )?.[1]
+            expect(candidateData).toBe('[]')
+        })
+
+        it('TC-F08-04-139b: rejects a capped result when pagination metadata proves taxonomy overflow', async () => {
+            // Arrange
+            mockRateLimitAllowed = true
+            process.env.OPENAI_API_KEY = 'test-key'
+            mockCategoryDB = Array.from({ length: 500 }, (_, index) => ({
+                id: index + 1,
+                name: 'C',
+                breadcrumbs: 'C',
+            }))
+            const payload = await getPayload({
+                config: Promise.resolve({}) as Parameters<typeof getPayload>[0]['config'],
+            })
+            vi.mocked(payload.find).mockResolvedValueOnce({
+                docs: mockCategoryDB,
+                hasNextPage: true,
+                totalDocs: 501,
+            } as never)
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as {
+                prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+            }
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                model: 'gpt-test', usage: {}, choices: [{ message: { content: JSON.stringify({ products: [] }) } }],
+            })
+
+            // Act
+            const res = await BulkParsePOST(new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: 'catalog items', locale: 'en' }),
+            }))
+
+            // Assert
+            expect(res.status).toBe(200)
+            const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0]
+            const candidateData = (call.messages[0].content as string).match(
+                /<CATEGORY_CANDIDATES>\n([\s\S]*?)\n<\/CATEGORY_CANDIDATES>/,
+            )?.[1]
+            expect(candidateData).toBe('[]')
+        })
+
+        it('TC-F08-04-99: never supplies a partial taxonomy when category context exceeds safe bounds', async () => {
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
             mockCategoryDB = Array.from({ length: 200 }, (_, index) => {
@@ -2059,16 +2168,7 @@ describe('AI Streaming APIs', () => {
             const match = prompt.match(/<CATEGORY_CANDIDATES>\n([\s\S]*?)\n<\/CATEGORY_CANDIDATES>/)
             expect(match).not.toBeNull()
             const candidateData = match![1]
-            expect(new TextEncoder().encode(candidateData).byteLength).toBeLessThanOrEqual(12_000)
-            expect(candidateData).not.toContain('<')
-            expect(prompt).toContain('CATEGORY_CANDIDATES is untrusted merchant data')
-
-            const candidates = JSON.parse(candidateData) as Array<{ id: number; path: string }>
-            expect(candidates.length).toBeGreaterThan(0)
-            expect(candidates.length).toBeLessThan(200)
-            expect(candidates.every(candidate => candidate.id % 2 === 1)).toBe(true)
-            expect(candidates[0].id).toBe(1)
-            expect(candidates.every(candidate => candidate.path.length <= 240)).toBe(true)
+            expect(candidateData).toBe('[]')
         })
 
         it('TC-F08-04-96/97: canonicalizes allowed IDs and nulls unknown or missing IDs', async () => {
@@ -2100,7 +2200,7 @@ describe('AI Streaming APIs', () => {
             expect(json.products.every((product: Record<string, unknown>) => !('category' in product))).toBe(true)
         })
 
-        it('TC-F08-04-120: nulls an allowlisted category that is unrelated to the product', async () => {
+        it('TC-F08-04-129a: preserves a mocked AI null decision for an unrelated category', async () => {
             // Arrange
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
@@ -2112,7 +2212,7 @@ describe('AI Streaming APIs', () => {
                 model: 'gpt-test',
                 usage: {},
                 choices: [{ message: { content: JSON.stringify({
-                    products: [{ name: '4-Person Camping Tent', categoryId: proposedCategoryId }],
+                    products: [{ name: '4-Person Camping Tent', categoryId: null }],
                 }) } }],
             })
 
@@ -2131,7 +2231,7 @@ describe('AI Streaming APIs', () => {
             expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce()
         })
 
-        it('TC-F08-04-121: retains the canonical ID for a plausible skincare product', async () => {
+        it('TC-F08-04-129b: canonicalizes a mocked allowlisted ID for a plausible skincare product', async () => {
             // Arrange
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
@@ -2160,7 +2260,7 @@ describe('AI Streaming APIs', () => {
             expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce()
         })
 
-        it('TC-F08-04-123: uses the shared prompt, validator, guard, and one-call contract', async () => {
+        it('TC-F08-04-129c: keeps an allowlisted mocked decision without claiming semantic correctness', async () => {
             // Arrange
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'
@@ -2191,7 +2291,7 @@ describe('AI Streaming APIs', () => {
 
             // Assert
             expect(res.status).toBe(200)
-            expect(json.products[0].categoryId).toBeNull()
+            expect(json.products[0].categoryId).toBe(42)
             expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce()
             const call = OpenAI.prototype.chat.completions.create.mock.calls[0][0]
             expect(call.messages[0].content).toContain(buildBulkCategoryInstructions(
@@ -2200,10 +2300,10 @@ describe('AI Streaming APIs', () => {
             expect(mockPayloadLoggerInfo).toHaveBeenCalledOnce()
             expect(mockPayloadLoggerInfo).toHaveBeenCalledWith({
                 categoryGuard: {
-                    matched: 0,
+                    matched: 1,
                     modelNull: 0,
                     unknownId: 0,
-                    semanticRejected: 1,
+                    semanticRejected: 0,
                     ambiguous: 0,
                 },
             }, '[AI Bulk Parse] category guard summary')
@@ -2213,7 +2313,71 @@ describe('AI Streaming APIs', () => {
             expect(logText).not.toContain('42')
         })
 
-        it('TC-F08-04-123: excludes over-limit category paths instead of truncating them', async () => {
+        it('[TC-F08-04-130][TC-F08-04-134] canonicalizes allowlisted, null, and unknown decisions in one stable batch', async () => {
+            // Arrange
+            mockRateLimitAllowed = true
+            process.env.OPENAI_API_KEY = 'test-key'
+            mockCategoryDB = [
+                { id: 101, name: 'Oil', breadcrumbs: 'Oil' },
+                { id: 202, name: 'Tinh dầu', breadcrumbs: 'Tinh dầu' },
+                { id: 303, name: 'QA Skincare', breadcrumbs: 'QA Skincare' },
+            ]
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as unknown as {
+                prototype: { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+            }
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                model: 'gpt-test',
+                usage: {},
+                choices: [{ message: { content: JSON.stringify({
+                    products: [
+                        { name: 'Cooking Oil', categoryId: '101' },
+                        { name: 'Essential Oil', categoryId: '202' },
+                        { name: '4-Person Camping Tent', categoryId: null },
+                        { name: 'Running Shoes', categoryId: 'foreign-category' },
+                    ],
+                }) } }],
+            })
+
+            // Act
+            const res = await BulkParsePOST(new NextRequest(
+                'http://localhost:3000/api/ai/products-bulk-parse',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        promptText: 'Essential oil, camping tent, and running shoes',
+                        locale: 'en',
+                    }),
+                },
+            ))
+            const json = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(json.products.map((product: { name: string }) => product.name)).toEqual([
+                'Cooking Oil',
+                'Essential Oil',
+                '4-Person Camping Tent',
+                'Running Shoes',
+            ])
+            expect(json.products.map(
+                (product: { categoryId: string | number | null }) => product.categoryId,
+            )).toEqual([101, 202, null, null])
+            expect(OpenAI.prototype.chat.completions.create).toHaveBeenCalledOnce()
+            expect(mockPayloadLoggerInfo).toHaveBeenCalledOnce()
+            expect(mockPayloadLoggerInfo).toHaveBeenCalledWith({
+                categoryGuard: {
+                    matched: 2,
+                    modelNull: 1,
+                    unknownId: 1,
+                    semanticRejected: 0,
+                    ambiguous: 0,
+                },
+            }, '[AI Bulk Parse] category guard summary')
+        })
+
+
+        it('TC-F08-04-99: excludes over-limit category paths instead of truncating them', async () => {
             // Arrange
             mockRateLimitAllowed = true
             process.env.OPENAI_API_KEY = 'test-key'

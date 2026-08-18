@@ -26,8 +26,8 @@ const BulkParseRequestSchema = z.object({
     locale: z.enum(['en', 'ms']).optional().default('en'),
 })
 
-const CATEGORY_CANDIDATE_LIMIT = 200
 const CATEGORY_CONTEXT_MAX_BYTES = 12_000
+const CATEGORY_FETCH_LIMIT = 500
 
 type MerchantLocale = 'en' | 'ms' | 'vi'
 
@@ -229,19 +229,39 @@ export const POST = withAuth(async (user, req) => {
                 and: [{ tenant: { equals: tenantId } }, { deletedAt: { exists: false } }],
             },
             depth: 0,
-            limit: CATEGORY_CANDIDATE_LIMIT,
+            limit: CATEGORY_FETCH_LIMIT + 1,
             sort: ['breadcrumbs', 'id'],
-            select: { name: true, breadcrumbs: true },
+            select: { name: true, breadcrumbs: true, parent: true },
         })
+        let categoryContextComplete = categoryResult.docs.length <= CATEGORY_FETCH_LIMIT
+            && categoryResult.hasNextPage !== true
+            && (
+                typeof categoryResult.totalDocs !== 'number'
+                || categoryResult.totalDocs <= CATEGORY_FETCH_LIMIT
+            )
+        const categoryDocs = categoryContextComplete ? categoryResult.docs : []
+        const parentCategoryIds = new Set(
+            categoryDocs.flatMap(category => {
+                const parent = category.parent
+                const parentId = typeof parent === 'object' && parent !== null && 'id' in parent ? parent.id : parent
+                return parentId == null ? [] : [String(parentId)]
+            }),
+        )
+        const selectableCategoryDocs = categoryDocs.filter(
+            category => !parentCategoryIds.has(String(category.id)),
+        )
         const categoryCandidates: BulkCategoryCandidate[] = []
         const serializedCategoryCandidates: string[] = []
         const encoder = new TextEncoder()
         let categoryContextBytes = 2 // opening + closing JSON brackets
 
-        for (const category of categoryResult.docs) {
+        for (const category of selectableCategoryDocs) {
             const breadcrumbs = typeof category.breadcrumbs === 'string' ? category.breadcrumbs.trim() : ''
             const path = String(breadcrumbs || category.name || '').trim()
-            if (path.length > BULK_CATEGORY_PATH_MAX_CHARS) continue
+            if (path.length > BULK_CATEGORY_PATH_MAX_CHARS) {
+                categoryContextComplete = false
+                break
+            }
             const serialized = JSON.stringify({
                 id: category.id,
                 path,
@@ -250,11 +270,18 @@ export const POST = withAuth(async (user, req) => {
                 .replace(/>/g, '\\u003e')
             const serializedBytes = encoder.encode(serialized).byteLength
             const separatorBytes = serializedCategoryCandidates.length > 0 ? 1 : 0
-            if (categoryContextBytes + separatorBytes + serializedBytes > CATEGORY_CONTEXT_MAX_BYTES) break
+            if (categoryContextBytes + separatorBytes + serializedBytes > CATEGORY_CONTEXT_MAX_BYTES) {
+                categoryContextComplete = false
+                break
+            }
 
             serializedCategoryCandidates.push(serialized)
             categoryContextBytes += separatorBytes + serializedBytes
             categoryCandidates.push({ id: category.id, path })
+        }
+        if (!categoryContextComplete) {
+            serializedCategoryCandidates.length = 0
+            categoryCandidates.length = 0
         }
         const categoryCandidateData = `[${serializedCategoryCandidates.join(',')}]`
 

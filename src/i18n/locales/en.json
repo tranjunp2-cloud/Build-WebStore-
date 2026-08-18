@@ -1966,6 +1966,8 @@
         "rateLimitExceeded": "You've used all your AI generation attempts this hour. Try again in {minutes} min.",
         "noCategoriesTitle": "Create a category before generating AI drafts",
         "noCategoriesDescription": "AI products need an existing category. Add one, then try again.",
+        "tooManyCategoriesTitle": "Too many categories for AI draft review",
+        "tooManyCategoriesDescription": "AI draft review supports up to {count} active categories. Reduce the number of active categories, then try again.",
         "manageCategories": "Manage Categories",
         "previewTitle": "Preview (AI processed)",
         "previewSubtitle": "Products without an image will use a default box icon when saved.",

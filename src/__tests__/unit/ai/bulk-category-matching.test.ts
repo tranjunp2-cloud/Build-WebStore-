@@ -7,7 +7,24 @@ import {
     type BulkCategoryCandidate,
 } from '@/lib/ai/bulk-category-matching'
 
-describe('[TC-F08-04-122] fail-closed bulk category canonicalizer', () => {
+describe('[TC-F08-04-128][TC-F08-04-133] tenant allowlist bulk category canonicalizer', () => {
+    it('publishes the AI-authoritative allowlist contract in fixture v7', () => {
+        // Arrange
+        const expectedGuardRules = [
+            'preserve a model-proposed id only when it canonicalizes to a supplied tenant candidate id',
+            'preserve model null without server-side semantic inference',
+            'reject unknown ids without falling back to another candidate',
+            'never reinterpret category semantics from the generated product name',
+        ]
+
+        // Act
+        const guardRules = fixture.contract.guardRules
+
+        // Assert
+        expect(fixture.version).toBe(7)
+        expect(guardRules).toEqual(expectedGuardRules)
+    })
+
     it.each(fixture.cases)('$id', testCase => {
         // Arrange
         const candidates: BulkCategoryCandidate[] = testCase.candidates
@@ -26,7 +43,7 @@ describe('[TC-F08-04-122] fail-closed bulk category canonicalizer', () => {
         })
     })
 
-    it('keeps exact character and token boundaries valid', () => {
+    it('does not reinterpret bounded or unusual product names after AI selected an allowlisted id', () => {
         // Arrange
         const exactCharProduct = `${'-'.repeat(115)}Shoes`
         const exactCharPath = `${'P'.repeat(232)} > Shoes`
@@ -53,7 +70,7 @@ describe('[TC-F08-04-122] fail-closed bulk category canonicalizer', () => {
     })
 })
 
-describe('[TC-F08-04-123] shared bulk category prompt and validator', () => {
+describe('[TC-F08-04-129] shared bulk category prompt and validator', () => {
     it('makes assignment optional and includes positive and negative controls', () => {
         // Arrange
         const candidates = '[{"id":42,"path":"QA Skincare"}]'
@@ -65,6 +82,15 @@ describe('[TC-F08-04-123] shared bulk category prompt and validator', () => {
         expect(instructions).toContain('Category assignment is optional')
         expect(instructions).toContain('Never select a category merely because it is the only candidate')
         expect(instructions).toContain('Vitamin C Skin Serum')
+        expect(instructions).toContain('Cooking Oil')
+        expect(instructions).toContain('use generic "Oil" only when no more specific candidate exists')
+        expect(instructions).toContain('Classify each product independently')
+        expect(instructions).toContain('primary sellable item')
+        expect(instructions).toContain('Exact product-type precedence')
+        expect(instructions).toContain('"Hair Oil"')
+        expect(instructions).toContain('must not use "QA Skincare"')
+        expect(instructions).toContain('final semantic self-check')
+        expect(instructions).toContain('Oil Painting')
         expect(instructions).toContain('4-Person Camping Tent')
         expect(instructions).toContain(candidates)
     })

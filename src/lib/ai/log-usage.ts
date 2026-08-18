@@ -29,14 +29,13 @@
 import type { AITask } from './config'
 import type { Payload } from 'payload'
 
-// Per-1M-token pricing used to estimate cost. Sourced from
-// plans/260414-0914-ai-model-optimization/research/researcher-01-openai-models-2026.md
-// Updated whenever we add a new model to config.ts.
+// Per-1M-token pricing used to estimate cost. Verify against the official
+// model pricing whenever a model is added to config.ts or its price changes.
 const PRICING_PER_1M: Record<string, { input: number; output: number }> = {
     'gpt-4o':           { input: 2.50, output: 10.00 },
     'gpt-4o-mini':      { input: 0.15, output: 0.60 },
     'gpt-4.1':          { input: 2.00, output: 8.00 },
-    'gpt-4.1-mini':     { input: 0.20, output: 0.80 },
+    'gpt-4.1-mini':     { input: 0.40, output: 1.60 },
     'gpt-4.1-nano':     { input: 0.05, output: 0.20 },
     'gpt-5.4-mini':     { input: 0.75, output: 4.50 },
 }

@@ -74,8 +74,8 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
         expect(selectModel('product-description')).toBe('gpt-4.1-nano')
     })
 
-    it('returns gpt-4.1-nano for bulk-parse (phase-04: 50x cheaper for CSV extraction)', () => {
-        expect(selectModel('bulk-parse')).toBe('gpt-4.1-nano')
+    it('returns gpt-4.1-mini for bulk-parse semantic category instruction-following', () => {
+        expect(selectModel('bulk-parse')).toBe('gpt-4.1-mini')
     })
 
     it('returns gpt-4.1-nano for url-extraction (phase-04)', () => {

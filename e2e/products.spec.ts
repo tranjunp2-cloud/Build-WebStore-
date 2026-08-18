@@ -266,6 +266,38 @@ async function readProductFixtures(page: Page, names: string[]): Promise<Product
     return (body.data ?? []).filter(product => names.includes(product.name))
 }
 
+async function focusFirstSelectableCategoryLeaf(page: Page, trigger: Locator) {
+    await trigger.press('ArrowDown')
+    const tree = page.locator('[role="tree"]:visible')
+    await expect(tree, 'CategorySelect did not open a single visible category tree.').toHaveCount(1)
+
+    for (let depth = 0; depth < 3; depth++) {
+        const focusedItem = tree.locator('[role="treeitem"]:focus')
+        await expect(
+            focusedItem,
+            `CategorySelect did not focus a tree item at depth ${depth + 1}.`,
+        ).toBeVisible()
+
+        if (await focusedItem.getAttribute('aria-expanded') === null) {
+            const id = await focusedItem.getAttribute('data-category-id')
+            const label = (await focusedItem.innerText()).trim()
+            expect(id, 'Selectable category leaf is missing data-category-id.').toBeTruthy()
+            expect(label, 'Selectable category leaf is missing its visible label.').toBeTruthy()
+            return { id: id as string, label }
+        }
+
+        const parentId = await focusedItem.getAttribute('data-category-id')
+        expect(parentId, 'Expandable category is missing data-category-id.').toBeTruthy()
+        await focusedItem.press('ArrowRight')
+        await expect(tree.locator('[role="treeitem"]:focus')).not.toHaveAttribute(
+            'data-category-id',
+            parentId,
+        )
+    }
+
+    throw new Error('CategorySelect did not expose a selectable leaf within its supported three levels.')
+}
+
 test.describe('GH-1733 — verified AI Product persistence on staging', () => {
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const fixtureCategoryName = 'E2E AI Products'
@@ -473,7 +505,7 @@ test.describe('GH-1588 Bug 1 — fail-closed unmatched AI category', () => {
         }
     })
 
-    test('[TC-F08-04-125] real bulk-parse route keeps the reported negative control uncategorized', async ({ page }) => {
+    test('[TC-F08-04-131] real bulk-parse route uses the Skincare candidate only for the matching product', async ({ page }) => {
         test.setTimeout(120_000)
 
         await page.addInitScript(() => {
@@ -481,6 +513,23 @@ test.describe('GH-1588 Bug 1 — fail-closed unmatched AI category', () => {
             document.cookie = 'prefer_lang=en; path=/; samesite=lax'
         })
         liveCategoryCreated = await ensureCategoryViaUi(page, liveCategoryName)
+        await navigateTo(page, '/products/new')
+        await expectNoServerError(page)
+        const productCategory = page.locator('#product-category-select')
+        await productCategory.press('ArrowDown')
+        const liveCategoryItem = page.locator('[role="tree"]:visible').getByRole(
+            'treeitem',
+            { name: liveCategoryName, exact: true },
+        )
+        await expect(liveCategoryItem).toBeVisible()
+        expect(
+            await liveCategoryItem.getAttribute('aria-expanded'),
+            'QA Skincare fixture must remain a selectable leaf.',
+        ).toBeNull()
+        const liveCategoryId = await liveCategoryItem.getAttribute('data-category-id')
+        expect(liveCategoryId, 'QA Skincare leaf is missing data-category-id.').toBeTruthy()
+        await liveCategoryItem.press('Escape')
+
         await navigateTo(page, '/products')
         await expectNoServerError(page)
 
@@ -493,26 +542,117 @@ test.describe('GH-1588 Bug 1 — fail-closed unmatched AI category', () => {
         )
 
         await aiChatTextarea.fill(
-            'Create exactly one draft product named "4-Person Camping Tent" with price RM 100.',
+            'Create exactly two draft products in this order: one named "QA Skincare" with price RM 50, then one named "4-Person Camping Tent" with price RM 100.',
         )
         await aiChatTextarea.press('Enter')
         const parseResponse = await parseResponsePromise
         const body = await parseResponse.json() as {
-            products?: Array<{ categoryId?: string | number | null }>
+            products?: Array<{ name?: string; categoryId?: string | number | null }>
         }
 
         expect(parseResponse.ok()).toBe(true)
-        expect(body.products).toHaveLength(1)
-        expect(body.products?.[0]?.categoryId).toBeNull()
+        expect(body.products).toHaveLength(2)
+        expect(body.products?.[0]?.name).toBe('QA Skincare')
+        expect(body.products?.[0]).toHaveProperty('categoryId')
+        expect(String(body.products?.[0]?.categoryId)).toBe(liveCategoryId)
+        expect(body.products?.[1]?.name).toBe('4-Person Camping Tent')
+        expect(body.products?.[1]).toHaveProperty('categoryId')
+        expect(String(body.products?.[1]?.categoryId)).not.toBe(liveCategoryId)
 
         const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
         await expect(reviewHeading).toBeVisible()
         const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
-        const categorySelect = reviewOverlay.getByTestId('ai-category-select-1')
-        await expect(categorySelect.getByRole('combobox')).toContainText('Select categories')
-        await expect(reviewOverlay.getByText(/pick at least one category|at least one category must be selected/i)).toBeVisible()
-        await expect(reviewOverlay.getByRole('button', { name: /approve all/i })).toBeDisabled()
+        const matchedCategory = reviewOverlay.getByRole('combobox', {
+            name: /Category for QA Skincare, draft 1/i,
+        })
+        const tentCategory = reviewOverlay.getByRole('combobox', {
+            name: /Category for 4-Person Camping Tent, draft 2/i,
+        })
+        await expect(matchedCategory).toContainText(liveCategoryName)
+        await expect(tentCategory).not.toContainText(liveCategoryName)
 
+        await reviewOverlay.getByRole('button', { name: /discard/i }).click()
+        await expect(reviewHeading).toBeHidden()
+    })
+
+    test('[TC-F08-04-136] mixed AI review preserves a matched category and blocks an unmatched draft', async ({ page }) => {
+        test.setTimeout(90_000)
+
+        // Arrange — discover a selectable tenant category through the real Product form.
+        await page.addInitScript(() => {
+            localStorage.setItem('prefer_lang', 'en')
+            document.cookie = 'prefer_lang=en; path=/; samesite=lax'
+        })
+        await navigateTo(page, '/products/new')
+        await expectNoServerError(page)
+        const fixtureCategory = await focusFirstSelectableCategoryLeaf(
+            page,
+            page.locator('#product-category-select'),
+        )
+
+        await page.route('**/api/ai/products-bulk-parse', async route => {
+            if (route.request().method() !== 'POST') {
+                await route.continue()
+                return
+            }
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    generationId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+                    products: [
+                        {
+                            name: 'Essential Oil',
+                            price: 35,
+                            sku: 'TC136-OIL',
+                            categoryId: fixtureCategory.id,
+                            variants: [],
+                        },
+                        {
+                            name: 'Camping Tent',
+                            price: 100,
+                            sku: 'TC136-TENT',
+                            categoryId: null,
+                            variants: [],
+                        },
+                    ],
+                }),
+            })
+        })
+        await navigateTo(page, '/products')
+        await expectNoServerError(page)
+        const prompt = page.locator('textarea').first()
+        await expect(prompt).toBeVisible({ timeout: 10_000 })
+
+        // Act
+        await prompt.fill('Create one essential oil and one camping tent.')
+        await prompt.press('Enter')
+
+        // Assert — only the unmatched draft blocks the initial batch.
+        const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts' })
+        await expect(reviewHeading).toBeVisible()
+        const reviewOverlay = page.locator('.fixed.inset-0').filter({ has: reviewHeading })
+        const matchedCategory = reviewOverlay.getByTestId('ai-category-select-1')
+            .getByRole('combobox', { name: /Category for Essential Oil, draft 1/i })
+        const unmatchedCategory = reviewOverlay.getByTestId('ai-category-select-2')
+            .getByRole('combobox', { name: /Category for Camping Tent, draft 2/i })
+        const approveButton = reviewOverlay.getByRole('button', { name: /approve all/i })
+        await expect(matchedCategory).toContainText(fixtureCategory.label)
+        await expect(unmatchedCategory).toContainText('Select categories')
+        await expect(unmatchedCategory).toHaveAttribute('aria-invalid', 'true')
+        await expect(reviewOverlay.getByText(
+            /pick at least one category|at least one category must be selected/i,
+        )).toBeVisible()
+        await expect(approveButton).toBeDisabled()
+
+        // Act — resolve only the unmatched draft with a selectable leaf from the modal taxonomy.
+        const reviewCategory = await focusFirstSelectableCategoryLeaf(page, unmatchedCategory)
+        await page.locator('[role="tree"]:visible').locator('[role="treeitem"]:focus').press('Enter')
+
+        // Assert — the existing matched selection remains stable and no Product is saved.
+        await expect(matchedCategory).toContainText(fixtureCategory.label)
+        await expect(unmatchedCategory).toContainText(reviewCategory.label)
+        await expect(approveButton).toBeEnabled()
         await reviewOverlay.getByRole('button', { name: /discard/i }).click()
         await expect(reviewHeading).toBeHidden()
     })

@@ -1,17 +1,28 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F08 - Products CRUD
-> **Phiên bản:** 9.7 | **Cập nhật:** 2026-08-06 (merge staging + GH-1588 fail-closed guard) | **Thực hiện:** QA Team
-
-> **Phiên bản:** 9.7 | **Cập nhật:** 2026-08-06 (merge staging + GH-1588 fail-closed guard) | **Thực hiện:** QA Team
+> **Phiên bản:** 9.9 | **Cập nhật:** 2026-08-18 (GH-1588 AI-authoritative category assignment) | **Thực hiện:** QA Team
 
 ### GH-1588 Bug 1 addendum
-- The staging merge reserves TC-F08-04-120..127 for GH-1733. GH-1588 implementation labels remain TC120..125 in source/plan; this addendum uses the next free QA IDs to avoid overwriting staging evidence.
-- **TC-F08-04-128** (Unit): production canonicalizer passes the versioned exact-set fail-closed matrix, including tent/skincare negative and serum/skincare positive controls.
-- **TC-F08-04-129** (API): production prompt, validator, allowlist, and canonicalizer use the shared seam with one model call; unrelated/unknown/ambiguous IDs become null.
-- **TC-F08-04-130** (API): canonical numeric/string IDs and reason-count privacy logging remain valid after the staging merge.
-- **TC-F08-04-131** (Playwright/Live): real bulk-parse route keeps `4-Person Camping Tent` uncategorized and disables Approve All; debounce-safe category fixture cleanup is included.
-- **TC-F08-04-132** (Manual/Staging): tent/skincare negative and serum/skincare positive controls remain the external QA gate.
+- The staging merge reserves TC-F08-04-120..127 for GH-1733. GH-1588 addenda use TC128 onward to avoid overwriting staging evidence.
+- **TC-F08-04-128** (Unit/AUTO) [x]: fixture v7 executes the production allowlist guard. Valid tenant IDs are canonicalized without product-name reinterpretation; model null remains null; unknown IDs are rejected.
+- **TC-F08-04-129a-c** (API/AUTO) [x]: mocked null pass-through, canonical allowlisted-ID pass-through, prompt/validator/query wiring, privacy-safe telemetry, and the one-call contract share the production seam. TC129c deliberately proves integrity-only behavior and is not evidence of semantic correctness; live semantics remain TC137.
+- **TC-F08-04-130** (API/AUTO) [x]: numeric/string IDs canonicalize and aggregate reason logs contain counts only.
+- **TC-F08-04-131** (Playwright/Live) [x]: one real provider-backed batch proves the provisioned `QA Skincare` leaf was supplied and selected for the exact matching product, while `4-Person Camping Tent` never receives that false-positive ID. Another semantically valid tenant category may be selected for Tent; deterministic unmatched blocking remains TC136.
+- **TC-F08-04-132** (Manual/Staging) [ ]: provider/model smoke repeats the tent/skincare negative and a valid positive before release.
+
+### GH-1588 final architecture addendum
+- **TC-F08-04-133** (Unit/AUTO) [x]: fixture v7 proves `Cooking Oil`, `Hair Oil`, and `Essential Oil` retain an AI-proposed allowlisted ID without server phrase exceptions; model null has no server recovery; unknown IDs fail closed.
+- **TC-F08-04-134** (API/AUTO) [x]: one mixed response preserves stable order and exact totals `{ matched: 2, modelNull: 1, unknownId: 1, semanticRejected: 0, ambiguous: 0 }` with one model call and one privacy-safe aggregate log.
+- **TC-F08-04-135** (Component/AUTO) [x]: one matched and one null draft keeps only the matched category preselected, displays one inline warning, and disables Approve All until the null draft is resolved.
+- **TC-F08-04-136** (Playwright/AUTO) [x]: authenticated automation discovers a valid matched leaf, independently selects a valid modal leaf for the unmatched draft, verifies disabled-to-enabled without assuming identical ordering across category loaders, then discards before save. Fresh run passed 2026-08-18.
+- **TC-F08-04-137** (Manual/Staging) [ ]: local provider-backed A/B on 2026-08-18 rejected `gpt-4.1-nano`; the final `gpt-4.1-mini` seven-product pre-gate passed Essential->Tinh dầu, Cooking/Hair->Oil, and null negatives for Painting/Diffuser/Guide/Tent with all fixtures cleaned. Repeat against deployed staging before checking this gate.
+- **TC-F08-04-94/99** (API/AUTO) [x]: query at most 501 active categories and supply only selectable leaves; if any path or the total serialized context exceeds bounds, supply no category candidates rather than a partial taxonomy.
+- **TC-F08-04-138** (API/AUTO) [x]: exactly 500 bounded active categories are supplied completely to the model.
+- **TC-F08-04-139/139b** (API/AUTO) [x]: 501 active categories, or pagination metadata proving overflow despite a capped 500-row result, supply an empty parser candidate set.
+- **TC-F08-04-140/141** (Unit/AUTO) [x]: AI review loads a complete taxonomy through the supported 1,000-category ceiling and returns typed overflow at 1,001 without exposing partial options.
+- **TC-F08-04-142** (Component/AUTO) [x]: review overflow keeps the prompt, re-enables Generate, shows localized guidance, and never opens the modal.
 
 ### Changelog
+- **v9.9 (2026-08-18)** — GH-1588 adopts AI-authoritative category selection from the complete bounded selectable-leaf taxonomy. Backend canonicalizes tenant-allowlisted IDs only; prompt classification is independent per product with exact product-type precedence; the default bulk model is `gpt-4.1-mini` after live A/B rejected nano. Parser boundary TC138/139 and review-loader boundary TC140–142 prevent partial taxonomy exposure; deployed-staging TC137 remains open.
 - **v9.2 (2026-07-29)** — Bổ sung regression GH-1588 Scope 02: AI parser chỉ dùng active category của tenant; null/stale bắt buộc chọn category hiện có; không auto-create; ID lookup reject malformed/dedupe canonical IDs; zero-category tenant bị chặn trước parse; partial save giữ modal/draft chưa lưu; prompt mới không bị completion cũ xóa; AI Server Action revalidate đúng một category và manual Product flow không đổi.
 - **v9.1 (2026-05-15)** — Thêm TC-F08.141..177 (37 TCs) phủ 37 gaps từ ck:scenario audit: (A) BR/FR contracts — BR-04 price=0, BR-06 stock=0, FR-07 required fields, FR-13 attributes max 20; (B) Data Validation Rules §7.5 boundary — name 120/121, compareAtPrice ==/>, SKU 50/51, weight 0/0.01/1001, dimensions 0/-1/10001, SEO title 70/71, SEO desc 160/161, URL slug regex + trim; (C) Variants + Attributes — max 2 tiers, 30 options, 900 variants, case-insensitive duplicates, attribute key 100; (D) Design/i18n — empty images placeholder, max 5 images, Bahasa Melayu unicode. **37/37 PASS**.
 - **v9.0 (2026-04-06)** — Initial 140 TCs across 8 groups (US-01..07 + US-831 storefront API + Global Dev-Killer + Blog Auto-Seed + GH-909 Regression).
@@ -24,7 +35,7 @@
 
 Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi ro xuyên suốt 7 User Stories chính của Product CRUD và Categories.
 
-**Tổng cộng 91 kịch bản chi tiết** bao phủ: Positive, Negative/Edge cases, UI States, Form Validation, Routing Navigation, Security (IDOR/XSS).
+Bộ registry lịch sử và các addendum bên trên bao phủ Positive, Negative/Edge cases, UI States, Form Validation, Routing Navigation, Security (IDOR/XSS).
 
 ---
 

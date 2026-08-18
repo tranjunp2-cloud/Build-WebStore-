@@ -116,8 +116,9 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
 
     it('TC-F08-04-104: keeps a newer prompt when the submitted AI session completes', async () => {
         const aiCategories = [{ id: 'primary', name: 'Primary tenant category' }]
-        let resolveCategories!: (value: typeof aiCategories) => void
-        const categoryRequest = new Promise<typeof aiCategories>(resolve => {
+        const aiCategoryResult = { status: 'ready' as const, categories: aiCategories }
+        let resolveCategories!: (value: typeof aiCategoryResult) => void
+        const categoryRequest = new Promise<typeof aiCategoryResult>(resolve => {
             resolveCategories = resolve
         })
         vi.mocked(getProductsAction).mockResolvedValue([
@@ -137,7 +138,7 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         expect(screen.queryByTestId('bulk-create-modal')).not.toBeInTheDocument()
 
         await act(async () => {
-            resolveCategories(aiCategories)
+            resolveCategories(aiCategoryResult)
             await categoryRequest
         })
 
@@ -167,7 +168,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
             category: [],
         }
         vi.mocked(getCategoriesAction).mockResolvedValue([excludedCategory] as never)
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([excludedCategory])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [excludedCategory],
+        })
         vi.mocked(getProductsAction)
             .mockResolvedValueOnce([
                 makeProduct('existing', 'Existing draft'),
@@ -232,7 +236,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         const refreshRequest = new Promise<never[]>(resolve => {
             resolveRefresh = resolve
         })
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([{ id: 123, name: 'Fashion' }])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [{ id: 123, name: 'Fashion' }],
+        })
         vi.mocked(getProductsAction)
             .mockResolvedValueOnce([
                 makeProduct('existing', 'Existing draft'),
@@ -264,7 +271,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
     })
 
     it('TC-F08-04-107: keeps the AI modal mounted when a background product refresh fails', async () => {
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([{ id: 123, name: 'Fashion' }])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [{ id: 123, name: 'Fashion' }],
+        })
         vi.mocked(getProductsAction)
             .mockResolvedValueOnce([])
             .mockRejectedValueOnce(new Error('refresh failed'))
@@ -292,7 +302,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         const retryRequest = new Promise<ProductsResult>(resolve => {
             resolveRetry = resolve
         })
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([{ id: 123, name: 'Fashion' }])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [{ id: 123, name: 'Fashion' }],
+        })
         vi.mocked(getProductsAction)
             .mockResolvedValueOnce([])
             .mockRejectedValueOnce(new Error('refresh failed'))
@@ -343,7 +356,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         const staleResult = [makeProduct('stale', 'Stale snapshot')] as unknown as ProductsResult
         const freshResult = [makeProduct('fresh', 'Fresh product')] as unknown as ProductsResult
 
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([{ id: 123, name: 'Fashion' }])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [{ id: 123, name: 'Fashion' }],
+        })
         vi.mocked(getProductsAction)
             .mockResolvedValueOnce([])
             .mockReturnValueOnce(partialRequest)
@@ -385,7 +401,10 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
     })
 
     it('TC-F08-04-106: blocks AI parsing and offers category management when no active category exists', async () => {
-        vi.mocked(getAiCategoriesAction).mockResolvedValue([])
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'ready',
+            categories: [],
+        })
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
@@ -409,5 +428,29 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         } | undefined
         toastOptions?.action?.onClick()
         expect(mockRouterPush).toHaveBeenCalledWith('/products/categories')
+    })
+
+    it('TC-F08-04-142: blocks AI review with explicit guidance when the category ceiling is exceeded', async () => {
+        vi.mocked(getAiCategoriesAction).mockResolvedValue({
+            status: 'overflow',
+            maxCategories: 987,
+        })
+        renderPage()
+
+        await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
+        const prompt = await waitFor(() => screen.getByPlaceholderText(/Leather jacket/))
+        fireEvent.change(prompt, { target: { value: 'prompt with oversized taxonomy' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Generate Drafts' }))
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+            'Too many categories for AI draft review',
+            expect.objectContaining({
+                description: 'AI draft review supports up to 987 active categories. Reduce the number of active categories, then try again.',
+                action: expect.objectContaining({ label: 'Manage Categories' }),
+            }),
+        ))
+        expect(screen.queryByTestId('bulk-create-modal')).not.toBeInTheDocument()
+        expect(prompt).toHaveValue('prompt with oversized taxonomy')
+        expect(screen.getByRole('button', { name: 'Generate Drafts' })).toBeEnabled()
     })
 })

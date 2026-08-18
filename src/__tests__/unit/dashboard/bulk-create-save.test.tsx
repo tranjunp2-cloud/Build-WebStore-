@@ -380,6 +380,41 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(mockSaveCategory).not.toHaveBeenCalled()
     })
 
+    it('TC-F08-04-135: keeps a matched draft selected while an unmatched draft blocks Approve', async () => {
+        // Arrange
+        const categories = [{ id: 'cat-oil', name: 'Oil' }]
+        await renderAndWaitForProducts([
+            { ...BASE_PRODUCT, name: 'Essential Oil', categoryId: 'cat-oil' },
+            { ...BASE_PRODUCT, name: 'Camping Tent', categoryId: null },
+        ], {}, categories)
+        const approve = screen.getByRole('button', { name: /approve/i })
+        const matchedCategory = screen.getByRole('combobox', {
+            name: 'Category for Essential Oil, draft 1',
+        })
+        const unmatchedCategory = screen.getByRole('combobox', {
+            name: 'Category for Camping Tent, draft 2',
+        })
+
+        // Assert — only the unmatched draft blocks the initial batch.
+        expect(approve).toBeDisabled()
+        expect(matchedCategory).toHaveValue('cat-oil')
+        expect(matchedCategory).not.toHaveAttribute('aria-invalid', 'true')
+        expect(unmatchedCategory).toHaveValue('')
+        expect(unmatchedCategory).toHaveAttribute('aria-invalid', 'true')
+        expect(screen.getByRole('alert')).toHaveAttribute('id', 'ai-category-error-2')
+        expect(mockSaveProduct).not.toHaveBeenCalled()
+
+        // Act
+        fireEvent.change(unmatchedCategory, { target: { value: 'cat-oil' } })
+
+        // Assert — merchant resolution enables approval without changing the matched draft.
+        expect(matchedCategory).toHaveValue('cat-oil')
+        expect(unmatchedCategory).toHaveValue('cat-oil')
+        expect(screen.queryAllByRole('alert')).toHaveLength(0)
+        await waitFor(() => expect(approve).not.toBeDisabled())
+        expect(mockSaveProduct).not.toHaveBeenCalled()
+    })
+
     it('[TC-F08-04-127] falls through a transient category preflight failure to the correlated authoritative save', async () => {
         // Arrange
         mockGetCategories.mockRejectedValue(new Error('category service unavailable'))

@@ -80,9 +80,9 @@ const DEFAULT_MODELS: Record<AITask, AIModel> = {
     'blog-seed':          'gpt-4.1-nano',
     'image-rating':       'gpt-5.4-mini',
     'url-extraction':     'gpt-4.1-nano',
-    // phase-04: hardcoded gpt-4o → gpt-4.1-nano for bulk product CSV parsing
-    // (structured extraction, low creativity, 50x cheaper)
-    'bulk-parse':         'gpt-4.1-nano',
+    // GH-1588: bulk parse now performs semantic tenant-category selection as well as extraction.
+    // Live A/B rejected nano because it ignored cross-product and product-type constraints.
+    'bulk-parse':         'gpt-4.1-mini',
 }
 
 /**
@@ -259,5 +259,5 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'blog-seed': 0.0026,           // nano, 1 seed call + 3 content calls per site gen
     'image-rating': 0.002,
     'url-extraction': 0.001,      // GPT-4o-mini, ~2.3K in + 500 out
-    'bulk-parse': 0.001,          // GPT-4o-mini, ~2K in + 1K out
+    'bulk-parse': 0.005,          // gpt-4.1-mini, bounded taxonomy + generated product batch
 }

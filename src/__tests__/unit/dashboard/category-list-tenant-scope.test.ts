@@ -73,12 +73,15 @@ describe('getCategoriesAction — tenant-scoped access (TC-F08-05-13)', () => {
             }],
         })
 
-        await expect(getAiCategoriesAction()).resolves.toEqual([{
-            id: 42,
-            name: 'Primary leaf',
-            breadcrumbs: 'Primary > Leaf',
-            parent: 7,
-        }])
+        await expect(getAiCategoriesAction()).resolves.toEqual({
+            status: 'ready',
+            categories: [{
+                id: 42,
+                name: 'Primary leaf',
+                breadcrumbs: 'Primary > Leaf',
+                parent: 7,
+            }],
+        })
 
         expect(mockFind).toHaveBeenCalledWith({
             collection: 'categories',
@@ -91,7 +94,7 @@ describe('getCategoriesAction — tenant-scoped access (TC-F08-05-13)', () => {
                 ],
             },
             depth: 0,
-            limit: 1000,
+            limit: 1001,
             sort: ['breadcrumbs', 'id'],
             select: {
                 name: true,
@@ -100,6 +103,63 @@ describe('getCategoriesAction — tenant-scoped access (TC-F08-05-13)', () => {
             },
         })
         expect(mockExecute).not.toHaveBeenCalled()
+    })
+
+    it('TC-F08-04-140: returns the complete AI review taxonomy at the supported 1,000-category ceiling', async () => {
+        const categories = Array.from({ length: 1000 }, (_, index) => ({
+            id: index + 1,
+            name: `Category ${index + 1}`,
+            breadcrumbs: `Category ${index + 1}`,
+            parent: null,
+        }))
+        mockFind.mockResolvedValueOnce({
+            docs: categories,
+            totalDocs: 1000,
+            hasNextPage: false,
+        })
+
+        await expect(getAiCategoriesAction()).resolves.toEqual({
+            status: 'ready',
+            categories,
+        })
+    })
+
+    it('TC-F08-04-141: rejects an oversized AI review taxonomy without exposing partial options', async () => {
+        mockFind.mockResolvedValueOnce({
+            docs: Array.from({ length: 1001 }, (_, index) => ({
+                id: index + 1,
+                name: `Category ${index + 1}`,
+                breadcrumbs: `Category ${index + 1}`,
+                parent: null,
+            })),
+            totalDocs: 1001,
+            hasNextPage: false,
+        })
+
+        await expect(getAiCategoriesAction()).resolves.toEqual({
+            status: 'overflow',
+            maxCategories: 1000,
+        })
+    })
+
+    it.each([
+        { hasNextPage: true, totalDocs: 1000 },
+        { hasNextPage: false, totalDocs: 1001 },
+    ])('TC-F08-04-141: rejects a capped result when pagination metadata proves overflow (%j)', async metadata => {
+        mockFind.mockResolvedValueOnce({
+            docs: Array.from({ length: 1000 }, (_, index) => ({
+                id: index + 1,
+                name: `Category ${index + 1}`,
+                breadcrumbs: `Category ${index + 1}`,
+                parent: null,
+            })),
+            ...metadata,
+        })
+
+        await expect(getAiCategoriesAction()).resolves.toEqual({
+            status: 'overflow',
+            maxCategories: 1000,
+        })
     })
 
     it('TC-F08-04-104: rejects AI category loading without a primary tenant', async () => {
