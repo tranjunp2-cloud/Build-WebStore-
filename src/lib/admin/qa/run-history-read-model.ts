@@ -13,7 +13,10 @@ type Db = { drizzle?: { execute: (query: unknown) => Promise<{ rows: UnifiedRunH
  */
 export async function getUnifiedRunHistory(payload: Payload, filters: UnifiedHistoryFilters, cursor?: UnifiedHistoryCursor): Promise<UnifiedRunHistoryRow[] | null> {
   const db = payload.db as unknown as Db | undefined;
-  if (!db?.drizzle) return null; // Unit tests exercise the Payload fallback route.
+  // Local `next dev` deliberately uses the Payload path: a developer can run
+  // against a database before migrations, while deployed builds always use
+  // the snapshot-stable SQL read model installed by db-setup.
+  if (process.env.NODE_ENV === "development" || !db?.drizzle) return null;
   const result = await db.drizzle.execute(sql`
     WITH dispatch_snapshot AS (
       SELECT DISTINCT ON (d.id) d.*, e.status AS event_status, e.occurred_at AS cursor_at

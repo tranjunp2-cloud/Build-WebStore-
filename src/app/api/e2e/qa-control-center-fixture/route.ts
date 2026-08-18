@@ -11,7 +11,13 @@ const TARGET_ID = "editor-productgrid-variants";
 const SUITE = "editor-product-grid-variants-smoke";
 const TEST_CASE_ID = "TC-F40-04-02";
 const IMPACT_TARGET_ID = "editor-publish-lifecycle";
+const MANUAL_CONTEXT_TARGET_ID = "editor-block-content";
 const MANUAL_CONTEXT_RUN = "local-f40-07-manual-context";
+// Impossible production-shaped context reserved exclusively for the local
+// E2E fixture. It makes cleanup safe even if a developer points localhost at
+// a shared database: real staging runs must never use this pair.
+const E2E_MANUAL_PULL_REQUEST = 999_999;
+const E2E_MANUAL_COMMIT_SHA = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 /**
  * Deterministic local-only test data for the browser contract of F40-04.
@@ -28,6 +34,55 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     );
 
   const payload = await getPayload({ config });
+  // Browser runs may be re-executed locally. Release only the dedicated
+  // Product Grid test dispatches before seeding so a previous E2E attempt
+  // cannot exhaust the real preflight capacity checks.
+  const staleDispatches = await payload.find({
+    collection: "qa_smoke_dispatches",
+    where: {
+      and: [
+        { targetId: { equals: TARGET_ID } },
+        { environment: { equals: "staging" } },
+        { requestedBy: { equals: user.id } },
+        { pullRequest: { equals: E2E_MANUAL_PULL_REQUEST } },
+        { commitSha: { equals: E2E_MANUAL_COMMIT_SHA } },
+        { status: { in: ["queued", "dispatched", "cancel_requested"] } },
+      ],
+    },
+    pagination: false,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const staleIds = staleDispatches.docs.map((dispatch) => String(dispatch.id));
+  await Promise.all(
+    staleIds.map((id) =>
+      payload.update({
+        collection: "qa_smoke_dispatches",
+        id,
+        data: { status: "cancelled", cancelledAt: new Date().toISOString() },
+        overrideAccess: true,
+      }),
+    ),
+  );
+  if (staleIds.length) {
+    const leases = await payload.find({
+      collection: "qa_fixture_leases",
+      where: { dispatch: { in: staleIds } },
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    });
+    await Promise.all(
+      leases.docs.map((lease) =>
+        payload.update({
+          collection: "qa_fixture_leases",
+          id: lease.id,
+          data: { status: "released", releasedAt: new Date().toISOString() },
+          overrideAccess: true,
+        }),
+      ),
+    );
+  }
   const workflowRunId = "local-f40-04-product-grid-failure";
   const existing = await payload.find({
     collection: "qa_test_runs",
@@ -79,13 +134,19 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
     workflowRunId: MANUAL_CONTEXT_RUN,
     attempt: 1,
     ingestDigest: "local-f40-07-manual-context-v1",
-    targetId: TARGET_ID,
+    // Keep the Staging-context record separate from both Inbox fixtures: a
+    // passing context must not hide the failed Product Grid or the untested
+    // Page Publish deploy impact that this fixture intentionally verifies.
+    targetId: MANUAL_CONTEXT_TARGET_ID,
     suite: SUITE,
     profile: "manual-smoke",
     environment: "staging" as const,
     status: "passed" as const,
-    pullRequest: 1746,
-    commitSha: "abcdef1",
+    pullRequest: E2E_MANUAL_PULL_REQUEST,
+    // The dedicated fixture pair is intentionally not a deploy identifier.
+    // The local preflight resolver accepts its seeded staging record; deployed
+    // environments cannot call this development-only route.
+    commitSha: E2E_MANUAL_COMMIT_SHA,
     startedAt: now,
     finishedAt: now,
     summary: { passed: 1, failed: 0, skipped: 0, blocked: 0 },
@@ -241,6 +302,10 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { user }) => {
       resultId: result.id,
       snapshotId: snapshot.id,
       findingId: finding.id,
+      manualContext: {
+        pullRequest: manualContextData.pullRequest,
+        commitSha: manualContextData.commitSha,
+      },
     },
   });
 });

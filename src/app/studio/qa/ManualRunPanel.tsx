@@ -1,286 +1,1469 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 type Target = { id: string; name: string; domain: string };
 type Profile = "smoke" | "regression";
 type Preflight = {
   canDispatch: boolean;
   reasons: Array<{ code: string; recovery: string }>;
+  availableProfiles: Record<Profile, boolean>;
   environment: string;
-  context?: { pullRequest: number; commitSha: string };
   pack?: {
-    id: string; version: number; testType: string; testCases: Array<{ id: string }>;
-    prerequisites: readonly string[]; fixtureKey: string; estimatedDurationMinutes: number; manualChecklistCount: number;
+    id: string;
+    version: number;
+    testType: string;
+    testCases: Array<{ id: string }>;
+    prerequisites: readonly string[];
+    fixtureKey: string;
+    estimatedDurationMinutes: number;
+    manualChecklistCount: number;
   };
 };
 type HistoryItem = {
-  id: string; targetId: string; packId?: string; profile: string; status: string;
-  pullRequest?: number; commitSha?: string; evidenceState: string; canCancel?: boolean;
-  startedAt?: string; finishedAt?: string; summary?: unknown;
+  id: string;
+  targetId: string;
+  packId?: string;
+  profile: string;
+  status: string;
+  pullRequest?: number;
+  commitSha?: string;
+  evidenceState: string;
+  canCancel?: boolean;
+  startedAt?: string;
+  finishedAt?: string;
+  summary?: unknown;
 };
-type HistoryResponse = {
-  data?: HistoryItem[]; active?: HistoryItem[]; completed?: HistoryItem[];
-  meta?: { nextCursor?: string }; completedMeta?: { nextPage?: number }; dispatchMeta?: { nextPage?: number };
+type Filters = {
+  status: string;
+  profile: string;
+  pullRequest: string;
+  commitSha: string;
+  packId: string;
+  testCaseId: string;
 };
-type Filters = { status: string; profile: string; pullRequest: string; commitSha: string; packId: string; testCaseId: string };
 
-const emptyFilters: Filters = { status: "", profile: "", pullRequest: "", commitSha: "", packId: "", testCaseId: "" };
-const fieldClass = "min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-950 dark:focus:ring-blue-900";
+const emptyFilters: Filters = {
+  status: "",
+  profile: "",
+  pullRequest: "",
+  commitSha: "",
+  packId: "",
+  testCaseId: "",
+};
 
-function statusStyle(status: string): string {
-  if (status === "passed") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (["failed", "blocked"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
-  if (["queued", "dispatched", "cancel_requested"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "cancelled") return "border-slate-200 bg-slate-100 text-slate-700";
-  return "border-blue-200 bg-blue-50 text-blue-700";
+const fieldClass =
+  "min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-border)]";
+const toolbarFieldClass =
+  "h-9 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold text-[var(--text)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-border)]";
+
+function statusLabel(status: string) {
+  return (
+    (
+      {
+        passed: "Đạt",
+        failed: "Thất bại",
+        queued: "Đang chờ",
+        dispatched: "Đang chạy",
+        cancel_requested: "Đang hủy",
+        cancelled: "Đã hủy",
+        blocked: "Bị chặn",
+      } as Record<string, string>
+    )[status] ?? status
+  );
 }
 
-function statusLabel(status: string): string {
-  return ({ passed: "Đạt", failed: "Thất bại", queued: "Đang chờ", dispatched: "Đang chạy", cancel_requested: "Đang hủy", cancelled: "Đã hủy", blocked: "Bị chặn" } as Record<string, string>)[status] ?? status;
+function statusTone(status: string) {
+  if (status === "passed") return "var(--success)";
+  if (["failed", "blocked"].includes(status)) return "var(--danger)";
+  if (["queued", "dispatched", "cancel_requested"].includes(status))
+    return "var(--warn)";
+  return "var(--text-2)";
 }
 
-function evidenceLabel(state: string): string {
-  return ({ available: "Evidence sẵn sàng", expiring: "Evidence sắp hết hạn", expired: "Evidence đã hết hạn", unavailable: "Evidence chưa sẵn sàng" } as Record<string, string>)[state] ?? "Evidence chưa sẵn sàng";
+function evidenceLabel(state: string) {
+  return (
+    (
+      {
+        available: "Evidence sẵn sàng",
+        expiring: "Evidence sắp hết hạn",
+        expired: "Evidence đã hết hạn",
+        unavailable: "Evidence chưa sẵn sàng",
+      } as Record<string, string>
+    )[state] ?? "Evidence chưa sẵn sàng"
+  );
 }
 
-function formatWhen(value?: string): string {
+function preflightReasonCopy(code: string, recovery: string) {
+  const known = {
+    TARGET_INACTIVE: {
+      title: "Target này hiện không còn hoạt động",
+      action: "Chọn một target QA đang hoạt động.",
+    },
+    NO_ACTIVE_PACK: {
+      title: "Target này chưa có gói test được QA phê duyệt",
+      action:
+        "QA/Engineering cần đăng ký Smoke hoặc Regression pack và TC-ID cho target này trước.",
+    },
+    STAGING_CONTEXT_UNAVAILABLE: {
+      title: "Chưa tìm thấy bản deploy Staging để đối chiếu",
+      action:
+        "Deploy PR lên Staging (QC), hoặc nhập đúng PR và commit SHA của bản đã deploy ở phần Context deploy.",
+    },
+    FIXTURE_CAPACITY_EXHAUSTED: {
+      title: "Môi trường test đang được một lần chạy khác sử dụng",
+      action: "Đợi lần chạy hiện tại hoàn tất rồi thử lại.",
+    },
+    PROFILE_CAPACITY_EXHAUSTED: {
+      title: "Đã đạt số lượng lần chạy đồng thời cho gói test này",
+      action: "Đợi một lần chạy cùng loại hoàn tất rồi thử lại.",
+    },
+  } as Record<string, { title: string; action: string }>;
+  return known[code] ?? { title: code, action: recovery };
+}
+
+function formatWhen(value?: string) {
   if (!value) return "Đang xử lý";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
   if (minutes < 1) return "vừa xong";
   if (minutes < 60) return `${minutes} phút trước`;
-  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} giờ trước`;
-  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  if (minutes < 1_440) return `${Math.round(minutes / 60)} giờ trước`;
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
-export function ManualRunPanel({ targets }: { targets: Target[] }) {
+export function ManualRunPanel({
+  targets,
+  openRequest = 0,
+  externalOpenButton,
+}: {
+  targets: Target[];
+  openRequest?: number;
+  externalOpenButton?: RefObject<HTMLButtonElement | null>;
+}) {
   const [targetId, setTargetId] = useState("");
+  const [days, setDays] = useState("7");
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string>();
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [historyLoadError, setHistoryLoadError] = useState("");
+  const [message, setMessage] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [runTargetId, setRunTargetId] = useState("");
   const [profile, setProfile] = useState<Profile>("smoke");
   const [context, setContext] = useState({ pullRequest: "", commitSha: "" });
-  const [preflight, setPreflight] = useState<Preflight | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [days, setDays] = useState("7");
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
-  const [nextCompletedPage, setNextCompletedPage] = useState<number | undefined>();
-  const [nextDispatchPage, setNextDispatchPage] = useState<number | undefined>();
-  const [statusMessage, setStatusMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [confirmationKey, setConfirmationKey] = useState<string | null>(null);
-  const [targetSearch, setTargetSearch] = useState("");
-  const [hydratedFilters, setHydratedFilters] = useState(false);
-  const [selectedRun, setSelectedRun] = useState<HistoryItem | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [preflight, setPreflight] = useState<Preflight>();
+  const [availableProfilesByTarget, setAvailableProfilesByTarget] = useState<
+    Record<string, Record<Profile, boolean>>
+  >({});
+  const [confirmationKey, setConfirmationKey] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<HistoryItem>();
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const filtersDialogRef = useRef<HTMLDivElement>(null);
-  const filtersButton = useRef<HTMLButtonElement>(null);
-  const detailDialogRef = useRef<HTMLDivElement>(null);
-  const detailReturnFocus = useRef<HTMLElement | null>(null);
-  const historyRequest = useRef(0);
   const openRunButton = useRef<HTMLButtonElement>(null);
-  const activeTargets = useMemo(() => targets.slice().sort((a, b) => a.name.localeCompare(b.name)), [targets]);
-  const selectedTarget = activeTargets.find((target) => target.id === runTargetId);
-  const dialogTargets = activeTargets.filter((target) => {
-    const query = targetSearch.trim().toLowerCase();
-    return !query || `${target.name} ${target.domain} ${target.id}`.toLowerCase().includes(query);
-  });
+  const openedExternally = useRef(false);
+  const lastOpenRequest = useRef(0);
+  const requestSequence = useRef(0);
+  const preflightRequestSequence = useRef(0);
+  const sortedTargets = useMemo(
+    () =>
+      [...targets].sort((left, right) => left.name.localeCompare(right.name)),
+    [targets],
+  );
+  const activeTarget = sortedTargets.find(
+    (target) => target.id === runTargetId,
+  );
+  const packOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          [...history.map((run) => run.packId), filters.packId].filter(
+            (packId): packId is string => Boolean(packId),
+          ),
+        ),
+      ].sort(),
+    [filters.packId, history],
+  );
 
-  const loadHistory = async (options: { cursor?: string; completedPage?: number; dispatchPage?: number; append?: boolean } = {}) => {
-    const requestId = ++historyRequest.current;
+  const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
+    setFilters((current) => ({ ...current, [key]: value }));
+
+  const loadHistory = async (cursor?: string, append = false, preserve = false) => {
+    const sequence = ++requestSequence.current;
+    setLoadingHistory(true);
+    setHistoryLoadError("");
     const query = new URLSearchParams({ days });
     if (targetId) query.set("targetId", targetId);
-    if (options.cursor) query.set("cursor", options.cursor);
-    if (options.completedPage) query.set("completedPage", String(options.completedPage));
-    if (options.dispatchPage) query.set("dispatchPage", String(options.dispatchPage));
-    Object.entries(filters).forEach(([key, value]) => { if (value.trim()) query.set(key, value.trim()); });
+    if (cursor) query.set("cursor", cursor);
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value.trim()) query.set(key, value.trim());
+    });
     try {
-      const response = await fetch(`/api/admin/qa/runs?${query}`, { credentials: "same-origin" });
-      const body = await response.json().catch(() => null) as HistoryResponse | null;
-      if (requestId !== historyRequest.current) return;
-      if (!response.ok) { setStatusMessage("Không thể tải lịch sử run với bộ lọc hiện tại."); return; }
-      const initial = [...(body?.active ?? []), ...(body?.completed ?? []), ...(body?.data ?? [])];
-      const appended = options.completedPage ? (body?.completed ?? []) : options.dispatchPage ? [...(body?.active ?? []), ...(body?.completed ?? [])] : (body?.data ?? []);
-      setHistory((current) => options.append ? [...current, ...appended.filter((item) => !current.some((existing) => existing.id === item.id))] : initial);
-      if (!options.append) {
-        setNextCursor(body?.meta?.nextCursor);
-        setNextCompletedPage(body?.completedMeta?.nextPage);
-        setNextDispatchPage(body?.dispatchMeta?.nextPage);
-      } else if (options.completedPage) setNextCompletedPage(body?.completedMeta?.nextPage);
-      else if (options.dispatchPage) setNextDispatchPage(body?.dispatchMeta?.nextPage);
-      else setNextCursor(body?.meta?.nextCursor);
+      const response = await fetch(`/api/admin/qa/runs?${query}`, {
+        credentials: "same-origin",
+      });
+      const body = (await response.json()) as {
+        data?: HistoryItem[];
+        active?: HistoryItem[];
+        completed?: HistoryItem[];
+        meta?: { nextCursor?: string };
+      };
+      if (sequence !== requestSequence.current) return;
+      if (!response.ok) throw new Error();
+      const records = [
+        ...(body.active ?? []),
+        ...(body.completed ?? []),
+        ...(body.data ?? []),
+      ];
+      setHistory((current) =>
+        append
+          ? [
+              ...current,
+              ...records.filter(
+                (item) => !current.some((old) => old.id === item.id),
+              ),
+            ]
+          : preserve
+            ? [
+                ...records,
+                ...current.filter(
+                  (old) =>
+                    !records.some((item) => item.id === old.id) &&
+                    !["queued", "dispatched", "cancel_requested"].includes(
+                      old.status,
+                    ),
+                ),
+              ]
+            : records,
+      );
+      if (!preserve) setNextCursor(body.meta?.nextCursor);
     } catch {
-      if (requestId === historyRequest.current) setStatusMessage("Không thể kết nối để tải lịch sử run.");
+      if (sequence === requestSequence.current)
+        setHistoryLoadError("Không thể tải lịch sử chạy. Hãy thử lại.");
+    } finally {
+      if (sequence === requestSequence.current) setLoadingHistory(false);
     }
   };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setTargetId(params.get("targetId") ?? "");
-    setFilters({ status: params.get("status") ?? "", profile: params.get("profile") ?? "", pullRequest: params.get("pullRequest") ?? "", commitSha: params.get("commitSha") ?? "", packId: params.get("packId") ?? "", testCaseId: params.get("testCaseId") ?? "" });
     setDays(params.get("days") ?? "7");
-    setHydratedFilters(true);
+    setFilters({
+      status: params.get("status") ?? "",
+      profile: params.get("profile") ?? "",
+      pullRequest: params.get("pullRequest") ?? "",
+      commitSha: params.get("commitSha") ?? "",
+      packId: params.get("packId") ?? "",
+      testCaseId: params.get("testCaseId") ?? "",
+    });
   }, []);
-  useEffect(() => { if (hydratedFilters) void loadHistory(); }, [targetId, filters, days, hydratedFilters]);
+  useEffect(() => void loadHistory(), [targetId, days, filters]);
   useEffect(() => {
-    if (!hydratedFilters) return;
-    const query = new URLSearchParams();
-    if (targetId) query.set("targetId", targetId);
-    if (days !== "7") query.set("days", days);
-    Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
-    window.history.replaceState(null, "", `${window.location.pathname}${query.size ? `?${query}` : ""}`);
-  }, [targetId, filters, days, hydratedFilters]);
-  useEffect(() => {
-    if (!history.some((run) => run.canCancel)) return;
-    const timer = window.setInterval(() => void loadHistory(), 15_000);
+    const hasActiveRun = history.some((run) =>
+      ["queued", "dispatched", "cancel_requested"].includes(run.status),
+    );
+    if (!hasActiveRun) return;
+    const timer = window.setInterval(() => void loadHistory(undefined, false, true), 15_000);
     return () => window.clearInterval(timer);
-  }, [history, targetId, filters, days]);
+  }, [history, targetId, days, filters]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    ["targetId", "days", ...Object.keys(emptyFilters)].forEach((key) =>
+      url.searchParams.delete(key),
+    );
+    if (targetId) url.searchParams.set("targetId", targetId);
+    if (days !== "7") url.searchParams.set("days", days);
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+    });
+    window.history.replaceState(null, "", url);
+  }, [targetId, days, filters]);
   useEffect(() => {
     if (!dialogOpen) return;
-    const firstFocusable = () => dialogRef.current?.querySelector<HTMLElement>("input, select, button:not([disabled])");
-    firstFocusable()?.focus();
+    const focusable = () => [
+      ...(dialogRef.current?.querySelectorAll<HTMLElement>(
+        "input, select, button:not([disabled])",
+      ) ?? []),
+    ];
+    focusable()[0]?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setDialogOpen(false); return; }
-      if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>("input, select, button:not([disabled])")];
-      const first = focusable[0]; const last = focusable.at(-1);
+      if (event.key === "Escape") return setDialogOpen(false);
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      const first = items[0];
+      const last = items.at(-1);
       if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => { window.removeEventListener("keydown", onKeyDown); openRunButton.current?.focus(); };
-  }, [dialogOpen]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      (openedExternally.current
+        ? externalOpenButton?.current
+        : openRunButton.current
+      )?.focus();
+      openedExternally.current = false;
+    };
+  }, [dialogOpen, externalOpenButton]);
   useEffect(() => {
-    if (!filtersOpen) return;
-    const firstFocusable = () => filtersDialogRef.current?.querySelector<HTMLElement>("input, select, button:not([disabled])");
-    firstFocusable()?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setFiltersOpen(false); return; }
-      if (event.key !== "Tab" || !filtersDialogRef.current) return;
-      const focusable = [...filtersDialogRef.current.querySelectorAll<HTMLElement>("input, select, button:not([disabled])")];
-      const first = focusable[0]; const last = focusable.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => { window.removeEventListener("keydown", onKeyDown); filtersButton.current?.focus(); };
-  }, [filtersOpen]);
-  useEffect(() => {
-    if (!selectedRun) return;
-    const firstFocusable = () => detailDialogRef.current?.querySelector<HTMLElement>("button:not([disabled])");
-    firstFocusable()?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedRun(null); return; }
-      if (event.key !== "Tab" || !detailDialogRef.current) return;
-      const focusable = [...detailDialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled])")];
-      const first = focusable[0]; const last = focusable.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => { window.removeEventListener("keydown", onKeyDown); detailReturnFocus.current?.focus(); };
-  }, [selectedRun]);
+    if (!openRequest || openRequest <= lastOpenRequest.current) return;
+    lastOpenRequest.current = openRequest;
+    openedExternally.current = true;
+    setRunTargetId(targetId);
+    setPreflight(undefined);
+    setConfirmationKey(undefined);
+    setDialogOpen(true);
+  }, [openRequest, targetId]);
   useEffect(() => {
     if (!dialogOpen || !runTargetId) return;
+    preflightRequestSequence.current += 1;
+    const contextIsPartial =
+      Boolean(context.pullRequest) !== Boolean(context.commitSha);
+    if (contextIsPartial) {
+      // Keep the blocking preflight visible while the operator completes the
+      // required PR/SHA pair. Clearing it here collapses the SHA field after
+      // entering PR, making the context impossible to complete.
+      return;
+    }
+    setPreflight(undefined);
     void review();
-  // Preflight is advisory and rechecked by POST; refresh it as the selected
-  // target/profile changes so an uncovered pack explains itself immediately.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialogOpen, runTargetId, profile]);
+    // Profile/target previews are advisory; dispatch repeats this check server-side.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    context.commitSha,
+    context.pullRequest,
+    dialogOpen,
+    runTargetId,
+    profile,
+  ]);
 
   const review = async () => {
-    if (!runTargetId) { setStatusMessage("Chọn đúng một target trước khi kiểm tra preflight."); return; }
-    setLoading(true); setStatusMessage("");
+    if (!runTargetId) return;
+    const sequence = ++preflightRequestSequence.current;
+    const reviewedTargetId = runTargetId;
+    setSubmitting(true);
     try {
       const query = new URLSearchParams({ targetId: runTargetId, profile });
-      if (context.pullRequest || context.commitSha) { query.set("pullRequest", context.pullRequest); query.set("commitSha", context.commitSha); }
-      const response = await fetch(`/api/admin/qa/manual-runs/preflight?${query}`, { credentials: "same-origin" });
-      const body = await response.json().catch(() => null) as { data?: Preflight } | null;
-      if (!response.ok || !body?.data) throw new Error("preflight");
-      setPreflight(body.data);
-      if (body.data.canDispatch) setConfirmationKey(crypto.randomUUID().replaceAll("-", ""));
-    } catch { setStatusMessage("Không thể kiểm tra preflight."); }
-    finally { setLoading(false); }
+      if (context.pullRequest || context.commitSha) {
+        query.set("pullRequest", context.pullRequest);
+        query.set("commitSha", context.commitSha);
+      }
+      const response = await fetch(
+        `/api/admin/qa/manual-runs/preflight?${query}`,
+        {
+          credentials: "same-origin",
+        },
+      );
+      const body = (await response.json()) as { data?: Preflight };
+      const preflightData = body.data;
+      if (!response.ok || !preflightData) throw new Error();
+      if (sequence !== preflightRequestSequence.current) return;
+      setAvailableProfilesByTarget((current) => ({
+        ...current,
+        [reviewedTargetId]: preflightData.availableProfiles,
+      }));
+      setPreflight(preflightData);
+      if (preflightData.canDispatch) {
+        setConfirmationKey(
+          (current) => current ?? crypto.randomUUID().replaceAll("-", ""),
+        );
+      }
+    } catch {
+      if (sequence === preflightRequestSequence.current) {
+        setPreflight(undefined);
+        setMessage("Không thể kiểm tra preflight.");
+      }
+    } finally {
+      if (sequence === preflightRequestSequence.current) setSubmitting(false);
+    }
   };
 
   const dispatch = async () => {
-    if (!runTargetId || !preflight?.canDispatch) return;
-    setLoading(true); setStatusMessage("");
+    if (!preflight?.canDispatch || !runTargetId) return;
+    setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = { targetId: runTargetId, profile, idempotencyKey: confirmationKey ?? crypto.randomUUID().replaceAll("-", "") };
-      if (context.pullRequest || context.commitSha) { payload.pullRequest = Number(context.pullRequest); payload.commitSha = context.commitSha; }
-      const response = await fetch("/api/admin/qa/manual-runs", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const body = await response.json().catch(() => null) as { data?: { status?: string }; error?: string } | null;
-      setStatusMessage(response.ok ? `Run ${body?.data?.status ?? "accepted"}.` : body?.error ?? "Run bị chặn.");
-      if (response.ok) { setDialogOpen(false); setPreflight(null); setConfirmationKey(null); await loadHistory(); }
-    } catch { setStatusMessage("Không thể dispatch run."); }
-    finally { setLoading(false); }
-  };
-
-  const cancel = async (id: string) => {
-    if (!window.confirm("Hủy run đang chờ/chạy?")) return;
-    try {
-      const response = await fetch(`/api/admin/qa/manual-runs/${id.replace("dispatch-", "")}/cancel`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "Cancelled by QA tester" }) });
-      setStatusMessage(response.ok ? "Yêu cầu hủy đã được ghi nhận." : "Không thể hủy run này.");
+      const response = await fetch("/api/admin/qa/manual-runs", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetId: runTargetId,
+          profile,
+          pullRequest: context.pullRequest
+            ? Number(context.pullRequest)
+            : undefined,
+          commitSha: context.commitSha || undefined,
+          idempotencyKey:
+            confirmationKey ?? crypto.randomUUID().replaceAll("-", ""),
+        }),
+      });
+      if (!response.ok) throw new Error();
+      setDialogOpen(false);
+      setMessage("Run đã được gửi vào hàng đợi.");
       await loadHistory();
-    } catch { setStatusMessage("Không thể gửi yêu cầu hủy run."); }
+    } catch {
+      setMessage("Không thể gửi run. Kiểm tra lại preflight rồi thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
+  const cancel = async (run: HistoryItem) => {
+    if (!window.confirm("Hủy run đang chờ hoặc đang chạy?")) return;
+    const response = await fetch(
+      `/api/admin/qa/manual-runs/${run.id.replace("dispatch-", "")}/cancel`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Cancelled by QA tester" }),
+      },
+    );
+    setMessage(
+      response.ok ? "Yêu cầu hủy đã được ghi nhận." : "Không thể hủy run này.",
+    );
+    if (response.ok) await loadHistory();
+  };
 
-  return <section id="runs" aria-labelledby="manual-runs-title" className="space-y-4">
-    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div><h2 id="manual-runs-title" className="text-xl font-bold tracking-tight">Runs</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Xem lịch sử hoặc chạy một target cụ thể; không có Run all.</p></div>
-      <div className="hidden grid-cols-1 gap-2 sm:grid sm:grid-cols-3">
-        <select aria-label="Lọc Target" value={targetId} onChange={(event) => setTargetId(event.target.value)} className={fieldClass}><option value="">Target: Tất cả</option>{activeTargets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}</select>
-        <select aria-label="Lọc Profile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={fieldClass}><option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option></select>
-        <select aria-label="Lọc Trạng thái" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)} className={fieldClass}><option value="">Trạng thái: Tất cả</option><option value="passed">Đạt</option><option value="failed">Thất bại</option><option value="queued">Đang chờ</option><option value="dispatched">Đang chạy</option><option value="cancel_requested">Đang hủy</option><option value="blocked">Bị chặn</option><option value="cancelled">Đã hủy</option></select>
-      </div>
-    </div>
+  const clearFilters = () => {
+    setTargetId("");
+    setDays("7");
+    setFilters(emptyFilters);
+  };
 
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
-        <div><h3 className="font-bold">Run history</h3><p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">Staging (QC) only · trạng thái evidence an toàn, không mở artifact đã hết hạn.</p></div>
-        <button ref={openRunButton} type="button" onClick={() => { setRunTargetId(targetId); setDialogOpen(true); setPreflight(null); setStatusMessage(""); }} className="min-h-11 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Run targeted test</button>
+  return (
+    <section aria-labelledby="manual-runs-title" className="space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2
+            id="manual-runs-title"
+            className="text-[20px] font-bold tracking-tight"
+          >
+            Lịch sử chạy test
+          </h2>
+          <p className="mt-1 text-[13px] text-[var(--text-2)]">
+            Theo dõi lịch sử chạy test hoặc chạy một target cụ thể; không có nút
+            chạy toàn dự án.
+          </p>
+        </div>
+        <div className="hidden gap-2 sm:grid sm:grid-cols-4">
+          <select
+            aria-label="Khoảng thời gian"
+            value={days}
+            onChange={(event) => setDays(event.target.value)}
+            className={toolbarFieldClass}
+          >
+            <option value="7">Thời gian: 7 ngày</option>
+            <option value="14">Thời gian: 14 ngày</option>
+            <option value="30">Thời gian: 30 ngày</option>
+          </select>
+          <select
+            aria-label="Lọc Target"
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            className={toolbarFieldClass}
+          >
+            <option value="">Target: Tất cả</option>
+            {sortedTargets.map((target) => (
+              <option key={target.id} value={target.id}>
+                {target.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Lọc Pack"
+            value={filters.packId}
+            onChange={(event) => updateFilter("packId", event.target.value)}
+            className={toolbarFieldClass}
+          >
+            <option value="">Gói test: Tất cả</option>
+            {packOptions.map((packId) => (
+              <option key={packId} value={packId}>
+                {packId}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Lọc Trạng thái"
+            value={filters.status}
+            onChange={(event) => updateFilter("status", event.target.value)}
+            className={toolbarFieldClass}
+          >
+            <option value="">Kết quả: Tất cả</option>
+            <option value="passed">Đạt</option>
+            <option value="failed">Thất bại</option>
+            <option value="dispatched">Đang chạy</option>
+            <option value="cancelled">Đã hủy</option>
+          </select>
+          <select aria-label="Lọc Profile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={toolbarFieldClass}>
+            <option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option>
+          </select>
+          <input aria-label="Lọc PR" value={filters.pullRequest} onChange={(event) => updateFilter("pullRequest", event.target.value)} placeholder="PR #" className={toolbarFieldClass} />
+          <input aria-label="Lọc SHA" value={filters.commitSha} onChange={(event) => updateFilter("commitSha", event.target.value)} placeholder="Commit SHA" className={toolbarFieldClass} />
+        </div>
       </div>
-      <div className="border-b border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-        <button ref={filtersButton} type="button" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog" aria-expanded={filtersOpen} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-left text-sm font-semibold sm:hidden dark:border-slate-600">Bộ lọc lịch sử</button>
-        <div className="hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-5"><select aria-label="Khoảng thời gian" value={days} onChange={(event) => setDays(event.target.value)} className={fieldClass}><option value="7">7 ngày gần đây</option><option value="14">14 ngày gần đây</option><option value="30">30 ngày gần đây</option></select><input aria-label="Lọc PR" value={filters.pullRequest} onChange={(event) => updateFilter("pullRequest", event.target.value)} placeholder="PR #" inputMode="numeric" className={fieldClass} /><input aria-label="Lọc SHA" value={filters.commitSha} onChange={(event) => updateFilter("commitSha", event.target.value)} placeholder="Commit SHA" className={fieldClass} /><input aria-label="Lọc Pack" value={filters.packId} onChange={(event) => updateFilter("packId", event.target.value)} placeholder="Pack" className={fieldClass} /><input aria-label="Lọc TC-ID" value={filters.testCaseId} onChange={(event) => updateFilter("testCaseId", event.target.value)} placeholder="TC-ID" className={fieldClass} /></div>
-        {(targetId || days !== "7" || Object.values(filters).some(Boolean)) && <p className="mt-2 text-xs text-slate-500">Đang áp dụng bộ lọc: {targetId ? (activeTargets.find((target) => target.id === targetId)?.name ?? targetId) : "mọi target"} · {days} ngày</p>}
-        <button type="button" onClick={() => setFilters(emptyFilters)} className="mt-2 min-h-11 text-sm font-semibold text-blue-700 hover:underline dark:text-blue-400">Xóa bộ lọc</button>
-      </div>
-      <div className="hidden overflow-x-auto md:block"><table className="min-w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-950"><tr><th className="px-4 py-3">Target</th><th className="px-4 py-3">Profile / result</th><th className="px-4 py-3">PR / SHA</th><th className="px-4 py-3">Finished</th><th className="px-4 py-3">Action</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">{history.map((run) => <RunRow key={run.id} run={run} targets={activeTargets} onCancel={cancel} onView={(item, trigger) => { detailReturnFocus.current = trigger; setSelectedRun(item); }} />)}</tbody></table></div>
-      <ul className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{history.map((run) => <li key={run.id} className="space-y-2 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{activeTargets.find((target) => target.id === run.targetId)?.name ?? run.targetId}</p><p className="text-xs text-slate-500">{activeTargets.find((target) => target.id === run.targetId)?.domain ?? "Target"}</p></div><StatusPill status={run.status} /></div><p className="text-sm">{run.profile} · {run.packId ?? "terminal"}</p><p className="font-mono text-xs text-slate-600 dark:text-slate-300">{run.pullRequest ? `#${run.pullRequest}` : "PR —"} · {run.commitSha?.slice(0, 7) ?? "SHA —"}</p><div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-500">{formatWhen(run.finishedAt ?? run.startedAt)}</span>{run.canCancel ? <button type="button" onClick={() => void cancel(run.id)} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold dark:border-slate-600">Hủy run</button> : <span className="text-xs text-slate-500">{evidenceLabel(run.evidenceState)}</span>}</div></li>)}</ul>
-      {history.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Chưa có run trong bộ lọc này.</p>}
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 p-3 dark:border-slate-700">{(nextDispatchPage || nextCursor || nextCompletedPage) && <button type="button" onClick={() => { if (nextDispatchPage) void loadHistory({ dispatchPage: nextDispatchPage, append: true }); else if (nextCompletedPage) void loadHistory({ completedPage: nextCompletedPage, append: true }); else if (nextCursor) void loadHistory({ cursor: nextCursor, append: true }); }} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">Tải thêm 50</button>}</div>
-    </article>
-    <div className="flex gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-200"><span aria-hidden="true" className="font-bold text-blue-700">i</span><p><b>Chạy targeted test khi có lý do rõ ràng.</b> Chọn screen, flow hoặc feature; preflight hiển thị checks, fixture, thời gian và capacity trước khi dispatch.</p></div>
-    {statusMessage && <p role="status" aria-live="polite" className="text-sm font-medium text-slate-700 dark:text-slate-200">{statusMessage}</p>}
-
-    {selectedRun && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><div ref={detailDialogRef} role="dialog" aria-modal="true" aria-labelledby="run-detail-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><div className="flex items-start justify-between gap-3"><div><h3 id="run-detail-title" className="text-lg font-bold">Run detail</h3><p className="text-sm text-slate-500">Safe metadata only · không hiển thị URL artifact.</p></div><button type="button" aria-label="Đóng chi tiết run" onClick={() => setSelectedRun(null)} className="min-h-11 min-w-11 rounded-lg text-xl">×</button></div><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500">Target</dt><dd>{selectedRun.targetId}</dd></div><div><dt className="text-slate-500">Status</dt><dd>{statusLabel(selectedRun.status)}</dd></div><div><dt className="text-slate-500">Pack / profile</dt><dd>{selectedRun.packId ?? "terminal"} · {selectedRun.profile}</dd></div><div><dt className="text-slate-500">Evidence</dt><dd>{evidenceLabel(selectedRun.evidenceState)}</dd></div><div><dt className="text-slate-500">PR / SHA</dt><dd>#{selectedRun.pullRequest ?? "—"} · {selectedRun.commitSha?.slice(0, 7) ?? "—"}</dd></div><div><dt className="text-slate-500">Finished</dt><dd>{formatWhen(selectedRun.finishedAt ?? selectedRun.startedAt)}</dd></div></dl>{Boolean(selectedRun.summary) && <pre className="mt-4 max-h-40 overflow-auto rounded-lg bg-slate-100 p-3 text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-200">{JSON.stringify(selectedRun.summary, null, 2)}</pre>}</div></div>}
-    {dialogOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="manual-run-confirm-title" aria-describedby="manual-run-confirm-description" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900"><header className="flex items-start justify-between gap-4 border-b border-slate-200 p-5 dark:border-slate-700"><div><h3 id="manual-run-confirm-title" className="text-xl font-bold">Chạy manual targeted test</h3><p id="manual-run-confirm-description" className="mt-1 text-sm text-slate-600 dark:text-slate-300">Chọn chính xác một target và một profile được allow-list. Không có Run all hoặc lệnh tự do.</p></div><button type="button" onClick={() => setDialogOpen(false)} aria-label="Đóng" className="min-h-11 min-w-11 rounded-lg text-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">×</button></header>
-      <div className="grid gap-0 md:grid-cols-[1.05fr_0.95fr]"><section className="border-b border-slate-200 p-5 md:border-b-0 md:border-r dark:border-slate-700"><label className="text-sm font-semibold" htmlFor="manual-run-search">Chọn target</label><input id="manual-run-search" type="search" value={targetSearch} onChange={(event) => setTargetSearch(event.target.value)} placeholder="Tìm screen, flow hoặc target" className={`mt-2 w-full ${fieldClass}`} /><div role="radiogroup" aria-label="QA target" className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">{dialogTargets.map((target) => <button key={target.id} role="radio" aria-checked={runTargetId === target.id} type="button" onClick={() => { setRunTargetId(target.id); setPreflight(null); setConfirmationKey(null); }} className={`w-full rounded-xl border p-3 text-left transition ${runTargetId === target.id ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600 dark:bg-blue-950/30" : "border-slate-200 hover:border-blue-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"}`}><span className="block font-semibold">{target.name}</span><span className="mt-1 block text-xs text-slate-500">{target.domain} · {target.id}</span></button>)}</div></section>
-        <section className="space-y-4 p-5"><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Profile<select aria-label="QA profile" value={profile} onChange={(event) => { setProfile(event.target.value as Profile); setPreflight(null); setConfirmationKey(null); }} className={`mt-1 w-full ${fieldClass}`}><option value="smoke">Smoke</option><option value="regression">Regression</option></select></label><div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Environment</span><b>Staging (QC)</b></div></div><div className="grid gap-2 sm:grid-cols-2"><input aria-label="Pull request context" value={context.pullRequest} onChange={(event) => { setContext((current) => ({ ...current, pullRequest: event.target.value })); setPreflight(null); }} placeholder="PR (đi cùng SHA)" inputMode="numeric" className={fieldClass} /><input aria-label="Commit SHA context" value={context.commitSha} onChange={(event) => { setContext((current) => ({ ...current, commitSha: event.target.value })); setPreflight(null); }} placeholder="Immutable SHA (đi cùng PR)" className={fieldClass} /></div>
-          <button type="button" onClick={() => void review()} disabled={!runTargetId || loading} className="min-h-11 w-full rounded-lg border border-blue-700 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950/30">{loading ? "Đang kiểm tra…" : "Kiểm tra preflight"}</button>
-          {preflight ? <div role="status" aria-live="polite" className={`rounded-xl border p-4 text-sm ${preflight.canDispatch ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}><p className="font-bold">{preflight.canDispatch ? "Preflight đạt" : "Preflight bị chặn"}</p>{preflight.pack && <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2"><dt className="text-slate-500">Pack</dt><dd>{preflight.pack.id} v{preflight.pack.version}</dd><dt className="text-slate-500">Test type</dt><dd>{preflight.pack.testType}</dd><dt className="text-slate-500">Checks</dt><dd>{preflight.pack.testCases.map((item) => item.id).join(", ")}</dd><dt className="text-slate-500">Manual checklist</dt><dd>{preflight.pack.manualChecklistCount} mục</dd><dt className="text-slate-500">Fixture</dt><dd>{preflight.pack.fixtureKey}</dd><dt className="text-slate-500">Thời lượng</dt><dd>~{preflight.pack.estimatedDurationMinutes} phút</dd></dl>}<ul className="mt-3 space-y-1">{preflight.reasons.map((reason) => <li key={reason.code}><b>{reason.code}</b>: {reason.recovery}</li>)}{preflight.pack?.prerequisites.map((item) => <li key={item}>✓ {item}</li>)}</ul></div> : <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-600">Preflight sẽ hiển thị test type, TC-ID, prerequisite, fixture capacity và thời lượng trước khi cho phép xác nhận.</div>}
-        </section></div>
-      <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end dark:border-slate-700"><button type="button" onClick={() => setDialogOpen(false)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">Hủy</button><button type="button" onClick={() => void dispatch()} disabled={!preflight?.canDispatch || loading} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">{preflight?.pack ? `Chạy ${preflight.pack.testCases.length} checks` : "Xác nhận chạy"}</button></footer>
-    </div></div>}
-    {filtersOpen && <div className="fixed inset-0 z-50 flex items-end bg-slate-950/60 sm:hidden"><div ref={filtersDialogRef} role="dialog" aria-modal="true" aria-labelledby="run-filters-title" className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" /><div className="flex items-center justify-between gap-3"><h3 id="run-filters-title" className="text-lg font-bold">Bộ lọc lịch sử chạy</h3><button type="button" aria-label="Đóng bộ lọc" onClick={() => setFiltersOpen(false)} className="min-h-11 min-w-11 rounded-lg text-xl">×</button></div><div className="mt-4 grid gap-3"><select aria-label="Lọc Target mobile" value={targetId} onChange={(event) => setTargetId(event.target.value)} className={fieldClass}><option value="">Target: Tất cả</option>{activeTargets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}</select><select aria-label="Lọc Profile mobile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={fieldClass}><option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option></select><select aria-label="Lọc Trạng thái mobile" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)} className={fieldClass}><option value="">Trạng thái: Tất cả</option><option value="passed">Đạt</option><option value="failed">Thất bại</option><option value="queued">Đang chờ</option><option value="dispatched">Đang chạy</option><option value="cancel_requested">Đang hủy</option><option value="blocked">Bị chặn</option><option value="cancelled">Đã hủy</option></select><select aria-label="Khoảng thời gian mobile" value={days} onChange={(event) => setDays(event.target.value)} className={fieldClass}><option value="7">7 ngày gần đây</option><option value="14">14 ngày gần đây</option><option value="30">30 ngày gần đây</option></select><input aria-label="Lọc PR mobile" value={filters.pullRequest} onChange={(event) => updateFilter("pullRequest", event.target.value)} placeholder="PR #" inputMode="numeric" className={fieldClass} /><input aria-label="Lọc SHA mobile" value={filters.commitSha} onChange={(event) => updateFilter("commitSha", event.target.value)} placeholder="Commit SHA" className={fieldClass} /><input aria-label="Lọc Pack mobile" value={filters.packId} onChange={(event) => updateFilter("packId", event.target.value)} placeholder="Pack" className={fieldClass} /><input aria-label="Lọc TC-ID mobile" value={filters.testCaseId} onChange={(event) => updateFilter("testCaseId", event.target.value)} placeholder="TC-ID" className={fieldClass} /></div><div className="mt-5 flex gap-2"><button type="button" onClick={() => { setFilters(emptyFilters); setTargetId(""); setDays("7"); }} className="min-h-11 flex-1 rounded-lg border border-slate-300 px-4 text-sm font-semibold dark:border-slate-600">Xóa</button><button type="button" onClick={() => setFiltersOpen(false)} className="min-h-11 flex-1 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white">Áp dụng</button></div></div></div>}
-  </section>;
+      <article className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-elev)]">
+        <div className="flex flex-col gap-3 border-b border-[var(--border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[12px] text-[var(--text-2)]">
+              Staging only · evidence liên kết GitHub an toàn.
+            </p>
+          </div>
+          <button
+            ref={openRunButton}
+            type="button"
+            onClick={() => {
+              setRunTargetId(targetId);
+              setPreflight(undefined);
+              setConfirmationKey(undefined);
+              setDialogOpen(true);
+            }}
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--text)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-[0_4px_10px_color-mix(in_srgb,var(--text)_20%,transparent)] sm:min-h-9"
+          >
+            Chạy test theo target
+          </button>
+        </div>
+        <div className="border-b border-[var(--border)] bg-[var(--bg-sunk)] p-3 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-left text-sm font-semibold"
+          >
+            Bộ lọc lịch sử
+          </button>
+        </div>
+        {(targetId || days !== "7" || Object.values(filters).some(Boolean)) && (
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--bg-sunk)] px-4 py-2 text-xs text-[var(--text-2)]">
+            <span>Đang áp dụng bộ lọc</span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="min-h-11 font-semibold text-[var(--accent)]"
+            >
+              Xóa bộ lọc
+            </button>
+          </div>
+        )}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-full text-left text-[13px]">
+            <thead className="border-b border-[var(--border)] bg-[var(--bg-sunk)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-3)]">
+              <tr>
+                <th className="px-4 py-3">Target</th>
+                <th className="px-4 py-3">Gói test / result</th>
+                <th className="px-4 py-3">PR / SHA</th>
+                <th className="px-4 py-3">Hoàn tất</th>
+                <th className="px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {history.map((run) => (
+                <RunRow
+                  key={run.id}
+                  run={run}
+                  targets={sortedTargets}
+                  onView={setSelectedRun}
+                  onCancel={cancel}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="divide-y divide-[var(--border)] md:hidden">
+          {history.map((run) => (
+            <li key={run.id} className="space-y-2 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">
+                    {sortedTargets.find((target) => target.id === run.targetId)
+                      ?.name ?? run.targetId}
+                  </p>
+                  <p className="text-xs text-[var(--text-2)]">
+                    {run.profile} · {run.packId ?? "terminal"}
+                  </p>
+                </div>
+                <StatusPill status={run.status} />
+              </div>
+              <p className="font-mono text-xs text-[var(--text-2)]">
+                #{run.pullRequest ?? "—"} ·{" "}
+                {run.commitSha?.slice(0, 7) ?? "SHA —"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedRun(run)}
+                className="min-h-11 text-sm font-semibold text-[var(--accent)]"
+              >
+                Xem lần chạy
+              </button>
+            </li>
+          ))}
+        </ul>
+        {loadingHistory && (
+          <p aria-busy="true" className="p-6 text-sm text-[var(--text-2)]">
+            Đang tải lịch sử chạy…
+          </p>
+        )}
+        {historyLoadError ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 p-6 text-sm text-[var(--text-2)]"
+          >
+            <span>{historyLoadError}</span>
+            <button
+              type="button"
+              onClick={() => void loadHistory()}
+              className="min-h-9 rounded-[var(--radius)] border border-[var(--border)] px-3 text-[12px] font-bold text-[var(--accent)]"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : !loadingHistory && !history.length ? (
+          <p className="p-6 text-sm text-[var(--text-2)]">
+            Chưa có lần chạy trong bộ lọc này.
+          </p>
+        ) : null}
+        <footer className="flex min-h-12 items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--bg-sunk)] px-4 py-2 text-[12px] text-[var(--text-2)]">
+          <span>
+            Hiển thị {history.length ? `1–${history.length}` : "0"} lần chạy ·
+            Phạm vi {days} ngày gần nhất
+          </span>
+          {nextCursor ? (
+            <button
+              type="button"
+              onClick={() => void loadHistory(nextCursor, true)}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-[12px] font-bold sm:min-h-9"
+            >
+              Tải thêm 50
+            </button>
+          ) : (
+            <span className="text-[11px]">Không còn lần chạy cũ hơn</span>
+          )}
+        </footer>
+      </article>
+      <aside className="rounded-[var(--radius)] border border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_8%,var(--bg-elev))] p-4 text-sm text-[var(--text-2)]">
+        <strong className="block text-[var(--text)]">
+          Chạy targeted test khi có lý do rõ ràng.
+        </strong>{" "}
+        Chọn screen, flow hoặc tính năng; preflight hiển thị check, fixture,
+        thời gian và capacity trước khi dispatch.
+      </aside>
+      {message && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm text-[var(--text-2)]"
+        >
+          {message}
+        </p>
+      )}
+      {dialogOpen && (
+        <DispatchDialog
+          dialogRef={dialogRef}
+          targets={sortedTargets}
+          runTargetId={runTargetId}
+          setRunTargetId={(value) => {
+            setRunTargetId(value);
+            setPreflight(undefined);
+            setConfirmationKey(undefined);
+          }}
+          profile={profile}
+          setProfile={(value) => {
+            setProfile(value);
+            setPreflight(undefined);
+            setConfirmationKey(undefined);
+          }}
+          context={context}
+          setContext={(value) => {
+            setContext(value);
+            setPreflight(undefined);
+            setConfirmationKey(undefined);
+          }}
+          preflight={preflight}
+          availableProfiles={availableProfilesByTarget[runTargetId]}
+          onDispatch={() => void dispatch()}
+          submitting={submitting}
+          onClose={() => setDialogOpen(false)}
+        />
+      )}
+      {selectedRun && (
+        <RunDetail
+          run={selectedRun}
+          target={sortedTargets.find(
+            (item) => item.id === selectedRun.targetId,
+          )}
+          onClose={() => setSelectedRun(undefined)}
+        />
+      )}
+      {mobileFiltersOpen && (
+        <MobileFilters
+          targets={sortedTargets}
+          packOptions={packOptions}
+          targetId={targetId}
+          setTargetId={setTargetId}
+          days={days}
+          setDays={setDays}
+          filters={filters}
+          updateFilter={updateFilter}
+          onClear={clearFilters}
+          onClose={() => setMobileFiltersOpen(false)}
+        />
+      )}
+    </section>
+  );
 }
 
 function StatusPill({ status }: { status: string }) {
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${statusStyle(status)}`}><span aria-hidden="true">{["queued", "dispatched", "cancel_requested"].includes(status) ? "●" : status === "passed" ? "✓" : "!"}</span>{statusLabel(status)}</span>;
+  return (
+    <span
+      className="inline-flex items-center rounded-full border px-2 py-1 text-xs font-bold"
+      style={{ borderColor: statusTone(status), color: statusTone(status) }}
+    >
+      {statusLabel(status)}
+    </span>
+  );
 }
-
-function RunRow({ run, targets, onCancel, onView }: { run: HistoryItem; targets: Target[]; onCancel: (id: string) => Promise<void>; onView: (run: HistoryItem, trigger: HTMLElement) => void }) {
+function RunRow({
+  run,
+  targets,
+  onView,
+  onCancel,
+}: {
+  run: HistoryItem;
+  targets: Target[];
+  onView: (run: HistoryItem) => void;
+  onCancel: (run: HistoryItem) => void;
+}) {
   const target = targets.find((item) => item.id === run.targetId);
-  return <tr><td className="px-4 py-3"><p className="font-semibold">{target?.name ?? run.targetId}</p><p className="text-xs text-slate-500">{target?.domain ?? "Target"}</p></td><td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2"><StatusPill status={run.status} /><span className="text-xs text-slate-500">{run.profile} · {run.packId ?? "terminal"}</span></div></td><td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">{run.pullRequest ? `#${run.pullRequest}` : "PR —"} · {run.commitSha?.slice(0, 7) ?? "SHA —"}</td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatWhen(run.finishedAt ?? run.startedAt)}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-2">{run.canCancel && <button type="button" onClick={() => void onCancel(run.id)} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">Hủy run</button>}<button type="button" onClick={(event) => onView(run, event.currentTarget)} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800">Xem run</button></div></td></tr>;
+  return (
+    <tr>
+      <td className="px-4 py-3">
+        <p className="font-semibold">{target?.name ?? run.targetId}</p>
+        <p className="text-[11px] text-[var(--text-2)]">
+          {target?.domain ?? "Target"}
+        </p>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <StatusPill status={run.status} />
+          <span className="text-[11px] text-[var(--text-2)]">
+            {run.profile} · {run.packId ?? "terminal"}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 font-mono text-[11px] text-[var(--text-2)]">
+        #{run.pullRequest ?? "—"} · {run.commitSha?.slice(0, 7) ?? "SHA —"}
+      </td>
+      <td className="px-4 py-3 text-[var(--text-2)]">
+        {formatWhen(run.finishedAt ?? run.startedAt)}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex gap-2">
+          {run.canCancel && (
+            <button
+              type="button"
+              onClick={() => void onCancel(run)}
+              className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-[12px] font-bold sm:min-h-9"
+            >
+              Hủy run
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onView(run)}
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-3 text-[12px] font-bold sm:min-h-9"
+          >
+            Xem lần chạy
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+function DispatchDialog({
+  dialogRef,
+  targets,
+  runTargetId,
+  setRunTargetId,
+  profile,
+  setProfile,
+  context,
+  setContext,
+  preflight,
+  availableProfiles,
+  onDispatch,
+  submitting,
+  onClose,
+}: {
+  dialogRef: RefObject<HTMLDivElement | null>;
+  targets: Target[];
+  runTargetId: string;
+  setRunTargetId: (id: string) => void;
+  profile: Profile;
+  setProfile: (value: Profile) => void;
+  context: { pullRequest: string; commitSha: string };
+  setContext: (value: { pullRequest: string; commitSha: string }) => void;
+  preflight?: Preflight;
+  availableProfiles?: Record<Profile, boolean>;
+  onDispatch: () => void;
+  submitting: boolean;
+  onClose: () => void;
+}) {
+  const [targetSearch, setTargetSearch] = useState("");
+  const [domain, setDomain] = useState("all");
+  const selected = targets.find((target) => target.id === runTargetId);
+  const domains = [...new Set(targets.map((target) => target.domain))].sort();
+  const scopedTargets = targets
+    .filter((target) => domain === "all" || target.domain === domain)
+    .filter((target) =>
+      `${target.domain} ${target.name} ${target.id}`
+        .toLowerCase()
+        .includes(targetSearch.toLowerCase()),
+    );
+  const groupedTargets = scopedTargets.reduce<Record<string, Target[]>>(
+    (groups, target) => {
+      (groups[target.domain] ??= []).push(target);
+      return groups;
+    },
+    {},
+  );
+  const stagingContextRequired =
+    Boolean(context.pullRequest || context.commitSha) ||
+    preflight?.reasons.some(
+      (reason) => reason.code === "STAGING_CONTEXT_UNAVAILABLE",
+    );
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_srgb,var(--text)_55%,transparent)] p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-run-confirm-title"
+        aria-describedby="manual-run-confirm-description"
+        className="max-h-[92dvh] w-full max-w-[920px] overflow-y-auto rounded-[var(--radius-lg)] bg-[var(--bg-elev)] shadow-2xl"
+      >
+        <header className="flex items-start justify-between border-b border-[var(--border)] p-5">
+          <div>
+            <h3 id="manual-run-confirm-title" className="text-xl font-bold">
+              Chạy manual targeted test
+            </h3>
+            <p id="manual-run-confirm-description" className="mt-1 text-sm text-[var(--text-2)]">
+              Chọn đúng target trước; hệ thống chỉ chạy test pack liên quan.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={onClose}
+            className="min-h-11 min-w-11 text-xl"
+          >
+            ×
+          </button>
+        </header>
+        <div className="grid md:grid-cols-[1.05fr_.95fr]">
+          <section className="border-b border-[var(--border)] p-5 md:border-b-0 md:border-r">
+            <label className="text-sm font-semibold">
+              Tìm màn hình, flow hoặc feature
+              <input
+                aria-label="Tìm QA target"
+                value={targetSearch}
+                onChange={(event) => setTargetSearch(event.target.value)}
+                placeholder="Tìm target đã map"
+                className={`mt-2 ${fieldClass}`}
+              />
+            </label>
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-[var(--text-2)]">
+                Nhóm chức năng
+                <select
+                  aria-label="Nhóm chức năng"
+                  value={domain}
+                  onChange={(event) => {
+                    setDomain(event.target.value);
+                    setRunTargetId("");
+                  }}
+                  className={`mt-1 ${fieldClass}`}
+                >
+                  <option value="all">Tất cả nhóm</option>
+                  {domains.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="mt-2 block text-xs font-semibold text-[var(--text-2)]">
+              <span className="flex items-center gap-2">
+                Target cần chạy
+                <span className="rounded-[var(--radius)] bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--danger)]">
+                  Bắt buộc
+                </span>
+              </span>
+              <select
+                aria-label="Target cần chạy"
+                aria-required="true"
+                value={runTargetId}
+                onChange={(event) => setRunTargetId(event.target.value)}
+                className={`mt-1 ${fieldClass}`}
+              >
+                <option value="">Chọn target cần chạy</option>
+                {scopedTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="mt-4 text-xs font-semibold uppercase text-[var(--text-3)]">
+              Catalog target QA · {scopedTargets.length} target
+            </p>
+            <div
+              aria-label="Danh sách QA target"
+              className="mt-2 max-h-64 space-y-3 overflow-y-auto"
+            >
+              {Object.entries(groupedTargets).map(([domain, items]) => (
+                <div key={domain}>
+                  <p className="text-xs font-semibold text-[var(--text-2)]">
+                    {domain}
+                  </p>
+                  {items.map((target) => (
+                    <button
+                      key={target.id}
+                      type="button"
+                      aria-pressed={runTargetId === target.id}
+                      onClick={() => setRunTargetId(target.id)}
+                      className={`mt-1 w-full rounded-[var(--radius)] border p-3 text-left ${runTargetId === target.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-transparent hover:bg-[var(--bg-hover)]"}`}
+                    >
+                      <strong className="block text-[13px]">
+                        {target.name}
+                      </strong>
+                      <span className="text-xs text-[var(--text-2)]">
+                        {target.id} · chọn để kiểm tra pack và điều kiện chạy
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+            {selected && (
+              <div className="mt-2 rounded-[var(--radius)] border border-[var(--accent-border)] bg-[var(--accent-soft)] p-3">
+                <strong className="block">
+                  {selected.domain} › {selected.name}
+                </strong>
+                <span className="text-xs text-[var(--text-2)]">
+                  {selected.id}
+                </span>
+              </div>
+            )}
+          </section>
+          <section className="space-y-4 p-5">
+            <h4 className="text-[15px] font-bold">Preflight trước khi chạy</h4>
+            {selected ? (
+              <div className="rounded-[var(--radius)] border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-[12px] font-bold text-[var(--accent)]">
+                {selected.domain} › {selected.name}
+              </div>
+            ) : (
+              <div className="rounded-[var(--radius)] border border-dashed border-[var(--border-dashed)] px-3 py-2 text-[12px] text-[var(--text-2)]">
+                Chọn target để xem pack và điều kiện chạy.
+              </div>
+            )}
+            <fieldset className="border-0 p-0">
+              <legend className="px-0 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
+                Gói test được phép
+              </legend>
+              <p className="mt-1 text-[11px] text-[var(--text-2)]">
+                Chỉ gói có TC-ID đã được QA phê duyệt mới có thể chạy.
+              </p>
+              <div className="mt-2 space-y-2">
+                {(
+                  [
+                    ["smoke", "Smoke", "Kiểm tra phạm vi tác động đã map"],
+                    [
+                      "regression",
+                      "Regression",
+                      "Chỉ chạy khi target có pack regression được chứng nhận",
+                    ],
+                  ] as const
+                ).map(([value, label, description]) => {
+                  const available = availableProfiles?.[value] ?? false;
+                  const availabilityMessage = !runTargetId
+                    ? "Chọn target để xem gói test được phép"
+                    : !availableProfiles
+                      ? "Đang kiểm tra gói test được phép…"
+                      : "Chưa có pack được QA phê duyệt cho target này";
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={profile === value}
+                      disabled={!available}
+                      onClick={() => setProfile(value)}
+                      className={`w-full rounded-[var(--radius)] border p-3 text-left disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--bg-sunk)] disabled:opacity-70 ${profile === value && available ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] hover:bg-[var(--bg-hover)]"}`}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span>
+                          <strong className="block text-sm">{label}</strong>
+                          <span className="block text-xs text-[var(--text-2)]">
+                            {available ? description : availabilityMessage}
+                          </span>
+                        </span>
+                        {profile === value && preflight?.pack && (
+                          <span className="shrink-0 text-right text-[11px] font-bold text-[var(--accent)]">
+                            {preflight.pack.testCases.length} TC ·{" "}
+                            {preflight.pack.estimatedDurationMinutes} phút
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <details
+              open={stagingContextRequired}
+              className="rounded-[var(--radius)] border border-[var(--border)] p-3"
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold">
+                Thông tin bản deploy Staging
+                <span className="rounded-[var(--radius)] bg-[var(--bg-sunk)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-2)]">
+                  {stagingContextRequired
+                    ? "Bắt buộc lúc này"
+                    : "Có điều kiện"}
+                </span>
+              </summary>
+              <p className="mt-1 text-[11px] text-[var(--text-2)]">
+                Hệ thống sẽ tự nhận bản Staging trước. Nếu không tìm được, nhập
+                đủ cả PR và Commit SHA của cùng một bản deploy.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-[var(--text-2)]">
+                  PR Staging
+                  <span className="ml-1 text-[10px] font-bold text-[var(--danger)]">
+                    {stagingContextRequired ? "Bắt buộc" : "đi cùng SHA"}
+                  </span>
+                  <input
+                    aria-label="PR Staging"
+                    aria-required={stagingContextRequired}
+                    value={context.pullRequest}
+                    onChange={(event) =>
+                      setContext({ ...context, pullRequest: event.target.value })
+                    }
+                    placeholder="Ví dụ: 1746"
+                    className={`mt-1 ${fieldClass}`}
+                  />
+                </label>
+                <label className="block text-xs font-semibold text-[var(--text-2)]">
+                  Commit SHA
+                  <span className="ml-1 text-[10px] font-bold text-[var(--danger)]">
+                    {stagingContextRequired ? "Bắt buộc" : "đi cùng PR"}
+                  </span>
+                  <input
+                    aria-label="Commit SHA"
+                    aria-required={stagingContextRequired}
+                    value={context.commitSha}
+                    onChange={(event) =>
+                      setContext({ ...context, commitSha: event.target.value })
+                    }
+                    placeholder="Ví dụ: a1b2c3d4"
+                    className={`mt-1 ${fieldClass}`}
+                  />
+                </label>
+              </div>
+            </details>
+            <p className="rounded-[var(--radius)] bg-[var(--bg-sunk)] p-3 text-xs text-[var(--text-2)]">
+              Chỉ pack được server cho phép mới có thể chạy. Preflight luôn được
+              kiểm tra lại trước khi dispatch.
+            </p>
+            {preflight ? (
+              <PreflightCard preflight={preflight} />
+            ) : (
+              <p className="rounded-[var(--radius)] border border-dashed border-[var(--border-dashed)] p-4 text-sm text-[var(--text-2)]">
+                Preflight hiển thị TC-ID, fixture, thời lượng và capacity trước
+                khi xác nhận.
+              </p>
+            )}
+          </section>
+        </div>
+        <footer className="flex flex-col-reverse gap-2 border-t border-[var(--border)] p-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-semibold"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            disabled={!preflight?.canDispatch || submitting}
+            onClick={onDispatch}
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {preflight?.pack
+              ? `Xác nhận chạy ${preflight.pack.testCases.length} TC`
+              : "Xác nhận chạy"}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+function PreflightCard({ preflight }: { preflight: Preflight }) {
+  const blocked = preflight.reasons.map((reason) => ({
+    ...reason,
+    ...preflightReasonCopy(reason.code, reason.recovery),
+  }));
+  return (
+    <div
+      role="status"
+      className="rounded-[var(--radius)] border p-4 text-sm"
+      style={{
+        borderColor: preflight.canDispatch ? "var(--success)" : "var(--warn)",
+      }}
+    >
+      <strong className="block text-[13px]">
+        {preflight.canDispatch
+          ? "Sẵn sàng chạy test"
+          : "Chưa thể chạy test này"}
+      </strong>
+      {!preflight.canDispatch && (
+        <p className="mt-1 text-[12px] text-[var(--text-2)]">
+          Hoàn thành các điều kiện dưới đây rồi hệ thống sẽ tự cho phép nút “Xác
+          nhận chạy”.
+        </p>
+      )}
+      {preflight.pack && (
+        <dl className="mt-3 grid grid-cols-2 gap-2">
+          <dt>Pack</dt>
+          <dd>
+            {preflight.pack.id} · v{preflight.pack.version}
+          </dd>
+          <dt>Test type</dt>
+          <dd>{preflight.pack.testType}</dd>
+          <dt>Selected checks</dt>
+          <dd>{preflight.pack.testCases.length} TC</dd>
+          <dt>Fixture</dt>
+          <dd>{preflight.pack.fixtureKey}</dd>
+          <dt>Estimated duration</dt>
+          <dd>{preflight.pack.estimatedDurationMinutes} phút</dd>
+          <dt>Manual checklist</dt>
+          <dd>{preflight.pack.manualChecklistCount} mục</dd>
+          <dt>Environment</dt>
+          <dd>{preflight.environment}</dd>
+        </dl>
+      )}
+      <ul className="mt-3 space-y-2">
+        {blocked.map((reason) => (
+          <li
+            key={reason.code}
+            className="rounded-[var(--radius)] bg-[color-mix(in_srgb,var(--warn)_10%,var(--bg-elev))] px-3 py-2 text-[12px] text-[var(--text-2)]"
+          >
+            <strong className="block text-[var(--text)]">{reason.title}</strong>
+            <span className="mt-0.5 block">Cần làm: {reason.action}</span>
+          </li>
+        ))}
+        {preflight.pack?.prerequisites.map((item) => (
+          <li key={item} className="text-[12px] text-[var(--text-2)]">
+            Điều kiện: {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+function RunDetail({
+  run,
+  target,
+  onClose,
+}: {
+  run: HistoryItem;
+  target?: Target;
+  onClose: () => void;
+}) {
+  const resultSummary = (() => {
+    if (!run.summary || typeof run.summary !== "object")
+      return "Chưa có tổng hợp testcase; evidence an toàn sẽ xuất hiện khi runner hoàn tất.";
+    const summary = run.summary as Record<string, unknown>;
+    const passed = summary.passed ?? summary.summaryPassed;
+    const failed = summary.failed ?? summary.summaryFailed;
+    const skipped = summary.skipped ?? summary.summarySkipped;
+    const parts = [
+      passed === undefined ? undefined : `${String(passed)} đạt`,
+      failed === undefined ? undefined : `${String(failed)} thất bại`,
+      skipped === undefined ? undefined : `${String(skipped)} bỏ qua`,
+    ].filter(Boolean);
+    return parts.length
+      ? `${parts.join(" · ")} — chỉ hiển thị metadata evidence an toàn.`
+      : "Tổng hợp testcase đã được ghi nhận; không hiển thị URL artifact thô.";
+  })();
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    dialog.current?.querySelector<HTMLElement>("button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...(dialog.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input, select, [href]",
+        ) ?? []),
+      ];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_srgb,var(--text)_55%,transparent)] p-4">
+      <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="run-detail-title"
+        className="w-full max-w-3xl rounded-[var(--radius-lg)] bg-[var(--bg-elev)] shadow-2xl"
+      >
+        <header className="flex items-start justify-between border-b border-[var(--border)] p-5">
+          <div>
+            <h3 id="run-detail-title" className="text-xl font-bold">
+              Chi tiết lần chạy · {target?.name ?? run.targetId}
+            </h3>
+            <p className="mt-1 text-sm text-[var(--text-2)]">
+              Safe run metadata · Staging
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Đóng chi tiết run"
+            onClick={onClose}
+            className="min-h-11 min-w-11 text-xl"
+          >
+            ×
+          </button>
+        </header>
+        <div className="grid gap-5 p-5 sm:grid-cols-2">
+          <section>
+            <h4 className="mb-3 text-[12px] font-bold">Tóm tắt lần chạy</h4>
+            <dl className="space-y-2 text-[12px]">
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--text-2)]">Gói test</dt>
+                <dd>
+                  {run.packId ?? "terminal"} · {run.profile}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--text-2)]">Kết quả</dt>
+                <dd>{statusLabel(run.status)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-[var(--text-2)]">Evidence</dt>
+                <dd>{evidenceLabel(run.evidenceState)}</dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <h4 className="mb-3 text-[12px] font-bold">Kết quả testcase</h4>
+            <div className="rounded-[var(--radius)] bg-[var(--bg-sunk)] p-3 text-[12px] leading-5 text-[var(--text-2)]">
+              {resultSummary}
+            </div>
+          </section>
+        </div>
+        <footer className="border-t border-[var(--border)] p-4 text-right">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-semibold"
+          >
+            Đóng
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+function MobileFilters({
+  targets,
+  packOptions,
+  targetId,
+  setTargetId,
+  days,
+  setDays,
+  filters,
+  updateFilter,
+  onClear,
+  onClose,
+}: {
+  targets: Target[];
+  packOptions: string[];
+  targetId: string;
+  setTargetId: (value: string) => void;
+  days: string;
+  setDays: (value: string) => void;
+  filters: Filters;
+  updateFilter: <K extends keyof Filters>(key: K, value: Filters[K]) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    dialog.current
+      ?.querySelector<HTMLElement>("button, input, select")
+      ?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...(dialog.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input, select",
+        ) ?? []),
+      ];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-[color-mix(in_srgb,var(--text)_55%,transparent)] sm:hidden">
+      <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="run-filters-title"
+        className="w-full rounded-t-[var(--radius-lg)] bg-[var(--bg-elev)] p-5"
+      >
+        <div className="flex items-center justify-between">
+          <h3 id="run-filters-title" className="text-lg font-bold">
+            Bộ lọc lịch sử chạy
+          </h3>
+          <button
+            type="button"
+            aria-label="Đóng bộ lọc"
+            onClick={onClose}
+            className="min-h-11 min-w-11 text-xl"
+          >
+            ×
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3">
+          <select
+            aria-label="Lọc Target mobile"
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            className={fieldClass}
+          >
+            <option value="">Target: Tất cả</option>
+            {targets.map((target) => (
+              <option key={target.id} value={target.id}>
+                {target.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Khoảng thời gian mobile"
+            value={days}
+            onChange={(event) => setDays(event.target.value)}
+            className={fieldClass}
+          >
+            <option value="7">7 ngày gần đây</option>
+            <option value="14">14 ngày gần đây</option>
+            <option value="30">30 ngày gần đây</option>
+          </select>
+          <select
+            aria-label="Lọc Pack mobile"
+            value={filters.packId}
+            onChange={(event) => updateFilter("packId", event.target.value)}
+            className={fieldClass}
+          >
+            <option value="">Gói test: Tất cả</option>
+            {packOptions.map((packId) => (
+              <option key={packId} value={packId}>
+                {packId}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Lọc Trạng thái mobile"
+            value={filters.status}
+            onChange={(event) => updateFilter("status", event.target.value)}
+            className={fieldClass}
+          >
+            <option value="">Kết quả: Tất cả</option>
+            <option value="passed">Đạt</option>
+            <option value="failed">Thất bại</option>
+            <option value="dispatched">Đang chạy</option>
+            <option value="cancelled">Đã hủy</option>
+          </select>
+          <select aria-label="Lọc Profile mobile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={fieldClass}>
+            <option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option>
+          </select>
+          <input
+            aria-label="Lọc PR mobile"
+            value={filters.pullRequest}
+            onChange={(event) =>
+              updateFilter("pullRequest", event.target.value)
+            }
+            placeholder="PR #"
+            className={fieldClass}
+          />
+          <input
+            aria-label="Lọc SHA mobile"
+            value={filters.commitSha}
+            onChange={(event) => updateFilter("commitSha", event.target.value)}
+            placeholder="Commit SHA"
+            className={fieldClass}
+          />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] text-sm font-semibold"
+          >
+            Xóa
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-[var(--radius)] bg-[var(--accent)] text-sm font-semibold text-white"
+          >
+            Áp dụng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

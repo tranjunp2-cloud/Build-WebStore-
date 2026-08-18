@@ -482,13 +482,16 @@ export async function getQaControlCenterData(
         (right.lastRunAt ?? "").localeCompare(left.lastRunAt ?? "") ||
         left.targetName.localeCompare(right.targetName),
     );
-  const relevantRunIds = [
-    ...new Set(
-      actionable.flatMap((target) =>
-        target.links.flatMap((link) => (link.runId ? [link.runId] : [])),
-      ),
-    ),
-  ];
+  // A finding or change-impact link does not necessarily carry a runId. Fetch
+  // every already-bounded recent run for actionable targets so Feature Detail
+  // can still show the failed TC/fixture/evidence instead of a false coverage
+  // gap when the health explanation originated from another signal.
+  const actionableTargetIds = new Set(
+    actionable.map((target) => target.targetId),
+  );
+  const relevantRunIds = runs
+    .filter((run) => actionableTargetIds.has(run.targetId))
+    .map((run) => run.id);
   const resultsResult = relevantRunIds.length
     ? await payload.find({
         collection: "qa_test_results",

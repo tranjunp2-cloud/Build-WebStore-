@@ -69,7 +69,9 @@ test.describe("F40 finding review and GitHub promotion", () => {
     );
 
     // Act: opening the confirmation and cancelling it must remain side-effect free.
-    await page.goto("/studio/qa?tab=findings");
+    // Finding review is intentionally aggregated into Inbox, rather than a
+    // competing top-level workflow.
+    await page.goto("/studio/qa?tab=inbox");
     await expect(
       page.getByTestId(`qa-open-finding-${findingId}`),
     ).toBeVisible();

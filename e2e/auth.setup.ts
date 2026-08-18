@@ -79,7 +79,17 @@ setup('authenticate', async ({ page }, testInfo) => {
         // Submit OTP — click verify button or wait for auto-submit
         const verifyBtn = page.locator('button[type="submit"], button:has-text("Verify"), button:has-text("Submit")').first()
         if (await verifyBtn.isVisible()) {
-            await verifyBtn.click()
+            // The OTP page can redirect synchronously after the last digit is
+            // entered. Do not fail setup if that successful navigation detaches
+            // the button while Playwright is completing the click.
+            try {
+                await verifyBtn.click({ noWaitAfter: true })
+            } catch (error) {
+                const pathname = new URL(page.url()).pathname
+                if (!['/dashboard', '/builder', '/onboarding'].some((path) => pathname.includes(path))) {
+                    throw error
+                }
+            }
         }
 
         // Wait for redirect to dashboard

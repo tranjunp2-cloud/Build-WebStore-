@@ -120,6 +120,41 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
     await expect(
       page.getByRole("heading", { name: /QA Control Center/i }),
     ).toBeVisible();
+    // The approved IA has exactly three local workspaces. Finding review is
+    // intentionally presented inside Inbox, never as a competing top-level tab.
+    await expect(page.getByRole("tab")).toHaveCount(3);
+    await expect(
+      page.getByText("Theo dõi tự động đang bật cho Staging"),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Findings" })).toHaveCount(0);
+    await expect(page.getByTestId("qa-inbox-list")).toHaveCount(1);
+    await expect(page.getByTestId("qa-inbox-table")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Hộp việc QC", exact: true }),
+    ).toHaveCount(1);
+    await expect(page.getByTestId("qa-findings-inbox")).toHaveCount(0);
+    await page.getByRole("button", { name: /Nghiêm trọng/ }).click();
+    await expect(
+      page
+        .getByTestId("qa-inbox-table")
+        .getByText(/Finding cần review luôn hiển thị/),
+    ).toBeVisible();
+    await expect(page.getByTestId(/qa-open-finding-/).first()).toBeVisible();
+    await page.getByRole("button", { name: "Chạy test thủ công" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Chạy manual targeted test" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("button", { name: "Chạy test thủ công" }),
+    ).toBeFocused();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("tab"))
+      .toBe("runs");
+
+    // Return to Inbox before asserting its ordered queue. The header CTA
+    // intentionally opens the manual flow from the Runs workspace.
+    await page.getByRole("tab", { name: "Việc cần xử lý" }).click();
 
     // AC-1/2: an actionable Product Grid failure is ordered into Inbox and
     // exposes its persisted scenario detail rather than demo content.
@@ -132,8 +167,12 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
     ).toBeVisible();
     const orderedInboxTargets = await page
       .locator("[data-testid^='qa-inbox-row-']")
-      .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-testid")));
-    expect(orderedInboxTargets.indexOf("qa-inbox-row-editor-productgrid-variants")).toBeLessThan(
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-testid")),
+      );
+    expect(
+      orderedInboxTargets.indexOf("qa-inbox-row-editor-productgrid-variants"),
+    ).toBeLessThan(
       orderedInboxTargets.indexOf("qa-inbox-row-editor-publish-lifecycle"),
     );
     await page
@@ -146,7 +185,9 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
       "QA-Tshirt-SML",
     );
     await expect(page.getByTestId("qa-detail-expected")).toContainText("S, M");
-    await expect(page.getByTestId("qa-detail-actual")).toHaveText("Chỉ thấy S và M");
+    await expect(page.getByTestId("qa-detail-actual")).toHaveText(
+      "Chỉ thấy S và M",
+    );
     await expect(page.getByTestId("qa-visual-comparison")).toBeVisible();
     await expect(page.getByTestId("qa-visual-review-status")).toContainText(
       "Chờ tester xác nhận",
@@ -163,7 +204,9 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
       "href",
       /qa-e2e\.local\/sanitized\/diff/,
     );
-    await page.getByRole("button", { name: "Đánh dấu thay đổi hợp lệ" }).click();
+    await page
+      .getByRole("button", { name: "Đánh dấu thay đổi hợp lệ" })
+      .click();
     await expect(page.getByTestId("qa-visual-review-status")).toContainText(
       "Đã đánh dấu thay đổi hợp lệ",
     );
@@ -176,7 +219,7 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
     await page.keyboard.press("Escape");
 
     await page.getByTestId("qa-health-tab").click();
-    const searchInput = page.locator("#qa-target-search");
+    const searchInput = page.getByLabel("Tìm target toolbar");
     await expect(searchInput).toBeVisible();
     await searchInput.fill("Page Publish & Rollback");
 
@@ -203,16 +246,34 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
       "true",
     );
     await expect(
-      page.getByRole("heading", { name: "Lịch sử chạy" }),
+      page.getByRole("heading", { name: "Lịch sử chạy test", exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Lịch sử chạy test", exact: true }),
+    ).toHaveCount(1);
     await expect
       .poll(() => new URL(page.url()).searchParams.get("tab"))
       .toBe("runs");
+    // Retest may hand off to the manual-run workspace. Ensure its dialog is
+    // closed before exercising another tab; an open modal must block clicks.
+    const manualDialog = page.getByRole("dialog", {
+      name: "Chạy manual targeted test",
+    });
+    if (await manualDialog.isVisible()) {
+      await page.keyboard.press("Escape");
+      await expect(manualDialog).toBeHidden();
+    }
     await page.getByTestId("qa-health-tab").click();
-    await page
-      .getByRole("button", { name: "Mở chi tiết" })
-      .first()
-      .click();
+    const healthSummary = page.getByRole("region", {
+      name: "Tóm tắt sức khỏe",
+    });
+    await expect(healthSummary).toBeVisible();
+    await expect(healthSummary.locator(":scope > div")).toHaveCount(5);
+    await page.getByRole("button", { name: "Mở chi tiết" }).first().click();
+    await expect(page.getByTestId("qa-coverage-gap")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Coverage QA chưa sẵn sàng" }),
+    ).toBeVisible();
     await expect(page.getByTestId("qa-retest-pending")).toBeVisible();
     await page.keyboard.press("Escape");
 
@@ -225,6 +286,13 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
         ),
       )
       .toBe(true);
-
+    await page.getByRole("button", { name: "Lọc sức khỏe dự án" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Lọc sức khỏe dự án" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("dialog", { name: "Lọc sức khỏe dự án" }),
+    ).toBeHidden();
   });
 });
