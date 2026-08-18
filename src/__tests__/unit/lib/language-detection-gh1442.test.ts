@@ -136,6 +136,20 @@ describe('[TC-F26-11-01] shared language detection', () => {
         })
     })
 
+    it('detects a realistic Malay spa builder submission instead of falling back to English', () => {
+        const text = buildLanguageDetectionText({
+            businessName: 'Seri Embun Wellness',
+            industry: 'beauty',
+            shortDescription: 'Pusat rawatan wanita di Shah Alam yang menawarkan pengalaman penjagaan diri yang tenang menggunakan bahan semula jadi.',
+            products: 'Urutan aromaterapi, Rawatan muka, Mandian herba, Pakej pengantin',
+        })
+
+        expect(resolveGenerationLanguageDecision('auto', text)).toEqual({
+            locale: 'ms',
+            requiresConfirmation: false,
+        })
+    })
+
     it('normalizes pasted zero-width and non-breaking whitespace', () => {
         // Arrange / Act
         const text = buildLanguageDetectionText({ businessName: 'Ottimi\u200B\u00A0dolci', products: 'e birra' })

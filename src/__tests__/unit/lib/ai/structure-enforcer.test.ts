@@ -5,6 +5,7 @@ import {
     enforceSubpageStructure,
     enforceMinItems,
     enforceGridAlignment,
+    getSubpageContentTarget,
 } from '@/lib/ai/structure-enforcer'
 import { CATEGORY_REQUIREMENTS, getCategoryRequirement, ITEM_FIELD_BY_BLOCK } from '@/lib/ai/category-requirements'
 
@@ -630,6 +631,135 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
                 ),
             ).toHaveLength(5)
         })
+
+        it('keeps generated Contact pages compact and removes unrelated landing-page sections', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero', headline: 'Contact us' },
+                    { blockType: 'about' },
+                    { blockType: 'services' },
+                    { blockType: 'gallery' },
+                    { blockType: 'testimonials' },
+                    { blockType: 'cta' },
+                    { blockType: 'contact', headline: 'Get in touch' },
+                    { blockType: 'faq', headline: 'Helpful details' },
+                    { blockType: 'footer' },
+                ],
+                'restaurant',
+                { seed: 42 },
+                '/contact',
+            )
+
+            expect(result.map((block) => block.blockType)).toEqual([
+                'navigation',
+                'hero',
+                'contact',
+                'faq',
+                'footer',
+            ])
+        })
+
+        it('injects the required contact block without padding unrelated sections', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero', headline: 'Contact us' },
+                    { blockType: 'gallery' },
+                    { blockType: 'footer' },
+                ],
+                'restaurant',
+                { seed: 42 },
+                'contact',
+            )
+
+            expect(result.map((block) => block.blockType)).toEqual([
+                'navigation',
+                'hero',
+                'contact',
+                'footer',
+            ])
+        })
+
+        it('keeps About focused and removes Contact, Gallery, Services, and duplicate blocks', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero' },
+                    { blockType: 'about', headline: 'Our story' },
+                    { blockType: 'about', headline: 'Duplicate story' },
+                    { blockType: 'services' },
+                    { blockType: 'gallery' },
+                    { blockType: 'contact' },
+                    { blockType: 'team' },
+                    { blockType: 'footer' },
+                ],
+                'fnb',
+                { seed: 42 },
+                '/about',
+            )
+            const types = result.map((block) => block.blockType)
+
+            expect(types).toEqual(['navigation', 'hero', 'about', 'team', 'stats', 'footer'])
+            expect(types.filter((type) => type === 'about')).toHaveLength(1)
+            expect(types).not.toContain('gallery')
+            expect(types).not.toContain('contact')
+            expect(types).not.toContain('services')
+        })
+
+        it('keeps Services focused and deduplicates repeated service sections', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero' },
+                    { blockType: 'service-cards' },
+                    { blockType: 'service-cards' },
+                    { blockType: 'gallery' },
+                    { blockType: 'contact' },
+                    { blockType: 'faq' },
+                    { blockType: 'footer' },
+                ],
+                'restaurant',
+                { seed: 42 },
+                '/services',
+            )
+            const types = result.map((block) => block.blockType)
+
+            expect(types.filter((type) => type === 'service-cards')).toHaveLength(1)
+            expect(types).toContain('menu-food')
+            expect(types).toContain('faq')
+            expect(types).not.toContain('gallery')
+            expect(types).not.toContain('contact')
+            expect(getSubpageContentTarget('/services')).toBe(4)
+        })
+
+        it('keeps Blog focused and removes generic Gallery and Contact padding', () => {
+            const result = enforceSubpageStructure(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero' },
+                    { blockType: 'blog-list' },
+                    { blockType: 'gallery' },
+                    { blockType: 'contact' },
+                    { blockType: 'newsletter' },
+                    { blockType: 'cta' },
+                    { blockType: 'footer' },
+                ],
+                'fnb',
+                { seed: 42 },
+                '/blog',
+            )
+
+            expect(result.map((block) => block.blockType)).toEqual([
+                'navigation',
+                'hero',
+                'blog-list',
+                'newsletter',
+                'cta',
+                'footer',
+            ])
+            expect(getSubpageContentTarget('/blog')).toBe(3)
+        })
     })
 
     describe('backfillContentSections', () => {
@@ -658,6 +788,33 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             expect(result.some((block) => block.blockType === 'service-cards')).toBe(false)
             expect(result[0]).toBe(existing[0])
             expect(result[result.length - 1]).toBe(existing[existing.length - 1])
+        })
+
+        it('uses the Blog profile and does not restore Gallery or Contact', () => {
+            const result = backfillContentSections(
+                [
+                    { blockType: 'navigation' },
+                    { blockType: 'hero' },
+                    { blockType: 'blog-list' },
+                    { blockType: 'footer' },
+                ],
+                'fnb',
+                3,
+                { seed: 42 },
+                new Set(),
+                '/blog',
+            )
+            const types = result.map((block) => block.blockType)
+
+            expect(types).toEqual([
+                'navigation',
+                'hero',
+                'blog-list',
+                'newsletter',
+                'footer',
+            ])
+            expect(types).not.toContain('gallery')
+            expect(types).not.toContain('contact')
         })
     })
 })

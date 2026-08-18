@@ -16,7 +16,11 @@
 // Usage:
 //   await withPayloadRetry(() => payload.update({ collection, id, data }))
 
-export type TransientErrorKind = 'deadlock' | 'fk-violation' | 'type-error-title'
+export type TransientErrorKind =
+    | 'deadlock'
+    | 'fk-violation'
+    | 'type-error-title'
+    | 'type-error-transform'
 
 interface RetryOptions {
     maxRetries?: number
@@ -37,6 +41,13 @@ export function classifyTransientError(err: unknown): TransientErrorKind | null 
     // Known symptom of a post-deadlock stale doc (Payload internals trying
     // to read .title after the version rollback)
     if (err instanceof TypeError && msg.includes("reading 'title'")) return 'type-error-title'
+    // Payload Drizzle can occasionally fail to read back a newly inserted or
+    // updated row under heavy concurrent writes. createOperation/updateOperation
+    // rolls the transaction back before this reaches the caller, so retrying is safe.
+    if (
+        err instanceof TypeError &&
+        msg.includes("Cannot use 'in' operator to search for '_rels' in undefined")
+    ) return 'type-error-transform'
     return null
 }
 

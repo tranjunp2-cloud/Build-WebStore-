@@ -75,6 +75,70 @@ describe('composeFallbackResult — behaviors', () => {
         expect(result.language).toBe('vi')
     })
 
+    it('Malay F&B template converts legacy menu blueprint without duplicating business copy', () => {
+        const result = composeFallbackResult('kafe tempatan', 0, 'ms', {
+            businessName: 'Kopi Shah Alam',
+            industry: 'fnb',
+            products: 'Kopi artisan, Nasi lemak, Roti bakar',
+            shortDescription: 'Kafe tempatan dengan sarapan tradisional.',
+        })
+        const menu = result.pages
+            ?.flatMap((page) => page.blocks)
+            .find((block) => block.blockType === 'menu-food') as Record<string, unknown> | undefined
+        const categories = menu?.categories as Array<{ name: string; items: Array<Record<string, unknown>> }> | undefined
+
+        expect(menu?.headline).toBe('Menu Kami')
+        expect(categories?.[0]?.name).toBe('Pilihan Kami')
+        expect(categories?.[0]?.items.map((item) => item.name)).toEqual([
+            'Kopi artisan',
+            'Nasi lemak',
+            'Roti bakar',
+        ])
+        expect(categories?.[0]?.items.every((item) => item.tag == null)).toBe(true)
+        expect(JSON.stringify(menu)).not.toContain('Kafe tempatan dengan sarapan tradisional.')
+
+		const footer = result.pages
+			?.flatMap((page) => page.blocks)
+			.find((block) => block.blockType === 'footer') as Record<string, unknown> | undefined
+		const footerColumns = footer?.columns as Array<{ title: string; links: Array<{ label: string }> }> | undefined
+		expect(footer?.logoText).toBe('Kopi Shah Alam')
+		expect(footer?.copyrightText).toBe(`© ${new Date().getFullYear()} Kopi Shah Alam. Hak cipta terpelihara.`)
+		expect(footerColumns?.[0]?.title).toBe('Terokai')
+		expect(footerColumns?.[0]?.links.map((link) => link.label)).toContain('Utama')
+    })
+
+    it('Malay template keeps semantic item copy instead of repeating structural labels or business description', () => {
+        const shortDescription = 'Studio kecantikan wanita di Petaling Jaya yang menawarkan rawatan profesional dalam suasana selesa dan peribadi.'
+        const services = ['Rawatan jerawat', 'Urutan aromaterapi', 'Pakej pengantin']
+        const result = composeFallbackResult('studio kecantikan', 0, 'ms', {
+            businessName: 'Luna Beauty Studio',
+            industry: 'beauty',
+            products: services.join(', '),
+            shortDescription,
+        })
+        const blocks = result.pages?.flatMap((page) => page.blocks) ?? []
+        const findBlock = (blockType: string) => blocks.find((block) => block.blockType === blockType) as Record<string, unknown> | undefined
+
+        const features = findBlock('features')?.features as Array<{ title: string; description: string }>
+        expect(features.map((item) => item.title)).toEqual(services)
+        expect(new Set(features.map((item) => item.description)).size).toBe(services.length)
+
+        const testimonials = findBlock('testimonials')?.testimonials as Array<{ quote: string; name: string }>
+        expect(new Set(testimonials.map((item) => item.quote)).size).toBe(testimonials.length)
+        expect(testimonials.every((item) => item.quote !== shortDescription)).toBe(true)
+        expect(testimonials.every((item) => !services.includes(item.name))).toBe(true)
+
+        const faq = findBlock('faq')?.items as Array<{ question: string; answer: string }>
+        expect(new Set(faq.map((item) => item.question)).size).toBe(faq.length)
+        expect(faq.every((item) => item.question !== 'Soalan Lazim')).toBe(true)
+        expect(faq.every((item) => item.answer !== shortDescription)).toBe(true)
+
+        const team = findBlock('team')?.members as Array<{ name: string; role: string; bio: string }>
+        expect(team.every((member) => !services.includes(member.name))).toBe(true)
+        expect(team.every((member) => !services.includes(member.role))).toBe(true)
+        expect(team.every((member) => member.bio !== shortDescription)).toBe(true)
+    })
+
     it('pages array mirrors templateSeed pages', () => {
         const result = composeFallbackResult('restaurant', 0, 'en')
         expect(result.pages).toBeDefined()

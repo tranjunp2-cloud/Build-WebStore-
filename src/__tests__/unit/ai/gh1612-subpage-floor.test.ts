@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { composeFallbackResult } from '@/lib/ai/fallback-adapter'
-import { enforceSubpageStructure } from '@/lib/ai/structure-enforcer'
+import { enforceSubpageStructure, getSubpageContentTarget } from '@/lib/ai/structure-enforcer'
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 
 // Mock OpenAI client
@@ -88,11 +88,26 @@ describe('GH-1612 subpage floor and thickness tests (AC-10 / AC-01 / AC-03)', ()
         delete process.env.GEN_MODE
     })
 
+    it('template-first: Vietnamese restaurant About uses locale-safe padding without contact or gallery', () => {
+        const info = buildMockBusinessInfo('restaurant')
+        const result = composeFallbackResult('restaurant', 42, 'vi', info)
+        const aboutPage = result.pages?.find((page) => page.slug === '/about')
+        const contentBlocks = (aboutPage?.blocks || []).filter(
+            (block) => block.blockType !== 'navigation' && block.blockType !== 'footer',
+        )
+
+        expect(aboutPage).toBeDefined()
+        expect(contentBlocks).toHaveLength(4)
+        expect(contentBlocks.some((block) => block.blockType === 'features')).toBe(true)
+        expect(contentBlocks.some((block) => block.blockType === 'contact')).toBe(false)
+        expect(contentBlocks.some((block) => block.blockType === 'gallery')).toBe(false)
+    })
+
     // Test matrix: 5 categories x 2 languages
     for (const category of CATEGORIES) {
         for (const lang of LANGUAGES) {
             describe(`Category: ${category}, Lang: ${lang}`, () => {
-                it('template-first: every subpage has >= 5 content sections', () => {
+                it('template-first: standard subpages stay thick while Contact stays compact', () => {
                     const info = buildMockBusinessInfo(category)
                     const result = composeFallbackResult(category, 42, lang, info)
                     
@@ -112,8 +127,13 @@ describe('GH-1612 subpage floor and thickness tests (AC-10 / AC-01 / AC-03)', ()
                             (b) => b.blockType !== 'navigation' && b.blockType !== 'footer'
                         )
                         
-                        // AC-01 & AC-03: Every subpage has >= 5 content sections (no navigation + footer)
-                        expect(contentBlocks.length).toBeGreaterThanOrEqual(5)
+                        const target = getSubpageContentTarget(page.slug)
+                        expect(contentBlocks.length).toBeGreaterThanOrEqual(target)
+
+                        if (['/about', '/services', '/products', '/blog'].includes(`/${page.slug.replace(/^\/+/, '')}`)) {
+                            expect(contentBlocks.some((block) => block.blockType === 'contact')).toBe(false)
+                            expect(contentBlocks.some((block) => block.blockType === 'gallery')).toBe(false)
+                        }
                     }
                 })
 
@@ -210,8 +230,13 @@ describe('GH-1612 subpage floor and thickness tests (AC-10 / AC-01 / AC-03)', ()
                             (b) => b.blockType !== 'navigation' && b.blockType !== 'footer'
                         )
 
-                        // AC-01 & AC-03 & AC-10: Subpage generated via AI-first has >= 5 content sections after generator enforcer loop
-                        expect(contentBlocks.length).toBeGreaterThanOrEqual(5)
+                        const target = getSubpageContentTarget(page.slug)
+                        expect(contentBlocks.length).toBeGreaterThanOrEqual(target)
+
+                        if (['/about', '/services', '/products', '/blog'].includes(`/${page.slug.replace(/^\/+/, '')}`)) {
+                            expect(contentBlocks.some((block) => block.blockType === 'contact')).toBe(false)
+                            expect(contentBlocks.some((block) => block.blockType === 'gallery')).toBe(false)
+                        }
                     }
                 })
             })

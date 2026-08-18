@@ -4,17 +4,7 @@
  * slot name (gallery[0], hero[0], etc.) using per-site prefix imglib:s{siteId}:
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-
-const { mockReadSiteStockAssignments } = vi.hoisted(() => ({
-    mockReadSiteStockAssignments: vi.fn(),
-}))
-
-vi.mock('@/lib/media/stock-adapter', () => ({
-    createF38StockInfrastructure: vi.fn(() => ({
-        readSiteStockAssignments: mockReadSiteStockAssignments,
-    })),
-}))
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
@@ -33,9 +23,6 @@ function buildPayload(docs: Array<{ alt?: string; url?: string; filename?: strin
 describe('resolveImageLibraryS3Map', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-    })
-    afterEach(() => {
-        vi.unstubAllEnvs()
     })
 
     it('TC-GH-727-03a: happy path — returns map keyed by slot name (Phase 04 format)', async () => {
@@ -95,35 +82,5 @@ describe('resolveImageLibraryS3Map', () => {
         expect(Object.keys(result)).toHaveLength(1)
         expect(result['about']).toBe('https://s3.example.com/valid.jpg')
         expect(result['imglib:s1:about']).toBeUndefined() // key is slot name, not full altKey
-    })
-
-    it('TC-F38-RES-08: resolves F38 site-slot assignments to shared Media URLs', async () => {
-        // Arrange
-        vi.stubEnv('F38_IMAGE_PIPELINE', 'true')
-        mockReadSiteStockAssignments.mockResolvedValue([
-            { slot: 'gallery[0]', mediaId: 101 },
-            { slot: 'hero[0]', mediaId: 202 },
-        ])
-        const payload = {
-            find: vi.fn().mockResolvedValue({
-                docs: [
-                    { id: 101, url: 'https://s3.example.com/shared-gallery.jpg' },
-                    { id: 202, url: 'https://s3.example.com/shared-hero.jpg' },
-                ],
-            }),
-        }
-
-        // Act
-        const result = await resolveImageLibraryS3Map(payload as never, 42)
-
-        // Assert
-        expect(result).toEqual({
-            'gallery[0]': 'https://s3.example.com/shared-gallery.jpg',
-            'hero[0]': 'https://s3.example.com/shared-hero.jpg',
-        })
-        expect(mockReadSiteStockAssignments).toHaveBeenCalledWith(42)
-        expect(payload.find).toHaveBeenCalledWith(expect.objectContaining({
-            where: { id: { in: [101, 202] } },
-        }))
     })
 })

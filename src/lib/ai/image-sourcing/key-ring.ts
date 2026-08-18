@@ -1,9 +1,12 @@
 export type Clock = () => number
 
+export type PixabayKeyUnavailableReason = 'auth' | 'rate' | 'server'
+
 interface KeyState {
     disabled: boolean
     cooldownUntil: number
     consecutiveServerErrors: number
+    unavailableReason: PixabayKeyUnavailableReason | null
 }
 
 export interface SelectedPixabayKey {
@@ -33,6 +36,7 @@ export class PixabayKeyRing {
             disabled: false,
             cooldownUntil: 0,
             consecutiveServerErrors: 0,
+            unavailableReason: null,
         }))
     }
 
@@ -65,6 +69,7 @@ export class PixabayKeyRing {
         if (status === 401 || status === 403) {
             state.disabled = true
             state.consecutiveServerErrors = 0
+            state.unavailableReason = 'auth'
             return
         }
         if (status === 429) {
@@ -72,6 +77,7 @@ export class PixabayKeyRing {
             const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 60
             state.cooldownUntil = this.clock() + seconds * 1000
             state.consecutiveServerErrors = 0
+            state.unavailableReason = 'rate'
             return
         }
         if (status >= 500) {
@@ -79,10 +85,24 @@ export class PixabayKeyRing {
             if (state.consecutiveServerErrors >= 3) {
                 state.cooldownUntil = this.clock() + 60_000
                 state.consecutiveServerErrors = 0
+                state.unavailableReason = 'server'
             }
             return
         }
         state.consecutiveServerErrors = 0
+        state.unavailableReason = null
+    }
+
+    getUnavailableReason(): PixabayKeyUnavailableReason | 'no_key' | null {
+        if (this.keys.length === 0) return 'no_key'
+        const now = this.clock()
+        const unavailable = this.states.filter(
+            (state) => state.disabled || now < state.cooldownUntil,
+        )
+        if (unavailable.length < this.states.length) return null
+        if (unavailable.some((state) => state.unavailableReason === 'rate')) return 'rate'
+        if (unavailable.some((state) => state.unavailableReason === 'server')) return 'server'
+        return 'auth'
     }
 
     getSafeState(index: number): Readonly<KeyState> | null {

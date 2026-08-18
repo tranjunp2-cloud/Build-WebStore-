@@ -53,6 +53,7 @@ vi.mock('@/lib/ai/pixabay-client', () => {
         }
     }
     return {
+        markPixabayMediaUsed: vi.fn(),
         searchPhotos: vi.fn().mockResolvedValue([
             {
                 id: 'p1',

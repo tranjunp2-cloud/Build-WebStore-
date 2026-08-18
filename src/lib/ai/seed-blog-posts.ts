@@ -3,7 +3,12 @@ import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
-import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import {
+    searchPhotos,
+    PixabayError,
+    PIXABAY_CATEGORY_BY_COMPOSER,
+    markPixabayMediaUsed,
+} from './pixabay-client'
 import { normalizeComposerCategory } from './composer-category-resolver'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import type { BlogPost } from './content/types'
@@ -333,6 +338,7 @@ export async function persistBlogPosts(
                 context: { skipPublishNotify: true },
             })
             count++
+            if (post.thumbnailId !== undefined) markPixabayMediaUsed([post.thumbnailId])
         } catch (err) {
             console.warn(`[seed-blog-posts] post "${post.slug}" failed (non-fatal):`, (err as Error).message)
         }

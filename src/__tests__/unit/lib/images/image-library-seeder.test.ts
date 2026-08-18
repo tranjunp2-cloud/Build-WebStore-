@@ -6,32 +6,9 @@
  * Coverage: happy path, idempotency, partial failure, unknown category fallback.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Top-level mocks ──────────────────────────────────────────────────────────
-
-const {
-    mockReadSiteStockAssignments,
-    mockReplaceSiteStockAssignments,
-    mockResolveF38ImageDemand,
-} = vi.hoisted(() => ({
-    mockReadSiteStockAssignments: vi.fn(),
-    mockReplaceSiteStockAssignments: vi.fn(),
-    mockResolveF38ImageDemand: vi.fn(),
-}))
-
-vi.mock('@/lib/media/stock-adapter', () => ({
-    createF38StockInfrastructure: vi.fn(() => ({
-        readSiteStockAssignments: mockReadSiteStockAssignments,
-        replaceSiteStockAssignments: mockReplaceSiteStockAssignments,
-    })),
-}))
-
-vi.mock('@/lib/ai/image-sourcing', () => ({
-    createF38RuntimeResolver: vi.fn(() => ({
-        resolveF38ImageDemand: mockResolveF38ImageDemand,
-    })),
-}))
 
 vi.mock('@/lib/ai/pixabay-client', () => ({
     searchPhotos: vi.fn(),
@@ -47,10 +24,7 @@ vi.mock('@/lib/ai/media-pipeline', () => ({
 
 // ── Imports (after mocks) ────────────────────────────────────────────────────
 
-import {
-    persistF38ImageLibraryAssignments,
-    seedImageLibraryForSite,
-} from '@/lib/images/image-library-seeder'
+import { seedImageLibraryForSite } from '@/lib/images/image-library-seeder'
 import { searchPhotos, downloadPhotoBuffer } from '@/lib/ai/pixabay-client'
 import { uploadBufferToMedia } from '@/lib/ai/media-pipeline'
 
@@ -87,10 +61,6 @@ const FAKE_MIMETYPE = 'image/jpeg'
 // Phase 04: seeder always uploads exactly 17 slots per site
 // 6 gallery + 3 hero + 1 about + 4 team + 3 features = 17
 const TOTAL_SLOTS = 17
-
-afterEach(() => {
-    vi.unstubAllEnvs()
-})
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -270,121 +240,5 @@ describe('TC-GENPERF-W1-03 — imglib seeder idempotency (Wave 1 integration)', 
         expect(mockUpload.mock.calls.length).toBe(uploadCountAfterFirst)
         expect(mockSearch.mock.calls.length).toBe(searchCallsAfterFirst) // No new searches
         expect(mockDownload.mock.calls.length).toBe(downloadCallsAfterFirst) // No new downloads
-    })
-})
-
-describe('TC-F38-REUSE-01 — shared Media site-slot assignments', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-    })
-
-    it('upserts site slots without creating tenant Media copies', async () => {
-        // Arrange
-        mockReplaceSiteStockAssignments.mockImplementation(async (
-            siteId: number,
-            assignments: Array<{ slot: string; mediaId: number }>,
-        ) => assignments.map((assignment, index) => ({
-            id: index + 1,
-            siteId,
-            ...assignment,
-        })))
-        const payload = {
-            create: vi.fn(),
-        }
-
-        // Act
-        const persisted = await persistF38ImageLibraryAssignments(
-            payload as never,
-            10,
-            {
-                hero: [101],
-                gallery: [202, 203],
-                about: 304,
-                team: [],
-                features: [],
-            },
-        )
-
-        // Assert
-        expect(persisted).toBe(4)
-        expect(mockReplaceSiteStockAssignments).toHaveBeenCalledOnce()
-        expect(mockReplaceSiteStockAssignments).toHaveBeenCalledWith(
-            10,
-            expect.arrayContaining([{ slot: 'gallery[1]', mediaId: 203 }]),
-        )
-        expect(payload.create).not.toHaveBeenCalled()
-    })
-
-    it('TC-F38-RES-08: clears stale site assignments when no library images remain', async () => {
-        // Arrange
-        mockReplaceSiteStockAssignments.mockResolvedValue([])
-
-        // Act
-        const persisted = await persistF38ImageLibraryAssignments(
-            {} as never,
-            10,
-            {
-                hero: [],
-                gallery: [],
-                about: null,
-                team: [],
-                features: [],
-            },
-        )
-
-        // Assert
-        expect(persisted).toBe(0)
-        expect(mockReplaceSiteStockAssignments).toHaveBeenCalledOnce()
-        expect(mockReplaceSiteStockAssignments).toHaveBeenCalledWith(10, [])
-    })
-
-    it('TC-F38-RES-08: standalone seed uses one F38 resolver and no direct Pixabay search', async () => {
-        // Arrange
-        vi.clearAllMocks()
-        vi.stubEnv('F38_IMAGE_PIPELINE', 'true')
-        mockReadSiteStockAssignments.mockResolvedValue([])
-        const resolved = (ids: number[]) => ids.map((mediaId) => ({
-            source: 'catalog',
-            mediaId,
-            objectKey: `stock/test/${mediaId}.jpg`,
-        }))
-        mockResolveF38ImageDemand.mockResolvedValue({
-            attemptsUsed: 0,
-            events: [],
-            reservoirs: {
-                landscape: resolved([1, 2, 3, 4, 5, 6, 7]),
-                square: resolved([8, 9, 10, 11, 12, 13]),
-                people: resolved([14, 15, 16, 17]),
-                products: [],
-                blogs: [],
-            },
-        })
-        mockReplaceSiteStockAssignments.mockImplementation(async (
-            siteId: number,
-            assignments: Array<{ slot: string; mediaId: number }>,
-        ) => assignments.map((assignment, index) => ({
-            id: index + 1,
-            siteId,
-            ...assignment,
-        })))
-        const payload = { find: vi.fn(), create: vi.fn() }
-
-        // Act
-        const result = await seedImageLibraryForSite(
-            payload as never,
-            1,
-            10,
-            'restaurant',
-        )
-
-        // Assert
-        expect(result.gallery).toEqual([8, 9, 10, 11, 12, 13])
-        expect(result.hero).toEqual([1, 2, 3])
-        expect(result.about).toBe(4)
-        expect(result.team).toEqual([14, 15, 16, 17])
-        expect(result.features).toEqual([5, 6, 7])
-        expect(mockResolveF38ImageDemand).toHaveBeenCalledOnce()
-        expect(mockSearch).not.toHaveBeenCalled()
-        expect(mockReplaceSiteStockAssignments).toHaveBeenCalledOnce()
     })
 })

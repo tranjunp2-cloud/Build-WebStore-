@@ -3,7 +3,7 @@
  *
  * Coverage:
  *   TC-F01-W.13 — pool shape + types
- *   TC-F01-W.14 — buildImagePool 2-search + mood query propagation
+ *   TC-F01-W.14 — unified image-pool search + mood query propagation
  *   TC-F01-W.15 — pickFromPool seeded determinism + role → bucket mapping
  *   TC-F01-W.16 — underfill backoff with relaxed query
  *
@@ -62,6 +62,7 @@ function fakePhoto(id: string, w: number, h: number, alt: string = RAMEN_TAGS): 
 
 const landscapeFixture = Array.from({ length: 12 }, (_, i) => fakePhoto(`L${i}`, 1920, 1080))
 const squareFixture = Array.from({ length: 6 }, (_, i) => fakePhoto(`S${i}`, 1000, 1000))
+const unifiedFixture = [...landscapeFixture, ...squareFixture]
 
 beforeEach(() => {
   mockSearchPhotos.mockReset()
@@ -86,9 +87,7 @@ function baseCtx(overrides: Partial<BuildPoolCtx> = {}): BuildPoolCtx {
 
 describe('TC-F01-W.13 — image pool shape', () => {
   it('buildImagePool returns expected structure', async () => {
-    mockSearchPhotos
-      .mockResolvedValueOnce(landscapeFixture)
-      .mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
 
     const pool = await buildImagePool(baseCtx())
 
@@ -101,9 +100,7 @@ describe('TC-F01-W.13 — image pool shape', () => {
   })
 
   it('PoolPhoto has all required fields', async () => {
-    mockSearchPhotos
-      .mockResolvedValueOnce(landscapeFixture)
-      .mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
 
     const pool = await buildImagePool(baseCtx())
     const photo = pool.landscape[0]!
@@ -129,7 +126,8 @@ describe('TC-F01-W.13 — image pool shape', () => {
       fakePhoto('sq', 1000, 1000), // 1:1
       ...Array.from({ length: 5 }, (_, i) => fakePhoto(`spad${i}`, 1000, 1000)),
     ]
-    mockSearchPhotos.mockResolvedValueOnce(landscapeAll).mockResolvedValueOnce(squareAll)
+    const unifiedAll = [...landscapeAll, ...squareAll]
+    mockSearchPhotos.mockResolvedValueOnce(unifiedAll)
 
     const pool = await buildImagePool(baseCtx())
     expect(pool.landscape[0]!.aspectRatio).toBe('16:9')
@@ -142,7 +140,7 @@ describe('TC-F01-W.13 — image pool shape', () => {
 
 describe('TC-F01-W.14 — buildImagePool query construction', () => {
   it('query contains top product only (no mood adjectives with raw keywords)', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
 
     const pool = await buildImagePool(
       baseCtx({ topProduct: 'ramen', mood: THEME_MOODS.elegant }),
@@ -157,7 +155,7 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
   })
 
   it('query uses the category PHRASE when no product + no mood (GH-1611)', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
     const pool = await buildImagePool({
       category: 'beauty',
       seed: 1,
@@ -168,18 +166,16 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     expect(pool.queryUsed).toBe('spa treatment')
   })
 
-  it('makes 2 searchPhotos calls — 1 landscape + 1 square', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+  it('makes exactly 1 searchPhotos call with squarish orientation', async () => {
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
     await buildImagePool(baseCtx())
-    expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
-    // First call: landscape orientation
-    expect(mockSearchPhotos.mock.calls[0]![2]).toMatchObject({ orientation: 'landscape' })
-    // Second call: squarish orientation
-    expect(mockSearchPhotos.mock.calls[1]![2]).toMatchObject({ orientation: 'squarish' })
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    // Unified call uses squarish (maps to all)
+    expect(mockSearchPhotos.mock.calls[0]![2]).toMatchObject({ orientation: 'squarish' })
   })
 
   it('deduplicates identical terms (product === mood adj)', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
     // When product exactly matches a mood adjective, dedupe kicks in.
     const pool = await buildImagePool(
       baseCtx({ topProduct: 'candlelit', mood: THEME_MOODS.elegant }),
@@ -193,7 +189,7 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
   it('query uses supplied product terms directly (GH-1185)', async () => {
     // Products arrive RAW from parseProductsString (no translation) and must
     // reach the query verbatim, without the category injected alongside.
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
     const pool = await buildImagePool({
       category: 'tech',
       products: ['software team', 'business dashboard'],
@@ -296,16 +292,10 @@ describe('TC-F01-W.15 — pickFromPool', () => {
 
 describe('TC-F01-W.16 — underfill backoff', () => {
   it('retries with relaxed query when landscape underfills', async () => {
-    // First landscape call returns 1 photo (underfill), retry with relaxed returns 2.
-    // GH-1611: even though the SEARCH broadens to the category phrase, accepted
-    // photos must still match the merchant's product term.
+    // First call returns 1 photo (underfill), retry with relaxed returns enough.
     mockSearchPhotos
-      .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // initial landscape — underfill
-      .mockResolvedValueOnce([
-        fakePhoto('RL1', 1920, 1080, RAMEN_TAGS),
-        fakePhoto('RL2', 1920, 1080, RAMEN_TAGS),
-      ]) // relaxed retry
-      .mockResolvedValueOnce(squareFixture) // square OK first try
+      .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // initial search — underfill (minCount = 3)
+      .mockResolvedValueOnce(unifiedFixture) // relaxed retry — succeeds
 
     const pool = await buildImagePool(baseCtx({ mood: THEME_MOODS.elegant }))
 
@@ -324,40 +314,73 @@ describe('TC-F01-W.16 — underfill backoff', () => {
   it('relaxed query broadens from product to the category PHRASE (GH-1611)', async () => {
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // underfill initial
-      .mockResolvedValueOnce([fakePhoto('RL1', 1920, 1080, 'restaurant interior, dining')]) // relaxed retry
-      .mockResolvedValueOnce(squareFixture)
+      .mockResolvedValueOnce(unifiedFixture) // relaxed retry
 
     await buildImagePool(baseCtx({ topProduct: 'ramen', mood: THEME_MOODS.elegant }))
 
     const initialQuery = mockSearchPhotos.mock.calls[0]![0] as string
     const relaxedQuery = mockSearchPhotos.mock.calls[1]![0] as string
     // Initial: raw product only = "ramen"
-    // Relaxed with ≤1 term: broadens to the category PHRASE. Was the bare composer
-    // key ('restaurant'), which for 'fnb'/'realestate' is not a searchable word at
-    // all — q="fnb" returns nothing, and q="business" (the fnb→business drift)
-    // returned retail/fashion stock. Hence "restaurant interior", not "restaurant".
+    // Relaxed with ≤1 term: broadens to the category PHRASE.
     expect(initialQuery).toBe('ramen')
     expect(relaxedQuery).toBe('restaurant interior')
   })
 
   it('no retry when initial query already has sufficient results', async () => {
-    mockSearchPhotos
-      .mockResolvedValueOnce(landscapeFixture) // full
-      .mockResolvedValueOnce(squareFixture) // full
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture) // full
 
     await buildImagePool(baseCtx())
-    // Only 2 calls (no retry)
-    expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+    // Only 1 call (no retry)
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+  })
+
+  it('AI-first exact-slot mode uses at most one request per orientation', async () => {
+    const unifiedAll = [
+      ...Array.from({ length: 120 }, (_, i) => fakePhoto(`EL${i}`, 1920, 1080)),
+      ...Array.from({ length: 60 }, (_, i) => fakePhoto(`ES${i}`, 1000, 1000)),
+    ]
+    mockSearchPhotos.mockResolvedValueOnce(unifiedAll)
+
+    const pool = await buildImagePool(baseCtx({
+      landscapeSize: 40,
+      squareSize: 20,
+      landscapeMin: 40,
+      squareMin: 20,
+      exactSlotMode: true,
+    }))
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(200) // max size * 3 = 120, exactSlotMode scales it to 360, clamped to Pixabay max 200
+    expect(pool.landscape).toHaveLength(40)
+    expect(pool.square).toHaveLength(20)
+  })
+
+  it('AI-first exact-slot mode fills an aspect deficit from unused relevant photos', async () => {
+    const mostlyLandscape = [
+      ...Array.from({ length: 30 }, (_, i) => fakePhoto(`XL${i}`, 1920, 1080)),
+      ...Array.from({ length: 4 }, (_, i) => fakePhoto(`XS${i}`, 1000, 1000)),
+    ]
+    mockSearchPhotos.mockResolvedValueOnce(mostlyLandscape)
+
+    const pool = await buildImagePool(baseCtx({
+      landscapeSize: 10,
+      squareSize: 10,
+      landscapeMin: 10,
+      squareMin: 10,
+      exactSlotMode: true,
+    }))
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(pool.landscape).toHaveLength(10)
+    expect(pool.square).toHaveLength(10)
+    expect(new Set([...pool.landscape, ...pool.square].map((photo) => photo.id)).size).toBe(20)
+    expect(pool.underfill).toBe(false)
   })
 
   it('pool.square borrows from landscape when squarish returns 0', async () => {
-    // TC-F01-W.16 extension: landscape succeeds, squarish returns 0 on both
-    // initial + relaxed retry → square bucket gets landscape photos as fallback.
-    // This prevents media-injector from falling back to legacy search per block.
-    mockSearchPhotos
-      .mockResolvedValueOnce(landscapeFixture) // landscape OK
-      .mockResolvedValueOnce([])               // squarish initial → 0
-      .mockResolvedValueOnce([])               // squarish relaxed retry → 0
+    // TC-F01-W.16 extension: squarish initial returns only landscapeFixture
+    // (all horizontal, 0 square) -> square bucket borrows landscape photos as fallback.
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture) // only landscape, 0 square
 
     const pool = await buildImagePool(baseCtx({ mood: THEME_MOODS.elegant }))
 
@@ -432,7 +455,7 @@ describe('image-pool helpers', () => {
     })
 
     expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
-    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(9)
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(15) // targetSize (9) + excludeIds (6)
     expect(result.added.landscape.map((photo) => photo.id)).toEqual(['L6', 'L7', 'L8'])
     expect(result.pool.landscape.map((photo) => photo.id)).toEqual([
       'L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8',
@@ -448,15 +471,13 @@ describe('image-pool helpers', () => {
 })
 
 describe('TC-F01-W.17 — integration cohesion spy', () => {
-  it('5 runs with same seed call searchPhotos exactly 2× each (no underfill)', async () => {
+  it('5 runs with same seed call searchPhotos exactly 1× each (no underfill)', async () => {
     for (let i = 0; i < 5; i++) {
-      mockSearchPhotos
-        .mockResolvedValueOnce(landscapeFixture)
-        .mockResolvedValueOnce(squareFixture)
+      mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
       await buildImagePool(baseCtx({ seed: i }))
     }
-    // 5 runs × 2 calls each = 10 total
-    expect(mockSearchPhotos).toHaveBeenCalledTimes(10)
+    // 5 runs × 1 call each = 5 total
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(5)
   })
 
   it('query string is stable across same-seed reruns', async () => {
@@ -548,7 +569,7 @@ describe('TC-F38-RAW — raw keyword path (Pixabay + VN keywords)', () => {
   // EN/MS) is asserted at the client level in pixabay-client.test.ts —
   // searchPhotos is mocked here so the URL is not observable.
   it('[TC-F38-RAW-06] searchPhotos receives raw VN q verbatim', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture)
 
     await buildImagePool({
       category: 'restaurant',
@@ -557,26 +578,24 @@ describe('TC-F38-RAW — raw keyword path (Pixabay + VN keywords)', () => {
       seed: 1,
     })
 
-    // First call is landscape search with raw q
-    // (searchPhotos signature: (query, count, opts))
     const firstCall = mockSearchPhotos.mock.calls[0]!
     const query = firstCall[0] as string
     const opts = firstCall[2] as Record<string, unknown>
 
     expect(query).toBe('phở bò')
-    expect(opts.orientation).toBe('landscape')
+    expect(opts.orientation).toBe('squarish')
   })
 })
 
 // ── TC-F01-W.18: bucket sizing — skip zero-size buckets ─────────────────────
 describe('TC-F01-W.18 — buildImagePool honors explicit bucket sizes', () => {
   it('squareSize 0 → only the landscape Pixabay call runs (no square search)', async () => {
-    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture.slice(0, 3))
+    mockSearchPhotos.mockResolvedValueOnce(unifiedFixture.slice(0, 3))
     const pool = await buildImagePool(baseCtx({ landscapeSize: 3, squareSize: 0 }))
     expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
-    expect(mockSearchPhotos.mock.calls[0]![2]).toMatchObject({ orientation: 'landscape' })
+    expect(mockSearchPhotos.mock.calls[0]![2]).toMatchObject({ orientation: 'squarish' })
     // count arg forwarded from landscapeSize
-    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(3)
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(9) // targetSize = Max(3,0)*3 = 9
     // square bucket empty (not reused-from-landscape when size is 0)
     expect(pool.square.length).toBe(0)
     expect(pool.landscape.length).toBe(3)
@@ -653,6 +672,23 @@ describe('TC-F38-RAW-23 — non-VN zero-hit falls back to EN category base keywo
 
 // ── TC-F38-RAW-25: 429 short-circuits the fallback ladder ───────────────────
 describe('TC-F38-RAW-25 — provider outage short-circuits the pool fallback ladder', () => {
+  it('tier-1 TIMEOUT uses a short category query as the final generation-budget retry', async () => {
+    mockSearchPhotos
+      .mockRejectedValueOnce(new PixabayError('TIMEOUT', 0, true))
+      .mockResolvedValueOnce([fakePhoto('L1', 1920, 1080, 'restaurant interior')])
+
+    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+    expect(mockSearchPhotos.mock.calls[1]![0]).toBe('food')
+    expect(mockSearchPhotos.mock.calls[1]![2]).toMatchObject({
+      category: 'food',
+      timeoutMs: 25_000,
+    })
+    expect(pool.landscape.map((photo) => photo.id)).toEqual(['L1'])
+    expect(pool.underfill).toBe(true)
+  })
+
   it('tier-1 RATE_LIMITED → no tier-2/tier-3 calls, underfill=true', async () => {
     // Arrange — any further tier is a guaranteed-fail request.
     mockSearchPhotos.mockRejectedValueOnce(new PixabayError('RATE_LIMITED', 429, true))

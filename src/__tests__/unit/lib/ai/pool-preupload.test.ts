@@ -18,6 +18,7 @@ vi.mock('@/lib/ai/pixabay-client', () => ({
 		buffer: Buffer.from(`mock-buffer-${url}`),
 		mimetype: 'image/jpeg',
 	})),
+	registerPixabayMediaSource: vi.fn(),
 }))
 
 vi.mock('@/lib/ai/media-pipeline', () => {

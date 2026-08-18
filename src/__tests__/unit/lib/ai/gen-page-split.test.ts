@@ -18,6 +18,7 @@ import {
 	runParallelPageSplit,
 	applyDeterministicChrome,
 	syncFooterAcrossPages,
+	materializeLocaleSafePage,
 	type ParallelSplitInput,
 } from '@/lib/ai/gen-page-split'
 
@@ -59,6 +60,61 @@ vi.mock('@/lib/ai/log-usage', () => ({
 }))
 
 describe('[TC-GENPERF-W2-01] buildBrief — deterministic nav labels', () => {
+	it('keeps footer identity fields intact when repairing Malay copy', () => {
+		const page = {
+			title: 'Home',
+			slug: '/',
+			blocks: [{
+				blockType: 'footer',
+				variant: 'dark-gradient',
+				logoText: 'English placeholder',
+				tagline: 'Professional beauty services in a calm private studio.',
+				columns: [
+					{
+						title: 'Explore',
+						links: [
+							{ label: 'Home', url: '/' },
+							{ label: 'About', url: '/about' },
+						],
+					},
+					{ title: 'Company', links: [{ label: 'Contact', url: '/contact' }] },
+				],
+				copyrightText: '© 2026 English placeholder. All rights reserved.',
+				socials: [{ platform: 'instagram', url: '#' }],
+			}],
+		}
+
+		const result = materializeLocaleSafePage(
+			page,
+			{
+				businessName: 'Luna Beauty Studio',
+				industry: 'beauty',
+				products: 'Rawatan muka, Manikur, Pedikur',
+				shortDescription: 'Studio kecantikan wanita di Petaling Jaya yang menawarkan rawatan profesional dalam suasana selesa dan peribadi.',
+			},
+			{
+				navigation: { home: 'Utama', about: 'Tentang Kami', services: 'Perkhidmatan', contact: 'Hubungi', getStarted: 'Mulakan', blog: 'Blog' },
+				sections: { about: 'Tentang Kami', gallery: 'Galeri', contact: 'Hubungi Kami', features: 'Ciri-ciri', testimonials: 'Testimoni', faq: 'Soalan Lazim', team: 'Pasukan', serviceCards: 'Perkhidmatan', stats: 'Statistik', pricing: 'Harga', newsletter: 'Langgan', clientLogos: 'Dipercayai Oleh', blogList: 'Blog', contactSubmitLabel: 'Hantar', aboutHeadlinePrefix: 'Tentang' },
+				newsletter: { buttonLabel: 'Langgan', emailPlaceholder: 'E-mel' },
+				blogList: { readArticleLabel: 'Baca Artikel', uncategorizedLabel: 'Tanpa Kategori', emptyStateLabel: 'Belum ada artikel.' },
+				contact: { headline: 'Hubungi Kami', subheadline: 'Hubungi kami hari ini.', nameLabel: 'Nama', emailLabel: 'E-mel', phoneLabel: 'Telefon', addressLabel: 'Alamat', messageLabel: 'Mesej', submitLabel: 'Hantar Mesej' },
+				footer: { exploreLabel: 'Terokai', companyLabel: 'Syarikat', supportLabel: 'Sokongan', legalLabel: 'Undang-undang', allRightsReserved: 'Hak cipta terpelihara.' },
+			},
+			'ms',
+		)
+		const footer = (result.blocks as Array<Record<string, unknown>>)[0]!
+		const columns = footer.columns as Array<{ title: string; links: Array<{ label: string }> }>
+
+		expect(footer.logoText).toBe('Luna Beauty Studio')
+		expect(footer.logoText).not.toBe('Studio kecantikan wanita di Petaling Jaya yang menawarkan rawatan profesional dalam suasana selesa dan peribadi.')
+		expect(footer.copyrightText).toBe(`© ${new Date().getFullYear()} Luna Beauty Studio. Hak cipta terpelihara.`)
+		expect(columns[0]?.title).toBe('Terokai')
+		expect(columns[0]?.links.map((link) => link.label)).toEqual(['Utama', 'Tentang Kami'])
+		expect(columns[1]?.title).toBe('Syarikat')
+		expect(columns[1]?.links.map((link) => link.label)).toEqual(['Hubungi'])
+		expect((footer.socials as Array<{ platform: string }>)[0]?.platform).toBe('instagram')
+	})
+
 	it('TC-GENPERF-W2-01: returns navLabels for known language (en)', () => {
 		// Arrange, Act
 		const brief = buildBrief('en')
@@ -153,8 +209,23 @@ describe('[TC-GENPERF-W2-02] buildSubpagesSystemPrompt — batch scope', () => {
 		const result = buildSubpagesSystemPrompt(basePrompt, brief, batchWithBlog)
 
 		// Assert
-		expect(result).toContain('blog-list block')
+        expect(result).toContain('blog-list')
 		expect(result).toContain('>=3 posts')
+	})
+
+	it('keeps the Contact page compact and excludes unrelated content blocks', () => {
+		const result = buildSubpagesSystemPrompt('Base', buildBrief('en'), ['Contact', 'Blog'])
+
+		expect(result).toContain('exactly one contact block')
+		expect(result).toContain('Blog: 3-4 content blocks')
+		expect(result).toContain('Do NOT add contact or gallery blocks to About, Services/Products, or Blog')
+	})
+
+	it('gives About and Services separate page-specific block contracts', () => {
+		const result = buildSubpagesSystemPrompt('Base', buildBrief('en'), ['About', 'Services/Products'])
+
+		expect(result).toContain('About: 4-6 content blocks')
+		expect(result).toContain('Services/Products: 4-6 content blocks')
 	})
 })
 

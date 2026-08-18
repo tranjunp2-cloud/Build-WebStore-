@@ -11,7 +11,7 @@ import { getPayload } from 'payload'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
-import { tenantIdForQuery } from '@/lib/auth'
+import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
 import { buildBulkCategoryInstructions } from '@/lib/ai/bulk-category-matching'
 
@@ -37,13 +37,10 @@ vi.mock('next/headers', () => ({
 // Mock RateLimiter
 let mockRateLimitAllowed = true
 const initialOpenAiApiKey = process.env.OPENAI_API_KEY
-const initialF38ImagePipeline = process.env.F38_IMAGE_PIPELINE
 
 afterEach(() => {
     if (initialOpenAiApiKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = initialOpenAiApiKey
-    if (initialF38ImagePipeline === undefined) delete process.env.F38_IMAGE_PIPELINE
-    else process.env.F38_IMAGE_PIPELINE = initialF38ImagePipeline
 })
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: vi.fn().mockImplementation(() => ({
@@ -163,37 +160,15 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
     prepareSampleProducts: vi.fn().mockResolvedValue({
-        category: 'fnb',
+        category: 'services',
         products: Array.from({ length: 6 }, (_, index) => ({
-            name: `F38 Product ${index + 1}`,
+            name: `Sample Product ${index + 1}`,
             shortDescription: 'Sample product',
             description: 'A complete sample product.',
             price: 10 + index,
-            sku: '',
-            inventory: 0,
-            status: 'active',
-            imageKeyword: `product ${index + 1}`,
+            imageKeyword: `sample product ${index + 1}`,
         })),
     }),
-    assignResolvedSampleProductImages: vi.fn((
-        prepared: { products: Array<Record<string, unknown>> },
-        imageIds: Array<number | undefined>,
-    ) => ({
-        products: prepared.products.map((product: Record<string, unknown>, index: number) => {
-            const { imageKeyword: _, ...copy } = product
-            return {
-                ...copy,
-                imageId: imageIds[index],
-                sku: `F38-${index + 1}`,
-                inventory: 0,
-            }
-        }),
-        stats: {
-            rateLimited: 0,
-            uploadFailed: 0,
-            noImage: Math.max(0, prepared.products.length - imageIds.length),
-        },
-    })),
     generateSampleProducts: vi.fn().mockResolvedValue({
         products: Array.from({ length: 6 }, (_, index) => ({
             name: `Sample Product ${index + 1}`,
@@ -208,42 +183,6 @@ vi.mock('@/lib/ai/generate-sample-products', () => ({
     }),
 }))
 
-vi.mock('@/lib/ai/image-sourcing', () => ({
-    createF38RuntimeResolver: vi.fn(() => ({
-        resolveF38ImageDemand: vi.fn().mockResolvedValue({
-            attemptsUsed: 0,
-            events: [],
-            reservoirs: {
-                landscape: Array.from({ length: 12 }, (_, index) => ({
-                    source: 'catalog',
-                    mediaId: 100 + index,
-                    objectKey: `stock/test/landscape-${index}.jpg`,
-                })),
-                square: Array.from({ length: 6 }, (_, index) => ({
-                    source: 'catalog',
-                    mediaId: 200 + index,
-                    objectKey: `stock/test/square-${index}.jpg`,
-                })),
-                people: Array.from({ length: 6 }, (_, index) => ({
-                    source: 'catalog',
-                    mediaId: 300 + index,
-                    objectKey: `stock/test/people-${index}.jpg`,
-                })),
-                products: Array.from({ length: 6 }, (_, index) => ({
-                    source: 'catalog',
-                    mediaId: 400 + index,
-                    objectKey: `stock/test/product-${index}.jpg`,
-                })),
-                blogs: Array.from({ length: 3 }, (_, index) => ({
-                    source: 'catalog',
-                    mediaId: 500 + index,
-                    objectKey: `stock/test/blog-${index}.jpg`,
-                })),
-            },
-        }),
-    })),
-}))
-
 // gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
 // prove seeding is DEFERRED (scheduled, not awaited in-request) and then
 // invoke the captured tasks to assert post-response behavior. NextRequest/
@@ -256,21 +195,18 @@ vi.mock('next/server', async (importOriginal) => ({
 // Seeder boundaries — the route schedules these via after(); mocked so tests
 // observe scheduling without running GPT/Pixabay work.
 vi.mock('@/lib/ai/seed-blog-posts', () => ({
-    assignResolvedBlogThumbnails: vi.fn((
-        prepared: Array<Record<string, unknown>>,
-        thumbnailIds: Array<number | undefined>,
-    ) =>
-        prepared.map((post: Record<string, unknown>, index: number) => ({
-            ...post,
-            thumbnailId: thumbnailIds[index],
-        }))),
     seedBlogPosts: vi.fn().mockResolvedValue(3),
     // Default regeneration path: three persisted rows already exist.
     prepareBlogPosts: vi.fn().mockResolvedValue([]),
+    assignResolvedBlogThumbnails: vi.fn((posts, thumbnailIds) =>
+        posts.map((post: Record<string, unknown>, index: number) => ({
+            ...post,
+            ...(thumbnailIds[index] !== undefined ? { thumbnailId: thumbnailIds[index] } : {}),
+        })),
+    ),
     persistBlogPosts: vi.fn().mockResolvedValue(3),
 }))
 vi.mock('@/lib/images/image-library-seeder', () => ({
-    persistF38ImageLibraryAssignments: vi.fn().mockResolvedValue(0),
     seedImageLibraryForSite: vi.fn().mockResolvedValue({ hero: [], gallery: [], about: null, team: [], features: [] }),
 }))
 vi.mock('@/lib/sso/sso-api-client', () => ({
@@ -281,6 +217,10 @@ vi.mock('@/lib/sso/sso-api-client', () => ({
 // GH-1190: generateSiteWithAI now forwards events via onEvent callback (6th param) in real-time
 // instead of returning them in the events[] array for post-hoc replay. Mock must call onEvent.
 vi.mock('@/lib/ai/openai-generator', () => ({
+    resolveSiteGenerationMode: vi.fn().mockResolvedValue({
+        requestedGenMode: 'template-first',
+        effectiveGenMode: 'template-first',
+    }),
     generateSiteWithAI: vi.fn().mockImplementation(async (
         _rawBusinessInfo: unknown,
         _extra: unknown,
@@ -303,6 +243,8 @@ vi.mock('@/lib/ai/openai-generator', () => ({
                 blocks: [{ blockType: 'hero', headline: 'Welcome to Bakery' }]
             },
             events: mockEvents,
+            requestedGenMode: 'template-first',
+            effectiveGenMode: 'template-first',
         }
     }),
 }))
@@ -336,7 +278,6 @@ describe('AI Streaming APIs', () => {
         mockCompleteBlogCount = 3
         mockFailedPageCreateData = null
         mockIdCounter = 0
-        delete process.env.F38_IMAGE_PIPELINE
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -363,174 +304,13 @@ describe('AI Streaming APIs', () => {
              const result = await res.json()
 
              expect(res.status).toBe(200)
+             expect(getCurrentUser).toHaveBeenCalledWith(req)
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
              expect(mockPageDB.length).toBe(5) // Four generated pages + system 404
              expect(result.totalPages).toBe(4)
              expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
-        })
-
-        it('[TC-F38-RES-08] routes generation consumers through one F38 resolver', async () => {
-             // Arrange
-             process.env.F38_IMAGE_PIPELINE = 'true'
-             const {
-                 prepareSampleProducts,
-             } = await import('@/lib/ai/generate-sample-products')
-             const { createF38RuntimeResolver } = await import('@/lib/ai/image-sourcing')
-             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: {
-                         businessName: 'F38 Bakery',
-                         industry: 'Food',
-                         products: 'Bread',
-                         shortDescription: 'Fresh artisan bakery',
-                     },
-                 }),
-             })
-
-             // Act
-             const res = await GenerateSitePOST(req)
-
-             // Assert
-             expect(res.status).toBe(200)
-             expect(vi.mocked(generateSampleProducts)).not.toHaveBeenCalled()
-             expect(vi.mocked(prepareSampleProducts)).toHaveBeenCalledOnce()
-             expect(vi.mocked(createF38RuntimeResolver)).toHaveBeenCalledOnce()
-             const resolver = vi.mocked(createF38RuntimeResolver).mock.results[0]?.value
-             expect(resolver?.resolveF38ImageDemand).toHaveBeenCalledOnce()
-             const demands = resolver?.resolveF38ImageDemand.mock.calls[0]?.[0].demands
-             expect(demands.map((demand: { kind: string }) => demand.kind)).toEqual([
-                 'landscape',
-                 'square',
-                 'people',
-                 'products',
-             ])
-             expect(demands.every((demand: { aiEligible?: boolean }) =>
-                 demand.aiEligible === false)).toBe(true)
-        })
-
-        it('[TC-F38-REUSE-02] keeps final cloned pages, products, and library assignments distinct', async () => {
-             // Arrange
-             process.env.F38_IMAGE_PIPELINE = 'true'
-             delete process.env.PIXABAY_BLOCKS
-             mockMediaDB = [
-                 ...Array.from({ length: 12 }, (_, index) => 100 + index),
-                 ...Array.from({ length: 6 }, (_, index) => 200 + index),
-                 ...Array.from({ length: 6 }, (_, index) => 300 + index),
-                 ...Array.from({ length: 6 }, (_, index) => 400 + index),
-                 ...Array.from({ length: 3 }, (_, index) => 500 + index),
-             ].map((id) => ({
-                 id,
-                 filename: `f38-${id}.jpg`,
-                 mimeType: 'image/jpeg',
-                 filesize: 1024,
-             }))
-             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
-                 result: {
-                     siteName: 'F38 Distinct Bakery',
-                     siteType: 'ecommerce',
-                     theme: { primaryColor: '#000000' },
-                     seo: { title: 'F38 Bakery', description: 'Distinct images' },
-                     blocks: [
-                         { blockType: 'hero', headline: 'Fresh bread' },
-                         { blockType: 'about', headline: 'Our bakery', body: 'Local bakers' },
-                         {
-                             blockType: 'testimonials',
-                             testimonials: [
-                                 { quote: 'Excellent', name: 'A' },
-                                 { quote: 'Wonderful', name: 'B' },
-                             ],
-                         },
-                         {
-                             blockType: 'gallery',
-                             images: [{ caption: 'Bread' }, { caption: 'Pastry' }],
-                         },
-                     ],
-                 },
-                 events: [],
-             })
-             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
-                 method: 'POST',
-                 body: JSON.stringify({
-                     businessInfo: {
-                         businessName: 'F38 Distinct Bakery',
-                         industry: 'Food',
-                         products: 'Bread',
-                         shortDescription: 'Fresh artisan bakery',
-                     },
-                 }),
-             })
-
-             // Act
-             const res = await GenerateSitePOST(req)
-             const { after } = await import('next/server')
-             for (const call of vi.mocked(after).mock.calls) {
-                 await (call[0] as () => unknown)()
-             }
-
-             // Assert
-             expect(res.status).toBe(200)
-             const pageMediaIds = (mockPageDB as PersistedPage[])
-                 .filter((page) => page.slug !== '404')
-                 .flatMap((page) => page.layout ?? [])
-                 .flatMap((block) => {
-                     if (block.blockType === 'hero') {
-                         return typeof block.image === 'number' ? [block.image] : []
-                     }
-                     if (block.blockType === 'about') {
-                         return typeof block.image === 'number' ? [block.image] : []
-                     }
-                     if (block.blockType === 'gallery' && Array.isArray(block.images)) {
-                         return block.images.flatMap((item: { image?: unknown }) =>
-                             typeof item.image === 'number' ? [item.image] : [])
-                     }
-                     if (
-                         block.blockType === 'testimonials'
-                         && Array.isArray(block.testimonials)
-                     ) {
-                         return block.testimonials.flatMap((item: { avatar?: unknown }) =>
-                             typeof item.avatar === 'number' ? [item.avatar] : [])
-                     }
-                     return []
-                 })
-             expect(pageMediaIds).toHaveLength(14)
-             expect(new Set(pageMediaIds).size).toBe(pageMediaIds.length)
-
-             const productMediaIds = mockProductDB.flatMap((product) => {
-                 const images = product.images
-                 if (!Array.isArray(images)) return []
-                 return images.flatMap((image: { image?: unknown }) =>
-                     typeof image.image === 'number' ? [image.image] : [])
-             })
-             expect(productMediaIds).toHaveLength(6)
-             expect(productMediaIds.every((id) => !pageMediaIds.includes(id))).toBe(true)
-
-             const { persistF38ImageLibraryAssignments } =
-                 await import('@/lib/images/image-library-seeder')
-             expect(vi.mocked(persistF38ImageLibraryAssignments)).toHaveBeenCalledOnce()
-             const mapping = vi.mocked(persistF38ImageLibraryAssignments).mock.calls[0]?.[2]
-             const libraryMediaIds = mapping
-                 ? [
-                     ...mapping.hero,
-                     ...mapping.gallery,
-                     ...(mapping.about == null ? [] : [mapping.about]),
-                     ...mapping.team,
-                     ...mapping.features,
-                 ]
-                 : []
-             expect(new Set(libraryMediaIds).size).toBe(libraryMediaIds.length)
-             expect(libraryMediaIds.every((id) =>
-                 !pageMediaIds.includes(id) && !productMediaIds.includes(id))).toBe(true)
-
-             const { createF38RuntimeResolver } = await import('@/lib/ai/image-sourcing')
-             const resolver = vi.mocked(createF38RuntimeResolver).mock.results[0]?.value
-             const demands = resolver?.resolveF38ImageDemand.mock.calls[0]?.[0].demands
-             expect(demands.find((demand: { kind: string }) =>
-                 demand.kind === 'landscape')?.count).toBeGreaterThan(7)
-             expect(demands.find((demand: { kind: string }) =>
-                 demand.kind === 'people')?.count).toBeGreaterThan(4)
         })
 
         it('accepts a valid generated site with six pages', async () => {
@@ -1617,7 +1397,13 @@ describe('AI Streaming APIs', () => {
 
              // Assert
              const generatorCall = vi.mocked(generateSiteWithAI).mock.calls.at(-1)
-             expect(generatorCall?.[6]).toEqual({ targetLocale: 'it' })
+             expect(generatorCall?.[6]).toEqual({
+                 targetLocale: 'it',
+                 modeDecision: {
+                     requestedGenMode: 'template-first',
+                     effectiveGenMode: 'template-first',
+                 },
+             })
              expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
              const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
              expect(vi.mocked(prepareBlogPosts).mock.calls.at(-1)?.[0]).toEqual(
@@ -3059,7 +2845,17 @@ describe('AI Streaming APIs', () => {
             const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
             expect(m).toBeTruthy()
             expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
-                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+                [
+                    'pageId',
+                    'pixabayImageStatus',
+                    'pixabayUsedImages',
+                    'siteId',
+                    'siteLanguage',
+                    'siteName',
+                    'timeMs',
+                    'totalBlocks',
+                    'totalPages',
+                ],
             )
         })
 
@@ -3177,6 +2973,31 @@ describe('AI Streaming APIs', () => {
     })
 
     describe('buildGeneratedPages — fallback hero image allocation', () => {
+        it('[TC-GENSLUG-05] keeps one homepage and drops duplicate canonical slugs from AI output', () => {
+            const pages = buildGeneratedPages({
+                blocks: [],
+                businessInfo: {
+                    businessName: 'Acme',
+                    shortDescription: 'Consulting services',
+                    products: 'Advisory',
+                },
+                result: {
+                    pages: [
+                        { title: 'Home', slug: '/', isHomepage: true, blocks: [] },
+                        { title: 'About Us', slug: '/our-story', isHomepage: true, blocks: [] },
+                        { title: 'About', slug: '/about', blocks: [] },
+                        { title: 'Contact', slug: '/contact', blocks: [] },
+                    ],
+                },
+            })
+
+            expect(pages.map(page => ({ slug: page.slug, isHomepage: page.isHomepage }))).toEqual([
+                { slug: '/', isHomepage: true },
+                { slug: '/about', isHomepage: false },
+                { slug: '/contact', isHomepage: false },
+            ])
+        })
+
         it('[TC-GENPERF-W3-17] gives cloned subpage heroes their reserved Media IDs', () => {
             const pages = buildGeneratedPages({
                 blocks: [{

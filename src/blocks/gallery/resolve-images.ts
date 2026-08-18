@@ -19,7 +19,10 @@ export function resolveGalleryImages(
     fallbackUrls: string[],
 ): GalleryConfig['images'] {
     const seen = new Set<string>()
-    const slotCount = Math.max(rawImages.length, fallbackUrls.length)
+    // Generated galleries already carry Pixabay Media IDs. Do not pad a real
+    // gallery with checked-in fallback URLs merely to reach the legacy six
+    // slots; that mixed two providers in one block.
+    const slotCount = rawImages.length > 0 ? rawImages.length : fallbackUrls.length
 
     const fallbackFor = (index: number, caption: string): GalleryConfig['images'][number] => {
         for (let offset = 0; offset < fallbackUrls.length; offset++) {
@@ -40,10 +43,8 @@ export function resolveGalleryImages(
         if (image && typeof image === 'object') {
             const record = image as Record<string, unknown>
             const key = imageIdentity(record)
-            if (key && !seen.has(key)) {
-                seen.add(key)
-                return item as GalleryConfig['images'][number]
-            }
+            if (key) seen.add(key)
+            return item as GalleryConfig['images'][number]
         }
         return fallbackFor(index, caption)
     })

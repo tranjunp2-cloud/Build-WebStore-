@@ -12,8 +12,6 @@ import type { Payload } from 'payload'
 import { searchPhotos, downloadPhotoBuffer, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
 import { normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { uploadBufferToMedia } from '@/lib/ai/media-pipeline'
-import { createF38StockInfrastructure } from '@/lib/media/stock-adapter'
-import type { ReservoirKind, ResolvedImage } from '@/lib/ai/image-sourcing/contracts'
 import { buildSiteAltKey, siteAltKeyPrefix } from './image-library-keys'
 
 // ── Search query per category+slot type ─────────────────────────────────────
@@ -146,139 +144,6 @@ export interface SeededImageMapping {
     features: number[]
 }
 
-function assignmentEntries(mapping: SeededImageMapping): Array<{ slot: string; mediaId: number }> {
-    return [
-        ...mapping.hero.map((mediaId, index) => ({ slot: `hero[${index}]`, mediaId })),
-        ...mapping.gallery.map((mediaId, index) => ({ slot: `gallery[${index}]`, mediaId })),
-        ...(mapping.about == null ? [] : [{ slot: 'about', mediaId: mapping.about }]),
-        ...mapping.team.map((mediaId, index) => ({ slot: `team[${index}]`, mediaId })),
-        ...mapping.features.map((mediaId, index) => ({ slot: `features[${index}]`, mediaId })),
-    ]
-}
-
-/**
- * Persist per-site slot ownership without copying global catalog Media rows.
- * The assignment table is internal and additive; repeated generation upserts
- * the same site/slot pair deterministically.
- */
-export async function persistF38ImageLibraryAssignments(
-    payload: Payload,
-    siteId: number | string,
-    mapping: SeededImageMapping,
-): Promise<number> {
-    const numericSiteId = Number(siteId)
-    if (!Number.isSafeInteger(numericSiteId) || numericSiteId <= 0) return 0
-    const entries = assignmentEntries(mapping)
-        .filter(({ mediaId }) => Number.isSafeInteger(mediaId) && mediaId > 0)
-
-    const infrastructure = createF38StockInfrastructure(payload)
-    const persisted = await infrastructure.replaceSiteStockAssignments(numericSiteId, entries)
-    return persisted.length
-}
-
-function appendMappedSlot(mapping: SeededImageMapping, slot: string, mediaId: number): void {
-    if (slot.startsWith('gallery')) mapping.gallery.push(mediaId)
-    else if (slot.startsWith('hero')) mapping.hero.push(mediaId)
-    else if (slot === 'about') mapping.about = mediaId
-    else if (slot.startsWith('team')) mapping.team.push(mediaId)
-    else if (slot.startsWith('features')) mapping.features.push(mediaId)
-}
-
-function reservoirForLibrarySlot(slot: string): ReservoirKind {
-    if (slot.startsWith('gallery')) return 'square'
-    if (slot.startsWith('team')) return 'people'
-    return 'landscape'
-}
-
-async function seedF38ImageLibraryForSite(
-    payload: Payload,
-    tenantId: number | string,
-    siteId: number | string,
-    category: string,
-    slotFilter?: (slot: string) => boolean,
-    productTerms?: string | null,
-): Promise<SeededImageMapping> {
-    const mapping: SeededImageMapping = {
-        hero: [],
-        gallery: [],
-        about: null,
-        team: [],
-        features: [],
-    }
-    const numericSiteId = Number(siteId)
-    if (!Number.isSafeInteger(numericSiteId) || numericSiteId <= 0) return mapping
-
-    try {
-        const infrastructure = createF38StockInfrastructure(payload)
-        const existing = await infrastructure.readSiteStockAssignments(numericSiteId)
-        if (existing.length > 0) {
-            for (const assignment of existing) {
-                if (!slotFilter || slotFilter(assignment.slot)) {
-                    appendMappedSlot(mapping, assignment.slot, assignment.mediaId)
-                }
-            }
-            return mapping
-        }
-
-        const slots = buildSlots(category, productTerms)
-            .filter((slot) => !slotFilter || slotFilter(slot.slot))
-        const counts: Record<ReservoirKind, number> = {
-            landscape: 0,
-            square: 0,
-            people: 0,
-            products: 0,
-            blogs: 0,
-        }
-        for (const slot of slots) counts[reservoirForLibrarySlot(slot.slot)]++
-
-        const normalizedCategory = normalizeComposerCategory(category)
-        const subject =
-            buildProductQueryCandidates(productTerms)[0] ||
-            GALLERY_QUERIES[normalizedCategory] ||
-            GALLERY_QUERIES.business!
-        const demands = (['landscape', 'square', 'people'] as const)
-            .filter((kind) => counts[kind] > 0)
-            .map((kind) => ({
-                kind,
-                count: counts[kind],
-                subject: kind === 'people' ? 'professional portrait' : subject,
-                category: kind === 'people' ? 'people' : normalizedCategory,
-                aiEligible: false,
-            }))
-        if (demands.length === 0) return mapping
-
-        const { createF38RuntimeResolver } = await import('@/lib/ai/image-sourcing')
-        const resolver = createF38RuntimeResolver(payload, {
-            tenantId: String(tenantId),
-            businessName: `Site ${siteId}`,
-            category: normalizedCategory,
-            products: productTerms ? [productTerms] : undefined,
-        })
-        const resolution = await resolver.resolveF38ImageDemand({ demands })
-        const reservoirIds = (kind: ReservoirKind): number[] =>
-            resolution.reservoirs[kind]
-                .map((image: ResolvedImage) => image.mediaId)
-                .map((id) => typeof id === 'number' ? id : Number(id))
-                .filter((id) => Number.isSafeInteger(id) && id > 0)
-        const offsets: Record<ReservoirKind, number> = {
-            landscape: 0,
-            square: 0,
-            people: 0,
-            products: 0,
-            blogs: 0,
-        }
-        for (const slot of slots) {
-            const kind = reservoirForLibrarySlot(slot.slot)
-            const mediaId = reservoirIds(kind)[offsets[kind]++]
-            if (mediaId != null) appendMappedSlot(mapping, slot.slot, mediaId)
-        }
-        await persistF38ImageLibraryAssignments(payload, numericSiteId, mapping)
-    } catch (err) {
-        console.warn('[seeder] F38 seed failed', err instanceof Error ? err.message : err)
-    }
-    return mapping
-}
-
 /**
  * Seed IMAGE_LIBRARY for a site by searching Unsplash with category keywords.
  * Each site gets a unique set of photos. Idempotent per site (skips if already seeded).
@@ -293,16 +158,6 @@ export async function seedImageLibraryForSite(
     slotFilter?: (slot: string) => boolean,
     productTerms?: string | null,
 ): Promise<SeededImageMapping> {
-    if (process.env.F38_IMAGE_PIPELINE === 'true') {
-        return seedF38ImageLibraryForSite(
-            payload,
-            tenantId,
-            siteId,
-            category,
-            slotFilter,
-            productTerms,
-        )
-    }
     const start = Date.now()
     const mapping: SeededImageMapping = { hero: [], gallery: [], about: null, team: [], features: [] }
 

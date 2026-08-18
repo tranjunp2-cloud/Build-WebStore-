@@ -26,7 +26,7 @@ vi.mock('@/lib/ai/system-prompt', () => ({
     buildUserPrompt: () => 'User prompt',
 }))
 
-import { generateSiteWithAI } from '@/lib/ai/openai-generator'
+import { generateSiteWithAI, resolveSiteGenerationMode } from '@/lib/ai/openai-generator'
 
 // ─── TC-F01.08: AI site generation with OpenAI ───────────────────────
 
@@ -124,6 +124,103 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     afterAll(() => {
         delete process.env.OPENAI_API_KEY
         delete process.env.GEN_MODE
+    })
+
+    it('keeps ai-first when the credit pilot succeeds', async () => {
+        const create = vi.fn().mockResolvedValue({
+            model: 'gpt-5.4-mini',
+            usage: { prompt_tokens: 5, completion_tokens: 3 },
+            choices: [{ message: { content: '{"ok":true}' } }],
+        })
+        const OpenAI = (await import('openai')).default as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        const decision = await resolveSiteGenerationMode()
+
+        expect(decision).toEqual({
+            requestedGenMode: 'ai-first',
+            effectiveGenMode: 'ai-first',
+        })
+        expect(create).toHaveBeenCalledTimes(1)
+    })
+
+    it('switches to template-first after one pilot call when AI credit is exhausted', async () => {
+        const quotaError = Object.assign(new Error('AI credit exhausted'), {
+            status: 429,
+            code: 'insufficient_quota',
+        })
+        const create = vi.fn().mockRejectedValue(quotaError)
+        const OpenAI = (await import('openai')).default as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        const output = await generateSiteWithAI(businessInfo)
+
+        expect(output.requestedGenMode).toBe('ai-first')
+        expect(output.effectiveGenMode).toBe('template-first')
+        expect(output.modeReason).toBe('insufficient_quota')
+        expect(output.result.blocks.length).toBeGreaterThan(0)
+        expect(create).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps Malay generation on the configured template-first pipeline', async () => {
+        process.env.GEN_MODE = 'template-first'
+        const create = vi.fn().mockResolvedValue({
+            model: 'gpt-5.4-mini',
+            usage: { prompt_tokens: 5, completion_tokens: 3 },
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        heroHeadline: 'Kopi Shah Alam',
+                        heroSubheadline: 'Sarapan tempatan setiap hari.',
+                        seoTitle: 'Kopi Shah Alam',
+                        seoDescription: 'Kopi artisan dan sarapan tempatan.',
+                    }),
+                },
+            }],
+        })
+        const OpenAI = (await import('openai')).default as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        try {
+            const output = await generateSiteWithAI(
+                {
+                    businessName: 'Kopi Shah Alam',
+                    industry: 'fnb',
+                    products: 'Kopi artisan, Nasi lemak, Roti bakar',
+                    shortDescription: 'Kafe tempatan dengan sarapan tradisional.',
+                },
+                undefined,
+                'ms',
+            )
+
+            expect(output.effectiveGenMode).toBe('template-first')
+            expect(output.modeReason).toBeUndefined()
+            expect(output.result.language).toBe('ms')
+            const menu = output.result.pages
+                ?.flatMap((page) => page.blocks)
+                .find((block) => block.blockType === 'menu-food') as Record<string, unknown> | undefined
+            expect(menu?.headline).toBe('Menu Kami')
+        } finally {
+            process.env.GEN_MODE = 'ai-first'
+        }
+    })
+
+    it('does not mistake a transient 429 for exhausted credit', async () => {
+        const transientRateLimit = Object.assign(new Error('Rate limit exceeded'), {
+            status: 429,
+            code: 'rate_limit_exceeded',
+        })
+        const create = vi.fn().mockRejectedValue(transientRateLimit)
+        const OpenAI = (await import('openai')).default as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        const decision = await resolveSiteGenerationMode()
+
+        expect(decision).toEqual({
+            requestedGenMode: 'ai-first',
+            effectiveGenMode: 'ai-first',
+        })
+        expect(create).toHaveBeenCalledTimes(1)
     })
 
     it('parses valid AI response and returns blocks', async () => {
@@ -446,6 +543,20 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
         expect(validVariants).toContain(output.variant)
     })
 
+    it('normalizes invalid CTA style without replacing CTA content', () => {
+        const output = sanitizeBlockData({
+            blockType: 'cta',
+            headline: 'Tempah sekarang',
+            ctaLabel: 'Mulakan',
+            ctaUrl: '/contact',
+            ctaStyle: 'Kafe tempatan yang menyajikan kopi artisan.',
+        })
+
+        expect(output.ctaStyle).toBe('primary')
+        expect(output.headline).toBe('Tempah sekarang')
+        expect(output.ctaLabel).toBe('Mulakan')
+    })
+
     it('forces footer socials into array of object format', () => {
         const input = { blockType: 'footer', socials: ['facebook', 'twitter'] }
         const output = sanitizeBlockData(input)
@@ -478,13 +589,13 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
         expect(plans[1].price).toBe('RM 0')
     })
 
-    it('preserves logo-cloud name metadata while stripping URLs', () => {
+    it('preserves valid logo-cloud placeholders while stripping URLs', () => {
         const input = { blockType: 'logo-cloud', logos: ['Acme Corp', { name: 'Partner Inc', url: 'http://example.com' }] }
         const output = sanitizeBlockData(input)
         const logos = output.logos as Array<Record<string, unknown>>
         expect(logos).toHaveLength(2)
-        expect(logos[0]).toEqual({ name: 'Acme Corp' })
-        expect(logos[1]).toEqual({ name: 'Partner Inc' })
+        expect(logos[0]).toEqual({ name: 'Acme Corp', logo: { url: '', alt: 'Acme Corp' } })
+        expect(logos[1]).toEqual({ name: 'Partner Inc', logo: { url: '', alt: 'Partner Inc' } })
     })
 
     it('handles nulls or completely broken objects safely', () => {

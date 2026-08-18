@@ -94,6 +94,12 @@ export interface BuildPoolCtx {
   squareExcludeIds?: ReadonlySet<string>
   /** Per-request deadline; backfill uses a tighter budget than speculative preload. */
   timeoutMs?: number
+  /**
+   * Post-AI exact-slot mode: one Pixabay request per non-empty aspect bucket,
+   * over-fetch candidate metadata in that request, then retain only the exact
+   * number of unique photos required by the generated block tree.
+   */
+  exactSlotMode?: boolean
 }
 
 export interface ImagePoolTargets {
@@ -331,22 +337,43 @@ async function searchBucket(
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
-  // Provider-outage short-circuit: every further tier is a guaranteed-fail
-  // request that deepens the storm. Return thin/empty and let the caller use
-  // its deterministic industry fallback.
+  // Provider-outage short-circuit: rate limits and 5xx responses make every
+  // further tier a guaranteed-fail request. A timeout is different: it may be
+  // query-specific, so the generation's second and final request may still
+  // retry with the broader tier-2 query.
   const isProviderUnavailable = (err: unknown): boolean =>
     err instanceof PixabayError
-    && (err.code === 'RATE_LIMITED' || err.code === 'SERVER_ERROR' || err.code === 'TIMEOUT')
+    && (err.code === 'RATE_LIMITED' || err.code === 'SERVER_ERROR')
+  const errorSummary = (err: unknown): string =>
+    err instanceof PixabayError
+      ? `code=${err.code} message="${err.message}"`
+      : `message="${err instanceof Error ? err.message : String(err)}"`
+  const isTimeout = (err: unknown): boolean =>
+    err instanceof PixabayError && err.code === 'TIMEOUT'
 
   // Ask for enough rows to move past the already-used first page. The result is
   // still capped to `size`, which is the exact deficit this call must fill.
-  const requestCount = Math.min(200, size + excludeIds.size)
+  const requestedPoolSize = size + excludeIds.size
+  // Five generated pages can require 30 distinct gallery photos. Ask Pixabay
+  // for extra landscape candidates in the same HTTP request so the relevance
+  // gate can reject weak matches without shrinking the usable pool back to one
+  // six-photo gallery. Squarish search already over-fetches 3x in searchPhotos.
+  const requestCount = Math.min(
+    200,
+    ctx.exactSlotMode
+      ? requestedPoolSize * 3
+      : orientation === 'landscape' && size > DEFAULT_LANDSCAPE_SIZE
+        ? requestedPoolSize * 3
+        : requestedPoolSize,
+  )
   const searchOptions = { orientation, width, category, timeoutMs: ctx.timeoutMs }
+  let primaryTimedOut = false
   try {
     photos = (await searchPhotos(query, requestCount, searchOptions)) ?? []
   } catch (err) {
-    console.warn(`[image-pool] ${orientation} search failed:`, err)
+    console.warn(`[image-pool] ${orientation} search unavailable ${errorSummary(err)}`)
     if (isProviderUnavailable(err)) return { photos, usedFallback: true }
+    primaryTimedOut = isTimeout(err)
   }
   // GH-1611: gate EVERY language, not just Vietnamese. The pool query is
   // English by default (GEN_TRANSLATE_POOL_KEYWORDS), so a VN-only gate never
@@ -380,9 +407,46 @@ async function searchBucket(
     }
   }
 
+  // A transport timeout needs a genuinely cheap recovery request. Retrying a
+  // long product query consumed the generation's second and final Pixabay call
+  // while leaving every bucket empty. Use Pixabay's own category keyword (or
+  // our category phrase when no provider category exists), then reuse the
+  // recovered photos across all roles. The category filter + short query keeps
+  // this on-industry without depending on product tags being present.
+  if (primaryTimedOut) {
+    usedFallback = true
+    if (ctx.exactSlotMode) {
+      return { photos: [], usedFallback }
+    }
+    const recoveryQuery = category ?? categoryPhrase(ctx.category)
+    try {
+      const recovered = (await searchPhotos(recoveryQuery, requestCount, {
+        ...searchOptions,
+        timeoutMs: Math.max(ctx.timeoutMs ?? 20_000, 25_000),
+      })) ?? []
+      const safeRecovered = categoryMapped
+        ? recovered
+        : gate(recovered, gateTerms, recoveryQuery)
+      merge(safeRecovered)
+      if (photos.length > 0) {
+        console.info(
+          `[image-pool] ${orientation} timeout recovery "${recoveryQuery}": +${photos.length}`,
+        )
+      }
+    } catch (err) {
+      console.warn(
+        `[image-pool] ${orientation} timeout recovery unavailable ${errorSummary(err)}`,
+      )
+    }
+    return { photos: photos.slice(0, size), usedFallback }
+  }
+
   const tier1 = gate(photos, gateTerms, query)
   photos = []
   merge(tier1)
+  if (ctx.exactSlotMode) {
+    return { photos: photos.slice(0, size), usedFallback }
+  }
   if (photos.length >= minCount) return { photos: photos.slice(0, size), usedFallback }
 
   // The category phrase broadens SEARCH coverage only. It never replaces trusted
@@ -410,7 +474,7 @@ async function searchBucket(
       // gate() deliberately accepts mapped categories and rejects unmapped ones.
       merge(gate(extra, gateTerms, relaxedQuery))
     } catch (err) {
-      console.warn(`[image-pool] ${orientation} relaxed retry failed:`, err)
+      console.warn(`[image-pool] ${orientation} relaxed retry unavailable ${errorSummary(err)}`)
       if (isProviderUnavailable(err)) return { photos, usedFallback: true }
       tier2Failed = true
     }
@@ -443,7 +507,7 @@ async function searchBucket(
       }
       merge(gate(extra, gateTerms, catQuery))
     } catch (err) {
-      console.warn(`[image-pool] ${orientation} category fallback failed:`, err)
+      console.warn(`[image-pool] ${orientation} category fallback unavailable ${errorSummary(err)}`)
     }
   }
   if (photos.length === 0) {
@@ -459,7 +523,10 @@ async function searchBucket(
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Build the per-site image pool. Makes 1-2 Pixabay calls (landscape + square).
+ * Build the per-site image pool. Landscape and square candidates come from one
+ * orientation=all search and are split locally by aspect ratio. Callers may
+ * enforce a one-request generation budget; outside that budget the fallback
+ * ladder can still issue broader searches when the primary result underfills.
  *
  * Failure modes:
  *   - Pixabay returns 0 results → retry once with relaxed (broadened) query
@@ -474,52 +541,98 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   const query = buildPoolQuery(ctx, false)
   let underfill = false
 
-  // ── Landscape bucket (hero, gallery wide) ────────────────────────
-  // Size 0 = no landscape-role block enabled for this gen — skip the Pixabay
-  // call entirely (empty bucket is intentional here, NOT an underfill).
   let landscapePhotos: PixabayPhoto[] = []
-  if (landscapeSize > 0) {
-    // GH-1611: "filled" = enough for the hungriest block that draws from this
-    // bucket (gallery needs 6), not half the bucket size. Never BELOW the legacy
-    // floor though — hero-only sizing has a base need of 1, and stopping the
-    // ladder at a single photo would hand hero and about the same image.
-    // Clamped to the bucket size so it can't demand more than we ever fetch.
+  let squarePhotos: PixabayPhoto[] = []
+
+  if (landscapeSize > 0 || squareSize > 0) {
     const landscapeMin = Math.min(
       landscapeSize,
       Math.max(ctx.landscapeMin ?? 0, Math.max(3, Math.floor(landscapeSize / 2))),
     )
-    const landscape = await searchBucket(
-      ctx, query, 'landscape', landscapeSize, 1200, landscapeMin,
-      ctx.landscapeExcludeIds,
-    )
-    landscapePhotos = landscape.photos
-    if (landscape.usedFallback || landscapePhotos.length === 0) underfill = true
-  }
-
-  // ── Square bucket (team, product flatlay) ─────────────────────────
-  let squarePhotos: PixabayPhoto[] = []
-  if (squareSize > 0) {
     const squareMin = Math.min(
       squareSize,
       Math.max(ctx.squareMin ?? 0, Math.max(2, Math.floor(squareSize / 2))),
     )
-    const square = await searchBucket(
-      ctx, query, 'squarish', squareSize, 1000, squareMin,
-      ctx.squareExcludeIds,
+    const minCount = Math.max(landscapeMin, squareMin)
+
+    // Calculate requested pool size for single search call.
+    // When both buckets are active, request a larger chunk (min 100) because squarish
+    // sorting puts square photos at the front, which can starve the landscape bucket
+    // if the slice limit is too low.
+    const requestedSize = Math.max(landscapeSize, squareSize)
+    const targetSize = Math.min(
+      200,
+      squareSize > 0 && landscapeSize > 0
+        ? Math.max(100, (landscapeSize + squareSize) * 4)
+        : requestedSize * 3
     )
-    squarePhotos = square.photos
-    if (square.usedFallback || squarePhotos.length === 0) underfill = true
+
+    const combinedExcludeIds = new Set<string>([
+      ...(ctx.landscapeExcludeIds ?? []),
+      ...(ctx.squareExcludeIds ?? []),
+    ])
+
+    const searchResult = await searchBucket(
+      ctx,
+      query,
+      'squarish', // squarish maps to 'all' orientation -> returns both landscape and square
+      targetSize,
+      1200,
+      minCount,
+      combinedExcludeIds,
+    )
+
+    underfill = searchResult.usedFallback || searchResult.photos.length === 0
+
+    // Filter local candidates by aspect ratio
+    const isLandscape = (p: PixabayPhoto) => (p.width / Math.max(p.height, 1)) >= 1.25
+    const isSquareOrPortrait = (p: PixabayPhoto) => (p.width / Math.max(p.height, 1)) < 1.25
+
+    landscapePhotos = searchResult.photos.filter(isLandscape).slice(0, landscapeSize)
+    squarePhotos = searchResult.photos.filter(isSquareOrPortrait).slice(0, squareSize)
+
+    if (ctx.exactSlotMode) {
+      // One search can return enough relevant photos overall while its natural
+      // aspect split is uneven. Use the unused results for the short bucket;
+      // renderers crop with object-fit, and every assigned slot remains unique.
+      const usedIds = new Set([
+        ...landscapePhotos.map((photo) => photo.id),
+        ...squarePhotos.map((photo) => photo.id),
+      ])
+      const fillFromUnused = (bucket: PixabayPhoto[], targetSize: number): void => {
+        for (const photo of searchResult.photos) {
+          if (bucket.length >= targetSize) break
+          if (usedIds.has(photo.id)) continue
+          bucket.push(photo)
+          usedIds.add(photo.id)
+        }
+      }
+      fillFromUnused(landscapePhotos, landscapeSize)
+      fillFromUnused(squarePhotos, squareSize)
+      if (landscapePhotos.length < landscapeSize || squarePhotos.length < squareSize) {
+        underfill = true
+      }
+    } else {
+      // Legacy fallback if one bucket is completely empty but the other has surplus.
+      if (landscapePhotos.length === 0 && squarePhotos.length > 0 && landscapeSize > 0) {
+        landscapePhotos = searchResult.photos.slice(0, landscapeSize)
+        underfill = true
+      }
+      if (squarePhotos.length === 0 && landscapePhotos.length > 0 && squareSize > 0) {
+        squarePhotos = searchResult.photos.slice(0, squareSize)
+        underfill = true
+      }
+    }
   }
 
   return {
     landscape: landscapePhotos.map((p) => normalize(p, 'gallery')),
-    // When squarish search returns 0 (Pixabay has thin coverage for niche queries
-    // like "bubble tea"), reuse landscape photos instead of leaving the bucket empty.
-    // Empty square bucket causes media-injector to fall back to legacy search per
-    // block (extra Pixabay API calls → rate limit pressure).
+    // When squarish search returns 0, reuse landscape photos instead of leaving the bucket empty.
     square: squarePhotos.length > 0
       ? squarePhotos.map((p) => normalize(p, 'team'))
-      : landscapePhotos.slice(0, squareSize).map((p) => normalize(p, 'team')),
+      : ctx.exactSlotMode
+        ? []
+        : landscapePhotos.slice(0, squareSize).map((p) => normalize(p, 'team')),
     // Portrait not populated by default — derived from landscape if needed.
     portrait: [],
     queryUsed: query,
@@ -575,8 +688,7 @@ export function pickFromPool(
   role: ImageRole,
   seed: number,
 ): PoolPhoto | undefined {
-  const bucket = bucketForRole(role)
-  const source = pool[bucket]
+  const source = sourceForRole(pool, role)
   if (source.length === 0) return undefined
 
   // Compound seed so different roles pick distinct entries at the same seed.
@@ -607,8 +719,7 @@ export function pickManyFromPool(
   seed: number,
   count: number,
 ): PoolPhoto[] {
-  const bucket = bucketForRole(role)
-  const source = pool[bucket]
+  const source = sourceForRole(pool, role)
   if (source.length === 0 || count <= 0) return []
 
   // Seeded Fisher-Yates shuffle to get distinct picks.
@@ -622,6 +733,28 @@ export function pickManyFromPool(
     ...source[idx]!,
     role,
   }))
+}
+
+/**
+ * Keep every role on the successful Pixabay pool even when one orientation
+ * underfills. This prevents a missing square response from switching blocks
+ * back to the checked-in image library.
+ */
+function sourceForRole(pool: ImagePool, role: ImageRole): PoolPhoto[] {
+  const portrait = pool.portrait ?? []
+  const square = pool.square ?? []
+  const landscape = pool.landscape ?? []
+  if (role === 'team') {
+    return portrait.length > 0
+      ? portrait
+      : square.length > 0
+        ? square
+        : landscape
+  }
+  if (role === 'product') {
+    return square.length > 0 ? square : landscape
+  }
+  return landscape.length > 0 ? landscape : square
 }
 
 /**

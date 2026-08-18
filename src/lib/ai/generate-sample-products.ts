@@ -13,7 +13,11 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import {
+    searchPhotos,
+    PixabayError,
+    PIXABAY_CATEGORY_BY_COMPOSER,
+} from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -487,7 +491,14 @@ export async function generateSampleProducts(
     tenantId: string,
     payload: BasePayload,
     siteId?: string | number,
+    resolved?: {
+        prepared: PreparedSampleProductsResult
+        imageIds: readonly (number | undefined)[]
+    },
 ): Promise<GeneratedProductsResult> {
-    const prepared = await prepareSampleProducts(businessInfo, language)
+    const prepared = resolved?.prepared ?? await prepareSampleProducts(businessInfo, language)
+    if (resolved) {
+        return assignResolvedSampleProductImages(prepared, resolved.imageIds)
+    }
     return assignSampleProductImages(prepared, tenantId, payload, siteId)
 }

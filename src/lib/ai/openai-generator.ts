@@ -21,7 +21,7 @@ import {
     enforceSubpageStructure,
     enforceMinItems,
     enforceGridAlignment,
-    MIN_SUBPAGE_CONTENT_SECTIONS,
+    getSubpageContentTarget,
 } from './structure-enforcer'
 import {
     postAISwapStep,
@@ -83,6 +83,114 @@ export type SSEEvent = {
 export interface GenerateSiteOptions {
     /** Locale already selected by the user or accepted in the confirmation popup. */
     targetLocale?: string
+    /** Request-local mode selected by the route's single credit pilot. */
+    modeDecision?: SiteGenerationModeDecision
+}
+
+export type SiteGenerationMode = 'ai-first' | 'template-first'
+export type SiteGenerationModeReason =
+    | 'insufficient_quota'
+    | 'missing_api_key'
+    | 'ai_generation_error'
+
+export type SiteGenerationModeDecision = {
+    requestedGenMode: SiteGenerationMode
+    effectiveGenMode: SiteGenerationMode
+    modeReason?: SiteGenerationModeReason
+}
+
+export type GenerateSiteOutput = {
+    result: GenerationResult
+    events: SSEEvent[]
+    requestedGenMode: SiteGenerationMode
+    effectiveGenMode: SiteGenerationMode
+    modeReason?: SiteGenerationModeReason
+}
+
+function isInsufficientQuotaError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false
+    const status = (error as { status?: unknown }).status
+    const code = (error as { code?: unknown }).code
+    return status === 429 && code === 'insufficient_quota'
+}
+
+async function runSiteGenerationCreditPilot(openai: OpenAI): Promise<'available' | 'insufficient_quota'> {
+    const model = selectModel('site-generation')
+    const startedAt = Date.now()
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: 'Return a minimal JSON health response.' },
+                { role: 'user', content: 'Return {"ok":true}.' },
+            ],
+            temperature: 0,
+            max_completion_tokens: 8,
+            response_format: { type: 'json_object' },
+        }, { timeout: 8_000 })
+        logAiUsage({
+            endpoint: 'site-generation',
+            model: completion.model,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            durationMs: Date.now() - startedAt,
+            success: true,
+        })
+        console.info(`[AI][CREDIT_PILOT] status=available model=${completion.model} duration=${Date.now() - startedAt}ms`)
+        return 'available'
+    } catch (error) {
+        const hardQuota = isInsufficientQuotaError(error)
+        logAiUsage({
+            endpoint: 'site-generation',
+            model,
+            tokensIn: 0,
+            tokensOut: 0,
+            durationMs: Date.now() - startedAt,
+            success: false,
+            errorCode: hardQuota ? 'insufficient_quota' : error instanceof Error ? error.name : 'unknown',
+        })
+        if (hardQuota) {
+            console.warn(`[AI][CREDIT_PILOT] status=insufficient_quota model=${model} duration=${Date.now() - startedAt}ms`)
+            return 'insufficient_quota'
+        }
+
+        // A timeout, transport failure, or transient rate limit does not prove
+        // that the account is out of credit. Preserve the configured AI-first
+        // path and let its existing per-scope fallback handling decide.
+        console.warn(
+            `[AI][CREDIT_PILOT] status=inconclusive model=${model} ` +
+            `duration=${Date.now() - startedAt}ms error=${error instanceof Error ? error.message : String(error)}`,
+        )
+        return 'available'
+    }
+}
+
+export async function resolveSiteGenerationMode(): Promise<SiteGenerationModeDecision> {
+    const requestedGenMode: SiteGenerationMode = process.env.GEN_MODE?.trim() === 'ai-first'
+        ? 'ai-first'
+        : 'template-first'
+    if (requestedGenMode === 'template-first') {
+        return { requestedGenMode, effectiveGenMode: 'template-first' }
+    }
+
+    const openai = getOpenAI()
+    if (!openai) {
+        return {
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            modeReason: 'missing_api_key',
+        }
+    }
+
+    const pilotStatus = await runSiteGenerationCreditPilot(openai)
+    return pilotStatus === 'insufficient_quota'
+        ? {
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            modeReason: 'insufficient_quota',
+        }
+        : { requestedGenMode, effectiveGenMode: 'ai-first' }
 }
 
 function countContentSections(blocks: Array<Record<string, unknown>>): number {
@@ -111,7 +219,7 @@ function backfillPagesAfterServiceDedupe(
         ).length
         const targetContentCount = page.isHomepage
             ? Math.max(0, getCategoryRequirement(category).minBlocks - structuralBlockCount)
-            : MIN_SUBPAGE_CONTENT_SECTIONS
+            : getSubpageContentTarget(page.slug)
         if (countContentSections(currentBlocks) >= targetContentCount) return page
 
         let repairedBlocks = backfillContentSections(
@@ -120,6 +228,7 @@ function backfillPagesAfterServiceDedupe(
             targetContentCount,
             enforcerCtx,
             excludedBlockTypes,
+            page.slug,
         )
         repairedBlocks = enforceMinItems(repairedBlocks, category, enforcerCtx)
         enforceGridAlignment(repairedBlocks, category, enforcerCtx)
@@ -148,7 +257,7 @@ export async function generateSiteWithAI(
     blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
     onEvent?: (e: SSEEvent) => void,
     options: GenerateSiteOptions = {},
-): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
+): Promise<GenerateSiteOutput> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
     // carries broken Unicode (common from mobile emoji paste + Windows clip).
@@ -193,6 +302,8 @@ export async function generateSiteWithAI(
             ? detectLanguage(inputText)
             : resolveDetectedLanguage(language)
 
+    const modeDecision = options.modeDecision ?? await resolveSiteGenerationMode()
+    const { requestedGenMode } = modeDecision
     const openai = getOpenAI()
     if (!openai) {
         if (!['en', 'ms', 'vi'].includes(blockLang)) {
@@ -206,7 +317,12 @@ export async function generateSiteWithAI(
             selectedBlocks: fallbackBlocks,
             outputSnapshot: { path: 'fallback-no-key', siteName: fallbackResult.result.siteName },
         })
-        return fallbackResult
+        return {
+            ...fallbackResult,
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            modeReason: 'missing_api_key',
+        }
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -221,13 +337,54 @@ export async function generateSiteWithAI(
     //   - User provided extraInstructions or referencePrompt (custom input)
     //   - Composer returns null (unknown category)
     // ────────────────────────────────────────────────────────────────────
-    const genMode = process.env.GEN_MODE?.trim() || 'template-first'
+    const genMode = modeDecision.effectiveGenMode
     const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
 
-    // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
-    // Skip it for explicit non-English languages and for 'auto' when user's input text
-    // is detected as Malay/Vietnamese so AI-first generates fully localized content.
-    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en' && blockLang === 'en') {
+    if (modeDecision.modeReason === 'insufficient_quota') {
+        console.warn('[AI] Switching this site generation request from ai-first to template-first (insufficient quota)')
+        const templateResult = await generateTemplateFirst(
+            businessInfo,
+            detectedLang,
+            promptText,
+            openai,
+            events,
+            { personalize: false },
+        )
+        const quotaFallback = templateResult ?? await generateWithFallback(
+            promptText,
+            events,
+            detectedLang,
+            businessInfo,
+        )
+        const fallbackBlocks = quotaFallback.result.blocks.map(
+            (block: GeneratedBlock) => String((block as Record<string, unknown>).blockType ?? ''),
+        )
+        const fallbackFieldCounts = countSnapshotFields({
+            blocks: quotaFallback.result.blocks as Record<string, unknown>[],
+        })
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: fallbackBlocks,
+            outputSnapshot: {
+                path: 'template-first-quota-fallback',
+                siteName: quotaFallback.result.siteName,
+            },
+            fieldsTotal: fallbackFieldCounts.fieldsTotal,
+            fieldsFilled: fallbackFieldCounts.fieldsFilled,
+        })
+        return {
+            ...quotaFallback,
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            modeReason: 'insufficient_quota',
+        }
+    }
+
+    // Keep the configured generation mode stable for every supported locale.
+    // The composer receives the resolved locale and owns localized template copy;
+    // silently switching Malay/Vietnamese requests to AI-first makes template
+    // structure dependent on model output and can corrupt nested block fields.
+    if (genMode === 'template-first' && !hasCustomInput) {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
@@ -244,7 +401,11 @@ export async function generateSiteWithAI(
                 fieldsTotal: tfFieldCounts.fieldsTotal,
                 fieldsFilled: tfFieldCounts.fieldsFilled,
             })
-            return templateResult
+            return {
+                ...templateResult,
+                requestedGenMode,
+                effectiveGenMode: 'template-first',
+            }
         }
         // templateResult === null → composer failed, fall through to AI-first
         console.warn('[AI] Template-first returned null — falling back to AI-first path')
@@ -480,6 +641,40 @@ export async function generateSiteWithAI(
                 if (!blockType) continue
 
                 if (blockRegistry.has(blockType)) {
+                    // Clean up/pad image fields generated by LLM to avoid noisy Zod validation warnings.
+                    // The LLM often generates "alt" but leaves "url" undefined because URLs are injected later.
+                    if (blockData && typeof blockData === 'object') {
+                        const sanitizeImageRefs = (obj: any) => {
+                            if (!obj || typeof obj !== 'object') return
+                            for (const key of Object.keys(obj)) {
+                                const val = obj[key]
+                                if (val && typeof val === 'object') {
+                                    if (key === 'image' || key === 'logo' || key === 'thumbnail' || key === 'avatar') {
+                                        if (Object.keys(val).length === 0) {
+                                            delete obj[key]
+                                        } else {
+                                            if (typeof val.url !== 'string') {
+                                                val.url = ''
+                                            }
+                                        }
+                                    } else if (key === 'images' && Array.isArray(val)) {
+                                        obj[key] = val.map((item) => {
+                                            if (item && typeof item === 'object') {
+                                                if (Object.keys(item).length === 0) return undefined
+                                                if (typeof item.url !== 'string') {
+                                                    item.url = ''
+                                                }
+                                            }
+                                            return item
+                                        }).filter((item) => item !== undefined)
+                                    } else {
+                                        sanitizeImageRefs(val)
+                                    }
+                                }
+                            }
+                        }
+                        sanitizeImageRefs(blockData)
+                    }
                     const validation = blockRegistry.validate(blockType, blockData)
                     const validatedData = validation.success ? validation.data as Record<string, unknown> : blockData
 
@@ -590,6 +785,7 @@ export async function generateSiteWithAI(
                         pageBlocks as Record<string, unknown>[],
                         enforcerCategory,
                         enforcerCtx,
+                        typeof rawPage.slug === 'string' ? rawPage.slug : undefined,
                     ) as typeof pageBlocks
                 }
                 pageBlocks = enforceMinItems(
@@ -834,7 +1030,12 @@ export async function generateSiteWithAI(
             fieldsFilled: aiFieldCounts.fieldsFilled,
         })
 
-        return { result, events }
+        return {
+            result,
+            events,
+            requestedGenMode,
+            effectiveGenMode: 'ai-first',
+        }
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
@@ -853,7 +1054,12 @@ export async function generateSiteWithAI(
             selectedBlocks: fallbackBlocks,
             outputSnapshot: { path: 'ai-first-fallback', siteName: fallbackResult.result.siteName, error: errMessage.slice(0, 200) },
         })
-        return fallbackResult
+        return {
+            ...fallbackResult,
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            modeReason: 'ai_generation_error',
+        }
     }
 }
 
@@ -1570,6 +1776,13 @@ export function sanitizeBlockData(
         }
     }
 
+    // CTA button style is a strict enum. Models occasionally copy nearby body
+    // text into this field; keep the CTA content and fall back to the default
+    // style instead of persisting an invalid block.
+    if (s.blockType === 'cta' && s.ctaStyle !== 'primary' && s.ctaStyle !== 'outline') {
+        s.ctaStyle = 'primary'
+    }
+
     // Phase 04 — Content validation (headline length, blocked CTAs, generic copy).
     // Auto-fixes merge into `s` with console.warn per violation.
     // NEVER throws: AI pipeline must always succeed.
@@ -2052,17 +2265,23 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // LOGO CLOUD: Strip URL strings but keep name/alt metadata
+    // LOGO CLOUD: Strip untrusted URLs while preserving the required logo
+    // object. The renderer intentionally treats an empty URL as a monogram.
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'logo-cloud' && Array.isArray(s.logos)) {
         s.logos = s.logos.map((logo: unknown) => {
-            if (typeof logo === 'string') return { name: logo }
+            if (typeof logo === 'string') {
+                return { name: logo, logo: { url: '', alt: logo } }
+            }
             const lObj = (typeof logo === 'object' && logo !== null ? logo : {}) as Record<string, unknown>
-            const cleaned: Record<string, unknown> = {}
-            if (lObj.name) cleaned.name = String(lObj.name)
-            if (lObj.alt) cleaned.alt = String(lObj.alt)
-            return cleaned
-        }).filter((logo: Record<string, unknown>) => Object.keys(logo).length > 0)
+            const name = String(lObj.name || lObj.alt || '').trim()
+            if (!name) return null
+            const nestedLogo = typeof lObj.logo === 'object' && lObj.logo !== null
+                ? lObj.logo as Record<string, unknown>
+                : null
+            const alt = String(nestedLogo?.alt || lObj.alt || name)
+            return { name, logo: { url: '', alt } }
+        }).filter((logo) => logo !== null)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2337,6 +2556,7 @@ async function generateTemplateFirst(
     promptText: string,
     openai: OpenAI,
     events: SSEEvent[],
+    options: { personalize?: boolean } = {},
 ): Promise<{ result: GenerationResult; events: SSEEvent[] } | null> {
     events.push({ event: 'step', data: { step: 'composing', label: 'Building from templates...', progress: 15 } })
 
@@ -2353,12 +2573,17 @@ async function generateTemplateFirst(
     // ~5ms DB query; empty set on error so gen proceeds normally.
     const disabledSet = await loadDisabledVariants()
 
-    // Run composer + GPT personalize in parallel
+    const shouldPersonalize = options.personalize !== false
+
+    // Run composer + GPT personalize in parallel. A quota-triggered mode switch
+    // disables personalization so template-first does not make another AI call.
     const [composerSettled, personalizeSettled] = await Promise.allSettled([
         // Composer: build full 5-page site from library (~0.5s)
         Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo, disabledSet)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
-        personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
+        shouldPersonalize
+            ? personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang)
+            : Promise.resolve(null),
     ])
 
     // Extract composer result
@@ -2415,6 +2640,7 @@ async function generateTemplateFirst(
         seed: themeSeed,
         userBiz: enforcerBizOverride,
         mood: themeMood,
+        language: resolvedLang,
     }
 
     // Enforce homepage blocks
@@ -2434,7 +2660,12 @@ async function generateTemplateFirst(
             }
             let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
             pageBlocks = dedupePageSingletonBlocks(pageBlocks) as typeof pageBlocks
-            pageBlocks = enforceSubpageStructure(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
+            pageBlocks = enforceSubpageStructure(
+                pageBlocks,
+                presetCategory,
+                enforcerCtx,
+                page.slug,
+            ) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
             page.blocks = pageBlocks as GeneratedBlock[]
@@ -2454,7 +2685,9 @@ async function generateTemplateFirst(
     }
 
     console.info(
-        `[Template-First] OK blocks=${composerResult.blocks.length} pages=${composerResult.pages?.length ?? 0} personalized=${personalizeApplied} gptFailed=${personalizeSettled.status === 'rejected'}`,
+        `[Template-First] OK blocks=${composerResult.blocks.length} pages=${composerResult.pages?.length ?? 0} ` +
+        `personalized=${personalizeApplied} personalizeSkipped=${!shouldPersonalize} ` +
+        `gptFailed=${personalizeSettled.status === 'rejected'}`,
     )
 
     // Emit theme

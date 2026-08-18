@@ -18,6 +18,14 @@
  * `largeImageURL` ~1280px. `fullHDURL`/original need full-API-access approval.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
+import {
+    getProcessPixabayKeyRing,
+    parsePixabayKeys,
+    resetProcessPixabayKeyRingForTests,
+    type SelectedPixabayKey,
+} from '@/lib/ai/image-sourcing/key-ring'
+
 export type PixabayOrientation = 'landscape' | 'portrait' | 'squarish'
 
 /** Normalized photo — `url` is already sized by the client (no Imgix on Pixabay). */
@@ -145,54 +153,137 @@ const DOWNLOAD_TIMEOUT_MS = 15_000
 const DEFAULT_MAX_BYTES = 10_000_000 // 10 MB
 const RATE_LIMIT_WARN_THRESHOLD = 20
 const LARGE_SIZE_MIN_WIDTH = 700 // ≥ this → largeImageURL (1280px), else webformatURL (640px)
-const CIRCUIT_OPEN_MS = 60_000
-const SERVER_ERROR_CIRCUIT_THRESHOLD = 3
 
-let circuitOpenUntil = 0
-let circuitError: PixabayError | null = null
-let consecutiveServerErrors = 0
+export interface PixabaySearchBudget {
+    readonly limit: number
+    readonly requestId?: string
+    used: number
+    skipped: number
+    exhaustedLogged: boolean
+    searchResultPixabayUrls: Set<string>
+    downloadedPixabayUrls: Set<string>
+    uploadedPixabayUrls: Set<string>
+    mediaSourceUrls: Map<number, string>
+    usedPixabayUrls: Set<string>
+    downloadedPixabayCount: number
+    uploadedPixabayCount: number
+    assignedPixabaySlots: number
+    rateLimited: boolean
+    providerErrorCodes: Set<PixabayError['code']>
+}
 
-function openCircuit(error: PixabayError): void {
-    // A timeout may be query-specific and must not suppress unrelated users on
-    // the same warm instance. Rate limits are provider-wide; repeated 5xxs are
-    // treated as an outage only after a small failure threshold.
-    if (error.code === 'TIMEOUT') return
-    if (error.code === 'SERVER_ERROR') {
-        consecutiveServerErrors += 1
-        if (consecutiveServerErrors < SERVER_ERROR_CIRCUIT_THRESHOLD) return
-    } else if (error.code !== 'RATE_LIMITED') {
-        return
+const searchBudgetStorage = new AsyncLocalStorage<PixabaySearchBudget>()
+
+/**
+ * Creates a generation-scoped search budget. The mutable counter is retained
+ * by deferred blog and image-library work from the same generation.
+ */
+export function createPixabaySearchBudget(
+    limit: number,
+    requestId?: string,
+): PixabaySearchBudget {
+    return {
+        limit: Math.max(0, Math.floor(limit)),
+        ...(requestId ? { requestId } : {}),
+        used: 0,
+        skipped: 0,
+        exhaustedLogged: false,
+        searchResultPixabayUrls: new Set(),
+        downloadedPixabayUrls: new Set(),
+        uploadedPixabayUrls: new Set(),
+        mediaSourceUrls: new Map(),
+        usedPixabayUrls: new Set(),
+        downloadedPixabayCount: 0,
+        uploadedPixabayCount: 0,
+        assignedPixabaySlots: 0,
+        rateLimited: false,
+        providerErrorCodes: new Set(),
     }
-    circuitOpenUntil = Date.now() + CIRCUIT_OPEN_MS
-    circuitError = error
 }
 
-function recordProviderSuccess(): void {
-    consecutiveServerErrors = 0
+/** Runs work inside an isolated budget, so concurrent users never share it. */
+export function withPixabaySearchBudget<T>(
+    budget: PixabaySearchBudget,
+    work: () => T,
+): T {
+    return searchBudgetStorage.run(budget, work)
 }
 
-function assertCircuitClosed(): void {
-    if (circuitOpenUntil === 0) return
-    if (Date.now() >= circuitOpenUntil) {
-        circuitOpenUntil = 0
-        circuitError = null
-        consecutiveServerErrors = 0
-        return
+function claimSearchRequest(): boolean {
+    const budget = searchBudgetStorage.getStore()
+    if (!budget) return true
+    if (budget.used < budget.limit) {
+        budget.used += 1
+        return true
     }
-    const source = circuitError
-    throw new PixabayError(
-        source?.code ?? 'SERVER_ERROR',
-        source?.status ?? 0,
-        false,
-        `[Pixabay] circuit open after ${source?.code ?? 'provider outage'}`,
-    )
+    budget.skipped += 1
+    if (!budget.exhaustedLogged) {
+        budget.exhaustedLogged = true
+        console.info(
+            `[Pixabay] generation search budget exhausted (${budget.used}/${budget.limit}); using existing fallbacks`,
+        )
+    }
+    return false
 }
 
-/** Test isolation for the process-wide provider circuit. */
+function hasSearchBudget(): boolean {
+    return searchBudgetStorage.getStore() !== undefined
+}
+
+function isPixabayUrl(url: string): boolean {
+    try {
+        const hostname = new URL(url).hostname
+        return hostname === 'pixabay.com' || hostname === 'cdn.pixabay.com'
+    } catch {
+        return false
+    }
+}
+
+/** Associates an uploaded Media row with its original Pixabay URL. */
+export function registerPixabayMediaSource(mediaId: number, sourceUrl: string): void {
+    if (!isPixabayUrl(sourceUrl)) return
+    const budget = searchBudgetStorage.getStore()
+    if (!budget) return
+    budget.mediaSourceUrls.set(mediaId, sourceUrl)
+    budget.uploadedPixabayCount += 1
+    budget.uploadedPixabayUrls.add(sourceUrl)
+}
+
+/** Marks Media IDs that were actually assigned to generated content. */
+export function markPixabayMediaUsed(mediaIds: readonly number[]): void {
+    const budget = searchBudgetStorage.getStore()
+    if (!budget) return
+    for (const mediaId of mediaIds) {
+        const sourceUrl = budget.mediaSourceUrls.get(mediaId)
+        if (!sourceUrl) continue
+        budget.assignedPixabaySlots += 1
+        if (budget.usedPixabayUrls.has(sourceUrl)) continue
+        budget.usedPixabayUrls.add(sourceUrl)
+    }
+}
+
+/** Marks Pixabay URLs assigned directly to text/JSON image fields. */
+export function markPixabayUrlsUsed(urls: readonly string[]): void {
+    const budget = searchBudgetStorage.getStore()
+    if (!budget) return
+    for (const sourceUrl of urls) {
+        if (!isPixabayUrl(sourceUrl)) continue
+        budget.assignedPixabaySlots += 1
+        if (budget.usedPixabayUrls.has(sourceUrl)) continue
+        budget.usedPixabayUrls.add(sourceUrl)
+    }
+}
+
+function recordProviderError(error: PixabayError): void {
+    const budget = searchBudgetStorage.getStore()
+    if (!budget) return
+    budget.providerErrorCodes.add(error.code)
+    if (error.code === 'RATE_LIMITED') budget.rateLimited = true
+}
+
+/** Test isolation for the process-wide key ring. */
 export function __resetPixabayCircuitForTests(): void {
-    circuitOpenUntil = 0
-    circuitError = null
-    consecutiveServerErrors = 0
+    resetProcessPixabayKeyRingForTests()
 }
 
 /** Recommended orientation per block type — used by media-pipeline callers. */
@@ -212,17 +303,52 @@ const ORIENTATION_MAP: Record<PixabayOrientation, string> = {
     squarish: 'all',
 }
 
-function hasPixabayKey(): boolean {
-    const key = process.env.PIXABAY_API_KEY
-    return Boolean(key && key.length >= 10)
+function getConfiguredPixabayKeys(): string[] {
+    return parsePixabayKeys(process.env.PIXABAY_API_KEYS, process.env.PIXABAY_API_KEY)
 }
 
-function getKey(): string {
-    const key = process.env.PIXABAY_API_KEY
-    if (!key || key.length < 10) {
-        throw new PixabayError('NO_KEY', 0, false, 'PIXABAY_API_KEY not set or invalid')
+function hasPixabayKey(): boolean {
+    return getConfiguredPixabayKeys().length > 0
+}
+
+function selectPixabayKey(): SelectedPixabayKey {
+    const keyRing = getProcessPixabayKeyRing()
+    const selected = keyRing.select()
+    if (selected) return selected
+
+    const unavailableReason = keyRing.getUnavailableReason()
+    let error: PixabayError
+    if (unavailableReason === 'no_key') {
+        error = new PixabayError(
+            'NO_KEY',
+            0,
+            false,
+            'PIXABAY_API_KEYS/PIXABAY_API_KEY not set or invalid',
+        )
+    } else if (unavailableReason === 'auth') {
+        error = new PixabayError(
+            'UNAUTHORIZED',
+            401,
+            false,
+            '[Pixabay] all configured API keys are unauthorized',
+        )
+    } else if (unavailableReason === 'server') {
+        error = new PixabayError(
+            'SERVER_ERROR',
+            503,
+            false,
+            '[Pixabay] all configured API keys are cooling down after provider errors',
+        )
+    } else {
+        error = new PixabayError(
+            'RATE_LIMITED',
+            429,
+            false,
+            '[Pixabay] all configured API keys are cooling down after rate limits',
+        )
     }
-    return key
+    recordProviderError(error)
+    throw error
 }
 
 // Log the "no key" warning ONCE per process so we don't spam the dev console.
@@ -231,8 +357,8 @@ function warnNoKeyOnce(): void {
     if (pixabayKeyWarningLogged) return
     pixabayKeyWarningLogged = true
     console.warn(
-        '[Pixabay] PIXABAY_API_KEY not set — image pipeline will skip pool + per-block searches. ' +
-            'Set the key in .env.local to enable stock photography (copy from Vercel Dashboard staging env).',
+        '[Pixabay] PIXABAY_API_KEYS/PIXABAY_API_KEY not set — image pipeline will skip pool + per-block searches. ' +
+            'Set the keys in .env.local to enable stock photography (copy from Vercel Dashboard staging env).',
     )
 }
 
@@ -246,17 +372,31 @@ function logRateLimit(headers: Headers): void {
     }
 }
 
-async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
+async function fetchWithRetry(
+    url: string,
+    init?: RequestInit,
+    maxRetries: number = 1,
+    selectedKey?: SelectedPixabayKey,
+): Promise<Response> {
+    const keyRing = selectedKey ? getProcessPixabayKeyRing() : null
     let attempt = 0
-    while (attempt <= 1) {
+    while (attempt <= maxRetries) {
         try {
             const res = await fetch(url, init)
+            if (selectedKey) {
+                keyRing?.recordResponse(
+                    selectedKey.index,
+                    res.status,
+                    res.headers.get('x-ratelimit-reset'),
+                )
+            }
             if (res.ok) {
-                recordProviderSuccess()
                 return res
             }
             if (res.status === 401 || res.status === 403) {
-                throw new PixabayError('UNAUTHORIZED', res.status, false)
+                const error = new PixabayError('UNAUTHORIZED', res.status, false)
+                recordProviderError(error)
+                throw error
             }
             if (res.status === 429 || res.status >= 500) {
                 const error = new PixabayError(
@@ -264,12 +404,12 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
                     res.status,
                     true,
                 )
-                // Retrying the same unavailable provider multiplied one 503 into
-                // a 56s pool ladder, followed by product/blog/legacy retries.
-                openCircuit(error)
+                recordProviderError(error)
                 throw error
             }
-            throw new PixabayError('SERVER_ERROR', res.status, false)
+            const error = new PixabayError('SERVER_ERROR', res.status, false)
+            recordProviderError(error)
+            throw error
         } catch (err) {
             if (err instanceof PixabayError) throw err
             // AbortSignal.timeout() throws DOMException named 'TimeoutError',
@@ -281,21 +421,23 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
             // misclassified SERVER_ERROR.)
             if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
                 const error = new PixabayError('TIMEOUT', 0, true, err.message)
-                openCircuit(error)
+                recordProviderError(error)
                 throw error
             }
-            if (attempt === 0) {
+            if (attempt < maxRetries) {
                 attempt++
                 await new Promise((r) => setTimeout(r, 1500))
                 continue
             }
             const error = new PixabayError('SERVER_ERROR', 0, true, (err as Error).message)
-            openCircuit(error)
+            if (selectedKey) keyRing?.recordResponse(selectedKey.index, 503)
+            recordProviderError(error)
             throw error
         }
     }
     const error = new PixabayError('SERVER_ERROR', 0, true, 'retry exhausted')
-    openCircuit(error)
+    if (selectedKey) keyRing?.recordResponse(selectedKey.index, 503)
+    recordProviderError(error)
     throw error
 }
 
@@ -406,6 +548,28 @@ export function photoMatchesQuery(photoTags: string | null | undefined, query: s
  * (GEN_TRANSLATE_POOL_KEYWORDS), so a Vietnamese-only gate is a gate that never
  * runs in production. Callers must NOT wrap this in a language check.
  */
+const WEAK_WORDS = new Set([
+    // Colors & materials
+    'red', 'blue', 'green', 'white', 'black', 'yellow', 'brown', 'grey', 'gray',
+    'leather', 'wooden', 'wood', 'glass', 'metal', 'plastic', 'paper', 'gold', 'silver',
+    // Adjectives & modifiers
+    'fresh', 'best', 'good', 'clean', 'modern', 'minimalist', 'large', 'small', 'high', 'low',
+    'hot', 'cold', 'soft', 'hard', 'quick', 'easy', 'safe', 'clear', 'organic', 'natural',
+    // Generic nouns
+    'team', 'group', 'people', 'man', 'woman', 'person', 'client', 'customer', 'worker', 'staff',
+    'service', 'product', 'business', 'company', 'hand', 'face', 'background', 'design', 'style',
+    'work', 'setup', 'detail', 'concept', 'idea', 'object', 'thing', 'soup', 'rice', 'food',
+    'dish', 'sauce', 'drink', 'juice', 'store', 'shop', 'item'
+])
+
+// Vietnamese rice dishes commonly put the protein before a trailing cooking
+// method: "com suon nuong", "com ga chien". In those phrases the cooking
+// method describes the protein; it is not the subject shown in the photo.
+const VI_TRAILING_PREPARATION_WORDS = new Set([
+    'chien', 'hap', 'kho', 'luoc', 'nuong', 'quay', 'rang', 'rim', 'sot', 'xao',
+    'chiên', 'hấp', 'luộc', 'nướng', 'sốt',
+])
+
 export function photoMatchesTerms(
     photoTags: string | null | undefined,
     terms: readonly string[],
@@ -451,13 +615,41 @@ export function photoMatchesTerms(
 
     return termWords.some(({ term, words }) => {
         const hits = words.filter(wordHits).length
-        // 1-2 words: all of them.
-        if (words.length <= 2) return hits === words.length
-        // 3+ words: head noun + at least one modifier.
+        // 1 word: must match.
+        if (words.length === 1) return hits === 1
+
         const isVi = detectQueryLang(term) === 'vi'
-        const headWord = isVi
-            ? (words[0] === 'cơm' && words.length > 2 ? words[words.length - 1]! : words[0]!)
+
+        // 2 words: check weak/strong combination
+        if (words.length === 2) {
+            // Non-English terms (e.g. Vietnamese) must match both words to preserve invariants (e.g. phở bò vs bò)
+            if (isVi) return hits === 2
+
+            const w0Weak = WEAK_WORDS.has(words[0]!)
+            const w1Weak = WEAK_WORDS.has(words[1]!)
+            if (w0Weak && w1Weak) return hits === 2
+            if (w0Weak) return wordHits(words[1]!) && hits >= 1
+            if (w1Weak) return wordHits(words[0]!) && hits >= 1
+            return hits >= 1 // both strong -> match either
+        }
+
+        // 3+ words: head noun + at least one modifier.
+        let headWord = isVi
+            ? words[0]!
             : words[words.length - 1]!
+
+        if (isVi && words[0] === 'cơm' && words.length > 2) {
+            const lastWord = words[words.length - 1]!
+            headWord = VI_TRAILING_PREPARATION_WORDS.has(lastWord)
+                ? words[words.length - 2]!
+                : lastWord
+        }
+
+        // If the English head word is generic/weak, try using the modifier before it
+        if (!isVi && WEAK_WORDS.has(headWord) && words.length > 2) {
+            headWord = words[words.length - 2]!
+        }
+
         return wordHits(headWord) && hits >= 2
     })
 }
@@ -502,7 +694,7 @@ function splitWords(text: string): string[] {
  * Search Pixabay photos. Returns up to `count` normalized photos.
  * Empty array if no results — not thrown.
  *
- * When `PIXABAY_API_KEY` is missing (common on fresh local dev), returns `[]`
+ * When Pixabay API keys are missing (common on fresh local dev), returns `[]`
  * gracefully instead of throwing. Downstream callers already handle empty
  * results via backoff + cleanup paths, so the gen pipeline stays healthy.
  */
@@ -522,14 +714,19 @@ export async function searchPhotos(
         warnNoKeyOnce()
         return []
     }
-    assertCircuitClosed()
+    // Count real Pixabay search calls, not CDN image downloads. Retrying a
+    // bounded search is disabled because it would consume the allowance
+    // without adding a new image query.
+    if (!claimSearchRequest()) return []
+    const selectedKey = selectPixabayKey()
+    const configuredKeyCount = getConfiguredPixabayKeys().length
     // Pixabay has no 'squarish' orientation (mapped to 'all'). Over-fetch candidates
     // so we can prefer near-square hits for avatar/team buckets — see reordering below.
     const isSquarish = opts.orientation === 'squarish'
     // Pixabay per_page min is 3 — clamp low side, then slice to requested count.
     const perPage = Math.min(Math.max(isSquarish ? count * 3 : count, 3), 200)
     const params = new URLSearchParams({
-        key: getKey(),
+        key: selectedKey.key,
         q: normalizedQuery.slice(0, 100),
         image_type: 'photo',
         orientation: ORIENTATION_MAP[opts.orientation ?? 'landscape'],
@@ -549,9 +746,15 @@ export async function searchPhotos(
     if (opts.category) params.set('category', opts.category)
 
     const url = `${BASE}?${params.toString()}`
-    const res = await fetchWithRetry(url, {
-        signal: AbortSignal.timeout(opts.timeoutMs ?? SEARCH_TIMEOUT_MS),
-    })
+    console.info(
+        `[Pixabay API Request] key_slot=${selectedKey.index + 1}/${configuredKeyCount} query="${normalizedQuery}" orientation="${opts.orientation ?? 'landscape'}" limit=${perPage}`,
+    )
+    const res = await fetchWithRetry(
+        url,
+        { signal: AbortSignal.timeout(opts.timeoutMs ?? SEARCH_TIMEOUT_MS) },
+        hasSearchBudget() ? 0 : 1,
+        selectedKey,
+    )
     logRateLimit(res.headers)
     const json = (await res.json()) as PixabaySearchResponse
     let hits = Array.isArray(json.hits) ? json.hits : []
@@ -563,7 +766,7 @@ export async function searchPhotos(
         }
         hits = [...hits.filter(isNearSquare), ...hits.filter((h) => !isNearSquare(h))]
     }
-    return hits.slice(0, count).map((hit) => ({
+    const photos = hits.slice(0, count).map((hit) => ({
         id: String(hit.id),
         url: pickSizedUrl(hit, opts.width),
         alt: hit.tags || null,
@@ -571,6 +774,13 @@ export async function searchPhotos(
         width: hit.imageWidth,
         height: hit.imageHeight,
     }))
+    const budget = searchBudgetStorage.getStore()
+    if (budget) {
+        for (const photo of photos) {
+            budget.searchResultPixabayUrls.add(photo.url)
+        }
+    }
+    return photos
 }
 
 /** SSRF guard: URL host must be in the allowlist (Pixabay or static-fallback hosts). */
@@ -615,6 +825,13 @@ export async function downloadPhotoBuffer(
     const buffer = Buffer.from(arrayBuffer)
     if (buffer.length > maxBytes) {
         throw new PixabayError('TOO_LARGE', 413, false, `${buffer.length} > ${maxBytes}`)
+    }
+    if (isPixabayUrl(url)) {
+        const budget = searchBudgetStorage.getStore()
+        if (budget) {
+            budget.downloadedPixabayCount += 1
+            budget.downloadedPixabayUrls.add(url)
+        }
     }
     return {
         buffer,

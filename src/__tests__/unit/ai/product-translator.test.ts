@@ -8,6 +8,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   translateProductTerm,
+  translateKnownProductTerm,
+  translateKnownProductTerms,
   translatePrimaryProduct,
   VI_MS_TO_EN,
 } from '@/lib/ai/product-translator'
@@ -33,6 +35,30 @@ describe('TC-F01-W.06b — product-translator', () => {
 
     it('trims whitespace before lookup', () => {
       expect(translateProductTerm('  teh tarik  ')).toBe('malaysian pulled milk tea')
+    })
+
+    it('translates the Malay product phrases from a failed AI translation', () => {
+      expect(translateProductTerm('Kopi gula Melaka')).toBe('malaysian palm sugar coffee')
+      expect(translateProductTerm('Roti bakar kaya')).toBe('malaysian kaya toast')
+      expect(translateProductTerm('Nasi lemak pandan')).toBe('malaysian pandan coconut rice')
+    })
+
+    it('recognizes a known phrase inside a longer product label', () => {
+      expect(translateKnownProductTerm('Signature nasi lemak pandan set')).toBe('malaysian pandan coconut rice')
+    })
+  })
+
+  describe('translateKnownProductTerms', () => {
+    it('returns only known English translations and removes duplicates', () => {
+      expect(translateKnownProductTerms([
+        'Kopi gula Melaka',
+        'unknown seasonal special',
+        'kopi gula melaka',
+        'Roti bakar kaya',
+      ])).toEqual([
+        'malaysian palm sugar coffee',
+        'malaysian kaya toast',
+      ])
     })
   })
 

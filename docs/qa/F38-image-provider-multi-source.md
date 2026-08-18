@@ -4,6 +4,10 @@
 > **Scope:** Backend generation pipeline; no UI
 > **Automation convention:** `docs/TEST_CONVENTION.md`
 
+> **Retired:** The `stock_image_catalog` runtime is no longer part of site
+> generation. The cases below are preserved as historical QA context and are
+> not acceptance criteria for the active Pixabay pipeline.
+
 ## 1. Test status and boundaries
 
 - `[x] AUTO`: an automated test with this TC-ID exists in the repository.

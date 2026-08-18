@@ -125,3 +125,42 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
   ...BATCH2_PRESETS,
   ...BATCH3_PRESETS,
 ]
+
+// buildGallery currently materializes six image slots for every gallery block.
+// Pool planning uses this same value instead of assuming every page has one.
+export const TEMPLATE_GALLERY_IMAGE_COUNT = 6
+
+export function selectTemplatePreset(
+  category: string,
+  seed: number,
+): TemplatePreset | undefined {
+  const candidates = TEMPLATE_PRESETS.filter((preset) => preset.category === category)
+  if (candidates.length === 0) return undefined
+  return candidates[Math.abs(Math.floor(seed)) % candidates.length]
+}
+
+export interface TemplateGalleryDemand {
+  presetId: string
+  blockCount: number
+  imageCount: number
+}
+
+export function getTemplateGalleryDemand(
+  category: string,
+  seed: number,
+): TemplateGalleryDemand | null {
+  const preset = selectTemplatePreset(category, seed)
+  if (!preset) return null
+
+  const blockCount = preset.pages.reduce(
+    (total, page) =>
+      total + page.blocks.filter((block) => block.blockType === 'gallery').length,
+    0,
+  )
+
+  return {
+    presetId: preset.id,
+    blockCount,
+    imageCount: blockCount * TEMPLATE_GALLERY_IMAGE_COUNT,
+  }
+}

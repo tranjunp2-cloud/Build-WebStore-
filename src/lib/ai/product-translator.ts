@@ -71,7 +71,10 @@ export const VI_MS_TO_EN: Record<string, string> = {
   'rendang': 'malaysian beef rendang',
   'teh tarik': 'malaysian pulled milk tea',
   'kopi o': 'malaysian black coffee',
+  'kopi gula melaka': 'malaysian palm sugar coffee',
   'kopitiam': 'traditional malaysian coffee shop',
+  'roti bakar kaya': 'malaysian kaya toast',
+  'nasi lemak pandan': 'malaysian pandan coconut rice',
   'cendol': 'malaysian iced dessert',
   'kuih': 'malaysian traditional cake',
   'ais kacang': 'malaysian shaved ice dessert',
@@ -100,6 +103,41 @@ export const VI_MS_TO_EN: Record<string, string> = {
   'rawatan wajah': 'facial treatment',
 }
 
+const PRODUCT_TRANSLATION_ENTRIES = Object.entries(VI_MS_TO_EN)
+  .sort((a, b) => b[0].length - a[0].length)
+
+function normalizeProductLookup(term: string): string {
+  return term
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Return a deterministic English translation only when the curated dictionary
+ * recognizes the whole term or a complete phrase inside it.
+ */
+export function translateKnownProductTerm(term: string): string | null {
+  if (!term || typeof term !== 'string') return null
+  const normalized = normalizeProductLookup(term)
+  if (!normalized) return null
+
+  const padded = ` ${normalized} `
+  for (const [foreign, english] of PRODUCT_TRANSLATION_ENTRIES) {
+    const normalizedForeign = normalizeProductLookup(foreign)
+    if (normalized === normalizedForeign || padded.includes(` ${normalizedForeign} `)) {
+      return english
+    }
+  }
+  return null
+}
+
+/** Translate only recognized terms and remove duplicates without leaking raw non-English text. */
+export function translateKnownProductTerms(terms: string[]): string[] {
+  return [...new Set(terms.map(translateKnownProductTerm).filter((term): term is string => Boolean(term)))]
+}
+
 /**
  * Translate a single product term to English for Unsplash search.
  *
@@ -117,10 +155,8 @@ export function translateProductTerm(term: string): string {
 
   // Dict hit wins — even for english terms like "teh tarik" that franc may
   // classify as not vi/ms, the dict is the authoritative mapping.
-  const key = trimmed.toLowerCase()
-  if (key in VI_MS_TO_EN) {
-    return VI_MS_TO_EN[key]!
-  }
+  const knownTranslation = translateKnownProductTerm(trimmed)
+  if (knownTranslation) return knownTranslation
 
   // Short strings: franc can't detect reliably; pass through.
   if (trimmed.length < 3) return trimmed

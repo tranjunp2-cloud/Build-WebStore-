@@ -1,8 +1,12 @@
 # PRD: Local-First Multi-Source Image Selection (F38)
 
-> **Status:** Implemented; staging verification pending
+> **Status:** Retired — retained as historical design context only
 > **Consumer:** F01 AI Builder image pipeline
 > **Scope:** Backend generation pipeline; no UI
+
+> The `stock_image_catalog` runtime and schema provisioning were removed. Site
+> generation continues to use the active Pixabay media pipeline and does not
+> read from or write to this catalog.
 
 ## 1. Decision
 
