@@ -86,6 +86,99 @@ describe('[TC-F08-04-110] POST /api/e2e/ensure-test-user', () => {
         expect(getPayload).not.toHaveBeenCalled()
     })
 
+    it('[TC-1725-E2E-FIXTURE-01] rejects invalid SSO step fixture input before Payload access', async () => {
+        // Arrange
+        const request = new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'benchmark@example.com',
+                password: 'password123',
+                ssoCompletedSteps: [1, 4],
+            }),
+        })
+
+        // Act
+        const response = await POST(request)
+
+        // Assert
+        expect(response.status).toBe(400)
+        expect(await response.json()).toEqual({
+            error: 'ssoCompletedSteps must be a unique array containing only 1, 2, or 3',
+        })
+        expect(getPayload).not.toHaveBeenCalled()
+    })
+
+    it('[TC-1725-E2E-FIXTURE-02] replaces SSO progress with deterministic Step-1-only state', async () => {
+        // Arrange
+        const execute = vi.fn().mockResolvedValue({ rows: [] })
+        const existingUser = {
+            id: 84,
+            roles: ['tenant-owner'],
+            has_seen_ai_wizard: false,
+            tenants: [{ tenant: 42, role: 'owner', status: 'active', permissions: [] }],
+        }
+        const payload = {
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 42, onboardingCompleted: false }] }
+                if (collection === 'plan-subscriptions') return { docs: [{ id: 63 }] }
+                if (collection === 'sites') return { docs: [{ id: 77 }] }
+                if (collection === 'categories') return { docs: [{ id: 88 }] }
+                if (collection === 'users') return { docs: [existingUser] }
+                return { docs: [] }
+            }),
+            create: vi.fn(),
+            update: vi.fn().mockImplementation(async ({
+                id,
+                data,
+            }: {
+                id: string | number
+                data: Record<string, unknown>
+            }) => ({ id, ...data })),
+            db: { drizzle: { execute } },
+        }
+        vi.mocked(getPayload).mockResolvedValue(payload as never)
+        const request = new NextRequest('http://localhost/api/e2e/ensure-test-user', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer setup-secret', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'benchmark@example.com',
+                password: 'password123',
+                ssoCompletedSteps: [1],
+            }),
+        })
+
+        // Act
+        const response = await POST(request)
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body).toEqual(expect.objectContaining({
+            userId: 84,
+            ssoCompletedSteps: [1],
+            ssoLegacyGates: {
+                hasSeenAiWizard: true,
+                onboardingCompleted: true,
+            },
+        }))
+        expect(payload.update).toHaveBeenCalledWith({
+            collection: 'tenants',
+            id: 42,
+            overrideAccess: true,
+            data: { onboardingCompleted: true },
+        })
+        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'users',
+            id: 84,
+            overrideAccess: true,
+            data: expect.objectContaining({
+                has_seen_ai_wizard: true,
+            }),
+        }))
+        expect(execute).toHaveBeenCalledTimes(2)
+    })
+
     it('[TC-F08-04-126] provisions active subscription, Site, and tenant-owned Product category', async () => {
         // Arrange
         const payload = {

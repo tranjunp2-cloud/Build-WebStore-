@@ -48,6 +48,21 @@ export default defineConfig({
             dependencies: ['setup'],
             testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
         },
+        // GH-1725 exercises a token-bearing SSO callback with real browser/API
+        // boundaries. Disable retained artifacts so v2_token never lands in a
+        // trace, screenshot, or video.
+        {
+            name: 'gh-1725-sso-navigation',
+            testDir: './tests',
+            testMatch: /gh-1725-sso-navigation\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: undefined,
+                trace: 'off',
+                screenshot: 'off',
+                video: 'off',
+            },
+        },
         // Public storefront regressions required by repo review rules live in
         // tests/*.spec.ts and render without authenticated browser state.
         {

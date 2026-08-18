@@ -82,7 +82,27 @@ describe('[TC-SSOPW2-13] SsoAuthorizationClient — redirect guard', () => {
         await waitFor(() => expect(capturedHref).toBe('/onboarding'))
     })
 
-    it('TC-SSOPW2-13: falls back to /dashboard when server returns disallowed redirectTo (open redirect guard)', async () => {
+    it('TC-1725-CLIENT-01: forwards the ProductCard redirect intent to the session API', async () => {
+        // Arrange
+        fetchMock.mockResolvedValue({
+            json: () => Promise.resolve({ ok: true, redirectTo: '/settings/shipping' }),
+        })
+
+        // Act
+        render(<SsoAuthorizationClient v2Token="valid-token" redirectUrl="/initial-setting" />)
+        await waitFor(() => expect(capturedHref).toBe('/settings/shipping'))
+
+        // Assert
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/api/auth/sso-session',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ v2_token: 'valid-token', redirect_url: '/initial-setting' }),
+            }),
+        )
+    })
+
+    it('TC-SSOPW2-13 / TC-1725-CLIENT-02: falls back to /dashboard for disallowed server redirect', async () => {
         // Core security assertion: even if the server is compromised and returns
         // an external URL, the client whitelist must block it and default to /dashboard.
         fetchMock.mockResolvedValue({
@@ -90,6 +110,19 @@ describe('[TC-SSOPW2-13] SsoAuthorizationClient — redirect guard', () => {
         })
         render(<SsoAuthorizationClient v2Token="valid-token" />)
         await waitFor(() => expect(capturedHref).toBe('/dashboard'))
+    })
+
+    it('TC-1725-CLIENT-03: follows the canonical /products destination', async () => {
+        // Arrange
+        fetchMock.mockResolvedValue({
+            json: () => Promise.resolve({ ok: true, redirectTo: '/products' }),
+        })
+
+        // Act
+        render(<SsoAuthorizationClient v2Token="valid-token" />)
+
+        // Assert
+        await waitFor(() => expect(capturedHref).toBe('/products'))
     })
 
     it('TC-SSOPW2-13d: falls back to /dashboard for absolute external URL', async () => {

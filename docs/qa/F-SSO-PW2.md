@@ -18,21 +18,60 @@
 | **TC-SSO.RL-08** | API | `SSO_RATE_LIMIT_PER_MIN` env var overrides IP bucket limit | `SSO_RATE_LIMIT_PER_MIN=500` | POST valid token | `checkRateLimit` called with limit=500 on IP bucket | Medium |
 | **TC-SSOPW2-04a** | API | All tenants suspended — login blocked | User has 1 tenant, status=suspended | POST with valid token | 403 `{ error: 'account_suspended' }` | High |
 | **TC-SSOPW2-04b** | API | Mixed tenant statuses — login allowed | User has 2 tenants, 1 suspended 1 active | POST with valid token | 200 `{ ok: true }` | Medium |
-| **TC-SSOPW2-05** | API | New user (no tenants, no wizard) → onboarding | User has no tenants, has_seen_ai_wizard=false | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
-| **TC-SSOPW2-06** | API | Existing user, onboarding incomplete, no wizard seen | Tenant onboardingCompleted=false, has_seen_ai_wizard=false | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
-| **TC-SSOPW2-07** | API | User already saw wizard → dashboard | has_seen_ai_wizard=true (regardless of onboardingCompleted) | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | High |
+| **TC-SSOPW2-05** | API | Explicit setup intent: new user → onboarding | User has no tenants, has_seen_ai_wizard=false | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
+| **TC-SSOPW2-06** | API | Explicit setup intent: no Step 1 row → onboarding | Tenant onboardingCompleted=false, has_seen_ai_wizard=false; no step rows | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/onboarding' }`; step resolver is queried | High |
+| **TC-SSOPW2-07** | API | Explicit setup intent: user already saw wizard and completed all steps | has_seen_ai_wizard=true; all step rows exist | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/dashboard' }` | High |
 | **TC-SSOPW2-08** | API | Non-owner role → dashboard | User role=editor or viewer | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | Medium |
-| **TC-SSOPW2-09** | API | Onboarding complete → dashboard | Tenant onboardingCompleted=true, has_seen_ai_wizard=false | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | Medium |
+| **TC-SSOPW2-09** | API | Explicit setup intent: onboarding and all steps complete → dashboard | Tenant onboardingCompleted=true, has_seen_ai_wizard=false; all step rows exist | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/dashboard' }` | Medium |
 | **TC-SSOPW2-10** | API | Session cookie set on success | — | POST with valid token | Response sets `payload-token` cookie: httpOnly=true, sameSite=lax, path=/ | High |
-| **TC-SSOPW2-11** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — happy path (dashboard) | SSO user with completed onboarding | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/dashboard`, no `/verify-otp` bounce | High |
-| **TC-SSOPW2-12** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — new user (onboarding) | SSO user, tenant onboardingCompleted=false, wizard not seen | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/onboarding` | High |
+| **TC-SSOPW2-11** | E2E *(deferred — no Playwright impl yet)* | Full generic SSO flow → dashboard | Successfully authenticated SSO user | SSO login → `/sso/authorization` without step intent | Loading screen → cookie set → redirect to `/dashboard`, no `/verify-otp` bounce | High |
+| **TC-SSOPW2-12** | E2E *(deferred — no Playwright impl yet)* | Full explicit setup flow → onboarding | SSO user, tenant onboardingCompleted=false, wizard not seen | SSO login → `/sso/authorization?redirect_url=/initial-setting` | Loading screen → cookie set → redirect to `/onboarding` | High |
 | **TC-SSOPW2-13** | Security | Client redirect guard | Server returns malicious redirectTo | SsoAuthorizationClient receives `redirectTo: '//evil.com'` | Falls back to `/dashboard` — no external redirect | High |
-| **TC-SSOPW2-14** | API | Web Store: 0 steps done → /onboarding | tenant-owner, onboarding complete, no sso_step_events rows | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
-| **TC-SSOPW2-15** | API | Web Store: step 1 done → /settings/shipping | tenant-owner, step 1 completed in sso_step_events | POST with valid token | 200 `{ ok: true, redirectTo: '/settings/shipping' }` | High |
-| **TC-SSOPW2-16** | API | Web Store: steps 1+2 done → /products/new | tenant-owner, steps 1+2 completed | POST with valid token | 200 `{ ok: true, redirectTo: '/products/new' }` | High |
-| **TC-SSOPW2-17** | API | Web Store: all 3 steps done → /dashboard | tenant-owner, all steps completed | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | High |
-| **TC-SSOPW2-18** | API | Web Store: DB error → fail-open /dashboard | sso_step_events query throws | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` — SSO not blocked | High |
-| **TC-SSOPW2-19** | API | Web Store: has_seen_ai_wizard=false + onboarding done + 0 steps → /onboarding | Tenant onboardingCompleted=true, wizard not seen, no steps | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | Medium |
+| **TC-SSOPW2-14** | API | Explicit setup: 0 steps done → /onboarding | tenant-owner, onboarding complete, no sso_step_events rows | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
+| **TC-SSOPW2-15** | API | Explicit setup: step 1 done → /settings/shipping | tenant-owner, step 1 completed in sso_step_events | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/settings/shipping' }` | High |
+| **TC-SSOPW2-16** | API | Explicit setup: steps 1+2 done → /products | tenant-owner, steps 1+2 completed | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/products' }` | High |
+| **TC-SSOPW2-17** | API | Explicit setup: all 3 steps done → /dashboard | tenant-owner, all steps completed | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/dashboard' }` | High |
+| **TC-SSOPW2-18** | API | Explicit setup: DB error → fail-open /dashboard | sso_step_events query throws | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/dashboard' }` — SSO not blocked | High |
+| **TC-SSOPW2-19** | API | Explicit setup: has_seen_ai_wizard=false + onboarding done + 0 steps → /onboarding | Tenant onboardingCompleted=true, wizard not seen, no steps | POST with valid token and `redirect_url='/initial-setting'` | 200 `{ ok: true, redirectTo: '/onboarding' }` | Medium |
+
+---
+
+## GH-1725 — Generic Web Store Navigation
+
+> **Issue:** App Switcher and Direct icon must open PWv2 Dashboard. Source evidence shows both generic entries omit `redirect_url`; ProductCard alone supplies the legacy step paths.
+> **ProductCard contract:** `/content-manager/product[/]` resolves `/products`. For an existing tenant, `/initial-setting` uses completed `sso_step_events`; Step 1 wins over stale onboarding flags, while no tenant or no Step 1 remains `/onboarding`.
+
+| ID | Automation | Area | Scenario | Expected Result | Priority |
+|:---|:---:|:---|:---|:---|:---:|
+| **TC-1725-NAV-01** | [x] AUTO | API | Generic callback with Step 1 row present and Step 2 absent | `/dashboard`; `sso_step_events` is not queried | High |
+| **TC-1725-NAV-02** | [x] AUTO | API | Generic callback for a user matching the current onboarding predicate | `/dashboard`; generic entry takes precedence | High |
+| **TC-1725-NAV-03** | [x] AUTO | API | Explicit `/initial-setting` with no step rows | `/onboarding` | High |
+| **TC-1725-NAV-04** | [x] AUTO | API | Explicit `/initial-setting` with Step 1 row | `/settings/shipping` | High |
+| **TC-1725-NAV-05** | [x] AUTO | API | Explicit `/content-manager/product` with or without trailing slash | `/products`; step resolver is not queried | High |
+| **TC-1725-NAV-06** | [x] AUTO | Security | Unknown, external, protocol-relative, oversized, or non-string intent | `/dashboard`; raw value is never used as destination | High |
+| **TC-1725-NAV-07** | [x] AUTO | API | Explicit `/initial-setting`, Step 1 row, onboarding flags still false | `/settings/shipping`; step state overrides stale onboarding flags | High |
+| **TC-1725-CLIENT-01** | [x] AUTO | Client | Authorization client receives a legacy ProductCard intent | Session POST includes the same `redirect_url` | High |
+| **TC-1725-CLIENT-02** | [x] AUTO | Client security | Session API returns a disallowed destination | Client falls back to `/dashboard` | High |
+| **TC-1725-CLIENT-03** | [x] AUTO | Client | Session API returns canonical Product list destination | Client navigates to `/products` | High |
+| **TC-1725-PAGE-01** | [x] AUTO | Server page | Authorization page receives one `redirect_url` value | Client receives the exact string prop | High |
+| **TC-1725-PAGE-02** | [x] AUTO | Server page | Authorization page receives repeated `redirect_url` values | Client receives no intent; session fallback is Dashboard | High |
+| **TC-1725-E2E-FIXTURE-01** | [x] AUTO | API fixture security | Invalid SSO completed-step fixture values | Guarded fixture returns 400 before Payload/DB access | High |
+| **TC-1725-E2E-FIXTURE-02** | [x] AUTO | API fixture | Seed `ssoCompletedSteps: [1]` for the isolated E2E user | Existing rows are replaced with deterministic Step-1-only state | High |
+| **TC-1725-E2E-03** | [x] AUTO | PWv2 browser | Generic authorization callback with deterministic Step-1-only state | Real page → session API → cookie flow ends at `/dashboard`, never Shipping or OTP | High |
+| **TC-1725-E2E-01** | [ ] MANUAL | Staging browser | App Switcher → Web Store, exact Step-1-complete reproducer | Final pathname `/dashboard` | High |
+| **TC-1725-E2E-02** | [ ] MANUAL | Staging browser | Web Store Direct icon, same reproducer | Final pathname `/dashboard` | High |
+
+### Execution record — 2026-08-14
+
+- PWv2 and SSO staging were reachable, but the fix was not yet deployed when manual acceptance was attempted.
+- No verified exact-state SSO session was available.
+- `TC-1725-E2E-01`: **BLOCKED / NOT RUN**.
+- `TC-1725-E2E-02`: **BLOCKED / NOT RUN**.
+- `TC-1725-E2E-03` now automates the PWv2-owned callback boundary with a guarded Step-1-only fixture. It does not claim to click either external SSO Hub control.
+- Focused baseline was 44/50 with six targeted contract failures; after the reviewer follow-up, local verification passed 50/50 tests, typecheck, lint, and diff-check. Lint retained 147 baseline warnings, with none attributable to GH-1725.
+- Review remains conditional on the two external SSO Hub journeys for full cross-application acceptance.
+- Unblock by deploying the exact fix to PWv2 staging and providing a secure SSO-issued session for the exact Step-1-complete/Step-2-current account state.
+- Token safety: do not use a locally minted application token as an SSO fixture; do not store credentials, tokens, or full callback paths in execution evidence.
 
 ---
 

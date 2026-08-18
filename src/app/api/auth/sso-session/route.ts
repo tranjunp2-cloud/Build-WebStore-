@@ -4,6 +4,19 @@ import { getPayload, type BasePayload } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit, RateLimitResult } from '@/lib/rateLimit'
 
+type WebStoreRedirectIntent = 'generic' | 'initial-setting' | 'product'
+
+const MAX_REDIRECT_URL_LENGTH = 2048
+
+function classifyWebStoreRedirectIntent(value: unknown): WebStoreRedirectIntent {
+    if (typeof value !== 'string' || value.length > MAX_REDIRECT_URL_LENGTH) return 'generic'
+
+    if (value === '/initial-setting') return 'initial-setting'
+    if (value === '/content-manager/product' || value === '/content-manager/product/') return 'product'
+
+    return 'generic'
+}
+
 function rateLimited(r: RateLimitResult) {
     const retryAfter = Math.max(0, Math.ceil((r.resetAt - Date.now()) / 1000))
     return NextResponse.json(
@@ -18,7 +31,7 @@ function rateLimited(r: RateLimitResult) {
 
 // Queries sso_step_events to find first incomplete Web Store step.
 // Step 1 = Pick Template, Step 2 = Setup Shipping, Step 3 = Add Product.
-// Returns /onboarding if 0 steps done, /dashboard if all done.
+// Returns /onboarding if 0 steps done, /products after shipping, /dashboard if all done.
 // Fail-open: returns /dashboard on any DB error to avoid blocking SSO.
 async function getWebStoreRedirect(payload: BasePayload, userId: number | string): Promise<string> {
     try {
@@ -32,7 +45,7 @@ async function getWebStoreRedirect(payload: BasePayload, userId: number | string
         const completed = new Set<number>((result.rows ?? [] as { step: number }[]).map((r: { step: number }) => r.step))
         if (!completed.has(1)) return '/onboarding'
         if (!completed.has(2)) return '/settings/shipping'
-        if (!completed.has(3)) return '/products/new'
+        if (!completed.has(3)) return '/products'
         return '/dashboard'
     } catch (err) {
         console.error('[SSO] getWebStoreRedirect failed for user', userId, err)
@@ -61,9 +74,11 @@ export async function POST(req: NextRequest) {
 
     try {
         let v2Token: string | undefined
+        let redirectIntent: WebStoreRedirectIntent = 'generic'
         try {
             const body = await req.json()
             v2Token = body?.v2_token
+            redirectIntent = classifyWebStoreRedirectIntent(body?.redirect_url)
         } catch {
             // invalid JSON body
         }
@@ -154,27 +169,17 @@ export async function POST(req: NextRequest) {
         }
 
         // SSO only handles tenant-owner users; staff go through direct Payload login.
-        // has_seen_ai_wizard gate takes precedence over onboardingCompleted.
+        // Explicit ProductCard intent is authoritative because template selection updates
+        // sso_step_events but does not update the legacy onboarding flags.
         const roles: string[] = (user.roles as string[]) || []
-        const tenants = user.tenants as { tenant: { onboardingCompleted?: boolean } | string }[] | undefined
-        const hasSeenAiWizard = user.has_seen_ai_wizard as boolean | undefined
         let redirectTo = '/dashboard'
-        if (roles.includes('tenant-owner')) {
-            if (!hasSeenAiWizard) {
-                if (!tenants || tenants.length === 0) {
-                    redirectTo = '/onboarding'
-                } else {
-                    const firstTenant = tenants[0]?.tenant
-                    // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
-                    if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
-                        redirectTo = '/onboarding'
-                    } else {
-                        // Onboarding complete — route to first incomplete Web Store step
-                        redirectTo = await getWebStoreRedirect(payload, id)
-                    }
-                }
+        if (roles.includes('tenant-owner') && redirectIntent !== 'generic') {
+            if (!userTenants || userTenants.length === 0) {
+                redirectTo = '/onboarding'
+            } else if (redirectIntent === 'product') {
+                redirectTo = '/products'
             } else {
-                // hasSeenAiWizard=true: wizard bypassed — route to first incomplete Web Store step
+                // Exact initial-setting intent follows the recorded ProductCard progression.
                 redirectTo = await getWebStoreRedirect(payload, id)
             }
         }

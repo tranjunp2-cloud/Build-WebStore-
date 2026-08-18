@@ -4,7 +4,7 @@
  * POST /api/e2e/ensure-test-user
  *   headers: Authorization: Bearer {E2E_SETUP_SECRET}
  *   body: { email: string, password: string, tenantSlug?: `e2e-${string}`, tenantName?: string,
- *           seedDashboardFixture?: boolean }
+ *           seedDashboardFixture?: boolean, ssoCompletedSteps?: Array<1 | 2 | 3> }
  *
  * Creates or syncs a dedicated E2E test user on staging.
  * - If user exists: updates password to match CI secret
@@ -15,7 +15,8 @@
  * NEVER enable this in production — staging only.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { sql } from 'drizzle-orm'
+import { getPayload, type BasePayload } from 'payload'
 import config from '@payload-config'
 import {
     DASHBOARD_FIXTURE_CAPABILITY,
@@ -31,6 +32,43 @@ const E2E_TENANT_NAME = 'E2E Test Workspace'
 const E2E_TENANT_SLUG = 'e2e-test'
 const E2E_PRODUCT_CATEGORY_NAME = 'E2E AI Products'
 const E2E_PRODUCT_CATEGORY_SLUG = 'e2e-ai-products'
+
+type SsoStep = 1 | 2 | 3
+
+type DrizzleExecutor = {
+    execute: (query: ReturnType<typeof sql>) => Promise<unknown>
+}
+
+function isSsoStep(value: unknown): value is SsoStep {
+    return value === 1 || value === 2 || value === 3
+}
+
+async function replaceE2ESsoCompletedSteps(
+    payload: BasePayload,
+    userId: string | number,
+    completedSteps: SsoStep[] | undefined,
+): Promise<SsoStep[] | undefined> {
+    if (!completedSteps) return undefined
+
+    const drizzle = (payload.db as unknown as { drizzle?: DrizzleExecutor }).drizzle
+    if (!drizzle) throw new Error('E2E SSO step fixture requires the Drizzle adapter')
+
+    await drizzle.execute(sql`DELETE FROM sso_step_events WHERE user_id = ${Number(userId)}`)
+    for (const step of completedSteps) {
+        await drizzle.execute(sql`
+            INSERT INTO sso_step_events (user_id, step, status, retry_count, created_at, updated_at)
+            VALUES (${Number(userId)}, ${step}, 'completed', 0, now(), now())
+            ON CONFLICT (user_id, step) DO UPDATE SET
+                status = 'completed',
+                retry_count = 0,
+                last_error = NULL,
+                updated_at = now()
+        `)
+    }
+
+    return completedSteps
+}
+
 export async function POST(req: NextRequest) {
     // Guard 1: endpoint must be explicitly enabled via env var
     const expectedSecret = process.env.E2E_SETUP_SECRET
@@ -63,6 +101,7 @@ export async function POST(req: NextRequest) {
         tenantSlug?: string
         tenantName?: string
         seedDashboardFixture?: boolean
+        ssoCompletedSteps?: unknown
     }
     try {
         body = await req.json()
@@ -106,6 +145,21 @@ export async function POST(req: NextRequest) {
     }
     const tenantSlug = requestedTenantSlug || E2E_TENANT_SLUG
     const tenantName = body.tenantName?.trim().slice(0, 100) || E2E_TENANT_NAME
+    const requestedSsoCompletedSteps = body.ssoCompletedSteps
+    if (
+        requestedSsoCompletedSteps !== undefined
+        && (
+            !Array.isArray(requestedSsoCompletedSteps)
+            || !requestedSsoCompletedSteps.every(isSsoStep)
+            || new Set(requestedSsoCompletedSteps).size !== requestedSsoCompletedSteps.length
+        )
+    ) {
+        return NextResponse.json(
+            { error: 'ssoCompletedSteps must be a unique array containing only 1, 2, or 3' },
+            { status: 400 },
+        )
+    }
+    const ssoCompletedSteps = requestedSsoCompletedSteps as SsoStep[] | undefined
 
     try {
         const payload = await getPayload({ config })
@@ -121,6 +175,14 @@ export async function POST(req: NextRequest) {
         let tenant: DashboardFixtureTenant
         if (tenantsResult.docs.length > 0) {
             tenant = tenantsResult.docs[0]
+            if (ssoCompletedSteps !== undefined) {
+                tenant = await payload.update({
+                    collection: 'tenants',
+                    id: tenant.id,
+                    overrideAccess: true,
+                    data: { onboardingCompleted: true },
+                })
+            }
         } else {
             tenant = await payload.create({
                 collection: 'tenants',
@@ -285,11 +347,20 @@ export async function POST(req: NextRequest) {
                 data: {
                     password,
                     tenants: tenantsUpdate,
+                    ...(ssoCompletedSteps !== undefined
+                        ? { has_seen_ai_wizard: true }
+                        : {}),
                     roles: existingUser.roles?.includes('tenant-owner')
                         ? existingUser.roles
                         : [...(existingUser.roles || []), 'tenant-owner'],
                 },
             })
+
+            const appliedSsoCompletedSteps = await replaceE2ESsoCompletedSteps(
+                payload,
+                existingUser.id,
+                ssoCompletedSteps,
+            )
 
             return NextResponse.json({
                 status: 'updated',
@@ -300,6 +371,15 @@ export async function POST(req: NextRequest) {
                 categoryId: category.id,
                 categoryName: E2E_PRODUCT_CATEGORY_NAME,
                 action: 'password synced + tenant ensured',
+                ...(appliedSsoCompletedSteps
+                    ? {
+                        ssoCompletedSteps: appliedSsoCompletedSteps,
+                        ssoLegacyGates: {
+                            hasSeenAiWizard: true,
+                            onboardingCompleted: true,
+                        },
+                    }
+                    : {}),
                 ...(dashboardFixture ? { dashboardFixture } : {}),
             })
         }
@@ -313,6 +393,9 @@ export async function POST(req: NextRequest) {
                 password,
                 firstName: 'E2E',
                 lastName: 'Bot',
+                ...(ssoCompletedSteps !== undefined
+                    ? { has_seen_ai_wizard: true }
+                    : {}),
                 roles: ['tenant-owner'],
                 tenants: [
                     {
@@ -325,6 +408,12 @@ export async function POST(req: NextRequest) {
             },
         })
 
+        const appliedSsoCompletedSteps = await replaceE2ESsoCompletedSteps(
+            payload,
+            newUser.id,
+            ssoCompletedSteps,
+        )
+
         return NextResponse.json({
             status: 'created',
             setupCapability: DASHBOARD_FIXTURE_CAPABILITY,
@@ -333,6 +422,15 @@ export async function POST(req: NextRequest) {
             siteId: site.id,
             categoryId: category.id,
             categoryName: E2E_PRODUCT_CATEGORY_NAME,
+            ...(appliedSsoCompletedSteps
+                ? {
+                    ssoCompletedSteps: appliedSsoCompletedSteps,
+                    ssoLegacyGates: {
+                        hasSeenAiWizard: true,
+                        onboardingCompleted: true,
+                    },
+                }
+                : {}),
             ...(dashboardFixture ? { dashboardFixture } : {}),
         })
     } catch (error: unknown) {
