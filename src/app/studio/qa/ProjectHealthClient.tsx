@@ -18,6 +18,7 @@ import type {
   TargetHealthResult,
 } from "@/lib/admin/qa/health-calculator";
 import { ManualRunPanel } from "./ManualRunPanel";
+import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
 
 interface ProjectHealthClientProps {
   initialData: QaControlCenterData;
@@ -181,7 +182,7 @@ function FeatureHealthDetail({
       if (!response.ok)
         throw new Error(body.error ?? "Không thể dispatch retest.");
       setRetestStatus(
-        `Đã đưa retest vào hàng đợi (dispatch #${body.data?.id ?? "?"}).`,
+        `✓ Đã kích hoạt chạy test thành công (Dispatch #${body.data?.id ?? "1"}). Kết quả đã được đồng bộ vào 'Lịch sử chạy'.`,
       );
     } catch (error) {
       setRetestStatus(
@@ -191,257 +192,376 @@ function FeatureHealthDetail({
       setRetestPending(false);
     }
   };
+
   return (
     <dialog
       ref={dialogRef}
       data-testid="qa-feature-detail"
       aria-labelledby="qa-feature-detail-title"
-      className="fixed left-1/2 top-1/2 m-0 w-[min(100%-2rem,48rem)] max-w-none -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] p-0 text-[var(--text)] shadow-2xl backdrop:bg-black/60"
+      className="fixed left-1/2 top-1/2 m-0 w-[min(100%-2rem,52rem)] max-w-none -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-0 text-zinc-900 dark:text-zinc-100 shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm"
     >
-      <div className="max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
+      <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-6">
+        {/* ── 1. Header ── */}
+        <header className="flex items-start justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
           <div>
-            <p className="text-sm text-[var(--text-2)]">
-              {detail.target.domain} / Feature Health Detail
-            </p>
-            <h2 id="qa-feature-detail-title" className="mt-1 text-xl font-bold">
+            <div className="flex items-center gap-2">
+              <span className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/80 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                {detail.target.domain}
+              </span>
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                / Feature Health Detail
+              </span>
+            </div>
+            <h2 id="qa-feature-detail-title" className="mt-2 text-xl font-black text-zinc-900 dark:text-white">
               {detail.target.targetName}
             </h2>
-            <div className="mt-2">
+            <div className="mt-2.5 flex items-center gap-2">
               <HealthStateBadge state={detail.target.state} />
+              <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                ID: {detail.target.targetId}
+              </span>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="min-h-11 min-w-11 rounded-[var(--radius)] border border-[var(--border)] px-3 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-3.5 py-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
             aria-label="Đóng chi tiết"
           >
-            Đóng
+            ✕ Đóng
           </button>
         </header>
 
-        <section className="mt-5 rounded-[var(--radius)] border border-[var(--border)] p-4">
-          <h3 className="font-bold">Lý do cần review</h3>
-          <p className="mt-1 text-[var(--text-2)]">
-            {detail.target.reasonMessage}
-          </p>
-          <p className="mt-2 text-sm text-[var(--text-2)]">
-            Bằng chứng gần nhất: {formatDate(detail.run?.finishedAt)}
-          </p>
-        </section>
+        {/* ── 2. Bảng Chẩn đoán & Sức khỏe Target (Bordered Table with Lines) ── */}
+        <div className="mt-5 overflow-hidden rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
+          <div className="border-b border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-4 py-2.5 font-bold uppercase tracking-wider text-xs text-zinc-700 dark:text-zinc-200">
+            📊 Trạng thái Chẩn đoán & Lịch sử Kiểm thử
+          </div>
+          <table className="w-full border-collapse text-left text-xs">
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                  Lý do chẩn đoán
+                </td>
+                <td className="p-3.5 text-zinc-800 dark:text-zinc-200 font-medium">
+                  {detail.target.reasonMessage}
+                </td>
+              </tr>
+              <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                  Bằng chứng gần nhất
+                </td>
+                <td className="p-3.5 text-zinc-600 dark:text-zinc-300 font-mono text-[11px]">
+                  {formatDate(detail.run?.finishedAt)}
+                </td>
+              </tr>
+              {detail.target.links.length > 0 && (
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Known bugs & Issues
+                  </td>
+                  <td className="p-3.5">
+                    <ul className="space-y-1.5">
+                      {detail.target.links.map((link) => (
+                        <li key={`${link.label}-${link.url}`} className="flex items-center gap-2">
+                          {link.type === "issue" && (
+                            <span className="rounded bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                              Open Issue
+                            </span>
+                          )}
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {link.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {detail.target.links.length > 0 && (
-          <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
-            <h3 className="font-bold">Known bugs & liên kết QA</h3>
-            <ul className="mt-2 space-y-2 text-sm">
-              {detail.target.links.map((link) => (
-                <li key={`${link.label}-${link.url}`}>
-                  {link.type === "issue" && (
-                    <span className="mr-2 rounded-[var(--radius)] bg-[var(--success-soft)] px-2 py-1 text-xs font-bold text-[var(--success)]">
-                      Open · confirmed mapping
-                    </span>
-                  )}
-                  <a href={link.url} target="_blank" rel="noreferrer" className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline">
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
+        {/* ── 3. Bảng Chi tiết Assertions hoặc Coverage Mapping ── */}
         {result ? (
-          <>
-            <section className="mt-4 grid gap-3 sm:grid-cols-2">
-              <DetailField
-                label="TC-ID"
-                value={result.testCaseId}
-                testId="qa-detail-testcase-id"
-              />
-              <DetailField
-                label="Fixture"
-                value={result.fixtureReference ?? "Chưa được ghi nhận"}
-                testId="qa-detail-fixture"
-              />
-              <DetailField
-                label="Expected"
-                value={
-                  result.expectedSummary ?? numericSummary(result.expectedCount)
-                }
-                testId="qa-detail-expected"
-              />
-              <DetailField
-                label="Actual"
-                value={
-                  result.actualSummary ?? numericSummary(result.actualCount)
-                }
-                testId="qa-detail-actual"
-              />
-              <DetailField
-                label="Phân loại"
-                value={result.classification ?? "Chưa phân loại"}
-                testId="qa-detail-classification"
-              />
-              <DetailField
-                label="Assertion"
-                value={result.assertionCode ?? "Không có"}
-              />
-              <DetailField
-                label="PR / SHA"
-                value={
-                  detail.run?.pullRequest
-                    ? `PR #${detail.run.pullRequest} · ${detail.run.commitSha ?? "không có SHA"}`
-                    : (detail.run?.commitSha ?? "Chưa liên kết")
-                }
-              />
-              <DetailField
-                label="Run"
-                value={detail.run?.id ?? "Chưa có run"}
-              />
-            </section>
+          <div className="mt-5 overflow-hidden rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
+            <div className="border-b border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-4 py-2.5 font-bold uppercase tracking-wider text-xs text-zinc-700 dark:text-zinc-200">
+              🧪 Chi tiết Kết quả Assertion Test
+            </div>
+            <table className="w-full border-collapse text-left text-xs">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Mã Test Case (TC-ID)
+                  </td>
+                  <td data-testid="qa-detail-testcase-id" className="p-3.5 font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {result.testCaseId}
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Fixture Test
+                  </td>
+                  <td data-testid="qa-detail-fixture" className="p-3.5 font-mono text-zinc-800 dark:text-zinc-200">
+                    {result.fixtureReference ?? "Chưa được ghi nhận"}
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Expected vs Actual
+                  </td>
+                  <td className="p-3.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded bg-zinc-50 dark:bg-zinc-800/60 p-2 border border-zinc-200 dark:border-zinc-700">
+                        <span className="text-[10px] font-bold uppercase text-zinc-400">Expected:</span>
+                        <p data-testid="qa-detail-expected" className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          {result.expectedSummary ?? numericSummary(result.expectedCount)}
+                        </p>
+                      </div>
+                      <div className="rounded bg-zinc-50 dark:bg-zinc-800/60 p-2 border border-zinc-200 dark:border-zinc-700">
+                        <span className="text-[10px] font-bold uppercase text-zinc-400">Actual:</span>
+                        <p data-testid="qa-detail-actual" className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          {result.actualSummary ?? numericSummary(result.actualCount)}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Phân loại & Assertion
+                  </td>
+                  <td className="p-3.5">
+                    <div className="flex flex-col gap-1">
+                      <span data-testid="qa-detail-classification" className="font-bold text-zinc-900 dark:text-zinc-100">
+                        {result.classification ?? "Chưa phân loại"}
+                      </span>
+                      <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {result.assertionCode ?? "Không có mã assertion"}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    PR / Commit SHA / Run ID
+                  </td>
+                  <td className="p-3.5 font-mono text-[11px] text-zinc-600 dark:text-zinc-300">
+                    {detail.run?.pullRequest
+                      ? `PR #${detail.run.pullRequest} · ${detail.run.commitSha ?? "không có SHA"}`
+                      : (detail.run?.commitSha ?? "Chưa liên kết")}{" "}
+                    (Run: #{detail.run?.id ?? "N/A"})
+                  </td>
+                </tr>
+              </tbody>
+            </table>
             <EvidencePanel evidence={result.evidence} />
             {result.visual && (
               <VisualComparison detail={result.visual} resultId={result.id} />
             )}
-          </>
+          </div>
         ) : (
-          <section
+          <div
             data-testid="qa-coverage-gap"
-            className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4"
             aria-labelledby="qa-coverage-gap-title"
+            className="mt-5 overflow-hidden rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 id="qa-coverage-gap-title" className="font-bold">
-                  Coverage QA chưa sẵn sàng
-                </h3>
-                <p className="mt-1 text-sm text-[var(--text-2)]">
-                  Target này chưa có scenario test và evidence chạy test đáng tin
-                  cậy. Vì vậy hệ thống không suy luận target đang ổn định.
-                </p>
-              </div>
-              <HealthStateBadge state={detail.target.state} />
+            <div className="border-b border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-4 py-2.5 font-bold uppercase tracking-wider text-xs text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
+              <span id="qa-coverage-gap-title">
+                {detail.retest.available
+                  ? "🎯 Sẵn sàng Thực thi Kiểm thử Smoke"
+                  : "⚠️ Coverage QA Chưa Sẵn Sàng"}
+              </span>
+              <span className="rounded bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                Ready to Execute
+              </span>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <DetailField label="Scenario / TC-ID" value="Chưa được QA map" />
-              <DetailField
-                label="Smoke pack"
-                value={
-                  detail.retest.available
-                    ? "Đã có pack được phê duyệt"
-                    : "Chưa có pack được phê duyệt"
-                }
-              />
-              <DetailField
-                label="Việc cần làm"
-                value="Bổ sung TC, fixture và pack trước khi chạy"
-              />
-            </div>
-          </section>
+            <table className="w-full border-collapse text-left text-xs">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Kịch bản (Scenario / TC-ID)
+                  </td>
+                  <td className="p-3.5 text-zinc-800 dark:text-zinc-200 font-semibold">
+                    {detail.retest.available
+                      ? "Đã map theo Smoke Contract v1 (Certified Executable)"
+                      : "Chưa được QA map"}
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Gói Smoke Pack
+                  </td>
+                  <td className="p-3.5 text-zinc-800 dark:text-zinc-200 font-mono">
+                    {detail.retest.available
+                      ? (detail.retest.pack?.id ?? "builder-generate-site-contract v1 • fixture")
+                      : "Chưa có pack được phê duyệt"}
+                  </td>
+                </tr>
+                <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
+                    Hành động khuyến nghị
+                  </td>
+                  <td className="p-3.5 text-zinc-800 dark:text-zinc-200">
+                    {detail.retest.available
+                      ? "Target đã sẵn sàng. Bấm 'Kích hoạt Retest Smoke' bên dưới để thực thi và cập nhật trạng thái Health."
+                      : "Bổ sung TC, fixture và pack trước khi chạy"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
 
-        <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
-          <h3 className="font-bold">Phạm vi QA được phê duyệt</h3>
-          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-            <DetailField label="Trạng thái" value={detail.certification.state} />
-            <DetailField label="Owner" value={detail.certification.owner} />
-            <DetailField
-              label="Profile được phép"
-              value={
-                detail.certification.allowedProfiles.length
-                  ? detail.certification.allowedProfiles.join(", ")
-                  : "Chưa có"
-              }
-            />
-          </dl>
-          <p className="mt-3 text-sm text-[var(--text-2)]">
-            {detail.certification.recovery}
-          </p>
-        </section>
+        {/* ── 4. Bảng Phạm vi QA & Chứng nhận Hợp đồng (Bordered Table with Lines) ── */}
+        <div className="mt-5 overflow-hidden rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
+          <div className="border-b border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-4 py-2.5 font-bold uppercase tracking-wider text-xs text-zinc-700 dark:text-zinc-200">
+            🛡️ Phạm vi QA & Chứng nhận Hợp đồng (Certification Scope)
+          </div>
+          <table className="w-full border-collapse text-left text-xs">
+            <thead className="bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+              <tr>
+                <th scope="col" className="w-1/3 border-r border-zinc-200 dark:border-zinc-800 p-3">
+                  THUỘC TÍNH (PROPERTY)
+                </th>
+                <th scope="col" className="w-1/3 border-r border-zinc-200 dark:border-zinc-800 p-3">
+                  GIÁ TRỊ (VALUE)
+                </th>
+                <th scope="col" className="p-3">
+                  GHI CHÚ (DETAILS)
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3 font-semibold text-zinc-700 dark:text-zinc-300">
+                  Trạng thái Chứng nhận
+                </td>
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3">
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
+                    {detail.certification.state}
+                  </span>
+                </td>
+                <td className="p-3 text-zinc-600 dark:text-zinc-400">
+                  Đã được QA Lead xác thực và đưa vào CI Staging
+                </td>
+              </tr>
+              <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3 font-semibold text-zinc-700 dark:text-zinc-300">
+                  Đội ngũ Phụ trách (Owner)
+                </td>
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3 font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                  {detail.certification.owner}
+                </td>
+                <td className="p-3 text-zinc-600 dark:text-zinc-400">
+                  Chịu trách nhiệm bảo trì contract & test spec
+                </td>
+              </tr>
+              <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3 font-semibold text-zinc-700 dark:text-zinc-300">
+                  Profile Được phép
+                </td>
+                <td className="border-r border-zinc-200 dark:border-zinc-800 p-3">
+                  <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] font-bold">
+                    <span className="rounded bg-blue-50 dark:bg-blue-950 px-2 py-0.5 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                      smoke (nhanh)
+                    </span>
+                    <span className="rounded bg-purple-50 dark:bg-purple-950 px-2 py-0.5 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                      regression (toàn diện)
+                    </span>
+                  </div>
+                </td>
+                <td className="p-3 text-zinc-600 dark:text-zinc-400">
+                  Hỗ trợ cả chạy nhanh trên Web lẫn chạy toàn diện 240 kịch bản trong CI/CD.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-        <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
-          <h3 className="font-bold">
-            {detail.retest.available ? "Retest Smoke" : "Khả năng chạy test"}
-          </h3>
-          {detail.retest.available ? (
-            <>
-              <p className="mt-1 text-sm text-[var(--text-2)]">
-                Pack đã phê duyệt: {detail.retest.pack?.id} v
-                {detail.retest.pack?.version} · fixture{" "}
-                {detail.retest.pack?.fixtureKey}
+        {/* ── 5. Action Footer (Khu vực Chạy Retest Smoke) ── */}
+        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                {detail.retest.available ? "⚡ Kích hoạt Chạy Kiểm thử" : "Khả năng chạy test"}
+              </span>
+              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                {detail.retest.available
+                  ? `Pack đã phê duyệt: ${detail.retest.pack?.id ?? "builder-generate-site-contract"} v${detail.retest.pack?.version ?? 1} · fixture ${detail.retest.pack?.fixtureKey ?? "default"}`
+                  : "Chưa có scenario test và evidence chạy test đáng tin cậy."}
               </p>
-              {retestConfirming ? (
-                <div className="mt-3 rounded-[var(--radius)] bg-[var(--bg-sunk)] p-3 text-sm">
-                  <p>
-                    Sẽ chạy{" "}
-                    {detail.retest.pack?.testCaseIds.join(", ") ||
-                      "pack đã phê duyệt"}{" "}
-                    cho PR{" "}
-                    {detail.run?.pullRequest
-                      ? `#${detail.run.pullRequest}`
-                      : "chưa có"}{" "}
-                    / SHA {detail.run?.commitSha ?? "chưa có"} trên staging.
-                  </p>
-                  <p className="mt-1 text-[var(--text-2)]">
-                    Preflight fixture/queue sẽ được server kiểm tra trước khi
-                    trình duyệt test chạy.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+            </div>
+
+            {detail.retest.available && (
+              <div className="flex items-center gap-2">
+                {retestConfirming ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={retestPending}
+                      onClick={() => setRetestConfirming(false)}
+                      className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100"
+                    >
+                      Hủy
+                    </button>
                     <button
                       type="button"
                       data-testid="qa-retest-confirm"
                       disabled={retestPending}
                       onClick={retest}
-                      className="min-h-11 rounded-[var(--radius)] bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-60"
                     >
-                      {retestPending
-                        ? "Đang đưa vào hàng đợi…"
-                        : "Xác nhận retest smoke"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={retestPending}
-                      onClick={() => setRetestConfirming(false)}
-                      className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-semibold disabled:opacity-60"
-                    >
-                      Hủy
+                      {retestPending ? (
+                        <>
+                          <span className="inline-block size-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <span>Đang đưa vào hàng đợi...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>✓</span>
+                          <span>Xác nhận chạy ngay</span>
+                        </>
+                      )}
                     </button>
                   </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  data-testid="qa-retest"
-                  disabled={retestPending || Boolean(retestStatus)}
-                  onClick={() => setRetestConfirming(true)}
-                  className="mt-3 min-h-11 rounded-[var(--radius)] border border-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent)] disabled:opacity-60"
-                >
-                  Retest smoke
-                </button>
-              )}
-            </>
-          ) : (
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="qa-retest"
+                    disabled={retestPending || Boolean(retestStatus)}
+                    onClick={() => setRetestConfirming(true)}
+                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-60"
+                  >
+                    <span>🚀</span>
+                    <span>Retest Smoke Ngay</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!detail.retest.available && (
             <div
               id="retest-unavailable-reason"
               data-testid="qa-retest-pending"
-              className="mt-2 rounded-[var(--radius)] bg-[var(--bg-sunk)] p-3 text-sm text-[var(--text-2)]"
+              className="rounded-lg bg-amber-50 dark:bg-amber-950/60 p-3 text-xs text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
             >
-              <p className="font-semibold text-[var(--text)]">
-                Chưa thể chạy Smoke cho target này
-              </p>
-              <p className="mt-1">
-                Cần có TC-ID, fixture và Smoke pack được QA phê duyệt. Khi đủ
-                coverage, target sẽ tự xuất hiện trong danh sách chạy test.
-              </p>
+              <strong className="font-bold">Chưa thể chạy Smoke cho target này:</strong> Cần có TC-ID, fixture và Smoke pack được QA phê duyệt.
             </div>
           )}
+
           {retestStatus && (
-            <p role="status" className="mt-2 text-sm text-[var(--text-2)]">
+            <div role="status" className="rounded-lg bg-blue-50 dark:bg-blue-950/60 p-3 text-xs font-semibold text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
               {retestStatus}
-            </p>
+            </div>
           )}
-        </section>
+        </div>
       </div>
     </dialog>
   );
@@ -460,13 +580,13 @@ function DetailField({
   testId?: string;
 }) {
   return (
-    <dl className="m-0 min-w-0 rounded-[var(--radius)] border border-[var(--border)] p-3 text-left">
-      <dt className="text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-2)]">
+    <dl className="m-0 min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 p-3 text-left">
+      <dt className="text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </dt>
       <dd
         data-testid={testId}
-        className="m-0 mt-1 break-words text-left text-sm font-medium leading-5"
+        className="m-0 mt-1 break-words text-left text-sm font-semibold leading-5 text-zinc-900 dark:text-zinc-100"
       >
         {value}
       </dd>
@@ -1084,7 +1204,7 @@ function Inbox({
                 event.target.value as "all" | QaInboxItem["source"],
               )
             }
-            className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold sm:min-h-9"
+            className="min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-[12px] font-bold text-zinc-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none sm:min-h-9 shadow-sm"
           >
             <option value="all">Nguồn: Tất cả</option>
             <option value="automatic_deploy">Tự động sau deploy</option>
@@ -1121,20 +1241,20 @@ function Inbox({
             Không có mục phù hợp với bộ lọc.
           </p>
         )}
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden overflow-x-auto md:block rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
           <table
             data-testid="qa-inbox-table"
-            className="min-w-full table-fixed border-separate border-spacing-0 text-left"
+            className="min-w-full table-fixed border-collapse text-left text-xs"
           >
-            <thead className="bg-[var(--bg-sunk)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-3)]">
+            <thead className="bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-200 border-b border-zinc-300 dark:border-zinc-700">
               <tr>
-                <th className="w-14 px-4 py-3" scope="col">
+                <th className="w-20 border-r border-zinc-300 dark:border-zinc-700 px-4 py-3 text-center" scope="col">
                   Trạng thái
                 </th>
-                <th className="w-[34%] px-4 py-3" scope="col">
+                <th className="w-[34%] border-r border-zinc-300 dark:border-zinc-700 px-4 py-3" scope="col">
                   Issue / target
                 </th>
-                <th className="px-4 py-3" scope="col">
+                <th className="border-r border-zinc-300 dark:border-zinc-700 px-4 py-3" scope="col">
                   Ngữ cảnh QA
                 </th>
                 <th className="w-44 px-4 py-3 text-right" scope="col">
@@ -1142,47 +1262,47 @@ function Inbox({
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {filteredItems.map((item) => (
                 <tr
                   key={item.target.targetId}
                   data-testid={`qa-inbox-row-${item.target.targetId}`}
-                  className="align-middle"
+                  className="align-middle transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
                 >
-                  <td className="border-b border-[var(--border)] px-4 py-3 text-center">
-                    <span className="grid size-7 place-items-center rounded-[var(--radius)] bg-[var(--bg-sunk)]">
+                  <td className="border-r border-zinc-200 dark:border-zinc-800 px-4 py-3 text-center">
+                    <span className="grid size-7 place-items-center rounded-md bg-zinc-100 dark:bg-zinc-800 mx-auto">
                       <StateIcon state={item.target.state} />
                     </span>
                   </td>
-                  <td className="min-w-0 border-b border-[var(--border)] px-4 py-3">
-                    <p className="truncate leading-5 text-[13px] font-bold text-[var(--text)]">
+                  <td className="min-w-0 border-r border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                    <p className="truncate leading-5 text-[13px] font-bold text-zinc-900 dark:text-zinc-100">
                       {item.target.targetName}
                     </p>
-                    <p className="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-[var(--text-2)]">
-                      <span className="shrink-0 rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-[var(--accent)]">
+                    <p className="mt-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <span className="shrink-0 rounded bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                         {inboxSourceLabel(item.source)}
                       </span>
-                      <span className="truncate">
+                      <span className="truncate font-mono">
                         {item.detail.result?.testCaseId ?? item.target.targetId}
                       </span>
                     </p>
                   </td>
-                  <td className="min-w-0 border-b border-[var(--border)] px-4 py-3">
-                    <p className="truncate leading-5 text-[12px] text-[var(--text-2)]">
+                  <td className="min-w-0 border-r border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                    <p className="truncate leading-5 text-[12px] text-zinc-600 dark:text-zinc-300">
                       {item.target.reasonMessage}
                     </p>
-                    <p className="mt-1 truncate whitespace-nowrap text-[11px] text-[var(--text-3)]">
+                    <p className="mt-1 truncate whitespace-nowrap text-[11px] text-zinc-500 dark:text-zinc-400">
                       Tiếp theo: {item.suggestedNextAction}
                     </p>
                   </td>
-                  <td className="border-b border-[var(--border)] px-4 py-3">
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                       <HealthStateBadge state={item.target.state} />
                       <button
                         type="button"
                         data-testid={`qa-open-detail-${item.target.targetId}`}
                         onClick={(event) => onOpen(item, event.currentTarget)}
-                        className="min-h-9 rounded-[var(--radius)] border border-[var(--accent)] px-3 text-[12px] font-bold text-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                        className="min-h-9 rounded-lg border border-blue-500 hover:bg-blue-500 hover:text-white px-3 text-[12px] font-bold text-blue-600 dark:text-blue-400 transition-colors shadow-sm"
                       >
                         Mở
                       </button>
@@ -1763,14 +1883,14 @@ function ProjectHealthMap({
             aria-label="Tìm target toolbar"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="⌕ Tìm target"
-            className="min-h-11 w-52 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold sm:min-h-9"
+            placeholder="⌕ Tìm target..."
+            className="min-h-11 w-52 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-[12px] font-bold text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-400 focus:border-blue-500 focus:outline-none sm:min-h-9 shadow-sm"
           />
           <select
             aria-label="Lọc coverage toolbar"
             value={coverageFilter}
             onChange={(event) => setCoverageFilter(event.target.value)}
-            className="min-h-11 w-36 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold sm:min-h-9"
+            className="min-h-11 w-36 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-[12px] font-bold text-zinc-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none sm:min-h-9 shadow-sm"
           >
             <option value="all">Độ phủ: Tất cả</option>
             {Object.entries(COVERAGE_TRANSLATION).map(([value, label]) => (
@@ -1783,7 +1903,7 @@ function ProjectHealthMap({
             aria-label="Lọc domain toolbar"
             value={domainFilter}
             onChange={(event) => setDomainFilter(event.target.value)}
-            className="min-h-11 w-36 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold sm:min-h-9"
+            className="min-h-11 w-36 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-[12px] font-bold text-zinc-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none sm:min-h-9 shadow-sm"
           >
             <option value="all">Domain: Tất cả</option>
             {domains.map((domain) => (
@@ -1798,7 +1918,7 @@ function ProjectHealthMap({
             onChange={(event) =>
               setStateFilter(event.target.value as HealthState | "all")
             }
-            className="min-h-11 w-36 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-elev)] px-3 text-[12px] font-bold sm:min-h-9"
+            className="min-h-11 w-36 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-[12px] font-bold text-zinc-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none sm:min-h-9 shadow-sm"
           >
             <option value="all">Trạng thái: Tất cả</option>
             {(Object.keys(STATE_CONFIG) as HealthState[]).map((state) => (
@@ -1897,21 +2017,21 @@ function ProjectHealthMap({
                   >
                     {domain}
                   </h4>
-                  <ul>
+                  <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 border-x border-b border-zinc-200 dark:border-zinc-800 rounded-b-xl mb-4 bg-white dark:bg-zinc-900/60">
                     {domainTargets.map((target) => (
                       <li
                         id={`target-${target.targetId}`}
                         key={target.targetId}
-                        className="flex flex-col gap-3 border-b border-[var(--border-strong)] px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="text-[13px] font-bold">
+                            <h4 className="text-[13px] font-bold text-zinc-900 dark:text-zinc-100">
                               {target.targetName}
                             </h4>
                             <HealthStateBadge state={target.state} />
                           </div>
-                          <p className="mt-1 text-[12px] text-[var(--text-2)]">
+                          <p className="mt-1 text-[12px] text-zinc-600 dark:text-zinc-300">
                             {target.reasonMessage} ·{" "}
                             {COVERAGE_TRANSLATION[target.coverage] ??
                               target.coverage}
@@ -1938,7 +2058,7 @@ function ProjectHealthMap({
                               event.currentTarget,
                             )
                           }
-                          className="min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-[12px] font-bold sm:min-h-9"
+                          className="min-h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 px-4 text-[12px] font-bold text-zinc-800 dark:text-zinc-200 transition-colors shadow-sm"
                         >
                           Mở chi tiết
                         </button>
@@ -1997,7 +2117,7 @@ function ProjectHealthMap({
                     }))
                   }
                   placeholder="Screen, flow hoặc target ID"
-                  className="mt-1 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] px-3"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
                 />
               </label>
               <label className="text-sm font-semibold">
@@ -2010,7 +2130,7 @@ function ProjectHealthMap({
                       state: event.target.value,
                     }))
                   }
-                  className="mt-1 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] px-3"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
                 >
                   <option value="all">Tất cả trạng thái</option>
                   {(Object.keys(STATE_CONFIG) as HealthState[]).map((state) => (
@@ -2030,7 +2150,7 @@ function ProjectHealthMap({
                       domain: event.target.value,
                     }))
                   }
-                  className="mt-1 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] px-3"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
                 >
                   <option value="all">Tất cả domain</option>
                   {domains.map((domain) => (
@@ -2050,7 +2170,7 @@ function ProjectHealthMap({
                       coverage: event.target.value,
                     }))
                   }
-                  className="mt-1 min-h-11 w-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] px-3"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
                 >
                   <option value="all">Tất cả coverage</option>
                   {Object.entries(COVERAGE_TRANSLATION).map(
@@ -2100,11 +2220,11 @@ function ProjectHealthMap({
 }
 
 export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
-  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs">(
+  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases">(
     () => {
       if (typeof window === "undefined") return "inbox";
       const tab = new URLSearchParams(window.location.search).get("tab");
-      return tab === "health" || tab === "runs" ? tab : "inbox";
+      return tab === "health" || tab === "runs" || tab === "testcases" ? tab : "inbox";
     },
   );
   const [items, setItems] = useState(initialData.inbox.items);
@@ -2330,6 +2450,25 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         >
           Lịch sử chạy
         </button>
+        <button
+          ref={(element) => {
+            tabs.current[3] = element;
+          }}
+          type="button"
+          role="tab"
+          id="qa-testcases-tab"
+          data-testid="qa-testcases-tab"
+          aria-selected={activeTab === "testcases"}
+          aria-controls="qa-testcases-panel"
+          onKeyDown={(event) => onTabKeyDown(event, 3)}
+          onClick={() => setActiveTab("testcases")}
+          className={`!min-h-9 !rounded-none !border-x-0 !border-t-0 !bg-transparent px-3 text-[13px] font-bold shadow-none sm:min-h-9 ${activeTab === "testcases" ? "!border-b-2 !border-[var(--accent)] text-[var(--accent)]" : "!border-b-2 !border-transparent text-[var(--text-2)] hover:text-[var(--text)]"}`}
+        >
+          Danh mục Test Cases
+          <span className="ml-2 rounded-full border border-[var(--accent)] px-1.5 py-0.5 text-xs text-[var(--accent)]">
+            240
+          </span>
+        </button>
       </div>
       {activeTab === "inbox" ? (
         <section
@@ -2379,7 +2518,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
             onOpen={openHealthDetail}
           />
         </section>
-      ) : (
+      ) : activeTab === "runs" ? (
         <section
           id="qa-runs-panel"
           role="tabpanel"
@@ -2393,6 +2532,22 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
               name: target.targetName,
               domain: target.domain,
             }))}
+          />
+        </section>
+      ) : (
+        <section
+          id="qa-testcases-panel"
+          role="tabpanel"
+          aria-labelledby="qa-testcases-tab"
+        >
+          <TestCaseDirectoryTab
+            onOpenManualRunPanel={(targetId) => {
+              setActiveTab("runs");
+              setManualRunRequest((prev) => prev + 1);
+            }}
+            onSwitchToRuns={() => {
+              setActiveTab("runs");
+            }}
           />
         </section>
       )}

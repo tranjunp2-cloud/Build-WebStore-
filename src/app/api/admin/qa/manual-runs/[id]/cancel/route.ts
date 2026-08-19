@@ -44,28 +44,71 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
   if (!Number.isSafeInteger(id) || id < 1 || !body.success)
     return NextResponse.json({ error: "Invalid cancellation request" }, { status: 422 });
   const payload = await getPayload({ config });
-  const initial = await payload.findByID({ collection: "qa_smoke_dispatches", id, depth: 0, overrideAccess: true }) as { fixtureKey?: string; profile?: string };
-  if (!initial.fixtureKey)
-    return NextResponse.json({ error: "Run is not cancellable" }, { status: 409 });
+  const initial = (await payload.findByID({
+    collection: "qa_smoke_dispatches",
+    id,
+    depth: 0,
+    overrideAccess: true,
+  })) as { fixtureKey?: string; profile?: string; status?: string; runner?: string } | null;
+  if (!initial)
+    return NextResponse.json({ error: "Run not found" }, { status: 404 });
+  const fixtureKey = initial.fixtureKey || `runner-${initial.runner ?? "smoke"}`;
   const quotaProfile = initial.profile === "manual-regression" ? "regression" : "smoke";
   let workflowRunId: string | undefined;
   let status: string | undefined;
-  await withQaTargetedDispatchTransaction(payload, "staging", initial.fixtureKey, async (transactionReq) => {
+  await withQaTargetedDispatchTransaction(payload, "staging", fixtureKey, async (transactionReq) => {
     const options = { overrideAccess: true, req: transactionReq };
-    const dispatch = await payload.findByID({ collection: "qa_smoke_dispatches", id, ...options }) as { id: number; status?: string; workflowRunId?: string };
+    const dispatch = (await payload.findByID({
+      collection: "qa_smoke_dispatches",
+      id,
+      ...options,
+    })) as { id: number; status?: string; workflowRunId?: string };
     status = dispatch.status;
     if (dispatch.status === "queued") {
-      await payload.update({ collection: "qa_smoke_dispatches", id, data: { status: "cancelled", cancelReason: body.data.reason, cancelledAt: new Date().toISOString() }, ...options });
-      const leases = await payload.find({ collection: "qa_fixture_leases", where: { and: [{ dispatch: { equals: id } }, { status: { equals: "active" } }] }, limit: 10, ...options });
-      await Promise.all(leases.docs.map((lease) => payload.update({ collection: "qa_fixture_leases", id: lease.id, data: { status: "released", releasedAt: new Date().toISOString() }, ...options })));
+      await payload.update({
+        collection: "qa_smoke_dispatches",
+        id,
+        data: {
+          status: "cancelled",
+          cancelReason: body.data.reason,
+          cancelledAt: new Date().toISOString(),
+        },
+        ...options,
+      });
+      const leases = await payload.find({
+        collection: "qa_fixture_leases",
+        where: { and: [{ dispatch: { equals: id } }, { status: { equals: "active" } }] },
+        limit: 10,
+        ...options,
+      });
+      await Promise.all(
+        leases.docs.map((lease) =>
+          payload.update({
+            collection: "qa_fixture_leases",
+            id: lease.id,
+            data: { status: "released", releasedAt: new Date().toISOString() },
+            ...options,
+          }),
+        ),
+      );
       status = "cancelled";
       return;
     }
     if (dispatch.status !== "dispatched" && dispatch.status !== "cancel_requested") return;
     workflowRunId = dispatch.workflowRunId;
-    if (dispatch.status === "dispatched")
-      await payload.update({ collection: "qa_smoke_dispatches", id, data: { status: "cancel_requested", cancelReason: body.data.reason, cancelRequestedAt: new Date().toISOString() }, ...options });
-    status = "cancel_requested";
+    if (dispatch.status === "dispatched") {
+      await payload.update({
+        collection: "qa_smoke_dispatches",
+        id,
+        data: {
+          status: "cancel_requested",
+          cancelReason: body.data.reason,
+          cancelRequestedAt: new Date().toISOString(),
+        },
+        ...options,
+      });
+      status = "cancel_requested";
+    }
   }, quotaProfile);
   if (status !== "cancelled" && status !== "cancel_requested")
     return NextResponse.json({ error: "Only a non-terminal run can be cancelled" }, { status: 409 });
