@@ -5,13 +5,9 @@ import {
   validateTargetedSmokePacks,
   type TargetedSmokePack,
 } from "@/lib/admin/qa/targeted-smoke-registry";
+import { CMS_TARGET_REGISTRY } from "@/lib/admin/qa/target-registry";
 
-const knownTargetIds = new Set([
-  "editor-productgrid-variants",
-  "products-variants-inventory",
-  "order-payment-verification",
-  "storefront-discount-checkout",
-]);
+const knownTargetIds = new Set(CMS_TARGET_REGISTRY.map((target) => target.id));
 
 describe("[TC-F40-03-01] Targeted critical-flow Smoke registry", () => {
   it("allows only the three declared pilot critical-flow packs", () => {

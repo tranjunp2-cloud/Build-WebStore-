@@ -13,7 +13,7 @@ const request = {
   environment: "staging" as const,
   profile: "targeted-smoke" as const,
   requestDigest: "request-digest",
-  pack: TARGETED_SMOKE_PACKS[0],
+  pack: TARGETED_SMOKE_PACKS.find((p) => p.runner === "smoke")!,
 };
 
 function payloadFor(
@@ -51,6 +51,19 @@ describe("[TC-F40-03-02] Targeted Smoke fixture capacity", () => {
 
     // Assert
     expect(status).toBe("blocked");
+  });
+
+  it("reports a non-stateful targeted API contract as failed rather than fixture-blocked", () => {
+    // Arrange
+    const results = [
+      { testCaseId: "TC-F10-03-01", status: "failed" as const, assertionCode: "ORDER_CANCEL_FAILED" },
+    ];
+
+    // Act
+    const status = deriveQaRunStatusForSuite("targeted-api", results);
+
+    // Assert
+    expect(status).toBe("failed");
   });
 
   it("creates a queued dispatch and active lease when capacity is available", async () => {

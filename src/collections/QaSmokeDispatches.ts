@@ -30,8 +30,16 @@ export const QaSmokeDispatches: CollectionConfig = {
       options: ["targeted-smoke", "manual-retest", "manual-smoke", "manual-regression"],
       index: true,
     },
-    { name: "fixtureKey", type: "text", required: true, index: true },
-    { name: "fixtureCapacity", type: "number", required: true, min: 1 },
+    {
+      name: "runner",
+      type: "select",
+      required: true,
+      defaultValue: "smoke",
+      options: ["unit", "logic", "api", "smoke"],
+      index: true,
+    },
+    { name: "fixtureKey", type: "text", index: true },
+    { name: "fixtureCapacity", type: "number", min: 1 },
     {
       name: "environment",
       type: "select",

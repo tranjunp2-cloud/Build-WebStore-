@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Payload, Where } from "payload";
 import { getTargetById } from "@/lib/admin/qa/target-registry";
+import { getTargetQaCoverage } from "@/lib/admin/qa/targeted-qa-coverage";
 import {
   getManualQaProfileAvailability,
   resolveManualQaPack,
@@ -16,14 +17,24 @@ export type ManualRunPreflight = {
   reasons: Array<{ code: string; recovery: string }>;
   availableProfiles: Record<ManualQaProfile, boolean>;
   environment: "staging";
-  target?: { id: string; name: string; type: string };
+  target?: {
+    id: string;
+    name: string;
+    type: string;
+    certification: {
+      state: string;
+      owner: string;
+      recovery: string;
+      allowedProfiles: readonly string[];
+    };
+  };
   pack?: {
     id: string;
     version: number;
     testType: string;
     testCases: Array<{ id: string; assertion: string }>;
     prerequisites: readonly string[];
-    fixtureKey: string;
+    fixtureKey?: string;
     estimatedDurationMinutes: number;
     manualChecklistCount: number;
   };
@@ -111,6 +122,7 @@ export async function getManualRunPreflight(
   },
 ): Promise<ManualRunPreflight> {
   const target = getTargetById(input.targetId);
+  const certification = target ? getTargetQaCoverage(target.id) : undefined;
   const availableProfiles = target?.active
     ? getManualQaProfileAvailability(target.id)
     : { smoke: false, regression: false };
@@ -127,7 +139,9 @@ export async function getManualRunPreflight(
   if (!resolved)
     reasons.push({
       code: "NO_ACTIVE_PACK",
-      recovery: "Choose a profile with an approved target-specific pack.",
+      recovery:
+        certification?.recovery ??
+        "Choose a profile with an approved target-specific pack.",
     });
   const context = await resolvedStagingContext(payload, input.context);
   if (!context)
@@ -135,7 +149,7 @@ export async function getManualRunPreflight(
       code: "STAGING_CONTEXT_UNAVAILABLE",
       recovery: "Use the currently deployed Staging (QC) PR and SHA.",
     });
-  if (resolved) {
+  if (resolved?.pack.fixtureKey) {
     const active = await payload.find({
       collection: "qa_fixture_leases",
       where: {
@@ -145,7 +159,7 @@ export async function getManualRunPreflight(
           { status: { equals: "active" } },
         ],
       },
-      limit: resolved.pack.fixtureCapacity,
+      limit: resolved.pack.fixtureCapacity ?? 1,
       depth: 0,
       overrideAccess: true,
     });
@@ -154,42 +168,54 @@ export async function getManualRunPreflight(
       const expiresAt = (lease as { expiresAt?: unknown }).expiresAt;
       return typeof expiresAt === "string" && Date.parse(expiresAt) > now;
     });
-    if (unexpired.length >= resolved.pack.fixtureCapacity)
+    if (unexpired.length >= (resolved.pack.fixtureCapacity ?? 1))
       reasons.push({
         code: "FIXTURE_CAPACITY_EXHAUSTED",
         recovery: "Wait for the fixture lease to finish or expire.",
       });
-    const profileValues =
-      input.profile === "regression"
-        ? ["manual-regression"]
-        : ["targeted-smoke", "manual-retest", "manual-smoke"];
-    const profileLimit = input.profile === "regression" ? 1 : 2;
-    const profileRuns = await payload.find({
-      collection: "qa_smoke_dispatches",
-      where: {
-        and: [
-          { environment: { equals: "staging" } },
-          { profile: { in: profileValues } },
-          { status: { in: ["queued", "dispatched", "cancel_requested"] } },
-        ],
-      },
-      limit: profileLimit,
-      depth: 0,
-      overrideAccess: true,
-    });
-    if (profileRuns.docs.length >= profileLimit)
-      reasons.push({
-        code: "PROFILE_CAPACITY_EXHAUSTED",
-        recovery: `Wait for an active ${input.profile} run to finish.`,
-      });
   }
+  const profileValues =
+    input.profile === "regression"
+      ? ["manual-regression"]
+      : ["targeted-smoke", "manual-retest", "manual-smoke"];
+  const profileLimit = input.profile === "regression" ? 1 : 2;
+  const profileRuns = await payload.find({
+    collection: "qa_smoke_dispatches",
+    where: {
+      and: [
+        { environment: { equals: "staging" } },
+        { profile: { in: profileValues } },
+        { status: { in: ["queued", "dispatched", "cancel_requested"] } },
+      ],
+    },
+    limit: profileLimit,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (profileRuns.docs.length >= profileLimit)
+    reasons.push({
+      code: "PROFILE_CAPACITY_EXHAUSTED",
+      recovery: `Wait for an active ${input.profile} run to finish.`,
+    });
   return {
     canDispatch: reasons.length === 0,
     reasons,
     availableProfiles,
     environment: "staging",
     target: target
-      ? { id: target.id, name: target.name, type: target.type }
+      ? {
+          id: target.id,
+          name: target.name,
+          type: target.type,
+          certification: {
+            state: certification?.certificationState ?? "no-certified-pack",
+            owner: certification?.owner ?? "qa-unassigned",
+            recovery:
+              certification?.recovery ??
+              "QA approval is required before this target can run.",
+            allowedProfiles: certification?.allowedProfiles ?? [],
+          },
+        }
       : undefined,
     pack: resolved
       ? {

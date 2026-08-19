@@ -142,7 +142,7 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
   try {
     const quotaProfile = parsed.data.profile === "regression" ? "regression" : "smoke";
     let transitionStatus: string | undefined;
-    await withQaTargetedDispatchTransaction(payload, "staging", resolved.pack.fixtureKey, async (transactionReq) => {
+    await withQaTargetedDispatchTransaction(payload, "staging", resolved.pack.fixtureKey ?? `runner-${resolved.pack.runner}`, async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
       const current = await payload.findByID({ collection: "qa_smoke_dispatches", id: outcome.dispatch.id, depth: 0, ...options }) as { status?: string };
       transitionStatus = current.status;

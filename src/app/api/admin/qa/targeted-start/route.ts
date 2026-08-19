@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
     collection: "qa_smoke_dispatches",
     id: parsed.data.dispatchId,
     overrideAccess: true,
-  }) as { id: string | number; fixtureKey?: string };
-  if (!initial.fixtureKey) return NextResponse.json({ error: "Unknown dispatch" }, { status: 409 });
+  }) as { id: string | number; fixtureKey?: string; runner?: "unit" | "logic" | "api" | "smoke" };
+  const transactionKey = initial.fixtureKey ?? `runner-${initial.runner ?? "smoke"}`;
   let cancelled = false;
   try {
-    await withQaTargetedDispatchTransaction(payload, "staging", initial.fixtureKey, async (transactionReq) => {
+    await withQaTargetedDispatchTransaction(payload, "staging", transactionKey, async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
       const dispatch = await payload.findByID({
         collection: "qa_smoke_dispatches",
@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
         workflowNonce?: string;
         workflowRunId?: string;
         workflowAttempt?: number;
+        fixtureKey?: string;
       };
       if (dispatch.workflowNonce !== parsed.data.workflowNonce)
         throw new Error("Dispatch is not claimable");
@@ -104,12 +105,12 @@ export async function POST(req: NextRequest) {
           data: { status: "cancelled", cancelledAt: now },
           ...options,
         });
-        const activeLeases = await payload.find({
+        const activeLeases = dispatch.fixtureKey ? await payload.find({
           collection: "qa_fixture_leases",
           where: { and: [{ dispatch: { equals: dispatch.id } }, { status: { equals: "active" } }] },
           limit: 10,
           ...options,
-        });
+        }) : { docs: [] as Array<{ id: string | number }> };
         await Promise.all(activeLeases.docs.map((lease) => payload.update({
           collection: "qa_fixture_leases",
           id: lease.id,
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
           data: { workflowRunId: parsed.data.workflowRunId, workflowAttempt: parsed.data.attempt },
           ...options,
         });
-      const activeLeases = await payload.find({
+      const activeLeases = dispatch.fixtureKey ? await payload.find({
         collection: "qa_fixture_leases",
         where: {
           and: [
@@ -143,16 +144,18 @@ export async function POST(req: NextRequest) {
         },
         limit: 10,
         ...options,
-      });
-      if (activeLeases.docs.length !== 1)
+      }) : { docs: [] as Array<{ id: string | number }> };
+      if (dispatch.fixtureKey && activeLeases.docs.length !== 1)
         throw new Error("Dispatch has no exclusive active fixture lease");
-      const claimedAt = new Date();
-      await payload.update({
-        collection: "qa_fixture_leases",
-        id: activeLeases.docs[0].id,
-        data: { expiresAt: new Date(claimedAt.getTime() + CLAIMED_LEASE_DURATION_MS).toISOString() },
-        ...options,
-      });
+      if (dispatch.fixtureKey) {
+        const claimedAt = new Date();
+        await payload.update({
+          collection: "qa_fixture_leases",
+          id: activeLeases.docs[0].id,
+          data: { expiresAt: new Date(claimedAt.getTime() + CLAIMED_LEASE_DURATION_MS).toISOString() },
+          ...options,
+        });
+      }
     });
   } catch {
     return NextResponse.json({ error: "Dispatch is not claimable" }, { status: 409 });

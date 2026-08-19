@@ -33,6 +33,14 @@ export const QaTestRuns: CollectionConfig = {
     { name: "suite", type: "text", required: true, index: true },
     { name: "profile", type: "text", required: true },
     {
+      name: "runner",
+      type: "select",
+      required: true,
+      defaultValue: "smoke",
+      options: ["unit", "logic", "api", "smoke"],
+      index: true,
+    },
+    {
       name: "environment",
       type: "select",
       required: true,

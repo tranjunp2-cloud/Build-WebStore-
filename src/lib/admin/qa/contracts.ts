@@ -57,6 +57,7 @@ export const QaRunSummarySchema = z
     targetId: SafeTargetId,
     suite: safeMachineIdentifier(120),
     profile: safeMachineIdentifier(120),
+    runner: z.enum(["unit", "logic", "api", "smoke"]).default("smoke"),
     environment: z.enum(["staging", "production", "local"]),
     pullRequest: z.number().int().positive().optional(),
     commitSha: z
@@ -207,7 +208,7 @@ export const QaRunSummarySchema = z
         message: "changeSnapshot must match run PR/SHA/environment",
         path: ["changeSnapshot"],
       });
-    if (value.suite === "targeted-smoke" && !value.targetedDispatch)
+    if (value.suite.startsWith("targeted-") && !value.targetedDispatch)
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "targetedDispatch is required for targeted Smoke evidence",
@@ -282,7 +283,11 @@ export function deriveQaRunStatus(
   return "cancelled";
 }
 
-/** A targeted critical-flow run is never healthy if any declared case did not pass. */
+/**
+ * Browser Smoke contracts fail closed as `blocked` because their shared fixture
+ * may be unsafe to reuse after any non-pass. Unit, logic and API contracts do
+ * not reserve a fixture: their declared test failure is reported as `failed`.
+ */
 export function deriveQaRunStatusForSuite(
   suite: string,
   results: QaRunSummary["results"],

@@ -9,13 +9,24 @@ type Preflight = {
   reasons: Array<{ code: string; recovery: string }>;
   availableProfiles: Record<Profile, boolean>;
   environment: string;
+  target?: {
+    id: string;
+    name: string;
+    type: string;
+    certification: {
+      state: string;
+      owner: string;
+      recovery: string;
+      allowedProfiles: readonly string[];
+    };
+  };
   pack?: {
     id: string;
     version: number;
     testType: string;
     testCases: Array<{ id: string }>;
     prerequisites: readonly string[];
-    fixtureKey: string;
+    fixtureKey?: string;
     estimatedDurationMinutes: number;
     manualChecklistCount: number;
   };

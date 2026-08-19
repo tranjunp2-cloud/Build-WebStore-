@@ -148,6 +148,16 @@ test.describe("[TC-F40-07-05] Targeted manual-run browser flow", () => {
       .getByLabel("Đóng")
       .click();
 
+    // A catalog target stays selectable for explanation, but an uncertified
+    // Smoke profile must surface the evidence-gated recovery and stay blocked.
+    await page.getByRole("button", { name: "Run targeted test" }).click();
+    await page.getByRole("radio", { name: /AI Content Translation/ }).click();
+    await page.getByRole("button", { name: "Kiểm tra preflight" }).click();
+    await expect(page.getByText("Preflight bị chặn")).toBeVisible();
+    await expect(page.getByText(/map TC-ID, test thực, fixture resettable/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Chạy \d+ checks/ })).toBeDisabled();
+    await page.getByRole("dialog", { name: "Chạy manual targeted test" }).getByRole("button", { name: "Đóng" }).click();
+
     // Act/Assert: history filters are URL-addressable and never expose artifact links.
     await page.setViewportSize({ width: 375, height: 812 });
     await page.getByRole("button", { name: "Bộ lọc lịch sử" }).click();

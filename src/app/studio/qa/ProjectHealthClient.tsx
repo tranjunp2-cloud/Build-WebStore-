@@ -342,6 +342,25 @@ function FeatureHealthDetail({
         )}
 
         <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
+          <h3 className="font-bold">Phạm vi QA được phê duyệt</h3>
+          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+            <DetailField label="Trạng thái" value={detail.certification.state} />
+            <DetailField label="Owner" value={detail.certification.owner} />
+            <DetailField
+              label="Profile được phép"
+              value={
+                detail.certification.allowedProfiles.length
+                  ? detail.certification.allowedProfiles.join(", ")
+                  : "Chưa có"
+              }
+            />
+          </dl>
+          <p className="mt-3 text-sm text-[var(--text-2)]">
+            {detail.certification.recovery}
+          </p>
+        </section>
+
+        <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
           <h3 className="font-bold">
             {detail.retest.available ? "Retest Smoke" : "Khả năng chạy test"}
           </h3>
@@ -1904,6 +1923,13 @@ function ProjectHealthMap({
                             onOpen(
                               detailsByTarget.get(target.targetId) ?? {
                                 target,
+                                certification: {
+                                  state: "no-certified-pack",
+                                  owner: "qa-unassigned",
+                                  recovery:
+                                    "QA approval is required before this target can run.",
+                                  allowedProfiles: [],
+                                },
                                 retest: {
                                   available: false,
                                   reason: "NO_ACTIVE_SMOKE_PACK",

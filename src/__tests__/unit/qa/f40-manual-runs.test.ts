@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { Payload } from "payload";
 import {
+  getManualRunPreflight,
   parseManualRunContext,
   validateManualIdempotencyKey,
 } from "@/lib/admin/qa/manual-runs";
@@ -43,5 +45,48 @@ describe("[TC-F40-07-01] Manual targeted pack contract", () => {
     expect(() => validateManualIdempotencyKey("short")).toThrow(
       "Invalid idempotency key",
     );
+  });
+});
+
+describe("[TC-F40-08-04] Manual preflight coverage gate", () => {
+  it("blocks an uncertified profile and returns its safe recovery guidance", async () => {
+    // Arrange
+    const payload = {
+      find: vi
+        .fn()
+        .mockResolvedValueOnce({
+          docs: [{ pullRequest: 1772, commitSha: "abcdef1" }],
+        })
+        .mockResolvedValueOnce({
+          docs: [],
+        }),
+    } as unknown as Payload;
+
+    // Act
+    const preflight = await getManualRunPreflight(payload, {
+      targetId: "identity-login-otp",
+      profile: "regression",
+      context: { pullRequest: 1772, commitSha: "abcdef1" },
+    });
+
+    // Assert
+    expect(preflight.canDispatch).toBe(false);
+    expect(preflight.reasons).toEqual([
+      {
+        code: "NO_ACTIVE_PACK",
+        recovery:
+          "Có contract test đã được QA phê duyệt cho Staging (QC).",
+      },
+    ]);
+    expect(preflight.context).toEqual({ pullRequest: 1772, commitSha: "abcdef1" });
+    expect(preflight.target?.certification).toEqual({
+      state: "certified_executable",
+      owner: "qa-auth-team",
+      recovery:
+        "Có contract test đã được QA phê duyệt cho Staging (QC).",
+      allowedProfiles: ["smoke"],
+    });
+    expect(preflight.pack).toBeUndefined();
+    expect(payload.find).toHaveBeenCalledTimes(2);
   });
 });

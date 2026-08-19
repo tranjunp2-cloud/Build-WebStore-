@@ -13,6 +13,7 @@ import {
 import { hasApprovedArtifactUrl } from "@/lib/admin/qa/contracts";
 import { isApprovedQaEvidenceUrl } from "@/lib/admin/qa/safe-evidence";
 import { getAllActiveTargets } from "@/lib/admin/qa/target-registry";
+import { getTargetQaCoverage } from "@/lib/admin/qa/targeted-qa-coverage";
 import { resolveTargetedSmokePacks } from "@/lib/admin/qa/targeted-smoke-registry";
 
 const RUN_LIMIT = 500;
@@ -62,6 +63,12 @@ export interface QaEvidenceLink {
 
 export interface QaFeatureDetail {
   target: TargetHealthResult;
+  certification: {
+    state: string;
+    owner: string;
+    recovery: string;
+    allowedProfiles: readonly string[];
+  };
   run?: Pick<
     QaRunInput,
     "id" | "status" | "finishedAt" | "pullRequest" | "commitSha" | "profile"
@@ -83,11 +90,11 @@ export interface QaFeatureDetail {
   };
   retest: {
     available: boolean;
-    reason?: "NO_ACTIVE_SMOKE_PACK";
+    reason?: string;
     pack?: {
       id: string;
       version: number;
-      fixtureKey: string;
+      fixtureKey?: string;
       testCaseIds: string[];
     };
   };
@@ -313,6 +320,15 @@ function detailForTarget(
     resultsByRunId,
   );
   const pack = resolveTargetedSmokePacks([target.targetId])[0];
+  const coverage = getTargetQaCoverage(target.targetId);
+  const certification = {
+    state: coverage?.certificationState ?? "no-certified-pack",
+    owner: coverage?.owner ?? "qa-unassigned",
+    recovery:
+      coverage?.recovery ??
+      "QA approval is required before this target can run.",
+    allowedProfiles: coverage?.allowedProfiles ?? [],
+  };
   const evidence = result
     ? evidenceLink(
         result.evidenceKind ?? "report",
@@ -322,6 +338,7 @@ function detailForTarget(
     : undefined;
   return {
     target,
+    certification,
     run: run && {
       id: run.id,
       status: run.status,
@@ -366,7 +383,7 @@ function detailForTarget(
             testCaseIds: pack.testCases.map((testCase) => testCase.id),
           },
         }
-      : { available: false, reason: "NO_ACTIVE_SMOKE_PACK" },
+      : { available: false, reason: certification.recovery },
   };
 }
 

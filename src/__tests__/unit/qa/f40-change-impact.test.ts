@@ -51,4 +51,23 @@ describe("[TC-F40-02-04] QA change-impact mapping", () => {
     expect(impact.mappedTargetIds).toContain("order-shipping-label");
     expect(impact.unmappedPaths).toEqual(["src/lib/unknown.ts"]);
   });
+
+  it("uses the cancel-route rule instead of the broad Orders fallback", () => {
+    // Arrange
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "qa/coverage-map.yml"),
+      "utf8",
+    );
+    const productionMap = parseCoverageMap(source);
+
+    // Act
+    const impact = resolveChangeImpact(
+      ["src/app/api/orders/[id]/cancel/route.ts"],
+      productionMap,
+    );
+
+    // Assert
+    expect(impact.mappedTargetIds).toEqual(["order-refund-cancel-retry"]);
+    expect(impact.unmappedPaths).toEqual([]);
+  });
 });

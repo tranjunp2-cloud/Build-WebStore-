@@ -52,7 +52,7 @@ describe("[TC-F40-03-02] Targeted Smoke workflow claim boundary", () => {
     process.env.QA_INGEST_SECRET = "test-secret";
     mocks.findByID
       .mockResolvedValueOnce({ id: 42, fixtureKey: "QA-Tshirt-SML" })
-      .mockResolvedValueOnce({ id: 42, status: "cancel_requested", workflowNonce: "a".repeat(32) });
+      .mockResolvedValueOnce({ id: 42, fixtureKey: "QA-Tshirt-SML", status: "cancel_requested", workflowNonce: "a".repeat(32) });
     mocks.find.mockResolvedValue({ docs: [{ id: 9 }] });
     const request = new NextRequest("http://localhost/api/admin/qa/targeted-start", {
       method: "POST",
@@ -67,5 +67,28 @@ describe("[TC-F40-03-02] Targeted Smoke workflow claim boundary", () => {
     await expect(response.json()).resolves.toEqual({ claimed: false, cancelled: true });
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "qa_smoke_dispatches", data: expect.objectContaining({ status: "cancelled" }) }));
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "qa_fixture_leases", data: expect.objectContaining({ status: "released" }) }));
+  });
+
+  it("claims a non-stateful API contract without creating or requiring a fixture lease", async () => {
+    // Arrange
+    process.env.QA_INGEST_SECRET = "test-secret";
+    mocks.findByID
+      .mockResolvedValueOnce({ id: 43, runner: "api" })
+      .mockResolvedValueOnce({ id: 43, runner: "api", status: "dispatched", workflowNonce: "b".repeat(32) });
+    mocks.find.mockResolvedValue({ docs: [] });
+    const request = new NextRequest("http://localhost/api/admin/qa/targeted-start", {
+      method: "POST",
+      body: JSON.stringify({ dispatchId: 43, workflowNonce: "b".repeat(32), workflowRunId: "124-1", attempt: 1 }),
+    });
+
+    // Act
+    const response = await POST(request);
+
+    // Assert
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ claimed: true, cancelled: false });
+    expect(mocks.transaction).toHaveBeenCalledWith(expect.anything(), "staging", "runner-api", expect.any(Function));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "qa_smoke_dispatches", data: expect.objectContaining({ workflowRunId: "124-1" }) }));
+    expect(mocks.update).not.toHaveBeenCalledWith(expect.objectContaining({ collection: "qa_fixture_leases" }));
   });
 });

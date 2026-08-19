@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         if (error instanceof GitHubWorkflowDispatchRejectedError) {
           await blockTargetedSmokeDispatch(
             payload,
-            { id: outcome.dispatch.id, fixtureKey: pack.fixtureKey },
+            { id: outcome.dispatch.id, fixtureKey: pack.fixtureKey, runner: pack.runner },
             "GITHUB_DISPATCH_FAILED",
             "Retry the deploy event after GitHub Actions is available.",
           );

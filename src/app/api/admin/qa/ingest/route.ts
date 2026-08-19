@@ -190,10 +190,13 @@ export async function POST(req: NextRequest) {
             collection: "qa_smoke_dispatches",
             id: summary.targetedDispatch.dispatchId,
             ...options,
-          }) as { fixtureKey?: string };
-          if (!dispatch.fixtureKey)
-            throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
-          await lockQaTargetedFixture(payload, "staging", dispatch.fixtureKey, transactionReq);
+          }) as { fixtureKey?: string; runner?: string };
+          await lockQaTargetedFixture(
+            payload,
+            "staging",
+            dispatch.fixtureKey ?? `runner-${dispatch.runner ?? "smoke"}`,
+            transactionReq,
+          );
         }
         const existingRun = await payload.find({
           collection: "qa_test_runs",
@@ -219,6 +222,7 @@ export async function POST(req: NextRequest) {
             targetId: summary.targetId,
             suite: summary.suite,
             profile: summary.profile,
+            runner: summary.runner,
             environment: summary.environment,
             status: deriveQaRunStatusForSuite(summary.suite, summary.results),
             pullRequest: summary.pullRequest,
@@ -253,9 +257,8 @@ export async function POST(req: NextRequest) {
             environment?: string;
             fixtureKey?: string;
             profile?: string;
+            runner?: string;
           };
-          if (!dispatch.fixtureKey)
-            throw new IngestConflictError("Targeted Smoke dispatch has no fixture lease");
           // Re-read after the fixture lock acquired at transaction entry.
           dispatch = await payload.findByID({
             collection: "qa_smoke_dispatches",
@@ -276,6 +279,10 @@ export async function POST(req: NextRequest) {
           if (dispatch.profile !== summary.profile)
             throw new IngestConflictError(
               "Targeted Smoke terminal result has a different provenance profile",
+            );
+          if ((dispatch.runner ?? "smoke") !== summary.runner)
+            throw new IngestConflictError(
+              "Targeted QA terminal result has a different runner",
             );
           if (
             dispatch.workflowRunId !== summary.workflowRunId ||
@@ -398,7 +405,7 @@ export async function POST(req: NextRequest) {
             await payload.create({ collection: "qa_findings", data: { fingerprint, targetId: summary.targetId, suite: summary.suite, testCaseId: result.testCaseId, assertionCode: result.assertionCode, owner, severity: "P1", lifecycle: "needs_review", promotionState: "not_requested", lifecycleAudit: [{ at: summary.finishedAt, from: null, to: "needs_review", reason: "failed_product_result" }], ...findingData }, ...options });
             }
           }
-          if (result.status === "passed" && result.assertionCode && summary.suite === "targeted-smoke" && summary.targetedDispatch) {
+          if (result.status === "passed" && result.assertionCode && summary.suite.startsWith("targeted-") && summary.targetedDispatch) {
             const fingerprint = createQaFindingFingerprint({ targetId: summary.targetId, suite: summary.suite, testCaseId: result.testCaseId, assertionCode: result.assertionCode });
             await lockQaFindingFingerprint(payload, fingerprint, transactionReq);
             const candidates = await payload.find({ collection: "qa_findings", where: { and: [{ fingerprint: { equals: fingerprint } }, { lifecycle: { in: ["needs_review", "promoting", "github_created"] } }] }, limit: 1, ...options });

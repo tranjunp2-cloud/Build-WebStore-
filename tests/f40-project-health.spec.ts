@@ -228,6 +228,16 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
       page.getByText("Page Publish & Rollback", { exact: true }),
     ).toBeVisible();
 
+    // F40-08: descriptive catalog coverage does not enable execution. The
+    // detail keeps the owner and recovery path visible instead of a fake pass.
+    await page.locator("#qa-target-search").fill("Password Recovery & Reset");
+    await page.getByRole("button", { name: "Mở chi tiết" }).click();
+    await expect(page.getByText("Phạm vi QA được phê duyệt")).toBeVisible();
+    await expect(page.getByText("no-certified-pack")).toBeVisible();
+    await expect(page.getByText(/map TC-ID, test thực, fixture resettable/i)).toBeVisible();
+    await expect(page.getByTestId("qa-retest-pending")).toBeVisible();
+    await page.keyboard.press("Escape");
+
     // Keyboard navigation must keep all local QA tabs operable.
     await page.getByTestId("qa-health-tab").focus();
     await page.keyboard.press("ArrowLeft");

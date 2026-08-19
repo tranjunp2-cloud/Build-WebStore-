@@ -69,10 +69,12 @@ export async function claimTargetedSmokeDispatch(
   const quotaProfile = request.profile === "manual-regression" ? "regression" : "smoke";
   const quotaLimit = quotaProfile === "regression" ? 1 : 2;
 
+  const hasFixture = Boolean(request.pack.fixtureKey);
+  const transactionKey = request.pack.fixtureKey ?? `runner-${request.pack.runner}`;
   return withQaTargetedDispatchTransaction(
     payload,
     request.environment,
-    request.pack.fixtureKey,
+    transactionKey,
     async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
       const existing = await payload.find({
@@ -114,18 +116,20 @@ export async function claimTargetedSmokeDispatch(
         ...options,
       });
 
-      const activeLeases = await payload.find({
-        collection: "qa_fixture_leases",
-        where: {
-          and: [
-            { environment: { equals: request.environment } },
-            { fixtureKey: { equals: request.pack.fixtureKey } },
-            { status: { equals: "active" } },
-          ],
-        },
-        limit: 100,
-        ...options,
-      });
+      const activeLeases = hasFixture
+        ? await payload.find({
+            collection: "qa_fixture_leases",
+            where: {
+              and: [
+                { environment: { equals: request.environment } },
+                { fixtureKey: { equals: request.pack.fixtureKey } },
+                { status: { equals: "active" } },
+              ],
+            },
+            limit: 100,
+            ...options,
+          })
+        : { docs: [] as LeaseRecord[] };
       const active: LeaseRecord[] = [];
       for (const lease of activeLeases.docs as LeaseRecord[]) {
         const expires = (lease as LeaseRecord & { expiresAt?: string })
@@ -150,8 +154,9 @@ export async function claimTargetedSmokeDispatch(
         packId: request.pack.packId,
         packVersion: request.pack.packVersion,
         profile: request.profile,
-        fixtureKey: request.pack.fixtureKey,
-        fixtureCapacity: request.pack.fixtureCapacity,
+        runner: request.pack.runner,
+        ...(request.pack.fixtureKey ? { fixtureKey: request.pack.fixtureKey } : {}),
+        ...(request.pack.fixtureCapacity ? { fixtureCapacity: request.pack.fixtureCapacity } : {}),
         environment: request.environment,
         pullRequest: request.pullRequest,
         commitSha: request.commitSha,
@@ -171,7 +176,7 @@ export async function claimTargetedSmokeDispatch(
         })) as DispatchRecord;
         return { dispatch, created: true, blocked: true };
       }
-      if (active.length >= request.pack.fixtureCapacity) {
+      if (hasFixture && active.length >= (request.pack.fixtureCapacity ?? 1)) {
         const dispatch = (await payload.create({
           collection: "qa_smoke_dispatches",
           data: {
@@ -191,19 +196,20 @@ export async function claimTargetedSmokeDispatch(
         data: { ...baseData, status: "queued" },
         ...options,
       })) as DispatchRecord;
-      await payload.create({
-        collection: "qa_fixture_leases",
-        data: {
-          dispatch: dispatch.id,
-          environment: request.environment,
-          fixtureKey: request.pack.fixtureKey,
-          capacitySlot: active.length + 1,
-          status: "active",
-          acquiredAt: now.toISOString(),
-          expiresAt,
-        },
-        ...options,
-      });
+      if (hasFixture)
+        await payload.create({
+          collection: "qa_fixture_leases",
+          data: {
+            dispatch: dispatch.id,
+            environment: request.environment,
+            fixtureKey: request.pack.fixtureKey,
+            capacitySlot: active.length + 1,
+            status: "active",
+            acquiredAt: now.toISOString(),
+            expiresAt,
+          },
+          ...options,
+        });
       return { dispatch, created: true, blocked: false };
     },
     quotaProfile,
@@ -213,7 +219,7 @@ export async function claimTargetedSmokeDispatch(
 /** Compensates a failed external workflow dispatch while holding the same fixture lock. */
 export async function blockTargetedSmokeDispatch(
   payload: Payload,
-  dispatch: { id: string | number; fixtureKey: string },
+  dispatch: { id: string | number; fixtureKey?: string; runner?: TargetedSmokePack["runner"] },
   code: "GITHUB_DISPATCH_FAILED" | "GITHUB_DISPATCH_UNCONFIRMED",
   recoveryHint: string,
   now = new Date(),
@@ -221,7 +227,7 @@ export async function blockTargetedSmokeDispatch(
   await withQaTargetedDispatchTransaction(
     payload,
     "staging",
-    dispatch.fixtureKey,
+    dispatch.fixtureKey ?? `runner-${dispatch.runner ?? "smoke"}`,
     async (transactionReq) => {
       const options = { overrideAccess: true, req: transactionReq };
       const current = (await payload.findByID({
@@ -275,6 +281,7 @@ export async function recordTargetedSmokeCoverageGap(
     targetId: request.targetId,
     packId: "coverage-gap",
     packVersion: 1,
+    runner: "smoke",
     fixtureKey,
     fixtureCapacity: 1,
     spec: "tests/targeted-smoke/coverage-gap.smoke.spec.ts",
