@@ -71,13 +71,17 @@ async function resolvedStagingContext(
   requested?: ManualRunContext,
 ): Promise<ManualRunContext | undefined> {
   const currentSha = process.env.VERCEL_GIT_COMMIT_SHA;
-  if (requested && currentSha && requested.commitSha !== currentSha)
+  if (
+    requested &&
+    currentSha &&
+    !currentSha.toLowerCase().startsWith(requested.commitSha.toLowerCase()) &&
+    !requested.commitSha.toLowerCase().startsWith(currentSha.toLowerCase())
+  )
     return undefined;
   const where: Where | undefined = requested
     ? {
         and: [
           { pullRequest: { equals: requested.pullRequest } },
-          { commitSha: { equals: requested.commitSha } },
           { environment: { equals: "staging" } },
         ],
       }
@@ -94,23 +98,34 @@ async function resolvedStagingContext(
     collection: "qa_test_runs",
     where,
     sort: "-finishedAt",
-    limit: 1,
+    limit: 20,
     depth: 0,
     overrideAccess: true,
   });
-  const run = result.docs[0] as
-    | { pullRequest?: unknown; commitSha?: unknown }
-    | undefined;
-  const pullRequest = run?.pullRequest;
-  const commitSha = run?.commitSha;
+  const matchingRun = result.docs.find((doc) => {
+    const run = doc as { pullRequest?: unknown; commitSha?: unknown };
+    const pullRequest = run?.pullRequest;
+    const commitSha = run?.commitSha;
+    if (!Number.isSafeInteger(pullRequest) || typeof commitSha !== "string")
+      return false;
+    if (requested) {
+      if (pullRequest !== requested.pullRequest) return false;
+      const rSha = requested.commitSha.toLowerCase();
+      const dSha = commitSha.toLowerCase();
+      return rSha === dSha || dSha.startsWith(rSha) || rSha.startsWith(dSha);
+    }
+    return true;
+  }) as { pullRequest?: unknown; commitSha?: unknown } | undefined;
+
+  if (!matchingRun) return undefined;
+  const pullRequest = matchingRun.pullRequest;
+  const commitSha = matchingRun.commitSha;
   if (!Number.isSafeInteger(pullRequest) || typeof commitSha !== "string")
     return undefined;
-  if (
-    requested &&
-    (pullRequest !== requested.pullRequest || commitSha !== requested.commitSha)
-  )
-    return undefined;
-  return { pullRequest: pullRequest as number, commitSha };
+  return {
+    pullRequest: pullRequest as number,
+    commitSha: commitSha as string,
+  };
 }
 
 export async function getManualRunPreflight(
