@@ -1,0 +1,7 @@
+@font-face {
+  font-family: 'Passions Conflict';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(9ef776d4b5f2-kmKnZrcrFhfafnWX9x0GuEC-zowow5Ne.ttf) format('truetype');
+}

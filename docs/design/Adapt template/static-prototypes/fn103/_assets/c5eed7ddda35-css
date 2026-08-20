@@ -1,0 +1,102 @@
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  src: url(f3504655a78a-JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aX8.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 700;
+  src: url(acb6d43e88b6-JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM73w5aX8.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Oxygen';
+  font-style: normal;
+  font-weight: 300;
+  src: url(2c0d3932372f-2sDcZG1Wl4LcnbuCJW8zaGW8.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Oxygen';
+  font-style: normal;
+  font-weight: 400;
+  src: url(8140c2f451aa-2sDfZG1Wl4LcnbuKjk0j.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Oxygen';
+  font-style: normal;
+  font-weight: 700;
+  src: url(ccbd4fd0f515-2sDcZG1Wl4LcnbuCNWgzaGW8.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 200;
+  src: url(4df2f208f9f3-6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZYokSds18E.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 300;
+  src: url(076ac499f240-6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZZMkids18E.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 400;
+  src: url(f30dc2b9f777-6xK1dSBYKcSV-LCoeQqfX1RYOo3qPZ7nsDc.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 600;
+  src: url(42bd9977dfa9-6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZY4lCds18E.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 700;
+  src: url(8f3fea7e7882-6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZZclSds18E.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 900;
+  src: url(23a32032496c-6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZZklyds18E.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 200;
+  src: url(ed85426b2b4c-6xKydSBYKcSV-LCoeQqfX1RYOo3i94_wlxdr.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 300;
+  src: url(1c5bb77d0a79-6xKydSBYKcSV-LCoeQqfX1RYOo3ik4zwlxdr.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 400;
+  src: url(2f3308d95002-6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7g.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 600;
+  src: url(8bc6cc315d3b-6xKydSBYKcSV-LCoeQqfX1RYOo3i54rwlxdr.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 700;
+  src: url(813cab75e8da-6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdr.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 900;
+  src: url(a8ba7566149f-6xKydSBYKcSV-LCoeQqfX1RYOo3iu4nwlxdr.ttf) format('truetype');
+}

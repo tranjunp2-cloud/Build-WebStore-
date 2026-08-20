@@ -1,0 +1,7 @@
+@font-face {
+  font-family: 'Mr De Haviland';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(8fbe0ccd130b-OpNVnooIhJj96FdB73296ksbOj3C.ttf) format('truetype');
+}

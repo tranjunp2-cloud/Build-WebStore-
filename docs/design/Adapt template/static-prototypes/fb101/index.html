@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OrganicNest — Organic food, simply chosen</title>
+    <style>
+      :root {
+        --ink: #173d2b;
+        --muted: #617266;
+        --leaf: #1f6b45;
+        --lime: #b3d366;
+        --cream: #f7f5ec;
+        --line: #dfe6df;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        font:
+          16px/1.6 Inter,
+          system-ui,
+          sans-serif;
+      }
+      a {
+        text-decoration: none;
+        color: inherit;
+      }
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .container {
+        width: min(1160px, calc(100% - 40px));
+        margin: auto;
+      }
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #fffc;
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(12px);
+      }
+      .nav-in {
+        height: 76px;
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .brand {
+        font: 800 1.5rem Georgia;
+        color: var(--leaf);
+      }
+      .brand b {
+        color: var(--lime);
+      }
+      nav.links {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin-left: auto;
+      }
+      .btn {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        padding: 0 22px;
+        border: 0;
+        border-radius: 99px;
+        background: var(--leaf);
+        color: white;
+        font-weight: 750;
+      }
+      .menu,
+      .mobile {
+        display: none;
+      }
+      .hero {
+        background: var(--cream);
+      }
+      .hero-grid {
+        min-height: 620px;
+        display: grid;
+        grid-template-columns: 1fr 1.08fr;
+        align-items: center;
+        gap: 64px;
+      }
+      .eyebrow {
+        color: var(--leaf);
+        font-size: 0.76rem;
+        font-weight: 850;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2 {
+        font-family: Georgia, serif;
+        letter-spacing: -0.035em;
+        line-height: 1.05;
+      }
+      h1 {
+        font-size: clamp(3rem, 6vw, 5.4rem);
+        margin: 12px 0 20px;
+      }
+      .hero p,
+      .heading p,
+      .about p,
+      .cta p {
+        color: var(--muted);
+      }
+      .hero-media {
+        height: 520px;
+      }
+      .hero-media img {
+        border-radius: 32px 8px;
+      }
+      .section {
+        padding: 88px 0;
+      }
+      .heading {
+        text-align: center;
+        max-width: 670px;
+        margin: 0 auto 40px;
+      }
+      .heading h2,
+      .about h2,
+      .cta h2 {
+        font-size: clamp(2rem, 4vw, 3.3rem);
+        margin: 8px 0;
+      }
+      .features {
+        padding: 30px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .feature {
+        text-align: center;
+        padding: 20px;
+        border-right: 1px solid var(--line);
+      }
+      .feature:last-child {
+        border: 0;
+      }
+      .feature i {
+        display: grid;
+        place-items: center;
+        width: 50px;
+        height: 50px;
+        margin: auto;
+        border-radius: 50%;
+        background: #edf5df;
+        font-style: normal;
+      }
+      .feature h3 {
+        font: 700 1rem Inter;
+        margin: 8px 0 0;
+      }
+      .feature p {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin: 4px;
+      }
+      .cards,
+      .products,
+      .blogs {
+        display: grid;
+        gap: 22px;
+      }
+      .cards,
+      .blogs {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .category {
+        height: 320px;
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+      }
+      .category:after {
+        content: "";
+        position: absolute;
+        inset: 40% 0 0;
+        background: linear-gradient(transparent, #102d20e6);
+      }
+      .copy {
+        position: absolute;
+        z-index: 1;
+        left: 22px;
+        bottom: 20px;
+        color: white;
+      }
+      .copy h3 {
+        font: 700 1.4rem Georgia;
+        margin: 0;
+      }
+      .featured {
+        background: #153c2b;
+        color: white;
+      }
+      .featured .heading p {
+        color: #c7d6cc;
+      }
+      .products {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .product,
+      .blog {
+        overflow: hidden;
+        border-radius: 16px;
+        background: white;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .featured .product {
+        border: 0;
+      }
+      .product-media {
+        height: 225px;
+      }
+      .product-body,
+      .blog-body {
+        padding: 18px;
+      }
+      .product h3 {
+        min-height: 48px;
+        font-size: 1rem;
+        margin: 5px 0 8px;
+      }
+      .product small,
+      .blog small {
+        color: var(--muted);
+      }
+      .price {
+        font-weight: 850;
+        color: var(--leaf);
+      }
+      .about {
+        background: var(--cream);
+      }
+      .about-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        gap: 66px;
+      }
+      .about-media {
+        height: 440px;
+        border-radius: 22px;
+        overflow: hidden;
+      }
+      .blog-media {
+        height: 215px;
+      }
+      .blog h3 {
+        font: 700 1.3rem Georgia;
+        margin: 8px 0;
+      }
+      .cta {
+        padding: 64px 0;
+        background: #eaf3d7;
+      }
+      .cta-in,
+      .news-in {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 40px;
+      }
+      .newsletter {
+        background: #f4f7f1;
+      }
+      .newsletter form {
+        display: flex;
+        min-width: min(100%, 480px);
+        padding: 7px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: white;
+      }
+      .newsletter input {
+        min-width: 0;
+        flex: 1;
+        border: 0;
+        padding: 0 16px;
+      }
+      .footer {
+        padding: 56px 0 26px;
+        background: #0f2e20;
+        color: white;
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr;
+        gap: 50px;
+      }
+      .footer p,
+      .footer a {
+        color: #c4d2c9;
+      }
+      .footer nav {
+        display: grid;
+        gap: 7px;
+      }
+      .copyright {
+        border-top: 1px solid #ffffff22;
+        margin-top: 38px;
+        padding-top: 20px;
+      }
+      .cart {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        border: 0;
+        border-radius: 99px;
+        padding: 14px 18px;
+        background: var(--leaf);
+        color: #fff;
+        font-weight: 800;
+      }
+      .cart span {
+        margin-left: 6px;
+        padding: 2px 7px;
+        border-radius: 99px;
+        background: var(--lime);
+        color: var(--ink);
+      }
+      @media (max-width: 800px) {
+        nav.links {
+          display: none;
+        }
+        .menu {
+          display: block;
+          margin-left: auto;
+          border: 0;
+          background: none;
+          font-size: 1.5rem;
+        }
+        .mobile.open {
+          display: grid;
+          padding: 12px 20px;
+        }
+        .hero-grid,
+        .about-grid {
+          grid-template-columns: 1fr;
+          padding: 60px 0;
+        }
+        .hero-media {
+          height: 350px;
+        }
+        .products {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .cards,
+        .blogs {
+          grid-template-columns: 1fr;
+        }
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+        .feature {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .cta-in,
+        .news-in {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .footer-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        .container {
+          width: calc(100% - 30px);
+        }
+        .section {
+          padding: 62px 0;
+        }
+        h1 {
+          font-size: 3rem;
+        }
+        .product-media {
+          height: 145px;
+        }
+        .product-body {
+          padding: 11px;
+        }
+        .product h3 {
+          font-size: 0.82rem;
+        }
+        .about-media {
+          height: 300px;
+        }
+        .footer-grid {
+          grid-template-columns: 1fr;
+        }
+        .newsletter form {
+          min-width: 100%;
+        }
+      }
+    </style>
+    <style>
+      :root {
+        --lime: #66862d;
+        --lime-bg: #b3d366;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 3px solid #e1a92c;
+        outline-offset: 3px;
+      }
+      .carousel-shell {
+        position: relative;
+        overflow: hidden;
+      }
+      .cards {
+        display: flex !important;
+        transition: transform 0.35s ease;
+      }
+      .category {
+        flex: 0 0 100%;
+        height: 390px;
+      }
+      .carousel-controls,
+      .feature-controls {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      .carousel-controls button,
+      .feature-controls button {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: #fff;
+        color: var(--ink);
+        font-size: 1.15rem;
+      }
+      .dot {
+        width: 44px !important;
+        height: 44px !important;
+        padding: 0;
+        border: 0 !important;
+        background: transparent !important;
+        position: relative;
+      }
+      .dot:before {
+        content: "";
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #bcc8bf;
+        inset: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .dot.active:before {
+        background: var(--leaf);
+      }
+      .featured-viewport {
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+      .featured-viewport::-webkit-scrollbar {
+        display: none;
+      }
+      .featured .products {
+        display: flex;
+      }
+      .featured .product {
+        flex: 0 0 min(500px, 82vw);
+        scroll-snap-align: start;
+        position: relative;
+      }
+      .featured .product-media {
+        height: 440px;
+      }
+      .featured .product-body {
+        position: absolute;
+        inset: auto 0 0;
+        padding: 70px 24px 24px;
+        background: linear-gradient(transparent, #071c13ee);
+        color: #fff;
+      }
+      .featured .product-body small {
+        color: #d9e4dc;
+      }
+      .featured .price {
+        color: #d9f096;
+      }
+      .feature-controls {
+        justify-content: flex-end;
+      }
+      .features {
+        padding: 72px 0;
+      }
+      .features .heading {
+        margin-bottom: 30px;
+      }
+      .feature-grid {
+        gap: 18px;
+      }
+      .feature {
+        border: 1px solid var(--line) !important;
+        border-radius: 16px;
+        padding: 28px !important;
+        background: #fff;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      .feature:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 34px #173d2b16;
+      }
+      .mobile a {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+      }
+      .cart {
+        left: 20px;
+        right: auto;
+        z-index: 20;
+      }
+      .overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: #081b12aa;
+      }
+      .overlay.open {
+        display: block;
+      }
+      .drawer {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: min(430px, 100%);
+        padding: 28px;
+        background: #fff;
+        color: var(--ink);
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .close {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: #fff;
+        font-size: 1.4rem;
+      }
+      .drawer-item {
+        display: grid;
+        grid-template-columns: 82px 1fr;
+        gap: 15px;
+        margin-top: 25px;
+        padding: 16px 0;
+        border-block: 1px solid var(--line);
+      }
+      .drawer-item img {
+        height: 82px;
+        border-radius: 10px;
+      }
+      .drawer-foot {
+        margin-top: auto;
+      }
+      .subtotal {
+        display: flex;
+        justify-content: space-between;
+        font-size: 1.15rem;
+        margin-bottom: 16px;
+      }
+      .drawer .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .qty {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .qty button,
+      .remove {
+        min-width: 44px;
+        min-height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .remove {
+        color: #8b2d2d;
+      }
+      .empty-cart[hidden] {
+        display: none;
+      }
+      .shipping {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      @media (max-width: 520px) {
+        .products:not(.featured .products) {
+          grid-template-columns: 1fr;
+        }
+        .product-media {
+          height: 240px;
+        }
+        .product-body {
+          padding: 16px;
+        }
+        .product h3 {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- source replacements + about/cta coverage additions; cart is runtime-owned -->
+    <header
+      class="nav"
+      data-block-type="navigation"
+      data-block-variant="default"
+      data-mapping-status="approximation"
+      data-react-component="NavigationBlock"
+    >
+      <div class="container nav-in">
+        <a class="brand" href="index.html">Organic<b>Nest</b></a>
+        <nav class="links" aria-label="Primary">
+          <a aria-current="page" href="index.html">Home</a
+          ><a href="products/index.html">Products</a
+          ><a href="articles/index.html" data-production-href="/blog">Blog</a
+          ><a href="about-us/index.html">About</a
+          ><a href="contact/index.html">Contact</a
+          ><a class="btn" href="products/index.html">Shop organic</a>
+        </nav>
+        <button
+          class="menu"
+          type="button"
+          aria-label="Open menu"
+          aria-expanded="false"
+          aria-controls="mobile-navigation"
+        >
+          ☰
+        </button>
+      </div>
+      <nav
+        class="mobile"
+        id="mobile-navigation"
+        aria-label="Mobile navigation"
+        hidden
+      >
+        <a href="products/index.html">Products</a
+        ><a href="articles/index.html" data-production-href="/blog">Blog</a
+        ><a href="about-us/index.html">About</a
+        ><a href="contact/index.html">Contact</a>
+      </nav>
+    </header>
+    <main>
+      <section
+        class="hero"
+        data-block-type="hero"
+        data-block-variant="split-left"
+        data-mapping-status="approximation"
+        data-react-component="HeroBlock"
+      >
+        <div class="container hero-grid">
+          <div>
+            <span class="eyebrow">Fresh from trusted growers</span>
+            <h1>Tasty &amp; healthy organic food</h1>
+            <p>
+              Everyday produce, pantry staples and nourishing ingredients
+              selected to make better meals feel simple.
+            </p>
+            <a class="btn" href="products/index.html">Explore products</a>
+          </div>
+          <div class="hero-media">
+            <img
+              src="_assets/60a064b61df0-9.jpg"
+              alt="Fresh organic produce arranged for a meal"
+            />
+          </div>
+        </div>
+      </section>
+      <section
+        class="features"
+        data-block-type="features"
+        data-block-variant="icon-top"
+        data-mapping-status="approximation"
+        data-react-component="FeaturesBlock"
+      >
+        <div class="container heading">
+          <span class="eyebrow">Why OrganicNest</span>
+          <h2>Better essentials, made easier</h2>
+          <p>Simple service from thoughtful selection through delivery.</p>
+        </div>
+        <div class="container feature-grid">
+          <article class="feature">
+            <i>✓</i>
+            <h3>Quality products</h3>
+            <p>Carefully selected pantry and fresh food.</p>
+          </article>
+          <article class="feature">
+            <i>↗</i>
+            <h3>Fast delivery</h3>
+            <p>Convenient delivery for everyday essentials.</p>
+          </article>
+          <article class="feature">
+            <i>♡</i>
+            <h3>Support policy</h3>
+            <p>Helpful support from browse to basket.</p>
+          </article>
+        </div>
+      </section>
+      <section
+        class="section"
+        data-block-type="carousel"
+        data-block-variant="cards"
+        data-mapping-status="approximation"
+        data-react-component="CarouselBlock"
+      >
+        <div class="container">
+          <div class="heading">
+            <span class="eyebrow">Browse categories</span>
+            <h2>What are you cooking today?</h2>
+            <p>
+              Start with a collection, then find a new favorite for your
+              kitchen.
+            </p>
+          </div>
+          <div class="carousel-shell">
+            <div class="cards">
+              <a class="category" href="products/index.html"
+                ><img
+                  src="_assets/83c6b538b25b-UIFnKZSjXyvIGJvLCo86_0I0Dd3arxCjsJJwF3skXyY.jpg"
+                  alt="Fresh vegetables"
+                />
+                <div class="copy">
+                  <h3>Garden vegetables</h3>
+                  <span>Shop collection →</span>
+                </div></a
+              ><a class="category" href="products/index.html"
+                ><img
+                  src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
+                  alt="Pantry essentials"
+                />
+                <div class="copy">
+                  <h3>Pantry essentials</h3>
+                  <span>Shop collection →</span>
+                </div></a
+              ><a class="category" href="products/index.html"
+                ><img
+                  src="_assets/4142ffbf5204-qmG15agXS9zd6W31BrnNWmYxBt97jOPe98UozoPknVM.jpg"
+                  alt="Fresh ingredients"
+                />
+                <div class="copy">
+                  <h3>Fresh picks</h3>
+                  <span>Shop collection →</span>
+                </div></a
+              >
+            </div>
+          </div>
+          <div class="carousel-controls">
+            <button
+              class="category-prev"
+              type="button"
+              aria-label="Previous category"
+            >
+              ←
+            </button>
+            <div class="dots" aria-label="Category slides">
+              <button
+                class="dot active"
+                type="button"
+                aria-label="Category 1"
+                aria-current="true"
+              ></button
+              ><button
+                class="dot"
+                type="button"
+                aria-label="Category 2"
+              ></button
+              ><button
+                class="dot"
+                type="button"
+                aria-label="Category 3"
+              ></button>
+            </div>
+            <button
+              class="category-next"
+              type="button"
+              aria-label="Next category"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      </section>
+      <section
+        class="section featured"
+        data-block-type="products-featured"
+        data-block-variant="carousel"
+        data-mapping-status="approximation"
+        data-react-component="ProductsFeaturedBlock"
+      >
+        <div class="container">
+          <div class="heading">
+            <span class="eyebrow">Featured shelf</span>
+            <h2>OrganicNest favorites</h2>
+            <p>Popular picks customers return to week after week.</p>
+          </div>
+          <div class="featured-viewport">
+            <div class="products">
+              <a class="product" href="products/index.html"
+                ><div class="product-media">
+                  <img
+                    src="_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg"
+                    alt="Sea Salt Grinder"
+                  />
+                </div>
+                <div class="product-body">
+                  <small>Condiment &amp; sauce</small>
+                  <h3>McCormick Sea Salt Grinder</h3>
+                  <b class="price">RM 15.00</b>
+                </div></a
+              ><a class="product" href="products/index.html"
+                ><div class="product-media">
+                  <img
+                    src="_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg"
+                    alt="Mo Qua Squash"
+                  />
+                </div>
+                <div class="product-body">
+                  <small>Garden vegetables</small>
+                  <h3>Fresh Mo Qua Squash</h3>
+                  <b class="price">RM 10.00</b>
+                </div></a
+              ><a class="product" href="products/index.html"
+                ><div class="product-media">
+                  <img
+                    src="_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg"
+                    alt="Pork Ribeye Chops"
+                  />
+                </div>
+                <div class="product-body">
+                  <small>Fresh</small>
+                  <h3>Pork Ribeye Chops Boneless</h3>
+                  <b class="price">RM 33.00</b>
+                </div></a
+              ><a class="product" href="products/index.html"
+                ><div class="product-media">
+                  <img
+                    src="_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg"
+                    alt="Purple Onion"
+                  />
+                </div>
+                <div class="product-body">
+                  <small>Seasoning</small>
+                  <h3>Purple Onion Hasfarm Green+</h3>
+                  <b class="price">RM 3.80</b>
+                </div></a
+              >
+            </div>
+          </div>
+          <div class="feature-controls">
+            <button
+              class="featured-prev"
+              type="button"
+              aria-label="Previous featured product"
+            >
+              ←</button
+            ><button
+              class="featured-next"
+              type="button"
+              aria-label="Next featured product"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      </section>
+      <section
+        class="section"
+        data-block-type="products-grid"
+        data-block-variant="grid-4"
+        data-mapping-status="approximation"
+        data-react-component="ProductsGridBlock"
+      >
+        <div class="container">
+          <div class="heading">
+            <span class="eyebrow">Our products</span>
+            <h2>Stock the kitchen well</h2>
+            <p>
+              Reliable basics and fresh ingredients, ready for your next meal.
+            </p>
+          </div>
+          <div class="products">
+            <a class="product" href="products/index.html"
+              ><div class="product-media">
+                <img
+                  src="_assets/d6cf6255767a-dqDs_txwjJ9hOkGsIvTN7M9ZhkMy2NcuEDNfQa8SalU.jpg"
+                  alt="Butterhead Lettuce"
+                />
+              </div>
+              <div class="product-body">
+                <small>Vegetables</small>
+                <h3>Butterhead Lettuce Hasfarm Green+</h3>
+                <b class="price">RM 2.00</b>
+              </div></a
+            ><a class="product" href="products/index.html"
+              ><div class="product-media">
+                <img
+                  src="_assets/f0a2e0efb68c-V0KNhEph0FiS9o-BCuNWxa4mhSC4UPsRSzY3zRRv4zc.jpg"
+                  alt="Alfredo Sauce"
+                />
+              </div>
+              <div class="product-body">
+                <small>Condiment</small>
+                <h3>Prego Homestyle Alfredo Sauce</h3>
+                <b class="price">RM 18.00</b>
+              </div></a
+            ><a class="product" href="products/index.html"
+              ><div class="product-media">
+                <img
+                  src="_assets/a5d19052a083-NIG13ymL6iWxcwIpc_cdbK5zT8DWHt2RugmdtMDLU1w.jpg"
+                  alt="Pasta Sauce"
+                />
+              </div>
+              <div class="product-body">
+                <small>Pantry</small>
+                <h3>Traditional Pasta Sauce</h3>
+                <b class="price">RM 18.00</b>
+              </div></a
+            ><a class="product" href="products/index.html"
+              ><div class="product-media">
+                <img
+                  src="_assets/f50cfb1b1956-Pj945HmXAbf_QvQ6qY0woXoYAX1iMwodftb1tCqnUhU.jpg"
+                  alt="Plant-based sausage"
+                />
+              </div>
+              <div class="product-body">
+                <small>Plant based</small>
+                <h3>Beyond Meat Sausage Original</h3>
+                <b class="price">RM 36.00</b>
+              </div></a
+            >
+          </div>
+        </div>
+      </section>
+      <section
+        class="section about"
+        data-block-type="about"
+        data-block-variant="split"
+        data-mapping-status="approximation"
+        data-coverage-role="rich-text"
+        data-react-component="AboutBlock"
+      >
+        <div class="container about-grid">
+          <div class="about-media">
+            <img
+              src="_assets/5b13a166e850-1.jpg"
+              alt="Organic ingredients selected with care"
+            />
+          </div>
+          <div>
+            <span class="eyebrow">Our approach</span>
+            <h2>Good food begins with thoughtful choices</h2>
+            <p>
+              OrganicNest brings useful ingredients together in one calm,
+              approachable shop. We focus on quality, clarity and the everyday
+              pleasure of cooking well.
+            </p>
+            <a class="btn" href="about-us/index.html">Meet OrganicNest</a>
+          </div>
+        </div>
+      </section>
+      <section
+        class="section"
+        data-block-type="blog-list"
+        data-block-variant="cards"
+        data-mapping-status="approximation"
+        data-react-component="BlogListBlock"
+      >
+        <div class="container">
+          <div class="heading">
+            <span class="eyebrow">Our articles</span>
+            <h2>Ideas for a fresher table</h2>
+            <p>
+              Simple guides, ingredient notes and practical ways to eat well.
+            </p>
+          </div>
+          <div class="blogs">
+            <a
+              class="blog"
+              href="articles/index.html"
+              data-production-href="/blog"
+              ><div class="blog-media">
+                <img src="_assets/e0162c479c97-2.jpg" alt="Fresh ingredients" />
+              </div>
+              <div class="blog-body">
+                <small>Kitchen notes · 6 min</small>
+                <h3>Build a better everyday pantry</h3>
+                <span>Read article →</span>
+              </div></a
+            ><a
+              class="blog"
+              href="articles/index.html"
+              data-production-href="/blog"
+              ><div class="blog-media">
+                <img src="_assets/60a064b61df0-9.jpg" alt="Organic produce" />
+              </div>
+              <div class="blog-body">
+                <small>Fresh food · 4 min</small>
+                <h3>How to choose seasonal vegetables</h3>
+                <span>Read article →</span>
+              </div></a
+            ><a
+              class="blog"
+              href="articles/index.html"
+              data-production-href="/blog"
+              ><div class="blog-media">
+                <img
+                  src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
+                  alt="Cooking sauces"
+                />
+              </div>
+              <div class="blog-body">
+                <small>Quick meals · 5 min</small>
+                <h3>Three sauces, five weeknight dinners</h3>
+                <span>Read article →</span>
+              </div></a
+            >
+          </div>
+        </div>
+      </section>
+      <section
+        class="cta"
+        data-block-type="cta"
+        data-block-variant="banner"
+        data-mapping-status="approximation"
+        data-coverage-role="small-banner"
+        data-react-component="CTABlock"
+      >
+        <div class="container cta-in">
+          <div>
+            <span class="eyebrow">Your interest, naturally</span>
+            <h2>Make the next meal a little greener</h2>
+            <p>
+              Explore fresh produce and pantry staples for everyday cooking.
+            </p>
+          </div>
+          <a class="btn" href="products/index.html">Shop all products</a>
+        </div>
+      </section>
+      <section
+        class="section newsletter"
+        data-block-type="newsletter"
+        data-block-variant="inline"
+        data-mapping-status="approximation"
+        data-react-component="NewsletterBlock"
+      >
+        <div class="container news-in">
+          <div>
+            <span class="eyebrow">OrganicNest notes</span>
+            <h2>Fresh ideas in your inbox</h2>
+            <p>Seasonal picks, product news and simple recipes.</p>
+          </div>
+          <form onsubmit="event.preventDefault()">
+            <input
+              type="email"
+              aria-label="Email address"
+              placeholder="you@example.com"
+              required
+            /><button class="btn">Subscribe</button>
+          </form>
+        </div>
+      </section>
+    </main>
+    <footer
+      class="footer"
+      data-block-type="footer"
+      data-block-variant="simple"
+      data-mapping-status="approximation"
+      data-react-component="FooterBlock"
+    >
+      <div class="container">
+        <div class="footer-grid">
+          <div>
+            <a class="brand" href="index.html">Organic<b>Nest</b></a>
+            <p>Thoughtfully selected food for naturally better meals.</p>
+          </div>
+          <div>
+            <h3>Shop</h3>
+            <nav>
+              <a href="products/index.html">Products</a
+              ><a href="articles/index.html" data-production-href="/blog"
+                >Blog</a
+              ><a href="about-us/index.html">About us</a>
+            </nav>
+          </div>
+          <div>
+            <h3>Help</h3>
+            <nav>
+              <a href="contact/index.html">Contact</a
+              ><a
+                href="order-tracking/index.html"
+                data-production-href="/orders"
+                >Track an order</a
+              ><a href="cart/index.html">Cart</a>
+            </nav>
+          </div>
+        </div>
+        <p class="copyright">
+          © 2026 OrganicNest. Static adaptation for Prime Web v2 review.
+        </p>
+      </div>
+    </footer>
+    <button
+      class="cart"
+      type="button"
+      aria-label="Open cart"
+      aria-expanded="false"
+      aria-controls="cart-drawer"
+      data-block-type="cartWidget"
+      data-block-variant="floating"
+      data-mapping-status="runtime"
+      data-runtime-component="CartDrawer"
+    >
+      Cart <span>2</span>
+    </button>
+    <div class="overlay" aria-hidden="true">
+      <aside
+        class="drawer"
+        id="cart-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cart-title"
+      >
+        <div class="drawer-head">
+          <div>
+            <small>OrganicNest basket</small>
+            <h2 id="cart-title">Your cart (2)</h2>
+          </div>
+          <button class="close" type="button" aria-label="Close cart">×</button>
+        </div>
+        <article class="drawer-item">
+          <img
+            src="_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg"
+            alt="McCormick Sea Salt Grinder"
+          />
+          <div>
+            <h3>McCormick Sea Salt Grinder</h3>
+            <div class="qty" aria-label="Quantity">
+              <button
+                type="button"
+                class="minus"
+                aria-label="Decrease quantity"
+              >
+                −</button
+              ><span>2</span
+              ><button
+                type="button"
+                class="plus"
+                aria-label="Increase quantity"
+              >
+                +</button
+              ><button
+                type="button"
+                class="remove"
+                aria-label="Remove Sea Salt Grinder"
+              >
+                Remove
+              </button>
+            </div>
+            <strong class="line-total">RM 30.00</strong>
+          </div>
+        </article>
+        <div class="empty-cart" hidden>
+          <h3>Your cart is empty</h3>
+          <p>Add a few OrganicNest favorites to begin.</p>
+          <a class="btn" href="products/index.html">Browse products</a>
+        </div>
+        <div class="drawer-foot">
+          <div class="subtotal">
+            <span>Subtotal</span
+            ><strong class="subtotal-total">RM 30.00</strong>
+          </div>
+          <p class="shipping">Shipping and taxes are calculated at checkout.</p>
+          <a class="btn" href="checkout/index.html">Proceed to checkout</a>
+        </div>
+      </aside>
+    </div>
+    <script>
+      const b = document.querySelector(".menu"),
+        m = document.querySelector(".mobile");
+      b.onclick = () => {
+        const o = m.classList.toggle("open");
+        b.setAttribute("aria-expanded", o);
+        b.setAttribute("aria-label", o ? "Close menu" : "Open menu");
+        b.textContent = o ? "×" : "☰";
+        m.hidden = !o;
+      };
+      const track = document.querySelector(".cards"),
+        dots = [...document.querySelectorAll(".dot")];
+      let categoryIndex = 0;
+      const showCategory = (i) => {
+        categoryIndex = (i + 3) % 3;
+        track.style.transform = `translateX(-${categoryIndex * 100}%)`;
+        dots.forEach((dot, n) => {
+          dot.classList.toggle("active", n === categoryIndex);
+          if (n === categoryIndex) dot.setAttribute("aria-current", "true");
+          else dot.removeAttribute("aria-current");
+        });
+      };
+      document.querySelector(".category-prev").onclick = () =>
+        showCategory(categoryIndex - 1);
+      document.querySelector(".category-next").onclick = () =>
+        showCategory(categoryIndex + 1);
+      dots.forEach((dot, i) => (dot.onclick = () => showCategory(i)));
+      const viewport = document.querySelector(".featured-viewport");
+      const featuredStep = () => {
+        const card = viewport.querySelector(".product"),
+          styles = getComputedStyle(viewport.querySelector(".products"));
+        return card.getBoundingClientRect().width + parseFloat(styles.gap || 0);
+      };
+      document.querySelector(".featured-prev").onclick = () =>
+        viewport.scrollBy({ left: -featuredStep(), behavior: "smooth" });
+      document.querySelector(".featured-next").onclick = () =>
+        viewport.scrollBy({ left: featuredStep(), behavior: "smooth" });
+      const cart = document.querySelector(".cart"),
+        overlay = document.querySelector(".overlay"),
+        close = document.querySelector(".close");
+      let lastFocus;
+      const setCart = (open) => {
+        overlay.classList.toggle("open", open);
+        overlay.setAttribute("aria-hidden", String(!open));
+        cart.setAttribute("aria-expanded", String(open));
+        document.body.style.overflow = open ? "hidden" : "";
+        document
+          .querySelectorAll("header,main,footer")
+          .forEach((el) => (el.inert = open));
+        if (open) {
+          lastFocus = document.activeElement;
+          close.focus();
+        } else lastFocus?.focus();
+      };
+      cart.onclick = () => setCart(true);
+      close.onclick = () => setCart(false);
+      overlay.onclick = (e) => {
+        if (e.target === overlay) setCart(false);
+      };
+      const qty = document.querySelector(".qty span"),
+        minus = document.querySelector(".minus"),
+        plus = document.querySelector(".plus"),
+        remove = document.querySelector(".remove"),
+        item = document.querySelector(".drawer-item"),
+        empty = document.querySelector(".empty-cart"),
+        foot = document.querySelector(".drawer-foot");
+      const updateQty = (n) => {
+        qty.textContent = n;
+        minus.disabled = n <= 1;
+        document.querySelector("#cart-title").textContent = `Your cart (${n})`;
+        cart.querySelector("span").textContent = n;
+        document.querySelector(".line-total").textContent =
+          `RM ${(n * 15).toFixed(2)}`;
+        document.querySelector(".subtotal-total").textContent =
+          `RM ${(n * 15).toFixed(2)}`;
+      };
+      minus.onclick = () => updateQty(Math.max(1, +qty.textContent - 1));
+      plus.onclick = () => updateQty(+qty.textContent + 1);
+      remove.onclick = () => {
+        item.hidden = true;
+        empty.hidden = false;
+        foot.hidden = true;
+        document.querySelector("#cart-title").textContent = "Your cart (0)";
+        cart.querySelector("span").textContent = "0";
+        close.focus();
+      };
+      addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && overlay.classList.contains("open"))
+          setCart(false);
+        if (e.key === "Escape" && !m.hidden) {
+          m.hidden = true;
+          m.classList.remove("open");
+          b.setAttribute("aria-expanded", "false");
+          b.setAttribute("aria-label", "Open menu");
+          b.textContent = "☰";
+          b.focus();
+        }
+        if (e.key === "Tab" && overlay.classList.contains("open")) {
+          const focusable = [
+            ...overlay.querySelectorAll("button,a[href]"),
+          ].filter((el) => !el.disabled && el.offsetParent !== null);
+          const first = focusable[0],
+            last = focusable.at(-1);
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

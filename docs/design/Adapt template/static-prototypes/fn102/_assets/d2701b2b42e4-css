@@ -1,0 +1,12 @@
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  src: url(c74e082a80e7-pxiEyp8kv8JHgFVrJJfedw.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  src: url(e653e88818c7-pxiByp8kv8JHgFVrLCz7Z1xlEA.ttf) format('truetype');
+}

@@ -1,0 +1,88 @@
+{
+  "code": "pa101",
+  "name": "EcoGarden",
+  "source": "https://pa101.web.ecommercehub.unifi.com.my",
+  "generatedAt": "2026-08-17T12:02:41.949Z",
+  "adaptation": {
+    "status": "needs-ui-review",
+    "updatedAt": "2026-08-18",
+    "scope": "full-route-set-static-prototype",
+    "blockSequence": [
+      "navigation:centered",
+      "hero:slideshow",
+      "about:centered-large",
+      "cta:image-bg",
+      "products-grid:grid-3",
+      "blog-list:cards",
+      "carousel:cards",
+      "footer:simple",
+      "cartWidget:floating"
+    ],
+    "runtimeMirrors": [
+      "CartDrawer",
+      "useCartStore",
+      "checkout",
+      "order-tracking",
+      "product-detail",
+      "blog-detail"
+    ],
+    "routeMappings": {
+      "/products": "navigation:centered → hero:minimal → products-grid:grid-3 → cta:banner → footer:simple + cartWidget:floating",
+      "/articles": "legacy static route; canonical /blog → navigation:centered → hero:minimal → blog-list:cards → newsletter:inline → footer:simple + cartWidget:floating",
+      "/contact": "navigation:centered → contact:split → footer:simple + cartWidget:floating",
+      "/cart": "static mirror: CartDrawer",
+      "/checkout": "static mirror: CheckoutClient",
+      "/order-tracking": "compatibility mirror: OrderLookupClient (/orders)",
+      "/products/mid-century-turned-wood-planter-carved-white": "static mirror: ProductDetailPage + ProductImageGallery + ProductAddToCartSection",
+      "/articles/logitech-pop-mouse": "compatibility mirror: BlogDetailPage (/blog/[blogSlug])"
+    },
+    "removed": [
+      "legacy-slider-plugin",
+      "hashed-component-css",
+      "loading-wrappers",
+      "placeholder-copy"
+    ]
+  },
+  "routes": [
+    {
+      "route": "/",
+      "file": "index.html"
+    },
+    {
+      "route": "/products",
+      "file": "products/index.html"
+    },
+    {
+      "route": "/articles",
+      "canonicalRoute": "/blog",
+      "file": "articles/index.html"
+    },
+    {
+      "route": "/cart",
+      "file": "cart/index.html"
+    },
+    {
+      "route": "/checkout",
+      "file": "checkout/index.html"
+    },
+    {
+      "route": "/contact",
+      "file": "contact/index.html"
+    },
+    {
+      "route": "/order-tracking",
+      "file": "order-tracking/index.html"
+    },
+    {
+      "route": "/products/mid-century-turned-wood-planter-carved-white",
+      "file": "products/mid-century-turned-wood-planter-carved-white/index.html"
+    },
+    {
+      "route": "/articles/logitech-pop-mouse",
+      "canonicalRoute": "/blog/logitech-pop-mouse",
+      "file": "articles/logitech-pop-mouse/index.html"
+    }
+  ],
+  "assetCount": 146,
+  "failures": []
+}
