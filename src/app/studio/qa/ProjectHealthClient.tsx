@@ -17,8 +17,16 @@ import type {
   HealthState,
   TargetHealthResult,
 } from "@/lib/admin/qa/health-calculator";
+import {
+  Inbox as InboxIcon,
+  Activity,
+  History,
+  FolderTree,
+  Sparkles,
+} from "lucide-react";
 import { ManualRunPanel } from "./ManualRunPanel";
 import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
+import { VisualCmsReviewClient } from "./visual-review/VisualCmsReviewClient";
 
 interface ProjectHealthClientProps {
   initialData: QaControlCenterData;
@@ -1837,9 +1845,10 @@ function ProjectHealthMap({
       }
     };
     window.addEventListener("keydown", onKeyDown);
+    const btn = filtersButton.current;
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      filtersButton.current?.focus();
+      btn?.focus();
     };
   }, [filtersOpen]);
   const groups = useMemo(() => {
@@ -2220,11 +2229,11 @@ function ProjectHealthMap({
 }
 
 export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
-  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases">(
+  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases" | "visual_review">(
     () => {
       if (typeof window === "undefined") return "inbox";
       const tab = new URLSearchParams(window.location.search).get("tab");
-      return tab === "health" || tab === "runs" || tab === "testcases" ? tab : "inbox";
+      return tab === "health" || tab === "runs" || tab === "testcases" || tab === "visual_review" ? tab : "inbox";
     },
   );
   const [items, setItems] = useState(initialData.inbox.items);
@@ -2395,7 +2404,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
       <div
         role="tablist"
         aria-label="QA Control Center"
-        className="flex gap-1 border-b border-[var(--border)]"
+        className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900/70 dark:bg-slate-900/90 rounded-2xl border border-slate-800 shadow-sm"
       >
         <button
           ref={(element) => {
@@ -2409,15 +2418,21 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-inbox-panel"
           onKeyDown={(event) => onTabKeyDown(event, 0)}
           onClick={() => setActiveTab("inbox")}
-          className={`!min-h-9 !rounded-none !border-x-0 !border-t-0 !bg-transparent px-3 text-[13px] font-bold shadow-none sm:min-h-9 ${activeTab === "inbox" ? "!border-b-2 !border-[var(--accent)] text-[var(--accent)]" : "!border-b-2 !border-transparent text-[var(--text-2)] hover:text-[var(--text)]"}`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+            activeTab === "inbox"
+              ? "bg-slate-800 text-white shadow border border-slate-700"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+          }`}
         >
-          Việc cần xử lý
+          <InboxIcon className="size-4 shrink-0" />
+          <span>Việc cần xử lý</span>
           {items.length > 0 && (
-            <span className="ml-2 rounded-full border border-[var(--danger)] px-1.5 py-0.5 text-xs text-[var(--danger)]">
+            <span className="ml-1 rounded-full bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-xs text-red-400 font-extrabold">
               {items.length}
             </span>
           )}
         </button>
+
         <button
           ref={(element) => {
             tabs.current[1] = element;
@@ -2430,10 +2445,16 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-health-panel"
           onKeyDown={(event) => onTabKeyDown(event, 1)}
           onClick={() => setActiveTab("health")}
-          className={`!min-h-9 !rounded-none !border-x-0 !border-t-0 !bg-transparent px-3 text-[13px] font-bold shadow-none sm:min-h-9 ${activeTab === "health" ? "!border-b-2 !border-[var(--accent)] text-[var(--accent)]" : "!border-b-2 !border-transparent text-[var(--text-2)] hover:text-[var(--text)]"}`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+            activeTab === "health"
+              ? "bg-slate-800 text-white shadow border border-slate-700"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+          }`}
         >
-          Sức khỏe dự án
+          <Activity className="size-4 shrink-0" />
+          <span>Sức khỏe dự án</span>
         </button>
+
         <button
           ref={(element) => {
             tabs.current[2] = element;
@@ -2446,10 +2467,16 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-runs-panel"
           onKeyDown={(event) => onTabKeyDown(event, 2)}
           onClick={() => setActiveTab("runs")}
-          className={`!min-h-9 !rounded-none !border-x-0 !border-t-0 !bg-transparent px-3 text-[13px] font-bold shadow-none sm:min-h-9 ${activeTab === "runs" ? "!border-b-2 !border-[var(--accent)] text-[var(--accent)]" : "!border-b-2 !border-transparent text-[var(--text-2)] hover:text-[var(--text)]"}`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+            activeTab === "runs"
+              ? "bg-slate-800 text-white shadow border border-slate-700"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+          }`}
         >
-          Lịch sử chạy
+          <History className="size-4 shrink-0" />
+          <span>Lịch sử chạy</span>
         </button>
+
         <button
           ref={(element) => {
             tabs.current[3] = element;
@@ -2462,11 +2489,45 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-testcases-panel"
           onKeyDown={(event) => onTabKeyDown(event, 3)}
           onClick={() => setActiveTab("testcases")}
-          className={`!min-h-9 !rounded-none !border-x-0 !border-t-0 !bg-transparent px-3 text-[13px] font-bold shadow-none sm:min-h-9 ${activeTab === "testcases" ? "!border-b-2 !border-[var(--accent)] text-[var(--accent)]" : "!border-b-2 !border-transparent text-[var(--text-2)] hover:text-[var(--text)]"}`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+            activeTab === "testcases"
+              ? "bg-slate-800 text-white shadow border border-slate-700"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+          }`}
         >
-          Danh mục Test Cases
-          <span className="ml-2 rounded-full border border-[var(--accent)] px-1.5 py-0.5 text-xs text-[var(--accent)]">
+          <FolderTree className="size-4 shrink-0" />
+          <span>Danh mục Test Cases</span>
+          <span className="ml-1 rounded-full bg-cyan-950 border border-cyan-700/80 px-2 py-0.5 text-xs text-cyan-300 font-bold font-mono">
             240
+          </span>
+        </button>
+
+        <button
+          ref={(element) => {
+            tabs.current[4] = element;
+          }}
+          type="button"
+          role="tab"
+          id="qa-visual-review-tab"
+          data-testid="qa-visual-review-tab"
+          aria-selected={activeTab === "visual_review"}
+          aria-controls="qa-visual-review-panel"
+          onKeyDown={(event) => onTabKeyDown(event, 4)}
+          onClick={() => setActiveTab("visual_review")}
+          className={`relative ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
+            activeTab === "visual_review"
+              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-300"
+              : "bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 border border-cyan-500/50 shadow-sm"
+          }`}
+        >
+          <Sparkles className={`size-4 shrink-0 ${activeTab === "visual_review" ? "text-slate-950" : "text-cyan-400 animate-pulse"}`} />
+          <span>Visual CMS Review</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${
+            activeTab === "visual_review"
+              ? "bg-slate-950 text-cyan-300"
+              : "bg-cyan-500 text-slate-950"
+          }`}>
+            100% UI
           </span>
         </button>
       </div>
@@ -2533,6 +2594,15 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
               domain: target.domain,
             }))}
           />
+        </section>
+      ) : activeTab === "visual_review" ? (
+        <section
+          id="qa-visual-review-panel"
+          role="tabpanel"
+          aria-labelledby="qa-visual-review-tab"
+          className="-mx-4 sm:-mx-6 -mb-6"
+        >
+          <VisualCmsReviewClient />
         </section>
       ) : (
         <section
