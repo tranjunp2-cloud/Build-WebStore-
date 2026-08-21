@@ -271,12 +271,12 @@ export function getMockRank(keyword: string): number {
  * Block IDs for the single-column dashboard stream (matches the Claude design).
  * Each block is a full-width section; `glance` holds the 4 stat cards as a unit.
  */
-export type DashboardBlockId = 'onboarding' | 'glance' | 'traffic' | 'seo' | 'tools' | 'orders'
+export type DashboardBlockId = 'onboarding' | 'glance' | 'traffic' | 'seo' | 'orders'
 
-const ALL_BLOCK_IDS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools', 'orders']
+const ALL_BLOCK_IDS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'orders']
 
-/** Default visible blocks, in order. `orders` (Coming Soon / F10) intentionally OFF. */
-export const DEFAULT_DASHBOARD_BLOCKS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools']
+/** Default visible blocks, in order. `orders` intentionally remains OFF by default. */
+export const DEFAULT_DASHBOARD_BLOCKS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo']
 
 /** Legacy stat-pref names saved before the revamp (stat-level granularity is gone). */
 const LEGACY_STAT_NAMES = new Set(['views', 'leads', 'engagement', 'revenue'])
@@ -308,7 +308,7 @@ export interface DashboardBlockMeta {
     icon: string
     /** key under i18n `dashboard.overview.customizeModal.blocks.*` */
     labelKey: string
-    /** Coming Soon block (F10) — rendered with overlay, default OFF */
+    /** Coming Soon block rendered with a locked preview. */
     soon?: boolean
 }
 
@@ -318,8 +318,7 @@ export const ALL_BLOCKS: DashboardBlockMeta[] = [
     { id: 'glance', icon: 'layout-grid', labelKey: 'glance' },
     { id: 'traffic', icon: 'bar-chart-3', labelKey: 'traffic' },
     { id: 'seo', icon: 'search-check', labelKey: 'seo' },
-    { id: 'tools', icon: 'wrench', labelKey: 'tools' },
-    { id: 'orders', icon: 'package-check', labelKey: 'orders', soon: true },
+    { id: 'orders', icon: 'package-check', labelKey: 'orders' },
 ]
 
 export interface CustomizeBlockRow extends DashboardBlockMeta {

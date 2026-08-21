@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { DirectUploadUnavailableError, useDirectUpload } from './use-direct-upload'
 
 type MediaDoc = {
     id: string | number
@@ -8,34 +9,41 @@ type MediaDoc = {
     [key: string]: unknown
 }
 
-/** XHR-based media upload with real progress tracking (0–100).
- * Progress caps at 95 during transfer; jumps to 100 when server responds. */
+/** Direct media upload with real progress tracking (0–100), plus a buffered
+ * route fallback for local development without object storage. */
 export function useUploadProgress() {
-    const [progress, setProgress] = useState(0)
-    const [isUploading, setIsUploading] = useState(false)
+    const {
+        upload: directUpload,
+        progress: directProgress,
+        isUploading: directUploading,
+        reset: resetDirect,
+    } = useDirectUpload()
+    const [legacyProgress, setLegacyProgress] = useState(0)
+    const [legacyUploading, setLegacyUploading] = useState(false)
 
     const reset = useCallback(() => {
-        setProgress(0)
-        setIsUploading(false)
-    }, [])
+        resetDirect()
+        setLegacyProgress(0)
+        setLegacyUploading(false)
+    }, [resetDirect])
 
-    const upload = useCallback((formData: FormData): Promise<MediaDoc> => {
+    const legacyUpload = useCallback((formData: FormData): Promise<MediaDoc> => {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest()
 
-            setIsUploading(true)
-            setProgress(0)
+            setLegacyUploading(true)
+            setLegacyProgress(0)
 
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     // Cap at 95 — leaves room for server-side S3 write
-                    setProgress(Math.min(95, Math.round((e.loaded / e.total) * 95)))
+                    setLegacyProgress(Math.min(95, Math.round((e.loaded / e.total) * 95)))
                 }
             })
 
             xhr.addEventListener('load', () => {
-                setProgress(100)
-                setIsUploading(false)
+                setLegacyProgress(100)
+                setLegacyUploading(false)
                 if (xhr.status >= 200 && xhr.status < 300) {
                     try {
                         resolve(JSON.parse(xhr.responseText))
@@ -53,17 +61,17 @@ export function useUploadProgress() {
             })
 
             xhr.addEventListener('error', () => {
-                setIsUploading(false)
+                setLegacyUploading(false)
                 reject(new Error('Network error during upload'))
             })
 
             xhr.addEventListener('abort', () => {
-                setIsUploading(false)
+                setLegacyUploading(false)
                 reject(new Error('Upload cancelled'))
             })
 
             xhr.addEventListener('timeout', () => {
-                setIsUploading(false)
+                setLegacyUploading(false)
                 reject(new Error('Upload timed out'))
             })
 
@@ -72,6 +80,27 @@ export function useUploadProgress() {
             xhr.send(formData)
         })
     }, [])
+
+    const upload = useCallback(async (formData: FormData): Promise<MediaDoc> => {
+        const file = formData.get('file')
+        if (!(file instanceof File)) throw new Error('No file provided')
+        const altRaw = formData.get('alt')
+        const alt = typeof altRaw === 'string' && altRaw.trim() ? altRaw.trim() : file.name
+
+        try {
+            return await directUpload(file, { alt })
+        } catch (err) {
+            // Local development can run without object storage. Only fall back
+            // when presigning was unavailable, before any object was uploaded.
+            if (err instanceof DirectUploadUnavailableError) {
+                return legacyUpload(formData)
+            }
+            throw err
+        }
+    }, [directUpload, legacyUpload])
+
+    const progress = legacyUploading ? legacyProgress : directProgress
+    const isUploading = legacyUploading || directUploading
 
     return { upload, progress, isUploading, reset }
 }

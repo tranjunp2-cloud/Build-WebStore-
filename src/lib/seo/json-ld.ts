@@ -8,7 +8,16 @@
  * arbitrary JS (stored XSS). Never inject raw template literals either.
  */
 
-import { schemaTypeForLocalBusiness, priceRangeForLocalBusinessCategory, dayOfWeekToSchema } from './schema-helpers'
+import {
+    dayOfWeekToSchema,
+    hasCompleteStructuredAddress,
+    hasValidGeoCoordinates,
+    isValidOpeningTimeRange,
+    normalizeHttpUrl,
+    priceRangeForLocalBusinessCategory,
+    schemaTypeForValidatedLocalBusiness,
+} from './schema-helpers'
+import { isCompatibleSchemaSubtype, type SchemaSubtype } from './local-business-constants'
 
 /**
  * Serialize a JSON-LD object for safe embedding inside a
@@ -28,7 +37,7 @@ export function serializeJsonLd(data: unknown): string {
 type BlockData = { blockType: string; [key: string]: unknown }
 
 type PageSchemaInput = {
-    blocks: BlockData[]
+    blocks: unknown
     site: Record<string, unknown>
     page: Record<string, unknown>
     isHomepage: boolean
@@ -45,9 +54,73 @@ export type LocalBusinessSiteData = {
     latitude?: number
     longitude?: number
     businessCategory?: string
+    schemaSubtype?: string
     priceRange?: string
     serviceAreaDescription?: string
     openingHours?: LocalBusinessOpeningHour[]
+}
+
+export type JsonLdNode = Record<string, unknown>
+
+export type ValidatedSubtypeEvidence = {
+    businessCategory: string
+    schemaSubtype: SchemaSubtype
+}
+
+export type SchemaGenerationArtifact = Readonly<{
+    strictLocalBusiness: JsonLdNode | null
+    organization: JsonLdNode | null
+    subtypeEvidence: ValidatedSubtypeEvidence | null
+}>
+
+function generateSafely(label: string, generator: () => JsonLdNode | null): JsonLdNode | null {
+    try { return generator() } catch { console.error(`[json-ld] ${label} generation failed`); return null }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0
+}
+function getHttpUrlValues(record: Record<string, unknown> | null): string[] {
+    return record
+        ? Object.values(record)
+            .map(normalizeHttpUrl)
+            .filter((value): value is string => Boolean(value))
+        : []
+}
+
+
+function getOptionalString(value: unknown): string | undefined {
+    return isNonEmptyString(value) ? value.trim() : undefined
+}
+
+function isBlockData(value: unknown): value is BlockData {
+    return isRecord(value) && typeof value.blockType === 'string'
+}
+
+function getOpeningHoursSpecifications(value: unknown): Record<string, unknown>[] {
+    if (!Array.isArray(value)) return []
+
+    const rows: unknown[] = value
+    return rows.flatMap(row => {
+        if (!isRecord(row) || row.isClosed === true) return []
+        if (!isValidOpeningTimeRange(row.opens, row.closes)) return []
+
+        const dayOfWeek = typeof row.dayOfWeek === 'string'
+            ? dayOfWeekToSchema(row.dayOfWeek)
+            : null
+        if (!dayOfWeek) return []
+
+        return [{
+            '@type': 'OpeningHoursSpecification',
+            dayOfWeek,
+            opens: row.opens,
+            closes: row.closes,
+        }]
+    })
 }
 
 /** True when `site.localBusiness` has enough data to be worth emitting on its
@@ -55,40 +128,42 @@ export type LocalBusinessSiteData = {
  *  LocalBusiness trigger (FR-04 AC-1). */
 export function hasMeaningfulLocalBusinessData(localBusiness: LocalBusinessSiteData | undefined): boolean {
     if (!localBusiness) return false
-    if (localBusiness.streetAddress) return true
-    return (localBusiness.openingHours || []).some(h => !h.isClosed && h.opens && h.closes)
+    if (isNonEmptyString(localBusiness.streetAddress)) return true
+    return getOpeningHoursSpecifications(localBusiness.openingHours).length > 0
 }
 
 // ── Schema Generators ──────────────────────────────────────────────────────
 
 export function generateOrganizationSchema(site: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
     if (!site) return null
-    const name = (site.name as string) || 'Business Name'
-    const url = (site.domain as string) ? `https://${site.domain}` : ''
-    const branding = site.branding as { logo?: string } | undefined
-    const contactInfo = site.contactInfo as { phone?: string; email?: string } | undefined
-    const socialLinks = site.socialLinks as Record<string, string | null | undefined> | undefined
+    const name = getOptionalString(site.name)
+    if (!name) return null
+    const url = normalizeHttpUrl(site.domain)
+    const branding = isRecord(site.branding) ? site.branding : null
+    const contactInfo = isRecord(site.contactInfo) ? site.contactInfo : null
+    const socialLinks = isRecord(site.socialLinks) ? site.socialLinks : null
+    const logo = normalizeHttpUrl(branding?.logo)
+    const telephone = getOptionalString(contactInfo?.phone)
+    const email = getOptionalString(contactInfo?.email)
 
-    const sameAs = socialLinks
-        ? Object.values(socialLinks).filter((v): v is string => Boolean(v))
-        : []
+    const sameAs = getHttpUrlValues(socialLinks)
 
     return {
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name,
         ...(url && { url }),
-        ...(branding?.logo ? { logo: branding.logo } : {}),
+        ...(logo && { logo }),
         ...(sameAs.length > 0 && { sameAs }),
-        ...(contactInfo?.phone && { telephone: contactInfo.phone }),
-        ...(contactInfo?.email && { email: contactInfo.email }),
+        ...(telephone && { telephone }),
+        ...(email && { email }),
     }
 }
 
 export function generateWebSiteSchema(site: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
     if (!site) return null
-    const name = (site.name as string) || 'Business Name'
-    const url = (site.domain as string) ? `https://${site.domain}` : ''
+    const name = getOptionalString(site.name) || 'Business Name'
+    const url = normalizeHttpUrl(site.domain)
 
     return {
         '@context': 'https://schema.org',
@@ -105,7 +180,7 @@ export function generateBreadcrumbSchema(
 ): Record<string, unknown> | null {
     if (!currentPage) return null
 
-    const baseUrl = siteUrl || ''
+    const baseUrl = getOptionalString(siteUrl) || ''
     const items: Record<string, unknown>[] = [
         {
             '@type': 'ListItem',
@@ -115,8 +190,8 @@ export function generateBreadcrumbSchema(
         },
     ]
 
-    const pageName = (currentPage.name as string) || (currentPage.slug as string) || ''
-    const pageSlug = (currentPage.slug as string) || ''
+    const pageName = getOptionalString(currentPage.name) || getOptionalString(currentPage.slug) || ''
+    const pageSlug = getOptionalString(currentPage.slug) || ''
     if (pageName && pageSlug !== 'home') {
         items.push({
             '@type': 'ListItem',
@@ -133,29 +208,31 @@ export function generateBreadcrumbSchema(
     }
 }
 
-export function generateFAQSchema(faqBlocks: BlockData[]): Record<string, unknown> | null {
-    if (!faqBlocks.length) return null
+export function generateFAQSchema(faqBlocks: unknown): Record<string, unknown> | null {
+    if (!Array.isArray(faqBlocks)) return null
 
-    // Merge FAQ items from all FAQ blocks into single schema (Scenario #28)
     const allItems: Record<string, unknown>[] = []
     const seenQuestions = new Set<string>()
+    const blocks: unknown[] = faqBlocks
 
-    for (const block of faqBlocks) {
-        const items = (block.items as Array<{ question?: string; answer?: string }>) || []
+    for (const block of blocks) {
+        if (!isRecord(block) || !Array.isArray(block.items)) continue
+        const items: unknown[] = block.items
         for (const item of items) {
-            const q = item.question || ''
-            if (q && !seenQuestions.has(q)) {
-                seenQuestions.add(q)
-                allItems.push({
-                    '@type': 'Question',
-                    name: q,
-                    acceptedAnswer: {
-                        '@type': 'Answer',
-                        // JSON.stringify in SiteRenderer handles XSS escaping
-                        text: item.answer || '',
-                    },
-                })
-            }
+            if (!isRecord(item)) continue
+            const question = typeof item.question === 'string' ? item.question : ''
+            if (!question) continue
+            if (seenQuestions.has(question)) continue
+
+            seenQuestions.add(question)
+            allItems.push({
+                '@type': 'Question',
+                name: question,
+                acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: typeof item.answer === 'string' ? item.answer : '',
+                },
+            })
         }
     }
 
@@ -174,60 +251,57 @@ export function generateLocalBusinessSchema(
 ): Record<string, unknown> | null {
     if (!contactBlock && !site) return null
 
-    const name = (site?.name as string) || 'Business'
-    const domain = site?.domain as string | undefined
-    const url = domain ? `https://${domain}` : ''
-    const contactInfo = site?.contactInfo as { phone?: string; email?: string; address?: string } | undefined
-    const socialLinks = site?.socialLinks as Record<string, string | null | undefined> | undefined
-    const localBusiness = site?.localBusiness as LocalBusinessSiteData | undefined
+    const name = getOptionalString(site?.name) || 'Business'
+    const url = normalizeHttpUrl(site?.domain)
+    const contactInfo = isRecord(site?.contactInfo) ? site.contactInfo : null
+    const socialLinks = isRecord(site?.socialLinks) ? site.socialLinks : null
+    const localBusiness = isRecord(site?.localBusiness) ? site.localBusiness : null
 
-    const phone = (contactBlock?.phone as string) || contactInfo?.phone || ''
-    const email = (contactBlock?.email as string) || contactInfo?.email || ''
+    const phone = getOptionalString(contactBlock?.phone)
+        || getOptionalString(contactInfo?.phone)
+        || ''
+    const email = getOptionalString(contactBlock?.email)
+        || getOptionalString(contactInfo?.email)
+        || ''
 
-    // BR-02: structured localBusiness address is the source of truth once the
-    // seller has entered one; legacy free-text (contactBlock/contactInfo) is
-    // only used as a fallback when the structured group is still empty.
+    const streetAddress = getOptionalString(contactInfo?.address)
+        || getOptionalString(localBusiness?.streetAddress)
+        || getOptionalString(contactBlock?.address)
+    const city = getOptionalString(localBusiness?.city)
+    const state = getOptionalString(localBusiness?.state)
+    const postcode = getOptionalString(localBusiness?.postcode)
+    const country = 'MY'
+
     let address: Record<string, unknown> | undefined
-    if (localBusiness?.streetAddress) {
+    if (streetAddress) {
         address = {
             '@type': 'PostalAddress',
-            streetAddress: localBusiness.streetAddress,
-            ...(localBusiness.city && { addressLocality: localBusiness.city }),
-            ...(localBusiness.state && { addressRegion: localBusiness.state }),
-            ...(localBusiness.postcode && { postalCode: localBusiness.postcode }),
-            ...(localBusiness.country && { addressCountry: localBusiness.country }),
+            streetAddress,
+            ...(city && { addressLocality: city }),
+            ...(state && { addressRegion: state }),
+            ...(postcode && { postalCode: postcode }),
+            ...(country && { addressCountry: country }),
         }
-    } else {
-        const legacyAddress = (contactBlock?.address as string) || contactInfo?.address || ''
-        if (legacyAddress) address = { '@type': 'PostalAddress', streetAddress: legacyAddress }
     }
 
-    const sameAs = socialLinks
-        ? Object.values(socialLinks).filter((v): v is string => Boolean(v))
-        : []
+    const sameAs = getHttpUrlValues(socialLinks)
 
-    // geo — GeoCoordinates only when both lat+lng are present, finite numbers.
-    const { latitude: lat, longitude: lng } = localBusiness || {}
-    const hasValidCoords = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)
+    const lat = localBusiness?.latitude
+    const lng = localBusiness?.longitude
+    const hasValidCoords = hasValidGeoCoordinates(lat, lng)
     const geo = hasValidCoords ? { '@type': 'GeoCoordinates', latitude: lat, longitude: lng } : undefined
-
-    // hasMap (US-F37-02 Additional Criteria): GBP/Waze URL take priority once
-    // those connections exist (US-F37-05/US-F37-09); until then, fall back to
-    // a plain Google Maps link derived from the coordinates the seller already entered.
     const hasMap = hasValidCoords ? `https://www.google.com/maps?q=${lat},${lng}` : undefined
 
-    // openingHoursSpecification — drop closed days and incomplete rows (AC-2).
-    const openingHoursSpecification = (localBusiness?.openingHours || [])
-        .filter(row => !row.isClosed && row.opens && row.closes)
-        .map(row => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: dayOfWeekToSchema(row.dayOfWeek), opens: row.opens, closes: row.closes }))
-        .filter((spec): spec is { '@type': string; dayOfWeek: string; opens: string; closes: string } => spec.dayOfWeek !== null)
-
-    const priceRange = localBusiness?.priceRange || priceRangeForLocalBusinessCategory(localBusiness?.businessCategory)
-    const areaServed = localBusiness?.serviceAreaDescription || undefined
+    const openingHoursSpecification = getOpeningHoursSpecifications(localBusiness?.openingHours)
+    const businessCategory = getOptionalString(localBusiness?.businessCategory)
+    const schemaSubtype = getOptionalString(localBusiness?.schemaSubtype)
+    const priceRange = getOptionalString(localBusiness?.priceRange)
+        || priceRangeForLocalBusinessCategory(businessCategory)
+    const areaServed = getOptionalString(localBusiness?.serviceAreaDescription)
 
     return {
         '@context': 'https://schema.org',
-        '@type': schemaTypeForLocalBusiness(localBusiness?.businessCategory),
+        '@type': schemaTypeForValidatedLocalBusiness(businessCategory, schemaSubtype),
         name,
         ...(url && { url }),
         ...(address && { address }),
@@ -244,20 +318,59 @@ export function generateLocalBusinessSchema(
     }
 }
 
+/** Emit the strict F37 v2 LocalBusiness node only when its identity contract
+ *  is complete. The legacy generator remains available for Contact blocks. */
+export function generateV2LocalBusinessSchema(
+    site: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+    if (!site || !isNonEmptyString(site.name)) return null
+
+    const localBusiness = isRecord(site.localBusiness)
+        ? site.localBusiness
+        : null
+    const contactInfo = isRecord(site.contactInfo) ? site.contactInfo : null
+    const normalizedAddress = {
+        ...localBusiness,
+        streetAddress: getOptionalString(contactInfo?.address)
+            || getOptionalString(localBusiness?.streetAddress),
+        country: 'MY',
+    }
+    if (!hasCompleteStructuredAddress(normalizedAddress)) return null
+
+    return generateLocalBusinessSchema(null, site)
+}
+
+export function generateSchemaGenerationArtifact(
+    site: Record<string, unknown> | null | undefined,
+): SchemaGenerationArtifact {
+    const strictLocalBusiness = generateSafely('LocalBusiness', () => generateV2LocalBusinessSchema(site))
+    const organization = generateSafely('Organization', () => generateOrganizationSchema(site))
+    const localBusiness = isRecord(site?.localBusiness) ? site.localBusiness : null
+    const businessCategory = getOptionalString(localBusiness?.businessCategory)
+    const schemaSubtype = getOptionalString(localBusiness?.schemaSubtype)
+    const subtypeEvidence = strictLocalBusiness && businessCategory
+        && isCompatibleSchemaSubtype(businessCategory, schemaSubtype)
+        ? { businessCategory, schemaSubtype }
+        : null
+
+    return Object.freeze({ strictLocalBusiness, organization, subtypeEvidence })
+}
+
 export function generateWebPageSchema(
     page: Record<string, unknown> | null | undefined,
     site: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | null {
     if (!page) return null
 
-    const seo = page.seo as { title?: string; description?: string } | undefined
-    const name = seo?.title || (page.name as string) || ''
-    const description = seo?.description || ''
-    const siteDomain = site?.domain as string | undefined
-    const siteUrl = siteDomain ? `https://${siteDomain}` : ''
-    const slug = (page.slug as string) || ''
-    const url = slug === 'home' ? siteUrl : `${siteUrl}/${slug}`
-    const siteName = (site?.name as string) || ''
+    const seo = isRecord(page.seo) ? page.seo : null
+    const name = getOptionalString(seo?.title) || getOptionalString(page.name) || ''
+    const description = getOptionalString(seo?.description) || ''
+    const siteUrl = normalizeHttpUrl(site?.domain)
+    const slug = getOptionalString(page.slug) || ''
+    const url = siteUrl
+        ? (slug === 'home' ? siteUrl : siteUrl + '/' + slug)
+        : undefined
+    const siteName = getOptionalString(site?.name) || ''
 
     return {
         '@context': 'https://schema.org',
@@ -274,44 +387,48 @@ export function generateWebPageSchema(
 
 export function generatePageSchemas({ blocks, site, page, isHomepage }: PageSchemaInput): Record<string, unknown>[] {
     const schemas: Record<string, unknown>[] = []
+    const artifact = isHomepage ? generateSchemaGenerationArtifact(site) : null
 
     try {
         // BreadcrumbList — every page
-        const breadcrumb = generateBreadcrumbSchema(null, page, (site?.domain as string) ? `https://${site.domain}` : '')
+        const safeBlocks = Array.isArray(blocks)
+            ? (blocks as unknown[]).filter(isBlockData)
+            : []
+
+        const siteDomain = getOptionalString(site?.domain)
+        const breadcrumb = generateSafely('Breadcrumb', () => generateBreadcrumbSchema(null, page, normalizeHttpUrl(siteDomain) || ''))
         if (breadcrumb) schemas.push(breadcrumb)
 
         // Organization + WebSite — homepage only
         if (isHomepage) {
-            const org = generateOrganizationSchema(site)
-            if (org) schemas.push(org)
-            const ws = generateWebSiteSchema(site)
+            const organization = artifact?.organization
+            if (organization) schemas.push(organization)
+            const ws = generateSafely('WebSite', () => generateWebSiteSchema(site))
             if (ws) schemas.push(ws)
         }
 
         // WebPage — non-homepage pages
         if (!isHomepage) {
-            const wp = generateWebPageSchema(page, site)
+            const wp = generateSafely('WebPage', () => generateWebPageSchema(page, site))
             if (wp) schemas.push(wp)
         }
 
         // FAQPage — if any FAQ blocks present (merged into single schema)
-        const faqBlocks = blocks.filter(b => b.blockType === 'faq')
+        const faqBlocks = safeBlocks.filter(b => b.blockType === 'faq')
         if (faqBlocks.length > 0) {
-            const faq = generateFAQSchema(faqBlocks)
+            const faq = generateSafely('FAQPage', () => generateFAQSchema(faqBlocks))
             if (faq) schemas.push(faq)
         }
 
-        // LocalBusiness — Contact block present, OR homepage with meaningful
-        // structured localBusiness data (FR-04 AC-1). Build once, push once —
-        // no double injection when both conditions are true simultaneously.
-        const contactBlock = blocks.find(b => b.blockType === 'contact')
-        const localBusiness = site?.localBusiness as LocalBusinessSiteData | undefined
-        if (contactBlock || (isHomepage && hasMeaningfulLocalBusinessData(localBusiness))) {
-            const lb = generateLocalBusinessSchema(contactBlock, site)
-            if (lb) schemas.push(lb)
-        }
+        // Homepage prefers the strict v2 node. Contact blocks retain legacy
+        // rendering only when the strict contract is unavailable.
+        const contactBlock = safeBlocks.find(b => b.blockType === 'contact')
+        const localBusiness = artifact?.strictLocalBusiness ?? null
+        const localBusinessFallback = localBusiness
+            || (contactBlock ? generateSafely('legacy LocalBusiness', () => generateLocalBusinessSchema(contactBlock, site)) : null)
+        if (localBusinessFallback) schemas.push(localBusinessFallback)
     } catch {
-        // Schema generation should never crash the page
+        console.error('[json-ld] Schema generation failed')
     }
 
     return schemas

@@ -34,6 +34,9 @@ export interface LocaleStructuralStrings {
     }
     footer: {
         exploreLabel: string
+        companyLabel?: string
+        supportLabel?: string
+        legalLabel?: string
         allRightsReserved: string
     }
 }
@@ -168,6 +171,9 @@ export function resolveLocaleStructuralStrings(
         },
         footer: {
             exploreLabel: strings.footer.explore,
+            companyLabel: strings.footer.company,
+            supportLabel: strings.footer.support,
+            legalLabel: strings.footer.legal,
             allRightsReserved: strings.footer.allRightsReserved,
         },
     }

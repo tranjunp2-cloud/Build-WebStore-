@@ -1,36 +1,89 @@
 'use client'
 
-/**
- * Pending orders — Coming Soon, default OFF in the Customize modal.
- * Renders an illustrative locked preview (clearly marked "Coming Soon").
- * All text driven by t.dashboard.revamp.orders.* and t.dashboard.revamp.comingSoon.
- */
+import Link from 'next/link'
+import { CircleAlert, PackageOpen } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { SectionHead, ComingSoonCorner } from './atoms'
+import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
+import { SectionHead } from './atoms'
 
-export function PendingOrders() {
-    const { t, ti } = useI18n()
-    const r = t.dashboard.revamp
+function PendingOrdersUnavailable({
+    title,
+    description,
+}: {
+    title: string
+    description: string
+}) {
+    return (
+        <div className="card po-state po-unavailable" role="status">
+            <span className="po-state-icon"><CircleAlert aria-hidden /></span>
+            <h3>{title}</h3>
+            <p>{description}</p>
+        </div>
+    )
+}
+
+export function PendingOrders({ data }: { data: PendingOrdersLoadState }) {
+    const { locale, t, tp } = useI18n()
+    const ordersT = t.dashboard.revamp.orders
+
+    const right = data.state === 'ready'
+        ? <span className="po-count">{tp(ordersT.count, data.totalCount)}</span>
+        : undefined
 
     return (
-        <div className="section">
-            <SectionHead icon="package-check" title={r.orders.title} sub={r.orders.subtitle} />
-            <div className="card cs-wrap locked" style={{ padding: 0 }}>
-                <div className="cs-content card-pad">
-                    <div className="tp-list">
-                        {[1, 2, 3].map(i => (
-                            <div className="tp-row" key={i} style={{ gridTemplateColumns: 'auto 1fr auto auto' }}>
-                                <span className="tp-rank">#{20480 + i}</span>
-                                <span className="tp-name">{ti(r.orders.mockOrder, { count: i + 1 })}</span>
-                                <span className="cs-badge" style={{ background: 'var(--dr-warning-bg)', color: 'var(--dr-warning-fg)', borderColor: 'var(--dr-warning-bd)' }}>{r.orders.awaiting}</span>
-                                <span className="tp-views">RM {120 + i * 40}</span>
-                            </div>
-                        ))}
+        <section className="section">
+            <SectionHead
+                icon="package-check"
+                title={ordersT.title}
+                sub={ordersT.subtitle}
+                right={right}
+            />
+
+            {data.state === 'unavailable' ? (
+                <PendingOrdersUnavailable
+                    title={ordersT.unavailableTitle}
+                    description={ordersT.unavailableDesc}
+                />
+            ) : data.orders.length === 0 ? (
+                <div className="card">
+                    <div className="empty-block" role="status">
+                        <span className="eb-ic"><PackageOpen aria-hidden /></span>
+                        <h5>{ordersT.emptyTitle}</h5>
+                        <p>{ordersT.emptyDesc}</p>
                     </div>
                 </div>
-                <ComingSoonCorner label={r.comingSoon} tip={r.orders.soonTip} />
-                <div className="cs-lockzone" />
-            </div>
-        </div>
+            ) : (
+                <div className="card po-card">
+                    <div className="po-list">
+                        {data.orders.slice(0, 5).map(order => {
+                            const itemCount = tp(ordersT.items, order.itemCount)
+                            const total = new Intl.NumberFormat(
+                                locale === 'ms' ? 'ms-MY' : 'en-MY',
+                                {
+                                    style: 'currency',
+                                    currency: order.currency,
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                }
+                            ).format(order.total)
+
+                            return (
+                                <Link
+                                    className="po-row"
+                                    href={`/orders/${encodeURIComponent(String(order.id))}`}
+                                    key={order.id}
+                                    aria-label={`${order.orderNumber}, ${itemCount}, ${total}, ${ordersT.awaiting}`}
+                                >
+                                    <span className="po-number">{order.orderNumber}</span>
+                                    <span className="po-items">{itemCount}</span>
+                                    <span className="po-total">{total}</span>
+                                    <span className="po-status">{ordersT.awaiting}</span>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+        </section>
     )
 }

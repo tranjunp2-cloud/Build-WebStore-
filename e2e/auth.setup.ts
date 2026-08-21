@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { assertAllowedAuthenticatedE2ETarget } from './helpers/authenticated-target'
 
 const AUTH_FILE = './e2e/.auth/user.json'
 
@@ -13,7 +14,9 @@ const AUTH_FILE = './e2e/.auth/user.json'
  * TC-F02.19: Login happy path
  * TC-F02.23: OTP verification
  */
-setup('authenticate', async ({ page }) => {
+setup('authenticate', async ({ page }, testInfo) => {
+    assertAllowedAuthenticatedE2ETarget(testInfo.project.use.baseURL)
+
     const email = process.env.TEST_EMAIL
     const password = process.env.TEST_PASSWORD
     if (!email || !password) {
@@ -40,7 +43,16 @@ setup('authenticate', async ({ page }) => {
     // Handle OTP verification
     const currentUrl = page.url()
     if (currentUrl.includes('/verify-otp')) {
-        const otpCode = process.env.E2E_TEST_OTP_CODE
+        const configuredOtpCode = process.env.E2E_TEST_OTP_CODE
+        const isLocalTarget = testInfo.project.use.baseURL?.includes('localhost')
+        // Local development intentionally accepts any six-digit OTP. This
+        // keeps the harness deterministic when a non-numeric CI placeholder
+        // exists in .env.local, without weakening a deployed environment.
+        const otpCode = /^\d{6}$/.test(configuredOtpCode ?? '')
+            ? configuredOtpCode
+            : isLocalTarget
+                ? '000000'
+                : undefined
         if (!otpCode) {
             console.warn('[Auth Setup] OTP page reached but E2E_TEST_OTP_CODE not set — cannot auto-verify')
             await page.context().storageState({ path: AUTH_FILE })
@@ -67,7 +79,17 @@ setup('authenticate', async ({ page }) => {
         // Submit OTP — click verify button or wait for auto-submit
         const verifyBtn = page.locator('button[type="submit"], button:has-text("Verify"), button:has-text("Submit")').first()
         if (await verifyBtn.isVisible()) {
-            await verifyBtn.click()
+            // The OTP page can redirect synchronously after the last digit is
+            // entered. Do not fail setup if that successful navigation detaches
+            // the button while Playwright is completing the click.
+            try {
+                await verifyBtn.click({ noWaitAfter: true })
+            } catch (error) {
+                const pathname = new URL(page.url()).pathname
+                if (!['/dashboard', '/builder', '/onboarding'].some((path) => pathname.includes(path))) {
+                    throw error
+                }
+            }
         }
 
         // Wait for redirect to dashboard

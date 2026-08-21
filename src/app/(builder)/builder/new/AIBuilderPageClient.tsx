@@ -706,8 +706,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         )
 
         if (!decision.requiresConfirmation) {
-            prepareGenerationSession(info)
-            void startSSEGeneration(info, undefined, briefSnapshot, decision.locale)
+            const apiLanguage = (['en', 'ms', 'vi'] as const).includes(
+                decision.locale as 'en' | 'ms' | 'vi',
+            )
+                ? decision.locale as 'en' | 'ms' | 'vi'
+                : 'auto'
+            const resolvedInfo: BusinessInfo = { ...info, language: apiLanguage }
+            prepareGenerationSession(resolvedInfo)
+            void startSSEGeneration(
+                resolvedInfo,
+                undefined,
+                briefSnapshot,
+                decision.locale,
+            )
             return
         }
 

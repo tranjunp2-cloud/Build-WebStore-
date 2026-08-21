@@ -8,7 +8,20 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, photoMatchesTerms, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER, __resetPixabayCircuitForTests } from '@/lib/ai/pixabay-client'
+import {
+    searchPhotos,
+    downloadPhotoBuffer,
+    detectQueryLang,
+    photoMatchesQuery,
+    photoMatchesTerms,
+    PixabayError,
+    PIXABAY_CATEGORY_BY_COMPOSER,
+    __resetPixabayCircuitForTests,
+    createPixabaySearchBudget,
+    withPixabaySearchBudget,
+    registerPixabayMediaSource,
+    markPixabayMediaUsed,
+} from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -61,12 +74,14 @@ function makeDownloadResponse(data: Uint8Array, mimeType = 'image/jpeg') {
 // ── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
+    delete process.env.PIXABAY_API_KEYS
     process.env.PIXABAY_API_KEY = DUMMY_KEY
     __resetPixabayCircuitForTests()
     vi.mocked(fetch).mockReset()
 })
 
 afterEach(() => {
+    delete process.env.PIXABAY_API_KEYS
     delete process.env.PIXABAY_API_KEY
     vi.useRealTimers()
 })
@@ -74,6 +89,114 @@ afterEach(() => {
 // ── searchPhotos ─────────────────────────────────────────────────────────────
 
 describe('searchPhotos', () => {
+    it('[TC-PIXABAY-KEY-RING-01] rotates configured keys for consecutive searches', async () => {
+        process.env.PIXABAY_API_KEYS = [
+            'a'.repeat(20),
+            'b'.repeat(20),
+            'c'.repeat(20),
+        ].join(',')
+        __resetPixabayCircuitForTests()
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        await searchPhotos('bakery hero', 1)
+        await searchPhotos('bakery products', 1)
+        await searchPhotos('bakery gallery', 1)
+
+        const usedKeys = vi.mocked(fetch).mock.calls.map(([input]) =>
+            new URL(input as string).searchParams.get('key'),
+        )
+        expect(usedKeys).toEqual(['a'.repeat(20), 'b'.repeat(20), 'c'.repeat(20)])
+    })
+
+    it('[TC-PIXABAY-KEY-RING-02] skips a rate-limited key on later searches', async () => {
+        process.env.PIXABAY_API_KEYS = ['a'.repeat(20), 'b'.repeat(20)].join(',')
+        __resetPixabayCircuitForTests()
+        vi.mocked(fetch)
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 429,
+                headers: new Headers({ 'x-ratelimit-reset': '60' }),
+            } as unknown as Response)
+            .mockResolvedValueOnce(makeApiResponse([makeHit(2)]))
+
+        await expect(searchPhotos('first query', 1)).rejects.toMatchObject({
+            code: 'RATE_LIMITED',
+        })
+        await expect(searchPhotos('second query', 1)).resolves.toHaveLength(1)
+
+        const usedKeys = vi.mocked(fetch).mock.calls.map(([input]) =>
+            new URL(input as string).searchParams.get('key'),
+        )
+        expect(usedKeys).toEqual(['a'.repeat(20), 'b'.repeat(20)])
+    })
+
+    it('[TC-PIXABAY-BUDGET-01] limits one website generation to one search request', async () => {
+        const budget = createPixabaySearchBudget(1)
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        const results = await withPixabaySearchBudget(budget, async () => Promise.all([
+            searchPhotos('bakery hero', 1),
+            searchPhotos('bakery product', 1),
+            searchPhotos('bakery blog', 1),
+        ]))
+
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+        expect(results.map((photos) => photos.length)).toEqual([1, 0, 0])
+        expect(budget).toMatchObject({ limit: 1, used: 1, skipped: 2 })
+        expect([...budget.searchResultPixabayUrls]).toEqual([
+            'https://pixabay.com/get/photo-1_1280.jpg',
+        ])
+    })
+
+    it('[TC-PIXABAY-BUDGET-02] isolates budgets for concurrent website generations', async () => {
+        const first = createPixabaySearchBudget(1)
+        const second = createPixabaySearchBudget(1)
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        await Promise.all([
+            withPixabaySearchBudget(first, async () => {
+                await searchPhotos('first hero', 1)
+                await searchPhotos('first extra', 1)
+            }),
+            withPixabaySearchBudget(second, async () => {
+                await searchPhotos('second hero', 1)
+                await searchPhotos('second extra', 1)
+            }),
+        ])
+
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+        expect(first).toMatchObject({ used: 1, skipped: 1 })
+        expect(second).toMatchObject({ used: 1, skipped: 1 })
+    })
+
+    it('[TC-PIXABAY-BUDGET-03] does not retry a failed network request inside a budget', async () => {
+        const budget = createPixabaySearchBudget(2)
+        vi.mocked(fetch).mockRejectedValue(new Error('network unavailable'))
+
+        await expect(
+            withPixabaySearchBudget(budget, () => searchPhotos('bakery', 1)),
+        ).rejects.toMatchObject({ code: 'SERVER_ERROR' })
+
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+        expect(budget.used).toBe(1)
+    })
+
+    it('[TC-PIXABAY-BUDGET-06] records rate limiting on the active generation budget', async () => {
+        const budget = createPixabaySearchBudget(2)
+        vi.mocked(fetch).mockResolvedValue({
+            ok: false,
+            status: 429,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+        } as Response)
+
+        await expect(
+            withPixabaySearchBudget(budget, () => searchPhotos('bakery', 1)),
+        ).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 })
+
+        expect(budget.rateLimited).toBe(true)
+        expect([...budget.providerErrorCodes]).toEqual(['RATE_LIMITED'])
+    })
+
     it('[TC-F38-PIXABAY-01] maps API hits to PixabayPhoto shape', async () => {
         // Arrange
         const hit = makeHit(42)
@@ -309,7 +432,7 @@ describe('searchPhotos', () => {
         expect(Number(url.searchParams.get('per_page'))).toBe(6)
     })
 
-    it('[TC-F38-PIXABAY-06] 429 opens the circuit without retrying', async () => {
+    it('[TC-F38-PIXABAY-06] 429 cools down the affected key without retrying', async () => {
         // Arrange
         vi.mocked(fetch).mockResolvedValue({
             ok: false,
@@ -323,7 +446,7 @@ describe('searchPhotos', () => {
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
 
-    it('[TC-GENPERF-W3-09] opens the circuit only after repeated 503 responses', async () => {
+    it('[TC-GENPERF-W3-09] cools down a key only after repeated 503 responses', async () => {
         vi.mocked(fetch).mockResolvedValue({
             ok: false,
             status: 503,
@@ -364,7 +487,7 @@ describe('searchPhotos', () => {
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
 
-    it('[TC-GENPERF-W3-18] one timeout does not open the process-wide circuit', async () => {
+    it('[TC-GENPERF-W3-18] one timeout does not cool down the selected key', async () => {
         const timeoutErr = new Error('slow query')
         timeoutErr.name = 'TimeoutError'
         vi.mocked(fetch)
@@ -380,6 +503,47 @@ describe('searchPhotos', () => {
 // ── downloadPhotoBuffer ───────────────────────────────────────────────────────
 
 describe('downloadPhotoBuffer', () => {
+    it('[TC-PIXABAY-BUDGET-04] records only Pixabay URLs whose Media IDs are used', () => {
+        const budget = createPixabaySearchBudget(2, 'req-123')
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+        withPixabaySearchBudget(budget, () => {
+            registerPixabayMediaSource(101, 'https://cdn.pixabay.com/used.jpg')
+            registerPixabayMediaSource(102, 'https://pixabay.com/downloaded-but-unused.jpg')
+            registerPixabayMediaSource(103, 'https://images.unsplash.com/fallback.jpg')
+            markPixabayMediaUsed([101, 103, 999])
+        })
+
+        expect([...budget.usedPixabayUrls]).toEqual(['https://cdn.pixabay.com/used.jpg'])
+        expect([...budget.uploadedPixabayUrls]).toEqual([
+            'https://cdn.pixabay.com/used.jpg',
+            'https://pixabay.com/downloaded-but-unused.jpg',
+        ])
+        expect(budget).toMatchObject({
+            uploadedPixabayCount: 2,
+            assignedPixabaySlots: 1,
+        })
+        expect(budget.mediaSourceUrls.has(103)).toBe(false)
+        infoSpy.mockRestore()
+    })
+
+    it('[TC-PIXABAY-BUDGET-05] logs every successful Pixabay download with its full URL', async () => {
+        const budget = createPixabaySearchBudget(2, 'req-download')
+        const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+        const fakeData = new Uint8Array([0xff, 0xd8, 0xff, 0xe0])
+        vi.mocked(fetch).mockResolvedValue(makeDownloadResponse(fakeData))
+
+        await withPixabaySearchBudget(budget, () =>
+            downloadPhotoBuffer('https://pixabay.com/get/full-photo_1280.jpg'),
+        )
+
+        expect(budget.downloadedPixabayCount).toBe(1)
+        expect([...budget.downloadedPixabayUrls]).toEqual([
+            'https://pixabay.com/get/full-photo_1280.jpg',
+        ])
+        infoSpy.mockRestore()
+    })
+
     it('[TC-F38-PIXABAY-07] non-allowlisted host → throws PixabayError SSRF_BLOCKED without fetching', async () => {
         // Act + Assert
         await expect(
@@ -469,6 +633,12 @@ describe('TC-GH1611 — photoMatchesTerms (term-aware gate)', () => {
         // have let this back in — hence the head-noun requirement ("tộ" is absent).
         expect(photoMatchesTerms('cá cơm, anchovy, dried fish', ['cơm cá kho tộ'])).toBe(false)
         expect(photoMatchesTerms('cơm tấm, sườn nướng, món việt', ['cơm tấm sườn nướng'])).toBe(true)
+    })
+
+    it('[TC-GH1611-31] anchors Vietnamese rice dishes on the protein, not the cooking method', () => {
+        expect(photoMatchesTerms('cơm, sườn heo, món việt', ['cơm sườn nướng'])).toBe(true)
+        expect(photoMatchesTerms('cơm, nướng, bếp than', ['cơm sườn nướng'])).toBe(false)
+        expect(photoMatchesTerms('cơm, gà, món việt', ['cơm gà chiên'])).toBe(true)
     })
 
     it('[TC-GH1611-27] matches whole tag tokens, not substrings', () => {

@@ -3,6 +3,15 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+const SHA1_HEX_SIGNATURE = /^[0-9a-f]{40}$/i
+
+function safeEqual(expected: string, received: string): boolean {
+    const expectedBuffer = Buffer.from(expected, 'hex')
+    const receivedBuffer = Buffer.from(received, 'hex')
+    if (expectedBuffer.length !== receivedBuffer.length) return false
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
+}
+
 /**
  * POST /api/webhooks/vercel
  *
@@ -15,16 +24,21 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(req: Request) {
     try {
-        const body = await req.text()
-
-        // Verify webhook signature
         const signature = req.headers.get('x-vercel-signature')
         const secret = process.env.VERCEL_WEBHOOK_SECRET
-        if (secret && signature) {
-            const hash = crypto.createHmac('sha1', secret).update(body).digest('hex')
-            if (hash !== signature) {
-                return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-            }
+
+        // Webhook authentication is mandatory. Do not parse or forward an
+        // unauthenticated payload when the sender omits the signature or this
+        // deployment is missing its configured secret.
+        if (!secret || !signature) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const body = await req.text()
+
+        const hash = crypto.createHmac('sha1', secret).update(body).digest('hex')
+        if (!SHA1_HEX_SIGNATURE.test(signature) || !safeEqual(hash, signature)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         const payload = JSON.parse(body)

@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-07-07 (Phase 05 section added)
+last_updated: 2026-08-05 (US-F37-04 Phase 3 implementation complete; external closeout pending)
 ---
 
 # F37 — Local Business Data Model (Local SEO)
@@ -23,14 +23,15 @@ Payload collection field (nested object) persists seller-entered data:
 
 ```typescript
 type LocalBusinessSiteData = {
-    streetAddress?: string
+    streetAddress?: string          // legacy fallback; not rendered in current Editor UI
     city?: string
     state?: string
     postcode?: string
-    country?: string
+    country?: string                // legacy persisted value; emitted country is implicitly MY
     latitude?: number
     longitude?: number
-    businessCategory?: string     // e.g. 'foodEstablishment', 'medicalClinic'
+    businessCategory?: string     // broad seller-facing category
+    schemaSubtype?: string        // compatible specific LocalBusiness subtype
     priceRange?: string          // e.g. '$$', '$$$'
     serviceAreaDescription?: string
     openingHours?: Array<{
@@ -43,6 +44,8 @@ type LocalBusinessSiteData = {
 ```
 
 Stored in `Sites` collection under the `localBusiness` group field (Payload schema, Phase 01 — `src/collections/Sites.ts`). Nested `openingHours` array persists to its own table (`sites_local_business_opening_hours`). Save-route validation via Zod (`localBusinessSchema` in `src/lib/validations/sites.ts`, Phase 02). Field is optional; existing sites without it are unaffected.
+
+The current Editor does not duplicate Street Address or Country inside Local Business Info. `site.contactInfo.address` is the canonical seller-edited street-address source; `localBusiness.streetAddress` remains a read-only legacy fallback for existing sites. Malaysia is the product default, so JSON-LD emits `addressCountry: "MY"` without rendering or requiring a Country control.
 
 ## Phase 04: JSON-LD Emission
 
@@ -70,7 +73,7 @@ Emits base `Organization` schema with name, URL, logo, contact info, and social 
     "addressLocality": "...",
     "addressRegion": "...",
     "postalCode": "...",
-    "addressCountry": "..."
+    "addressCountry": "MY"
   },
   "geo": {
     "@type": "GeoCoordinates",
@@ -92,8 +95,8 @@ Emits base `Organization` schema with name, URL, logo, contact info, and social 
 ```
 
 **Key behaviors:**
-- **@type selection:** Derived from `businessCategory` enum (e.g. `foodEstablishment` → `Restaurant`). See category mappings below.
-- **PostalAddress:** Full structure from `localBusiness` fields when `streetAddress` is set (sub-fields like `addressLocality`/`addressRegion` are omitted entirely, not emitted empty, when their source field is blank — conditional-spread pattern). Falls back to the legacy free-text `contactInfo.address` (bare `streetAddress` only) when `localBusiness.streetAddress` itself is empty — this REPLACES, not merges with, the legacy field once structured data exists (BR-02).
+- **@type selection:** Emit the validated `schemaSubtype`; when empty, emit generic `LocalBusiness`. `businessCategory` filters the subtype dropdown but never directly sets `@type`.
+- **PostalAddress:** `contactInfo.address` is the canonical `streetAddress`; legacy `localBusiness.streetAddress` is used only when the canonical value is empty. City/state/postcode continue to come from `localBusiness`, blank optional sub-fields are omitted, and `addressCountry` is always the implicit Malaysia code `MY`.
 - **GeoCoordinates:** Populated from seller's Maps link extraction (Phase 03 resolver) or manual lat/lng entry.
 - **OpeningHoursSpecification:** Filtered array, excluding days marked `isClosed: true`. Day-of-week codes (Mo/Tu) mapped to Schema.org names (Monday/Tuesday). Empty array if no open hours provided.
 - **priceRange:** Seller-entered value, or fallback heuristic per category.
@@ -104,7 +107,7 @@ Emits base `Organization` schema with name, URL, logo, contact info, and social 
 Emits `WebPage` schema (name, description, url, isPartOf) for non-homepage pages. Orthogonal to LocalBusiness. Breadcrumbs are a separate schema (`generateBreadcrumbSchema`), emitted independently for every page — not nested inside WebPage.
 
 #### `generatePageSchemas(input)`
-Orchestrator that calls all generators (Breadcrumb, Organization/WebSite on homepage, WebPage on subpages, FAQPage if FAQ blocks present, LocalBusiness per the trigger below) and returns the aggregated schema array. Called by `SiteRenderer` at render time.
+Orchestrator that calls the F37 generators (Organization/WebSite on homepage, WebPage on subpages, and LocalBusiness per the trigger below) and returns the aggregated schema array. Called by `SiteRenderer` at render time.
 
 ### Category Mapping: Two Separate Vocabularies
 
@@ -119,12 +122,14 @@ Loose, human-friendly codes used by the AI site builder's composer:
 - Examples: 'restaurant' → 'Restaurant', 'health' → 'MedicalClinic', 'ecommerce' → 'Store'
 - **Moved to `schema-helpers.ts`** from `json-ld-templates.ts` (Phase 04 refactor; no behavior change)
 
-#### F37 Local Business Categories (Phase 03)
-Pre-shaped Schema.org enum values, designed for 1:1 direct mapping:
-- Input: `businessCategory` (enum in Phase 03 accordion) = 'localBusiness', 'store', 'restaurant', 'foodEstablishment', 'medicalClinic', 'professionalService', 'automotiveBusiness', 'homeAndConstructionBusiness', 'financialService', 'healthAndBeautyBusiness'
-- Mapping: `schemaTypeForLocalBusiness(businessCategory)` → Schema.org @type
-- Examples: 'foodEstablishment' → 'FoodEstablishment', 'medicalClinic' → 'MedicalClinic'
-- Fallback: 'localBusiness' or unrecognized → 'LocalBusiness' (generic; Google accepts as valid fallback)
+#### F37 Local Business Category → Subtype
+
+- `businessCategory`: broad seller-facing category used to filter the next field.
+- `schemaSubtype`: one primary, specific LocalBusiness type selected from the compatible dropdown.
+- Source of truth: [`F37-local-business-subtype-mapping-v2.6.md`](./F37-local-business-subtype-mapping-v2.6.md), a versioned category→subtype mapping snapshot built from Google Local Business guidance and the Schema.org LocalBusiness hierarchy; never fetched at request time.
+- Mapping validation is shared by Editor filtering and the save boundary. An incompatible pair is rejected server-side.
+- Category change preserves a compatible subtype; otherwise clears it. Empty subtype emits `LocalBusiness` and earns no subtype points.
+- `priceRangeForLocalBusinessCategory()` continues to derive only the price fallback from the broad category.
 
 **Why separate?** The two paths (AI-gen and F37) use different input vocabularies designed for their respective UX contexts. Unifying them would require either:
 1. Forcing AI-gen sellers to choose from Schema.org-shaped categories (poor UX), or
@@ -147,7 +152,7 @@ At page render time:
    ```
 
 **Loosened trigger (Phase 04):** LocalBusiness now emits whenever:
-- `site.localBusiness` has meaningful data (street address OR non-closed opening hours), **OR**
+- `site.localBusiness` has meaningful legacy-compatible data (legacy street address OR non-closed opening hours), **OR**
 - Contact block exists on page (pre-existing, unchanged)
 
 Previously, LocalBusiness only appeared if a Contact block was present. This change allows standalone sites without Contact blocks to still emit LocalBusiness if sellers fill Phase 03's accordion.
@@ -166,65 +171,48 @@ JSON-LD scripts are embedded via `dangerouslySetInnerHTML`. Tenant-controlled st
 
 This is mandatory for safe embedding. Never use plain `JSON.stringify()` or template literals for JSON-LD injection.
 
-## Phase 05: Local SEO Score Backend
+## Phase 05: Authoritative Local SEO Score and Unified Dashboard
 
-### Scoring Engine
+### Runtime scoring contract
 
-**File:** `src/lib/seo/local-seo-score.ts`
+**Files:** `src/lib/seo/local-seo-score.ts`, `src/lib/seo/local-seo-evaluation.ts`, `src/lib/seo/local-seo-score-contract.ts`
 
-Exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult` — a pure function implementing the points-subtraction model from PRD §13.8 (start 100, deduct for missing signals). Returns:
-- `score`: integer 0–100 (clamped)
-- `breakdown`: object with per-bucket scores for diagnostics
+The runtime score is additive and exact: Business Data 20 + Schema 35 + AI Discoverability 15 + Technical Health 30 = 100. The authenticated response is runtime-validated and includes `score`, the four-bucket `breakdown`, every deduplicated seller-owned issue, `aiFixableItemCount`, `evaluatedAt`, and a SHA-256 `revisionToken`. Loading and error responses never invent a score.
 
-**Input:** business + structured + AI signals, plus F03 technical inputs (or precomputed `f03Technical` 0–100):
-- 7 business data signals (businessName, address, phone, hours, category, website, description) — 5 pts each
-- 4 structured data signals (localBusinessSchema, industrySubtype, faqSchema, orgSchema) with weighted deductions (10/5/8/7)
-- 2 AI discoverability signals (allowsSearchBots, sitemapPresent) — 12/8 pts
-- **Technical Health:** reuse F03 `calculateTechnicalSeoScore()` (OG image, Google verification, bad slugs, noIndex) then scale → 15 pts
-
-**Bucket breakdown:**
 | Bucket | Max | Composition |
-|--------|-----|-------------|
-| Business Data | 35 | 7 signals × 5 pts each |
-| Structured Data | 30 | LocalBusiness schema 10 + industry subtype 5 + FAQ 8 + Organization 7 |
-| AI Discoverability | 20 | allowsSearchBots 12 + sitemapPresent 8 |
-| Technical Health | 15 | `floor(calculateTechnicalSeoScore(...) × 15 / 100)` — F03 signals only |
-| **Total** | **100** | |
+|---|---:|---|
+| Business Data | 20 | Name 7 + complete MY address 8 (`contactInfo.address` + city + postcode; country implicit) + phone 5 |
+| Schema | 35 | LocalBusiness 10 + subtype 4 + hours 5 + geo 4 + telephone 3 + URL 3 + priceRange 3 + Organization 3 |
+| AI Discoverability | 15 | Platform-allowed crawlers 9 + published/serializable sitemap 5 + published llms.txt 1 |
+| Technical Health | 30 | Meta title coverage 8 + meta description coverage 8 + F03 Content Quality 8 + Technical SEO 6 |
 
-**Technical Health detail (Decision A, PM 2026-07-21):**
+Metadata coverage uses every eligible page, product, and blog. Technical SEO is Google verification 3 plus proportional indexability 3. Platform-managed crawler, Organization, and indexability signals affect the score but never become seller tasks.
 
-| F03 signal | Deduction on 0–100 scale | Cap |
-|------------|--------------------------|-----|
-| Missing `site.seo.ogImage` | −15 | — |
-| Missing `site.seo.googleVerificationToken` | −10 | — |
-| Bad page slug | −5 / slug | max −15 |
-| `seo.noIndex` page | −5 / page | max −10 |
+### Stable, bounded evaluation
 
-```
-technicalHealth = floor(max(0, 100 − deductions) × 15 / 100)
-```
+- The server-only evaluator uses explicit `select` projections for the site and each collection.
+- Pages, products, and blogs are read deterministically by `createdAt,id`, 100 rows per page, with a 10,000-record safety ceiling per collection.
+- Each evaluation accepts only a stable double-read snapshot. If the first verification differs, the verified snapshot is retried once; continued churn fails closed without a partial score.
+- Tenant ownership is checked before evaluation and on every site snapshot. The route requires a matching **active** tenant membership; pending, suspended, missing, or cross-tenant membership returns 403 before collection reads.
+- `TC-F37-04-19` locks a 1,001-page fixture to two site reads and exactly 28 collection queries across the two snapshots. This proves query shape and bounded pagination, not live p95 latency.
 
-**Do NOT** use CWV / mobileResponsive / httpsEnabled (removed — no real measurement; PRD previously misstated them). Same pure function as General SEO Technical pillar (`src/lib/seo/technical-score.ts`).
+### API endpoint
 
-**Critical architectural decision (locked in code + tests):** AI Discoverability bucket is exactly `allowsSearchBots(12) + sitemapPresent(8)` with **no "blocks suspicious bots" sub-signal**. PRD §13.8 explicitly forbids this sub-signal because it contradicts BR-03 (the platform's default-allow policy for AI crawlers). A pre-implementation research proposal suggested a 10/5/5 split including that forbidden sub-signal; that approach was explicitly rejected and is NOT in shipping code. Test case TC-F37-01-11 validates this via type-level guarantee (`LocalSeoScoreInput` has no `blocksSuspiciousBots` field) + runtime assertion.
+`GET /api/sites/[siteId]/local-seo-score` is force-dynamic, `maxDuration = 60`, rate-limited to 30 requests per 60 seconds per user, and always returns `Cache-Control: private, no-store`. It returns 401/403/404/429/500 without leaking a stale or partial score.
 
-**Implementation note:** Code may still temporarily hardcode CWV/mobile/HTTPS until US-F37-04 wires F03 inputs — **target state is Decision A above**. Replace placeholders when implementing dashboard score surface.
+Aggregate responses do not embed metadata records. `?detail=metadata&page=N&field=title|description` filters the complete metadata issue set by field **before** pagination, then returns at most the next 100 rows with the matching revision token. The Dashboard refuses a detail batch from a different revision.
 
-### API Endpoint
+### Unified Dashboard and actions
 
-**File:** `src/app/api/sites/[siteId]/local-seo-score/route.ts`
+`SeoHealthClient` is the sole score owner on Dashboard > SEO. `SeoHealthCard` renders one gauge, four qualitative progress bars, and **all** deduplicated seller root causes; there is no Score History panel, second Local SEO card, Action Tools card, or max-three issue truncation. Latest-request-wins behavior prevents an older response from replacing a newer score.
 
-`GET /api/sites/[siteId]/local-seo-score` — auth-gated read-only endpoint. Returns `{ success: true, score, breakdown }`.
+Metadata title/description rows are actor `AI`; seller-owned rows are actor `You`. Action kinds are runtime-allowlisted and deep-link to the owning Editor settings field, Domains, publish flow, page content, or product image-alt destination. Search verification is emitted at the storefront metadata boundary and has a real Editor destination.
 
-**Signal sourcing:**
-- **businessName, address, phone, hours, category, website, description:** sourced from `site.name`, `site.localBusiness.*`, `site.contactInfo.*`, `site.seo.metaDescription`
-- **localBusinessSchema:** calls `hasMeaningfulLocalBusinessData(site.localBusiness)` — true if `streetAddress` present OR has non-closed opening hours
-- **industrySubtype:** true if `schemaTypeForLocalBusiness(businessCategory)` returns a specific type (not generic 'LocalBusiness')
-- **faqSchema:** scans all site pages for FAQ blocks with items; true if any page has one
-- **orgSchema:** always true (platform emits for all sites)
-- **allowsSearchBots:** currently false (AI crawlers blocked by default until US-F37-03 ships); will become dynamic post-US-F37-03
-- **sitemapPresent:** true if `site.status === 'published'` (sitemap route 404s for unpublished sites — real signal, not assumed)
-- **Technical Health (Decision A):** call `calculateTechnicalSeoScore({ siteHasOgImage, siteHasGoogleVerification, pageSlugs, noIndexCount })` then `floor(score × 15 / 100)`. Source: `site.seo.ogImage`, `site.seo.googleVerificationToken`, pages `slug` + `seo.noIndex`. *(Legacy placeholder CWV/mobile/HTTPS must be removed when wiring this.)*
+The AI strip appears only when metadata gaps exist. A run fetches one field-filtered next-100 detail page, sends only title/description records to the bounded proposal API, and keeps Local Business data out of both proposal and apply payloads. Proposal batches are capped at 100 with concurrency 4. The proposal endpoint accepts only `siteId`, `revisionToken`, and `missingSeo`; it applies user-wide limits of 20 requests per minute and 100 per hour plus per-site limits of 2 requests per minute and 10 per hour before evaluation or generation. The modal counts only fulfilled apply results by matching returned undo data. Undo uses a five-minute HMAC bound to the exact site, revision, and payload; a partial Undo returns a newly signed continuation containing only the remaining failed targets so the client can retry without reporting full success.
+
+### Phase 3 verification boundary
+
+The exact post-CAS state passes 701 Vitest files / 11,687 tests (one skipped file / three skipped baseline tests), typecheck, lint, `git diff --check`, and an isolated production build with 112/112 pages. Playwright discovers `f37-seo-health-regression → setup` plus four browser cases for Local Business desktop containment, score/action focus, bounded metadata proposal, and 375px touch/overflow behavior. Current-code authenticated execution remains blocked because the credential guard permits only exact `http://localhost:3000`, which is owned by another worktree. No live browser pass, fixture reset/checksum, p95 < 2 s, apply proof, canary/rollback, or Story Sync #1312 is claimed.
 
 ### Exported Types (API Surface)
 
@@ -238,30 +226,20 @@ technicalHealth = floor(max(0, 100 − deductions) × 15 / 100)
 - **`LocalBusinessSiteData`:** Shape of entire `site.localBusiness` group field:
   ```typescript
   {
-    streetAddress?: string; city?: string; state?: string; postcode?: string; country?: string;
+    streetAddress?: string; city?: string; state?: string; postcode?: string; country?: string; // street/country retained for legacy compatibility
     latitude?: number; longitude?: number;
-    businessCategory?: string; priceRange?: string; serviceAreaDescription?: string;
+    businessCategory?: string; schemaSubtype?: string; priceRange?: string; serviceAreaDescription?: string;
     openingHours?: LocalBusinessOpeningHour[];
   }
   ```
 
-- **`hasMeaningfulLocalBusinessData(localBusiness: LocalBusinessSiteData | undefined): boolean`:** Predicate used by scoring endpoint to detect when `site.localBusiness` has enough data to activate LocalBusiness JSON-LD emission (per Phase 04 loosened trigger). True if street address present OR has at least one non-closed opening hour.
+- **`hasMeaningfulLocalBusinessData(localBusiness: LocalBusinessSiteData | undefined): boolean`:** Legacy-compatible predicate used by the emission orchestrator. A legacy `localBusiness.streetAddress` can still activate output; current address generation and strict scoring prefer `contactInfo.address`, and opening hours can independently activate LocalBusiness output.
 
 These types are imported and used by the score API route to type-check `site.localBusiness` as it extracts signals.
 
 ### Testing
 
-**File:** `src/__tests__/unit/seo/local-seo-score.test.ts`
-
-- **TC-F37-01-10:** Acceptance Criterion AC-1 — score raises by ≥20 pts when address + hours + category + localBusinessSchema + industrySubtype are saved (tests the synergy of structured business data).
-- **TC-F37-01-11:** Boundary + invariant tests:
-  - Full input (all signals true) scores exactly 100
-  - Empty input (all signals false) scores exactly 0
-  - Score always within [0, 100]
-  - Bucket breakdown sums exactly to total score
-  - **Type-level + runtime validation:** AI Discoverability bucket is exactly 20 (allowsSearchBots 12 + sitemapPresent 8); no extra sub-signals present. Explicitly tests that the "blocks suspicious bots" sub-signal is NOT present (contradicts PRD §13.8 note + BR-03).
-
-**Gap — defer to Phase 06:** The route handler's signal extraction logic (how it maps site fields to input booleans) was verified during implementation via temporary throwaway tests, deleted after use. Phase 06 (dedicated QA phase) should add permanent TC-ID-tagged integration tests for the route's end-to-end behavior.
+`src/__tests__/unit/seo/local-seo-score.test.ts` and `src/__tests__/api/local-seo-score.test.ts` lock the active PRD §5 formula, all four bucket totals, authoritative signal extraction, root-cause deduplication, and affected-record counts.
 
 ## Phase 06: Testing
 
@@ -280,14 +258,13 @@ These types are imported and used by the score API route to type-check `site.loc
 - **TC-F37-01-05:** Full PostalAddress + GeoCoordinates + priceRange emission
 - **TC-F37-01-06:** OpeningHoursSpecification excludes closed days (`isClosed: true`)
 - **TC-F37-01-07:** No `aggregateRating` key (Google 2025–26 policy compliance)
-- **TC-F37-01-08:** Category-mapped @type (e.g. `foodEstablishment` → `FoodEstablishment`)
+- **TC-F37-01-08 (legacy):** Current direct category→`@type` mapping; replace with TC-F37-02-29..32 for the approved subtype-dropdown contract
 - **TC-F37-01-09:** Homepage trigger: emits LocalBusiness from `site.localBusiness` alone (no Contact block required); dedupe when both present
 - **TC-F37-01-12:** Day-of-week mapping (Mo→Monday, Tu→Tuesday, …, Su→Sunday via 7-test `it.each`)
 - **Security (1 test):** XSS-safe JSON-LD serialization (escapes `</script>`, `<`, `>`, `&`)
 
 #### Scoring Tests (`src/__tests__/unit/seo/local-seo-score.test.ts`)
-- **TC-F37-01-10:** ≥20pt score gain when address + hours + category + localBusinessSchema + industrySubtype are saved (AC-1)
-- **TC-F37-01-11:** Bounded 0..100; bucket breakdown sum validation; no "blocks suspicious bots" sub-signal (PRD §13.8 design decision locked in code + tests)
+- Legacy coverage only; replace with PRD §5 scorecard tests before enabling the unified Dashboard score.
 
 ### Test Execution
 
@@ -317,17 +294,17 @@ Formalizes 12 TC-IDs with Acceptance Criteria (AC) / Functional Requirement (FR)
 - **Phase 04 (JSON-LD Emission):** Covered above.
 - **Phase 05 (Scoring):** Covered above.
 - **Phase 06 (Testing):** Covered above. 34 unit tests, permanent TC-ID-tagged coverage for all behaviors.
-- **US-F37-04 (Dashboard):** Not yet implemented. Will consume `GET /api/sites/[siteId]/local-seo-score` to display score + checklist widget.
+- **US-F37-04 (Dashboard):** Implemented locally as the sole unified `SeoHealth` score surface; live fixture and release closeout remain pending.
 - **F01 AI Gen:** Shares `src/lib/seo/schema-helpers.ts` mappings for AI-gen categories (read-only; no overlap with F37).
 
 ## Open Questions / Future Work
 
 - **Phase 06 (QA):** Permanent test coverage for Phase 04 JSON-LD behaviors + Phase 05 route integration.
-- **Technical Health (RESOLVED Decision A):** Reuse F03 `technical-score.ts` (OG, Google verification, slugs, noIndex) scaled to 15pts. No Lighthouse/CWV. Code still needs rewiring off CWV placeholders.
-- **US-F37-04 (Local SEO Dashboard):** Consumer UI for score + actionable checklist.
+- **Technical Health:** Canonical 30-point contract is active locally; live latency evidence remains pending.
+- **US-F37-04 (Local SEO Dashboard):** Implemented locally; pending current-code authenticated browser execution, live fixture execution, p95 evidence, Story Sync, and canary/rollback.
 - **Multi-language support:** Checklist items + improvement hints (Phase 06+).
 - **Structured data testing:** Google Search Console + Rich Results Test can validate emitted JSON-LD after deployment.
 
 ---
 
-See also: `docs/CHANGELOG.md` (F37 Phase 03–05 entries), `docs/CODEBASE_SUMMARY.md` (SEO JSON-LD module summary), `docs/prd/F37-local-seo-search-performance.md` (feature spec + PRD §13.8 scoring formula).
+See also: `docs/CHANGELOG.md` (F37 Phase 03–05 entries), `docs/CODEBASE_SUMMARY.md` (SEO JSON-LD module summary), `docs/prd/F37-local-seo-search-performance.md` (feature spec + PRD §5 scoring formula).

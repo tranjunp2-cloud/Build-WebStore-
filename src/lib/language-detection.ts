@@ -43,19 +43,21 @@ const MALAY_HIGH_PRECISION = new Set([
     'murah', 'harga', 'perkhidmatan', 'menyediakan', 'produk',
     'menggunakan', 'keperluan', 'kecantikan',
     'pergigian', 'pakaian', 'perabot', 'runcit', 'borong', 'khidmat', 'pemborong', 'hartanah',
+    'rawatan', 'penjagaan', 'urutan', 'mandian', 'pakej', 'pengantin', 'kediaman',
 ])
 
 const MALAY_CONTEXT_MARKERS = new Set([
     'kedai', 'warung', 'syarikat', 'perniagaan', 'jenama', 'jualan', 'pelanggan',
     'tempatan', 'berkualiti', 'perkhidmatan', 'menyediakan', 'pergigian', 'pakaian',
     'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
+    'rawatan', 'penjagaan', 'urutan', 'mandian', 'pakej', 'pengantin', 'kediaman',
 ])
 
 const MALAY_EXCLUSIVE_MARKERS = new Set([
     'kedai', 'syarikat', 'perniagaan', 'berkualiti', 'perkhidmatan', 'keperluan',
     'pergigian', 'perabot', 'runcit', 'khidmat', 'pemborong', 'hartanah',
     'pembaikan', 'pencuci', 'kanak', 'kediaman', 'penyelenggaraan', 'mengikut',
-    'suai', 'mewujudkan',
+    'suai', 'mewujudkan', 'rawatan', 'penjagaan', 'urutan', 'mandian', 'pakej',
 ])
 
 const INDONESIAN_EXCLUSIVE_MARKERS = new Set([

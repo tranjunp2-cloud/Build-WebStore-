@@ -175,3 +175,51 @@ describe('[TC-F37-02-25] saveSiteSchema.localBusiness — open row requires open
         expect(result.success).toBe(false)
     })
 })
+
+// ── TC-F37-02-31: effective-state subtype validation ───────────────────────
+
+describe('[TC-F37-02-31] saveSiteSchema.localBusiness — subtype pair validation', () => {
+    it('rejects an explicit incompatible category/subtype pair', () => {
+        // Arrange
+        const payload = { localBusiness: { businessCategory: 'store', schemaSubtype: 'Restaurant' } }
+
+        // Act
+        const result = saveSiteSchema.safeParse(payload)
+
+        // Assert
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.issues).toEqual(expect.arrayContaining([
+                expect.objectContaining({ path: ['localBusiness', 'schemaSubtype'] }),
+            ]))
+        }
+    })
+
+    it('accepts a compatible pair and nullable generic subtype', () => {
+        // Arrange
+        const compatible = { localBusiness: { businessCategory: 'store', schemaSubtype: 'Store' } }
+        const generic = { localBusiness: { businessCategory: 'localBusiness', schemaSubtype: null } }
+
+        // Act
+        const compatibleResult = saveSiteSchema.safeParse(compatible)
+        const genericResult = saveSiteSchema.safeParse(generic)
+
+        // Assert
+        expect(compatibleResult.success).toBe(true)
+        expect(genericResult.success).toBe(true)
+    })
+
+    it('allows a sparse patch so the save boundary can merge it with the persisted group', () => {
+        // Arrange
+        const categoryOnly = { localBusiness: { businessCategory: 'foodEstablishment' } }
+        const subtypeOnly = { localBusiness: { schemaSubtype: 'Bakery' } }
+
+        // Act
+        const categoryResult = saveSiteSchema.safeParse(categoryOnly)
+        const subtypeResult = saveSiteSchema.safeParse(subtypeOnly)
+
+        // Assert
+        expect(categoryResult.success).toBe(true)
+        expect(subtypeResult.success).toBe(true)
+    })
+})

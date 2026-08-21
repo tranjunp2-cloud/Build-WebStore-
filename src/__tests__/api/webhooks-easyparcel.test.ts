@@ -9,6 +9,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockFind = vi.fn()
 const mockUpdate = vi.fn()
+const mockExecute = vi.fn().mockResolvedValue({ rows: [{ id: 'order' }] })
+const mockTransaction = vi.fn()
+const mockSessions: Record<string, { db: unknown }> = {}
 const mockLoggerWarn = vi.fn()
 const mockLoggerInfo = vi.fn()
 const mockLoggerError = vi.fn()
@@ -18,6 +21,10 @@ vi.mock('payload', () => ({
     Promise.resolve({
       find: mockFind,
       update: mockUpdate,
+      db: {
+        drizzle: { transaction: mockTransaction },
+        sessions: mockSessions,
+      },
       logger: {
         warn: mockLoggerWarn,
         info: mockLoggerInfo,
@@ -43,9 +50,37 @@ function callPost(secret: string | null, body: Record<string, unknown>) {
   return POST(request)
 }
 
+function sqlToText(sqlObj: any): string {
+  return sqlObj.queryChunks
+    .map((chunk: any) =>
+      chunk && typeof chunk === 'object' && Array.isArray(chunk.value)
+        ? chunk.value.join('')
+        : String(chunk)
+    )
+    .join('')
+}
+
+function makeTransactionalPayload<T extends object>(payload: T) {
+  const execute = vi.fn().mockResolvedValue({ rows: [{ id: 'order' }] })
+  const transaction = vi.fn(async (
+    operation: (db: { execute: typeof execute }) => Promise<unknown>,
+  ) => operation({ execute }))
+
+  return Object.assign(payload, {
+    db: {
+      drizzle: { transaction },
+      sessions: {} as Record<string, { db: unknown }>,
+    },
+  })
+}
+
 describe('POST /api/webhooks/easyparcel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockTransaction.mockImplementation(async (
+      operation: (db: { execute: typeof mockExecute }) => Promise<unknown>,
+    ) => operation({ execute: mockExecute }))
+    for (const key of Object.keys(mockSessions)) delete mockSessions[key]
     delete process.env.EASYPARCEL_WEBHOOK_SECRET
   })
 
@@ -176,6 +211,46 @@ describe('POST /api/webhooks/easyparcel', () => {
     expect(updateArg.data.status).toBe('completed')
   })
 
+  it('[TC-F36.OD.045a] real tracking-update code 4 promotes ready_to_ship to shipped', async () => {
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+    mockFind.mockResolvedValue({
+      docs: [
+        {
+          id: 'order-45a',
+          status: 'ready_to_ship',
+          collectionMethod: 'dropoff',
+          shippingTrackingStatus: 'pending_pickup',
+          shippingTrackingHistory: [],
+        },
+      ],
+    })
+    mockUpdate.mockResolvedValue({ id: 'order-45a' })
+
+    const res = await callPost('my-secret', {
+      topic: 'shipment.tracking.update',
+      awb_number: 'RMP011459353MY',
+      event_date: '2026-07-22 11:18:45',
+      shipment_number: 'ES-2607-6V92R',
+      latest_tracking_status: 'Rider is Out for Delivery',
+      latest_shipment_status_code: 4,
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ matched: true, result: 'updated' })
+    const updateArg = mockUpdate.mock.calls[0][0]
+    expect(updateArg.data).toMatchObject({
+      shippingTrackingStatus: 'in_transit',
+      status: 'shipped',
+    })
+    expect(updateArg.data.shippingTrackingHistory.at(-1)).toMatchObject({
+      status: 'in_transit',
+      description: 'Rider is Out for Delivery',
+      collectionMethod: 'dropoff',
+    })
+    expect(mockExecute).toHaveBeenCalledTimes(1)
+    expect(sqlToText(mockExecute.mock.calls[0][0])).toContain('FOR UPDATE')
+  })
+
   // ───────────────────────────────────────────────────────────────────
   // TC-F36.OD.046: REAL EP payload (topic shipment.status.update) numeric
   // shipment_status_code:0 (Cancel) → cancelled tracking + reopen order to
@@ -219,6 +294,7 @@ describe('POST /api/webhooks/easyparcel', () => {
     expect(updateArg.data.trackingNumber).toBeNull()
     expect(updateArg.data.labelUrl).toBeNull()
     expect(updateArg.data.pickupScheduledAt).toBeNull()
+    expect(updateArg.data.collectionMethod).toBeNull()
     expect(updateArg.data.codStatus).toBeNull()
   })
 
@@ -668,10 +744,11 @@ describe('applyTrackingUpdate (unit)', () => {
 
   it('[TC-F36.OD.045] unchanged status (already in_transit) → skips update, returns "unchanged"', async () => {
     // Arrange
-    const mockPayload = {
+    const mockPayload = makeTransactionalPayload({
+      find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn(),
       logger: { debug: vi.fn() },
-    }
+    })
     const order = {
       id: 'order-a',
       status: 'shipped',
@@ -687,14 +764,162 @@ describe('applyTrackingUpdate (unit)', () => {
     expect(mockPayload.update).not.toHaveBeenCalled()
   })
 
+  it('[TC-F36.OD.045b] unchanged in_transit tracking self-heals ready_to_ship lifecycle', async () => {
+    const history = [{
+      status: 'in_transit',
+      description: 'Rider is Out for Delivery',
+      eventTime: '2026-07-22T03:18:45.000Z',
+    }]
+    const order = {
+      id: 'order-stale-lifecycle',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'in_transit',
+      shippingTrackingHistory: history,
+    }
+    const mockPayload = makeTransactionalPayload({
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    })
+
+    const result = await applyTrackingUpdate(mockPayload as any, order, 4, 'Rider is Out for Delivery')
+
+    expect(result).toBe('updated')
+    expect(mockPayload.db.drizzle.transaction).toHaveBeenCalledTimes(1)
+    expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: 'shipped' },
+    }))
+  })
+
+  it('[TC-F36.OD.045e] concurrent auto-ship and cancel serialize without losing terminal history', async () => {
+    const initialOrder = {
+      id: 'order-concurrent-cancel',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [] as Array<Record<string, unknown>>,
+    }
+    let storedOrder = structuredClone(initialOrder)
+    let transactionTail = Promise.resolve()
+    const transaction = vi.fn(async (
+      operation: (db: { execute: ReturnType<typeof vi.fn> }) => Promise<unknown>,
+    ) => {
+      const previous = transactionTail
+      let release!: () => void
+      transactionTail = new Promise<void>((resolve) => { release = resolve })
+      await previous
+      try {
+        return await operation({
+          execute: vi.fn().mockResolvedValue({ rows: [{ id: storedOrder.id }] }),
+        })
+      } finally {
+        release()
+      }
+    })
+    const mockPayload = {
+      find: vi.fn(async () => ({ docs: [structuredClone(storedOrder)] })),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        storedOrder = { ...storedOrder, ...data } as typeof storedOrder
+        return structuredClone(storedOrder)
+      }),
+      db: {
+        drizzle: { transaction },
+        sessions: {} as Record<string, { db: unknown }>,
+      },
+      logger: { debug: vi.fn() },
+    }
+
+    const [autoShipResult, cancelResult] = await Promise.all([
+      applyTrackingUpdate(mockPayload as any, initialOrder, 4, 'In Transit'),
+      applyTrackingUpdate(mockPayload as any, initialOrder, 0, 'Cancelled'),
+    ])
+
+    expect(autoShipResult).toBe('updated')
+    expect(cancelResult).toBe('updated')
+    expect(storedOrder.status).toBe('confirmed')
+    expect(storedOrder.shippingTrackingStatus).toBe('cancelled')
+    expect(storedOrder.shippingTrackingHistory.map((entry) => entry.status))
+      .toEqual(['in_transit', 'cancelled'])
+  })
+
+  it('[TC-F36.OD.045d] same internal status appends a new raw courier message once', async () => {
+    const order = {
+      id: 'order-schedule',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [{
+        status: 'pending_pickup',
+        description: 'Shipment created — RMC002235128MY',
+        eventTime: '2026-07-28T03:20:00.000Z',
+      }],
+    }
+    const mockPayload = makeTransactionalPayload({
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    })
+
+    const firstResult = await applyTrackingUpdate(
+      mockPayload as any,
+      order,
+      7,
+      'Schedule In Arrangement',
+    )
+
+    expect(firstResult).toBe('updated')
+    const updatedHistory = mockPayload.update.mock.calls[0][0].data.shippingTrackingHistory
+    expect(updatedHistory.at(-1)).toMatchObject({
+      status: 'pending_pickup',
+      description: 'Schedule In Arrangement',
+    })
+
+    const updatedOrder = { ...order, shippingTrackingHistory: updatedHistory }
+    mockPayload.find.mockResolvedValue({ docs: [updatedOrder] })
+    mockPayload.update.mockClear()
+
+    const retryResult = await applyTrackingUpdate(
+      mockPayload as any,
+      updatedOrder,
+      7,
+      'Schedule In Arrangement',
+    )
+
+    expect(retryResult).toBe('unchanged')
+    expect(mockPayload.update).not.toHaveBeenCalled()
+  })
+
+  it('[TC-F36.OD.045c] collected tracking promotes ready_to_ship to shipped', async () => {
+    const order = {
+      id: 'order-collected',
+      status: 'ready_to_ship',
+      shippingTrackingStatus: 'pending_pickup',
+      shippingTrackingHistory: [],
+    }
+    const mockPayload = makeTransactionalPayload({
+      find: vi.fn().mockResolvedValue({ docs: [order] }),
+      update: vi.fn().mockResolvedValue({}),
+      logger: { debug: vi.fn() },
+    })
+
+    const result = await applyTrackingUpdate(mockPayload as any, order, 3)
+
+    expect(result).toBe('updated')
+    expect(mockPayload.db.drizzle.transaction).toHaveBeenCalledTimes(1)
+    expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'shipped',
+        shippingTrackingStatus: 'picked_up',
+      }),
+    }))
+  })
+
   it('[TC-F36.OD.046] unknown EP status → skipped, never overwrites a valid status', async () => {
     // Arrange — F6 (review #1434): an unmapped EP status must NOT clobber a valid tracking
     // state with "unknown"/"Processing". Writer returns 'unchanged' and never calls update.
-    const mockPayload = {
+    const mockPayload = makeTransactionalPayload({
       find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn().mockResolvedValue({}),
       logger: { debug: vi.fn() },
-    }
+    })
     const order = {
       id: 'order-b',
       status: 'shipped',
@@ -713,11 +938,11 @@ describe('applyTrackingUpdate (unit)', () => {
   it('[TC-F36.OD.047] history appended with ISO eventTime', async () => {
     // Arrange
     // F8 re-read: no docs found → falls back to the caller-supplied `order.shippingTrackingHistory`.
-    const mockPayload = {
+    const mockPayload = makeTransactionalPayload({
       find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn().mockResolvedValue({}),
       logger: { debug: vi.fn() },
-    }
+    })
     const existingEntry = {
       status: 'picked_up',
       description: 'Parcel Picked Up',

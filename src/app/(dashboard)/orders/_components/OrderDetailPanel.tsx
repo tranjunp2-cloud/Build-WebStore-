@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, ZoomIn, X, RotateCcw } from 'lucide-react'
+import { Check, Loader2, ZoomIn, X, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
@@ -266,7 +266,7 @@ function StepPendingIcon({ isActive }: { isActive: boolean }) {
     const iStroke = isActive ? "white" : undefined
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
             <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M18.0002 24.6673C21.6821 24.6673 24.6668 21.6825 24.6668 18.0007C24.6668 14.3188 21.6821 11.334 18.0002 11.334C14.3183 11.334 11.3335 14.3188 11.3335 18.0007C11.3335 21.6825 14.3183 24.6673 18.0002 24.6673Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M18 14V18L20.6667 19.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -278,7 +278,7 @@ function StepConfirmedIcon({ isActive }: { isActive: boolean }) {
     const iStroke = isActive ? "white" : undefined
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
             <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -290,7 +290,7 @@ function StepReadyIcon({ isActive }: { isActive: boolean }) {
     const iStroke = isActive ? "white" : undefined
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
             <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M17.3333 24.486C17.536 24.603 17.766 24.6646 18 24.6646C18.234 24.6646 18.464 24.603 18.6667 24.486L23.3333 21.8193C23.5358 21.7024 23.704 21.5343 23.821 21.3318C23.938 21.1294 23.9998 20.8998 24 20.666V15.3326C23.9998 15.0988 23.938 14.8692 23.821 14.6667C23.704 14.4643 23.5358 14.2962 23.3333 14.1793L18.6667 11.5126C18.464 11.3956 18.234 11.334 18 11.334C17.766 11.334 17.536 11.3956 17.3333 11.5126L12.6667 14.1793C12.4642 14.2962 12.296 14.4643 12.179 14.6667C12.062 14.8692 12.0002 15.0988 12 15.3326V20.666C12.0002 20.8998 12.062 21.1294 12.179 21.3318C12.296 21.5343 12.4642 21.7024 12.6667 21.8193L17.3333 24.486Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M18 24.6667V18" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -304,7 +304,7 @@ function StepShippedIcon({ isActive }: { isActive: boolean }) {
     const iStroke = isActive ? "white" : undefined
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
             <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M19.3333 21.9993V13.9993C19.3333 13.6457 19.1928 13.3066 18.9427 13.0565C18.6927 12.8065 18.3535 12.666 17.9999 12.666H12.6666C12.313 12.666 11.9738 12.8065 11.7238 13.0565C11.4737 13.3066 11.3333 13.6457 11.3333 13.9993V21.3327C11.3333 21.5095 11.4035 21.6791 11.5285 21.8041C11.6535 21.9291 11.8231 21.9993 11.9999 21.9993H13.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M20 22H16" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -319,7 +319,7 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     const iStroke = isActive ? "white" : undefined
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
             <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -327,7 +327,15 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     )
 }
 
-export function OrderProgress({ status }: { status: OrderStatus }) {
+function CompletedCheckIcon() {
+    return (
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-[hsl(var(--primary))]">
+            <Check aria-hidden className="h-3.5 w-3.5 !text-white" strokeWidth={2.5} />
+        </span>
+    )
+}
+
+export function OrderProgress({ status, embedded = false }: { status: OrderStatus; embedded?: boolean }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const progressLabels = t.dashboard.orders.progress
@@ -341,7 +349,7 @@ export function OrderProgress({ status }: { status: OrderStatus }) {
         shipped: 3,
         completed: 4,
         cancelled: -1,
-        refunded: 4, // all 5 steps done; Refunded node appended separately below
+        refunded: STEPS.length, // all 5 standard steps done; Refunded node is current
         paid: 1,
         payment_failed: -1,
         processing: 1
@@ -350,77 +358,101 @@ export function OrderProgress({ status }: { status: OrderStatus }) {
 
     return (
         <div
-            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-dash-border bg-dash-surface h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
+            data-order-progress-mode={embedded ? 'embedded' : 'standalone'}
+            className={embedded
+                ? 'flex min-w-0 flex-col items-start self-stretch gap-[12px]'
+                : 'flex h-[118px] shrink-0 flex-col items-start self-stretch gap-[12px] rounded-[16px] border border-dash-border bg-dash-surface p-[17px] pb-[1px] md:h-[130.5px] md:gap-[16px] md:p-[21px] md:pb-[1px]'}
         >
             {/* Section label */}
-            <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-dash-text-muted leading-[1.333em]">
-                {d.orderProgress}
-            </span>
+            {!embedded && (
+                <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-dash-text-muted leading-[1.333em]">
+                    {d.orderProgress}
+                </span>
+            )}
 
             {/* Stepper canvas */}
-            <div className="flex w-full items-start md:justify-between overflow-x-auto overflow-y-hidden pb-3 md:pb-0 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-                {STEPS.map((step, i) => {
-                    const isActive = i <= currentStep
+            <div
+                data-order-stepper-canvas
+                className="min-h-[68px] w-full min-w-0 overflow-x-auto overflow-y-hidden pb-3 pt-1 md:pb-0 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-track]:bg-transparent"
+            >
+                <div className={`flex w-full items-start md:min-w-0 md:justify-between ${isRefundedStatus ? 'min-w-[624px]' : 'min-w-[520px]'}`}>
+                    {STEPS.map((step, i) => {
+                        const isCompleted = i < currentStep
+                        const isCurrent = i === currentStep
+                        const isUpcoming = i > currentStep
+                        const isActive = !isUpcoming
+                        const stepState = isCompleted ? 'completed' : isCurrent ? 'current' : 'upcoming'
 
-                    return (
-                        <React.Fragment key={step.label}>
-                            {/* Step node */}
-                            <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
-                                {/* Icon container */}
-                                <div className={`flex items-center justify-center shrink-0 rounded-full ${isActive ? 'shadow-[0_0_0_4px_hsl(var(--primary)/0.2)] md:shadow-none' : ''}`}>
-                                    <step.StepIcon isActive={isActive} />
+                        return (
+                            <React.Fragment key={step.label}>
+                                {/* Step node */}
+                                <div
+                                    className="z-10 flex shrink-0 flex-col items-center gap-[8px]"
+                                    data-order-step-state={stepState}
+                                >
+                                    {/* Icon container */}
+                                    <div
+                                        data-order-step-icon
+                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full md:h-9 md:w-9 ${isCurrent ? 'shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]' : ''}`}
+                                    >
+                                        {isCompleted ? <CompletedCheckIcon /> : <step.StepIcon isActive={isActive} />}
+                                    </div>
+
+                                    {/* Step label text */}
+                                    <span
+                                        data-order-step-label
+                                        className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-semibold text-dash-text' : 'font-normal text-dash-text-muted'} text-[12px] md:text-[10px] leading-[1.25em]`}
+                                    >
+                                        {step.label}
+                                    </span>
                                 </div>
 
-                                {/* Step label text */}
-                                <span
-                                    className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-normal md:font-semibold text-dash-text-muted md:text-dash-text' : 'font-normal text-dash-text-muted'} text-[12px] md:text-[10px] leading-[1.25em]`}
+                                {/* Connector Line */}
+                                {i < STEPS.length - 1 && (
+                                    <div
+                                        data-order-step-connector
+                                        className="mx-[8px] mt-[15px] h-[2px] min-w-[46px] flex-1 shrink-0 self-start md:mx-1 md:min-w-0 md:shrink md:mt-[17px]"
+                                        style={{
+                                            // Connector i joins step i → i+1: filled only once the NEXT step is
+                                            // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
+                                            background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
+                                        }}
+                                    />
+                                )}
+                            </React.Fragment>
+                        )
+                    })}
+
+                    {/* Refunded node — appended after Completed when order is refunded */}
+                    {isRefundedStatus && (
+                        <React.Fragment key="refunded">
+                            {/* Refund connector — fuchsia (#d946ef) */}
+                            <div
+                                data-order-step-connector
+                                className="mx-[8px] mt-[15px] h-[2px] min-w-[46px] flex-1 shrink-0 self-start md:mx-1 md:min-w-0 md:shrink md:mt-[17px]"
+                                style={{ background: '#d946ef' }}
+                            />
+                            {/* Refunded step node */}
+                            <div
+                                className="z-10 flex shrink-0 flex-col items-center gap-[8px]"
+                                data-order-step-state="current"
+                            >
+                                <div
+                                    data-order-step-icon
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#d946ef] bg-[rgba(217,70,239,.12)] text-[#d946ef] shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:h-9 md:w-9 md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
                                 >
-                                    {step.label}
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                </div>
+                                <span
+                                    className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
+                                    style={{ color: '#e879f9' }}
+                                >
+                                    {progressLabels.refunded}
                                 </span>
                             </div>
-
-                            {/* Connector Line */}
-                            {i < STEPS.length - 1 && (
-                                <div
-                                    className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
-                                    style={{
-                                        marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
-                                        height: 2,
-                                        // Connector i joins step i → i+1: filled only once the NEXT step is
-                                        // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
-                                        background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
-                                    }}
-                                />
-                            )}
                         </React.Fragment>
-                    )
-                })}
-
-                {/* Refunded node — appended after Completed when order is refunded */}
-                {isRefundedStatus && (
-                    <React.Fragment key="refunded">
-                        {/* Refund connector — fuchsia (#d946ef) */}
-                        <div
-                            className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
-                            style={{ marginTop: 15, height: 2, background: '#d946ef' }}
-                        />
-                        {/* Refunded step node */}
-                        <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
-                            <div
-                                className="flex items-center justify-center shrink-0 rounded-full shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
-                                style={{ width: 36, height: 36, background: 'rgba(217,70,239,.12)', border: '2px solid #d946ef', color: '#d946ef' }}
-                            >
-                                <RotateCcw className="w-4 h-4" />
-                            </div>
-                            <span
-                                className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
-                                style={{ color: '#e879f9' }}
-                            >
-                                {progressLabels.refunded}
-                            </span>
-                        </div>
-                    </React.Fragment>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     )
@@ -1171,6 +1203,3 @@ export function OrderDetailPanel({
         </div>
     )
 }
-
-
-

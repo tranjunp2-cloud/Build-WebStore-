@@ -40,7 +40,7 @@ const protectedPaths = [
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
 
 // SEO paths with dots that need tenant rewriting (not static files)
-const SEO_PATHS = ['/sitemap.xml', '/robots.txt']
+const SEO_PATHS = ['/sitemap.xml', '/robots.txt', '/llms.txt']
 
 /**
  * Multi-tenant middleware
@@ -234,10 +234,10 @@ export async function middleware(req: NextRequest) {
         }
 
         url.pathname = `/sites/custom${pathname}`
-        const response = NextResponse.rewrite(url)
-        response.headers.set('x-tenant-hostname', hostname)
-        response.headers.set('x-tenant-type', 'custom-domain')
-        return response
+        const requestHeaders = new Headers(req.headers)
+        requestHeaders.set('x-tenant-hostname', hostname)
+        requestHeaders.set('x-tenant-type', 'custom-domain')
+        return NextResponse.rewrite(url, { request: { headers: requestHeaders } })
     }
 
     // ── Auth Guard — Protected routes (US-F02-03, SPEC §11) ───────────────

@@ -20,7 +20,8 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
 
     // Per-slot fallback: prefer item.image.url (Payload upload), fallback to imageUrl (AI gen string), then Unsplash
     const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
-    const items = Array.from({ length: Math.max(rawItems.length, fallbackUrls.length) }, (_, i) => {
+    const itemCount = rawItems.length > 0 ? rawItems.length : fallbackUrls.length
+    const items = Array.from({ length: itemCount }, (_, i) => {
         const item = rawItems[i]
         const imgSrc = (item?.image as { url?: string } | undefined)?.url || item?.imageUrl
         if (imgSrc) return { ...item, imageUrl: imgSrc }

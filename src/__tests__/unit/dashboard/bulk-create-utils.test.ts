@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { slugify, buildSavePayload, generateFallbackSku } from '../../../components/dashboard/BulkCreateModal'
+import { describe, it, expect, vi } from 'vitest'
+import {
+    slugify,
+    buildSavePayload,
+    generateFallbackSku,
+    normalizeDraftProductName,
+} from '@/components/dashboard/BulkCreateModal'
 
 // ─── TC-F08-04-01: Bulk product creation utilities ──────────────────────
 
@@ -36,6 +41,133 @@ describe('slugify [TC-F08-04-01]', () => {
 
     it('handles numbers', () => {
         expect(slugify('Product 123 ABC')).toBe('product-123-abc')
+    })
+})
+
+describe('normalizeDraftProductName [TC-F08-04-118]', () => {
+    it('keeps product names single-value while allowing the textarea to wrap visually', () => {
+        // Arrange
+        const pastedName = 'Premium Backpack\r\nWith Extended\u2028Product\u2029Name'
+
+        // Act
+        const result = normalizeDraftProductName(pastedName)
+
+        // Assert
+        expect(result).toBe('Premium Backpack With Extended Product Name')
+    })
+
+    it('TC-F08-04-118: preserves a Product Name at the canonical 120-code-unit limit', () => {
+        // Arrange
+        const maxLengthName = 'A'.repeat(120)
+
+        // Act
+        const result = normalizeDraftProductName(maxLengthName)
+
+        // Assert
+        expect(result).toBe(maxLengthName)
+    })
+
+    it('TC-F08-04-118: discards Product Name characters beyond the canonical limit', () => {
+        // Arrange
+        const overlongName = 'A'.repeat(121)
+
+        // Act
+        const result = normalizeDraftProductName(overlongName)
+
+        // Assert
+        expect(result).toHaveLength(120)
+    })
+
+    it('TC-F08-04-118: never leaves an unpaired surrogate when truncating Unicode', () => {
+        // Arrange
+        const emojiAtBoundary = `${'A'.repeat(118)}😀`
+        const emojiAcrossBoundary = `${'A'.repeat(119)}😀`
+
+        // Act
+        const exactResult = normalizeDraftProductName(emojiAtBoundary)
+        const result = normalizeDraftProductName(emojiAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(emojiAtBoundary)
+        expect(result).toBe('A'.repeat(119))
+        expect(result).not.toMatch(/[\uD800-\uDFFF]$/)
+    })
+
+    it('TC-F08-04-118: preserves combining-mark graphemes at the limit and drops the whole cluster across it', () => {
+        // Arrange
+        const exactLimitName = `${'A'.repeat(118)}e\u0301`
+        const graphemeAcrossBoundary = `${'A'.repeat(119)}e\u0301`
+
+        // Act
+        const exactResult = normalizeDraftProductName(exactLimitName)
+        const truncatedResult = normalizeDraftProductName(graphemeAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(exactLimitName)
+        expect(exactResult).toHaveLength(120)
+        expect(truncatedResult).toBe('A'.repeat(119))
+    })
+
+    it('TC-F08-04-118: preserves ZWJ emoji at the limit and drops the whole cluster across it', () => {
+        // Arrange
+        const exactLimitName = `${'A'.repeat(115)}👩‍💻`
+        const graphemeAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
+
+        // Act
+        const exactResult = normalizeDraftProductName(exactLimitName)
+        const truncatedResult = normalizeDraftProductName(graphemeAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(exactLimitName)
+        expect(exactResult).toHaveLength(120)
+        expect(truncatedResult).toBe('A'.repeat(118))
+    })
+
+    it('TC-F08-04-118: preserves Unicode instead of guessing boundaries when Intl.Segmenter is unavailable', async () => {
+        // Arrange
+        const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter')
+        vi.resetModules()
+        Object.defineProperty(Intl, 'Segmenter', {
+            configurable: true,
+            writable: true,
+            value: undefined,
+        })
+
+        try {
+            // Act
+            const { normalizeDraftProductName: normalizeWithoutIntlSegmenter } = await import(
+                '@/components/dashboard/BulkCreateModal'
+            )
+            const names = [
+                `${'A'.repeat(119)}e\u0301`,
+                `${'A'.repeat(118)}👩‍💻`,
+                `${'A'.repeat(118)}🇻🇳`,
+                `${'A'.repeat(119)}가`,
+                `${'A'.repeat(118)}क्ष`,
+                'X'.repeat(4097),
+            ]
+
+            // Assert
+            expect(names.map(normalizeWithoutIntlSegmenter)).toEqual(names)
+        } finally {
+            if (segmenterDescriptor) {
+                Object.defineProperty(Intl, 'Segmenter', segmenterDescriptor)
+            } else {
+                Reflect.deleteProperty(Intl, 'Segmenter')
+            }
+            vi.resetModules()
+        }
+    })
+
+    it('TC-F08-04-118: bounds work for an oversized pasted or AI-generated name', () => {
+        // Arrange
+        const oversizedName = `${'\n'.repeat(4094)}e\u0301\u0301${'X'.repeat(1_000_000)}`
+
+        // Act
+        const result = normalizeDraftProductName(oversizedName)
+
+        // Assert
+        expect(result).toBe(' ')
     })
 })
 
@@ -494,5 +626,36 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         // Random suffix makes them different (very high probability)
         // Not asserting inequality since it's random — just check format
         expect(slug1).toMatch(/^same-name-[a-z0-9]{5}$/)
+    })
+
+    it('uses the draft UUID as a stable persisted idempotency key', () => {
+        const product = {
+            _id: '12345678-90ab-cdef-1234-567890abcdef',
+            _draftOrdinal: 1,
+            selected: true,
+            name: 'Same Name',
+            price: 10,
+            categoryId: null,
+            variants: [],
+        }
+
+        const slug1 = buildSavePayload(product, null, null).slug
+        const slug2 = buildSavePayload(product, null, null).slug
+        const otherSlug = buildSavePayload({
+            ...product,
+            _id: 'fedcba09-8765-4321-fedc-ba0987654321',
+        }, null, null).slug
+        const customBaseSlug = buildSavePayload({
+            ...product, slug: 'Custom Product Slug',
+        }, null, null).slug
+        const nonLatinBaseSlug = buildSavePayload({
+            ...product, name: '商品',
+        }, null, null).slug
+
+        expect(slug1).toBe('same-name-ai-1234567890abcdef1234567890abcdef')
+        expect(slug2).toBe(slug1)
+        expect(otherSlug).not.toBe(slug1)
+        expect(customBaseSlug).toBe('custom-product-slug-ai-1234567890abcdef1234567890abcdef')
+        expect(nonLatinBaseSlug).toBe('product-ai-1234567890abcdef1234567890abcdef')
     })
 })

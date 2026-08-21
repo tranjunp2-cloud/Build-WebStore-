@@ -67,6 +67,7 @@ const NON_CONTENT_KEYS = new Set([
     'price',
     'amount',
     'rating',
+    'platform',
 ])
 
 function collectHumanText(value: unknown, key = ''): string[] {
@@ -179,8 +180,22 @@ export function buildHomeSystemPrompt(base: string, brief: PageSplitBrief): stri
 }
 
 export function buildSubpagesSystemPrompt(base: string, brief: PageSplitBrief, batch: readonly string[]): string {
-    const blogNote = batch.includes('Blog') ? ' (Blog page needs blog-list block with >=3 posts)' : ''
-    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES ${batch.length} SUBPAGES ONLY (NO HOMEPAGE)\nThe 5-page STRUCTURE RULES above describe the FULL site, which is being produced by several parallel calls. THIS call's output is only a slice of it: return the "pages" array with EXACTLY ${batch.length} entries, in this order: ${batch.join(', ')} — each 4-6 blocks per STRUCTURE RULES${blogNote}. Set "isHomepage": false on every entry. Do NOT include a Homepage or any other page in this response.${OMIT_NAV_RULE}\nDo NOT include any "footer" block — the site-wide footer is applied automatically.${CONCISE_RULE}${navLabelsHint(brief)}`
+    const pageRules = batch.map((page) => {
+        if (page === 'About') {
+            return 'About: 4-6 content blocks from hero, about/story, stats, team, testimonials, and CTA only.'
+        }
+        if (page === 'Services/Products') {
+            return 'Services/Products: 4-6 content blocks from hero, service-cards, category-specific service blocks, features, pricing, FAQ, testimonials, logo-cloud, feature-comparison, and CTA only.'
+        }
+        if (page === 'Contact') {
+            return 'Contact: exactly one contact block, plus an optional short hero and at most one practical FAQ.'
+        }
+        if (page === 'Blog') {
+            return 'Blog: 3-4 content blocks from hero, blog-list, newsletter, and CTA only; blog-list needs >=3 posts.'
+        }
+        return `${page}: use only content relevant to this page.`
+    }).join('\n')
+    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES ${batch.length} SUBPAGES ONLY (NO HOMEPAGE)\nThe 5-page STRUCTURE RULES above describe the FULL site, which is being produced by several parallel calls. THIS call's output is only a slice of it: return the "pages" array with EXACTLY ${batch.length} entries, in this order: ${batch.join(', ')}.\n${pageRules}\nDo NOT add contact or gallery blocks to About, Services/Products, or Blog. Set "isHomepage": false on every entry. Do NOT include a Homepage or any other page in this response.${OMIT_NAV_RULE}\nDo NOT include any "footer" block — the site-wide footer is applied automatically.${CONCISE_RULE}${navLabelsHint(brief)}`
 }
 
 /** Scope repeated at the END of the user message — measured 2026-07-03 that
@@ -462,7 +477,7 @@ function blockSectionLabel(
  * context returned by the homepage call. The block structure, URLs, media and
  * CTA count stay intact.
  */
-function materializeLocaleSafePage(
+export function materializeLocaleSafePage(
     page: Record<string, unknown>,
     businessInfo: BusinessInfoInput,
     strings: LocaleStructuralStrings | null,
@@ -489,6 +504,7 @@ function materializeLocaleSafePage(
         key: string,
         blockType: string,
         parent: Record<string, unknown> | null,
+        currentValue: string,
     ): string => {
         const service = services[itemIndex++ % Math.max(services.length, 1)] ?? businessName
         const url = typeof parent?.url === 'string' ? parent.url : ''
@@ -496,7 +512,22 @@ function materializeLocaleSafePage(
         if (key === 'email') return businessInfo.email || businessName
         if (key === 'phone') return businessInfo.phone || businessName
         if (key === 'address') return businessInfo.address || businessName
-        if (key === 'copyrightText') return `${new Date().getFullYear()} ${businessName}`
+        if (key === 'logoText') return businessName
+        if (key === 'copyrightText') {
+            const rights = strings?.footer.allRightsReserved
+            return `© ${new Date().getFullYear()} ${businessName}${rights ? `. ${rights}` : ''}`
+        }
+        if (blockType === 'footer' && key === 'title') {
+            const footerTitles: Record<string, string | undefined> = {
+                explore: strings?.footer.exploreLabel,
+                company: strings?.footer.companyLabel,
+                support: strings?.footer.supportLabel,
+                legal: strings?.footer.legalLabel,
+            }
+            return footerTitles[currentValue.trim().toLowerCase()]
+                ?? strings?.footer.exploreLabel
+                ?? businessName
+        }
         if (key.toLowerCase().includes('placeholder')) {
             return strings?.newsletter.emailPlaceholder || businessInfo.email || businessName
         }
@@ -537,7 +568,7 @@ function materializeLocaleSafePage(
                 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
                 || /^#[0-9a-f]{3,8}$/i.test(trimmed)
             ) return value
-            return replacement(key, blockType, parent)
+            return replacement(key, blockType, parent, value)
         }
         if (Array.isArray(value)) return value.map((item) => visit(item, key, blockType, parent))
         if (!value || typeof value !== 'object') return value

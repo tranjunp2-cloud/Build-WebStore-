@@ -3,13 +3,14 @@ import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { checkUploadSize, UPLOAD_LIMITS } from '@/lib/media/upload-limits'
 import { buildMediaKey } from '@/lib/media/media-key'
-import { createVideoPresignedPost } from '@/lib/media/s3-presign'
+import { createMediaPresignedPost } from '@/lib/media/s3-presign'
 import { s3PublicUrl } from '@/lib/media/s3-public-url'
+import { SUPPORTED_IMAGE_MIMES } from '@/lib/media/image-signature'
+import { isS3Configured } from '@/lib/media/s3-client'
 
-// GH-1284 — video too large for the 4.5MB Vercel function body limit. This
-// endpoint hands the browser a presigned POST so it uploads the video STRAIGHT
+// This endpoint hands the browser a presigned POST so media uploads go STRAIGHT
 // to S3 (see /api/media/register for the follow-up DB record). Only the small
-// JSON request below touches the function; the video never does.
+// JSON request below touches the function; the binary file never does.
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
 
 export const maxDuration = 60
@@ -17,6 +18,12 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!isS3Configured()) {
+        return NextResponse.json(
+            { error: 'Direct upload unavailable', code: 'DIRECT_UPLOAD_UNAVAILABLE' },
+            { status: 503 },
+        )
+    }
 
     const rate = await checkRateLimit(`media-presign:${user.id}`, 60)
     if (!rate.allowed) {
@@ -35,8 +42,13 @@ export async function POST(req: NextRequest) {
     const size = Number(body.size)
 
     if (!filename) return NextResponse.json({ error: 'filename required' }, { status: 400 })
-    if (!VIDEO_MIMES.has(contentType)) {
-        return NextResponse.json({ error: 'Only MP4 and WebM videos are supported' }, { status: 415 })
+    const isVideo = VIDEO_MIMES.has(contentType)
+    const isImage = SUPPORTED_IMAGE_MIMES.has(contentType)
+    if (!isVideo && !isImage) {
+        return NextResponse.json(
+            { error: 'Only JPEG, PNG, WebP, ICO, MP4, and WebM files are supported' },
+            { status: 415 },
+        )
     }
     if (!Number.isFinite(size) || size <= 0) {
         return NextResponse.json({ error: 'valid size required' }, { status: 400 })
@@ -48,10 +60,10 @@ export async function POST(req: NextRequest) {
 
     try {
         const key = buildMediaKey({ userId: user.id, filename, mime: contentType })
-        const post = await createVideoPresignedPost({
+        const post = await createMediaPresignedPost({
             key,
             contentType,
-            maxFileBytes: UPLOAD_LIMITS.video,
+            maxFileBytes: isImage ? UPLOAD_LIMITS.image : UPLOAD_LIMITS.video,
         })
         return NextResponse.json({
             url: post.url,
@@ -62,6 +74,12 @@ export async function POST(req: NextRequest) {
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error('[/api/media/presign] Failed to presign:', msg)
+        if (msg === 'S3 not configured') {
+            return NextResponse.json(
+                { error: 'Direct upload unavailable', code: 'DIRECT_UPLOAD_UNAVAILABLE' },
+                { status: 503 },
+            )
+        }
         return NextResponse.json({ error: 'Could not prepare upload' }, { status: 500 })
     }
 }

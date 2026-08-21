@@ -3,6 +3,11 @@
  * Consumed by the server data fns (`*-data.ts`) and the revamp section components.
  */
 import type { MissingSeoItem } from '@/components/dashboard/views/SEOView'
+import type {
+    SeoHealthIssue as ScoreSeoHealthIssue,
+    SeoHealthIssueAction as ScoreSeoHealthIssueAction,
+    SeoHealthIssueCode as ScoreSeoHealthIssueCode,
+} from '@/lib/seo/local-seo-score-contract'
 
 export type DashboardPeriodKey = 'today' | '7d' | '30d'
 
@@ -84,6 +89,69 @@ export interface SeoData {
     topIssue: { count: number; fixType: 'title' | 'description' | 'alt' } | null
     missingSeoItems: MissingSeoItem[]
     siteId: string | number | null
-    autoMetaEnabled: boolean
-    aiCrawlersEnabled: boolean
 }
+
+/**
+ * Target F37-04 view model for the isolated SEO Health card.
+ *
+ * This contract is intentionally additive while the legacy SeoData runtime remains
+ * active. It contains semantic actions instead of URLs so the future integration layer
+ * can build and authorize destinations without trusting backend-provided links.
+ */
+export type SeoHealthBucketKey =
+    | 'business'
+    | 'schema'
+    | 'aiDiscoverability'
+    | 'technical'
+
+export type SeoHealthBucketStatus = 'good' | 'needsWork'
+
+export interface SeoHealthBucketViewModel {
+    progress: number
+    status: SeoHealthBucketStatus
+}
+
+export interface SeoHealthBucketViewModels {
+    business: SeoHealthBucketViewModel
+    schema: SeoHealthBucketViewModel
+    aiDiscoverability: SeoHealthBucketViewModel
+    technical: SeoHealthBucketViewModel
+}
+
+export type SeoHealthIssueCode = ScoreSeoHealthIssueCode
+export type SeoHealthIssueAction = ScoreSeoHealthIssueAction
+export type SeoHealthIssueViewModel = ScoreSeoHealthIssue
+
+export interface SeoHealthReadyViewModel {
+    score: number
+    aiFixableItemCount: number
+    buckets: SeoHealthBucketViewModels
+    /** Already deduplicated root-cause groups, in display order. */
+    issues: readonly SeoHealthIssueViewModel[]
+}
+
+export type SeoHealthCardLoadState =
+    | { state: 'loading' }
+    | { state: 'error' }
+    | ({ state: 'ready' } & SeoHealthReadyViewModel)
+
+// ── Pending orders ──────────────────────────────────────────────────────────
+export type PendingOrderCurrency = 'MYR' | 'USD' | 'SGD'
+
+export interface PendingOrderRow {
+    id: string | number
+    orderNumber: string
+    itemCount: number
+    total: number
+    currency: PendingOrderCurrency
+    status: 'pending'
+}
+
+export interface PendingOrdersData {
+    orders: PendingOrderRow[]
+    totalCount: number
+}
+
+export type PendingOrdersLoadState =
+    | ({ state: 'ready' } & PendingOrdersData)
+    | { state: 'unavailable' }

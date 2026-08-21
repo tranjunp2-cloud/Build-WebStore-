@@ -378,6 +378,7 @@ function featuresFromProducts(
   products: string[],
   category: string,
   maxCards: number,
+  language?: string,
 ): { icon: string; title: string; description: string }[] {
   const icons = PRODUCT_FEATURE_ICONS[category] ?? PRODUCT_FEATURE_ICONS['business']!
   const titleTpls = FEATURE_TITLE_TEMPLATES[category] ?? FEATURE_TITLE_TEMPLATES['business']!
@@ -385,10 +386,17 @@ function featuresFromProducts(
 
   return products.slice(0, maxCards).map((product, idx) => {
     const capitalized = capitalizeFirst(product)
+    const localizedDescription = language === 'ms'
+      ? `${capitalized} disediakan secara teliti oleh pasukan profesional kami mengikut keperluan setiap pelanggan.`
+      : language === 'vi'
+        ? `${capitalized} được đội ngũ chuyên nghiệp của chúng tôi thực hiện tận tâm theo nhu cầu của từng khách hàng.`
+        : bodyTpl.replace('{product}', product)
     return {
       icon: icons[idx % icons.length]!,
-      title: titleTpls[idx % titleTpls.length]!.replace('{P}', capitalized),
-      description: bodyTpl.replace('{product}', product),
+      title: language === 'ms' || language === 'vi'
+        ? capitalized
+        : titleTpls[idx % titleTpls.length]!.replace('{P}', capitalized),
+      description: localizedDescription,
     }
   })
 }
@@ -486,7 +494,7 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
   const hasNonAsciiProducts = language === 'en' && userProducts.some(p => /[^\x00-\x7F]/.test(p))
   const features =
     userProducts.length >= 2 && !hasNonAsciiProducts
-      ? featuresFromProducts(userProducts, category, canned.length)
+      ? featuresFromProducts(userProducts, category, canned.length, language)
       : canned.map(localizeFeature)
   // Skip non-ASCII tagline when target is English — avoids VN subheadline in EN features block (GH-1184).
   const subheadline = (language === 'en' && biz.tagline && /[^\x00-\x7F]/.test(biz.tagline))
@@ -504,18 +512,40 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
 export function buildTestimonials(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   const headlineFull = bizName ? i18n.testimonials.headlineWithBiz(bizName) : i18n.testimonials.headline
+  const localizedQuotes: Record<string, string[]> = {
+    ms: [
+      'Perkhidmatan yang sangat teliti dan profesional. Saya berasa selesa sepanjang sesi dan amat berpuas hati dengan hasilnya.',
+      'Proses tempahan mudah, suasananya tenang, dan pasukan menerangkan setiap langkah dengan jelas.',
+      'Perkhidmatan disesuaikan dengan keperluan saya dan hasilnya benar-benar menepati jangkaan.',
+      'Pengalaman yang menyenangkan dari awal hingga akhir. Saya pasti akan membuat tempahan lagi.',
+      'Pasukannya mesra, menepati masa, dan memberi cadangan yang sesuai tanpa memaksa.',
+      'Saya menghargai perhatian terhadap setiap butiran serta layanan yang konsisten dan berkualiti.',
+    ],
+    vi: [
+      'Dịch vụ rất tận tâm và chuyên nghiệp. Tôi cảm thấy thoải mái trong suốt buổi trải nghiệm và rất hài lòng với kết quả.',
+      'Quy trình đặt lịch thuận tiện, không gian dễ chịu và đội ngũ giải thích từng bước rất rõ ràng.',
+      'Dịch vụ được điều chỉnh đúng theo nhu cầu của tôi và kết quả thực sự vượt mong đợi.',
+      'Một trải nghiệm dễ chịu từ đầu đến cuối. Tôi chắc chắn sẽ quay lại lần nữa.',
+      'Đội ngũ thân thiện, đúng giờ và đưa ra những tư vấn phù hợp mà không gây áp lực.',
+      'Tôi đánh giá cao sự chỉn chu trong từng chi tiết và chất lượng phục vụ luôn ổn định.',
+    ],
+  }
+  const locale = language?.split('-')[0] ?? 'en'
+  const fallbackQuotes = localizedQuotes[locale]
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
     variant: 'cards',
     headline: headlineFull,
     subheadline: i18n.testimonials.subheadline,
-    testimonials: content.testimonials.slice(0, 6).map((t) => ({
+    testimonials: content.testimonials.slice(0, 6).map((t, index) => ({
       quote: (language === 'ms' && t.quote_ms) ? t.quote_ms
            : (language === 'vi' && t.quote_vi) ? t.quote_vi
-           : t.quote,
+           : (fallbackQuotes?.[index % fallbackQuotes.length] ?? t.quote),
       name: t.name,
-      title: t.title,
+      title: locale === 'ms' ? 'Pelanggan'
+           : locale === 'vi' ? 'Khách hàng'
+           : t.title,
       company: t.company,
       rating: t.rating,
       // Next-wins plan 260419-0034 phase-02: static avatar fallback for all.
@@ -549,7 +579,11 @@ function buildContact(biz: BusinessSample, language?: string): Record<string, un
   }
 }
 
-function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unknown> {
+function buildFooter(
+  biz: BusinessSample,
+  pages: string[],
+  language: ContentLang = 'en',
+): Record<string, unknown> {
   // Next-wins plan 260419-0034 phase-03: upgrade default to mega variant với 4 columns
   // (Explore / Company / Support / Legal) to meet Wix-pro footer expectations.
   // GH-820: build known-url set so secondary columns only include links to real pages.
@@ -562,34 +596,46 @@ function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unkno
   const isLiveLink = (url: string) =>
     url.startsWith('mailto:') || url.startsWith('http') || url === '#' || knownUrls.has(url.toLowerCase())
 
-  const exploreLinks = pages.map((p) => ({
-    label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
-    url: p === '/' ? '/' : `/${p}`,
-  }))
+  const i18n = getBlockStrings(language)
+  const pageLabels: Record<string, string> = {
+    '': i18n.navigation.home,
+    home: i18n.navigation.home,
+    about: i18n.navigation.about,
+    services: i18n.navigation.services,
+    contact: i18n.navigation.contact,
+    blog: 'Blog',
+  }
+  const exploreLinks = pages.map((p) => {
+    const slug = p === '/' ? '' : p.replace(/^\/+/, '').toLowerCase()
+    return {
+      label: pageLabels[slug] ?? (p === '/' ? i18n.navigation.home : p.charAt(0).toUpperCase() + p.slice(1)),
+      url: p === '/' ? '/' : `/${p.replace(/^\/+/, '')}`,
+    }
+  })
 
   const companyLinks = [
-    { label: 'About Us', url: '/about' },
-    { label: 'Contact', url: '/contact' },
-    { label: 'Careers', url: '/careers' },
+    { label: i18n.footer.aboutUs, url: '/about' },
+    { label: i18n.navigation.contact, url: '/contact' },
+    { label: i18n.footer.careers, url: '/careers' },
   ].filter((l) => isLiveLink(l.url))
 
   const supportLinks = [
-    { label: 'Help Center', url: '/help' },
+    { label: i18n.footer.helpCenter, url: '/help' },
     { label: 'FAQ', url: '/faq' },
-    { label: 'Get in Touch', url: `mailto:${biz.email}` },
+    { label: i18n.footer.getInTouch, url: `mailto:${biz.email}` },
   ].filter((l) => isLiveLink(l.url))
 
   const legalLinks = [
-    { label: 'Privacy Policy', url: '/privacy' },
-    { label: 'Terms of Service', url: '/terms' },
-    { label: 'Cookie Policy', url: '/cookies' },
+    { label: i18n.footer.privacyPolicy, url: '/privacy' },
+    { label: i18n.footer.termsOfService, url: '/terms' },
+    { label: i18n.footer.cookiePolicy, url: '/cookies' },
   ].filter((l) => isLiveLink(l.url))
 
   const linkColumns = [
-    { title: 'Explore', links: exploreLinks },
-    ...(companyLinks.length > 0 ? [{ title: 'Company', links: companyLinks }] : []),
-    ...(supportLinks.length > 0 ? [{ title: 'Support', links: supportLinks }] : []),
-    ...(legalLinks.length > 0 ? [{ title: 'Legal', links: legalLinks }] : []),
+    { title: i18n.footer.explore, links: exploreLinks },
+    ...(companyLinks.length > 0 ? [{ title: i18n.footer.company, links: companyLinks }] : []),
+    ...(supportLinks.length > 0 ? [{ title: i18n.footer.support, links: supportLinks }] : []),
+    ...(legalLinks.length > 0 ? [{ title: i18n.footer.legal, links: legalLinks }] : []),
   ]
   return {
     blockType: 'footer',
@@ -597,7 +643,7 @@ function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unkno
     logoText: biz.name,
     tagline: biz.tagline,
     columns: linkColumns,
-    copyrightText: `© 2026 ${biz.name}. All rights reserved.`,
+    copyrightText: `© ${new Date().getFullYear()} ${biz.name}. ${i18n.footer.allRightsReserved}`,
     contactEmail: biz.email,
     contactPhone: biz.phone,
     socials: [
@@ -691,24 +737,38 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
     blockType: 'gallery',
     variant: 'grid',
     headline: `Gallery — ${biz.name}`,
-    images: [
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 1` } },
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 2` } },
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 3` } },
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 4` } },
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 5` } },
-      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 6` } },
-    ],
+    images: Array.from({ length: TEMPLATE_GALLERY_IMAGE_COUNT }, (_, index) => ({
+      image: {
+        url: NEUTRAL_FALLBACK_SVG,
+        alt: `${biz.name} photo ${index + 1}`,
+      },
+    })),
   }
 }
 
 export function buildFAQ(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
+  const localizedItems: Record<string, Array<{ question: string; answer: string }>> = {
+    ms: [
+      { question: 'Bagaimanakah cara membuat tempahan?', answer: 'Hubungi kami melalui borang laman web, telefon, atau e-mel. Pasukan kami akan mengesahkan masa dan keperluan anda.' },
+      { question: 'Adakah tempahan awal diperlukan?', answer: 'Tempahan awal digalakkan untuk memastikan slot pilihan anda tersedia, terutama pada hujung minggu dan musim sibuk.' },
+      { question: 'Bolehkah perkhidmatan disesuaikan?', answer: 'Ya. Kami akan berbincang tentang keperluan dan pilihan anda sebelum mencadangkan perkhidmatan yang paling sesuai.' },
+      { question: 'Apakah kaedah pembayaran yang diterima?', answer: 'Kami menerima kaedah pembayaran utama yang tersedia di premis. Hubungi kami jika anda memerlukan pengesahan sebelum berkunjung.' },
+    ],
+    vi: [
+      { question: 'Tôi có thể đặt lịch bằng cách nào?', answer: 'Bạn có thể liên hệ qua biểu mẫu trên website, điện thoại hoặc email. Đội ngũ của chúng tôi sẽ xác nhận thời gian và nhu cầu của bạn.' },
+      { question: 'Tôi có cần đặt lịch trước không?', answer: 'Bạn nên đặt lịch trước để giữ khung giờ mong muốn, đặc biệt vào cuối tuần và các thời điểm đông khách.' },
+      { question: 'Dịch vụ có thể điều chỉnh theo nhu cầu không?', answer: 'Có. Chúng tôi sẽ trao đổi về nhu cầu và mong muốn của bạn trước khi đề xuất dịch vụ phù hợp nhất.' },
+      { question: 'Có những phương thức thanh toán nào?', answer: 'Chúng tôi chấp nhận các phương thức thanh toán phổ biến tại cơ sở. Vui lòng liên hệ nếu bạn cần xác nhận trước khi đến.' },
+    ],
+  }
+  const locale = language?.split('-')[0] ?? 'en'
+  const items = localizedItems[locale] ?? content.faqItems
   return {
     blockType: 'faq',
     variant: 'accordion',
     headline: bizName ? i18n.faq.headlineWithBiz(bizName) : i18n.faq.headline,
-    items: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
+    items: items.map((f) => ({ question: f.question, answer: f.answer })),
   }
 }
 
@@ -936,15 +996,29 @@ export function buildTeam(category: string, language?: string): Record<string, u
   ]
 
   const i18n = getBlockStrings(language)
+  const locale = language?.split('-')[0] ?? 'en'
+  const localizedMemberCopy: Record<string, Array<{ role: string; bio: string }>> = {
+    ms: [
+      { role: 'Pakar Kanan', bio: 'Berpengalaman luas dalam memberikan perkhidmatan profesional yang teliti dan disesuaikan untuk setiap pelanggan.' },
+      { role: 'Pakar Perkhidmatan', bio: 'Mengutamakan keselesaan pelanggan, hasil berkualiti, dan penerangan yang jelas pada setiap langkah.' },
+      { role: 'Penyelaras Pelanggan', bio: 'Memastikan setiap tempahan berjalan lancar dari pertanyaan pertama hingga perkhidmatan selesai.' },
+    ],
+    vi: [
+      { role: 'Chuyên gia cao cấp', bio: 'Có nhiều kinh nghiệm cung cấp dịch vụ chuyên nghiệp, chỉn chu và phù hợp với từng khách hàng.' },
+      { role: 'Chuyên viên dịch vụ', bio: 'Luôn ưu tiên sự thoải mái, chất lượng kết quả và giải thích rõ ràng trong từng bước.' },
+      { role: 'Điều phối khách hàng', bio: 'Đảm bảo mỗi lịch hẹn diễn ra thuận lợi từ lúc tư vấn đến khi hoàn tất dịch vụ.' },
+    ],
+  }
+  const localizedCopy = localizedMemberCopy[locale]
   return {
     blockType: 'team',
     variant: 'grid',
     headline: i18n.team.headline,
     subheadline: i18n.team.subheadline,
-    members: (teamMap[category] ?? defaultTeam).map((m) => ({
+    members: (teamMap[category] ?? defaultTeam).map((m, index) => ({
       name: m.name,
-      role: m.role,
-      bio: m.bio,
+      role: localizedCopy?.[index % localizedCopy.length]?.role ?? m.role,
+      bio: localizedCopy?.[index % localizedCopy.length]?.bio ?? m.bio,
     })),
   }
 }
@@ -964,18 +1038,51 @@ function buildNewsletter(biz: BusinessSample): Record<string, unknown> {
 
 // GH-1024: menu-display hidden — use menu-food (schema: price: string, currency: string, tag?: string, no dietaryTags).
 // GH-1219: prefer library block categories (already in canonical format) over hardcoded fallback.
-function buildMenuFood(content: CategoryContent): Record<string, unknown> {
+function buildMenuFood(
+  content: CategoryContent,
+  biz: BusinessSample,
+  language?: string,
+): Record<string, unknown> {
   const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food') as Record<string, unknown> | undefined
-  const headline = (industryBlock?.headline as string) ?? (industryBlock?.title as string) ?? 'Our Menu'
+  const menuHeadline: Record<string, string> = {
+    en: 'Our Menu',
+    ms: 'Menu Kami',
+    vi: 'Thực Đơn',
+  }
+  const headline = menuHeadline[language ?? 'en']
+    ?? (industryBlock?.headline as string)
+    ?? (industryBlock?.title as string)
+    ?? menuHeadline.en
   const libCategories = Array.isArray(industryBlock?.categories) && (industryBlock.categories as unknown[]).length > 0
     ? industryBlock.categories as unknown[]
+    : null
+  const productCategoryNames: Record<string, string> = {
+    en: 'Our Selection',
+    ms: 'Pilihan Kami',
+    vi: 'Lựa Chọn Của Chúng Tôi',
+  }
+  const libraryItems = (libCategories ?? []).flatMap((category) => {
+    if (!category || typeof category !== 'object') return []
+    const items = (category as { items?: unknown }).items
+    return Array.isArray(items) ? items : []
+  }) as Array<Record<string, unknown>>
+  const productItems = (biz.products ?? []).slice(0, 6).map((name, index) => {
+    const libraryItem = libraryItems[index % Math.max(libraryItems.length, 1)]
+    return {
+      name,
+      price: typeof libraryItem?.price === 'string' ? libraryItem.price : String(3 + index * 3),
+      currency: typeof libraryItem?.currency === 'string' ? libraryItem.currency : 'RM',
+    }
+  })
+  const productCategories = productItems.length >= 2
+    ? [{ name: productCategoryNames[language ?? 'en'] ?? productCategoryNames.en, items: productItems }]
     : null
 
   return {
     blockType: 'menu-food',
     variant: 'classic',
     headline,
-    categories: libCategories ?? [
+    categories: productCategories ?? libCategories ?? [
       {
         name: 'Mains',
         items: [
@@ -1283,18 +1390,35 @@ export function buildServiceCards(biz: BusinessSample, category: string, languag
   // rotated from PRODUCT_FEATURE_ICONS). Leaves price empty — storefront can
   // add pricing later via the editor.
   const userProducts = biz.products ?? []
-  const services =
+  const localizedCanned = canned.map(localizeService)
+  const userServices =
     userProducts.length >= 2
-      ? featuresFromProducts(userProducts, category, canned.length).map((card) => ({
+      ? featuresFromProducts(userProducts, category, 6).map((card) => ({
           title: card.title,
           description: card.description,
           icon: card.icon,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
-      : canned.map(localizeService).map((s) => ({
+      : []
+  const services = userServices.length > 0
+    ? [...userServices]
+    : localizedCanned.map((s) => ({
           ...s,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
+
+  if (userServices.length > 0 && services.length < 4) {
+    const existingTitles = new Set(services.map((service) => service.title.toLocaleLowerCase()))
+    for (const fallback of localizedCanned) {
+      if (services.length >= 4) break
+      if (existingTitles.has(fallback.title.toLocaleLowerCase())) continue
+      services.push({
+        ...fallback,
+        cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
+      })
+      existingTitles.add(fallback.title.toLocaleLowerCase())
+    }
+  }
 
   return {
     blockType: 'service-cards',
@@ -1375,7 +1499,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
   if (isUnsupportedBlock(blockType)) return null
   switch (blockType) {
     case 'menu-food':
-      return buildMenuFood(content)
+      return buildMenuFood(content, biz)
     case 'booking-widget':
       return buildBookingWidget(content, category)
     case 'class-schedule':
@@ -1683,7 +1807,11 @@ function buildBlogPage(biz: BusinessSample, category: string, pages: string[], s
 
 // ── Blueprint-driven composer (NEW — replaces algorithmic composition) ──────
 
-import type { TemplatePreset, BlockSpec } from './template-definitions'
+import {
+  TEMPLATE_GALLERY_IMAGE_COUNT,
+  type TemplatePreset,
+  type BlockSpec,
+} from './template-definitions'
 import { pickRecipe, type CategoryRecipe } from './category-recipes'
 import {
   NAV_VARIANT_BY_CATEGORY,
@@ -1742,13 +1870,19 @@ export function rotateStructuralVariants(
       for (const block of page.layout as Array<Record<string, unknown>>) {
         if (block.blockType === blockType) {
           // Guard: enforce min content for picked variant — prevents grid-4 with 3 items etc.
-          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos']
+          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos', 'services']
           let count = 0
           for (const field of contentFields) {
             const v = block[field]
             if (Array.isArray(v) && v.length > count) count = v.length
           }
           block.variant = count > 0 ? enforceMinContent(blockType, picked, count) : picked
+          if (blockType === 'service-cards' && Array.isArray(block.services)) {
+            const target = block.variant === 'featured' ? 4 : 3
+            if (block.services.length > target) {
+              block.services = block.services.slice(0, target)
+            }
+          }
         }
       }
     }
@@ -1828,44 +1962,45 @@ function buildBlockFromSpec(
   compositionSeed?: number,
   mood?: ThemeMood,
   disabledSet?: Set<string>,
+  language: ContentLang = 'en',
 ): Record<string, unknown> {
   // Auto-select variant if not specified in blueprint and seed is available
   const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category, disabledSet) : undefined)
   switch (spec.blockType) {
     case 'navigation':
-      return { ...buildNavigation(biz, pageNames, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildNavigation(biz, pageNames, category, mood, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'hero':
       return {
-        ...buildHero(biz, category, 0, mood),
+        ...buildHero(biz, category, 0, mood, language),
         ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
     case 'features': {
-      const fb = buildFeatures(biz, category) as Record<string, unknown>
+      const fb = buildFeatures(biz, category, language) as Record<string, unknown>
       const fbCount = Array.isArray(fb.features) ? (fb.features as unknown[]).length : 0
       const finalVariant = resolvedVariant ? enforceMinContent('features', resolvedVariant, fbCount) : undefined
       return { ...fb, ...(finalVariant ? { variant: finalVariant } : {}) }
     }
     case 'testimonials':
-      return { ...buildTestimonials(content, biz.name), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+      return { ...buildTestimonials(content, biz.name, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
-      return { ...buildContact(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildContact(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'footer':
-      return { ...buildFooter(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildFooter(biz, pageNames, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'stats':
       return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
       return { ...buildGallery(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
-      return { ...buildFAQ(content, biz.name), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildFAQ(content, biz.name, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
-      return { ...buildCTA(biz, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildCTA(biz, category, mood, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':
-      return { ...buildAbout(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildAbout(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'pricing':
-      return { ...buildPricing(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildPricing(category, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'team':
-      return { ...buildTeam(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildTeam(category, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'newsletter':
       return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
@@ -1873,7 +2008,7 @@ function buildBlockFromSpec(
       return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: 'logo-cloud', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-food':
-      return buildMenuFood(content)
+      return { ...buildMenuFood(content, biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'booking-widget':
       return buildBookingWidget(content, category)
     case 'class-schedule':
@@ -1904,7 +2039,7 @@ function buildBlockFromSpec(
       }
     }
     case 'service-cards':
-      return buildServiceCards(biz, category)
+      return buildServiceCards(biz, category, language)
     case 'feature-comparison':
       return buildFeatureComparison()
     case 'pricing-table':
@@ -2041,6 +2176,7 @@ function enrichSubPages(
   biz: BusinessSample,
   category: string,
   seed?: number,
+  language: ContentLang = 'en',
 ): void {
   const getPage = (title: string): TemplatePage | undefined =>
     pages.find((p) => p.title?.toLowerCase() === title.toLowerCase())
@@ -2080,6 +2216,33 @@ function enrichSubPages(
 
     // TODO(GH-820): re-enable google-maps injection when embedUrl pipeline lands
     if (!hasFaq) {
+      const contactFaq: Record<ContentLang, { headline: string; items: Array<{ question: string; answer: string }> }> = {
+        en: {
+          headline: 'Visit Us',
+          items: [
+            { question: 'What are your opening hours?', answer: 'We are open 9:00 AM to 9:00 PM daily. See our Google Maps listing for real-time updates.' },
+            { question: 'Do you offer walk-ins or is booking required?', answer: 'Walk-ins welcome for most services. For peak hours and specific requests, booking is recommended.' },
+            { question: 'Is parking available?', answer: 'Yes — street parking and nearby covered parking are both within a 2-minute walk.' },
+          ],
+        },
+        ms: {
+          headline: 'Kunjungi Kami',
+          items: [
+            { question: 'Apakah waktu operasi anda?', answer: 'Kami dibuka dari 9:00 pagi hingga 9:00 malam setiap hari. Hubungi kami untuk maklumat terkini.' },
+            { question: 'Adakah pelanggan tanpa tempahan diterima?', answer: 'Pelanggan tanpa tempahan diterima untuk kebanyakan perkhidmatan, tetapi tempahan awal digalakkan pada waktu sibuk.' },
+            { question: 'Adakah tempat letak kereta tersedia?', answer: 'Ya, tempat letak kereta di jalan dan parkir berbumbung berdekatan boleh dikunjungi dengan berjalan kaki.' },
+          ],
+        },
+        vi: {
+          headline: 'Ghé Thăm Chúng Tôi',
+          items: [
+            { question: 'Giờ hoạt động của cửa hàng là khi nào?', answer: 'Chúng tôi mở cửa từ 9 giờ sáng đến 9 giờ tối hằng ngày. Vui lòng liên hệ để biết thông tin mới nhất.' },
+            { question: 'Tôi có thể đến trực tiếp hay cần đặt lịch?', answer: 'Chúng tôi tiếp nhận khách đến trực tiếp cho hầu hết dịch vụ, nhưng bạn nên đặt trước vào giờ cao điểm.' },
+            { question: 'Có chỗ đậu xe không?', answer: 'Có, chỗ đậu xe ngoài đường và bãi đậu xe có mái che đều nằm trong khoảng cách đi bộ gần.' },
+          ],
+        },
+      }
+      const faqCopy = contactFaq[language]
       const insertIdx = contactPage.layout.findIndex(
         (b) => (b as Record<string, unknown>).blockType === 'footer',
       )
@@ -2087,12 +2250,8 @@ function enrichSubPages(
       contactPage.layout.splice(beforeFooter, 0, {
         blockType: 'faq',
         variant: 'accordion',
-        headline: 'Visit Us',
-        items: [
-          { question: 'What are your opening hours?', answer: 'We are open 9:00 AM to 9:00 PM daily. See our Google Maps listing for real-time updates.' },
-          { question: 'Do you offer walk-ins or is booking required?', answer: 'Walk-ins welcome for most services. For peak hours and specific requests, booking is recommended.' },
-          { question: 'Is parking available?', answer: 'Yes — street parking and nearby covered parking are both within a 2-minute walk.' },
-        ],
+        headline: faqCopy.headline,
+        items: faqCopy.items,
       } as unknown as Record<string, unknown>)
     }
   }
@@ -2143,6 +2302,7 @@ export function composeFromBlueprint(
   compositionSeed?: number,
   bizOverride?: Partial<BusinessSample>,
   disabledSet?: Set<string>,
+  language: ContentLang = 'en',
 ): TemplateSeed | null {
   // Plan 260415 fix-500 — return null instead of throw so caller (e.g.
   // fallback-adapter.composeFallbackResult) can fall back to the legacy
@@ -2182,11 +2342,18 @@ export function composeFromBlueprint(
   // required block — in that case we keep the preset sequence untouched.
   const recipe = pickRecipe(preset.category, seed, { name: biz.name })
 
-  // Template path content language — defaults to 'en' since template content
-  // in src/lib/ai/content/*.ts is pre-curated. Phase 04 wires the SAME
-  // content-rules validator used by the AI path, so any blocked CTA in the
-  // hand-authored template content is caught + fixed uniformly.
-  const templateLang: ContentLang = 'en'
+  // Old presets still reference menu-display, which is hidden in the editor.
+  // Normalize its blueprint to the supported menu-food schema before the
+  // unsupported-block filter runs, otherwise F&B templates lose their menu.
+  const normalizeSpec = (spec: BlockSpec): BlockSpec => {
+    if (spec.blockType !== 'menu-display') return spec
+    const menuVariant = spec.variant === 'cards' || spec.variant === 'photo-grid'
+      ? 'cards'
+      : spec.variant === 'minimal' || spec.variant === 'luxury-list'
+        ? 'minimal'
+        : 'classic'
+    return { ...spec, blockType: 'menu-food', variant: menuVariant }
+  }
 
   const pages: TemplatePage[] = preset.pages.map((page, pageIdx) => {
     // Only reorder the homepage — sub-pages keep their preset blueprint so
@@ -2200,11 +2367,12 @@ export function composeFromBlueprint(
       title: page.name,
       slug: page.slug,
       layout: specs
+        .map(normalizeSpec)
         // Filter out unsupported block types before building
         .filter((spec) => !isUnsupportedBlock(spec.blockType))
         .map((spec) => {
-          const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet)
-          return applyContentValidation(block, templateLang)
+          const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet, language)
+          return applyContentValidation(block, language)
         }),
     }
   })
@@ -2214,7 +2382,7 @@ export function composeFromBlueprint(
   // - Ensure About page hero subheadline weaves user biz.description when present
   // - Ensure Contact page has google-maps + opening-hours FAQ when user provides address
   // Mutates `pages` in place via helper — adds missing pages, updates existing.
-  enrichSubPages(pages, biz, preset.category, seed)
+  enrichSubPages(pages, biz, preset.category, seed, language)
 
   // Plan 260415 — rotate navigation / contact / footer variants from the
   // curated per-category pools so same-category businesses ship different

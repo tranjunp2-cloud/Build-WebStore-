@@ -12,6 +12,46 @@ const DB_POLL_MS = 5_000
 const HEARTBEAT_MS = 20_000
 const MAX_STREAM_MS = 50_000
 
+interface BuyerTrackingOrder {
+    status: string
+    paymentStatus: string
+    trackingNumber?: string | null
+    awbNo?: string | null
+    shippingCourier?: string | null
+    shippingCourierName?: string | null
+    shippingCourierLogo?: string | null
+    selfDeliveryCourier?: string | null
+    collectionMethod?: 'pickup' | 'dropoff' | null
+    shippingTrackingStatus?: string | null
+    shippingTrackingHistory?: Array<{
+        status?: string | null
+        description?: string | null
+        eventTime?: string | null
+        collectionMethod?: 'pickup' | 'dropoff' | null
+    }> | null
+}
+
+function buyerTrackingState(order: BuyerTrackingOrder) {
+    return {
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        trackingNumber: order.trackingNumber ?? null,
+        awbNo: order.awbNo ?? null,
+        shippingCourier: order.shippingCourier ?? null,
+        shippingCourierName: order.shippingCourierName ?? null,
+        shippingCourierLogo: order.shippingCourierLogo ?? null,
+        selfDeliveryCourier: order.selfDeliveryCourier ?? null,
+        collectionMethod: order.collectionMethod ?? null,
+        shippingTrackingStatus: order.shippingTrackingStatus ?? null,
+        shippingTrackingHistory: (order.shippingTrackingHistory ?? []).map((entry) => ({
+            status: entry.status ?? null,
+            description: entry.description ?? '',
+            eventTime: entry.eventTime ?? '',
+            collectionMethod: entry.collectionMethod ?? null,
+        })),
+    }
+}
+
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ orderNumber: string }> },
@@ -53,18 +93,20 @@ export async function GET(
         }
 
         const initial = await payload.find({ collection: 'orders', where, limit: 1, overrideAccess: true, depth: 0 })
-        const initialOrder = initial.docs[0] as any
+        const initialOrder = initial.docs[0] as unknown as BuyerTrackingOrder
         if (!initialOrder) return new Response('not_found', { status: 404 })
 
-        let lastStatus: string = initialOrder.status
-        let lastPaymentStatus: string = initialOrder.paymentStatus
-        let lastTrackingNumber: string | null = initialOrder.trackingNumber ?? null
+        let lastState = buyerTrackingState(initialOrder)
+        let lastStateJson = JSON.stringify(lastState)
 
         const encoder = new TextEncoder()
 
         const stream = new ReadableStream({
             start(controller) {
                 let closed = false
+                let pollId: ReturnType<typeof setInterval> | undefined
+                let heartbeatId: ReturnType<typeof setInterval> | undefined
+                let maxTimer: ReturnType<typeof setTimeout> | undefined
 
                 function send(data: object) {
                     if (closed) return
@@ -78,41 +120,38 @@ export async function GET(
                 function close() {
                     if (closed) return
                     closed = true
-                    clearInterval(pollId)
-                    clearInterval(heartbeatId)
-                    clearTimeout(maxTimer)
+                    if (pollId) clearInterval(pollId)
+                    if (heartbeatId) clearInterval(heartbeatId)
+                    if (maxTimer) clearTimeout(maxTimer)
                     try { controller.close() } catch {}
                 }
 
                 // Immediately send current state
                 send({
-                    status: lastStatus,
-                    paymentStatus: lastPaymentStatus,
-                    trackingNumber: lastTrackingNumber,
-                    terminal: TERMINAL_STATUSES.has(lastStatus),
+                    ...lastState,
+                    terminal: TERMINAL_STATUSES.has(lastState.status),
                 })
 
-                if (TERMINAL_STATUSES.has(lastStatus)) { close(); return }
+                if (TERMINAL_STATUSES.has(lastState.status)) { close(); return }
 
-                // Poll DB every 5s for status changes
-                const pollId = setInterval(async () => {
+                // Poll DB every 5s for order and courier-tracking changes.
+                pollId = setInterval(async () => {
                     if (closed) return
                     try {
                         const r = await payload.find({ collection: 'orders', where, limit: 1, overrideAccess: true, depth: 0 })
-                        const o = r.docs[0] as any
+                        const o = r.docs[0] as unknown as BuyerTrackingOrder
                         if (!o) return
 
-                        const newTracking = o.trackingNumber ?? null
-                        if (
-                            o.status !== lastStatus ||
-                            o.paymentStatus !== lastPaymentStatus ||
-                            newTracking !== lastTrackingNumber
-                        ) {
-                            lastStatus = o.status
-                            lastPaymentStatus = o.paymentStatus
-                            lastTrackingNumber = newTracking
-                            send({ status: lastStatus, paymentStatus: lastPaymentStatus, trackingNumber: lastTrackingNumber, terminal: TERMINAL_STATUSES.has(lastStatus) })
-                            if (TERMINAL_STATUSES.has(lastStatus)) close()
+                        const nextState = buyerTrackingState(o)
+                        const nextStateJson = JSON.stringify(nextState)
+                        if (nextStateJson !== lastStateJson) {
+                            lastState = nextState
+                            lastStateJson = nextStateJson
+                            send({
+                                ...lastState,
+                                terminal: TERMINAL_STATUSES.has(lastState.status),
+                            })
+                            if (TERMINAL_STATUSES.has(lastState.status)) close()
                         }
                     } catch {
                         // retry on next tick
@@ -120,13 +159,13 @@ export async function GET(
                 }, DB_POLL_MS)
 
                 // Heartbeat to keep connection alive through proxies
-                const heartbeatId = setInterval(() => {
+                heartbeatId = setInterval(() => {
                     if (closed) return
                     try { controller.enqueue(encoder.encode(': heartbeat\n\n')) } catch { close() }
                 }, HEARTBEAT_MS)
 
                 // Graceful close before Vercel timeout — EventSource auto-reconnects
-                const maxTimer = setTimeout(close, MAX_STREAM_MS)
+                maxTimer = setTimeout(close, MAX_STREAM_MS)
 
                 // Clean up on client disconnect
                 request.signal.addEventListener('abort', close)

@@ -150,7 +150,7 @@ describe('TC-NAV-10 — CTA label and url onBlur calls onHeaderUpdate with merge
             </I18nProvider>,
         )
 
-        const urlInput = screen.getByPlaceholderText('Button URL (e.g. /contact)')
+        const urlInput = screen.getByPlaceholderText('Button link (e.g. /contact)')
 
         // Act
         fireEvent.blur(urlInput, { target: { value: '/signup' } })
@@ -195,7 +195,7 @@ describe('TC-F05-15-01 — Hero CTA section renders with Add Button when ctaButt
 describe('TC-F05-15-02 — Hero CTA section shows empty state text when ctaButtons empty', () => {
     beforeEach(() => { vi.clearAllMocks() })
 
-    it('displays "No buttons yet" text when ctaButtons is empty', () => {
+    it('displays the empty state when ctaButtons is empty', () => {
         // Arrange
         const onBlockUpdate = vi.fn()
 
@@ -212,7 +212,7 @@ describe('TC-F05-15-02 — Hero CTA section shows empty state text when ctaButto
         )
 
         // Act & Assert
-        const emptyText = screen.getByText('No buttons yet')
+        const emptyText = screen.getByText('No buttons yet. Add one to get started.')
         expect(emptyText).toBeInTheDocument()
     })
 })
@@ -293,7 +293,7 @@ describe('TC-F05-15-04 — Clicking Hero Add Button calls onBlockUpdate with new
 describe('TC-F05-15-05 — CTA block shows Add secondary button when secondaryCtaLabel falsy', () => {
     beforeEach(() => { vi.clearAllMocks() })
 
-    it('renders Add Secondary Button when secondaryCtaLabel is undefined', () => {
+    it('renders Add Secondary button when secondaryCtaLabel is undefined', () => {
         // Arrange
         const onBlockUpdate = vi.fn()
 
@@ -315,7 +315,7 @@ describe('TC-F05-15-05 — CTA block shows Add secondary button when secondaryCt
         )
 
         // Act & Assert
-        expect(screen.getByText('Secondary Button')).toBeInTheDocument()
+        expect(screen.getByText('Secondary button')).toBeInTheDocument()
         const addSecondaryBtn = screen.getByRole('button', { name: /\+ Add Button/i })
         expect(addSecondaryBtn).toBeInTheDocument()
     })
@@ -415,7 +415,7 @@ describe('TC-NAV-12 — Nav CTA section hidden when nav variant is not default',
 
             // Assert — CTA inputs must not be present for non-default variants
             expect(screen.queryByPlaceholderText('Button label (e.g. Get started)')).not.toBeInTheDocument()
-            expect(screen.queryByPlaceholderText('Button URL (e.g. /contact)')).not.toBeInTheDocument()
+            expect(screen.queryByPlaceholderText('Button link (e.g. /contact)')).not.toBeInTheDocument()
         },
     )
 

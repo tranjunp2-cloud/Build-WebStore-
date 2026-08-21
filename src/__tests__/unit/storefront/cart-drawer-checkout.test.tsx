@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 
 // ── Mutable state driving useCartStore mock ───────────────────────────────
@@ -12,6 +12,8 @@ let mockChanges: import('@/store/cartStore').CartChange[] = []
 let mockRequiresConfirmation = false
 const mockRefreshCart = vi.fn()
 const mockAcknowledgeChanges = vi.fn()
+const mockUpdateQuantity = vi.fn()
+const mockCloseCart = vi.fn()
 
 // ── Mutable state driving usePathname mock ────────────────────────────────
 let mockPathname = '/sites/test-site'
@@ -25,9 +27,9 @@ vi.mock('@/store/cartStore', () => ({
     useCartStore: vi.fn(() => ({
         items: mockItems,
         isOpen: mockIsOpen,
-        closeCart: vi.fn(),
+        closeCart: mockCloseCart,
         removeItem: vi.fn(),
-        updateQuantity: vi.fn(),
+        updateQuantity: mockUpdateQuantity,
         subtotal: vi.fn(() => mockItems.reduce((s, i) => s + i.price * i.quantity, 0)),
         itemCount: vi.fn(() => mockItems.reduce((s, i) => s + i.quantity, 0)),
         siteId: mockSiteId,
@@ -167,6 +169,80 @@ describe('CartDrawer — checkout routing', () => {
         })
     })
 
+    // ── TC-F09.12: Drawer slides in from the right ──────────────────────
+    describe('TC-F09.12: Cart Drawer slide-in motion', () => {
+        it('starts off-screen to the right while the backdrop fades in', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('dialog', { name: /shopping cart/i }))
+                .toHaveStyle({ transform: 'translateX(100%)' })
+            expect(screen.getByTestId('cart-drawer-backdrop'))
+                .toHaveStyle({ opacity: '0' })
+        })
+
+        it('keeps keyboard focus inside the modal and closes on Escape', async () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            render(<CartDrawer siteSlug="test-site" />)
+            const closeButton = screen.getByRole('button', { name: 'Close cart' })
+            const checkoutLink = screen.getByRole('link', { name: /proceed to checkout/i })
+
+            // Act + Assert — initial focus enters the dialog
+            await waitFor(() => expect(closeButton).toHaveFocus())
+
+            // Act + Assert — Shift+Tab/Tab wrap at the dialog boundaries
+            fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+            expect(checkoutLink).toHaveFocus()
+            fireEvent.keyDown(document, { key: 'Tab' })
+            expect(closeButton).toHaveFocus()
+
+            // Act + Assert — Escape delegates closing to the cart store
+            fireEvent.keyDown(document, { key: 'Escape' })
+            expect(mockCloseCart).toHaveBeenCalledTimes(1)
+        })
+
+        it('restores focus to the opener after the drawer exits', async () => {
+            // Arrange
+            const opener = document.createElement('button')
+            opener.textContent = 'Open cart'
+            document.body.appendChild(opener)
+            opener.focus()
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            const { rerender } = render(<CartDrawer siteSlug="test-site" />)
+            await waitFor(() => expect(screen.getByRole('button', { name: 'Close cart' })).toHaveFocus())
+
+            // Act
+            mockIsOpen = false
+            rerender(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            await waitFor(() => expect(opener).toHaveFocus())
+            opener.remove()
+        })
+
+        it('provides accessible names for item actions', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+
+            // Act
+            render(<CartDrawer siteSlug="test-site" />)
+
+            // Assert
+            expect(screen.getByRole('button', { name: 'Remove Test Product from cart' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Decrease quantity for Test Product' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Increase quantity for Test Product' })).toBeInTheDocument()
+        })
+    })
+
     // ── TC-F09.220: Items + siteSlug → checkout link ───────────────────────
     describe('TC-F09.220: Cart has items → checkout renders as link with correct href', () => {
         it('renders checkout as <a> when items exist and siteSlug provided', () => {
@@ -235,6 +311,22 @@ describe('CartDrawer — checkout routing', () => {
             // Assert — no checkout link; fallback button rendered
             expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
             expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F09.16: Decrementing one item removes it ────────────────────────
+    describe('TC-F09.16: Quantity 1 → decrement to 0', () => {
+        it('passes quantity 0 to the cart store so the last item is removed', () => {
+            // Arrange
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            render(<CartDrawer siteSlug="test-site" />)
+            // Act
+            fireEvent.click(screen.getByRole('button', { name: 'Decrease quantity for Test Product' }))
+
+            // Assert
+            expect(mockUpdateQuantity).toHaveBeenCalledTimes(1)
+            expect(mockUpdateQuantity).toHaveBeenCalledWith('prod-1', 0, undefined)
         })
     })
 

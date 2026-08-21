@@ -13,8 +13,10 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, getCuratedFallbackMedia, type MediaPipelineContext } from './media-pipeline'
-import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
+import { getMediaForBlock, batchFetchFromPool, getCuratedFallbackMedia, type MediaPipelineContext } from './media-pipeline'
+import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImagePool, type ImageRole } from './image-pool'
+import { markPixabayMediaUsed, markPixabayUrlsUsed } from './pixabay-client'
+import type { ReservoirKind } from './image-sourcing/contracts'
 
 /** Describes how to find/mutate image fields for each block type. */
 export interface BlockImageSpec {
@@ -22,6 +24,13 @@ export interface BlockImageSpec {
     topLevel?: string[]
     /** Nested array fields: { arrayField, itemField } — each array item gets 1 image. */
     nestedArray?: Array<{ arrayField: string; itemField: string; minCount?: number }>
+    /** Two-level arrays such as menu-food.categories[].items[].image. */
+    deepNestedArray?: Array<{
+        outerArrayField: string
+        innerArrayField: string
+        itemField: string
+        minCount?: number
+    }>
 }
 
 /**
@@ -62,12 +71,12 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
     'property-card': {
         nestedArray: [{ arrayField: 'properties', itemField: 'image', minCount: 3 }],
     },
-    'doctor-profile': {
-        nestedArray: [{ arrayField: 'doctors', itemField: 'image', minCount: 2 }],
-    },
-    'before-after': {
-        topLevel: ['beforeImage', 'afterImage'],
-    },
+    'doctor-profile': {},
+    'before-after': {},
+    'gallery-masonry': {},
+    'video-showcase': {},
+    'menu-display': {},
+    'product-quick-view': {},
     'case-study': {
         nestedArray: [{ arrayField: 'caseStudies', itemField: 'image', minCount: 3 }],
     },
@@ -77,13 +86,28 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
     'blog-posts': {
         nestedArray: [{ arrayField: 'posts', itemField: 'image', minCount: 3 }],
     },
+    carousel: {
+        nestedArray: [{ arrayField: 'items', itemField: 'image', minCount: 3 }],
+    },
+    'social-proof': {
+        nestedArray: [{ arrayField: 'reviews', itemField: 'avatar', minCount: 3 }],
+    },
+    video: { topLevel: ['posterImage'] },
+    'menu-food': {
+        deepNestedArray: [{
+            outerArrayField: 'categories',
+            innerArrayField: 'items',
+            itemField: 'image',
+            minCount: 4,
+        }],
+    },
 }
 
 /**
  * Which block types should fetch stock images during gen.
  * Env var `PIXABAY_BLOCKS` overrides (comma-separated list).
- * Default: hero-only. Set to `all` to enable all block types — safe given
- * Pixabay's generous limit (~100 req/min ≈ 6000/hr).
+ * Default: every supported non-logo block. The generation-scoped search
+ * budget still caps the entire website at two Pixabay requests.
  *
  * BLOCK_IMAGE_SPEC above is still used by cleanupNonNumericImageFields
  * and stripOrphanMediaRefs regardless — those only clean refs, not fetch.
@@ -94,11 +118,7 @@ function getImageEnabledBlocks(): ReadonlySet<string> {
     if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
     return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
 }
-const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
-
-// GH-1185: blocks whose image slots show PEOPLE — routed to the dedicated
-// portrait search (getAvatarMedia) instead of the product-keyword pool.
-const PEOPLE_BLOCKS: ReadonlySet<string> = new Set(['testimonials', 'team', 'doctor-profile'])
+const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(Object.keys(BLOCK_IMAGE_SPEC))
 
 // GH-1185: logo-cloud must NEVER receive stock/pool photos — client logos are
 // name-only badges (monogram placeholder), not photo subjects. Kept separate
@@ -113,16 +133,21 @@ const NO_STOCK_BLOCKS: ReadonlySet<string> = new Set(['logo-cloud'])
 // sized to the exact count would hand every same-role block the identical set.
 const POOL_BUFFER_FACTOR = 1.4
 const POOL_MIN_EXTRA = 2
+const MAX_PIXABAY_RESULTS_PER_REQUEST = 200
+
+export interface PoolDemandHints {
+    galleryImages?: number
+}
 
 /**
  * Per-bucket pool size derived from the enabled image blocks — known entirely
  * pre-GPT (env + static specs), so this can size the pre-GPT pool build.
  *
- * A bucket's base = the LARGEST single-block need mapping to it (blocks share
- * the pool as a selection reservoir, they don't each consume a disjoint slice),
- * then padded by the diversity buffer and capped at the legacy default. People
- * blocks are excluded (avatars use getAvatarMedia, not the pool). A bucket with
- * no enabled block resolves to 0 → buildImagePool skips that Pixabay call.
+ * A bucket's base = the LARGEST single-block need mapping to it. Template-first
+ * callers may also supply the total gallery slots in the selected blueprint so
+ * repeated gallery blocks receive disjoint images. Other blocks keep the
+ * diversity buffer and legacy caps. A bucket with no enabled block resolves to
+ * 0, so buildImagePool skips that Pixabay call.
  *
  * Default config (hero-only) → { landscape: 3, square: 0 } instead of 12+6.
  *
@@ -134,28 +159,42 @@ const POOL_MIN_EXTRA = 2
  */
 export function computePoolBucketSizes(
     enabled: ReadonlySet<string> = getImageEnabledBlocks(),
+    demand: PoolDemandHints = {},
 ): { landscape: number; square: number; landscapeMin: number; squareMin: number } {
+    const galleryDemand = Math.min(
+        MAX_PIXABAY_RESULTS_PER_REQUEST,
+        Math.max(0, Math.floor(demand.galleryImages ?? 0)),
+    )
     let landscapeBase = 0
     let squareBase = 0
     for (const blockType of enabled) {
-        if (PEOPLE_BLOCKS.has(blockType)) continue
         // GH-1185: logo-cloud never consumes stock photos — exclude from sizing
         if (NO_STOCK_BLOCKS.has(blockType)) continue
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
-        const need = spec.nestedArray
-            ? Math.max(...spec.nestedArray.map((a) => a.minCount ?? 1))
+        const nestedNeeds = [
+            ...(spec.nestedArray ?? []).map((a) => a.minCount ?? 1),
+            ...(spec.deepNestedArray ?? []).map((a) => a.minCount ?? 1),
+        ]
+        const singleBlockNeed = nestedNeeds.length > 0
+            ? Math.max(...nestedNeeds)
             : 1 // top-level fields share one Media ID → 1 slot per block
+        const need = blockType === 'gallery'
+            ? Math.max(singleBlockNeed, galleryDemand)
+            : singleBlockNeed
         const bucket = bucketForRole(roleForBlock(blockType))
         if (bucket === 'square') squareBase = Math.max(squareBase, need)
         else landscapeBase = Math.max(landscapeBase, need)
     }
+    const landscapeCap = galleryDemand > 0
+        ? Math.max(DEFAULT_LANDSCAPE_SIZE, galleryDemand)
+        : DEFAULT_LANDSCAPE_SIZE
     const sized = (base: number, cap: number) =>
         base === 0 ? 0 : Math.min(cap, Math.max(base + POOL_MIN_EXTRA, Math.ceil(base * POOL_BUFFER_FACTOR)))
     return {
-        landscape: sized(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        landscape: sized(landscapeBase, landscapeCap),
         square: sized(squareBase, DEFAULT_SQUARE_SIZE),
-        landscapeMin: Math.min(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        landscapeMin: Math.min(landscapeBase, landscapeCap),
         squareMin: Math.min(squareBase, DEFAULT_SQUARE_SIZE),
     }
 }
@@ -165,6 +204,241 @@ export interface ImageNeed {
     blockType: string
     count: number
     assign: (mediaIds: number[]) => void
+}
+
+export interface F38PageImageNeed extends ImageNeed {
+    reservoir: ReservoirKind
+    pageIndex: number
+    blockIndex: number
+}
+
+export interface F38PageWithLayout {
+    layout?: unknown
+}
+
+interface F38ImageSlot {
+    read: () => number | undefined
+    write: (mediaId: number) => void
+    clear: () => void
+}
+
+interface F38PageBlockSpec {
+    reservoir: ReservoirKind
+    collectSlots: (block: AIBlock) => F38ImageSlot[]
+}
+
+function numericMediaId(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+        ? value
+        : undefined
+}
+
+function topLevelAliasSlot(block: AIBlock, fields: string[]): F38ImageSlot {
+    return {
+        read: () => {
+            for (const field of fields) {
+                const mediaId = numericMediaId(block[field])
+                if (mediaId != null) return mediaId
+            }
+            return undefined
+        },
+        write: (mediaId) => {
+            for (const field of fields) block[field] = mediaId
+        },
+        clear: () => {
+            for (const field of fields) delete block[field]
+        },
+    }
+}
+
+function nestedArraySlots(
+    block: AIBlock,
+    arrayField: string,
+    itemField: string,
+): F38ImageSlot[] {
+    const items = block[arrayField]
+    if (!Array.isArray(items)) return []
+
+    return items.flatMap((value) => {
+        if (!value || typeof value !== 'object') return []
+        const item = value as AIBlock
+        return [{
+            read: () => numericMediaId(item[itemField]),
+            write: (mediaId: number) => {
+                item[itemField] = mediaId
+            },
+            clear: () => {
+                delete item[itemField]
+            },
+        }]
+    })
+}
+
+function nestedMenuFoodSlots(block: AIBlock): F38ImageSlot[] {
+    const categories = block.categories
+    if (!Array.isArray(categories)) return []
+
+    return categories.flatMap((categoryValue) => {
+        if (!categoryValue || typeof categoryValue !== 'object') return []
+        return nestedArraySlots(categoryValue as AIBlock, 'items', 'image')
+    })
+}
+
+/**
+ * F38-only persisted upload-field map. It intentionally excludes logos and
+ * URL-only fields such as doctor-profile.photoUrl and gallery-masonry.images.url.
+ */
+const F38_PAGE_BLOCK_SPEC: Readonly<Record<string, F38PageBlockSpec>> = {
+    hero: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['image', 'backgroundImage'])],
+    },
+    about: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['image'])],
+    },
+    gallery: {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'images', 'image'),
+    },
+    'portfolio-grid': {
+        reservoir: 'square',
+        collectSlots: (block) => nestedArraySlots(block, 'projects', 'image'),
+    },
+    team: {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'members', 'image'),
+    },
+    testimonials: {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'testimonials', 'avatar'),
+    },
+    'property-card': {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'properties', 'image'),
+    },
+    carousel: {
+        reservoir: 'landscape',
+        collectSlots: (block) => nestedArraySlots(block, 'items', 'image'),
+    },
+    'social-proof': {
+        reservoir: 'people',
+        collectSlots: (block) => nestedArraySlots(block, 'reviews', 'avatar'),
+    },
+    video: {
+        reservoir: 'landscape',
+        collectSlots: (block) => [topLevelAliasSlot(block, ['posterImage'])],
+    },
+    'menu-food': {
+        reservoir: 'products',
+        collectSlots: nestedMenuFoodSlots,
+    },
+}
+
+function collectF38PageBlockSlots(
+    pages: F38PageWithLayout[],
+): Array<{
+    blockType: string
+    reservoir: ReservoirKind
+    pageIndex: number
+    blockIndex: number
+    slots: F38ImageSlot[]
+}> {
+    const groups: Array<{
+        blockType: string
+        reservoir: ReservoirKind
+        pageIndex: number
+        blockIndex: number
+        slots: F38ImageSlot[]
+    }> = []
+
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        const layout = pages[pageIndex]?.layout
+        if (!Array.isArray(layout)) continue
+
+        for (let blockIndex = 0; blockIndex < layout.length; blockIndex++) {
+            const value = layout[blockIndex]
+            if (!value || typeof value !== 'object') continue
+            const block = value as AIBlock
+            const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+            const spec = F38_PAGE_BLOCK_SPEC[blockType]
+            if (!spec) continue
+            const slots = spec.collectSlots(block)
+            if (slots.length === 0) continue
+            groups.push({
+                blockType,
+                reservoir: spec.reservoir,
+                pageIndex,
+                blockIndex,
+                slots,
+            })
+        }
+    }
+
+    return groups
+}
+
+/**
+ * Plan every persisted, non-logo Media slot after final pages are built.
+ * Existing values are cleared immediately so cloned pages cannot retain the
+ * same image. Assigning fewer IDs than requested leaves the overflow empty.
+ */
+export function planF38FinalPageImageNeeds(
+    pages: F38PageWithLayout[],
+): F38PageImageNeed[] {
+    return collectF38PageBlockSlots(pages).map((group) => {
+        for (const slot of group.slots) slot.clear()
+        return {
+            blockType: group.blockType,
+            reservoir: group.reservoir,
+            pageIndex: group.pageIndex,
+            blockIndex: group.blockIndex,
+            count: group.slots.length,
+            assign: (mediaIds) => {
+                for (let index = 0; index < group.slots.length; index++) {
+                    const slot = group.slots[index]!
+                    const mediaId = numericMediaId(mediaIds[index])
+                    if (mediaId == null) slot.clear()
+                    else slot.write(mediaId)
+                }
+            },
+        }
+    })
+}
+
+/**
+ * Final first-wins guard for numeric Media IDs across final page layouts.
+ * Hero image/backgroundImage is one logical slot and therefore one identity.
+ */
+export function dedupeF38FinalPageMediaIds(
+    pages: F38PageWithLayout[],
+    initiallyUsed: Iterable<number> = [],
+): { removed: number; usedMediaIds: Set<number> } {
+    const usedMediaIds = new Set<number>()
+    for (const value of initiallyUsed) {
+        const mediaId = numericMediaId(value)
+        if (mediaId != null) usedMediaIds.add(mediaId)
+    }
+
+    let removed = 0
+    for (const group of collectF38PageBlockSlots(pages)) {
+        for (const slot of group.slots) {
+            const mediaId = slot.read()
+            if (mediaId == null) {
+                slot.clear()
+                continue
+            }
+            if (usedMediaIds.has(mediaId)) {
+                slot.clear()
+                removed++
+                continue
+            }
+            usedMediaIds.add(mediaId)
+            slot.write(mediaId)
+        }
+    }
+
+    return { removed, usedMediaIds }
 }
 
 /**
@@ -178,19 +452,52 @@ export function computePoolTargetsForNeeds(
     let landscape = 0
     let square = 0
     for (const need of needs) {
-        if (PEOPLE_BLOCKS.has(need.blockType) || NO_STOCK_BLOCKS.has(need.blockType)) continue
+        if (NO_STOCK_BLOCKS.has(need.blockType)) continue
         const bucket = bucketForRole(roleForBlock(need.blockType))
         if (bucket === 'square') {
-            square = Math.min(DEFAULT_SQUARE_SIZE, square + need.count)
+            square = Math.min(MAX_PIXABAY_RESULTS_PER_REQUEST, square + need.count)
         } else {
-            landscape = Math.min(DEFAULT_LANDSCAPE_SIZE, landscape + need.count)
+            landscape = Math.min(MAX_PIXABAY_RESULTS_PER_REQUEST, landscape + need.count)
         }
     }
     return { landscape, square }
 }
 
+/**
+ * Exact post-AI pool demand. Upload-backed fields are represented by ImageNeed;
+ * URL-backed fields are counted from the final generated block tree.
+ */
+export function computePoolTargetsForBlocks(
+    needs: ReadonlyArray<Pick<ImageNeed, 'blockType' | 'count'>>,
+    blocks: AIBlock[],
+): { landscape: number; square: number } {
+    const targets = computePoolTargetsForNeeds(needs)
+    const enabledBlocks = getImageEnabledBlocks()
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        if (!enabledBlocks.has(blockType)) continue
+        const group = collectUrlSlots(block)
+        if (!group) continue
+        const bucket = bucketForRole(group.role)
+        if (bucket === 'square') {
+            targets.square = Math.min(
+                MAX_PIXABAY_RESULTS_PER_REQUEST,
+                targets.square + group.slots.length,
+            )
+        } else {
+            targets.landscape = Math.min(
+                MAX_PIXABAY_RESULTS_PER_REQUEST,
+                targets.landscape + group.slots.length,
+            )
+        }
+    }
+    return targets
+}
+
 export interface FulfillmentContext extends MediaPipelineContext {
     language?: KeywordLanguage
+    /** Shared across upload-backed and URL-backed assignment for site-wide uniqueness. */
+    usedPoolPhotoIds?: Set<string>
 }
 
 type AIBlock = Record<string, unknown>
@@ -208,13 +515,20 @@ function roleForBlock(blockType: string): ImageRole {
         case 'gallery-masonry':
         case 'portfolio-grid':
         case 'before-after':
+        case 'carousel':
+        case 'video':
+        case 'video-showcase':
             return 'gallery'
         case 'team':
         case 'doctor-profile':
+        case 'testimonials':
+        case 'social-proof':
             return 'team'
         case 'products-grid':
         case 'products-featured':
         case 'product-quick-view':
+        case 'menu-food':
+        case 'menu-display':
             return 'product'
         case 'property-card':
             // Real-estate photos are landscape; square bucket (6 photos) yields poor
@@ -304,6 +618,31 @@ export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
                 })
             }
         }
+
+        if (spec.deepNestedArray) {
+            for (const { outerArrayField, innerArrayField, itemField } of spec.deepNestedArray) {
+                const outerItems = block[outerArrayField]
+                if (!Array.isArray(outerItems)) continue
+                const items = outerItems.flatMap((outerItem) => {
+                    if (!outerItem || typeof outerItem !== 'object') return []
+                    const innerItems = (outerItem as AIBlock)[innerArrayField]
+                    if (!Array.isArray(innerItems)) return []
+                    return innerItems.filter(
+                        (item): item is AIBlock => Boolean(item) && typeof item === 'object',
+                    )
+                })
+                if (items.length === 0) continue
+                needs.push({
+                    blockType,
+                    count: items.length,
+                    assign: (ids) => {
+                        for (let i = 0; i < items.length && i < ids.length; i++) {
+                            items[i]![itemField] = ids[i]
+                        }
+                    },
+                })
+            }
+        }
     }
 
     return needs
@@ -347,6 +686,22 @@ export function cleanupNonNumericImageFields(blocks: AIBlock[]): void {
                 for (const item of arr as AIBlock[]) {
                     if (item && typeof item === 'object' && typeof item[itemField] !== 'number') {
                         delete item[itemField]
+                    }
+                }
+            }
+        }
+        if (spec.deepNestedArray) {
+            for (const { outerArrayField, innerArrayField, itemField } of spec.deepNestedArray) {
+                const outerItems = block[outerArrayField]
+                if (!Array.isArray(outerItems)) continue
+                for (const outerItem of outerItems) {
+                    if (!outerItem || typeof outerItem !== 'object') continue
+                    const innerItems = (outerItem as AIBlock)[innerArrayField]
+                    if (!Array.isArray(innerItems)) continue
+                    for (const item of innerItems as AIBlock[]) {
+                        if (item && typeof item === 'object' && typeof item[itemField] !== 'number') {
+                            delete item[itemField]
+                        }
                     }
                 }
             }
@@ -404,6 +759,21 @@ export async function stripOrphanMediaRefs(
                 for (const item of arr as AIBlock[]) {
                     if (item && typeof item === 'object') {
                         const val = item[itemField]
+                        if (typeof val === 'number' && Number.isFinite(val)) mediaIds.add(val)
+                    }
+                }
+            }
+        }
+        if (spec?.deepNestedArray) {
+            for (const { outerArrayField, innerArrayField, itemField } of spec.deepNestedArray) {
+                const outerItems = block[outerArrayField]
+                if (!Array.isArray(outerItems)) continue
+                for (const outerItem of outerItems) {
+                    if (!outerItem || typeof outerItem !== 'object') continue
+                    const innerItems = (outerItem as AIBlock)[innerArrayField]
+                    if (!Array.isArray(innerItems)) continue
+                    for (const item of innerItems as AIBlock[]) {
+                        const val = item?.[itemField]
                         if (typeof val === 'number' && Number.isFinite(val)) mediaIds.add(val)
                     }
                 }
@@ -502,6 +872,24 @@ export async function stripOrphanMediaRefs(
                 }
             }
         }
+        if (spec?.deepNestedArray) {
+            for (const { outerArrayField, innerArrayField, itemField } of spec.deepNestedArray) {
+                const outerItems = block[outerArrayField]
+                if (!Array.isArray(outerItems)) continue
+                for (const outerItem of outerItems) {
+                    if (!outerItem || typeof outerItem !== 'object') continue
+                    const innerItems = (outerItem as AIBlock)[innerArrayField]
+                    if (!Array.isArray(innerItems)) continue
+                    for (const item of innerItems as AIBlock[]) {
+                        const val = item?.[itemField]
+                        if (typeof val === 'number' && !valid.has(val)) {
+                            delete item[itemField]
+                            stripped++
+                        }
+                    }
+                }
+            }
+        }
     }
 
     return { stripped, checked: mediaIds.size }
@@ -532,22 +920,32 @@ export async function fulfillImageNeeds(
     // (CONCURRENCY) so we won't spike Unsplash beyond their rate limit.
     const start = Date.now()
     const curatedFallbackUsed = new Set<string>()
+    const usedPoolPhotoIds = ctx.usedPoolPhotoIds ?? new Set<string>()
     const perBlockResults = await Promise.all(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
             if (totalCount === 0) return { blockType, groupNeeds, ids: [] as number[], reusable: true }
-            const uniqueCount = Math.max(...groupNeeds.map((need) => need.count))
+            const largestNeed = Math.max(...groupNeeds.map((need) => need.count))
             const role = roleForBlock(blockType)
-            const bucketCap = bucketForRole(role) === 'square'
-                ? DEFAULT_SQUARE_SIZE
-                : DEFAULT_LANDSCAPE_SIZE
-            // Fetch enough IDs to keep repeated block instances distinct. The
-            // cap prevents large sites from returning to the old 84-upload path;
-            // a single oversized block may still request its full own count.
-            const requestCount = Math.max(uniqueCount, Math.min(totalCount, bucketCap))
+            const requestCount = Math.min(totalCount, MAX_PIXABAY_RESULTS_PER_REQUEST)
             const completeWithCuratedFallback = async (ids: number[]) => {
                 if (ids.length >= requestCount) {
                     return { blockType, groupNeeds, ids: ids.slice(0, requestCount), reusable: true }
+                }
+                if (ctx.pool && ids.length > 0) {
+                    console.warn(
+                        `[Media Injector] ${blockType} diversity shortfall: ` +
+                        `unique=${ids.length} requested=${requestCount}; repeating pool images`,
+                    )
+                    return {
+                        blockType,
+                        groupNeeds,
+                        ids: Array.from(
+                            { length: Math.max(largestNeed, ids.length) },
+                            (_, index) => ids[index % ids.length]!,
+                        ),
+                        reusable: true,
+                    }
                 }
                 const fallback = await getCuratedFallbackMedia(
                     blockType,
@@ -564,32 +962,27 @@ export async function fulfillImageNeeds(
                 return { blockType, groupNeeds, ids: [...ids, ...fallback.mediaIds], reusable: true }
             }
 
-            // GH-1185: people slots (testimonial avatars, team members,
-            // doctor profiles) are PEOPLE — never pool photos (pool is built
-            // from product keywords → food close-ups in face slots).
-            // Dedicated portrait search; on provider miss use only the curated
-            // people library, so product-pool photos never appear in face slots.
-            if (PEOPLE_BLOCKS.has(blockType)) {
-                try {
-                    const result = await getAvatarMedia(requestCount, ctx.language, ctx, payload, blockType)
-                    if (result.failures.length > 0) {
-                        console.warn(
-                            `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
-                        )
-                    }
-                    return completeWithCuratedFallback(result.mediaIds)
-                } catch (err) {
-                    const msg = err instanceof Error ? err.message : String(err)
-                    console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
-                    return completeWithCuratedFallback([])
-                }
-            }
-
             // Phase-03 pool-aware fast path: pick from pre-built site pool to
             // preserve visual cohesion across blocks.
             if (ctx.pool) {
                 const poolSeed = hashBlockSeed(blockType, ctx.businessName)
-                const picks = pickManyFromPool(ctx.pool, role, poolSeed, requestCount)
+                const allPicks = pickManyFromPool(
+                    ctx.pool,
+                    role,
+                    poolSeed,
+                    MAX_PIXABAY_RESULTS_PER_REQUEST,
+                )
+                let picks = allPicks
+                    .filter((photo) => !usedPoolPhotoIds.has(photo.id))
+                    .slice(0, requestCount)
+                if (picks.length === 0 && allPicks.length > 0) {
+                    picks = allPicks.slice(0, requestCount)
+                    console.warn(
+                        `[Media Injector] ${blockType} has no unused pool photo; ` +
+                        `reusing ${picks.length} Pixabay image(s)`,
+                    )
+                }
+                for (const photo of picks) usedPoolPhotoIds.add(photo.id)
                 if (picks.length > 0) {
                     try {
                         const result = await batchFetchFromPool(picks, blockType, ctx, payload)
@@ -679,6 +1072,7 @@ export async function fulfillImageNeeds(
                 : []
             if (slice.length > 0) {
                 need.assign(slice)
+                markPixabayMediaUsed(slice)
                 succeeded += slice.length
                 failed += need.count - slice.length
 
@@ -701,9 +1095,130 @@ export async function fulfillImageNeeds(
         }
     }
 
-    console.info(
-        `[Media Injector] fulfilled ${succeeded}/${succeeded + failed} image slots across ${groupedByBlock.size} block type(s) in ${Date.now() - start}ms`,
-    )
+    return { succeeded, failed }
+}
+
+type UrlSlot = { set: (url: string) => void }
+
+function collectUrlSlots(block: AIBlock): { role: ImageRole; slots: UrlSlot[] } | null {
+    const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+    const arraySlots = (
+        arrayField: string,
+        setter: (item: AIBlock, url: string) => void,
+    ): UrlSlot[] => {
+        const items = block[arrayField]
+        if (!Array.isArray(items)) return []
+        return items.flatMap((item) =>
+            item && typeof item === 'object'
+                ? [{ set: (url: string) => setter(item as AIBlock, url) }]
+                : [],
+        )
+    }
+    const deepSlots = (
+        outerField: string,
+        innerField: string,
+        setter: (item: AIBlock, url: string) => void,
+    ): UrlSlot[] => {
+        const outerItems = block[outerField]
+        if (!Array.isArray(outerItems)) return []
+        return outerItems.flatMap((outerItem) => {
+            if (!outerItem || typeof outerItem !== 'object') return []
+            const innerItems = (outerItem as AIBlock)[innerField]
+            if (!Array.isArray(innerItems)) return []
+            return innerItems.flatMap((item) =>
+                item && typeof item === 'object'
+                    ? [{ set: (url: string) => setter(item as AIBlock, url) }]
+                    : [],
+            )
+        })
+    }
+
+    switch (blockType) {
+        case 'doctor-profile':
+            return { role: 'team', slots: arraySlots('doctors', (item, url) => { item.photoUrl = url }) }
+        case 'gallery-masonry':
+            return { role: 'gallery', slots: arraySlots('images', (item, url) => { item.url = url }) }
+        case 'video-showcase':
+            return { role: 'gallery', slots: arraySlots('videos', (item, url) => { item.thumbnailUrl = url }) }
+        case 'menu-display':
+            return {
+                role: 'product',
+                slots: deepSlots('categories', 'items', (item, url) => { item.imageUrl = url }),
+            }
+        case 'product-quick-view':
+            return {
+                role: 'product',
+                slots: arraySlots('products', (item, url) => {
+                    item.imageUrls = [url]
+                    item.imageAlts = [typeof item.name === 'string' ? item.name : 'Product']
+                }),
+            }
+        case 'before-after': {
+            const slots: UrlSlot[] = []
+            for (const field of ['beforeImage', 'afterImage']) {
+                const value = block[field]
+                if (!value || typeof value !== 'object') continue
+                slots.push({ set: (url) => { (value as AIBlock).url = url } })
+            }
+            return { role: 'gallery', slots }
+        }
+        default:
+            return null
+    }
+}
+
+/**
+ * Fill URL-backed image fields from the same generation-scoped Pixabay pool.
+ * These fields cannot store Payload Media IDs, so they retain the Pixabay URL.
+ */
+export function injectPixabayUrlsIntoBlocks(
+    blocks: AIBlock[],
+    pool: ImagePool,
+    businessName: string,
+    usedPoolPhotoIds: Set<string> = new Set(),
+): { succeeded: number; failed: number } {
+    const enabledBlocks = getImageEnabledBlocks()
+    let succeeded = 0
+    let failed = 0
+
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        if (!enabledBlocks.has(blockType)) continue
+        const group = collectUrlSlots(block)
+        if (!group || group.slots.length === 0) continue
+        const allPicks = pickManyFromPool(
+            pool,
+            group.role,
+            hashBlockSeed(`${blockType}:url`, businessName),
+            MAX_PIXABAY_RESULTS_PER_REQUEST,
+        )
+        let picks = allPicks
+            .filter((photo) => !usedPoolPhotoIds.has(photo.id))
+            .slice(0, group.slots.length)
+        if (picks.length === 0 && allPicks.length > 0) {
+            picks = allPicks.slice(0, group.slots.length)
+        }
+        if (picks.length === 0) {
+            failed += group.slots.length
+            continue
+        }
+        if (picks.length < group.slots.length) {
+            console.warn(
+                `[Media Injector] ${blockType} URL diversity shortfall: ` +
+                `unique=${picks.length} requested=${group.slots.length}; repeating pool images`,
+            )
+        }
+        for (const photo of picks) usedPoolPhotoIds.add(photo.id)
+        const usedUrls: string[] = []
+        group.slots.forEach((slot, index) => {
+            const url = picks[index % picks.length]!.url
+            slot.set(url)
+            usedUrls.push(url)
+            succeeded++
+        })
+        markPixabayUrlsUsed(usedUrls)
+    }
+
     return { succeeded, failed }
 }
 
@@ -831,6 +1346,26 @@ export async function hydrateUrlUploadsToMedia(
                     getValue: () => (arr[ci] as Record<string, unknown>)[itemField],
                     setValue: (id) => { (arr[ci] as Record<string, unknown>)[itemField] = id },
                 })
+            }
+        }
+        for (const { outerArrayField, innerArrayField, itemField } of spec.deepNestedArray ?? []) {
+            const outerItems = block[outerArrayField]
+            if (!Array.isArray(outerItems)) continue
+            for (const outerItem of outerItems) {
+                if (!outerItem || typeof outerItem !== 'object') continue
+                const innerItems = (outerItem as Record<string, unknown>)[innerArrayField]
+                if (!Array.isArray(innerItems)) continue
+                for (let i = 0; i < innerItems.length; i++) {
+                    const item = innerItems[i] as Record<string, unknown> | undefined
+                    if (!item) continue
+                    const val = item[itemField]
+                    if (val === undefined || typeof val === 'number') continue
+                    const ci = i
+                    slots.push({
+                        getValue: () => (innerItems[ci] as Record<string, unknown>)[itemField],
+                        setValue: (id) => { (innerItems[ci] as Record<string, unknown>)[itemField] = id },
+                    })
+                }
             }
         }
     }

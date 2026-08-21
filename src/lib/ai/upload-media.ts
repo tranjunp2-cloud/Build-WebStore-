@@ -5,7 +5,7 @@
  */
 
 import type { BasePayload } from 'payload'
-import { downloadPhotoBuffer } from './pixabay-client'
+import { downloadPhotoBuffer, registerPixabayMediaSource } from './pixabay-client'
 import { withMediaCreateLock } from './media-create-lock'
 
 export async function uploadImageUrl(
@@ -35,5 +35,7 @@ export async function uploadImageUrl(
         doc = await withMediaCreateLock(() => payload.create(createArgs))
     }
     const numId = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
-    return Number.isFinite(numId) ? numId : undefined
+    if (!Number.isFinite(numId)) return undefined
+    registerPixabayMediaSource(numId, imageUrl)
+    return numId
 }

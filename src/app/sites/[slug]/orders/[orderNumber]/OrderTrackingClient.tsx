@@ -10,6 +10,7 @@ import {
     CalendarClock, Navigation, ChevronDown,
     RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw, ScanBarcode,
 } from 'lucide-react'
+import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
 
 type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
 
@@ -31,8 +32,10 @@ type ShippingAddress = {
 }
 
 type EpTrackingHistoryEntry = {
+    status?: string | null
     description: string
     eventTime: string
+    collectionMethod?: 'pickup' | 'dropoff' | null
 }
 
 type OrderData = {
@@ -57,6 +60,8 @@ type OrderData = {
     shippingCourierName?: string | null
     /** EP courier_logo URL captured at label creation — absent on old orders / failed lookups. */
     shippingCourierLogo?: string | null
+    selfDeliveryCourier?: string | null
+    collectionMethod?: 'pickup' | 'dropoff' | null
     shippingTrackingStatus?: string | null
     shippingTrackingHistory?: EpTrackingHistoryEntry[]
     createdAt: string
@@ -217,15 +222,22 @@ function OtStageTracker({ order, trackingStatus }: { order: OrderData; trackingS
 function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const [logoFailed, setLogoFailed] = useState(false)
-    const { awbNo, shippingCourier, shippingCourierName, shippingCourierLogo, shippingTrackingHistory } = order
+    const {
+        awbNo,
+        shippingCourier,
+        shippingCourierName,
+        shippingCourierLogo,
+        selfDeliveryCourier,
+        shippingTrackingHistory,
+    } = order
     const trackingNo = awbNo || order.trackingNumber
     const isInTransit = trackingStatus === 'in-transit'
     const isDelivered = trackingStatus === 'delivered'
     const history = shippingTrackingHistory ?? []
-    const isEp = Boolean(awbNo) || history.length > 0
+    const isEp = !selfDeliveryCourier && (Boolean(awbNo) || history.length > 0)
     // `shippingCourier` is EP's machine code ("EP-CR0DW") — never show it to a buyer. Fall back
     // to it only when the friendly name is missing (orders placed before it was persisted).
-    const courierLabel = shippingCourierName || shippingCourier
+    const courierLabel = selfDeliveryCourier || shippingCourierName || shippingCourier
     // EP cancelled the shipment: the reopen wipes awbNo, so without this the buyer would read the
     // generic "being prepared" line and watch their tracking history vanish — as if the order had
     // never shipped. Say what happened and keep the history.
@@ -263,6 +275,12 @@ function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingS
                             <span className="ot-courier-name">{courierLabel}</span>
                         </div>
                     )}
+                    {!courierLabel && (
+                        <div className="ot-tracking-row">
+                            <span className="ot-tr-label"><Truck size={12} /> Courier</span>
+                            <span className="ot-tr-value pending">Not yet assigned</span>
+                        </div>
+                    )}
                     {trackingNo ? (
                         <div className="ot-tracking-row">
                             <span className="ot-tr-label"><Hash size={12} /> Tracking No.</span>
@@ -279,14 +297,12 @@ function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingS
                     ) : (
                         <div className="ot-tracking-row">
                             <span className="ot-tr-label"><Hash size={12} /> Tracking No.</span>
-                            <span className="ot-tr-value" style={{ color: 'var(--f4)', fontStyle: 'italic' }}>Not yet assigned</span>
+                            <span className="ot-tr-value pending">Not yet assigned</span>
                         </div>
                     )}
-                    {!trackingNo && (
+                    {!trackingNo && shipmentCancelled && (
                         <p style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)', margin: 0 }}>
-                            {shipmentCancelled
-                                ? 'The earlier shipment was cancelled. Your order is safe — the seller is arranging a new delivery, and a new tracking number will appear here.'
-                                : 'Your order is being prepared — tracking number will appear once picked up.'}
+                            The earlier shipment was cancelled. Your order is safe — the seller is arranging a new delivery, and a new tracking number will appear here.
                         </p>
                     )}
                     {/* Estimated delivery — DELIBERATELY HIDDEN, not forgotten.
@@ -322,7 +338,7 @@ function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingS
                         <path d="M 0 130 L 200 110" stroke="#cfd6dd" strokeWidth="1.5" fill="none" />
                         <path d="M 70 0 L 90 200" stroke="#cfd6dd" strokeWidth="1.5" fill="none" />
                         <path d="M 140 0 L 130 200" stroke="#cfd6dd" strokeWidth="1.5" fill="none" />
-                        <path className="map-route" d="M 36 50 C 70 90, 120 100, 170 150" />
+                        <path className="map-route" d="M 45 49 C 78 68, 122 86, 163 115" />
                     </svg>
                     <div className="map-pin-from"><span>A</span></div>
                     <div className="map-pin-to"><span>B</span></div>
@@ -344,7 +360,6 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     type Entry = { state: 'latest' | 'completed'; Icon: React.ElementType; title: string; meta?: string; date: string; time: string }
     const entries: Entry[] = []
     const history = order.shippingTrackingHistory ?? []
-    const isEp = Boolean(order.awbNo) || history.length > 0
 
     entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received ${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     if (order.paymentStatus === 'paid') {
@@ -365,11 +380,12 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     // events above. Kept even when awbNo is null: an EP cancel wipes the AWB, and dropping the
     // history with it would erase every update the buyer had already seen.
     for (const h of history) {
+        const display = formatTrackingEventDisplay(h, order.collectionMethod)
         entries.push({
             state: 'completed',
             Icon: Package,
-            title: h.description,
-            meta: 'Courier update',
+            title: display.title,
+            meta: display.note ?? undefined,
             date: h.eventTime ? formatDate(h.eventTime) : '',
             time: h.eventTime ? formatTime(h.eventTime) : '',
         })
@@ -409,11 +425,6 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
                     </li>
                 ))}
             </ul>
-            {isEp && trackingStatus !== 'delivered' && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--f4, #6b7280)', marginTop: '0.75rem', marginBottom: 0 }}>
-                    Updates every 30–60 min — not realtime.
-                </p>
-            )}
         </div>
     )
 }
@@ -559,16 +570,22 @@ export default function OrderTrackingClient({ order, slug }: Props) {
             errorCount = 0
             try {
                 const data = JSON.parse(e.data)
-                if (data.status !== statusRef.current) {
-                    statusRef.current = data.status
-                    setLiveOrder(prev => ({
-                        ...prev,
-                        status: data.status,
-                        paymentStatus: data.paymentStatus,
-                        trackingNumber: data.trackingNumber,
-                    }))
-                    if (data.terminal) es.close()
-                }
+                statusRef.current = data.status
+                setLiveOrder(prev => ({
+                    ...prev,
+                    status: data.status,
+                    paymentStatus: data.paymentStatus,
+                    trackingNumber: data.trackingNumber,
+                    awbNo: data.awbNo,
+                    shippingCourier: data.shippingCourier,
+                    shippingCourierName: data.shippingCourierName,
+                    shippingCourierLogo: data.shippingCourierLogo,
+                    selfDeliveryCourier: data.selfDeliveryCourier,
+                    collectionMethod: data.collectionMethod,
+                    shippingTrackingStatus: data.shippingTrackingStatus,
+                    shippingTrackingHistory: data.shippingTrackingHistory,
+                }))
+                if (data.terminal) es.close()
             } catch {
                 // ignore malformed events
             }

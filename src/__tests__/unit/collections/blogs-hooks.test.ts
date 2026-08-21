@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { CollectionBeforeChangeHook } from 'payload'
-import { Blogs } from '../../../collections/Blogs'
+import { Blogs, validateBlogSlug } from '../../../collections/Blogs'
 
 describe('Blogs Collection Hooks — Category Tenant Isolation (TC-F17-SEC-13)', () => {
     const hook = Blogs.hooks!.beforeChange![0] as CollectionBeforeChangeHook
@@ -82,5 +82,20 @@ describe('Blogs Collection Hooks — Category Tenant Isolation (TC-F17-SEC-13)',
             operation: 'create',
             req,
         } as any)).rejects.toThrow(/BLOG_CATEGORY_TENANT_MISMATCH/)
+    })
+})
+
+describe('[TC-F37-03-48] Blog public slug validation', () => {
+    it('rejects nested slugs that cannot resolve through the single-segment detail route', () => {
+        // Arrange
+        const nestedSlug = 'news/launch'
+
+        // Act
+        const result = validateBlogSlug(nestedSlug)
+
+        // Assert
+        expect(result).toBe('Blog slug must be a single URL segment')
+        expect(validateBlogSlug('..')).toBe('Blog slug must be a single URL segment')
+        expect(validateBlogSlug('news-launch')).toBe(true)
     })
 })

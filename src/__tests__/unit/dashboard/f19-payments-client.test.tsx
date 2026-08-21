@@ -54,16 +54,16 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         console.log('DOM BEFORE WAIT', container.innerHTML);
 
         await waitFor(() => {
-            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+            expect(screen.getByText('Cash on delivery (COD)')).toBeInTheDocument();
         });
-        expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+        expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
     });
 
     it('[TC-F19.12] Allows toggling COD and saves changes', async () => {
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
-            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+            expect(screen.getByText('Cash on delivery (COD)')).toBeInTheDocument();
         });
 
         // Toggle COD on (marks form dirty)
@@ -98,7 +98,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         });
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
-        await waitFor(() => expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('Cash on delivery (COD)')).toBeInTheDocument());
         const codSwitch = screen.getAllByRole('switch')[0];
         fireEvent.click(codSwitch);
         fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
@@ -111,7 +111,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
-            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+            expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
@@ -122,7 +122,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         fireEvent.click(qrSwitch);
 
         await waitFor(() => {
-            expect(screen.getByText('Click to upload QR Code')).toBeInTheDocument();
+            expect(screen.getByText('Tap to upload your QR code')).toBeInTheDocument();
         });
     });
 
@@ -130,7 +130,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
-            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+            expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Click QR Toggle to show upload widget — Stripe not connected → COD[0], QR[1]
@@ -154,7 +154,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
-            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+            expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Click QR Toggle to show upload widget — Stripe not connected → COD[0], QR[1]
@@ -208,7 +208,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
-            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+            expect(screen.getByText('Cash on delivery (COD)')).toBeInTheDocument();
         });
 
         // Act: try to toggle COD off (it is the only active method)
@@ -217,7 +217,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         fireEvent.click(codSwitch);
 
         // Assert: error toast fired, COD still aria-checked=true (guard blocked toggle), save NOT called
-        expect(toast.error).toHaveBeenCalledWith('At least one payment method must stay active.');
+        expect(toast.error).toHaveBeenCalledWith('Keep at least one payment method active.');
         expect(codSwitch.getAttribute('aria-checked')).toBe('true');
         expect(updatePaymentSettings).not.toHaveBeenCalled();
     });
@@ -226,7 +226,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         // Arrange: default render (no QR)
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
-            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+            expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Act: toggle QR on (expands widget — no image so expand-gate triggers)
@@ -249,12 +249,12 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
-            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+            expect(screen.getByText('Bank transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Wait for form to be visible (QR active + image = no expand-gate)
         await waitFor(() => {
-            expect(screen.getByPlaceholderText('As shown on bank statement')).toBeInTheDocument();
+            expect(screen.getByPlaceholderText('As shown on your bank statement')).toBeInTheDocument();
         });
 
         // Make form dirty so Save is enabled (toggle COD on)
@@ -268,7 +268,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         // Assert: validation error text shown, save NOT called
         await waitFor(() => {
-            expect(screen.getByText('Account holder name is required.')).toBeInTheDocument();
+            expect(screen.getByText('Enter the account holder name.')).toBeInTheDocument();
         });
         expect(updatePaymentSettings).not.toHaveBeenCalled();
     });
@@ -277,7 +277,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         // Arrange: default (COD off)
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
-            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+            expect(screen.getByText('Cash on delivery (COD)')).toBeInTheDocument();
         });
 
         // Make form dirty: toggle COD on — Stripe not connected → COD[0], QR[1]

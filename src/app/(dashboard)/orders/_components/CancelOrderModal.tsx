@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, Info, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -12,11 +12,13 @@ interface CancelOrderModalProps {
     orderNumber: string
     isOpen: boolean
     isLoading: boolean
+    /** Mobile-only contextual note. Desktop callers omit this to preserve their modal. */
+    mobileCancelNote?: string
     onBack: () => void
     onConfirm: (reason: string) => void
 }
 
-export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfirm }: CancelOrderModalProps) {
+export function CancelOrderModal({ orderNumber, isOpen, isLoading, mobileCancelNote, onBack, onConfirm }: CancelOrderModalProps) {
     const { t } = useI18n()
     const c = t.dashboard.orders.cancel
     const [reason, setReason] = useState('')
@@ -73,6 +75,13 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                 <p className="w-full text-center text-[13px] mt-1 mb-2" style={{ color: 'hsl(var(--warning))' }}>
                     {c.warning}
                 </p>
+
+                {mobileCancelNote && (
+                    <p className="flex w-full items-start gap-2 text-[13px] leading-5" style={{ color: 'var(--dash-text-muted)' }}>
+                        <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                        {mobileCancelNote}
+                    </p>
+                )}
 
                 {/* Form Field */}
                 <div className="flex flex-col w-full gap-2 mb-2">

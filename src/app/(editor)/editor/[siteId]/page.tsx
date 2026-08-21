@@ -8,6 +8,7 @@ import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
 import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
+import { parseEditorSettingsDeepLink } from '@/lib/editor/settings-deep-link'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -21,7 +22,23 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import type { LocalBusinessData } from '@/components/editor/local-business/types'
-import { useEditorStore, BLOCK_TYPE_TO_KEY, PAGE_META_LOCALE_KEY, getDisplayPageTitle, type SiteLocale } from '@/store/editorStore'
+import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
+import {
+    normalizeLocalBusinessSnapshot,
+} from '@/components/editor/local-business/normalization'
+import { countCompletedLocalBusinessFields } from '@/components/editor/local-business/completion-utils'
+import { trackEvent } from '@/lib/analytics/track-event'
+import {
+    useEditorStore,
+    runSerializedEditorSave,
+    hasPendingSerializedEditorSave,
+    isEditorSaveContextCurrent,
+    BLOCK_TYPE_TO_KEY,
+    PAGE_META_LOCALE_KEY,
+    getDisplayPageTitle,
+    type EditorSaveContext,
+    type SiteLocale,
+} from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
 import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
@@ -39,6 +56,13 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CompactEditorLayout, type PreviewFrameSharedProps } from '@/components/editor/CompactEditorLayout'
 import type { ToolsSheetPanelProps, ToolsSheetTab } from '@/components/editor/EditorToolsSheet'
 import { useEditorLayoutMode } from '@/hooks/useEditorLayoutMode'
+
+class SerializedSaveSetupError extends Error {
+    constructor(readonly originalError: unknown) {
+        super('Failed to start serialized editor save')
+        this.name = 'SerializedSaveSetupError'
+    }
+}
 
 export type SiteData = {
     id: string
@@ -74,6 +98,7 @@ export type SiteData = {
         metaTitle?: string
         metaDescription?: string
         ogImage?: string | number | null
+        googleVerificationToken?: string
     }
     publishedAt?: string | null
     tenantSlug?: string | null
@@ -91,6 +116,73 @@ import type { PageData, BlockData } from '@/store/editorStore'
 type SaveOptions = {
     showToast?: boolean
     refreshPreview?: boolean
+    successToast?: string
+}
+
+type PendingSaveRequest = {
+    context: EditorSaveContext
+    options: SaveOptions
+    resolvers: Array<(saved: boolean) => void>
+}
+
+function mergeSaveOptions(current: SaveOptions | undefined, incoming: SaveOptions): SaveOptions {
+    if (!current) return { ...incoming }
+    return {
+        showToast: (current?.showToast ?? true) || (incoming.showToast ?? true),
+        refreshPreview: (current?.refreshPreview ?? true) || (incoming.refreshPreview ?? true),
+        successToast: incoming.successToast ?? current.successToast,
+    }
+}
+
+type LocalBusinessSaveBatch = {
+    siteId: string
+    snapshot: LocalBusinessData
+    revision: number
+    resolvers: Array<(saved: boolean) => void>
+}
+
+type LocalBusinessSiteState = {
+    snapshot: LocalBusinessData
+    persistedSnapshot: LocalBusinessData
+    revision: number
+    persistedRevision: number
+}
+
+type PersistSiteSettingsOptions = {
+    commitOptimistically?: boolean
+    targetSiteId?: string
+}
+
+const LOCAL_BUSINESS_COMPARISON_FIELDS = [
+    'streetAddress', 'city', 'state', 'postcode', 'country',
+    'latitude', 'longitude', 'businessCategory', 'schemaSubtype',
+    'priceRange', 'serviceAreaDescription',
+] as const
+
+const LOCAL_BUSINESS_RECONCILE_TIMEOUT_MS = 5_000
+
+function normalizeLocalBusinessForComparison(value: unknown) {
+    const record = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {}
+    const normalizedRecord = normalizeLocalBusinessSnapshot(record as LocalBusinessData)
+    const openingHours = Array.isArray(normalizedRecord.openingHours)
+        ? normalizedRecord.openingHours.map(row => {
+            const item = row && typeof row === 'object' && !Array.isArray(row)
+                ? row as Record<string, unknown>
+                : {}
+            return [item.dayOfWeek ?? null, item.opens ?? null, item.closes ?? null, item.isClosed === true]
+        })
+        : []
+    return {
+        fields: LOCAL_BUSINESS_COMPARISON_FIELDS.map(field => normalizedRecord[field] ?? null),
+        openingHours,
+    }
+}
+
+function localBusinessSnapshotsMatch(authoritative: unknown, requested: unknown): boolean {
+    return JSON.stringify(normalizeLocalBusinessForComparison(authoritative))
+        === JSON.stringify(normalizeLocalBusinessForComparison(requested))
 }
 
 // Maps Payload field path segments → user-facing labels for publish error toasts.
@@ -191,7 +283,10 @@ export default function EditorPage() {
     } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
-    const { isCompact: isCompactLayout } = useEditorLayoutMode()
+    const {
+        isCompact: isCompactLayout,
+        isResolved: isLayoutModeResolved,
+    } = useEditorLayoutMode()
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
@@ -201,6 +296,8 @@ export default function EditorPage() {
     const [toolsSheetTab, setToolsSheetTab] = useState<ToolsSheetTab>('chat')
     const [aiRunning, setAiRunning] = useState(false)
     const stopAIRef = useRef<(() => void) | null>(null)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string; focus?: string } | null>(null)
+    const settingsDeepLinkSignatureRef = useRef<string | null>(null)
 
     // PR #1485 review fix (I3): rotating/resizing across the 1280px compact↔desktop
     // boundary must not leave a sheet open from before the flip — reset both compact
@@ -231,7 +328,36 @@ export default function EditorPage() {
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
     useWorkspaceShortcuts()
-    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
+
+    useEffect(() => {
+        if (isLoading || !isLayoutModeResolved) return
+        const target = parseEditorSettingsDeepLink(new URLSearchParams(searchParams.toString()))
+        if (!target) return
+        const signature = JSON.stringify(target)
+        if (settingsDeepLinkSignatureRef.current === signature) return
+        settingsDeepLinkSignatureRef.current = signature
+        setSettingsRequestedTab({ ...target, key: Date.now() })
+        if (isCompactLayout) {
+            setIsMobileSettingsOpen(true)
+        } else if (!rightSidebarVisible) {
+            useWorkspaceStore.getState().toggleRight()
+        }
+
+        const next = new URLSearchParams(searchParams.toString())
+        next.delete('settingsTab')
+        next.delete('section')
+        next.delete('focus')
+        const query = next.toString()
+        router.replace('/editor/' + siteId + (query ? '?' + query : ''))
+    }, [
+        isCompactLayout,
+        isLayoutModeResolved,
+        isLoading,
+        rightSidebarVisible,
+        router,
+        searchParams,
+        siteId,
+    ])
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
@@ -240,8 +366,21 @@ export default function EditorPage() {
     // Imperative handle to send postMessages to iframe without full reload (Gap B)
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
-    const pendingSaveRef = useRef<SaveOptions | null>(null)
+    const pendingSaveRef = useRef<PendingSaveRequest | null>(null)
+    const contactSavePendingRef = useRef(false)
+    const [isContactSavePending, setIsContactSavePending] = useState(false)
+    const localBusinessBySiteRef = useRef(new Map<string, LocalBusinessSiteState>())
+    const localBusinessSaveInFlightSiteIdsRef = useRef(new Set<string>())
+    const queuedLocalBusinessSavesRef = useRef(new Map<string, LocalBusinessSaveBatch>())
+    const drainLocalBusinessSavesRef = useRef<(targetSiteId: string) => void>(() => {})
+    const localBusinessUnknownOutcomeSiteIdsRef = useRef(new Set<string>())
+    const activeSiteIdRef = useRef(siteId)
+    activeSiteIdRef.current = siteId
     // F26-04: AbortController for the currently in-flight locale switch.
+    const [localBusinessLockedSiteIds, setLocalBusinessLockedSiteIds] = useState<ReadonlySet<string>>(
+        () => new Set(),
+    )
+    const isLocalBusinessSaveLocked = localBusinessLockedSiteIds.has(siteId)
     // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
     const localeSwitchAbortRef = useRef<AbortController | null>(null)
 
@@ -278,6 +417,7 @@ export default function EditorPage() {
     const canUndo = useEditorStore(state => state.canUndo)
     const canRedo = useEditorStore(state => state.canRedo)
     const markSaved = useEditorStore(state => state.markSaved)
+    const markDirty = useEditorStore(state => state.markDirty)
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
@@ -321,14 +461,6 @@ export default function EditorPage() {
         return `https://${slug}.${domain}`
     }, [site?.primaryDomain, site?.tenantSlug])
 
-    const lastSavedLabel = useMemo(() => {
-        if (!lastSavedAt) return null
-        return new Date(lastSavedAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-        })
-    }, [lastSavedAt])
-
     const currentPageTitle = useMemo(() => {
         // Prefer the pages[] entry (carries localeContent → locale-aware title); fall back to
         // the lightweight `page` state (no localeContent) then a default.
@@ -350,6 +482,15 @@ export default function EditorPage() {
     useEffect(() => {
         if (!siteId) return
 
+        let cancelled = false
+        const localBusinessAtLoadStart = localBusinessBySiteRef.current.get(siteId)
+        const localBusinessRevisionAtLoadStart = localBusinessAtLoadStart?.revision ?? 0
+        const hadPendingLocalBusinessAtLoadStart = localBusinessAtLoadStart !== undefined && (
+            localBusinessAtLoadStart.revision !== localBusinessAtLoadStart.persistedRevision ||
+            localBusinessSaveInFlightSiteIdsRef.current.has(siteId) ||
+            queuedLocalBusinessSavesRef.current.has(siteId)
+        )
+
         async function loadData() {
             setIsLoading(true)
 
@@ -365,14 +506,47 @@ export default function EditorPage() {
                     fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' }),
                 ])
 
+                if (cancelled) return
+
                 if (!editorRes.ok) {
                     throw new Error(`Failed to load editor data (${editorRes.status})`)
                 }
 
                 const data = await editorRes.json()
 
+                if (cancelled) return
+
                 if (data.site) {
-                    setSite(data.site)
+                    const currentLocalBusiness = localBusinessBySiteRef.current.get(siteId)
+                    const hasNewerOrPendingLocalBusiness = currentLocalBusiness !== undefined && (
+                        hadPendingLocalBusinessAtLoadStart ||
+                        currentLocalBusiness.revision !== localBusinessRevisionAtLoadStart ||
+                        currentLocalBusiness.revision !== currentLocalBusiness.persistedRevision ||
+                        localBusinessSaveInFlightSiteIdsRef.current.has(siteId) ||
+                        queuedLocalBusinessSavesRef.current.has(siteId)
+                    )
+                    const serverLocalBusiness: LocalBusinessData = {
+                        ...(data.site.localBusiness || {}),
+                    }
+
+                    if (hasNewerOrPendingLocalBusiness && currentLocalBusiness) {
+                        setSite({
+                            ...data.site,
+                            localBusiness: currentLocalBusiness.snapshot,
+                        })
+                    } else {
+                        const settledRevision = currentLocalBusiness?.revision ?? 0
+                        localBusinessBySiteRef.current.set(siteId, {
+                            snapshot: serverLocalBusiness,
+                            persistedSnapshot: serverLocalBusiness,
+                            revision: settledRevision,
+                            persistedRevision: settledRevision,
+                        })
+                        setSite({
+                            ...data.site,
+                            localBusiness: serverLocalBusiness,
+                        })
+                    }
                 }
 
                 // Extract user info for menu drawer
@@ -463,33 +637,51 @@ export default function EditorPage() {
 
                 setSelectedBlock(null)
             } catch (err) {
+                if (cancelled) return
                 const message = err instanceof Error ? err.message : 'Failed to load site data'
                 toast.error('Failed to load site', { description: message })
             } finally {
-                setIsLoading(false)
+                if (!cancelled) setIsLoading(false)
             }
         }
 
         void loadData()
+        return () => {
+            cancelled = true
+        }
     }, [init, selectedPageId, setCurrentPageId, setPages, siteId])
 
     // User data is loaded from editor-data API in loadData useEffect above
 
-    const handleSave = useCallback(async (options: SaveOptions = {}) => {
+    const handleSave = useCallback(async (
+        options: SaveOptions = {},
+        queuedContext?: EditorSaveContext,
+    ): Promise<boolean> => {
         if (!siteId) return false
+        const saveContext = queuedContext ?? {
+            siteId,
+            pageId: useEditorStore.getState().currentPageId || null,
+        }
 
         if (isSavingRef.current) {
-            // A save is already in progress. Mutex lock.
-            // Queue this save request as "dirty" to fire after the current one completes.
-            pendingSaveRef.current = {
-                ...pendingSaveRef.current,
-                ...options,
-                showToast: options.showToast || pendingSaveRef.current?.showToast,
-                refreshPreview: options.refreshPreview === true || pendingSaveRef.current?.refreshPreview === true
-                    ? true
-                    : options.refreshPreview ?? pendingSaveRef.current?.refreshPreview
-            }
-            return true
+            // Coalesce callers for the same page into one follow-up write, but make
+            // every caller wait for that write instead of reporting success early.
+            return new Promise<boolean>((resolve) => {
+                const pending = pendingSaveRef.current
+                const sameContext = pending
+                    && pending.context.siteId === saveContext.siteId
+                    && pending.context.pageId === saveContext.pageId
+
+                if (pending && !sameContext) {
+                    pending.resolvers.forEach(resolvePending => resolvePending(false))
+                }
+
+                pendingSaveRef.current = {
+                    context: saveContext,
+                    options: mergeSaveOptions(sameContext ? pending.options : undefined, options),
+                    resolvers: [...(sameContext ? pending.resolvers : []), resolve],
+                }
+            })
         }
 
         isSavingRef.current = true
@@ -509,99 +701,146 @@ export default function EditorPage() {
             useEditorStore.setState({ autoSaveTimer: null })
         }
 
-        const snapshot = useEditorStore.getState()
-        const currentBlocks = snapshot.getDisplayBlocks()
-        const currentTheme = snapshot.theme
-        // Use pageId from store snapshot (not from closure) to prevent race condition
-        // when page switch happens during auto-save
-        const savePageId = snapshot.currentPageId
-
-        if (currentBlocks.length === 0 && !page) return false
-
-        setIsSaving(true)
-
         try {
-            const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (savePageId) {
-                saveUrl.searchParams.set('pageId', savePageId)
-            }
+            return await runSerializedEditorSave(saveContext.siteId, async () => {
+                // Snapshot only when this queued write gets the lock. A snapshot captured
+                // while waiting could overwrite a newer edit saved by an earlier task.
+                const snapshot = useEditorStore.getState()
+                if (!isEditorSaveContextCurrent(saveContext, snapshot)) return false
 
-            const res = await fetch(saveUrl.toString(), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    blocks: currentBlocks,
-                    theme: currentTheme,
-                    // F26-04: header/footer also serialized in display-locale so public site
-                    // renders the chosen language without needing locale resolution on read.
-                    headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
-                    footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
-                    // F26-04: global blocks also serialized in display locale
-                    ...(snapshot.globalBlocks !== null && {
-                        globalBlocks: {
-                            cartWidget: snapshot.globalBlocks.cartWidget
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
-                                : null,
-                            whatsappButton: snapshot.globalBlocks.whatsappButton
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
-                                : null,
-                            socialWidget: snapshot.globalBlocks.socialWidget
-                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
-                                : null,
-                        },
-                    }),
-                    // F-26: Persist locale overrides alongside blocks
-                    ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
-                    // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
-                    ...((snapshot.activeLocale === 'en' || snapshot.activeLocale === 'ms') && { locale: snapshot.activeLocale }),
-                    isDraft: true,
-                }),
+                const currentBlocks = snapshot.getDisplayBlocks()
+                const currentTheme = snapshot.theme
+                const savePageId = snapshot.currentPageId
+                const savedRevision = snapshot.contentRevision
+
+                if (currentBlocks.length === 0 && !page) return false
+
+                setIsSaving(true)
+
+                try {
+                    const saveUrl = new URL(`/api/sites/${saveContext.siteId}/save`, window.location.origin)
+                    if (savePageId) {
+                        saveUrl.searchParams.set('pageId', savePageId)
+                    }
+
+                    const res = await fetch(saveUrl.toString(), {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            blocks: currentBlocks,
+                            theme: currentTheme,
+                            // F26-04: header/footer also serialized in display-locale so public site
+                            // renders the chosen language without needing locale resolution on read.
+                            headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
+                            footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
+                            // F26-04: global blocks also serialized in display locale
+                            ...(snapshot.globalBlocks !== null && {
+                                globalBlocks: {
+                                    cartWidget: snapshot.globalBlocks.cartWidget
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
+                                        : null,
+                                    whatsappButton: snapshot.globalBlocks.whatsappButton
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
+                                        : null,
+                                    socialWidget: snapshot.globalBlocks.socialWidget
+                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
+                                        : null,
+                                },
+                            }),
+                            // F-26: Persist locale overrides alongside blocks
+                            ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
+                            // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
+                            ...((snapshot.activeLocale === 'en' || snapshot.activeLocale === 'ms') && { locale: snapshot.activeLocale }),
+                            isDraft: true,
+                        }),
+                    })
+
+                    if (!res.ok) {
+                        const payload = await res.json().catch(() => null)
+                        const fallback = typeof payload?.error === 'string'
+                            ? payload.error
+                            : payload?.error?.details?.formErrors?.[0]
+                                || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
+                                || payload?.error?.details?.fieldErrors?.blocks?.[0]
+                                || `Server returned ${res.status}`
+                        throw new Error(resolveApiError(payload, fallback, sub))
+                    }
+
+                    if (!isEditorSaveContextCurrent(saveContext, useEditorStore.getState())) {
+                        return false
+                    }
+
+                    markSaved(savedRevision)
+                    setSaveSuccess(true)
+
+                    if (options.refreshPreview ?? true) {
+                        setIframeKey(key => key + 1)
+                    }
+
+                    if (options.showToast ?? true) {
+                        toast.success(options.successToast ?? t.editor.toast.saveSuccess)
+                    }
+
+                    window.setTimeout(() => setSaveSuccess(false), 2000)
+                    return true
+                } catch (err) {
+                    if (!isEditorSaveContextCurrent(saveContext, useEditorStore.getState())) {
+                        return false
+                    }
+                    // BUG-F05-01: log sanitized error code (no internal details in production console)
+                    console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
+                    const errMsg = err instanceof Error ? err.message : null
+                    toast.error(errMsg || t.editor.toast.saveFailed)
+                    return false
+                }
             })
-
-            if (!res.ok) {
-                const payload = await res.json().catch(() => null)
-                const fallback = typeof payload?.error === 'string'
-                    ? payload.error
-                    : payload?.error?.details?.formErrors?.[0]
-                        || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
-                        || payload?.error?.details?.fieldErrors?.blocks?.[0]
-                        || `Server returned ${res.status}`
-                throw new Error(resolveApiError(payload, fallback, sub))
-            }
-
-            markSaved()
-            setSaveSuccess(true)
-
-            if (options.refreshPreview ?? true) {
-                setIframeKey(key => key + 1)
-            }
-
-            if (options.showToast ?? true) {
-                toast.success(t.editor.toast.saveSuccess)
-            }
-
-            window.setTimeout(() => setSaveSuccess(false), 2000)
-            return true
-        } catch (err) {
-            // BUG-F05-01: log sanitized error code (no internal details in production console)
-            console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
-            const errMsg = err instanceof Error ? err.message : null
-            toast.error(errMsg || t.editor.toast.saveFailed)
-            return false
         } finally {
             isSavingRef.current = false
-            if (pendingSaveRef.current) {
-                // There were unsaved changes queued while we were saving.
-                // Fetch the latest state and save again.
-                const nextOptions = pendingSaveRef.current
-                pendingSaveRef.current = null
-                void handleSave(nextOptions)
-            } else {
+            const pending = pendingSaveRef.current as PendingSaveRequest | null
+            pendingSaveRef.current = null
+            if (pending) {
+                void handleSave(pending.options, pending.context)
+                    .then(saved => pending.resolvers.forEach(resolve => resolve(saved)))
+                    .catch(() => pending.resolvers.forEach(resolve => resolve(false)))
+            } else if (useEditorStore.getState().siteId === saveContext.siteId) {
                 setIsSaving(false)
             }
         }
     }, [markSaved, page, setIsSaving, siteId])
+
+    const handleManualSave = useCallback(async (source: 'shell' | 'iframe' | 'footer' = 'shell') => {
+        if (templateApplied) {
+            setShowSaveGuard(true)
+            return false
+        }
+
+        // Most settings fields commit on blur. Flush the focused field before taking the
+        // manual-save snapshot so Cmd/Ctrl+S persists the value the user is still editing.
+        if (source === 'shell') {
+            const activeElement = document.activeElement
+            if (
+                activeElement instanceof HTMLInputElement
+                || activeElement instanceof HTMLTextAreaElement
+                || (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+            ) {
+                activeElement.blur()
+                await Promise.resolve()
+            }
+        }
+
+        // The footer keeps its own short debounce to preserve the contentEditable cursor.
+        // A manual save must cancel that deferred duplicate after PreviewFrame flushes its value.
+        if (source === 'footer' && footerUpdateSaveTimerRef.current) {
+            clearTimeout(footerUpdateSaveTimerRef.current)
+            footerUpdateSaveTimerRef.current = null
+        }
+
+        return await handleSave({
+            showToast: true,
+            successToast: t.editor.toast.manualSaveSuccess,
+        })
+    }, [handleSave, t.editor.toast.manualSaveSuccess, templateApplied])
 
     // Suspend store auto-save while a template is applied (user must confirm first)
     useEffect(() => {
@@ -664,6 +903,12 @@ export default function EditorPage() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                void handleManualSave()
+                return
+            }
+
             const target = e.target as HTMLElement
             if (target && target.closest('input, textarea, [contenteditable="true"]')) {
                 return
@@ -694,19 +939,11 @@ export default function EditorPage() {
                 }
             }
 
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-                e.preventDefault()
-                if (templateApplied) {
-                    setShowSaveGuard(true)
-                } else {
-                    void handleSave()
-                }
-            }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [canRedo, canUndo, handleSave, redo, undo])
+    }, [canRedo, canUndo, handleManualSave, redo, undo])
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
@@ -723,47 +960,73 @@ export default function EditorPage() {
         }
     }, [updateTheme, handleSave])
 
-    const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
-        if (!siteId) return
+    const persistSiteSettingsChanges = useCallback(async (
+        changes: Partial<SiteData>,
+        options: PersistSiteSettingsOptions = {},
+    ) => {
+        const persistenceSiteId = options.targetSiteId ?? siteId
+        if (!persistenceSiteId) return
 
         // Business name is required — silently ignore blank submissions
         if ('name' in changes && !changes.name) return
 
-        if (changes.name) {
-            updateSiteName(changes.name)
-            // Sync business name into navigation logoText so the nav header
-            // reflects the new name without a separate block edit.
-            updateHeaderBlock({ logoText: changes.name })
+        const isContactSave = changes.contactInfo !== undefined
+        const hasNonContactChanges = Object.entries(changes).some(
+            ([key, value]) => key !== 'contactInfo' && value !== undefined,
+        )
+        if (isContactSave && hasNonContactChanges) return false
+        let ownsContactSave = false
+        let keepContactSaveLocked = false
+
+        try {
+            if (isContactSave) {
+                if (contactSavePendingRef.current) return false
+                contactSavePendingRef.current = true
+                ownsContactSave = true
+                setIsContactSavePending(true)
+            }
+
+            if (changes.name) {
+                updateSiteName(changes.name)
+                // Sync business name into navigation logoText so the nav header
+                // reflects the new name without a separate block edit.
+                updateHeaderBlock({ logoText: changes.name })
+            }
+
+        const commitChangesToSite = () => {
+            setSite(prev => {
+                if (!prev) return prev
+
+                return {
+                    ...prev,
+                    ...changes,
+                    contactInfo: {
+                        ...(prev.contactInfo || {}),
+                        ...(changes.contactInfo || {}),
+                    },
+                    localBusiness: {
+                        ...(prev.localBusiness || {}),
+                        ...(changes.localBusiness || {}),
+                    },
+                    socialLinks: {
+                        ...(prev.socialLinks || {}),
+                        ...(changes.socialLinks || {}),
+                    },
+                    seo: {
+                        ...(prev.seo || {}),
+                        ...(changes.seo || {}),
+                    },
+                    branding: {
+                        ...(prev.branding || {}),
+                        ...(changes.branding || {}),
+                    },
+                }
+            })
         }
 
-        setSite(prev => {
-            if (!prev) return prev
-
-            return {
-                ...prev,
-                ...changes,
-                contactInfo: {
-                    ...(prev.contactInfo || {}),
-                    ...(changes.contactInfo || {}),
-                },
-                localBusiness: {
-                    ...(prev.localBusiness || {}),
-                    ...(changes.localBusiness || {}),
-                },
-                socialLinks: {
-                    ...(prev.socialLinks || {}),
-                    ...(changes.socialLinks || {}),
-                },
-                seo: {
-                    ...(prev.seo || {}),
-                    ...(changes.seo || {}),
-                },
-                branding: {
-                    ...(prev.branding || {}),
-                    ...(changes.branding || {}),
-                },
-            }
-        })
+        if (!isContactSave && options.commitOptimistically !== false) {
+            commitChangesToSite()
+        }
 
         // If logo is changing (value differs from current store), silently sync header/footer block logos.
         // This avoids handleContentChange (no "Changes Pending") — branding saves go live immediately.
@@ -795,59 +1058,324 @@ export default function EditorPage() {
             }
         }
 
-        try {
-            const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (currentPageId) {
+            const saveUrl = new URL(`/api/sites/${persistenceSiteId}/save`, window.location.origin)
+            if (options.targetSiteId === undefined && currentPageId) {
                 saveUrl.searchParams.set('pageId', currentPageId)
             }
 
-            const response = await fetch(saveUrl.toString(), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    ...(changes.name ? { siteName: changes.name } : {}),
-                    contactInfo: changes.contactInfo,
-                    localBusiness: changes.localBusiness,
-                    socialLinks: changes.socialLinks,
-                    branding: changes.branding,
-                    seo: changes.seo,
-                    // When name changes, persist updated headerBlock (logoText synced above).
-                    // When logo changes, persist synced header/footer blocks directly to DB.
-                    headerBlock: changes.name
-                        ? useEditorStore.getState().headerBlock
-                        : (logoSyncedHeaderBlock ?? changes.headerBlock),
-                    footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
-                }),
-            })
+            let request: Promise<Response>
+            try {
+                request = runSerializedEditorSave(persistenceSiteId, () => {
+                    try {
+                        return fetch(saveUrl.toString(), {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                ...(changes.name ? { siteName: changes.name } : {}),
+                                contactInfo: changes.contactInfo,
+                                localBusiness: changes.localBusiness,
+                                socialLinks: changes.socialLinks,
+                                branding: changes.branding,
+                                seo: changes.seo,
+                                // When name changes, persist updated headerBlock (logoText synced above).
+                                // When logo changes, persist synced header/footer blocks directly to DB.
+                                headerBlock: changes.name
+                                    ? useEditorStore.getState().headerBlock
+                                    : (logoSyncedHeaderBlock ?? changes.headerBlock),
+                                footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
+                            }),
+                        })
+                    } catch (setupError) {
+                        throw new SerializedSaveSetupError(setupError)
+                    }
+                })
+            } catch (setupError) {
+                throw setupError
+            }
+
+            let response: Response
+            try {
+                response = await request
+            } catch (transportError) {
+                if (transportError instanceof SerializedSaveSetupError) {
+                    throw transportError.originalError
+                }
+                if (changes.localBusiness) {
+                    const reconcileController = new AbortController()
+                    const reconcileTimeoutId = window.setTimeout(
+                        () => reconcileController.abort(),
+                        LOCAL_BUSINESS_RECONCILE_TIMEOUT_MS,
+                    )
+                    try {
+                        const editorUrl = new URL(`/api/sites/${persistenceSiteId}/editor-data`, window.location.origin)
+                        const reconcileResponse = await fetch(editorUrl.toString(), {
+                            credentials: 'include',
+                            cache: 'no-store',
+                            signal: reconcileController.signal,
+                        })
+                        if (reconcileResponse.ok) {
+                            const reconciledData = await reconcileResponse.json() as { site?: SiteData }
+                            const authoritativeLocalBusiness = reconciledData.site?.localBusiness
+                            if (localBusinessSnapshotsMatch(authoritativeLocalBusiness, changes.localBusiness)) {
+                                localBusinessUnknownOutcomeSiteIdsRef.current.delete(persistenceSiteId)
+                                setLocalBusinessLockedSiteIds(previous => {
+                                    if (!previous.has(persistenceSiteId)) return previous
+                                    const next = new Set(previous)
+                                    next.delete(persistenceSiteId)
+                                    return next
+                                })
+                                return true
+                            }
+                        }
+                    } catch (reconcileError) {
+                        console.error('Failed to reconcile local business information after transport error', reconcileError)
+                    } finally {
+                        window.clearTimeout(reconcileTimeoutId)
+                    }
+
+                    localBusinessUnknownOutcomeSiteIdsRef.current.add(persistenceSiteId)
+                    setLocalBusinessLockedSiteIds(previous => {
+                        const next = new Set(previous)
+                        next.add(persistenceSiteId)
+                        return next
+                    })
+                    console.error('Local business save outcome is unknown', transportError)
+                    toast.error(t.editor.settings.localBusinessSaveUnknownTitle, {
+                        description: t.editor.settings.localBusinessSaveUnknownDescription,
+                    })
+                    // Keep the optimistic snapshot visible and prevent later full-snapshot
+                    // writes until reload; rolling back could overwrite a late server commit.
+                    return false
+                }
+                if (isContactSave && changes.contactInfo) {
+                    try {
+                        const editorUrl = new URL(`/api/sites/${persistenceSiteId}/editor-data`, window.location.origin)
+                        if (currentPageId) editorUrl.searchParams.set('pageId', currentPageId)
+                        const reconcileResponse = await fetch(editorUrl.toString(), {
+                            credentials: 'include',
+                            cache: 'no-store',
+                        })
+                        if (reconcileResponse.ok) {
+                            const reconciledData = await reconcileResponse.json() as { site?: SiteData }
+                            const authoritativeSite = reconciledData.site
+                            if (authoritativeSite) {
+                                const authoritativeContactInfo = authoritativeSite.contactInfo ?? {}
+                                setSite(prev => prev
+                                    ? { ...prev, contactInfo: authoritativeSite.contactInfo }
+                                    : authoritativeSite)
+                                const contactFields = Object.keys(changes.contactInfo) as Array<keyof NonNullable<SiteData['contactInfo']>>
+                                const didPersist = contactFields.length > 0 && contactFields.every(
+                                    field => authoritativeContactInfo[field] === changes.contactInfo?.[field],
+                                )
+                                if (didPersist) return true
+                            }
+                        }
+                    } catch (reconcileError) {
+                        console.error('Failed to reconcile contact info after transport error', reconcileError)
+                    }
+                }
+                if (isContactSave) {
+                    console.error('Contact info save outcome is unknown', transportError)
+                    commitChangesToSite()
+                    keepContactSaveLocked = true
+                    toast.error('Could not confirm whether contact information was saved.', {
+                        description: 'Reload the editor before editing contact information again.',
+                    })
+                    return true
+                }
+                throw transportError
+            }
 
             if (!response.ok) {
                 const body = await response.json().catch(() => null)
                 throw new Error(resolveApiError(body, `Server returned ${response.status}`, sub))
             }
 
-            setSaveSuccess(true)
-            // header/footer update in-place; branding (CSS vars) still needs full reload
-            if (changes.headerBlock || changes.name) {
-                const s = useEditorStore.getState()
-                const h = s.headerBlock
-                if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
+            if (isContactSave) commitChangesToSite()
+
+            if (persistenceSiteId === siteId) {
+                setSaveSuccess(true)
+                // header/footer update in-place; branding (CSS vars) still needs full reload
+                if (changes.headerBlock || changes.name) {
+                    const s = useEditorStore.getState()
+                    const h = s.headerBlock
+                    if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
+                }
+                if (changes.footerBlock) {
+                    const s = useEditorStore.getState()
+                    const f = s.footerBlock
+                    if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
+                }
+                if (changes.branding) setIframeKey(key => key + 1)
+                window.setTimeout(() => setSaveSuccess(false), 1800)
             }
-            if (changes.footerBlock) {
-                const s = useEditorStore.getState()
-                const f = s.footerBlock
-                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
-            }
-            if (changes.branding) setIframeKey(key => key + 1)
-            window.setTimeout(() => setSaveSuccess(false), 1800)
             return true
         } catch (error) {
             console.error('Failed to update site settings', error)
             const errMsg = error instanceof Error ? error.message : null
             toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
             return false
+        } finally {
+            if (ownsContactSave && !keepContactSaveLocked) {
+                contactSavePendingRef.current = false
+                setIsContactSavePending(false)
+            }
         }
-    }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
+    }, [currentPageId, siteId, t.editor.settings.localBusinessSaveUnknownDescription, t.editor.settings.localBusinessSaveUnknownTitle, updateSiteName, updateHeaderBlock])
+
+    const drainLocalBusinessSaves = useCallback((targetSiteId: string) => {
+        if (localBusinessSaveInFlightSiteIdsRef.current.has(targetSiteId)) return
+
+        const batch = queuedLocalBusinessSavesRef.current.get(targetSiteId)
+        if (!batch) return
+        if (localBusinessUnknownOutcomeSiteIdsRef.current.has(targetSiteId)) {
+            queuedLocalBusinessSavesRef.current.delete(targetSiteId)
+            for (const resolve of batch.resolvers) resolve(false)
+            return
+        }
+
+        queuedLocalBusinessSavesRef.current.delete(targetSiteId)
+        localBusinessSaveInFlightSiteIdsRef.current.add(batch.siteId)
+
+        const rollbackBatch = () => {
+            const current = localBusinessBySiteRef.current.get(batch.siteId)
+            if (!current || current.revision !== batch.revision) return
+
+            const rolledBack: LocalBusinessSiteState = {
+                snapshot: current.persistedSnapshot,
+                persistedSnapshot: current.persistedSnapshot,
+                revision: current.persistedRevision,
+                persistedRevision: current.persistedRevision,
+            }
+            localBusinessBySiteRef.current.set(batch.siteId, rolledBack)
+            if (batch.siteId === activeSiteIdRef.current) {
+                setSite(previous => previous
+                    ? { ...previous, localBusiness: rolledBack.snapshot }
+                    : previous)
+            }
+        }
+
+        void persistSiteSettingsChanges(
+            { localBusiness: batch.snapshot },
+            { commitOptimistically: false, targetSiteId: batch.siteId },
+        )
+            .then(result => {
+                const saved = result === true
+                const outcomeUnknown = localBusinessUnknownOutcomeSiteIdsRef.current.has(batch.siteId)
+                if (outcomeUnknown) {
+                    // A later queued revision was never sent. Keep only the ambiguous
+                    // in-flight snapshot visible, then let the locked drain reject the queue.
+                    const current = localBusinessBySiteRef.current.get(batch.siteId)
+                    if (current) {
+                        localBusinessBySiteRef.current.set(batch.siteId, {
+                            ...current,
+                            snapshot: batch.snapshot,
+                            revision: batch.revision,
+                        })
+                        if (batch.siteId === activeSiteIdRef.current) {
+                            setSite(previous => previous
+                                ? { ...previous, localBusiness: batch.snapshot }
+                                : previous)
+                        }
+                    }
+                } else if (saved) {
+                    const current = localBusinessBySiteRef.current.get(batch.siteId)
+                    if (current) {
+                        localBusinessBySiteRef.current.set(batch.siteId, {
+                            ...current,
+                            persistedSnapshot: batch.snapshot,
+                            persistedRevision: Math.max(current.persistedRevision, batch.revision),
+                        })
+                    }
+                    trackEvent({
+                        siteId: batch.siteId,
+                        event: 'local_business_data_saved',
+                        pageUrl: `/editor/${batch.siteId}`,
+                        metadata: {
+                            fields_completed_count: countCompletedLocalBusinessFields(batch.snapshot),
+                        },
+                    })
+                } else {
+                    rollbackBatch()
+                }
+                for (const resolve of batch.resolvers) resolve(saved)
+            })
+            .catch(error => {
+                console.error('Unexpected local business queue failure', error)
+                rollbackBatch()
+                for (const resolve of batch.resolvers) resolve(false)
+            })
+            .finally(() => {
+                localBusinessSaveInFlightSiteIdsRef.current.delete(batch.siteId)
+                drainLocalBusinessSavesRef.current(batch.siteId)
+            })
+    }, [persistSiteSettingsChanges])
+
+    drainLocalBusinessSavesRef.current = drainLocalBusinessSaves
+
+    const handleSiteSettingsChange = useCallback((changes: Partial<SiteData>) => {
+        const localBusinessPatch = changes.localBusiness
+        if (localBusinessPatch === undefined) {
+            return persistSiteSettingsChanges(changes)
+        }
+
+        if (localBusinessUnknownOutcomeSiteIdsRef.current.has(siteId)) {
+            return Promise.resolve(false)
+        }
+
+        const hasNonLocalBusinessChanges = Object.entries(changes).some(
+            ([key, value]) => key !== 'localBusiness' && value !== undefined,
+        )
+        if (hasNonLocalBusinessChanges) return Promise.resolve(false)
+
+        const current = localBusinessBySiteRef.current.get(siteId) ?? {
+            snapshot: {},
+            persistedSnapshot: {},
+            revision: 0,
+            persistedRevision: 0,
+        }
+        const latestSnapshot = normalizeLocalBusinessSnapshot(
+            {
+                ...current.snapshot,
+                ...localBusinessPatch,
+            },
+        )
+        if (latestSnapshot.openingHours) {
+            latestSnapshot.openingHours = sanitizeLegacyOpeningHours(latestSnapshot.openingHours)
+        }
+        const revision = current.revision + 1
+        localBusinessBySiteRef.current.set(siteId, {
+            snapshot: latestSnapshot,
+            persistedSnapshot: current.persistedSnapshot,
+            revision,
+            persistedRevision: current.persistedRevision,
+        })
+        setSite(prev => prev
+            ? { ...prev, localBusiness: latestSnapshot }
+            : prev)
+
+        return new Promise<boolean>(resolve => {
+            const queued = queuedLocalBusinessSavesRef.current.get(siteId)
+            queuedLocalBusinessSavesRef.current.set(
+                siteId,
+                queued
+                    ? {
+                        ...queued,
+                        snapshot: latestSnapshot,
+                        revision,
+                        resolvers: [...queued.resolvers, resolve],
+                    }
+                    : {
+                        siteId,
+                        snapshot: latestSnapshot,
+                        revision,
+                        resolvers: [resolve],
+                    },
+            )
+            drainLocalBusinessSavesRef.current(siteId)
+        })
+    }, [persistSiteSettingsChanges, siteId])
 
     // F-26: Auto-translate header or footer block into target locale if not already cached.
     // Stores translation in block._localeContent[locale] (no history entry — silent background op).
@@ -992,7 +1520,7 @@ export default function EditorPage() {
         // Immediate save persists the new active locale's display blocks to DB so
         // /preview and public sources don't show stale content until next auto-save.
         if (!isStandard) {
-            useEditorStore.setState({ hasUnsavedChanges: true })
+            markDirty(false)
             void saveWithRetry({ showToast: false, refreshPreview: false })
             return
         }
@@ -1196,19 +1724,19 @@ export default function EditorPage() {
         // Persist new locale to Sites.locale + mark unsaved so flushSavesBeforePublish
         // calls handleSave (which uses getDisplayBlocks) before promoting to published.
         try {
-            await fetch(`/api/sites/${siteId}/save`, {
+            await runSerializedEditorSave(siteId, () => fetch(`/api/sites/${siteId}/save`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ locale }),
-            })
+            }))
         } catch {
             // Non-fatal — locale preference stored in memory until next save
         }
         // Mark dirty so publish flow re-saves with the new locale's display blocks (fix: Greek site → switch MS → publish → shows MS)
-        useEditorStore.setState({ hasUnsavedChanges: true })
+        markDirty(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- saveWithRetry declared after this; refs are stable
-    }, [siteId, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride, updatePageInState])
+    }, [siteId, markDirty, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride, updatePageInState])
 
     // F-26-04: Translate a specific block instance (called after block drop when needsTranslation)
     const handleAutoTranslateBlock = useCallback(async (blockId: string, blockType: string) => {
@@ -1750,37 +2278,42 @@ export default function EditorPage() {
             }
             // Force re-save with fully-translated state to guarantee header/footer/globals
             // hit DB in the chosen language before publish reads them.
-            useEditorStore.setState({ hasUnsavedChanges: true })
+            markDirty(false)
         }
-        // Poll until in-flight save finishes (max 10s)
-        if (isSavingRef.current) {
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (!isSavingRef.current || Date.now() > deadline) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
+        const deadline = Date.now() + 10_000
+        const waitForSaveQueue = async (): Promise<boolean> => {
+            while (isSavingRef.current || hasPendingSerializedEditorSave(siteId)) {
+                const remaining = deadline - Date.now()
+                if (remaining <= 0) return false
+                await new Promise<void>((resolve) => {
+                    window.setTimeout(resolve, Math.min(100, remaining))
+                })
+            }
+            return true
         }
-        // Save any remaining unsaved changes
-        if (useEditorStore.getState().hasUnsavedChanges) {
-            const saved = await handleSave({ showToast: false, refreshPreview: false })
+
+        // A user action can create a new revision while the flush save is in flight.
+        // Keep flushing until both the queue and dirty state are stable.
+        while (Date.now() < deadline) {
+            if (!await waitForSaveQueue()) return false
+            if (!useEditorStore.getState().hasUnsavedChanges) return true
+
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) return false
+
+            let timeoutId: number | null = null
+            const saved = await Promise.race<boolean>([
+                handleSave({ showToast: false, refreshPreview: false }),
+                new Promise<boolean>((resolve) => {
+                    timeoutId = window.setTimeout(() => resolve(false), remaining)
+                }),
+            ])
+            if (timeoutId !== null) window.clearTimeout(timeoutId)
             if (!saved) return false
-            // Wait for that save to finish too
-            await new Promise<void>((resolve) => {
-                const deadline = Date.now() + 10_000
-                const check = setInterval(() => {
-                    if (!isSavingRef.current || Date.now() > deadline) {
-                        clearInterval(check)
-                        resolve()
-                    }
-                }, 100)
-            })
         }
-        return true
-    }, [handleSave])
+
+        return false
+    }, [handleSave, markDirty, siteId])
 
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
@@ -2291,8 +2824,10 @@ export default function EditorPage() {
             blockIndex: null,
             theme,
             site,
+            isLocalBusinessSaveLocked,
             siteName: siteName || site?.name || '',
             siteStatus: site?.status || 'draft',
+            isContactSavePending,
             headerBlock,
             footerBlock,
             pages,
@@ -2378,6 +2913,9 @@ export default function EditorPage() {
             // Reloading here causes visible jank while user is still editing.
             await handleSave({ showToast: false, refreshPreview: false })
         },
+        onManualSave: async (source) => {
+            await handleManualSave(source)
+        },
         onFooterUpdate: (changes) => {
             updateFooterBlock(changes)
             const s = useEditorStore.getState()
@@ -2462,6 +3000,7 @@ export default function EditorPage() {
                 isSaving={isSaving}
                 saveSuccess={saveSuccess}
                 hasUnsavedChanges={hasUnsavedChanges}
+                lastSavedAt={lastSavedAt}
                 hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishSuccess={publishSuccess}
@@ -2475,13 +3014,7 @@ export default function EditorPage() {
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                onSave={() => {
-                    if (templateApplied) {
-                        setShowSaveGuard(true)
-                    } else {
-                        void handleSave()
-                    }
-                }}
+                onSave={() => { void handleManualSave() }}
                 onPublish={() => setIsPublishModalOpen(true)}
                 onRepublish={handleRepublish}
                 onUnpublish={() => setIsUnpublishModalOpen(true)}
@@ -2509,11 +3042,13 @@ export default function EditorPage() {
                     theme={theme}
                     site={site}
                     siteName={siteName}
+                    isContactSavePending={isContactSavePending}
                     headerBlock={headerBlock}
                     footerBlock={footerBlock}
                     pages={pages}
                     currentPageId={currentPageId}
                     siteLocale={siteLocale}
+                    isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                     primaryLocale={primaryLocale}
                     secondaryLocale={secondaryLocale}
                     pendingLocale={pendingLocale}
@@ -2577,10 +3112,12 @@ export default function EditorPage() {
                             theme={theme}
                             site={site}
                             siteName={siteName || site?.name || ''}
+                            isContactSavePending={isContactSavePending}
                             siteStatus={site?.status || 'draft'}
                             headerBlock={headerBlock}
                             footerBlock={footerBlock}
                             pages={pages}
+                            isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                             currentPageId={currentPageId}
                             siteLocale={siteLocale}
                             generationLocale={site?.generationLocale ?? siteLocale}

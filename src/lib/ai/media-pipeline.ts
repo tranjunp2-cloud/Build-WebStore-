@@ -26,6 +26,7 @@ import {
     PIXABAY_CATEGORY_BY_COMPOSER,
     PIXABAY_ORIENTATION_BY_BLOCK,
     PixabayError,
+    registerPixabayMediaSource,
     type PixabayPhoto,
 } from './pixabay-client'
 import { withMediaCreateLock } from './media-create-lock'
@@ -215,13 +216,15 @@ async function fetchAndStorePhoto(
     const alt = buildAttributedAlt(photo, `${ctx.businessName} ${blockType}`)
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
-    return uploadBufferToMedia(payload, {
+    const mediaId = await uploadBufferToMedia(payload, {
         buffer,
         filename,
         mimetype,
         alt,
         tenantId: ctx.tenantId,
     })
+    registerPixabayMediaSource(mediaId, photo.url)
+    return mediaId
 }
 
 /**
@@ -240,13 +243,15 @@ async function fetchAndStorePoolPhoto(
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
     const alt = photo.alt || `${ctx.businessName} ${blockType}`
-    return uploadBufferToMedia(payload, {
+    const mediaId = await uploadBufferToMedia(payload, {
         buffer,
         filename,
         mimetype,
         alt,
         tenantId: ctx.tenantId,
     })
+    registerPixabayMediaSource(mediaId, photo.url)
+    return mediaId
 }
 
 /**
@@ -578,11 +583,6 @@ export async function getMediaForBlock(
             return []
         }
         const kept = photos.filter((p) => photoMatchesTerms(p.alt, terms))
-        if (kept.length < photos.length) {
-            console.info(
-                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${terms.join(' | ')}"`,
-            )
-        }
         return kept
     }
     // Tier 3 broadens the search with a category phrase, then applies the same
@@ -614,9 +614,6 @@ export async function getMediaForBlock(
             // on the server-side filter, while unmapped categories reject all.
             const gatedPhotos = gateTerms(photos, subjectTerms)
             if (gatedPhotos.length > 0) {
-                console.info(
-                    `[Media Pipeline] ${blockType} category fallback "${fallbackQuery}": ${gatedPhotos.length}/${photos.length} photo(s)`,
-                )
                 return batchFetch(pickRandomN(gatedPhotos, count), blockType, ctx, payload)
             }
         }
@@ -665,9 +662,6 @@ export async function getMediaForBlock(
         }
         const picks = pickRandomN(photos, count)
         const result = await batchFetch(picks, blockType, ctx, payload)
-        console.info(
-            `[Media Pipeline] ${blockType}: ${result.mediaIds.length}/${count} uploaded (query="${query}")`,
-        )
         return result
     } catch (err) {
         const msg = err instanceof PixabayError ? err.code : (err as Error).message

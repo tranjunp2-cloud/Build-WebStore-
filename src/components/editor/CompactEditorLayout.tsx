@@ -42,6 +42,8 @@ export interface CompactEditorLayoutProps {
     theme: ThemeData
     site: SiteData | null
     siteName: string
+    isContactSavePending: boolean
+    isLocalBusinessSaveLocked?: boolean
     headerBlock: BlockData | null
     footerBlock: BlockData | null
     pages: PageData[]
@@ -50,7 +52,7 @@ export interface CompactEditorLayoutProps {
     primaryLocale: string
     secondaryLocale: string | null
     pendingLocale: string | null
-    settingsRequestedTab: { tab: SettingsTab; key: number; section?: string } | null
+    settingsRequestedTab: { tab: SettingsTab; key: number; section?: string; focus?: string } | null
     onNavLanguageSwitcherChange: (show: boolean) => void
     onAddLanguage: (locale: string) => void
     onRemoveLanguage: () => void
@@ -118,6 +120,8 @@ export function CompactEditorLayout({
     theme,
     site,
     siteName,
+    isContactSavePending,
+    isLocalBusinessSaveLocked = false,
     headerBlock,
     footerBlock,
     pages,
@@ -184,28 +188,35 @@ export function CompactEditorLayout({
         }
     }, [isMobileSettingsOpen, toolsSheetOpen])
 
-    // GH-1557 Bug 7: navigation/footer/breadcrumb have no entry in `blocks` or `globalBlocks`
-    // (unlike cartWidget/whatsapp-button/social), so `currentBlock` is null for them — but the
-    // sheet must still open, driven by `settingsRequestedTab` alone. Desktop's SettingsPanel is
-    // always mounted so `block=null` there is a non-issue; this compact sheet only mounts when
-    // `currentBlock` is truthy, hence the dedicated mode below.
+    // Menu targets and allowlisted Dashboard settings deep links have no selected block.
+    // Compact mounts the existing SettingsPanel in a settings-only sheet so its normal
+    // expand, scroll, and focus behavior can consume the request.
     const navFooterMenuMode = !currentBlock && settingsRequestedTab?.tab === 'menu'
+    const settingsOnlyMode = !currentBlock && (
+        settingsRequestedTab?.tab === 'global' ||
+        settingsRequestedTab?.tab === 'seo'
+    )
     const navFooterMenuLabel = settingsRequestedTab?.section === 'breadcrumb'
         ? 'Breadcrumb'
         : settingsRequestedTab?.section === 'footer'
             ? 'Footer'
             : 'Navigation'
+    const settingsOnlyLabel = settingsRequestedTab?.tab === 'seo' ? 'SEO' : 'Site'
 
     const blockLabel = currentBlock
         ? blockRegistry.getBlockMeta(currentBlock.blockType)?.name || currentBlock.blockType
         : navFooterMenuMode
             ? navFooterMenuLabel
-            : ''
+            : settingsOnlyMode
+                ? settingsOnlyLabel
+                : ''
     // Floating global widgets (cartWidget/whatsapp-button/social) use negative indices and
     // aren't part of the page's block flow — move/delete don't apply to them (their own
     // enable/disable + variant controls live in the SettingsPanel block view below).
-    // Nav/footer/breadcrumb menu mode has no block at all, so it hides the same way.
-    const isGlobalWidget = (selectedBlock !== null && selectedBlock < 0) || navFooterMenuMode
+    // Menu and settings-only modes have no block at all, so block actions do not apply.
+    const blockActionsUnavailable = (
+        selectedBlock !== null && selectedBlock < 0
+    ) || navFooterMenuMode || settingsOnlyMode
     const canMoveUp = selectedBlock !== null && selectedBlock > 0
     const canMoveDown = selectedBlock !== null && selectedBlock >= 0 && selectedBlock < totalBlocks - 1
     // F05 screen 11: empty new-page state — FAB is the ONLY screen showing it, and it
@@ -213,8 +224,8 @@ export function CompactEditorLayout({
     const showFab = totalBlocks === 0 && !toolsSheetOpen
 
     const handleConfirmDelete = () => {
-        // Defense-in-depth: the delete-bar button itself is hidden for floating widgets
-        // (isGlobalWidget) above, but guard here too — deleteBlock(negativeIndex) is a
+        // Defense-in-depth: the delete bar is hidden when block actions are unavailable,
+        // but guard here too — deleteBlock(negativeIndex) is a
         // silent no-op against the page's block array and must never fire a fake success.
         if (selectedBlock === null || selectedBlock < 0) return
         const deletedType = currentBlock?.blockType || 'block'
@@ -276,6 +287,7 @@ export function CompactEditorLayout({
                 role="button"
                 tabIndex={0}
                 aria-label={aiRunning ? t.editor.aiChat.stopAI : cl.openChatAndTools}
+                data-testid="editor-tools-trigger"
                 onClick={() => (aiRunning ? onStopAI() : onOpenTools())}
                 onKeyDown={(e) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return
@@ -313,9 +325,9 @@ export function CompactEditorLayout({
                 panelProps={toolsPanelProps}
             />
 
-            {/* F05 screen 4: block-settings bottom sheet (bsBlock) — auto-opens on tap-select.
-                GH-1557 Bug 7: also opens for nav/footer/breadcrumb, which have no `currentBlock`. */}
-            {isMobileSettingsOpen && (currentBlock || navFooterMenuMode) && (
+            {/* F05 screen 4: the existing compact settings sheet hosts block, menu,
+                and allowlisted site/SEO requests without creating a parallel surface. */}
+            {isMobileSettingsOpen && (currentBlock || navFooterMenuMode || settingsOnlyMode) && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center">
                     <div
                         className="absolute inset-0 bg-black/60"
@@ -332,7 +344,9 @@ export function CompactEditorLayout({
                     <div className="relative flex max-h-[70vh] max-[767px]:landscape:max-h-[90vh] min-[768px]:max-h-[640px] flex-col overflow-hidden rounded-t-2xl border-t border-solid border-[var(--editor-border)] bg-[var(--editor-surface)] min-[768px]:w-full min-[768px]:max-w-[680px] min-[768px]:shadow-2xl">
                         <div className="flex items-center justify-between border-b border-solid border-[var(--editor-border)] px-4 py-3">
                             <div className="flex min-w-0 items-baseline gap-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Block</span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+                                    {currentBlock ? 'Block' : 'Settings'}
+                                </span>
                                 <span className="truncate text-sm font-medium text-[var(--editor-text)] min-[768px]:text-base">{blockLabel}</span>
                             </div>
                             <button
@@ -348,7 +362,7 @@ export function CompactEditorLayout({
                         {/* mv-bar (F05): calls the same reorder handler the desktop BlockActionBar uses.
                             Hidden for floating global widgets — negative indices aren't page-flow
                             positions, so move up/down doesn't apply. */}
-                        {!isGlobalWidget && (
+                        {!blockActionsUnavailable && (
                             <div className="flex gap-2 border-b border-solid border-[var(--editor-border)] px-4 py-2.5">
                                 <button
                                     type="button"
@@ -376,6 +390,8 @@ export function CompactEditorLayout({
                                 theme={theme}
                                 site={site}
                                 siteName={siteName || site?.name || ''}
+                                isContactSavePending={isContactSavePending}
+                                isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
                                 siteStatus={site?.status || 'draft'}
                                 headerBlock={headerBlock}
                                 footerBlock={footerBlock}
@@ -408,7 +424,7 @@ export function CompactEditorLayout({
                             Hidden for floating global widgets — deleteBlock(negativeIndex) is a
                             no-op against the page's block array (widgets aren't in it); their
                             on/off toggle already lives in the SettingsPanel block view above. */}
-                        {!isGlobalWidget && (
+                        {!blockActionsUnavailable && (
                             <div className="border-t border-solid border-[var(--editor-border)] px-4 py-3">
                                 <button
                                     type="button"

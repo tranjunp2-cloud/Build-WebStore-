@@ -19,7 +19,7 @@ function sqlToText(sqlObj: any): string {
         .join('')
 }
 
-function createMockPayload(opts: { completedCheckHasRow?: boolean } = {}) {
+function createMockPayload(opts: { completedCheckHasRow?: boolean; hasKeyString?: boolean } = {}) {
     const execute = vi.fn(async (sqlObj: any) => {
         const text = sqlToText(sqlObj)
         if (text.includes('SELECT 1 FROM sso_step_events')) {
@@ -30,7 +30,7 @@ function createMockPayload(opts: { completedCheckHasRow?: boolean } = {}) {
     return {
         findByID: vi.fn().mockResolvedValue({
             email: 'user@test.com',
-            keyString: encryptPassword('test-password'),
+            keyString: opts.hasKeyString === false ? null : encryptPassword('test-password'),
         }),
         db: { drizzle: { execute } },
     } as any
@@ -158,6 +158,21 @@ describe('[TC-1293-SYNC] sso-api-client', () => {
         expect(fetchMock).not.toHaveBeenCalled()
     })
 
+    it('[TC-1724-SYNC-04] missing keyString persists pending instead of false completed', async () => {
+        const payload = createMockPayload({ hasKeyString: false })
+        vi.stubGlobal('fetch', vi.fn())
+
+        await expect(notifyStepComplete(payload, 1, 2)).resolves.toBeUndefined()
+
+        const insertCall = payload.db.drizzle.execute.mock.calls.find(([sqlObj]: any[]) =>
+            sqlToText(sqlObj).includes('INSERT INTO sso_step_events'),
+        )
+        expect(insertCall).toBeDefined()
+        const text = sqlToText(insertCall[0])
+        expect(text).toContain('pending')
+        expect(text).not.toContain('completed')
+    })
+
     it('[TC-1293-SYNC-06] a failing body read on an error response still throws a status-bearing error (no unhandled rejection)', async () => {
         vi.stubGlobal(
             'fetch',
@@ -214,5 +229,52 @@ describe('[TC-1293-SYNC] sso-api-client', () => {
         expect(text).toContain('retry_count = 0')
         // VALUES (..., 0) default, right before ON CONFLICT
         expect(text).toMatch(/,\s*0\)\s*ON CONFLICT/)
+    })
+    it('[TC-1724-SYNC-06] PATCH body consumption is covered by the stage timeout', async () => {
+        vi.useFakeTimers()
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({ status: 200, data: { access_token: 'tok123' } }),
+            })
+            .mockImplementationOnce((_url: string, init: RequestInit) => ({
+                ok: true,
+                status: 200,
+                text: () => new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener('abort', () =>
+                        reject(new DOMException('This operation was aborted', 'AbortError')),
+                    )
+                }),
+            }))
+        vi.stubGlobal('fetch', fetchMock)
+        const promise = sendSSOStepNotification(createMockPayload(), 1, 2, {
+            loginTimeoutMs: 100,
+            patchTimeoutMs: 100,
+        })
+        promise.catch(() => {})
+        await vi.advanceTimersByTimeAsync(99)
+        await vi.advanceTimersByTimeAsync(1)
+        await expect(promise).rejects.toThrow(/aborted/i)
+    })
+
+    it('[TC-1724-SYNC-07] deadline caps each network stage by remaining budget', async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+                init.signal?.addEventListener('abort', () =>
+                    reject(new DOMException('This operation was aborted', 'AbortError')),
+                )
+            }),
+        ))
+        const promise = sendSSOStepNotification(createMockPayload(), 1, 2, {
+            loginTimeoutMs: 20_000,
+            patchTimeoutMs: 25_000,
+            deadlineMs: Date.now() + 250,
+        })
+        promise.catch(() => {})
+        await vi.advanceTimersByTimeAsync(250)
+        await expect(promise).rejects.toThrow(/aborted/i)
     })
 })

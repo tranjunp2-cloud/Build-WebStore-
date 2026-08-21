@@ -14,7 +14,7 @@ import { LogoEditor } from './LogoEditor'
 import { FaviconEditor } from './FaviconEditor'
 import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
@@ -42,16 +42,26 @@ import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-
 import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
+import {
+    BUSINESS_CATEGORY_OPTIONS,
+    PRICE_RANGE_OPTIONS,
+    getCompatibleSchemaSubtypes,
+    isValidBusinessPhone,
+    reconcileSchemaSubtype,
+} from '@/lib/seo/local-business-constants'
 import { GeoCascadeFields } from './local-business/geo-cascade-fields'
 import { GeoLinkInput } from './local-business/geo-link-input'
 import { OpeningHoursEditor } from './local-business/opening-hours-editor'
 import { sanitizeLegacyOpeningHours } from './local-business/opening-hours-utils'
+import { sanitizeLocalBusinessText } from './local-business/normalization'
 import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
-import { trackEvent } from '@/lib/analytics/track-event'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+    SeoOverwriteConfirmDialog,
+    type SeoMetadataPreview,
+} from './SeoOverwriteConfirmDialog'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -62,20 +72,6 @@ function stripHtmlForDisplay(value: unknown): string {
 /** Strip HTML tags from input to prevent XSS */
 function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
-}
-
-/** F37 US-01: analytics `fields_completed_count` — address parts + category +
- *  "has ≥1 open day" flag (phase-03 plan architecture note). Deliberately NOT
- *  the same as the 3-row completion checklist (that's presence-per-group). */
-function countCompletedLocalBusinessFields(data: LocalBusinessData): number {
-    let count = 0
-    if (data.streetAddress?.trim()) count++
-    if (data.city?.trim()) count++
-    if (data.state?.trim()) count++
-    if (data.postcode?.trim()) count++
-    if (data.businessCategory?.trim()) count++
-    if (data.openingHours?.some(row => !row.isClosed && row.opens?.trim() && row.closes?.trim())) count++
-    return count
 }
 
 /** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
@@ -138,6 +134,18 @@ const PHONE_COUNTRIES = [
 const sectionCls = "border-t border-white/10 pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
 const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
+
+type SeoProposal = SeoMetadataPreview & {
+    slug?: string | null
+}
+
+type PendingSeoOverwrite = {
+    pageId: string
+    isHomepage: boolean
+    existing: SeoMetadataPreview
+    proposed: SeoProposal
+    warning?: string
+}
 
 /** Ensure phone number is displayed with country code prefix (e.g. "+60123456789"). */
 function preparePhoneForDisplay(phone: string, countryCode: string): string {
@@ -274,6 +282,7 @@ interface SettingsPanelProps {
             metaTitle?: string
             metaDescription?: string
             ogImage?: string | number | null
+            googleVerificationToken?: string
         }
     } | null
     siteName: string
@@ -293,14 +302,18 @@ interface SettingsPanelProps {
         contactInfo?: { phone?: string; email?: string; address?: string }
         localBusiness?: LocalBusinessData
         socialLinks?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; tiktok?: string }
-        seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null }
+        seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null; googleVerificationToken?: string }
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
     }) => void | boolean | Promise<void | boolean>
+    /** Parent-owned contact mutex state so every SettingsPanel mount stays locked. */
+    isContactSavePending?: boolean
+    /** Parent-owned lock after an indeterminate LocalBusiness save; cleared by reload. */
+    isLocalBusinessSaveLocked?: boolean
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
-    requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
+    requestedTab?: { tab: SettingsTab; key: number; section?: string; focus?: string } | null
     // F26: Multilingual panel in Menu settings
     siteLocale?: string
     navShowLanguageSwitcher?: boolean
@@ -334,6 +347,8 @@ function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
+    isContactSavePending = false,
+    isLocalBusinessSaveLocked = false,
     requestedTab,
     siteLocale = 'en',
     generationLocale, primaryLocale, secondaryLocale, pendingLocale,
@@ -343,6 +358,7 @@ function SettingsPanelInner({
     hideChrome = false,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
+    const { upload: uploadFooterLogo, isUploading: isUploadingFooterLogo } = useUploadProgress()
     const pm = t.editor.pageManager
     const s = t.editor.settings
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
@@ -424,9 +440,11 @@ function SettingsPanelInner({
         const sl = b?.showLink
         setAnnShowLink(sl === true || (sl === undefined && !!(b?.linkText || b?.linkUrl)))
     }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
-    const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
+    const [pendingSeoOverwrite, setPendingSeoOverwrite] = useState<PendingSeoOverwrite | null>(null)
+    const [isApplyingSeoOverwrite, setIsApplyingSeoOverwrite] = useState(false)
+    const currentPageIdRef = useRef(currentPageId)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
@@ -448,25 +466,81 @@ function SettingsPanelInner({
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const footerSectionRef = React.useRef<HTMLDivElement>(null)
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const panelScrollRef = React.useRef<HTMLDivElement>(null)
+    const settingsTargetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const settingsFocusObserverRef = React.useRef<MutationObserver | null>(null)
+    const settingsFocusFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
+
+    useEffect(() => {
+        currentPageIdRef.current = currentPageId
+        setPendingSeoOverwrite((pending) => (
+            pending && pending.pageId !== currentPageId ? null : pending
+        ))
+    }, [currentPageId])
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
         if (requestedTab) {
             setActiveTab(requestedTab.tab)
-            if (requestedTab.section === 'breadcrumb') {
-                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
-                breadcrumbScrollTimerRef.current = setTimeout(() => {
-                    breadcrumbSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 80)
+            const section = requestedTab.section
+            if (requestedTab.tab === "global" && (section === "brand" || section === "contact" || section === "localBusiness")) {
+                setOpenGlobalSections(previous => ({ ...previous, [section]: true }))
             }
-            if (requestedTab.section === 'footer') {
-                if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
-                footerScrollTimerRef.current = setTimeout(() => {
-                    footerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 80)
-            }
+            if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
+            settingsFocusObserverRef.current?.disconnect()
+            if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
+            settingsTargetTimerRef.current = setTimeout(() => {
+                const root = panelScrollRef.current
+                const sectionTarget = section
+                    ? root?.querySelector<HTMLElement>("[data-settings-section=\"" + section + "\"]")
+                    : null
+                const focusTarget = requestedTab.focus
+                    ? sectionTarget?.querySelector<HTMLElement>("[data-settings-focus=\"" + requestedTab.focus + "\"]")
+                        || root?.querySelector<HTMLElement>("[data-settings-focus=\"" + requestedTab.focus + "\"]")
+                    : null
+                const legacyTarget = section === "breadcrumb"
+                    ? breadcrumbSectionRef.current
+                    : section === "footer" ? footerSectionRef.current : null
+                const target = focusTarget || sectionTarget || legacyTarget
+                target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+                const focusWhenEnabled = () => {
+                    const focusable = target?.matches("input, textarea, button, [tabindex]")
+                        ? target
+                        : target?.querySelector<HTMLElement>("input, textarea, button, [tabindex]")
+                    if (!focusable || focusable.matches(":disabled")) return false
+                    focusable.focus({ preventScroll: true })
+                    return document.activeElement === focusable
+                }
+
+                if (focusWhenEnabled() || !root || typeof MutationObserver === "undefined") return
+
+                // Geo-backed controls can still be disabled when navigation finishes.
+                // Retry precisely when their loading state changes rather than losing focus
+                // permanently after this one navigation attempt.
+                const stopWaitingForFocus = () => {
+                    settingsFocusObserverRef.current?.disconnect()
+                    settingsFocusObserverRef.current = null
+                    if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
+                    settingsFocusFallbackTimerRef.current = null
+                }
+                settingsFocusObserverRef.current = new MutationObserver(() => {
+                    if (focusWhenEnabled()) stopWaitingForFocus()
+                })
+                settingsFocusObserverRef.current.observe(root, {
+                    attributes: true,
+                    attributeFilter: ["disabled"],
+                    childList: true,
+                    subtree: true,
+                })
+                settingsFocusFallbackTimerRef.current = setTimeout(stopWaitingForFocus, 5000)
+            }, 100)
             return () => {
+                if (settingsTargetTimerRef.current) clearTimeout(settingsTargetTimerRef.current)
+                settingsFocusObserverRef.current?.disconnect()
+                settingsFocusObserverRef.current = null
+                if (settingsFocusFallbackTimerRef.current) clearTimeout(settingsFocusFallbackTimerRef.current)
+                settingsFocusFallbackTimerRef.current = null
                 if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
                 if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
             }
@@ -480,42 +554,87 @@ function SettingsPanelInner({
 
     const siteContactInfo = site?.contactInfo || {}
     const siteLocalBusiness = site?.localBusiness || {}
+    const canonicalLocalBusinessAddress = siteContactInfo.address?.trim() || siteLocalBusiness.streetAddress
+    const compatibleSchemaSubtypes = getCompatibleSchemaSubtypes(siteLocalBusiness.businessCategory)
+    const hasBusinessCategory = Boolean(siteLocalBusiness.businessCategory)
+    const hasCompatibleSchemaSubtypes = compatibleSchemaSubtypes.length > 0
+    const isSchemaSubtypeDisabled = !hasBusinessCategory || !hasCompatibleSchemaSubtypes
+    const hasInvalidSchemaSubtype = Boolean(
+        siteLocalBusiness.schemaSubtype
+        && !compatibleSchemaSubtypes.some(option => option.value === siteLocalBusiness.schemaSubtype),
+    )
+    const schemaSubtypeDescriptionIds = [
+        !hasBusinessCategory ? 'local-business-schema-subtype-disabled-hint' : null,
+        hasBusinessCategory && !hasCompatibleSchemaSubtypes
+            ? 'local-business-schema-subtype-unavailable-hint'
+            : null,
+        hasInvalidSchemaSubtype ? 'local-business-schema-subtype-validation' : null,
+    ].filter(Boolean).join(' ') || undefined
     const siteSocialLinks = site?.socialLinks || {}
-    const siteSeo = site?.seo || {}
+    const siteSeoRaw = site?.seo || {}
+    // Normalize ogImage: Payload populates upload fields as full objects ({id, url, ...})
+    // but the save schema expects string | number | null. Extract the raw ID to prevent
+    // VALIDATION_ERROR 400 when spreading siteSeo into save payloads.
+    const siteSeo = {
+        ...siteSeoRaw,
+        ogImage: siteSeoRaw.ogImage && typeof siteSeoRaw.ogImage === 'object'
+            ? (siteSeoRaw.ogImage as { id?: string | number }).id ?? null
+            : siteSeoRaw.ogImage ?? null,
+    }
     const siteBranding = site?.branding || {}
+    const contactSavePendingRef = useRef(false)
+    const [isContactSaving, setIsContactSaving] = useState(false)
+    const isContactBusy = isContactSavePending || isContactSaving
 
-    // F37 US-01: merge a localBusiness patch into current state, save, then fire
-    // the completion analytics event on success (architecture: "on successful
-    // save: trackEvent(...)"). Shared by every field in the accordion below so
-    // the merge-then-track sequence lives in exactly one place (DRY).
+    const handleContactInfoChange = async (
+        field: keyof NonNullable<NonNullable<SettingsPanelProps['site']>['contactInfo']>,
+        input: HTMLInputElement | HTMLTextAreaElement,
+        value: string,
+        confirmedValue: string,
+    ) => {
+        if (isContactSavePending || contactSavePendingRef.current) {
+            input.value = confirmedValue
+            return
+        }
+
+        input.value = value
+        contactSavePendingRef.current = true
+        setIsContactSaving(true)
+        try {
+            const saved = await onSiteSettingsChange?.({ contactInfo: { [field]: value } })
+            if (saved !== true && input.isConnected) input.value = confirmedValue
+        } catch (error) {
+            console.error('[SettingsPanel] contact info save failed', error)
+            if (input.isConnected) input.value = confirmedValue
+        } finally {
+            contactSavePendingRef.current = false
+            setIsContactSaving(false)
+        }
+    }
+
+    // F37 US-01: send only the edited fields to the Editor owner. The parent owns
+    // the latest snapshot and serializes persistence, so a render-stale snapshot
+    // here can never overwrite a newer field edit.
     const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
-        const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
-        // Every save re-sends the full openingHours array (full-object merge
-        // above). A row saved before AC-3's strict validation could have
-        // isClosed=false with missing opens/closes, or no dayOfWeek at all —
-        // re-sending it as-is now fails saveSiteSchema. This also has to run
-        // when patch.openingHours IS set: applyBatchSave only re-encodes the
-        // day(s) the user just edited and passes every OTHER day through
-        // unchanged, so a legacy-invalid row on an untouched day would still
-        // 400 the save. sanitizeLegacyOpeningHours is a no-op for well-formed
-        // rows (encodeDay's output always has dayOfWeek, and open rows always
-        // have both opens+closes), so this never weakens validation for a
-        // genuinely new bad submission — there isn't one, since the UI can't
-        // produce one.
-        if (merged.openingHours) {
-            merged.openingHours = sanitizeLegacyOpeningHours(merged.openingHours)
+        if (isLocalBusinessSaveLocked) return
+        const updatesStructuredAddress = (
+            'streetAddress' in patch ||
+            'state' in patch ||
+            'city' in patch ||
+            'postcode' in patch
+        )
+        const normalizedPatch: Partial<LocalBusinessData> = {
+            ...patch,
+            ...(updatesStructuredAddress ? { country: siteLocalBusiness.country?.trim() || 'MY' } : {}),
         }
-        const result = await onSiteSettingsChange?.({ localBusiness: merged })
-        // Only track on a confirmed successful save — onSiteSettingsChange resolves
-        // even on failure (errors are caught/toasted upstream), so `result === true`
-        // is the only reliable success signal.
-        if (site?.id && result === true) {
-            trackEvent({
-                siteId: site.id,
-                event: 'local_business_data_saved',
-                metadata: { fields_completed_count: countCompletedLocalBusinessFields(merged) },
-            })
+
+        // Keep component output sparse. The parent also normalizes its full queued
+        // snapshot; normalize here when hours change so analytics sees the same rows.
+        if (normalizedPatch.openingHours) {
+            normalizedPatch.openingHours = sanitizeLegacyOpeningHours(normalizedPatch.openingHours)
         }
+
+        await onSiteSettingsChange?.({ localBusiness: normalizedPatch })
     }
 
     const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
@@ -526,9 +645,11 @@ function SettingsPanelInner({
         title: string,
         content: React.ReactNode,
     ) => (
-        <div className="rounded-xl">
+        <div className="rounded-xl" data-settings-section={id}>
             <button
                 type="button"
+                data-testid={`settings-section-toggle-${id}`}
+                aria-expanded={openGlobalSections[id]}
                 onClick={() => setOpenGlobalSections(prev => ({ ...prev, [id]: !prev[id] }))}
                 className={cn(
                     globalAccordionButtonCls,
@@ -610,6 +731,7 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessName}</label>
                         <Input
+                            data-testid="settings-business-name"
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
                             onBlur={(e: FieldBlurEvent) => {
@@ -672,15 +794,21 @@ function SettingsPanelInner({
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
                             <Input
+                                data-testid="settings-contact-phone"
+                                data-settings-focus="phone"
                                 defaultValue={siteContactInfo.phone || ''}
                                 key={`contact-phone-${siteContactInfo.phone || ''}`}
-                                onBlur={(e: FieldBlurEvent) => {
-                                    const v = e.target.value.trim()
-                                    if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
-                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
-                                    } else {
+                                disabled={isContactBusy}
+                                onBlur={async (e: FieldBlurEvent) => {
+                                    const input = e.currentTarget
+                                    const confirmedPhone = siteContactInfo.phone || ''
+                                    const phone = input.value.trim()
+                                    if (!isValidBusinessPhone(phone)) {
                                         toast.error(t.editor.settingsValidation.invalidPhone)
+                                        input.value = confirmedPhone
+                                        return
                                     }
+                                    await handleContactInfoChange('phone', input, phone, confirmedPhone)
                                 }}
                                 variant="editor"
                                 className={editorInputClassName}
@@ -690,14 +818,20 @@ function SettingsPanelInner({
                         <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
                             <Input
+                                data-testid="settings-contact-email"
                                 type="email"
                                 defaultValue={siteContactInfo.email || ''}
                                 key={`contact-email-${siteContactInfo.email || ''}`}
-                                onBlur={(e: FieldBlurEvent) => {
-                                    if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
+                                disabled={isContactBusy}
+                                onBlur={async (e: FieldBlurEvent) => {
+                                    const input = e.currentTarget
+                                    const confirmedEmail = siteContactInfo.email || ''
+                                    const email = sanitizeInput(input.value)
+                                    if (!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                        await handleContactInfoChange('email', input, email, confirmedEmail)
                                     } else {
                                         toast.error(s.invalidEmail)
+                                        input.value = confirmedEmail
                                     }
                                 }}
                                 variant="editor"
@@ -709,9 +843,20 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
                         <Textarea
+                            data-testid="settings-contact-address"
+                            data-settings-focus="address"
                             defaultValue={siteContactInfo.address || ''}
                             key={`contact-address-${siteContactInfo.address || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, address: e.target.value } })}
+                            disabled={isContactBusy}
+                            onBlur={async (e: FieldBlurEvent) => {
+                                const input = e.currentTarget
+                                await handleContactInfoChange(
+                                    'address',
+                                    input,
+                                    sanitizeInput(input.value),
+                                    siteContactInfo.address || '',
+                                )
+                            }}
                             variant="editor"
                             className={editorTextareaClassName}
                             placeholder={s.addressPlaceholder}
@@ -725,59 +870,59 @@ function SettingsPanelInner({
                 §2): address → coordinates (+ map preview) → category/offer → opening hours → checklist. */}
             {renderGlobalAccordion('localBusiness', s.localBusinessInfo, (
                 <div className="space-y-5">
-                    <div className="space-y-4">
-                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
-                        <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.streetAddress}</label>
-                            <Input
-                                defaultValue={siteLocalBusiness.streetAddress || ''}
-                                key={`lb-street-${siteLocalBusiness.streetAddress || ''}`}
-                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ streetAddress: sanitizeInput(e.target.value) })}
-                                variant="editor"
-                                className={editorInputClassName}
-                                placeholder={s.streetAddressPlaceholder}
-                            />
+                    {isLocalBusinessSaveLocked ? (
+                        <div
+                            id="local-business-save-locked"
+                            role="alert"
+                            className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100"
+                        >
+                            <p>
+                                <span className="font-semibold">{s.localBusinessSaveLockedTitle}</span>{' '}
+                                {s.localBusinessSaveLockedDescription}
+                            </p>
                         </div>
+                    ) : null}
+                    <fieldset
+                        data-testid="settings-local-business-fieldset"
+                        disabled={isLocalBusinessSaveLocked}
+                        aria-describedby={isLocalBusinessSaveLocked ? 'local-business-save-locked' : undefined}
+                        className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <legend className="sr-only">{s.localBusinessInfo}</legend>
+                    <div className="space-y-4" data-testid="settings-local-business-address" data-settings-focus="address">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
                         {/* State drives the District/Postcode cascade, so it must be picked
                             first — a deliberate reorder from the old street→city→postcode→state
                             order (see plans/260710-1032-f37-local-business-geo-cascade). `key`
                             forces a remount once `site` finishes loading (site starts `null` at
                             first paint), so the reverse-resolve pre-fill effect re-runs against
                             real saved data instead of permanently resolving against an empty value. */}
-                        <GeoCascadeFields
-                            key={site?.id ?? 'lb-geo-pending'}
-                            value={{ state: siteLocalBusiness.state, city: siteLocalBusiness.city, postcode: siteLocalBusiness.postcode }}
-                            onChange={patch => void handleLocalBusinessChange(patch)}
-                            fullWidth={fullWidth}
-                            labels={{
-                                state: s.state,
-                                city: s.city,
-                                postcode: s.postcode,
-                                selectState: s.selectState,
-                                selectCity: s.selectCity,
-                                selectPostcode: s.selectPostcode,
-                                loadingOption: s.loadingOption,
-                                legacyValueHint: s.legacyValueHint,
-                            }}
-                        />
-                        <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
-                            <Input
-                                value={s.countryMalaysia}
-                                disabled
-                                readOnly
-                                variant="editor"
-                                className={editorInputClassName}
+                        <div data-testid="settings-local-business-geo-fields">
+                            <GeoCascadeFields
+                                key={site?.id ?? 'lb-geo-pending'}
+                                value={{ state: siteLocalBusiness.state, city: siteLocalBusiness.city, postcode: siteLocalBusiness.postcode }}
+                                onChange={patch => void handleLocalBusinessChange(patch)}
+                                fullWidth={fullWidth}
+                                labels={{
+                                    state: s.state,
+                                    city: s.city,
+                                    postcode: s.postcode,
+                                    selectState: s.selectState,
+                                    selectCity: s.selectCity,
+                                    selectPostcode: s.selectPostcode,
+                                    loadingOption: s.loadingOption,
+                                    legacyValueHint: s.legacyValueHint,
+                                }}
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4" data-settings-focus="map">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.coordinatesGroupLabel}</p>
                         <GeoLinkInput
                             latitude={siteLocalBusiness.latitude}
                             longitude={siteLocalBusiness.longitude}
-                            streetAddress={siteLocalBusiness.streetAddress}
+                            streetAddress={canonicalLocalBusinessAddress}
                             city={siteLocalBusiness.city}
                             fullWidth={fullWidth}
                             onCoordinatesChange={coords => void handleLocalBusinessChange(coords)}
@@ -808,12 +953,23 @@ function SettingsPanelInner({
                     <div className="space-y-4 border-t border-white/[0.06] pt-4">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.categoryOfferGroupLabel}</p>
                         <div>
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessCategory}</label>
+                            <label
+                                htmlFor="local-business-category"
+                                className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                            >
+                                {s.businessCategory}
+                            </label>
                             <Select
                                 value={siteLocalBusiness.businessCategory || undefined}
-                                onValueChange={value => void handleLocalBusinessChange({ businessCategory: value })}
+                                onValueChange={value => void handleLocalBusinessChange({
+                                    businessCategory: value,
+                                    schemaSubtype: reconcileSchemaSubtype(value, siteLocalBusiness.schemaSubtype),
+                                })}
                             >
-                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger
+                                    id="local-business-category"
+                                    className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
+                                >
                                     <SelectValue placeholder={s.selectCategory} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
@@ -824,12 +980,71 @@ function SettingsPanelInner({
                             </Select>
                         </div>
                         <div>
+                            <label
+                                htmlFor="local-business-schema-subtype"
+                                className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                            >
+                                {s.schemaSubtype}
+                            </label>
+                            <Select
+                                value={hasInvalidSchemaSubtype ? undefined : siteLocalBusiness.schemaSubtype || undefined}
+                                disabled={isSchemaSubtypeDisabled}
+                                onValueChange={value => void handleLocalBusinessChange({
+                                    schemaSubtype: reconcileSchemaSubtype(siteLocalBusiness.businessCategory, value),
+                                })}
+                            >
+                                <SelectTrigger
+                                    id="local-business-schema-subtype"
+                                    data-settings-focus="schemaSubtype"
+                                    aria-describedby={schemaSubtypeDescriptionIds}
+                                    aria-invalid={hasInvalidSchemaSubtype || undefined}
+                                    className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none"
+                                >
+                                    <SelectValue placeholder={s.selectSchemaSubtype} />
+                                </SelectTrigger>
+                                <SelectContent
+                                    side="bottom"
+                                    align="start"
+                                    className="max-w-[calc(100vw-2rem)]"
+                                >
+                                    {compatibleSchemaSubtypes.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {!hasBusinessCategory ? (
+                                <p
+                                    id="local-business-schema-subtype-disabled-hint"
+                                    className="mt-1.5 break-words text-xs leading-5 text-slate-400"
+                                >
+                                    {s.schemaSubtypeDisabledHint}
+                                </p>
+                            ) : null}
+                            {hasBusinessCategory && !hasCompatibleSchemaSubtypes ? (
+                                <p
+                                    id="local-business-schema-subtype-unavailable-hint"
+                                    className="mt-1.5 break-words text-xs leading-5 text-slate-400"
+                                >
+                                    {s.schemaSubtypeUnavailableHint}
+                                </p>
+                            ) : null}
+                            {hasInvalidSchemaSubtype ? (
+                                <p
+                                    id="local-business-schema-subtype-validation"
+                                    role="alert"
+                                    className="mt-1.5 break-words text-xs leading-5 text-red-400"
+                                >
+                                    {s.schemaSubtypeInvalid}
+                                </p>
+                            ) : null}
+                        </div>
+                        <div>
                             <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.priceRange}</label>
                             <Select
                                 value={siteLocalBusiness.priceRange || undefined}
                                 onValueChange={value => void handleLocalBusinessChange({ priceRange: value })}
                             >
-                                <SelectTrigger className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                <SelectTrigger data-settings-focus="priceRange" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
                                     <SelectValue placeholder={s.selectPriceRange} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" align="start">
@@ -844,7 +1059,7 @@ function SettingsPanelInner({
                             <Textarea
                                 defaultValue={siteLocalBusiness.serviceAreaDescription || ''}
                                 key={`lb-service-area-${siteLocalBusiness.serviceAreaDescription || ''}`}
-                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: e.target.value })}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: sanitizeLocalBusinessText(e.target.value) })}
                                 variant="editor"
                                 className={editorTextareaClassName}
                                 placeholder={s.serviceAreaPlaceholder}
@@ -852,7 +1067,7 @@ function SettingsPanelInner({
                         </div>
                     </div>
 
-                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4" data-settings-focus="openingHours">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.openingHoursGroupLabel}</p>
                         <OpeningHoursEditor
                             rows={siteLocalBusiness.openingHours}
@@ -881,11 +1096,13 @@ function SettingsPanelInner({
                             invalidRangeLabel={s.openingHoursInvalidRange}
                             saveLabel={s.openingHoursSave}
                             cancelLabel={s.openingHoursCancel}
+                            notSetLabel={s.openingHoursNotSet}
+                            setLabel={s.openingHoursSet}
                         />
                     </div>
 
                     <CompletionChecklist
-                        data={siteLocalBusiness}
+                        data={{ ...siteLocalBusiness, streetAddress: canonicalLocalBusinessAddress }}
                         labels={{
                             title: s.checklistTitle,
                             addressSaved: s.checklistAddressSaved,
@@ -893,6 +1110,7 @@ function SettingsPanelInner({
                             categorySaved: s.checklistCategorySaved,
                         }}
                     />
+                    </fieldset>
                 </div>
             ))}
 
@@ -974,6 +1192,68 @@ function SettingsPanelInner({
         setSeoDescriptionInput(updatedPage.seoDescription || '')
     }
 
+    const applySeoProposal = async (
+        proposed: SeoProposal,
+        targetPageId: string,
+        targetIsHomepage: boolean,
+    ): Promise<boolean> => {
+        if (currentPageIdRef.current !== targetPageId) return false
+
+        if (proposed.title) setSeoTitleInput(proposed.title)
+        if (proposed.description) setSeoDescriptionInput(proposed.description)
+        if (proposed.slug && !targetIsHomepage) setSeoSlugInput(proposed.slug)
+
+        if (proposed.title) {
+            await handleSeoUpdate('seoTitle', proposed.title)
+            if (currentPageIdRef.current !== targetPageId) return false
+        }
+        if (proposed.description) {
+            await handleSeoUpdate('seoDescription', proposed.description)
+            if (currentPageIdRef.current !== targetPageId) return false
+        }
+        if (proposed.slug && !targetIsHomepage) {
+            await handleSeoUpdate('slug', proposed.slug)
+            if (currentPageIdRef.current !== targetPageId) return false
+        }
+        return true
+    }
+
+    const cancelSeoOverwrite = () => {
+        if (isApplyingSeoOverwrite) return
+        setPendingSeoOverwrite(null)
+        toast.info(s.seoCancelled)
+    }
+
+    const confirmSeoOverwrite = async () => {
+        if (!pendingSeoOverwrite || isApplyingSeoOverwrite) return
+        if (pendingSeoOverwrite.pageId !== currentPageIdRef.current) {
+            setPendingSeoOverwrite(null)
+            toast.info(s.seoCancelled)
+            return
+        }
+
+        const pending = pendingSeoOverwrite
+        setIsApplyingSeoOverwrite(true)
+        try {
+            const applied = await applySeoProposal(
+                pending.proposed,
+                pending.pageId,
+                pending.isHomepage,
+            )
+            if (!applied) {
+                toast.info(s.seoCancelled)
+                return
+            }
+            toast.success(s.seoGenerated)
+            if (pending.warning) toast.warning(pending.warning)
+            setPendingSeoOverwrite(null)
+        } catch {
+            toast.error(s.seoError)
+        } finally {
+            setIsApplyingSeoOverwrite(false)
+        }
+    }
+
     const seoTitleValue = seoTitleInput
     const seoDescriptionValue = seoDescriptionInput
     const seoSlugValue = seoSlugInput
@@ -984,17 +1264,51 @@ function SettingsPanelInner({
     const metaTitleWarning = seoTitleValue.length > 60 ? s.titleTruncated : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? s.descTruncated : null
 
+    const renderSearchVerification = () => (
+        <div
+            data-settings-section="searchVerification"
+            className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-4"
+        >
+            <label
+                className={labelCls}
+                htmlFor="settings-google-verification-token"
+            >
+                {s.searchVerificationTitle}
+            </label>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{s.searchVerificationDescription}</p>
+            <Input
+                id="settings-google-verification-token"
+                data-settings-focus="searchVerification"
+                data-testid="settings-google-verification-token"
+                defaultValue={siteSeo.googleVerificationToken || ""}
+                key={"google-verification-" + (siteSeo.googleVerificationToken || "")}
+                onBlur={(event: FieldBlurEvent) => {
+                    const googleVerificationToken = sanitizeInput(event.target.value)
+                    event.target.value = googleVerificationToken
+                    void onSiteSettingsChange?.({ seo: { ...siteSeo, googleVerificationToken } })
+                }}
+                variant="editor"
+                className={editorInputClassName}
+                placeholder={s.searchVerificationPlaceholder}
+            />
+        </div>
+    )
+
     const renderSeoContent = () => {
         if (!activePage) {
             return (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
-                    {s.selectPageSeo}
+                <div className="space-y-5">
+                    {renderSearchVerification()}
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
+                        {s.selectPageSeo}
+                    </div>
                 </div>
             )
         }
 
         return (
             <div className="space-y-5">
+                {renderSearchVerification()}
                 <div>
                     <label className={labelCls}>{s.urlSlug}</label>
                     <Input
@@ -1095,39 +1409,42 @@ function SettingsPanelInner({
                         disabled={isGeneratingSEO}
                         onClick={async () => {
                             if (!currentPageId || !site?.id) return
+                            const requestPageId = currentPageId
+                            const requestIsHomepage = isHomepage
                             setIsGeneratingSEO(true)
                             const loadingToastId = toast.loading(s.generatingSeo)
                             try {
-                                const res = await fetch(`/api/sites/${site.id}/pages/${currentPageId}/generate-seo`, {
+                                const res = await fetch(`/api/sites/${site.id}/pages/${requestPageId}/generate-seo`, {
                                     method: 'POST'
                                 })
                                 if (res.ok) {
                                     const data = await res.json()
-                                    const proposed = data.proposed || data
-                                    const applyChanges = async () => {
-                                        if (proposed.title) setSeoTitleInput(proposed.title)
-                                        if (proposed.description) setSeoDescriptionInput(proposed.description)
-                                        if (proposed.slug && !isHomepage) setSeoSlugInput(proposed.slug)
-                                        if (proposed.title) await handleSeoUpdate('seoTitle', proposed.title)
-                                        if (proposed.description) await handleSeoUpdate('seoDescription', proposed.description)
-                                        if (proposed.slug && !isHomepage) await handleSeoUpdate('slug', proposed.slug)
+                                    const proposed = (data.proposed || data) as SeoProposal
+                                    if (currentPageIdRef.current !== requestPageId) {
+                                        toast.info(s.seoCancelled, { id: loadingToastId })
+                                        return
                                     }
                                     // AC-16, BR-06: confirm before overwriting existing meta
                                     if (data.hasExisting) {
                                         toast.dismiss(loadingToastId)
-                                        const confirmed = window.confirm(
-                                            t.editor.settingsValidation.seoConfirmReplace
-                                                .replace('{oldTitle}', data.existing?.title || '(empty)')
-                                                .replace('{newTitle}', proposed.title)
-                                                .replace('{oldDesc}', data.existing?.description || '(empty)')
-                                                .replace('{newDesc}', proposed.description)
-                                        )
-                                        if (!confirmed) {
-                                            toast.info(s.seoCancelled)
-                                            return
-                                        }
+                                        setPendingSeoOverwrite({
+                                            pageId: requestPageId,
+                                            isHomepage: requestIsHomepage,
+                                            existing: data.existing || {},
+                                            proposed,
+                                            warning: data.warning,
+                                        })
+                                        return
                                     }
-                                    await applyChanges()
+                                    const applied = await applySeoProposal(
+                                        proposed,
+                                        requestPageId,
+                                        requestIsHomepage,
+                                    )
+                                    if (!applied) {
+                                        toast.info(s.seoCancelled, { id: loadingToastId })
+                                        return
+                                    }
                                     toast.success(s.seoGenerated, { id: loadingToastId })
                                     if (data.warning) toast.warning(data.warning)
                                 } else {
@@ -1156,18 +1473,16 @@ function SettingsPanelInner({
     const handleFooterLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        setIsUploadingFooterLogo(true)
         try {
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', 'Logo')
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await uploadFooterLogo(formData)
             if (!uploaded?.url) throw new Error('Upload succeeded but no URL returned')
             onFooterUpdate?.({ logo: { url: uploaded.url, alt: (footerBlock?.logo as { alt?: string } | undefined)?.alt || '' } })
         } catch {
             toast.error('Failed to upload logo')
         } finally {
-            setIsUploadingFooterLogo(false)
             if (footerLogoRef.current) footerLogoRef.current.value = ''
         }
     }
@@ -1643,12 +1958,13 @@ function SettingsPanelInner({
 
     return (
         <div
+            data-testid="settings-panel"
             className={cn(
                 // GH-1511 #45.2 (PR #1522 review): panel cố ý KHÔNG paint bg — kế thừa nền shell
                 // (--editor-bg), y hệt EditorToolbar (nav) nên 2 surface liền một khối. Trước đây
                 // dùng `bg-[var(--editor-surface)]/90` nhưng Tailwind v3 không compile alpha trên
                 // var đục (class chết) — visual này là look QA đã duyệt, giờ code nói thật.
-                'flex h-full flex-col',
+                'flex h-full flex-col [contain:layout]',
                 // border-l bỏ theo cùng lý do: thiếu border-solid nên chưa từng paint (class chết).
                 fullWidth ? 'w-full flex-1' : 'shrink-0',
             )}
@@ -1704,7 +2020,7 @@ function SettingsPanelInner({
             </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+            <div ref={panelScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
                 {!hideChrome && (
                 <div className="mb-6">
                     <div className="flex items-start gap-4">
@@ -1751,11 +2067,11 @@ function SettingsPanelInner({
                             {/* Variant Switcher */}
                             {bt === 'products-grid' && block.showCategoryFilter !== undefined ? (
                                 <div className={sectionCls}>
-                                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-slate-500">
+                                    <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-solid border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 py-2 text-sm text-[var(--editor-text)] transition-colors hover:border-[hsl(var(--primary)/0.45)] focus-within:border-[hsl(var(--ring)/0.65)]">
                                         <Checkbox
                                             checked={Boolean(block.showCategoryFilter)}
                                             onCheckedChange={(checked) => onBlockFieldChange(currentBlockIndex, 'showCategoryFilter', checked === true)}
-                                            className="h-5 w-5 rounded-md border-white/30 bg-white/5 data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))]"
+                                            className="h-5 w-5 rounded-md border-solid border-[hsl(var(--input-border))] bg-[var(--editor-surface-deep)] text-[hsl(var(--primary-foreground))] transition-colors focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--editor-surface-elevated)] data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:text-[hsl(var(--primary-foreground))]"
                                         />
                                         <span>{s.showCategoryFilter}</span>
                                     </label>
@@ -2857,6 +3173,15 @@ function SettingsPanelInner({
                     ) : null}
                 </div>
             </div>
+            <SeoOverwriteConfirmDialog
+                open={Boolean(pendingSeoOverwrite)}
+                current={pendingSeoOverwrite?.existing || {}}
+                proposed={pendingSeoOverwrite?.proposed || {}}
+                copy={s.seoOverwriteDialog}
+                isApplying={isApplyingSeoOverwrite}
+                onCancel={cancelSeoOverwrite}
+                onConfirm={() => void confirmSeoOverwrite()}
+            />
         </div>
     )
 }

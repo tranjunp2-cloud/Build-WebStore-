@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { withAuth } from '@/lib/auth'
+import { getPayload } from 'payload'
+import configPromise from '@payload-config'
+import { tenantIdForQuery, withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { selectModel } from '@/lib/ai/config'
 import { logAiUsage } from '@/lib/ai/log-usage'
 import { detectLocaleFromText } from '@/lib/detect-locale'
 import { z } from 'zod'
+import {
+    BULK_CATEGORY_PATH_MAX_CHARS,
+    buildBulkCategoryInstructions,
+    canonicalizeBulkParseResult,
+    isValidBulkParseResult,
+    type BulkCategoryCandidate,
+    type BulkParseResult,
+} from '@/lib/ai/bulk-category-matching'
 
 export const maxDuration = 60
 
@@ -16,41 +26,8 @@ const BulkParseRequestSchema = z.object({
     locale: z.enum(['en', 'ms']).optional().default('en'),
 })
 
-type ParsedVariant = {
-    name?: string
-    price?: number
-    compareAtPrice?: number
-    sku?: string
-    stock?: number
-}
-
-type ParsedVariantConfig = {
-    name?: string
-    options?: { value?: string }[]
-}
-
-type ParsedProduct = {
-    name?: string
-    description?: string
-    seoTitle?: string
-    seoDescription?: string
-    slug?: string
-    category?: string
-    price?: number
-    compareAtPrice?: number
-    sku?: string
-    stock?: number
-    weight?: number
-    length?: number
-    width?: number
-    height?: number
-    variants?: ParsedVariant[]
-    variantConfigs?: ParsedVariantConfig[]
-}
-
-type BulkParseResult = {
-    products?: ParsedProduct[]
-}
+const CATEGORY_CONTEXT_MAX_BYTES = 12_000
+const CATEGORY_FETCH_LIMIT = 500
 
 type MerchantLocale = 'en' | 'ms' | 'vi'
 
@@ -60,36 +37,30 @@ const LANGUAGE_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
         'for', 'green', 'grey', 'gray', 'large', 'made', 'material', 'medium',
         'men', 'offers', 'orange', 'pants', 'pink', 'product', 'purple', 'quality', 'red', 'shirt', 'size',
         'small', 'soft', 'style', 'suitable', 'trousers', 'warm', 'wear', 'white',
-        'with', 'women', 'yellow',
-    ]),
+        'with', 'women', 'yellow']),
     ms: new Set([
         'bahan', 'baju', 'besar', 'berkualiti', 'biru', 'coklat', 'dengan',
         'diperbuat', 'gaya', 'harian', 'hangat', 'hijau', 'hitam', 'kapas',
         'kelabu', 'kecil', 'kuning', 'lelaki', 'lembut', 'menawarkan', 'merah',
         'oren', 'produk', 'putih', 'saiz', 'sedang', 'sederhana', 'sesuai',
-        'seluar', 'ungu', 'untuk', 'wanita', 'warna', 'yang',
-    ]),
+        'seluar', 'ungu', 'untuk', 'wanita', 'warna', 'yang']),
     vi: new Set([
         'ao', 'chat', 'cho', 'den', 'do', 'duoc', 'hop', 'lieu', 'lon', 'mau',
         'nam', 'nau', 'nho', 'nu', 'pham', 'phu', 'quan', 'san', 'tay', 'thun',
-        'trang', 'vai', 'vang', 'va', 'vua', 'voi', 'xam', 'xanh',
-    ]),
+        'trang', 'vai', 'vang', 'va', 'vua', 'voi', 'xam', 'xanh']),
 }
 
 const VARIANT_MARKERS: Record<MerchantLocale, ReadonlySet<string>> = {
     en: new Set([
         'black', 'blue', 'brown', 'color', 'cotton', 'green', 'grey', 'gray',
         'large', 'material', 'medium', 'orange', 'pink', 'purple', 'red', 'size',
-        'small', 'white', 'yellow',
-    ]),
+        'small', 'white', 'yellow']),
     ms: new Set([
         'bahan', 'besar', 'biru', 'coklat', 'hijau', 'hitam', 'kapas', 'kelabu',
-        'kecil', 'kuning', 'merah', 'oren', 'putih', 'saiz', 'sederhana', 'ungu', 'warna',
-    ]),
+        'kecil', 'kuning', 'merah', 'oren', 'putih', 'saiz', 'sederhana', 'ungu', 'warna']),
     vi: new Set([
         'bac', 'cam', 'chat', 'den', 'do', 'hong', 'lieu', 'lon', 'mau', 'nau', 'nho',
-        'tim', 'trang', 'vai', 'vang', 'vua', 'xam', 'xanh',
-    ]),
+        'tim', 'trang', 'vai', 'vang', 'vua', 'xam', 'xanh']),
 }
 
 function tokenizeMerchantText(text: string): Set<string> {
@@ -124,8 +95,7 @@ function collectMerchantFacingText(result: BulkParseResult): string {
 
 function detectForeignVariantLocale(
     result: BulkParseResult,
-    requestedLocale: Exclude<MerchantLocale, 'vi'>,
-): MerchantLocale | null {
+    requestedLocale: Exclude<MerchantLocale, 'vi'>): MerchantLocale | null {
     const values: string[] = []
     for (const product of result.products ?? []) {
         for (const variant of product.variants ?? []) {
@@ -169,8 +139,7 @@ function detectTextLocale(text: string): string | null {
 
 function detectForeignMerchantFieldLocale(
     result: BulkParseResult,
-    requestedLocale: Exclude<MerchantLocale, 'vi'>,
-): string | null {
+    requestedLocale: Exclude<MerchantLocale, 'vi'>): string | null {
     for (const product of result.products ?? []) {
         const fields = [product.name, product.description, product.seoTitle, product.seoDescription]
         for (const field of fields) {
@@ -187,35 +156,6 @@ function detectMerchantFacingLocale(result: BulkParseResult): string | null {
     return text ? detectTextLocale(text) : null
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function hasOnlyOptionalStrings(record: Record<string, unknown>, fields: string[]): boolean {
-    return fields.every(field => record[field] === undefined || typeof record[field] === 'string')
-}
-
-function isValidBulkParseResult(value: unknown): value is BulkParseResult {
-    if (!isRecord(value) || !Array.isArray(value.products)) return false
-    return value.products.every(product => {
-        if (!isRecord(product) || typeof product.name !== 'string' || !product.name.trim()) return false
-        if (!hasOnlyOptionalStrings(product, ['description', 'seoTitle', 'seoDescription', 'slug', 'sku', 'category'])) return false
-        if (product.variants !== undefined && (!Array.isArray(product.variants) || !product.variants.every(
-            variant => isRecord(variant) && typeof variant.name === 'string' && variant.name.trim() &&
-                hasOnlyOptionalStrings(variant, ['sku'])
-        ))) return false
-        return product.variantConfigs === undefined || (
-            Array.isArray(product.variantConfigs) && product.variantConfigs.every(config =>
-                isRecord(config) &&
-                hasOnlyOptionalStrings(config, ['name']) &&
-                (config.options === undefined || (Array.isArray(config.options) && config.options.every(option =>
-                    isRecord(option) && hasOnlyOptionalStrings(option, ['value'])
-                )))
-            )
-        )
-    })
-}
-
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
@@ -230,10 +170,7 @@ export const POST = withAuth(async (user, req) => {
         // (see PR #1608 review). Matches this codebase's `{feature}:${user.id}` convention.
         const rateLimit = await checkRateLimit(`ai-bulk-parse:${user.id}`, 10)
         if (!rateLimit.allowed) {
-            return NextResponse.json(
-                { error: 'rateLimitExceeded', resetAt: rateLimit.resetAt },
-                { status: 429 }
-            )
+            return NextResponse.json({ error: 'rateLimitExceeded', resetAt: rateLimit.resetAt }, { status: 429 })
         }
 
         const request = BulkParseRequestSchema.safeParse(await req.json().catch(() => null))
@@ -241,6 +178,12 @@ export const POST = withAuth(async (user, req) => {
             return NextResponse.json({ error: 'invalidRequest' }, { status: 400 })
         }
         const { promptText, locale } = request.data
+
+        const tenantId = tenantIdForQuery(user)
+        if (tenantId == null) {
+            return NextResponse.json({ error: 'tenantRequired' }, { status: 403 })
+        }
+        const generationId = crypto.randomUUID()
 
         const openai = getOpenAI()
 
@@ -250,30 +193,101 @@ export const POST = withAuth(async (user, req) => {
             const fallbackProducts = locale === 'ms'
                 ? [
                     {
-                        name: 'Baju Contoh (Tiada Kunci API)', price: 45, category: 'Fashion', sku: 'BJ-CTH',
+                        name: 'Baju Contoh (Tiada Kunci API)', price: 45,
+                              categoryId: null, sku: 'BJ-CTH',
                         variants: [
                             { name: 'Hitam - M', price: 45, sku: 'BJ-BLK-M', stock: 0 },
-                            { name: 'Putih - L', price: 45, sku: 'BJ-WHT-L', stock: 0 }
-                        ]
-                    },
-                    { name: 'Selipar Contoh (Tiada Kunci API)', price: 15, category: 'Footwear', sku: 'SP-CTH', variants: [] }
-                ]
+                            { name: 'Putih - L', price: 45, sku: 'BJ-WHT-L', stock: 0 },
+                              ],
+                          },
+                    { name: 'Selipar Contoh (Tiada Kunci API)', price: 15,
+                              categoryId: null, sku: 'SP-CTH', variants: [],
+                          },
+                      ]
                 : [
                     {
-                        name: 'Sample T-Shirt (No API Key)', price: 45, category: 'Fashion', sku: 'TS-SAMPLE',
+                        name: 'Sample T-Shirt (No API Key)', price: 45,
+                              categoryId: null, sku: 'TS-SAMPLE',
                         variants: [
                             { name: 'Black - M', price: 45, sku: 'TS-BLK-M', stock: 0 },
-                            { name: 'White - L', price: 45, sku: 'TS-WHT-L', stock: 0 }
-                        ]
-                    },
-                    { name: 'Sample Slippers (No API Key)', price: 15, category: 'Footwear', sku: 'SS-SAMPLE', variants: [] }
-                ]
-            return NextResponse.json({ products: fallbackProducts })
+                            { name: 'White - L', price: 45, sku: 'TS-WHT-L', stock: 0 },
+                              ],
+                          },
+                    { name: 'Sample Slippers (No API Key)', price: 15,
+                              categoryId: null, sku: 'SS-SAMPLE', variants: [],
+                          },
+                      ]
+            return NextResponse.json({ generationId, products: fallbackProducts })
         }
+
+        const payload = await getPayload({ config: configPromise })
+        const categoryResult = await payload.find({
+            collection: 'categories',
+            user,
+            overrideAccess: false,
+            where: {
+                and: [{ tenant: { equals: tenantId } }, { deletedAt: { exists: false } }],
+            },
+            depth: 0,
+            limit: CATEGORY_FETCH_LIMIT + 1,
+            sort: ['breadcrumbs', 'id'],
+            select: { name: true, breadcrumbs: true, parent: true },
+        })
+        let categoryContextComplete = categoryResult.docs.length <= CATEGORY_FETCH_LIMIT
+            && categoryResult.hasNextPage !== true
+            && (
+                typeof categoryResult.totalDocs !== 'number'
+                || categoryResult.totalDocs <= CATEGORY_FETCH_LIMIT
+            )
+        const categoryDocs = categoryContextComplete ? categoryResult.docs : []
+        const parentCategoryIds = new Set(
+            categoryDocs.flatMap(category => {
+                const parent = category.parent
+                const parentId = typeof parent === 'object' && parent !== null && 'id' in parent ? parent.id : parent
+                return parentId == null ? [] : [String(parentId)]
+            }),
+        )
+        const selectableCategoryDocs = categoryDocs.filter(
+            category => !parentCategoryIds.has(String(category.id)),
+        )
+        const categoryCandidates: BulkCategoryCandidate[] = []
+        const serializedCategoryCandidates: string[] = []
+        const encoder = new TextEncoder()
+        let categoryContextBytes = 2 // opening + closing JSON brackets
+
+        for (const category of selectableCategoryDocs) {
+            const breadcrumbs = typeof category.breadcrumbs === 'string' ? category.breadcrumbs.trim() : ''
+            const path = String(breadcrumbs || category.name || '').trim()
+            if (path.length > BULK_CATEGORY_PATH_MAX_CHARS) {
+                categoryContextComplete = false
+                break
+            }
+            const serialized = JSON.stringify({
+                id: category.id,
+                path,
+            })
+                .replace(/</g, '\\u003c')
+                .replace(/>/g, '\\u003e')
+            const serializedBytes = encoder.encode(serialized).byteLength
+            const separatorBytes = serializedCategoryCandidates.length > 0 ? 1 : 0
+            if (categoryContextBytes + separatorBytes + serializedBytes > CATEGORY_CONTEXT_MAX_BYTES) {
+                categoryContextComplete = false
+                break
+            }
+
+            serializedCategoryCandidates.push(serialized)
+            categoryContextBytes += separatorBytes + serializedBytes
+            categoryCandidates.push({ id: category.id, path })
+        }
+        if (!categoryContextComplete) {
+            serializedCategoryCandidates.length = 0
+            categoryCandidates.length = 0
+        }
+        const categoryCandidateData = `[${serializedCategoryCandidates.join(',')}]`
 
         const languageMap: Record<string, string> = {
             en: 'English',
-            ms: 'Bahasa Melayu'
+            ms: 'Bahasa Melayu',
         }
         const targetLanguage = languageMap[locale as string] || 'English'
 
@@ -295,7 +309,7 @@ Each product item MUST have:
 - name: (string) The product name in ${targetLanguage.toUpperCase()}. MUST BE AT LEAST 3 CHARACTERS LONG and must not copy untranslated words from the user's input.
 - price: (number) The price in RM (Malaysian Ringgit) — this store ONLY sells in MYR, never VND or any other currency. Parse "RM89" or a plain "89" as 89; "RM1.5k" or "1.5k" as 1500 (k/K = x1000 shorthand). Default to 0 if not specified.
 - compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
-- category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
+- categoryId: (string | number | null) Choose exactly one id from CATEGORY_CANDIDATES below when it is a good match. Otherwise return null. Never invent or transform an id.
 - description: (string) A comprehensive, engaging product description. Write at least 2 paragraphs separated by \\n\\n.
 - weight: (number) Estimated logical shipping weight in kg. Minimum 0.1.
 - length: (number) Estimated length in cm.
@@ -327,8 +341,9 @@ Rules:
   NEVER generate 3 tiers in variantConfigs. variantConfigs array length must be <= 2.
   Variant names MUST have at most ONE hyphen separating Tier 1 and Tier 2, e.g., "Red - S".
 - If only 1 dimension of options (e.g. only colors), create 1 variant per option. NOTE: If the user says Vietnamese "quần màu đỏ" (ONLY 1 color option exists), you MUST output exactly 1 variant in ${targetLanguage.toUpperCase()} — e.g. "Red" for English or "Merah" for Bahasa Melayu — instead of an empty array.
-- The category name MUST be in English.
 - Output ONLY valid JSON matching this exact schema, no other text
+
+${buildBulkCategoryInstructions(categoryCandidateData)}
 `
 
         const callStart = Date.now()
@@ -354,6 +369,8 @@ Rules:
                 durationMs: Date.now() - callStart,
                 success: false,
                 userId: user?.id ?? null,
+                tenantId,
+                payload,
                 errorCode: err instanceof Error ? err.name : 'unknown',
             })
             throw err
@@ -367,6 +384,8 @@ Rules:
             durationMs: Date.now() - callStart,
             success: true,
             userId: user?.id ?? null,
+            tenantId,
+            payload,
         })
 
         const content = completion.choices[0]?.message?.content
@@ -374,13 +393,18 @@ Rules:
             throw new Error('Empty AI response')
         }
 
-        const parsedResult = JSON.parse(content)
+        const parsedResult: unknown = JSON.parse(content)
         if (!isValidBulkParseResult(parsedResult)) {
             throw new Error('Invalid AI response structure')
         }
-        const detectedLocale = detectForeignVariantLocale(parsedResult, locale)
-            ?? detectForeignMerchantFieldLocale(parsedResult, locale)
-            ?? detectMerchantFacingLocale(parsedResult)
+        const { result: canonicalResult, reasonCounts } = canonicalizeBulkParseResult(parsedResult, categoryCandidates)
+        payload.logger.info(
+            { categoryGuard: reasonCounts },
+            '[AI Bulk Parse] category guard summary',
+        )
+        const detectedLocale = detectForeignVariantLocale(canonicalResult, locale)
+            ?? detectForeignMerchantFieldLocale(canonicalResult, locale)
+            ?? detectMerchantFacingLocale(canonicalResult)
         if (detectedLocale && detectedLocale !== locale) {
             console.warn('[AI Bulk Parse] Merchant-facing language mismatch', {
                 requestedLocale: locale,
@@ -389,15 +413,14 @@ Rules:
             })
             return NextResponse.json(
                 { error: 'merchantLanguageMismatch', retryable: true },
-                { status: 422 },
-            )
+                { status: 422 })
         }
-        return NextResponse.json(parsedResult)
+        return NextResponse.json({ generationId, ...canonicalResult })
     } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         
         let errorCode = 'parseError'
-        const err = error as Error;
+        const err = error as Error
         if (err?.message) {
             if (err.message.includes('429') || err.message.includes('quota') || err.message.includes('insufficient_quota')) {
                 errorCode = 'aiQuotaExceeded'

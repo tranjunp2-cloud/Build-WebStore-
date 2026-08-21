@@ -438,6 +438,19 @@ export function PreviewScripts() {
         }
 
         const onKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                if (currentEditingEl) {
+                    if (liveTypingTimer) {
+                        clearTimeout(liveTypingTimer)
+                        liveTypingTimer = null
+                    }
+                    postLiveHtml()
+                }
+                window.parent.postMessage({ type: 'MANUAL_SAVE_REQUEST', source: 'iframe' }, parentOrigin)
+                return
+            }
+
             if (!currentEditingEl) return
             if (e.key === 'Escape') {
                 e.preventDefault()
@@ -498,6 +511,17 @@ export function PreviewScripts() {
                     }, 300)
                 }
                 const onFFKeyDown = (ev: KeyboardEvent) => {
+                    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 's') {
+                        ev.preventDefault()
+                        ev.stopPropagation()
+                        if (ffInputTimer) {
+                            clearTimeout(ffInputTimer)
+                            ffInputTimer = null
+                        }
+                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDITED', fieldName, newValue: ffEl.textContent ?? '' }, parentOrigin)
+                        window.parent.postMessage({ type: 'MANUAL_SAVE_REQUEST', source: 'footer' }, parentOrigin)
+                        return
+                    }
                     if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); ffEl.blur() }
                 }
                 const onFFPaste = (ev: ClipboardEvent) => {

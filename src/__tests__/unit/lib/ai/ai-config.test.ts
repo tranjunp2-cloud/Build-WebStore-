@@ -25,7 +25,7 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
     const ENV_KEYS = [
         'AI_MODEL_SITEGEN', 'AI_MODEL_EDIT', 'AI_MODEL_INLINE_EDIT',
         'AI_MODEL_SEO', 'AI_MODEL_REWRITE', 'AI_MODEL_PRODUCT_DESC',
-        'AI_MODEL_URL_EXTRACT', 'AI_MODEL_BULK_PARSE',
+        'AI_MODEL_IMAGE_RATING', 'AI_MODEL_URL_EXTRACT', 'AI_MODEL_BULK_PARSE',
     ]
 
     beforeEach(() => {
@@ -50,6 +50,10 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
         expect(selectModel('site-generation-subpages-light')).toBe('gpt-5.4-mini')
     })
 
+    it('returns gpt-5.4-mini for image rating', () => {
+        expect(selectModel('image-rating')).toBe('gpt-5.4-mini')
+    })
+
     it('returns gpt-4.1-mini for chat-edit (phase-04: better instruction following)', () => {
         expect(selectModel('chat-edit')).toBe('gpt-4.1-mini')
     })
@@ -70,8 +74,8 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
         expect(selectModel('product-description')).toBe('gpt-4.1-nano')
     })
 
-    it('returns gpt-4.1-nano for bulk-parse (phase-04: 50x cheaper for CSV extraction)', () => {
-        expect(selectModel('bulk-parse')).toBe('gpt-4.1-nano')
+    it('returns gpt-4.1-mini for bulk-parse semantic category instruction-following', () => {
+        expect(selectModel('bulk-parse')).toBe('gpt-4.1-mini')
     })
 
     it('returns gpt-4.1-nano for url-extraction (phase-04)', () => {

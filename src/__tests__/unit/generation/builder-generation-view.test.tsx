@@ -75,7 +75,7 @@ describe('[TC-S4-004] BuilderGenerationView', () => {
         )
 
         // Assert
-        expect(screen.getAllByText(/Taking longer than expected/).length).toBeGreaterThan(0)
+        expect(screen.getAllByText(/This is taking longer than usual/).length).toBeGreaterThan(0)
     })
 
     it('does NOT show timeout warning when showTimeoutWarning=false', () => {
@@ -89,7 +89,7 @@ describe('[TC-S4-004] BuilderGenerationView', () => {
         )
 
         // Assert
-        expect(screen.queryByText(/Taking longer than expected/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/This is taking longer than usual/)).not.toBeInTheDocument()
     })
 
     it('cancel button calls onCancel when clicked', async () => {

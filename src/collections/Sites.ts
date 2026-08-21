@@ -2,7 +2,14 @@ import type { CollectionConfig } from 'payload'
 import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
 import { THEME_ENUMS } from '../lib/theme/enums'
 import { MY_STATES } from '../lib/shipping/constants'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '../lib/seo/local-business-constants'
+import {
+    BUSINESS_CATEGORY_OPTIONS,
+    DAY_OF_WEEK_OPTIONS,
+    isCompatibleSchemaSubtype,
+    OPENING_HOURS_TIME_REGEX,
+    PRICE_RANGE_OPTIONS,
+    SCHEMA_SUBTYPE_OPTIONS,
+} from '../lib/seo/local-business-constants'
 import { sanitizeLegacyOpeningHours } from '../components/editor/local-business/opening-hours-utils'
 import type { CollectionBeforeValidateHook } from 'payload'
 import type { OpeningHourRow } from '../components/editor/local-business/types'
@@ -26,6 +33,19 @@ export const sanitizeOpeningHoursOnValidate: CollectionBeforeValidateHook = ({ d
     }
 }
 
+export const mergeLocalBusinessOnValidate: CollectionBeforeValidateHook = ({ data, originalDoc }) => {
+    if (!data?.localBusiness || typeof data.localBusiness !== 'object' || Array.isArray(data.localBusiness)) return data
+    const previous = originalDoc?.localBusiness
+    const previousGroup = previous && typeof previous === 'object' && !Array.isArray(previous) ? previous : {}
+    return {
+        ...data,
+        localBusiness: {
+            ...previousGroup,
+            ...data.localBusiness,
+        },
+    }
+}
+
 const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
 const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
 
@@ -36,7 +56,7 @@ export const Sites: CollectionConfig = {
         description: 'Each tenant can have one or more websites.',
     },
     hooks: {
-        beforeValidate: [sanitizeOpeningHoursOnValidate],
+        beforeValidate: [mergeLocalBusinessOnValidate, sanitizeOpeningHoursOnValidate],
         // Bust the storefront data cache on any site write (admin edits included).
         afterChange: [revalidateSiteAfterChange],
         afterDelete: [revalidateSiteAfterDelete],
@@ -313,7 +333,10 @@ export const Sites: CollectionConfig = {
             type: 'checkbox',
             defaultValue: true,
             label: 'Cho phép AI crawlers index website',
-            admin: { description: 'Allow GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot to index this storefront.' },
+            admin: {
+                hidden: true,
+                description: 'Deprecated legacy field. AI crawler access is managed by the platform.',
+            },
         },
         {
             name: 'socialLinks',
@@ -377,8 +400,20 @@ export const Sites: CollectionConfig = {
                 {
                     name: 'businessCategory',
                     type: 'select',
-                    options: BUSINESS_CATEGORY_OPTIONS,
-                    admin: { description: 'Maps to a Schema.org LocalBusiness sub-type' },
+                    options: [...BUSINESS_CATEGORY_OPTIONS],
+                    admin: { description: 'Broad seller-facing category used to filter schema subtype options' },
+                },
+                {
+                    name: 'schemaSubtype',
+                    type: 'select',
+                    options: [...SCHEMA_SUBTYPE_OPTIONS],
+                    admin: { description: 'Specific Schema.org LocalBusiness subtype' },
+                    validate: (value: unknown, { siblingData }: { siblingData: Record<string, unknown> }) => {
+                        if (value == null || value === '') return true
+                        return isCompatibleSchemaSubtype(siblingData?.businessCategory, value)
+                            ? true
+                            : 'Schema subtype is not compatible with the selected business category'
+                    },
                 },
                 {
                     name: 'priceRange',

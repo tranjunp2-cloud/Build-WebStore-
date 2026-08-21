@@ -34,8 +34,8 @@
       "schedule": "*/1 * * * *"
     },
     {
-      "path": "/api/cron/sync-tracking",
-      "schedule": "*/30 * * * *"
+      "path": "/api/cron/reconcile-qa-targeted-smoke",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

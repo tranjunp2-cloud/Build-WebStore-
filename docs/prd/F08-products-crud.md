@@ -105,7 +105,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-07 | Form Validation Rules: Bắt buộc điền Name (>3 ký tự), Description (AI/Manual), Category (>=1), Giá gốc (>0), Cân nặng (Weight >0 để tính phí Ship), SKU ID, Stock (>=0). Nếu thiếu báo Text đỏ. | US-F08-01 | P0 | Strict save barrier |
 | FR-08 | AI Description: Nút "✨ AI Viết Description" chèn nội dung vào plain textarea có character counter; user vẫn có thể chỉnh sửa trước khi lưu. | US-F08-01 | P0 | BM hoặc EN |
 | FR-09 | Product Image Upload: Kéo thả, max 5 ảnh. Khối lượng <= 5MB/ảnh tuân thủ chuẩn Editor. Format JPG/PNG/WEBP. AI auto scale/compress. | US-F08-01 | P0 | |
-| FR-10 | Bulk AI Create (Tạo hàng loạt): Nhập 1 list item -> AI parse ra Name, Price, Category, Variants. Hiển thị Bảng Preview để Edit ngang hàng (Data Grid). Khi duyệt xong lưu thành Draft, bỏ qua hình ảnh. | US-F08-04 | P0 | NLP Array parser |
+| FR-10 | Bulk AI Create (Tạo hàng loạt): AI parse Name, Price, Variants và `categoryId` lấy từ danh mục hiện có của tenant hoặc `null`; không tự tạo Category. Preview cho phép merchant chọn đúng 1 Category hiện có cho item chưa khớp và khóa Approve cho đến khi mọi item có Category. Luồng Add/Edit Product manual vẫn giữ validation Category bắt buộc khi Save. | US-F08-04 | P0 | Tenant-scoped NLP parser |
 | FR-11 | Default product image: Khi không có ảnh, hiển thị placeholder hình "Thùng hàng carton dễ thương". | US-F08-04 | P1 | Fallback UI |
 | FR-12 | Category Management: CRUD danh mục. Hỗ trợ Parent-Child tree (Tối đa 3 level sâu: L1 > L2 > L3). Gán 1 danh mục cho 1 Product (single-select). Bố trí nút/menu Direct "Quản lý Danh mục" bên cạnh nút "Add Product". Hard-block delete nếu danh mục có SP gán trực tiếp; con trực tiếp được đẩy lên top-level. | US-F08-05 | P0 | Nested Set Model / ParentID |
 | FR-13 | Dynamic Attributes: Ô thêm/xóa Key-Value tùy biến (VD: "Chất liệu": "Cotton"). Gen thành SEO Rich Snippets ngoài storefront. | US-F08-06 | P0 | Key-Value Array / JSON |
@@ -256,6 +256,7 @@ Weight, Length, Width, Height -> Để chuẩn bị tính Shipping Rate F14.
   - **Add Category Modal (Issue GH-1587):** 
     - **Contextual Title:** "Add New Category" (từ toolbar); "Add Subcategory" (từ nút + trên dòng danh mục); "Edit Category" khi sửa.
     - **Parent Field:** Auto-filled khi mở từ nút + trên dòng; disabled/locked trong subcategory mode. Editable khi tạo từ toolbar hoặc edit category.
+    - **Subcategory Guidance:** Khi mở từ nút + trên dòng, hiển thị `Adding a subcategory under {parentName} (L{currentLevel}) → new category will be Level {newLevel}.` và helper `Locked — you are adding under this category.` bên dưới Parent Field. Không hiển thị hai nội dung này trong luồng toolbar Add Category hoặc Edit Category.
     - **Parent Dropdown:** Thụt lề theo level (L1→L2→L3, visual hierarchy); L3 node hiển thị nhưng disabled (không thể chọn làm parent, max 3 levels); loại trừ self + toàn bộ descendants (cycle prevention).
     - **Single Add-Subcategory Affordance:** Chỉ có 1 nút "+" icon per row (ẩn ở L3). Không còn duplicate "+ Add subcategory" inline.
     - **Level Badges:** 3 màu riêng biệt — L1 teal, L2 blue, L3 violet.

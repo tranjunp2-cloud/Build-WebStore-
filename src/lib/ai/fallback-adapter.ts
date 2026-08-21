@@ -11,7 +11,7 @@
  */
 
 import { composeFromBlueprint, type TemplateSeed } from './template-composer'
-import { TEMPLATE_PRESETS } from './template-definitions'
+import { TEMPLATE_PRESETS, selectTemplatePreset } from './template-definitions'
 import type { TemplatePreset } from './template-definitions'
 import { resolveFontPairing } from './font-pairings'
 import {
@@ -82,12 +82,11 @@ function hasPresets(category: ComposerCategory): boolean {
 }
 
 function pickPreset(category: ComposerCategory, seed: number): TemplatePreset {
-    const candidates = TEMPLATE_PRESETS.filter((p) => p.category === category)
-    if (candidates.length === 0) {
+    const preset = selectTemplatePreset(category, seed)
+    if (!preset) {
         throw new Error(`[fallback-adapter] No TEMPLATE_PRESETS found for category: ${category}`)
     }
-    const index = Math.abs(Math.floor(seed)) % candidates.length
-    return candidates[index]!
+    return preset
 }
 
 /**
@@ -108,6 +107,7 @@ export function adaptTemplateSeedToGenerationResult(
         industry: category,
         seed,
         userBiz: biz,
+        language,
     }
 
     // Homepage blocks = first page's layout (composer always builds home first).
@@ -128,7 +128,12 @@ export function adaptTemplateSeedToGenerationResult(
         if (idx === 0) {
             pageBlocks = blocks
         } else {
-            pageBlocks = enforceSubpageStructure(pageBlocks as any[], category, enforcerCtx) as typeof pageBlocks
+            pageBlocks = enforceSubpageStructure(
+                pageBlocks as any[],
+                category,
+                enforcerCtx,
+                page.slug,
+            ) as typeof pageBlocks
             pageBlocks = enforceMinItems(pageBlocks as any[], category, enforcerCtx) as typeof pageBlocks
             enforceGridAlignment(pageBlocks as any[], category, enforcerCtx)
         }
@@ -244,8 +249,6 @@ export function composeTemplateResult(
     }
 
     // GH-1184: strip non-ASCII products/tagline from bizOverride when target is English.
-    // language does not propagate into composeFromBlueprint → buildHomePage → buildFeatures,
-    // so this is the earliest point where the filter can be applied.
     if (language === 'en' && bizOverride) {
         if (bizOverride.products?.some(p => /[^\x00-\x7F]/.test(p))) {
             delete bizOverride.products
@@ -255,7 +258,7 @@ export function composeTemplateResult(
         }
     }
 
-    const templateSeed = composeFromBlueprint(preset, seed, bizOverride, disabledSet)
+    const templateSeed = composeFromBlueprint(preset, seed, bizOverride, disabledSet, language)
     if (!templateSeed) {
         console.warn(`[fallback-adapter] composeFromBlueprint returned null for ${preset.category}`)
         return null

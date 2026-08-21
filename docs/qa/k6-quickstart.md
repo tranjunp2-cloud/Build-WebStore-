@@ -106,6 +106,43 @@ http_req_duration,1783350120,245.6,,,,true,,POST,http://.../request-otp,HTTP/2,d
 
 Mỗi row = 1 measurement. Có thể mở Excel/Numbers xử lý.
 
+## 4.1. Re-test GH-1640 PERF-01 / PERF-02 (Upload + autosave)
+
+Script `scripts/perf/f05-upload-autosave-contention.js` tái hiện hai request
+ghi chạy đồng thời trên **QC**: legacy fallback `POST /api/media/upload` và
+`PATCH /api/sites/[siteId]/save`. Đây là regression test cho lỗi lịch sử trong
+ticket #1640. Luồng editor hiện tại dùng `presign → S3 → register`; browser E2E
+cho luồng đó nằm ở `tests/gh-1640-performance.spec.ts`.
+
+Script tạo media test và cập nhật theme của site QC đã chọn. Nó từ chối mọi URL
+khác QC alias hoặc localhost, vì vậy không thể chạy staging/production.
+
+Chuẩn bị một site disposable thuộc về `qc-owner-1@primeweb.local`, lấy ID của
+site đó, rồi chạy:
+
+```bash
+QC_SITE_ID=123 \
+k6 run --out csv=reports/perf/f05-gh-1640-$(date +%Y%m%d-%H%M).csv \
+  scripts/perf/f05-upload-autosave-contention.js
+```
+
+Mặc định script xác thực bằng QC OTP bypass (`qc-owner-1@primeweb.local` +
+`123456`). Nếu bypass không sẵn sàng, truyền JWT tạm thời qua biến môi trường
+`QC_AUTH_TOKEN`; không ghi token vào file hoặc commit. Script chạy 15 VU, hold
+2 phút, và sleep 21 giây giữa các lượt để giữ một QC account dưới autosave rate
+limit (60 request/phút/user).
+
+**PASS:** upload P95 < 3s, autosave P95 < 3s, và cả hai success rate > 99%.
+Summary tách riêng số HTTP 409, 429 và 5xx. HTTP 409 là contention có retry
+được nhưng vẫn cần ghi lại để Dev kiểm tra Vercel/Neon logs; HTTP 429 nghĩa là
+test bị rate-limit và phải chạy lại sau khi reset thời gian; HTTP 500 là tái
+hiện lỗi ticket. Sau batch, reset/reseed QC để xóa media và thay đổi test:
+
+```bash
+set -a && . .env.qc-test && set +a
+npm run db:reset-qc && npm run db:seed-qc
+```
+
 ## 5. Đọc CSV đơn giản (không cần code)
 
 ```bash

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
-export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
+export function SsoAuthorizationClient({ v2Token, redirectUrl }: { v2Token?: string; redirectUrl?: string }) {
     const { t } = useI18n()
 
     useEffect(() => {
@@ -16,13 +16,13 @@ export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
         fetch('/api/auth/sso-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ v2_token: v2Token }),
+            body: JSON.stringify({ v2_token: v2Token, redirect_url: redirectUrl }),
         })
             .then((res) => res.json())
             .then((data) => {
                 if (data?.ok) {
                     // Whitelist-guard: only allow known relative paths to prevent open redirect
-                    const ALLOWED = new Set(['/dashboard', '/onboarding', '/settings/shipping', '/products/new'])
+                    const ALLOWED = new Set(['/dashboard', '/onboarding', '/settings/shipping', '/products'])
                     const dest = ALLOWED.has(data.redirectTo) ? data.redirectTo : '/dashboard'
                     window.location.href = dest
                 } else {
@@ -32,7 +32,7 @@ export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
             .catch(() => {
                 window.location.href = '/login?error=invalid_token'
             })
-    }, [v2Token])
+    }, [v2Token, redirectUrl])
 
     return (
         <main className="flex flex-1 w-full max-w-2xl flex-col justify-center items-center px-6 text-center">

@@ -4,21 +4,18 @@
 # Note: workflow_dispatch and workflow_run require file on default branch (main).
 # Until this workflow lands on main, we trigger via `push` on staging.
 #
-# Runs Playwright tests against live staging: https://web-v2.dev.ecommercehub.my
+# Runs browser/admin API checks against live CMS staging. Storefront fixtures
+# resolve their own tenant subdomain separately.
 name: E2E Staging
 
 on:
   push:
     branches: [staging]
-    paths:
-      - 'e2e/**'
-      - 'playwright.config.ts'
-      - '.github/workflows/e2e-staging.yml'
   workflow_dispatch:
     inputs:
       base_url:
-        description: 'Staging URL to test'
-        default: 'https://web-v2.dev.ecommercehub.my'
+        description: "Staging URL to test"
+        default: "https://web-cms-v2.dev.ecommercehub.my"
         required: false
 
 concurrency:
@@ -32,55 +29,53 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The deploy-impact snapshot compares the deployed commit to its parent.
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Install Chromium for targeted Smoke API boundary checks
         run: npx playwright install --with-deps chromium
 
       - name: Wait for NEW staging deploy to be ready
+        id: staging_deploy
         run: |
-          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
           echo "Waiting for Vercel deploy: $URL"
-          # We probe the E2E provisioning endpoint itself. Old deployments return
-          # 404 (route doesn't exist), new deployments return 401/503 (route exists
-          # but auth/config rejects our empty request). Either 401 or 503 means the
-          # new code is live. /api/health would pass on old deploy → race condition.
+          # The staging alias can point to the prior deployment while Vercel builds.
+          # Poll the deployed commit identity; route existence/status alone cannot
+          # prove this exact SHA is live.
           #
           # Vercel deploy typically takes 2-3 min for Next.js apps.
           sleep 45
-          for i in {1..30}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/api/e2e/ensure-test-user" \
-              -H "Authorization: Bearer probe" \
-              -H "Content-Type: application/json" \
-              -d '{}' || echo "000")
-            # 401 = endpoint exists + wrong token (new deploy ready)
-            # 503 = endpoint exists + E2E_SETUP_SECRET not set on server (config issue, not a deploy issue)
-            if [ "$STATUS" = "401" ] || [ "$STATUS" = "503" ]; then
-              echo "New deploy detected (endpoint responded $STATUS) on attempt $i"
-              # Also verify health for good measure
-              curl -s -o /dev/null -w "health: %{http_code}\n" "$URL/api/health"
+          for i in {1..50}; do
+            HEALTH=$(curl -fsS "$URL/api/health" || true)
+            DEPLOYED_SHA=$(printf '%s' "$HEALTH" | jq -r '.commitSha // empty' 2>/dev/null || true)
+            if [ "$DEPLOYED_SHA" = "$GITHUB_SHA" ]; then
+              echo "Expected staging deploy $DEPLOYED_SHA is live on attempt $i"
               exit 0
             fi
-            echo "Attempt $i/30: status $STATUS (still waiting for new deploy), retrying in 10s..."
+            echo "Attempt $i/50: deployed SHA '${DEPLOYED_SHA:-unavailable}' is not '$GITHUB_SHA', retrying in 10s..."
             sleep 10
           done
-          echo "::error::New deploy didn't appear after 6 min — aborting"
+          echo "::error::New deploy didn't appear after 10 min — aborting"
           exit 1
 
       - name: Ensure E2E test user exists
         run: |
-          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          BASE_URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
           if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
             echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
             exit 0
@@ -120,7 +115,11 @@ jobs:
             products.spec.ts \
             orders.spec.ts \
             gh1573-easyparcel-oauth.spec.ts \
-            --project=smoke --project=setup --project=chromium 2>&1 | tee e2e-output.log
+            tests/cart-drawer.spec.ts \
+            tests/gh-1734-self-delivery-complete.spec.ts \
+            tests/f40-qa-ingest.spec.ts \
+            tests/f40-project-health.spec.ts \
+            --project=smoke --project=setup --project=chromium --project=storefront-regression --project=gh-1734-self-delivery --project=f40-qa-ingest --project=f40-project-health 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
           PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
@@ -136,28 +135,79 @@ jobs:
           echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
           ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
 
-      - name: Upload Playwright report
+      - name: Resolve source PR for staging deploy
+        id: qa_context
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '.[0].number // empty')
+          if [ "${{ github.event_name }}" = "push" ] && [ -z "$PR_NUMBER" ]; then
+            echo "::error::No source PR could be resolved for staging commit ${GITHUB_SHA}; refusing to publish incomplete deploy impact."
+            exit 1
+          fi
+          echo "pull_request=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload test results
+      - name: Resolve QA change impact
+        id: qa_impact
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 3
+        run: |
+          git diff --name-only HEAD^ HEAD > /tmp/qa-changed-paths.txt
+          if [ "$(wc -l < /tmp/qa-changed-paths.txt)" -gt 500 ]; then
+            echo "::error::Deploy changed more than 500 paths; refusing to publish an incomplete coverage snapshot."
+            exit 1
+          fi
+          ./node_modules/.bin/tsx scripts/qa/resolve-change-impact.ts --paths-file /tmp/qa-changed-paths.txt > /tmp/qa-change-impact.json
+          echo "mapped_targets=$(jq '.mappedTargetIds | length' /tmp/qa-change-impact.json)" >> "$GITHUB_OUTPUT"
+          echo "unmapped_paths=$(jq '.unmappedPaths | length' /tmp/qa-change-impact.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch allow-listed targeted Smoke packs
+        if: always() && steps.staging_deploy.outcome == 'success' && steps.qa_context.outcome == 'success' && steps.qa_impact.outcome == 'success'
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET || secrets.QA_INGEST_SECRET }}
+          F40_TARGETED_SMOKE_ENABLED: ${{ vars.F40_TARGETED_SMOKE_ENABLED || 'false' }}
+          QA_PULL_REQUEST: ${{ steps.qa_context.outputs.pull_request }}
+        run: |
+          if [ "$F40_TARGETED_SMOKE_ENABLED" != 'true' ]; then
+            echo 'F40 targeted Smoke rollout is disabled; dispatch intentionally skipped.'
+            exit 0
+          fi
+          if [ -z "$QA_TARGETED_DISPATCH_SECRET" ]; then
+            echo '::error::QA_TARGETED_DISPATCH_SECRET is required when targeted Smoke is enabled.'
+            exit 1
+          fi
+          node <<'NODE'
+          const crypto = require('crypto')
+          const fs = require('fs')
+          const changedPaths = fs.readFileSync('/tmp/qa-changed-paths.txt', 'utf8').trim().split('\n').filter(Boolean)
+          const pullRequest = Number(process.env.QA_PULL_REQUEST || 0)
+          if (!Number.isInteger(pullRequest) || pullRequest < 1) throw new Error('A source PR is required')
+          const body = { pullRequest, commitSha: process.env.GITHUB_SHA, environment: 'staging', changedPaths }
+          const raw = JSON.stringify(body)
+          const timestamp = Date.now().toString()
+          const signature = crypto.createHmac('sha256', process.env.QA_TARGETED_DISPATCH_SECRET).update(`${timestamp}.${raw}`).digest('hex')
+          require('fs').writeFileSync('/tmp/qa-targeted-dispatch-body.json', raw)
+          require('fs').writeFileSync('/tmp/qa-targeted-dispatch-headers.txt', `${timestamp}\n${signature}`)
+          NODE
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/qa-targeted-dispatch-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/qa-targeted-dispatch-headers.txt)
+          curl --fail-with-body --retry 3 --retry-all-errors -X POST "$BASE_URL/api/internal/qa/targeted-dispatch" \
+            -H 'Content-Type: application/json' -H "x-qa-timestamp: $QA_TIMESTAMP" -H "x-qa-signature: sha256=$QA_SIGNATURE" \
+            --data-binary @/tmp/qa-targeted-dispatch-body.json
+
+      - name: Verify targeted Smoke API security boundaries
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+        run: npx playwright test tests/f40-targeted-smoke-api.spec.ts --project=f40-targeted-smoke-api
 
       - name: Prepare notification info
         if: always()
@@ -180,11 +230,11 @@ jobs:
         with:
           bot-url: ${{ secrets.BOT_NOTIFY_URL }}
           bot-secret: ${{ secrets.BOT_SECRET }}
-          event: 'ci_fail'
+          event: "ci_fail"
           branch: ${{ steps.notify_info.outputs.branch }}
           author: ${{ steps.notify_info.outputs.author }}
           commit-sha: ${{ steps.notify_info.outputs.short_sha }}
           commit-msg: ${{ steps.notify_info.outputs.commit_msg }}
-          failed-step: 'E2E Tests (staging)'
+          failed-step: "E2E Tests (staging)"
           ci-status: "E2E: ${{ steps.e2e.outputs.passed }}/${{ steps.e2e.outputs.total }} passed · ${{ steps.e2e.outputs.failed }} failed · ${{ steps.e2e.outputs.skipped }} skipped · ${{ steps.e2e.outputs.did_not_run }} did not run"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -16,6 +16,7 @@ import {
     FolderOpen,
     File,
     ArrowLeft,
+    Layers,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -62,6 +63,22 @@ const generateSlug = (text: string) => {
         .replace(/[đĐ]/g, 'd') // Handle Vietnamese 'đ'
         .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
         .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+}
+
+// Private-use markers preserve the translated placeholder boundary without HTML in locale files.
+const PARENT_NAME_EMPHASIS_TOKEN = '\uE000category-parent-name\uE001'
+
+const renderEmphasizedParentName = (text: string, parentName: string): React.ReactNode => {
+    const start = text.indexOf(PARENT_NAME_EMPHASIS_TOKEN)
+    if (start < 0) return text
+
+    return (
+        <>
+            {text.slice(0, start)}
+            <strong className="font-bold">{parentName}</strong>
+            {text.slice(start + PARENT_NAME_EMPHASIS_TOKEN.length)}
+        </>
+    )
 }
 
 // Helper to calculate depth of a category before saving. Capped at 5 hops — same safety
@@ -119,18 +136,67 @@ export const isDescendant = (candidateId: string | number | null, selfId: string
     return false
 }
 
+const getParentId = (category: Category): string | null => {
+    const rawParent = category.parent
+    const parentId = rawParent && typeof rawParent === 'object' ? rawParent.id : rawParent
+    return parentId == null ? null : String(parentId)
+}
+
+const compareCategories = (a: Category, b: Category): number => {
+    return a.name.localeCompare(b.name) || String(a.id).localeCompare(String(b.id))
+}
+
+// Parent dropdown options must follow tree preorder, regardless of the flat order returned by
+// Payload. Only root-reachable categories belong to this UI contract; malformed orphan/cycle
+// display policy remains outside this focused ordering fix.
+export const flattenCategoryHierarchy = (flatList: Category[]): Category[] => {
+    const childrenByParent = new Map<string | null, Category[]>()
+
+    for (const category of flatList) {
+        const parentId = getParentId(category)
+        const siblings = childrenByParent.get(parentId) ?? []
+        siblings.push(category)
+        childrenByParent.set(parentId, siblings)
+    }
+
+    for (const siblings of childrenByParent.values()) {
+        siblings.sort(compareCategories)
+    }
+
+    const ordered: Category[] = []
+    const visited = new Set<string>()
+
+    const visit = (category: Category, level: number) => {
+        const id = String(category.id)
+        if (visited.has(id)) return
+
+        visited.add(id)
+        ordered.push({ ...category, level })
+
+        for (const child of childrenByParent.get(id) ?? []) {
+            visit(child, level + 1)
+        }
+    }
+
+    for (const root of childrenByParent.get(null) ?? []) {
+        visit(root, 1)
+    }
+
+    return ordered
+}
+
 // Level text colors — semantic accents, not surface tokens. L1 teal (--primary), L2 blue
 // (--info), L3 violet — no dedicated semantic token for violet exists yet (only --ai-glow, which
 // carries unrelated AI-feature meaning), so L3 references the underlying --p-violet-300 palette
 // primitive directly (same primitive layer --primary/--info are themselves built from).
 const levelTextColors = {
-    1: 'text-[hsl(var(--primary))]',
-    2: 'text-[hsl(var(--info))]',
-    3: 'text-[hsl(var(--p-violet-300))]',
+    1: '!text-[hsl(var(--primary))]',
+    2: '!text-[hsl(var(--info))]',
+    3: '!text-[hsl(var(--p-violet-300))]',
 } as const
 
 export default function CategoryManager() {
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
     const router = useRouter()
     const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -246,19 +312,29 @@ export default function CategoryManager() {
         return buildTree(categories, null, 1)
     }, [categories, searchQuery])
 
-    // Parent <Select> options for the Add/Edit modal — level-annotated (for indentation +
-    // L3-disable) and excludes self + descendants (cycle prevention, Phase 03). Level of an
-    // EXISTING category equals the depth a NEW child of its own parent would get — reuses
-    // getCategoryDepth with the category's own parentId for that reason.
+    // Parent <Select> options for the Add/Edit modal — tree-ordered, level-annotated (for
+    // indentation + L3-disable), and excludes self + descendants (cycle prevention, Phase 03).
     const parentOptions = useMemo(() => {
-        return categories
+        return flattenCategoryHierarchy(categories)
             .filter(c => !formData.id || !isDescendant(c.id, formData.id, categories))
-            .map(c => {
-                const cParentId = typeof c.parent === 'object' && c.parent ? c.parent.id : (c.parent ?? null)
-                const level = getCategoryDepth(cParentId, categories)
-                return { id: c.id, label: c.breadcrumbs || c.name, level }
-            })
+            .map(c => ({ id: c.id, label: c.breadcrumbs || c.name, level: c.level ?? 1 }))
     }, [categories, formData.id])
+
+    const subcategoryContext = useMemo(() => {
+        if (!isSubcategoryMode || formData.parent == null) return null
+
+        const parent = categories.find(category => String(category.id) === String(formData.parent))
+        if (!parent) return null
+
+        const parentId = typeof parent.parent === 'object' && parent.parent
+            ? parent.parent.id
+            : (parent.parent ?? null)
+        const currentLevel = getCategoryDepth(parentId, categories)
+        const newLevel = currentLevel + 1
+        if (currentLevel < 1 || newLevel > 3) return null
+
+        return { parentName: parent.name, currentLevel, newLevel }
+    }, [categories, formData.parent, isSubcategoryMode])
 
     // GH-1579: snap back when deletions strand currentPage past the last page
     useTablePageClamp(currentPage, tree.length, pageSize, setCurrentPage)
@@ -411,6 +487,9 @@ export default function CategoryManager() {
                 const count = message.split(':')[1]
                 toast.error(t.dashboard.products.categories.deleteModal.reparentNameConflictError.replace('{count}', count))
                 // Keep modal open so the user can resolve the conflicting top-level names first.
+            } else if (message === 'CATEGORY_BUSY_RETRY') {
+                toast.error(t.dashboard.products.categories.deleteModal.busyRetryError)
+                // The competing save/delete is bounded; keep the modal open for an immediate retry.
             } else {
                 toast.error(t.dashboard.products.categories.toast.deleteError)
                 setIsDeleteOpen(false)
@@ -666,6 +745,25 @@ export default function CategoryManager() {
 
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                             <form id="cat-form" onSubmit={handleSave} onKeyDown={handleFormKeyDown} className="flex flex-col gap-6">
+                                {subcategoryContext && (
+                                    <div
+                                        role="note"
+                                        className="flex items-start gap-3 rounded-[8px] [border:1px_solid_hsl(var(--info)/0.55)] bg-[hsl(var(--info)/0.12)] px-3 py-3 text-[hsl(var(--info))]"
+                                    >
+                                        <Layers className="mt-0.5 h-[18px] w-[18px] shrink-0" aria-hidden />
+                                        <p className="m-0 text-[13px] font-medium leading-5">
+                                            {renderEmphasizedParentName(
+                                                ti(t.dashboard.products.categories.form.subcategoryContext, {
+                                                    parentName: PARENT_NAME_EMPHASIS_TOKEN,
+                                                    currentLevel: subcategoryContext.currentLevel,
+                                                    newLevel: subcategoryContext.newLevel,
+                                                }),
+                                                subcategoryContext.parentName,
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="flex flex-col gap-2">
                                     <Label>
                                         {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[hsl(var(--destructive))]">*</span>
@@ -700,7 +798,7 @@ export default function CategoryManager() {
                                         onValueChange={val => setFormData({...formData, parent: val === '__none__' ? null : val})}
                                         disabled={isSubcategoryMode}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger aria-describedby={subcategoryContext ? 'category-parent-locked-help' : undefined}>
                                             <SelectValue placeholder={t.dashboard.products.categories.form.parentNone || '--None--'} />
                                         </SelectTrigger>
                                         {/* z-[110]: SelectContent portals to <body> with a default z-50, which renders
@@ -720,6 +818,14 @@ export default function CategoryManager() {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {subcategoryContext && (
+                                        <p
+                                            id="category-parent-locked-help"
+                                            className="m-0 text-[12px] leading-5 text-[var(--dash-text-muted)]"
+                                        >
+                                            {t.dashboard.products.categories.form.parentLockedHelp}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">

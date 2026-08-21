@@ -4,9 +4,16 @@
  */
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { subDays, startOfDay, format } from 'date-fns'
 import { getCurrentTenantId } from '@/lib/auth'
 import type { DashboardPeriodKey, TopPerfRow, TrafficData } from './dashboard-types'
+import {
+    getViewerDateTimeParts,
+    getViewerDayRange,
+    normalizeViewerTimeZone,
+    shiftViewerDateKey,
+    toViewerDateKey,
+    viewerDateKeyToUtc,
+} from '@/lib/viewer-timezone'
 
 /** Rank a url→count map into the top rows with share% of the tab total. */
 function toRows(map: Record<string, number>): TopPerfRow[] {
@@ -31,17 +38,29 @@ const emptyTraffic = (period: DashboardPeriodKey): TrafficData => ({
     hasData: false,
 })
 
-export async function getTrafficData(period: DashboardPeriodKey): Promise<TrafficData> {
+export async function getTrafficData(
+    period: DashboardPeriodKey,
+    requestedTimeZone: string,
+): Promise<TrafficData> {
     const tenantId = await getCurrentTenantId()
     if (!tenantId) return emptyTraffic(period)
 
+    const timeZone = normalizeViewerTimeZone(requestedTimeZone)
+    const now = new Date()
+    const isHourly = period === 'today'
     const days = period === 'today' ? 1 : period === '30d' ? 30 : 7
-    const since = period === 'today' ? startOfDay(new Date()) : subDays(startOfDay(new Date()), days)
+    const viewerDay = getViewerDayRange(now, timeZone)
+    const sinceKey = shiftViewerDateKey(viewerDay.dayKey, -(days - 1)) ?? viewerDay.dayKey
+    const since = viewerDateKeyToUtc(sinceKey, timeZone) ?? viewerDay.start
+    const createdAt = {
+        greater_than_equal: since.toISOString(),
+        less_than: viewerDay.end.toISOString(),
+    }
     const payload = await getPayload({ config })
 
     const [viewsRes, clicksRes] = await Promise.all([
-        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { equals: 'pageview' } } }),
-        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { equals: 'click' } } }),
+        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt, event: { equals: 'pageview' } } }),
+        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt, event: { equals: 'click' } } }),
     ])
 
     if (viewsRes.totalDocs === 0 && clicksRes.totalDocs === 0) return emptyTraffic(period)
@@ -54,12 +73,11 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
     const internalEvents = ['local_business_data_saved']
     const { docs } = await payload.find({
         collection: 'analytics',
-        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: internalEvents } },
+        where: { tenant: { equals: tenantId }, createdAt, event: { not_in: internalEvents } },
         limit: 5000,
         sort: '-createdAt',
     })
 
-    const isHourly = period === 'today'
     const dailyViews: Record<string, number> = {}
     const hourlyViews: number[] = Array(24).fill(0)
     const pageViews: Record<string, number> = {}
@@ -74,12 +92,15 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
         if (internalEvents.includes(doc.event)) continue
 
         const created = new Date(doc.createdAt)
-        const dateKey = created.toISOString().split('T')[0]
+        const dateKey = toViewerDateKey(getViewerDateTimeParts(created, timeZone))
         const url = doc.pageUrl || '/'
 
         if (doc.event === 'pageview') {
             dailyViews[dateKey] = (dailyViews[dateKey] || 0) + 1
-            if (isHourly) hourlyViews[created.getHours()] += 1
+            if (isHourly) {
+                const viewerHour = getViewerDateTimeParts(created, timeZone).hour
+                hourlyViews[viewerHour] += 1
+            }
             pageViews[url] = (pageViews[url] || 0) + 1
             if (url.startsWith('/blog/')) blogViews[url] = (blogViews[url] || 0) + 1
         }
@@ -100,12 +121,11 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
     }
 
     // Chart series — hourly (today) or daily ISO, oldest→newest
-    const todayISO = format(new Date(), 'yyyy-MM-dd')
     const series = isHourly
-        ? hourlyViews.map((views, hour) => ({ date: todayISO, hour, views }))
+        ? hourlyViews.map((views, hour) => ({ date: viewerDay.dayKey, hour, views }))
         : Array.from({ length: days }, (_, idx) => {
-              const d = subDays(new Date(), days - 1 - idx)
-              const key = format(d, 'yyyy-MM-dd')
+              const key = shiftViewerDateKey(viewerDay.dayKey, -(days - 1 - idx))
+                  ?? viewerDay.dayKey
               return { date: key, views: dailyViews[key] || 0 }
           })
 

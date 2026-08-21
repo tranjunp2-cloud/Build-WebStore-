@@ -1,6 +1,15 @@
 import { z } from 'zod'
 import { MY_STATES } from '@/lib/shipping/constants'
-import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS, DAY_OF_WEEK_OPTIONS, OPENING_HOURS_TIME_REGEX } from '@/lib/seo/local-business-constants'
+import {
+    BUSINESS_CATEGORY_OPTIONS,
+    DAY_OF_WEEK_OPTIONS,
+    isCompatibleSchemaSubtype,
+    isValidBusinessPhone,
+    OPENING_HOURS_TIME_REGEX,
+    PRICE_RANGE_OPTIONS,
+    SCHEMA_SUBTYPE_OPTIONS,
+} from '@/lib/seo/local-business-constants'
+import { sanitizeLocalBusinessText } from '@/components/editor/local-business/normalization'
 
 const nullableString = z.string().nullable().optional()
 
@@ -14,13 +23,10 @@ const sanitizedString = z.string()
     .transform(v => stripHtml(v).trim())
     .nullable().optional()
 
-/** BUG-F05-045: Validate phone format — allows +, digits, spaces, hyphens, parens, dots */
+/** Validate optional business phone using the same rule as the Editor. */
 const phoneString = z.string()
+    .refine(isValidBusinessPhone, 'Invalid phone number format')
     .transform(v => stripHtml(v).trim())
-    .pipe(
-        z.string().regex(/^\+?[\d\s\-().]*$/, 'Invalid phone number format')
-            .or(z.literal(''))
-    )
     .nullable().optional()
 
 /** Validate URL format — only allow https:// or http:// */
@@ -40,26 +46,31 @@ const MY_STATE_VALUES = MY_STATES as unknown as [string, ...string[]]
 const BUSINESS_CATEGORY_VALUES = BUSINESS_CATEGORY_OPTIONS.map(o => o.value) as [string, ...string[]]
 const PRICE_RANGE_VALUES = PRICE_RANGE_OPTIONS.map(o => o.value) as [string, ...string[]]
 const DAY_OF_WEEK_VALUES = DAY_OF_WEEK_OPTIONS.map(o => o.value) as [string, ...string[]]
+const localBusinessSanitizedString = z.string()
+    .transform(sanitizeLocalBusinessText)
+    .nullable().optional()
+const SCHEMA_SUBTYPE_VALUES = SCHEMA_SUBTYPE_OPTIONS.map(o => o.value) as [string, ...string[]]
 
 /** F37 US-01: structured local business address + hours (AC-3 validation) */
-const localBusinessSchema = z.object({
-    streetAddress: sanitizedString,
-    city: sanitizedString,
+const localBusinessPatchSchema = z.object({
+    streetAddress: localBusinessSanitizedString,
+    city: localBusinessSanitizedString,
     state: z.enum(MY_STATE_VALUES).nullable().optional(),
     postcode: z.string()
-        .transform(v => stripHtml(v).trim())
+        .transform(sanitizeLocalBusinessText)
         .pipe(z.string().regex(/^\d{5}$/, 'MY postcode must be 5 digits').or(z.literal('')))
         .nullable().optional(),
-    country: sanitizedString,
+    country: localBusinessSanitizedString,
     latitude: z.number().min(-90, 'Latitude must be between -90 and 90').max(90, 'Latitude must be between -90 and 90').nullable().optional(),
     longitude: z.number().min(-180, 'Longitude must be between -180 and 180').max(180, 'Longitude must be between -180 and 180').nullable().optional(),
     businessCategory: z.enum(BUSINESS_CATEGORY_VALUES).nullable().optional(),
+    schemaSubtype: z.enum(SCHEMA_SUBTYPE_VALUES).nullable().optional(),
     priceRange: z.enum(PRICE_RANGE_VALUES).nullable().optional(),
-    serviceAreaDescription: sanitizedString,
+    serviceAreaDescription: localBusinessSanitizedString,
     openingHours: z.array(z.object({
         dayOfWeek: z.enum(DAY_OF_WEEK_VALUES).nullable().optional(),
-        opens: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
-        closes: z.string().transform(v => stripHtml(v).trim()).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
+        opens: z.string().transform(sanitizeLocalBusinessText).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
+        closes: z.string().transform(sanitizeLocalBusinessText).pipe(z.string().regex(OPENING_HOURS_TIME_REGEX).or(z.literal(''))).optional(),
         isClosed: z.boolean().optional(),
     }).superRefine((row, ctx) => {
         if (row.isClosed) return
@@ -86,7 +97,23 @@ const localBusinessSchema = z.object({
             })
         }
     })).max(21).optional(), // 7 days × up to 3 shifts (split-shift)
-}).optional()
+})
+
+function validateSchemaSubtypePair(
+    value: { businessCategory?: string | null; schemaSubtype?: string | null },
+    ctx: z.RefinementCtx,
+    path: Array<string | number> = ['schemaSubtype'],
+) {
+    if (!value.schemaSubtype) return
+    if (isCompatibleSchemaSubtype(value.businessCategory, value.schemaSubtype)) return
+    ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Schema subtype is not compatible with the selected business category',
+        path,
+    })
+}
+
+export const localBusinessSchema = localBusinessPatchSchema.superRefine(validateSchemaSubtypePair)
 
 export const saveSiteSchema = z.object({
     blocks: z.array(z.record(z.unknown())).optional(),
@@ -105,7 +132,7 @@ export const saveSiteSchema = z.object({
         email: sanitizedString,
         address: sanitizedString,
     }).optional(),
-    localBusiness: localBusinessSchema,
+    localBusiness: localBusinessPatchSchema.optional(),
     socialLinks: z.object({
         facebook: socialUrlString,
         instagram: socialUrlString,
@@ -122,6 +149,7 @@ export const saveSiteSchema = z.object({
         metaTitle: nullableString,
         metaDescription: nullableString,
         ogImage: z.union([z.string(), z.number()]).nullable().optional(),
+        googleVerificationToken: sanitizedString,
     }).optional(),
     shippingConfig: z.object({
         westRate: z.number().min(0).max(100_000).optional(),
@@ -133,6 +161,10 @@ export const saveSiteSchema = z.object({
     localeContent: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
     /** F26-01: Clear pendingLocaleConfirm flag after user confirms/dismisses dialog */
     pendingLocaleConfirm: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+    const localBusiness = value.localBusiness
+    if (!localBusiness || localBusiness.schemaSubtype === undefined || localBusiness.businessCategory === undefined) return
+    validateSchemaSubtypePair(localBusiness, ctx, ['localBusiness', 'schemaSubtype'])
 }).refine(data => data.blocks !== undefined
     || data.theme !== undefined
     || data.locale !== undefined

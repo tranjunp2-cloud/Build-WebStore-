@@ -13,7 +13,11 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import {
+    searchPhotos,
+    PixabayError,
+    PIXABAY_CATEGORY_BY_COMPOSER,
+} from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -50,6 +54,16 @@ export interface ProductImageStats {
 export interface GeneratedProductsResult {
     products: SampleProduct[]
     stats: ProductImageStats
+}
+
+export interface PreparedSampleProduct extends SampleProduct {
+    /** English stock-image subject generated with the product copy. */
+    imageKeyword: string
+}
+
+export interface PreparedSampleProductsResult {
+    products: PreparedSampleProduct[]
+    category: string
 }
 
 
@@ -315,18 +329,13 @@ async function fetchProductImage(
 }
 
 /**
- * Generate 6 sample products for a newly created site.
- * Tier 1: AI. Tier 2: curated library. Image network work uses bounded concurrency.
- * Never throws — returns whatever was successfully generated (may be []).
- * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
+ * Generate product copy without performing image-provider work. F38 uses this
+ * phase so product demands can join the generation-scoped image resolver.
  */
-export async function generateSampleProducts(
+export async function prepareSampleProducts(
     businessInfo: BusinessInfoInput,
     language: string,
-    tenantId: string,
-    payload: BasePayload,
-    siteId?: string | number,
-): Promise<GeneratedProductsResult> {
+): Promise<PreparedSampleProductsResult> {
     // The OpenAI client has retries disabled. Curated products are a complete,
     // deterministic fallback, so a second/third model attempt only extends p95.
     const MAX_RETRIES = 1
@@ -375,14 +384,31 @@ export async function generateSampleProducts(
         }
     }
 
-    // Resolve images with bounded network concurrency; media writes remain globally serialized.
-    const siteKey = siteId ? String(siteId) : Date.now().toString(36)
-    // GH-1611: form key wins (see getFallbackProducts) — this one drives the
-    // product IMAGE search, so a wrong category is a wrong-industry photo.
     const category = resolveBusinessCategory(
         businessInfo.industry,
         `${businessInfo.businessName} ${businessInfo.products ?? ''}`,
     )
+    return {
+        category,
+        products: rawProducts.map(({ _imageKeyword, ...product }) => ({
+            ...product,
+            imageKeyword: _imageKeyword,
+        })),
+    }
+}
+
+/**
+ * Legacy image assignment kept isolated so flag-off generation remains on the
+ * pre-F38 Pixabay → curated → carton path.
+ */
+export async function assignSampleProductImages(
+    prepared: PreparedSampleProductsResult,
+    tenantId: string,
+    payload: BasePayload,
+    siteId?: string | number,
+): Promise<GeneratedProductsResult> {
+    const { products: preparedProducts, category } = prepared
+    const siteKey = siteId ? String(siteId) : Date.now().toString(36)
     // Pre-fetch product URLs as Tier-C fallback (direct download, no search API needed)
     // Seed-shuffle the fixed industry pool (6 items) so each product gets a distinct URL
     const productImagePool = getProductImages(category)
@@ -399,10 +425,10 @@ export async function generateSampleProducts(
     // Pixabay allows substantially more request concurrency than the retired
     // Unsplash demo API. Network work is bounded at 3; uploadImageUrl still
     // serializes Payload media creates through the global media-create lock.
-    const withImages = await mapWithConcurrency(rawProducts, 3, async (p, i): Promise<SampleProduct> => {
+    const withImages = await mapWithConcurrency(preparedProducts, 3, async (p, i): Promise<SampleProduct> => {
         const skipSearch = fallbackOnly || searchRateLimited
         const { imageId, reason } = await fetchProductImage(
-            p._imageKeyword, i, siteKey, p.name, category, payload, tenantId,
+            p.imageKeyword, i, siteKey, p.name, category, payload, tenantId,
             productUrls[i % productUrls.length],
             skipSearch,
         )
@@ -415,8 +441,8 @@ export async function generateSampleProducts(
         }
         if (!imageId) stats.noImage++
         const reasonStr = reason ? ` reason=${reason}` : ''
-        console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
-        const { _imageKeyword: _, ...product } = p
+        console.log(`[sample-products] product ${i + 1}/${preparedProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
+        const { imageKeyword: _, ...product } = p
         return {
             ...product,
             imageId,
@@ -427,4 +453,52 @@ export async function generateSampleProducts(
     })
 
     return { products: withImages, stats }
+}
+
+export function assignResolvedSampleProductImages(
+    prepared: PreparedSampleProductsResult,
+    imageIds: readonly (number | undefined)[],
+): GeneratedProductsResult {
+    const skuPrefix = prepared.category.substring(0, 3).toUpperCase()
+    const products = prepared.products.map((preparedProduct, index): SampleProduct => {
+        const { imageKeyword: _, ...product } = preparedProduct
+        return {
+            ...product,
+            ...(imageIds[index] !== undefined ? { imageId: imageIds[index] } : {}),
+            sku: `${skuPrefix}-${String(index + 1).padStart(3, '0')}`,
+            inventory: 0,
+        }
+    })
+    return {
+        products,
+        stats: {
+            rateLimited: 0,
+            uploadFailed: 0,
+            noImage: products.filter((product) => product.imageId === undefined).length,
+        },
+    }
+}
+
+/**
+ * Generate 6 sample products for a newly created site.
+ * Tier 1: AI. Tier 2: curated library. Image network work uses bounded concurrency.
+ * Never throws — returns whatever was successfully generated (may be []).
+ * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
+ */
+export async function generateSampleProducts(
+    businessInfo: BusinessInfoInput,
+    language: string,
+    tenantId: string,
+    payload: BasePayload,
+    siteId?: string | number,
+    resolved?: {
+        prepared: PreparedSampleProductsResult
+        imageIds: readonly (number | undefined)[]
+    },
+): Promise<GeneratedProductsResult> {
+    const prepared = resolved?.prepared ?? await prepareSampleProducts(businessInfo, language)
+    if (resolved) {
+        return assignResolvedSampleProductImages(prepared, resolved.imageIds)
+    }
+    return assignSampleProductImages(prepared, tenantId, payload, siteId)
 }

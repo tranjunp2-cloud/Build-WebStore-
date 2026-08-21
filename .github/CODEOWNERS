@@ -55,3 +55,12 @@
 /docs/architecture/             @tinnt-prime
 /SPEC.md                        @haynoikonike
 /CLAUDE.md                      @tinnt-prime
+
+# ── Evidence-gated QA execution contracts — QA + Backend ─────────────
+# These explicit rules override the broad directory entries above. A pack
+# cannot become executable without both the QA evidence owner and a backend
+# reviewer seeing matrix/registry/workflow changes together.
+/src/lib/admin/qa/targeted-qa-coverage.ts @aryhibye @Mr-LeeB
+/src/lib/admin/qa/targeted-smoke-registry.ts @aryhibye @Mr-LeeB
+/.github/workflows/targeted-smoke.yml @aryhibye @Mr-LeeB
+/tests/targeted-smoke/ @aryhibye @Mr-LeeB

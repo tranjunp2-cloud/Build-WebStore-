@@ -85,21 +85,34 @@ describe('[TC-F03.G3-04] Organization schema — logo from branding', () => {
 // ── TC-F03.G3-05: LocalBusiness có PostalAddress thay vì string ─────────────
 
 describe('[TC-F03.G3-05] LocalBusiness schema — structured PostalAddress', () => {
-    it('outputs address as PostalAddress object', () => {
+    it('prefers canonical Contact Info address over a contact-block address', () => {
         const contactBlock = { blockType: 'contact', address: '456 Jalan Ampang', phone: '+60111', email: 'shop@test.com' }
         const schema = generateLocalBusinessSchema(contactBlock, baseSite)!
         expect(schema.address).toEqual({
             '@type': 'PostalAddress',
-            streetAddress: '456 Jalan Ampang',
+            streetAddress: '123 Jalan Bukit Bintang, KL 50200',
+            addressCountry: 'MY',
         })
     })
 
-    it('falls back to site contactInfo.address', () => {
+    it('uses site contactInfo.address with implicit Malaysia country', () => {
         const contactBlock = { blockType: 'contact' }
         const schema = generateLocalBusinessSchema(contactBlock, baseSite)!
         expect(schema.address).toEqual({
             '@type': 'PostalAddress',
             streetAddress: '123 Jalan Bukit Bintang, KL 50200',
+            addressCountry: 'MY',
+        })
+    })
+
+    it('falls back to a legacy contact-block address when the site has no address', () => {
+        const contactBlock = { blockType: 'contact', address: '456 Jalan Ampang' }
+        const site = { ...baseSite, contactInfo: { ...baseSite.contactInfo, address: '' } }
+        const schema = generateLocalBusinessSchema(contactBlock, site)!
+        expect(schema.address).toEqual({
+            '@type': 'PostalAddress',
+            streetAddress: '456 Jalan Ampang',
+            addressCountry: 'MY',
         })
     })
 
@@ -182,11 +195,15 @@ describe('[TC-F03.G3-08] generatePageSchemas — homepage Organization enriched'
 // ── TC-F03.G3-09: LocalBusiness has PostalAddress in aggregator ─────────────
 
 describe('[TC-F03.G3-09] generatePageSchemas — LocalBusiness enriched', () => {
-    it('LocalBusiness address is PostalAddress object', () => {
+    it('LocalBusiness uses the canonical Contact Info PostalAddress', () => {
         const blocks = [{ blockType: 'contact', address: '789 Street' }]
         const schemas = generatePageSchemas({ blocks, site: baseSite, page: { slug: 'contact' }, isHomepage: false })
         const lb = schemas.find(s => s['@type'] === 'LocalBusiness')!
-        expect(lb.address).toEqual({ '@type': 'PostalAddress', streetAddress: '789 Street' })
+        expect(lb.address).toEqual({
+            '@type': 'PostalAddress',
+            streetAddress: '123 Jalan Bukit Bintang, KL 50200',
+            addressCountry: 'MY',
+        })
         expect(lb.sameAs).toBeDefined()
     })
 })

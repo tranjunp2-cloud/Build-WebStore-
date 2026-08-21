@@ -37,12 +37,14 @@ export function CompletionChecklist({ data, labels }: CompletionChecklistProps) 
                         <span
                             className={cn(
                                 'flex h-4 w-4 shrink-0 items-center justify-center rounded-full',
-                                row.done ? 'bg-green-500/15 text-green-300' : 'bg-white/[0.06] text-slate-500',
+                                row.done
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300'
+                                    : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
                             )}
                         >
                             {row.done ? <Check className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
                         </span>
-                        <span className={row.done ? 'text-slate-300' : 'text-slate-500'}>{row.label}</span>
+                        <span className={row.done ? 'text-[var(--editor-text)]' : 'text-[var(--editor-text-muted)]'}>{row.label}</span>
                     </li>
                 ))}
             </ul>

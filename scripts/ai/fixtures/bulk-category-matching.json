@@ -1,0 +1,254 @@
+{
+  "version": 7,
+  "contract": {
+    "inputs": [
+      "model-returned category id",
+      "tenant-scoped active category candidates with trusted id and breadcrumb path"
+    ],
+    "excludedEvidence": [
+      "generated product name",
+      "description",
+      "seoTitle",
+      "seoDescription",
+      "sku",
+      "variants",
+      "merchant prompt",
+      "model confidence"
+    ],
+    "reasons": [
+      "matched",
+      "modelNull",
+      "unknownId",
+      "semanticRejected",
+      "ambiguous"
+    ],
+    "output": {
+      "categoryId": "the canonical tenant candidate id or null",
+      "reason": "matched, modelNull, or unknownId; legacy reason values remain response-compatible"
+    },
+    "semanticAuthority": [
+      "the AI chooses category semantics from the complete tenant candidate list and breadcrumb paths",
+      "the merchant reviews every generated draft before save",
+      "the server enforces tenant membership and save-time validity, not semantic similarity"
+    ],
+    "guardRules": [
+      "preserve a model-proposed id only when it canonicalizes to a supplied tenant candidate id",
+      "preserve model null without server-side semantic inference",
+      "reject unknown ids without falling back to another candidate",
+      "never reinterpret category semantics from the generated product name"
+    ]
+  },
+  "cases": [
+    {
+      "id": "allowlisted-cooking-oil-to-oil",
+      "productName": "Cooking Oil",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Food > Cooking Ingredients > Oil"
+        }
+      ],
+      "proposedCategoryId": "category-oil",
+      "expectedCategoryId": "category-oil",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "allowlisted-essential-oil-to-oil",
+      "productName": "Essential Oil",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Wellness > Oil"
+        }
+      ],
+      "proposedCategoryId": "category-oil",
+      "expectedCategoryId": "category-oil",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "allowlisted-essential-oil-to-tinh-dau",
+      "productName": "Essential Oil",
+      "candidates": [
+        {
+          "id": "category-tinh-dau",
+          "path": "Chăm sóc cá nhân > Tinh dầu"
+        }
+      ],
+      "proposedCategoryId": "category-tinh-dau",
+      "expectedCategoryId": "category-tinh-dau",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "allowlisted-hair-oil-to-oil",
+      "productName": "Hair Oil",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Personal Care > Oil"
+        }
+      ],
+      "proposedCategoryId": "category-oil",
+      "expectedCategoryId": "category-oil",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "semantic-boundary-does-not-reject-oil-painting",
+      "productName": "Oil Painting",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Food > Oil"
+        }
+      ],
+      "proposedCategoryId": "category-oil",
+      "expectedCategoryId": "category-oil",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "semantic-boundary-does-not-reject-tent-skincare",
+      "productName": "4-Person Camping Tent",
+      "candidates": [
+        {
+          "id": "category-skincare",
+          "path": "Beauty > Skincare"
+        }
+      ],
+      "proposedCategoryId": "category-skincare",
+      "expectedCategoryId": "category-skincare",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "model-null-cooking-oil-remains-null",
+      "productName": "Cooking Oil",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Food > Oil"
+        }
+      ],
+      "proposedCategoryId": null,
+      "expectedCategoryId": null,
+      "expectedReason": "modelNull"
+    },
+    {
+      "id": "model-null-essential-oil-has-no-server-recovery",
+      "productName": "Essential Oil",
+      "candidates": [
+        {
+          "id": "category-oil",
+          "path": "Wellness > Oil"
+        }
+      ],
+      "proposedCategoryId": null,
+      "expectedCategoryId": null,
+      "expectedReason": "modelNull"
+    },
+    {
+      "id": "unknown-id-is-rejected",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": "category-shoes",
+          "path": "Fashion > Shoes"
+        }
+      ],
+      "proposedCategoryId": "foreign-category",
+      "expectedCategoryId": null,
+      "expectedReason": "unknownId"
+    },
+    {
+      "id": "empty-candidate-list-rejects-id",
+      "productName": "Running Shoes",
+      "candidates": [],
+      "proposedCategoryId": "category-shoes",
+      "expectedCategoryId": null,
+      "expectedReason": "unknownId"
+    },
+    {
+      "id": "numeric-string-id-canonicalizes-to-numeric-tenant-id",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": 42,
+          "path": "Fashion > Shoes"
+        }
+      ],
+      "proposedCategoryId": "42",
+      "expectedCategoryId": 42,
+      "expectedReason": "matched"
+    },
+    {
+      "id": "numeric-id-canonicalizes-to-string-tenant-id",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": "42",
+          "path": "Fashion > Shoes"
+        }
+      ],
+      "proposedCategoryId": 42,
+      "expectedCategoryId": "42",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "multiple-semantic-candidates-preserve-ai-choice",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": "category-shoes",
+          "path": "Fashion > Shoes"
+        },
+        {
+          "id": "category-running-shoes",
+          "path": "Sports > Running Shoes"
+        }
+      ],
+      "proposedCategoryId": "category-running-shoes",
+      "expectedCategoryId": "category-running-shoes",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "duplicate-paths-preserve-the-proposed-canonical-id",
+      "productName": "Cooking Oil",
+      "candidates": [
+        {
+          "id": "category-oil-a",
+          "path": "Food > Oil"
+        },
+        {
+          "id": "category-oil-b",
+          "path": "Food > Oil"
+        }
+      ],
+      "proposedCategoryId": "category-oil-b",
+      "expectedCategoryId": "category-oil-b",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "malformed-path-does-not-change-valid-id-membership",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": "category-empty-path",
+          "path": ""
+        }
+      ],
+      "proposedCategoryId": "category-empty-path",
+      "expectedCategoryId": "category-empty-path",
+      "expectedReason": "matched"
+    },
+    {
+      "id": "map-safe-prototype-like-id",
+      "productName": "Running Shoes",
+      "candidates": [
+        {
+          "id": "__proto__",
+          "path": "Fashion > Shoes"
+        }
+      ],
+      "proposedCategoryId": "__proto__",
+      "expectedCategoryId": "__proto__",
+      "expectedReason": "matched"
+    }
+  ]
+}

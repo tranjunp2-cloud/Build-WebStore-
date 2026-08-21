@@ -2,7 +2,10 @@
 
 import type { ReactNode } from 'react'
 import type { BlockProps } from '../types'
-import type { FeatureComparisonConfig } from './config'
+import {
+    normalizeComparisonValues,
+    type FeatureComparisonConfig,
+} from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
@@ -36,7 +39,14 @@ function CrossIcon() {
 }
 
 export function FeatureComparisonBlock({ block }: BlockProps<FeatureComparisonConfig>) {
-    const { variant = 'table', headline, products = [], features = [] } = block
+    const { variant = 'table', headline } = block
+    const products = Array.isArray(block.products) ? block.products : []
+    const features = Array.isArray(block.features)
+        ? block.features.map((feature) => ({
+            ...feature,
+            values: normalizeComparisonValues(feature?.values, products.length),
+        }))
+        : []
 
     if (variant === 'cards') {
         return (

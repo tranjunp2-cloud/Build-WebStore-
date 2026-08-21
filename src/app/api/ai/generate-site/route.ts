@@ -6,14 +6,21 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { notifyStepComplete } from '@/lib/sso/sso-api-client'
-import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import {
+    generateSiteWithAI,
+    resolveSiteGenerationMode,
+    type SiteGenerationMode,
+    type SiteGenerationModeDecision,
+    type SiteGenerationModeReason,
+    type SSEEvent,
+} from '@/lib/ai/openai-generator'
 import {
     normalizeGeneratedPageLocaleStrings,
     normalizeLocaleStructuralStrings,
 } from '@/lib/ai/post-ai-swap'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, injectPixabayUrlsIntoBlocks, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds, computePoolTargetsForBlocks } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -35,11 +42,19 @@ import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
+import { getTemplateGalleryDemand } from '@/lib/ai/template-definitions'
 import { backfillImagePool, buildImagePool, poolSize, type BuildPoolCtx, type ImagePool } from '@/lib/ai/image-pool'
 import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
 import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
+import { translateKnownProductTerms } from '@/lib/ai/product-translator'
+import { CATEGORY_BASE_KEYWORDS } from '@/lib/ai/image-keywords'
+import {
+    createPixabaySearchBudget,
+    markPixabayMediaUsed,
+    withPixabaySearchBudget,
+} from '@/lib/ai/pixabay-client'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
@@ -48,9 +63,10 @@ import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
-import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { generateSampleProducts, prepareSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
-import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
+import { seedBlogPosts, prepareBlogPosts, assignResolvedBlogThumbnails, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
+import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
@@ -110,6 +126,22 @@ interface AIBlock {
     [key: string]: unknown;
 }
 
+function collectGenerationBlockBuckets(result: GenerationResult): Record<string, unknown>[][] {
+    const buckets: Record<string, unknown>[][] = []
+    if (Array.isArray(result.blocks)) {
+        buckets.push(result.blocks as Record<string, unknown>[])
+    }
+    const pages = (result as { pages?: Array<{ blocks?: unknown[] }> }).pages
+    if (Array.isArray(pages)) {
+        for (const page of pages) {
+            if (Array.isArray(page?.blocks)) {
+                buckets.push(page.blocks as Record<string, unknown>[])
+            }
+        }
+    }
+    return buckets
+}
+
 /**
  * POST /api/ai/generate-site
  * Generate a website from a text prompt using AI.
@@ -149,10 +181,15 @@ export async function POST(req: NextRequest) {
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
-        const user = await getCurrentUser()
+        const user = await getCurrentUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const userEmailValue = (user as { email?: unknown }).email
+        const userEmail = typeof userEmailValue === 'string' ? userEmailValue : ''
+        const generationAccount = userEmail.endsWith('@primeweb.local')
+            ? userEmail
+            : `user-${String(user.id)}`
 
         const payload = await getPayload({ config })
         _payload = payload
@@ -182,16 +219,6 @@ export async function POST(req: NextRequest) {
         // triggering OpenAI API calls.
         const targetInputLocale = requestedGenerationLocale || language || 'en'
         const businessInfo = { ...normalizedBusinessInfo }
-        const translatedBusinessInfoPromise = translateUserInputsIfNeeded(
-                {
-                    businessName: normalizedBusinessInfo.businessName,
-                    shortDescription: normalizedBusinessInfo.shortDescription,
-                    products: normalizedBusinessInfo.products,
-                },
-                targetInputLocale,
-            )
-            .then((translated) => Object.assign(businessInfo, translated))
-            .catch(() => businessInfo)
 
         // Get tenant ID — auto-create if missing (legacy accounts)
         let tenantId = (user as { tenants?: Array<{ tenant: unknown }> }).tenants?.[0]?.tenant
@@ -297,6 +324,29 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        const safetyCheck = checkBusinessInfoSafety(businessInfo)
+        if (!safetyCheck.safe) {
+            return NextResponse.json(
+                {
+                    error: safetyCheck.message,
+                    code: 'CONTENT_UNSAFE',
+                },
+                { status: 400 },
+            )
+        }
+
+        // This is the first OpenAI request in the generation flow and only runs
+        // after auth, rate limiting, safety, and subscription checks. Translation
+        // may also use AI, so start it only after the request-local mode is known.
+        const modeDecision: SiteGenerationModeDecision = await resolveSiteGenerationMode()
+        const translatedBusinessInfoPromise = translateUserInputsIfNeeded({
+            businessName: normalizedBusinessInfo.businessName,
+            shortDescription: normalizedBusinessInfo.shortDescription,
+            products: normalizedBusinessInfo.products,
+        }, targetInputLocale)
+            .then((translated) => Object.assign(businessInfo, translated))
+            .catch(() => businessInfo)
+
         // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
         // Syncing before SSE caused "Already taken" on retry after interrupted generation
         // because the slug was claimed even when no site was created. The sync now runs
@@ -334,17 +384,6 @@ export async function POST(req: NextRequest) {
                 // Non-critical — slug sync failure shouldn't block site generation
                 payload.logger.error({ err, tenantId: resolvedTenantId }, 'AI generation: Tenant slug sync failed')
             }
-        }
-
-        const safetyCheck = checkBusinessInfoSafety(businessInfo)
-        if (!safetyCheck.safe) {
-            return NextResponse.json(
-                {
-                    error: safetyCheck.message,
-                    code: 'CONTENT_UNSAFE',
-                },
-                { status: 400 },
-            )
         }
 
         // Shared by blog preparation and the persistence phase. Starting this
@@ -391,20 +430,61 @@ export async function POST(req: NextRequest) {
         const trackPhase = <T>(name: string, fn: () => Promise<T>): Promise<T> =>
             generationTimings.track(name, fn)
 
+        type PixabayGenerationStatus =
+            | 'pixabay_used'
+            | 'pixabay_partial_then_rate_limited'
+            | 'fallback_only_rate_limited'
+            | 'fallback_only_other'
+        type PixabayGenerationSummary = {
+            status: PixabayGenerationStatus
+            usedImages: number
+        }
+        const summarizePixabayGeneration = (
+            productImageStats: { rateLimited: number },
+        ): PixabayGenerationSummary => {
+            const rateLimited = pixabaySearchBudget.rateLimited
+                || productImageStats.rateLimited > 0
+            const usedImages = pixabaySearchBudget.usedPixabayUrls.size
+            const status: PixabayGenerationStatus = rateLimited
+                ? usedImages > 0
+                    ? 'pixabay_partial_then_rate_limited'
+                    : 'fallback_only_rate_limited'
+                : usedImages > 0
+                    ? 'pixabay_used'
+                    : 'fallback_only_other'
+            return { status, usedImages }
+        }
         const logGenerationDone = (input: {
             pages: number
             failures: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             blockImageStats: { succeeded: number; failed: number }
-        }) => {
+            requestedGenMode: SiteGenerationMode
+            effectiveGenMode: SiteGenerationMode
+            modeReason?: SiteGenerationModeReason
+        }): PixabayGenerationSummary => {
+            const pixabaySummary = summarizePixabayGeneration(input.productImageStats)
             console.info(
                 `[generate-site] DONE request_id=${generationRequestId} total=${generationTimings.totalMs()}ms ` +
                 `${generationTimings.compact()} pages=${input.pages} failures=${input.failures} ` +
-                `gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} ` +
+                `requested_gen_mode=${input.requestedGenMode} ` +
+                `effective_gen_mode=${input.effectiveGenMode} ` +
+                `gen_mode_reason=${input.modeReason ?? 'configured'} ` +
                 `pixabay_rl=${input.productImageStats.rateLimited} images_failed=${input.productImageStats.uploadFailed} ` +
                 `products_no_image=${input.productImageStats.noImage} ` +
-                `block_images_ok=${input.blockImageStats.succeeded} block_images_failed=${input.blockImageStats.failed}`,
+                `block_images_ok=${input.blockImageStats.succeeded} block_images_failed=${input.blockImageStats.failed} ` +
+                `pixabay_search_used=${pixabaySearchBudget.used}/${pixabaySearchBudget.limit} ` +
+                `pixabay_search_skipped=${pixabaySearchBudget.skipped} ` +
+                `pixabay_used_images=${pixabaySearchBudget.usedPixabayUrls.size} ` +
+                `pixabay_used_urls=${JSON.stringify([...pixabaySearchBudget.usedPixabayUrls])}`,
             )
+            console.info(
+                `[generate-site] PIXABAY_ACCOUNT_RESULT request_id=${generationRequestId} ` +
+                `account=${generationAccount} status=${pixabaySummary.status} ` +
+                `pixabay_used_images=${pixabaySummary.usedImages} ` +
+                `provider_errors=${JSON.stringify([...pixabaySearchBudget.providerErrorCodes])}`,
+            )
+            return pixabaySummary
         }
 
         // Fetch block prompt overrides from the admin template matching this category.
@@ -415,9 +495,15 @@ export async function POST(req: NextRequest) {
         // Shape: { [blockSlug]: { prompt, updatedAt, updatedBy? } }
         type BlockPromptOverridesMap = Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>
         let blockPromptOverrides: BlockPromptOverridesMap | undefined
-        const isAiFirstPath = process.env.GEN_MODE?.trim() === 'ai-first'
-            || Boolean(extraInstructions?.trim())
-            || Boolean(referencePrompt?.trim())
+        const isAiFirstPath = modeDecision.modeReason !== 'insufficient_quota'
+            && (
+                modeDecision.effectiveGenMode === 'ai-first'
+                || Boolean(extraInstructions?.trim())
+                || Boolean(referencePrompt?.trim())
+            )
+        const usesTemplatePresetForPool = !process.env.OPENAI_API_KEY
+            || modeDecision.modeReason === 'insufficient_quota'
+            || (!isAiFirstPath && effectiveGenerationLocale === 'en')
         if (isAiFirstPath) {
             try {
                 const promptCategoryText = [
@@ -432,15 +518,15 @@ export async function POST(req: NextRequest) {
                 const tmplResult = await payload.find({
                     collection: 'templates',
                     where: {
-                        and: [
-                            { category: { contains: resolvedCategory } },
-                            { status: { equals: 'live' } },
-                        ],
+                        status: { equals: 'live' },
                     },
-                    limit: 1,
+                    limit: 100,
                     depth: 0,
                 })
-                const tmplDoc = tmplResult.docs[0] as Record<string, unknown> | undefined
+                const tmplDoc = tmplResult.docs.find((t) => {
+                    const cats = Array.isArray(t.category) ? t.category : [t.category].filter(Boolean)
+                    return cats.includes(resolvedCategory)
+                }) as Record<string, unknown> | undefined
                 if (tmplDoc?.blockPromptOverrides && typeof tmplDoc.blockPromptOverrides === 'object') {
                     const raw = tmplDoc.blockPromptOverrides as Record<string, unknown>
                     const entries = Object.entries(raw).filter(([, v]) => {
@@ -467,8 +553,15 @@ export async function POST(req: NextRequest) {
         // GH-1190: Previously entire pipeline ran synchronously before ReadableStream was created.
         // Now we create the stream first and run the pipeline inside start() so the client
         // receives SSE events in real-time instead of waiting 60-100s for the first byte.
+        // A generation gets one Pixabay search. The image pool requests
+        // orientation=all once, then partitions those candidates into
+        // landscape and square buckets locally.
+        const pixabaySearchBudget = createPixabaySearchBudget(1, generationRequestId)
         const runGenPipeline = async (onEvent?: (e: SSEEvent) => void): Promise<{
             result: GenerationResult
+            requestedGenMode: SiteGenerationMode
+            effectiveGenMode: SiteGenerationMode
+            modeReason?: SiteGenerationModeReason
             site: Record<string, unknown>
             homepagePage: Record<string, unknown>
             createdPages: Record<string, unknown>[]
@@ -487,15 +580,20 @@ export async function POST(req: NextRequest) {
             // AI generation (GH-1190). await below costs ~0ms in the common case.
             const _parsedProductsForPool = !ENABLE_DALLE_HERO
                 ? parseProductsString(businessInfo.products) : []
-            // GH-1611: normalize, do NOT resolve. The builder form posts an already
-            // resolved composer key ('fnb', 'realestate', …) and
-            // resolveComposerCategory is not idempotent on those — neither key
-            // appears in its own keyword list, so both scored 0 and fell into the
-            // 'business' sink. A bakery then sent category=business to Pixabay
-            // instead of category=food, which let retail/fashion photos into the
-            // pool (clothing flatlays in a bakery gallery).
+            // Use the same category resolver and input shape as generateSiteWithAI
+            // so pool demand is calculated from the exact preset the composer picks.
+            // Resolved builder keys such as `fnb` remain authoritative.
             const _presetCategoryForPool = !ENABLE_DALLE_HERO
-                ? normalizeComposerCategory(businessInfo.industry) : ''
+                ? resolveBusinessCategory(
+                    businessInfo.industry,
+                    [
+                        businessInfo.businessName,
+                        businessInfo.industry,
+                        businessInfo.shortDescription,
+                        businessInfo.products,
+                    ].join(' | '),
+                )
+                : ''
             const _themeSeedForPool = !ENABLE_DALLE_HERO ? computeGenSeed(businessInfo) : 0
             const _themeMoodForPool = !ENABLE_DALLE_HERO
                 ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
@@ -503,7 +601,7 @@ export async function POST(req: NextRequest) {
             // NOTE: field keeps the historical name `englishKeywords` — it now carries
             // the RAW user-language keywords (see plan 260702-1607-GH-1185).
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[]; buildCtx: BuildPoolCtx | null }
-            const imagePoolPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO
+            const poolContextPromise: Promise<_PoolResult> = trackPhase('image_pool', () => !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
                     // GH-1185 phase-01: when `products` is empty/thin, ask a cheap
                     // LLM for 2-4 business-specific visual terms (SAME language as
@@ -543,7 +641,23 @@ export async function POST(req: NextRequest) {
                             poolKeywords = translated
                             console.info(`[image-pool] keyword translate: raw=[${rawKeywords.join(', ')}] → en=[${translated.join(', ')}]`)
                         } else {
-                            console.warn('[image-pool] keyword translate failed/null — using raw keywords')
+                            const dictionaryKeywords = translateKnownProductTerms(rawKeywords)
+                            const categoryKeyword = CATEGORY_BASE_KEYWORDS[_presetCategoryForPool]?.[0]
+                                ?? 'modern business'
+                            poolKeywords = effectiveGenerationLocale === 'en'
+                                ? rawKeywords
+                                : dictionaryKeywords.length > 0
+                                    ? dictionaryKeywords
+                                    : [categoryKeyword]
+                            const fallbackSource = effectiveGenerationLocale === 'en'
+                                ? 'raw English keywords'
+                                : dictionaryKeywords.length > 0
+                                    ? 'curated English product dictionary'
+                                    : `English category keyword "${categoryKeyword}"`
+                            console.warn(
+                                `[image-pool] keyword translate failed/null — using ${fallbackSource}: ` +
+                                `[${poolKeywords.join(', ')}]`,
+                            )
                         }
                     }
                     // Isolate buildImagePool failure so rawKeywords is always
@@ -556,7 +670,19 @@ export async function POST(req: NextRequest) {
                         // actually consume (default hero-only → ~3 landscape, 0
                         // square) instead of a fixed 12+6 — cuts speculative
                         // download + pre-upload and the orphan media it left.
-                        const poolSizes = computePoolBucketSizes()
+                        const templateGalleryDemand = usesTemplatePresetForPool
+                            ? getTemplateGalleryDemand(_presetCategoryForPool, _themeSeedForPool)
+                            : null
+                        const poolSizes = computePoolBucketSizes(undefined, {
+                            galleryImages: templateGalleryDemand?.imageCount,
+                        })
+                        if (templateGalleryDemand) {
+                            console.info(
+                                `[image-pool] template=${templateGalleryDemand.presetId} ` +
+                                `gallery_blocks=${templateGalleryDemand.blockCount} ` +
+                                `gallery_images=${templateGalleryDemand.imageCount}`,
+                            )
+                        }
                         buildCtx = {
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
@@ -579,52 +705,83 @@ export async function POST(req: NextRequest) {
                             // last slots were patched from an off-pool search.
                             landscapeMin: poolSizes.landscapeMin,
                             squareMin: poolSizes.squareMin,
+                            // The previous 5s default was too aggressive for
+                            // local/staging egress and produced false TIMEOUTs.
+                            // The generation-scoped one-request budget bounds
+                            // total provider work.
+                            timeoutMs: 20_000,
                         }
-                        pool = await buildImagePool(buildCtx)
-                        // GH-1611: surface a REAL deficit — QC could not tell from
-                        // the Editor whether a weak gallery came from a thin pool.
-                        // Keyed on the actual shortfall, not `pool.underfill`: that
-                        // flag is set whenever any fallback tier fired, which is
-                        // most gens, and a warning that always fires is noise.
-                        const landscapeShort = pool.landscape.length < poolSizes.landscapeMin
-                        const squareShort = pool.square.length < poolSizes.squareMin
-                        if (landscapeShort || squareShort) {
-                            console.warn(
-                                `[image-pool] UNDERFILL category=${_presetCategoryForPool} query="${pool.queryUsed}" ` +
-                                `landscape=${pool.landscape.length}/${poolSizes.landscapeMin} square=${pool.square.length}/${poolSizes.squareMin}`,
-                            )
+                        // Template-first knows its blueprint before generation, so it
+                        // keeps the low-latency pre-AI pool build. AI-first waits until
+                        // the generated block tree reveals the exact slot count.
+                        if (usesTemplatePresetForPool) {
+                            pool = await buildImagePool(buildCtx)
+                            // GH-1611: surface a REAL deficit — QC could not tell from
+                            // the Editor whether a weak gallery came from a thin pool.
+                            const landscapeShort = pool.landscape.length < poolSizes.landscapeMin
+                            const squareShort = pool.square.length < poolSizes.squareMin
+                            if (landscapeShort || squareShort) {
+                                console.warn(
+                                    `[image-pool] UNDERFILL category=${_presetCategoryForPool} query="${pool.queryUsed}" ` +
+                                    `landscape=${pool.landscape.length}/${poolSizes.landscapeMin} square=${pool.square.length}/${poolSizes.squareMin}`,
+                                )
+                            }
                         }
-                    } catch {
+                    } catch (err) {
+                        console.warn(
+                            `[image-pool] context/build failed before assignment: ${err instanceof Error ? err.message : String(err)}`,
+                        )
                         // pool stays null; rawKeywords still returned for legacy search
                     }
                     return { pool, englishKeywords: rawKeywords, buildCtx }
-                })().catch((): _PoolResult => ({ pool: null, englishKeywords: [], buildCtx: null }))
+                })().catch((err): _PoolResult => {
+                    console.warn(
+                        `[image-pool] context preparation failed: ${err instanceof Error ? err.message : String(err)}`,
+                    )
+                    return { pool: null, englishKeywords: [], buildCtx: null }
+                })
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [], buildCtx: null }))
 
-            // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
-            // photos to Payload `media` DURING the GPT window instead of after
-            // it (Wave 2b). Chained directly off imagePoolPromise (not awaited
-            // here) so it runs concurrently with the GPT call below. Post-GPT,
-            // fulfillImageNeeds/batchFetchFromPool consumes the resolved map
-            // and only assigns pre-uploaded Media IDs — no re-download/upload.
+            const shouldDeferAiFirstPool = !ENABLE_DALLE_HERO && !usesTemplatePresetForPool
+            let resolveAiFirstPool: (result: _PoolResult) => void = () => {}
+            const aiFirstPoolPromise = new Promise<_PoolResult>((resolve) => {
+                resolveAiFirstPool = resolve
+            })
+            const imagePoolPromise = shouldDeferAiFirstPool
+                ? aiFirstPoolPromise
+                : poolContextPromise
+
+            // Template-first pre-uploads during GPT as before. AI-first starts
+            // this phase only after its exact post-AI pool resolves, so the
+            // `pool_preupload` timing reports actual download/upload cost rather
+            // than including time spent waiting for site generation.
             // Default ON — set GEN_POOL_PREUPLOAD=false to disable (emergency
             // rollback). When off, resolves an empty Map immediately so the
             // downstream pool path is byte-identical to pre-Phase-06 behavior.
             const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
-            const preUploadedPoolPromise: Promise<Map<string, number>> = trackPhase('pool_preupload', () => GEN_POOL_PREUPLOAD
-                ? imagePoolPromise
-                    .then(({ pool }) =>
-                        pool
-                            ? preUploadPool(
-                                pool,
-                                String(resolvedTenantId),
-                                businessInfo.businessName,
-                                payload as unknown as Parameters<typeof preUploadPool>[3],
-                            )
-                            : new Map<string, number>(),
+            const uploadResolvedPool = ({ pool }: _PoolResult): Promise<Map<string, number>> =>
+                pool
+                    ? preUploadPool(
+                        pool,
+                        String(resolvedTenantId),
+                        businessInfo.businessName,
+                        payload as unknown as Parameters<typeof preUploadPool>[3],
                     )
-                    .catch((): Map<string, number> => new Map())
-                : Promise.resolve(new Map<string, number>()))
+                    : Promise.resolve(new Map<string, number>())
+            const preUploadedPoolPromise: Promise<Map<string, number>> = !GEN_POOL_PREUPLOAD
+                ? Promise.resolve(new Map())
+                : shouldDeferAiFirstPool
+                    ? imagePoolPromise
+                        .then((poolResult) =>
+                            trackPhase('pool_preupload', () => uploadResolvedPool(poolResult)),
+                        )
+                        .catch((): Map<string, number> => new Map())
+                    : trackPhase(
+                        'pool_preupload',
+                        () => imagePoolPromise
+                            .then(uploadResolvedPool)
+                            .catch((): Map<string, number> => new Map()),
+                    )
 
             // Start sample product generation AFTER imagePool completes to avoid competing
             // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
@@ -634,23 +791,39 @@ export async function POST(req: NextRequest) {
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = Promise.race([
-                imagePoolPromise.then(() => undefined),
-                new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-            ]).then(() =>
-                trackPhase('products_prepare', () =>
-                    generateSampleProducts(
-                        businessInfo,
-                        effectiveGenerationLocale,
-                        String(resolvedTenantId),
-                        payload,
-                        undefined,
-                    ),
-                ),
-            )
+            const sampleProductsPromise = trackPhase('products_prepare', async () => {
+                const [prepared, { pool }, preUploadedPool] = await Promise.all([
+                    prepareSampleProducts(businessInfo, effectiveGenerationLocale),
+                    imagePoolPromise,
+                    preUploadedPoolPromise,
+                ])
+                const source = pool
+                    ? (pool.square.length > 0 ? pool.square : pool.landscape)
+                    : []
+                const availableIds = source
+                    .map((photo) => preUploadedPool.get(photo.id))
+                    .filter((id): id is number => id != null)
+                const imageIds = prepared.products.map((_, index) =>
+                    availableIds.length > 0 ? availableIds[index % availableIds.length] : undefined,
+                )
+                return generateSampleProducts(
+                    businessInfo,
+                    effectiveGenerationLocale,
+                    String(resolvedTenantId),
+                    payload,
+                    undefined,
+                    { prepared, imageIds },
+                )
+            })
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
-            const { result, events } = await trackPhase('site_ai', () =>
+            const {
+                result,
+                events,
+                requestedGenMode,
+                effectiveGenMode,
+                modeReason,
+            } = await trackPhase('site_ai', () =>
                 withSentrySpan('ai.generateSite', () =>
                     generateSiteWithAI(
                         businessInfo,
@@ -659,10 +832,70 @@ export async function POST(req: NextRequest) {
                         referencePrompt,
                         blockPromptOverrides,
                         onEvent,
-                        { targetLocale: effectiveGenerationLocale },
+                        { targetLocale: effectiveGenerationLocale, modeDecision },
                     ),
                 ),
             )
+
+            // AI-first can only know its real image demand after the model has
+            // returned every page and block. Build one exact-size pool now from
+            // a single orientation=all request; aspect buckets are split locally.
+            if (shouldDeferAiFirstPool) {
+                let resolvedPool = await poolContextPromise
+                try {
+                    const blockBuckets = collectGenerationBlockBuckets(result)
+                    const targetNeeds = blockBuckets.flatMap((bucket) => planImageNeeds(bucket))
+                    const aiPages = (result as { pages?: unknown[] }).pages
+                    const hasSinglePageHero = (!Array.isArray(aiPages) || aiPages.length === 0)
+                        && Array.isArray(result.blocks)
+                        && result.blocks.some((block) => block?.blockType === 'hero')
+                    if (hasSinglePageHero) {
+                        targetNeeds.push({
+                            blockType: 'hero',
+                            count: 3,
+                            assign: () => {},
+                        })
+                    }
+                    const targets = computePoolTargetsForBlocks(
+                        targetNeeds,
+                        blockBuckets.flat(),
+                    )
+                    if (resolvedPool.buildCtx && (targets.landscape > 0 || targets.square > 0)) {
+                        const exactCtx: BuildPoolCtx = {
+                            ...resolvedPool.buildCtx,
+                            landscapeSize: targets.landscape,
+                            squareSize: targets.square,
+                            landscapeMin: targets.landscape,
+                            squareMin: targets.square,
+                            exactSlotMode: true,
+                            timeoutMs: 20_000,
+                        }
+                        console.info(
+                            `[image-pool] AI-first exact demand landscape=${targets.landscape} ` +
+                            `square=${targets.square} total=${targets.landscape + targets.square}`,
+                        )
+                        const pool = await trackPhase(
+                            'ai_first_image_pool',
+                            () => buildImagePool(exactCtx),
+                        )
+                        resolvedPool = {
+                            ...resolvedPool,
+                            pool,
+                            buildCtx: exactCtx,
+                        }
+                        console.info(
+                            `[image-pool] AI-first exact result landscape=${pool.landscape.length}/${targets.landscape} ` +
+                            `square=${pool.square.length}/${targets.square}`,
+                        )
+                    }
+                } catch (err) {
+                    console.warn(
+                        `[image-pool] AI-first exact build failed: ${err instanceof Error ? err.message : String(err)}`,
+                    )
+                }
+                resolveAiFirstPool(resolvedPool)
+            }
+
             // gen-perf blog-inline: prepare 3 blog posts (AI seed topics + full
             // article bodies + thumbnails). Kicked AFTER the site GPT resolves,
             // NOT during it — the site's parallel split calls own the OpenAI
@@ -682,7 +915,47 @@ export async function POST(req: NextRequest) {
                 industry: businessInfo.industry,
                 seed: computeGenSeed(businessInfo),
                 locale: effectiveGenerationLocale,
+                skipImages: true,
             })
+                .then(async (prepared) => {
+                    if (!prepared) return null
+                    const [{ pool }, preUploadedPool] = await Promise.all([
+                        imagePoolPromise,
+                        preUploadedPoolPromise,
+                    ])
+                    const source = pool
+                        ? (pool.landscape.length > 0 ? pool.landscape : pool.square)
+                        : []
+                    const availableIds = source
+                        .map((photo) => preUploadedPool.get(photo.id))
+                        .filter((id): id is number => id != null)
+
+                    if (availableIds.length > 0) {
+                        return assignResolvedBlogThumbnails(
+                            prepared,
+                            prepared.map((_, index) => availableIds[index % availableIds.length]),
+                        )
+                    }
+
+                    // Fallback for AI-first mode (initial pool is null) or empty pools:
+                    // Download and upload the curated Unsplash fallback thumbnails.
+                    // This does NOT use Pixabay API rate limits because it hits Unsplash CDN directly.
+                    const blogThumbnails = getBlogThumbnails(normalizeComposerCategory(businessInfo.industry))
+                    const uploadedIds = await Promise.all(
+                        prepared.map(async (post, index) => {
+                            const fallbackUrl = blogThumbnails[index % blogThumbnails.length]!
+                            const filename = `blog-${resolvedTenantId}-${post.slug}.jpg`
+                            try {
+                                return await uploadImageUrl(fallbackUrl, filename, post.title, resolvedTenantId, payload)
+                            } catch (err) {
+                                console.warn(`[generate-site] blog fallback thumbnail upload failed for ${filename}:`, err instanceof Error ? err.message : String(err))
+                                return undefined
+                            }
+                        })
+                    )
+
+                    return assignResolvedBlogThumbnails(prepared, uploadedIds)
+                })
                 .catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -753,6 +1026,8 @@ export async function POST(req: NextRequest) {
         if (!ENABLE_DALLE_HERO) {
             try {
                 const allBuckets = collectAllBlockBuckets()
+                let pixabayPoolForUrlFields: ImagePool | null = null
+                const usedPoolPhotoIds = new Set<string>()
                 // Flatten image needs across homepage + every subpage so a
                 // single fulfillImageNeeds call covers the whole site.
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
@@ -793,7 +1068,7 @@ export async function POST(req: NextRequest) {
                     // pool needs = resolves an already-empty Map (0ms wait),
                     // and batchFetchFromPool treats an empty map exactly like
                     // an absent one (legacy inline download+upload path).
-                    const backfillPromise = imagePool && buildCtx
+                    const backfillPromise = imagePool && buildCtx && usesTemplatePresetForPool
                         ? trackPhase('pool_backfill', () => backfillImagePool(
                             imagePool,
                             buildCtx,
@@ -809,6 +1084,7 @@ export async function POST(req: NextRequest) {
                     ])
                     const fulfillmentPool = backfillResult.pool
                     const addedPool = backfillResult.added
+                    pixabayPoolForUrlFields = fulfillmentPool
 
                     if (GEN_POOL_PREUPLOAD && addedPool && poolSize(addedPool) > 0) {
                         const backfillUploads = await trackPhase('pool_backfill_upload', () => preUploadPool(
@@ -841,10 +1117,29 @@ export async function POST(req: NextRequest) {
                                 pool: fulfillmentPool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                                 preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
+                                usedPoolPhotoIds,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
                     )
+                }
+                // URL-backed blocks do not produce upload needs. Resolve the
+                // shared pool independently so pages containing only those
+                // block types still receive Pixabay images.
+                if (!pixabayPoolForUrlFields) {
+                    pixabayPoolForUrlFields = (await imagePoolPromise).pool
+                }
+                if (pixabayPoolForUrlFields) {
+                    for (const bucket of allBuckets) {
+                        const urlStats = injectPixabayUrlsIntoBlocks(
+                            bucket,
+                            pixabayPoolForUrlFields,
+                            businessInfo.businessName,
+                            usedPoolPhotoIds,
+                        )
+                        blockImageStats.succeeded += urlStats.succeeded
+                        blockImageStats.failed += urlStats.failed
+                    }
                 }
                 // Strip any slot still holding a URL/object (Pixabay failed or missing) —
                 // Payload upload fields are optional; better empty than reject.
@@ -953,14 +1248,25 @@ export async function POST(req: NextRequest) {
         if (existingSites.docs.length > 0) {
             const previousSite = existingSites.docs[0] as Record<string, unknown>
             _site = previousSite
-            site = await payload.update({
-                collection: 'sites',
-                id: previousSite.id as string | number,
-                data: {
-                    ...siteGenerationData,
-                    generationStatus: 'generating',
-                },
-            })
+            site = await trackPhase('site_write', () =>
+                withPayloadRetry(
+                    () => payload.update({
+                        collection: 'sites',
+                        id: previousSite.id as string | number,
+                        data: {
+                            ...siteGenerationData,
+                            generationStatus: 'generating',
+                        },
+                    }),
+                    {
+                        maxRetries: 4,
+                        baseDelayMs: 150,
+                        onRetry: (attempt, kind) => {
+                            console.warn(`[generate-site] Retry site update attempt=${attempt} kind=${kind}`)
+                        },
+                    },
+                ),
+            )
             _site = site
 
             // Regeneration replaces page content immediately, matching the
@@ -974,18 +1280,38 @@ export async function POST(req: NextRequest) {
                 select: { id: true },
             })
             for (const oldPage of oldPages.docs) {
-                await payload.delete({ collection: 'pages', id: oldPage.id })
+                await withPayloadRetry(
+                    () => payload.delete({ collection: 'pages', id: oldPage.id }),
+                    {
+                        onRetry: (attempt, kind) => {
+                            console.warn(
+                                `[generate-site] Retry old page delete attempt=${attempt} kind=${kind} page_id=${oldPage.id}`,
+                            )
+                        },
+                    },
+                )
             }
         } else {
             // CREATE new site (first time)
-            site = await payload.create({
-                collection: 'sites',
-                data: {
-                    tenant: resolvedTenantId,
-                    ...siteGenerationData,
-                    generationStatus: 'generating',
-                },
-            })
+            site = await trackPhase('site_write', () =>
+                withPayloadRetry(
+                    () => payload.create({
+                        collection: 'sites',
+                        data: {
+                            tenant: resolvedTenantId,
+                            ...siteGenerationData,
+                            generationStatus: 'generating',
+                        },
+                    }),
+                    {
+                        maxRetries: 4,
+                        baseDelayMs: 150,
+                        onRetry: (attempt, kind) => {
+                            console.warn(`[generate-site] Retry site create attempt=${attempt} kind=${kind}`)
+                        },
+                    },
+                ),
+            )
             _site = site
         }
 
@@ -1253,18 +1579,27 @@ export async function POST(req: NextRequest) {
                             }
                         }
                     }
-                    createdPage = await payload.create({
-                        collection: 'pages',
-                        data: {
-                            title: pageDefinition.title,
-                            slug: pageDefinition.slug,
-                            site: site.id,
-                            isHomepage: pageDefinition.isHomepage,
-                            _status: 'published',
-                            layout: normalizedLayout,
-                            seo: pageDefinition.seo,
+                    createdPage = await withPayloadRetry(
+                        () => payload.create({
+                            collection: 'pages',
+                            data: {
+                                title: pageDefinition.title,
+                                slug: pageDefinition.slug,
+                                site: site.id,
+                                isHomepage: pageDefinition.isHomepage,
+                                _status: 'published',
+                                layout: normalizedLayout,
+                                seo: pageDefinition.seo,
+                            },
+                        }),
+                        {
+                            onRetry: (attempt, kind) => {
+                                console.warn(
+                                    `[generate-site] Retry image-free page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
+                                )
+                            },
                         },
-                    }) as Record<string, unknown>
+                    ) as Record<string, unknown>
                 }
                 createdPages.push(createdPage)
                 _createdPagesCount++
@@ -1283,6 +1618,7 @@ export async function POST(req: NextRequest) {
                 }))
                 // Homepage failure is fatal — rethrow so outer catch returns 500
                 if (pageDefinition.isHomepage) {
+                    generationTimings.record('pages_write', Date.now() - dbPhaseStart, 'error')
                     throw pageErr
                 }
                 // Sub-page failure is soft — continue loop, gen still ships
@@ -1556,6 +1892,7 @@ export async function POST(req: NextRequest) {
                         },
                     })
                     productsCreatedCount++
+                    if (safeImageId !== undefined) markPixabayMediaUsed([safeImageId])
                 } catch (err) {
                     if (safeImageId != null && isStaleMediaFk(err)) {
                         // FK violation: media row deleted between pre-check and create.
@@ -1649,34 +1986,36 @@ export async function POST(req: NextRequest) {
             console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
         } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
             const _blogSeedTask = () =>
-                blogPrepPromise
-                    .then((prepared) => {
-                        if (Array.isArray(prepared) && prepared.length > 0) {
-                            return persistBlogPosts(
-                                payload,
-                                prepared,
-                                resolvedTenantId,
-                                site.id as string | number,
-                                user.id,
-                            )
-                        }
-                        if (prepared === null) {
-                            return seedBlogPosts(
-                                payload,
-                                resolvedTenantId,
-                                site.id as string | number,
-                                normalizeComposerCategory(businessInfo.industry),
-                                businessInfo.businessName,
-                                user.id,
-                                parseProductsString(businessInfo.products),
-                                businessInfo.industry,
-                                computeGenSeed(businessInfo),
-                                effectiveGenerationLocale,
-                            )
-                        }
-                        return 0
-                    })
-                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+                withPixabaySearchBudget(pixabaySearchBudget, () =>
+                    blogPrepPromise
+                        .then((prepared) => {
+                            if (Array.isArray(prepared) && prepared.length > 0) {
+                                return persistBlogPosts(
+                                    payload,
+                                    prepared,
+                                    resolvedTenantId,
+                                    site.id as string | number,
+                                    user.id,
+                                )
+                            }
+                            if (prepared === null) {
+                                return seedBlogPosts(
+                                    payload,
+                                    resolvedTenantId,
+                                    site.id as string | number,
+                                    normalizeComposerCategory(businessInfo.industry),
+                                    businessInfo.businessName,
+                                    user.id,
+                                    parseProductsString(businessInfo.products),
+                                    businessInfo.industry,
+                                    computeGenSeed(businessInfo),
+                                    effectiveGenerationLocale,
+                                )
+                            }
+                            return 0
+                        })
+                        .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message)),
+                )
             try {
                 after(_blogSeedTask)
             } catch {
@@ -1684,15 +2023,24 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        await trackPhase('site_complete', () => payload.update({
-            collection: 'sites',
-            id: site.id as string | number,
-            data: {
-                generationStatus: 'completed',
-                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
-                ...cartPatch,
+        await trackPhase('site_complete', () => withPayloadRetry(
+            () => payload.update({
+                collection: 'sites',
+                id: site.id as string | number,
+                data: {
+                    generationStatus: 'completed',
+                    ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+                    ...cartPatch,
+                },
+            }),
+            {
+                onRetry: (attempt, kind) => {
+                    console.warn(
+                        `[generate-site] Retry site completion attempt=${attempt} kind=${kind} request_id=${generationRequestId}`,
+                    )
+                },
             },
-        }))
+        ))
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
         // fire-and-forget) so it runs reliably post-response on Vercel and
@@ -1702,21 +2050,22 @@ export async function POST(req: NextRequest) {
         // throws; until rows land, blocks fall back to static CDN images.
         if (resolvedTenantId) {
             const _seedCategory = safeSiteType
-            const _imglibSeedTask = () => {
-                const t = Date.now()
-                console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
-                return imagePoolPromise.then(({ englishKeywords }) => {
-                    const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
-                    return import('@/lib/images/image-library-seeder')
-                        .then(({ seedImageLibraryForSite }) =>
-                            seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory, undefined, _productTerms),
+            const _imglibSeedTask = () =>
+                withPixabaySearchBudget(pixabaySearchBudget, () => {
+                    const t = Date.now()
+                    console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
+                    return imagePoolPromise.then(({ englishKeywords }) => {
+                        const _productTerms = englishKeywords.length > 0 ? englishKeywords.join(' ') : null
+                        return import('@/lib/images/image-library-seeder')
+                            .then(({ seedImageLibraryForSite }) =>
+                                seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory, undefined, _productTerms),
+                            )
+                    })
+                        .catch(err =>
+                            console.error('[generate-site] image-library seed failed',
+                                err instanceof Error ? err.message : err),
                         )
                 })
-                    .catch(err =>
-                        console.error('[generate-site] image-library seed failed',
-                            err instanceof Error ? err.message : err),
-                    )
-            }
             try {
                 after(_imglibSeedTask)
             } catch {
@@ -1725,7 +2074,21 @@ export async function POST(req: NextRequest) {
         }
 
             const timeMs = generationTimings.totalMs()
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, blockImageStats, normalizedPageLinks }
+            return {
+                result,
+                requestedGenMode,
+                effectiveGenMode,
+                modeReason,
+                site,
+                homepagePage,
+                createdPages,
+                pageFailures,
+                productsCreatedCount,
+                timeMs,
+                productImageStats,
+                blockImageStats,
+                normalizedPageLinks,
+            }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1760,7 +2123,13 @@ export async function POST(req: NextRequest) {
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
-                        } = await runGenPipeline(onEvent)
+                            requestedGenMode,
+                            effectiveGenMode,
+                            modeReason,
+                        } = await withPixabaySearchBudget(
+                            pixabaySearchBudget,
+                            () => runGenPipeline(onEvent),
+                        )
                         // The site is already committed. Slug sync is optional
                         // post-response work and must not turn success into an SSE error.
                         const _slugSyncStream = () => trackPhase('slug_sync', syncTenantSlug)
@@ -1770,11 +2139,14 @@ export async function POST(req: NextRequest) {
                             void _slugSyncStream()
                         }
                         const timeMs = generationTimings.totalMs()
-                        logGenerationDone({
+                        const pixabaySummary = logGenerationDone({
                             pages: createdPages.length,
                             failures: pageFailures.length,
                             productImageStats,
                             blockImageStats,
+                            requestedGenMode,
+                            effectiveGenMode,
+                            modeReason,
                         })
 
                         // products_generated event
@@ -1792,6 +2164,8 @@ export async function POST(req: NextRequest) {
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
                                 timeMs,
+                                pixabayImageStatus: pixabaySummary.status,
+                                pixabayUsedImages: pixabaySummary.usedImages,
                             })}\n\n`
                         generationTimings.record('done_sent', 0)
                         if (streamOpen) {
@@ -1812,25 +2186,70 @@ export async function POST(req: NextRequest) {
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
+                        const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+                        const failedPhases = Object.entries(generationTimings.snapshot())
+                            .filter(([, timing]) => timing.outcome === 'error')
+                            .map(([name]) => name)
+                        const failedPhase = failedPhases.at(-1) ?? 'unknown'
+                        const siteId = _site?.id ?? null
+
+                        console.error('[generate-site] SSE_ERROR', JSON.stringify({
+                            requestId: generationRequestId,
+                            account: generationAccount,
+                            debugId,
+                            phase: failedPhase,
+                            failedPhases,
+                            errMsg: errMsg.slice(0, 500),
+                            timings: generationTimings.compact(),
+                            pagesCreated: _createdPagesCount,
+                            siteId,
+                        }))
+                        if (streamErr instanceof Error && streamErr.stack) {
+                            console.error('[generate-site] SSE_ERROR_STACK', debugId, streamErr.stack)
+                        }
                         // Guard: if stream was canceled (client disconnected), enqueue throws —
                         // wrap so error recovery below always runs regardless of stream state.
                         try {
                             controller.enqueue(
                                 _encoder.encode(
-                                    `event: error\ndata: ${JSON.stringify({ message: errMsg })}\n\n`,
+                                    `event: error\ndata: ${JSON.stringify({
+                                        message: errMsg,
+                                        code: 'GENERATION_FAILED',
+                                        debugId,
+                                        phase: failedPhase,
+                                        failedPhases,
+                                    })}\n\n`,
                                 ),
                             )
                         } catch { /* stream already canceled — skip SSE write, still recover DB */ }
                         // Error recovery: update site status if site was created before failure
                         if (_site?.id && _payload) {
                             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
-                            await _payload
-                                .update({
+                            await withPayloadRetry(
+                                () => _payload!.update({
                                     collection: 'sites',
-                                    id: _site.id as string | number,
+                                    id: _site!.id as string | number,
                                     data: { generationStatus: status },
+                                }),
+                                {
+                                    onRetry: (attempt, kind) => {
+                                        console.warn(
+                                            `[generate-site] Retry SSE recovery attempt=${attempt} kind=${kind} request_id=${generationRequestId}`,
+                                        )
+                                    },
+                                },
+                            )
+                                .catch((recoveryErr) => {
+                                    console.error('[generate-site] SSE_RECOVERY_FAILED', JSON.stringify({
+                                        requestId: generationRequestId,
+                                        debugId,
+                                        siteId,
+                                        status,
+                                        errMsg: recoveryErr instanceof Error
+                                            ? recoveryErr.message.slice(0, 500)
+                                            : String(recoveryErr).slice(0, 500),
+                                    }))
                                 })
-                                .catch(() => {})
                         }
                     } finally {
                         try { controller.close() } catch { /* already closed */ }
@@ -1856,7 +2275,13 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             productImageStats,
             blockImageStats,
-        } = await runGenPipeline()
+            requestedGenMode,
+            effectiveGenMode,
+            modeReason,
+        } = await withPixabaySearchBudget(
+            pixabaySearchBudget,
+            () => runGenPipeline(),
+        )
         // JSON callers share the same terminal contract: once committed, only
         // non-fatal post-response work remains.
         const _slugSync = () => trackPhase('slug_sync', syncTenantSlug)
@@ -1866,11 +2291,14 @@ export async function POST(req: NextRequest) {
             void _slugSync()
         }
         const timeMs = generationTimings.totalMs()
-        logGenerationDone({
+        const pixabaySummary = logGenerationDone({
             pages: createdPages.length,
             failures: pageFailures.length,
             productImageStats,
             blockImageStats,
+            requestedGenMode,
+            effectiveGenMode,
+            modeReason,
         })
 
         // Notify SSO Hub: user created their first site (step 1)
@@ -1896,6 +2324,8 @@ export async function POST(req: NextRequest) {
             totalPages: createdPages.length,
             theme: result.theme,
             timeMs,
+            pixabayImageStatus: pixabaySummary.status,
+            pixabayUsedImages: pixabaySummary.usedImages,
         })
 
     } catch (error: unknown) {
@@ -2159,16 +2589,35 @@ export function buildGeneratedPages({
     // Use AI-generated multi-page content when available
     const aiPages = (result as { pages?: Array<{ title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[]; seo?: Record<string, unknown> }> }).pages
     if (aiPages && aiPages.length > 0) {
-        return aiPages.map((page, index) => ({
-            title: page.title || `Page ${index + 1}`,
-            slug: canonicalizePageSlug(page, index),
-            isHomepage: page.isHomepage === true || index === 0,
-            layout: cloneBlockData(page.blocks || []),
-            seo: {
-                title: String(page.seo?.title || page.title || ''),
-                description: String(page.seo?.description || ''),
-            },
-        }))
+        const seenSlugs = new Set<string>()
+        return aiPages
+            .map((page, index) => {
+                // AI occasionally marks more than one page as homepage. The page plan
+                // is positional, so only index 0 may own '/' and be treated as fatal
+                // during persistence.
+                const isHomepage = index === 0
+                return {
+                    title: page.title || `Page ${index + 1}`,
+                    slug: canonicalizePageSlug({ ...page, isHomepage }, index),
+                    isHomepage,
+                    layout: cloneBlockData(page.blocks || []),
+                    seo: {
+                        title: String(page.seo?.title || page.title || ''),
+                        description: String(page.seo?.description || ''),
+                    },
+                }
+            })
+            .filter((page) => {
+                const normalizedSlug = page.slug.toLowerCase()
+                if (seenSlugs.has(normalizedSlug)) {
+                    console.warn(
+                        `[buildGeneratedPages] duplicate canonical slug dropped: ${page.slug} (${page.title})`,
+                    )
+                    return false
+                }
+                seenSlugs.add(normalizedSlug)
+                return true
+            })
     }
 
     // Fallback: clone-based page generation for single-page AI response

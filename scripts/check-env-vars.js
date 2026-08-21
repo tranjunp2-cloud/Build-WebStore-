@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * CI Check: Detect new environment variables in PR that are missing from env files.
+ * CI Check: Detect new environment variables and required deployment secrets
+ * that are missing from env files.
  *
  * Checks against both:
  * - .env.staging.example (staging deploy)
@@ -31,6 +32,12 @@ const BUILT_IN_VARS = new Set([
     // Local dev override for Xendit webhook URL (ngrok/Cloudflare tunnel).
     // Not set on staging/prod — NEXT_PUBLIC_SERVER_URL is used there.
     'XENDIT_WEBHOOK_URL',
+])
+
+// Webhooks that can trigger internal notifications must never deploy without a
+// documented secret in both target environments.
+const REQUIRED_DEPLOYMENT_SECRETS = new Set([
+    'VERCEL_WEBHOOK_SECRET',
 ])
 
 // ─── Parse env vars from a file ──────────────────────────────────
@@ -84,13 +91,11 @@ function main() {
     }
 
     const newVars = getNewEnvVarsFromDiff()
-
-    if (newVars.size === 0) {
-        console.log('\n[env-check] ✅ No new environment variables detected in PR')
-        process.exit(0)
+    for (const varName of REQUIRED_DEPLOYMENT_SECRETS) {
+        newVars.set(varName, 'required deployment secret')
     }
 
-    console.log(`\n[env-check] Found ${newVars.size} env var(s) in PR diff:`)
+    console.log(`\n[env-check] Checking ${newVars.size} env var(s):`)
     for (const [v] of newVars) {
         console.log(`   process.env.${v}`)
     }
@@ -132,7 +137,7 @@ function main() {
         process.exit(1)
     }
 
-    console.log('\n[env-check] ✅ All new env vars registered in staging + production env files')
+    console.log('\n[env-check] ✅ All required env vars registered in staging + production env files')
     process.exit(0)
 }
 

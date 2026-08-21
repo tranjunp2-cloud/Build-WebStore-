@@ -1,6 +1,6 @@
 /**
  * Unit Tests: buildMediaKey — server-minted, collision-safe S3 key for direct
- * video upload (GH-1284). Key must be flat, sanitized, and never trust the
+ * media upload. Key must be flat, sanitized, and never trust the
  * client's path or extension.
  * TC-IDs: TC-F30-HMO-013
  * QA doc: docs/qa/F30-hero-media-overlay.md
@@ -20,6 +20,18 @@ describe('TC-F30-HMO-013: buildMediaKey sanitizes and scopes the S3 key', () => 
     it('takes the extension from the mime, not the original filename', () => {
         const key = buildMediaKey({ userId: 1, filename: 'clip.exe', mime: 'video/webm' })
         expect(key.endsWith('.webm')).toBe(true)
+        expect(key).not.toContain('.exe')
+    })
+
+    it.each([
+        ['image/jpeg', 'jpg'],
+        ['image/png', 'png'],
+        ['image/webp', 'webp'],
+        ['image/x-icon', 'ico'],
+        ['image/vnd.microsoft.icon', 'ico'],
+    ])('supports direct image uploads for %s', (mime, extension) => {
+        const key = buildMediaKey({ userId: 1, filename: 'store-logo.exe', mime })
+        expect(key.endsWith(`.${extension}`)).toBe(true)
         expect(key).not.toContain('.exe')
     })
 

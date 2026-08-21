@@ -5,6 +5,8 @@ import { GET as EditorDataGET } from '@/app/api/sites/[siteId]/editor-data/route
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription } from '@/lib/subscriptions/plan-subscription'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => {
@@ -17,6 +19,15 @@ vi.mock('@/lib/auth', () => {
         getCurrentUser: vi.fn().mockResolvedValue(user),
     }
 })
+
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockResolvedValue({
+        allowed: true, remaining: 59, resetAt: Date.now() + 60_000,
+    }),
+    checkTwoTierRateLimit: vi.fn().mockResolvedValue({
+        allowed: true, remaining: 59, resetAt: Date.now() + 60_000,
+    }),
+}))
 
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
@@ -139,6 +150,43 @@ describe('Sites APIs', () => {
             }))
         })
 
+        it('[TC-F37-01-28] rejects cross-tenant Minimal Business Data before persistence', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as never })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({
+                id: 'site-123',
+                status: 'draft',
+                tenant: 'tenant-2',
+            } as never)
+            const req = new NextRequest('http://localhost:3000/api/sites/site-123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    siteName: 'Kedai Tenant Dua',
+                    contactInfo: { phone: '+60 12-345 6789' },
+                    localBusiness: {
+                        streetAddress: '12 Jalan Ampang',
+                        city: 'Kuala Lumpur',
+                        postcode: '50450',
+                        country: 'MY',
+                    },
+                }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            // Act
+            const res = await SavePATCH(req, {
+                params: Promise.resolve({ siteId: 'site-123' }),
+            })
+            const result = await res.json()
+
+            // Assert
+            expect(res.status).toBe(403)
+            expect(result).toEqual({ error: 'Forbidden' })
+            expect(checkRateLimit).toHaveBeenCalledWith('save:user-1', 60, 60_000)
+            expect(payload.update).not.toHaveBeenCalled()
+            expect(getActivePlanSubscription).not.toHaveBeenCalled()
+        })
+
         it('allows saving header navigation with empty destination (draft link)', async () => {
             const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
                 method: 'PATCH',
@@ -167,6 +215,127 @@ describe('Sites APIs', () => {
 
             const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
             expect(res.status).toBe(400)
+        })
+
+        it('[TC-F37-02-31] rejects a sparse category patch that conflicts with persisted subtype and performs zero writes', async () => {
+            // Arrange
+            const update = vi.fn()
+            const payload = {
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123', tenant: 'tenant-1',
+                    localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya' },
+                }),
+                update,
+            }
+            vi.mocked(getPayload).mockResolvedValueOnce(payload as unknown as Awaited<ReturnType<typeof getPayload>>)
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH', body: JSON.stringify({ localBusiness: { businessCategory: 'store' } }),
+            })
+
+            // Act
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+
+            // Assert
+            expect(res.status).toBe(400)
+            expect(await res.json()).toMatchObject({ error: 'Invalid local business data' })
+            expect(update).not.toHaveBeenCalled()
+        })
+
+        it('[TC-F37-02-31] validates and persists one merged effective group for a valid sparse patch', async () => {
+            // Arrange
+            const update = vi.fn().mockResolvedValue({ id: '123' })
+            const payload = {
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123', tenant: 'tenant-1',
+                    localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya' },
+                }),
+                update,
+            }
+            vi.mocked(getPayload).mockResolvedValueOnce(payload as unknown as Awaited<ReturnType<typeof getPayload>>)
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH', body: JSON.stringify({ localBusiness: { priceRange: '$$' } }),
+            })
+
+            // Act
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(update).toHaveBeenCalledTimes(1)
+            expect(update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'sites', id: '123',
+                data: expect.objectContaining({
+                    localBusiness: expect.objectContaining({ businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya', priceRange: '$$' }),
+                }),
+            }))
+        })
+
+        it('[TC-F37-02-31] self-heals persisted legacy opening hours before validating a sparse patch', async () => {
+            // Arrange
+            const update = vi.fn().mockResolvedValue({ id: '123' })
+            const payload = {
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123',
+                    tenant: 'tenant-1',
+                    localBusiness: {
+                        businessCategory: 'foodEstablishment',
+                        schemaSubtype: 'Bakery',
+                        openingHours: [{ dayOfWeek: 'Tu' }],
+                    },
+                }),
+                update,
+            }
+            vi.mocked(getPayload).mockResolvedValueOnce(
+                payload as unknown as Awaited<ReturnType<typeof getPayload>>,
+            )
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({ localBusiness: { priceRange: '$$' } }),
+            })
+
+            // Act
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'sites',
+                id: '123',
+                data: expect.objectContaining({
+                    localBusiness: expect.objectContaining({
+                        priceRange: '$$',
+                        openingHours: [{ dayOfWeek: 'Tu', isClosed: true }],
+                    }),
+                }),
+            }))
+        })
+
+        it('[TC-F37-02-31] rejects an invalid pageId before persisting mixed LocalBusiness changes', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as never })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({
+                id: '123',
+                tenant: 'tenant-1',
+                localBusiness: {
+                    businessCategory: 'foodEstablishment',
+                    schemaSubtype: 'Bakery',
+                },
+            } as never)
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save?pageId=not-a-page', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    blocks: [{ blockType: 'hero', headline: 'Must not persist partially' }],
+                    localBusiness: { priceRange: '$$' },
+                }),
+            })
+
+            // Act
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+
+            // Assert
+            expect(res.status).toBe(400)
+            expect(await res.json()).toEqual({ error: 'Invalid pageId' })
+            expect(payload.update).not.toHaveBeenCalled()
         })
     })
 

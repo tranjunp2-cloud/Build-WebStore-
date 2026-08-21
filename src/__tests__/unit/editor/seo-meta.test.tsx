@@ -19,6 +19,9 @@ vi.mock('sonner', () => ({
         loading: vi.fn(),
         success: vi.fn(),
         error: vi.fn(),
+        warning: vi.fn(),
+        info: vi.fn(),
+        dismiss: vi.fn(),
     },
 }))
 
@@ -28,6 +31,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        ;(toast.loading as Mock).mockReturnValue('seo-loading')
     })
 
     describe('SettingsPanel SEO Controls', () => {
@@ -53,11 +57,11 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             const titleInput = screen.getByDisplayValue('SEO Title') as HTMLInputElement
             
             fireEvent.change(titleInput, { target: { value: 'This is a very long title that exceeds the recommended sixty characters soft limit for google search engine optimization' }})
-            expect(screen.getByText('Title may be truncated on Google Search.')).toBeInTheDocument()
+            expect(screen.getByText('This title may be cut off in Google search results.')).toBeInTheDocument()
 
             const descInput = screen.getByDisplayValue('SEO Desc') as HTMLTextAreaElement
             fireEvent.change(descInput, { target: { value: 'A'.repeat(161) }})
-            expect(screen.getByText('Description may be truncated on Google Search.')).toBeInTheDocument()
+            expect(screen.getByText('This description may be cut short in Google Search.')).toBeInTheDocument()
         })
 
         it('TC-F05.29b: Auto-Gen AI LLM API Call flow', async () => {
@@ -79,7 +83,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             )
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
             
-            const aiButton = screen.getByText('Automatic SEO Optimization')
+            const aiButton = screen.getByText('Automatic SEO optimization')
             
             ;(global.fetch as Mock).mockResolvedValueOnce({
                 ok: true,
@@ -92,11 +96,11 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
 
             fireEvent.click(aiButton)
 
-            expect(toast.loading).toHaveBeenCalledWith('Generating SEO optimization using AI...')
+            expect(toast.loading).toHaveBeenCalledWith('Generating SEO with AI...')
             expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-1/pages/page-1/generate-seo', expect.any(Object))
 
             await waitFor(() => {
-                expect(toast.success).toHaveBeenCalledWith('SEO optimization successfully generated!', expect.any(Object))
+                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.', expect.any(Object))
             })
             
             // Because onPageUpdate resolves mocked state, local variables sync.
@@ -105,6 +109,117 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                  expect(screen.getByDisplayValue('Generated Title')).toBeInTheDocument()
                  expect(screen.getByDisplayValue('Generated Description')).toBeInTheDocument()
             })
+        })
+
+        it('shows a styled comparison dialog and leaves metadata unchanged when cancelled', async () => {
+            const onPageUpdate = vi.fn()
+            const confirmSpy = vi.spyOn(window, 'confirm')
+
+            render(
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
+                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
+                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
+                        currentPageId="page-1"
+                        pages={[{ id: 'page-1', title: 'About', slug: 'about', isHomepage: false, seoTitle: 'Existing Title', seoDescription: 'Existing Description' }] as unknown as React.ComponentProps<typeof SettingsPanel>['pages']}
+                        onPageUpdate={onPageUpdate}
+                    />
+                </I18nProvider>
+            )
+
+            ;(global.fetch as Mock).mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    hasExisting: true,
+                    existing: {
+                        title: 'Existing Title',
+                        description: 'Existing Description',
+                    },
+                    proposed: {
+                        title: 'Proposed Title',
+                        description: 'Proposed Description',
+                        slug: 'proposed-about',
+                    },
+                }),
+            })
+
+            fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
+            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
+
+            const dialog = await screen.findByRole('dialog', { name: 'Replace existing SEO metadata?' })
+            expect(dialog).toBeInTheDocument()
+            expect(screen.getByTestId('seo-current-title')).toHaveTextContent('Existing Title')
+            expect(screen.getByTestId('seo-proposed-title')).toHaveTextContent('Proposed Title')
+            expect(screen.getByTestId('seo-current-description')).toHaveTextContent('Existing Description')
+            expect(screen.getByTestId('seo-proposed-description')).toHaveTextContent('Proposed Description')
+            expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+            expect(confirmSpy).not.toHaveBeenCalled()
+            expect(toast.dismiss).toHaveBeenCalledWith('seo-loading')
+
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+            await waitFor(() => {
+                expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
+            })
+            expect(onPageUpdate).not.toHaveBeenCalled()
+            expect(toast.info).toHaveBeenCalledWith('SEO changes discarded')
+        })
+
+        it('applies the proposed metadata only after overwrite confirmation', async () => {
+            let mockPage = {
+                id: 'page-1',
+                title: 'About',
+                slug: 'about',
+                isHomepage: false,
+                seoTitle: 'Existing Title',
+                seoDescription: 'Existing Description',
+            }
+            const onPageUpdate = vi.fn().mockImplementation(async (_id, changes) => {
+                mockPage = { ...mockPage, ...changes }
+                return mockPage
+            })
+
+            render(
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
+                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
+                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
+                        currentPageId="page-1"
+                        pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
+                        onPageUpdate={onPageUpdate}
+                    />
+                </I18nProvider>
+            )
+
+            ;(global.fetch as Mock).mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    hasExisting: true,
+                    existing: {
+                        title: 'Existing Title',
+                        description: 'Existing Description',
+                    },
+                    proposed: {
+                        title: 'Proposed Title',
+                        description: 'Proposed Description',
+                        slug: 'proposed-about',
+                    },
+                }),
+            })
+
+            fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
+            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
+            fireEvent.click(await screen.findByRole('button', { name: 'Replace SEO' }))
+
+            await waitFor(() => {
+                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoTitle: 'Proposed Title' })
+                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoDescription: 'Proposed Description' })
+                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { slug: 'proposed-about' })
+                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.')
+            })
+            expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
         })
     })
 

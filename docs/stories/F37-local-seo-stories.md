@@ -15,7 +15,7 @@
 
 ```
 As a   SME seller
-I want to enter my name, structured address, and phone in the Editor
+I want to enter my name, contact address, local area details, and phone in the Editor
 So that my site has the required local business facts and earns Business Data points
 ```
 
@@ -25,9 +25,11 @@ So that my site has the required local business facts and earns Business Data po
 
 ```gherkin
 GIVEN the seller is on Editor Settings Global
-WHEN they save a name, street, city, postcode, country, and phone
+WHEN they save a name, Contact Info address, city, state, postcode, and phone
 THEN Business Data points for those fields are earned on the next score calculation
   AND the fields persist on reload
+  AND Local Business Info does not duplicate Street Address or Country
+  AND schema country is implicitly Malaysia (`MY`)
 ```
 
 #### AC-2: Score partial business data
@@ -58,14 +60,14 @@ THEN save is rejected with validation feedback
 
 ## US-F37-02: Schema-Rich Local Markup
 
-**Wave 4** | **P0** | **M** | **Status:** Ready
+**Wave 4** | **P0** | **M** | **Status:** In progress — Phase 00–02 built/tested; Phase 03 acceptance pending
 
 ### Story
 
 ```
 As a   SME seller
-I want hours, category, map coordinates, price range, and FAQ content to power JSON-LD
-So that search and AI systems receive complete LocalBusiness and FAQPage markup and I earn Schema points
+I want hours, business category, a compatible schema subtype, map coordinates, and price range to power JSON-LD
+So that search and AI systems receive complete LocalBusiness and Organization markup and I earn Schema points
 ```
 
 ### Acceptance Criteria
@@ -73,19 +75,19 @@ So that search and AI systems receive complete LocalBusiness and FAQPage markup 
 #### AC-1: Emit complete LocalBusiness markup
 
 ```gherkin
-GIVEN name and address, at least one open-hours row, a specific category, valid latitude and longitude, and priceRange
+GIVEN name and address, business category, a compatible specific schema subtype, at least one open-hours row, valid latitude and longitude, and priceRange
 WHEN the storefront homepage is rendered
-THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and a non-generic @type
+THEN LocalBusiness JSON-LD includes PostalAddress, openingHoursSpecification, geo, priceRange, and the selected @type
   AND the corresponding Schema points are earned
 ```
 
-#### AC-2: Emit FAQPage markup
+#### AC-2: Omit unusable opening hours
 
 ```gherkin
-GIVEN a page with FAQ block items
-WHEN that page is rendered
-THEN FAQPage JSON-LD is present
-  AND FAQ Schema points are earned
+GIVEN all opening-hours rows are closed or incomplete
+WHEN score calculation and JSON-LD emission run
+THEN openingHoursSpecification is omitted
+  AND opening-hours points are 0 while other valid Schema points remain earned
 ```
 
 #### AC-3: Omit incomplete coordinates safely
@@ -97,11 +99,25 @@ THEN geo is omitted from JSON-LD
   AND Geo points are 0 without a crash
 ```
 
+#### AC-4: Reject an incompatible subtype
+
+```gherkin
+GIVEN a schema subtype is incompatible with the selected business category
+WHEN the seller saves
+THEN the save is rejected and the previous valid pair remains
+  AND the invalid @type is not emitted
+```
+
 ### Definition of Done
 
-- [ ] FR-04 through FR-12 emit only valid, safely serialized tenant-storefront schema.
-- [ ] The score maps every Schema criterion in PRD section 5 point-for-point.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [x] FR-04 through FR-11 emit only valid, safely serialized tenant-storefront schema.
+- [x] Schema score maps the eight approved criteria to exactly 35 points; FAQ is not scored.
+- [x] Category/subtype persistence, filtering, atomic save, server validation, and generic fallback match the `@dominvopc`-approved versioned mapping.
+- [x] TC-F37-02-29..48 automated coverage passes locally. The TC-F37-02-48 targeted gate passes 65/65; a broader related run has 245 passing assertions, while 3 DB-backed schema-drift checks are environment-blocked because PostgreSQL is not running. The migration suite passes 24/24.
+- [x] TC-F37-02-45 automation discovers the authenticated account sole site, derives the canonical storefront URL from the tenant route/hostname, and asserts emitted schema URLs are non-empty and equal that canonical URL; it uses the existing email, password, and OTP credentials and does not require `E2E_SITE_ID`.
+- [x] TC-F37-02-47 covers rejected settings-save rollback, newer-revision preservation, and late cross-site failure isolation in `publish-flow.test.tsx` (21/21 local).
+- [x] TC-F37-02-48 covers normalized response-loss reconciliation, a bounded 5-second reconciliation timeout, unknown-outcome caller failure and cross-mount UI lock, queued-revision removal, and combined subtype a11y descriptions.
+- [ ] Execute TC-F37-02-45 against the owned staging fixture and capture manual Google Rich Results evidence. PR #1708 is not a dependency or blocker; reconcile it only if it lands first.
 
 ---
 
@@ -113,81 +129,89 @@ THEN geo is omitted from JSON-LD
 
 ```
 As a   SME seller
-I want AI crawler access on by default, with opt-out, and publishing to expose sitemap and llms.txt
-So that AI Discoverability points reflect real crawl access
+I want the platform to maintain AI crawler access automatically and publish to expose sitemap and llms.txt
+So that discoverability does not require technical settings
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Expose published-storefront discovery endpoints
+#### AC-01: Published storefront exposes every discovery signal
 
 ```gherkin
-GIVEN a published site with AI crawlers enabled by default
-WHEN robots.txt, sitemap.xml, and llms.txt are requested for the storefront
-THEN AI bots are allowed
-  AND sitemap returns URLs and llms.txt returns Markdown
-  AND full AI Discoverability points are available
+GIVEN a published storefront
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawlers are allowed
+  AND sitemap returns current URLs
+  AND llms.txt returns Markdown
 ```
 
-#### AC-2: Let the seller opt out of AI crawlers
+#### AC-02: Unpublished storefront hides publish-only discovery files
 
 ```gherkin
-GIVEN the seller turns AI crawlers off
-WHEN robots.txt is fetched
-THEN configured AI user-agents are disallowed
-  AND AI crawler points are 0
+GIVEN a storefront is not published
+WHEN robots.txt, sitemap.xml, and llms.txt are requested
+THEN approved AI assistant crawler access remains allowed
+  AND sitemap returns 404
+  AND llms.txt returns 404
 ```
 
-#### AC-3: Do not count an unpublished sitemap
+#### AC-03: Discovery endpoint failures are independent
 
 ```gherkin
-GIVEN the site is not published
-WHEN sitemap availability is evaluated
-THEN sitemap is not available as a present signal
-  AND Sitemap points are 0
+GIVEN a published storefront cannot serve sitemap.xml or llms.txt
+WHEN the discovery endpoints are requested
+THEN the other available discovery endpoints keep their normal behavior
+  AND no seller-facing resubmit control is shown
 ```
+
+> **Score ownership: #1312** — US-F37-04 consumes these route facts, awards crawler/sitemap/llms exactly 9/5/1, and integrates the approved 100-point scorecard. Score-engine changes are not part of #1311.
 
 ### Definition of Done
 
-- [ ] FR-13 through FR-15 work only below `/sites/[slug]/*`.
-- [ ] Robots, sitemap, and llms.txt behaviour is covered for published, unpublished, and opt-out states.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [ ] FR-12 through FR-14 expose platform-managed robots, sitemap, and llms.txt below `/sites/[slug]/*` and through supported storefront host rewrites.
+- [ ] Approved AI assistant crawlers are always allowed; no seller toggle, resubmit action, or SEO Action Tools section remains.
+- [ ] Published, unpublished, legacy-value, and independent endpoint-failure states have automated coverage.
+- [ ] The route/UI acceptance criteria above have automated or manual coverage; the score handoff is documented for #1312.
 
 ---
 
 ## US-F37-04: Score, Checklist, and Fix Loop
 
-**Wave 4** | **P0** | **M** | **Status:** Ready
+**Wave 4** | **P0** | **M** | **Status:** Implemented; Phase 3 local gates pass — live release closeout pending
+
+> **Phase 3 local verification (2026-08-06):** The production Dashboard consumes the authenticated authoritative 20/35/15/30 score, renders every deduplicated seller action without truncation, loads one field-filtered next-100 metadata-only AI batch, and deep-links to allowlisted Editor settings. Proposal/apply is active-membership, exact-site, revision, per-target-CAS, strict-request, user-wide 20/minute and 100/hour plus per-site 2/minute and 10/hour rate-limit guarded; partial Undo remains retryable through a newly signed continuation. The exact post-CAS state passes full local Vitest (701 files / 11,687 tests; one file / three tests skipped), typecheck, lint, an isolated 112/112-page build, the 1,001-record/28-query scale regression, and Playwright discovery. Current-code authenticated browser execution, fixture reset/checksum, p95, canary/rollback, and Story Sync #1312 remain pending.
 
 ### Story
 
 ```
 As a   SME seller
-I want a Local SEO score and up to three next actions
-So that I know what to edit in the Editor, or when F03 AI Fix All can improve page meta only, to improve the score
+I want one SEO Health score and a compact list of unresolved root causes
+So that I can use AI only for metadata and reach the exact destination for every seller-owned fix
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Show a complete score
+#### AC-01: Show a complete score
 
 ```gherkin
 GIVEN a site with all score criteria met
-WHEN the seller opens Dashboard > SEO
-THEN the Local SEO score is 100
-  AND the checklist has zero incomplete high-priority local items
+WHEN seller opens Dashboard > SEO
+THEN the single SEO Health score is 100
+  AND SEO Issues shows All clear
 ```
 
-#### AC-2: Identify technical deductions
+#### AC-02: Show every unresolved seller root cause
 
 ```gherkin
-GIVEN a missing OG image and one bad slug
+GIVEN unresolved metadata and seller-owned issues
 WHEN the score runs
-THEN Technical Health reflects only the OG and slug deductions
-  AND the checklist includes an item deep-linking to Editor SEO for the OG image or slug
+THEN each root cause appears once with an AI or You badge
+  AND each row uses its approved CTA and destination
 ```
 
-#### AC-3: Handle unauthorized score requests
+> **Scope note:** OG image and page URL slug remain Editor → SEO controls. They are not Local SEO score inputs, Technical Health deductions, or SEO Health checklist root causes.
+
+#### AC-03: Handle unauthorized score requests
 
 ```gherkin
 GIVEN the score API request is unauthorized
@@ -196,25 +220,45 @@ THEN the API returns 401 or 403
   AND Dashboard shows an error state without inventing a score number
 ```
 
-#### AC-4: Deep-link a Local Business fix
+#### AC-04: Deep-link a Local Business fix
 
 ```gherkin
-GIVEN a checklist item for a missing Local Business field
-WHEN the seller clicks its action
-THEN the Editor opens focused on the relevant Settings section
+GIVEN an issue for a missing business address
+WHEN the seller clicks Edit
+THEN the Editor opens focused on Contact Info Address
+  AND Local Business Info does not render duplicate Street Address or Country controls
 ```
 
-#### AC-5: Keep F03 AI Fix All meta-only
+#### AC-05: Keep F03 AI Fix All metadata-only
 
 ```gherkin
-GIVEN only page metadata is missing
+GIVEN at least one title or description is missing
 WHEN the seller runs F03 AI Fix All
-THEN page metadata is proposed or applied
+THEN only those metadata records are proposed or applied
   AND Local Business fields remain unchanged
+```
+
+#### AC-06: Deduplicate derived metrics
+
+```gherkin
+GIVEN multiple score metrics depend on one missing source field
+WHEN issues render
+THEN the seller sees one root-cause row
+  AND no duplicate row is created for derived schema metrics
+```
+
+#### AC-07: Hide unavailable AI actions
+
+```gherkin
+GIVEN no AI-fixable metadata issue remains
+WHEN issues render
+THEN the AI Fix All strip is hidden
 ```
 
 ### Definition of Done
 
-- [ ] FR-16 through FR-20 implement the PRD section 5 formula exactly and return score plus breakdown through the authenticated API.
-- [ ] Dashboard shows no more than three Editor deep-links and distinguishes its score checklist from the Editor completion checklist.
-- [ ] The corresponding acceptance criteria have automated or manual coverage.
+- [x] FR-15 through FR-21 implement the PRD section 5 formula exactly and return score plus four-bucket breakdown through the authenticated API.
+- [x] Dashboard shows one score, four qualitative bucket bars, and every deduplicated unresolved seller root cause without per-issue point values or a max-three cap.
+- [x] Every issue uses the actor, CTA, and destination contract in PRD section 12.3; AI Fix is conditional, metadata-only, revision-bound, and capped to the next 100 records.
+- [x] AC-01 through AC-07 have local automated coverage and a discovered three-case authenticated Playwright spec.
+- [ ] Current-code authenticated and live score-100, more-than-seven-issues, API-error/race/apply, 375px, and fixture restoration evidence remain pending.

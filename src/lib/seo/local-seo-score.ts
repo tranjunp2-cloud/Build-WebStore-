@@ -1,91 +1,210 @@
 /**
- * Local SEO Score — F37 US-01. Points-subtraction model (start 100, deduct
- * for missing signals), mirroring `technical-score.ts`. Phase 1 buckets sum
- * to 100: Business Data 35 / Structured Data 30 / AI Discoverability 20 /
- * Technical Health 15 (per PRD §13.8).
+ * Authoritative F37 Local SEO score.
  *
- * AI Discoverability = allowsSearchBots (12) + sitemapPresent (8) — matches
- * PRD §13.8 EXACTLY. There is deliberately NO "blocks suspicious bots"
- * sub-signal: the PRD explicitly forbids one (§13.8 note) because it
- * contradicts BR-03 (AI crawlers must default to ALLOW) — rewarding both
- * "let bots crawl" and "block bots" would be internally contradictory.
- * (researcher-02-json-ld-and-scoring.md Part 4/5 proposed a 3-signal
- * 10/5/5 split including that forbidden sub-signal — that research doc
- * diverges from the canonical PRD and was NOT followed here.)
- *
- * Saving address + hours + category raises the score by ≥20pts vs. a bare
- * site (AC-1): LocalBusiness schema present (+10) + hours (+5) + industry
- * subtype (+5) = +20.
+ * The four buckets are activated together so a displayed score can never mix
+ * the legacy dashboard formula with the F37 Business/Schema contracts.
  */
 
-export interface LocalSeoScoreInput {
-    // Business Data (35pts = 7 signals x 5pts)
-    businessName: boolean
-    address: boolean
-    phone: boolean
-    hours: boolean
-    category: boolean
-    website: boolean
-    description: boolean
-    // Structured Data (30pts)
-    localBusinessSchema: boolean
-    industrySubtype: boolean
-    faqSchema: boolean
-    orgSchema: boolean
-    // AI Discoverability (20pts) — allowsSearchBots(12) + sitemapPresent(8), per PRD §13.8
-    allowsSearchBots: boolean
+export interface BusinessDataScoreInput {
+    businessName: string | null | undefined
+    streetAddress: string | null | undefined
+    city: string | null | undefined
+    postcode: string | null | undefined
+    country: string | null | undefined
+    phone: string | null | undefined
+}
+
+export interface BusinessDataScoreResult {
+    score: number
+    breakdown: {
+        name: number
+        address: number
+        phone: number
+    }
+}
+
+/**
+ * Pure US-F37-01 v2 Business Data score. Presence checks trim strings, while
+ * address credit is all-or-nothing across the four required structured parts.
+ */
+export function calculateBusinessDataScore(
+    input: BusinessDataScoreInput,
+): BusinessDataScoreResult {
+    const isPresent = (value: string | null | undefined) =>
+        Boolean(value?.trim())
+
+    const name = isPresent(input.businessName) ? 7 : 0
+    const address = [
+        input.streetAddress,
+        input.city,
+        input.postcode,
+        input.country,
+    ].every(isPresent)
+        ? 8
+        : 0
+    const phone = isPresent(input.phone) ? 5 : 0
+
+    return {
+        score: name + address + phone,
+        breakdown: { name, address, phone },
+    }
+}
+
+export const LOCAL_SEO_BUCKET_MAX = {
+    businessData: 20,
+    schema: 35,
+    aiDiscoverability: 15,
+    technicalHealth: 30,
+} as const
+
+export interface AiDiscoverabilityScoreInput {
+    approvedAiCrawlersAllowed: boolean
     sitemapPresent: boolean
-    // Technical Health (15pts)
-    coreWebVitals: number // 0-100
-    mobileResponsive: boolean
-    httpsEnabled: boolean
+    llmsTxtReachable: boolean
+}
+
+export interface TechnicalHealthScoreInput {
+    eligibleMetadataCount: number
+    metaTitleCount: number
+    metaDescriptionCount: number
+    contentQualityScore: number
+    googleVerificationConfigured: boolean
+    eligiblePageCount: number
+    indexablePageCount: number
+}
+
+export interface LocalSeoScoreInput {
+    businessDataScore: number
+    schemaScore: number
+    aiDiscoverability: AiDiscoverabilityScoreInput
+    technicalHealth: TechnicalHealthScoreInput
 }
 
 export interface LocalSeoScoreBreakdown {
     businessData: number
-    structuredData: number
+    schema: number
     aiDiscoverability: number
     technicalHealth: number
+}
+
+export interface AiDiscoverabilityScoreBreakdown {
+    approvedAiCrawlersAllowed: number
+    sitemapPresent: number
+    llmsTxtReachable: number
+}
+
+export interface TechnicalHealthScoreBreakdown {
+    metaTitleCoverage: number
+    metaDescriptionCoverage: number
+    contentQuality: number
+    googleVerification: number
+    indexability: number
 }
 
 export interface LocalSeoScoreResult {
     score: number
     breakdown: LocalSeoScoreBreakdown
+    details: {
+        aiDiscoverability: AiDiscoverabilityScoreBreakdown
+        technicalHealth: TechnicalHealthScoreBreakdown
+    }
 }
 
-export function calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult {
-    let businessData = 35
-    if (!input.businessName) businessData -= 5
-    if (!input.address) businessData -= 5
-    if (!input.phone) businessData -= 5
-    if (!input.hours) businessData -= 5
-    if (!input.category) businessData -= 5
-    if (!input.website) businessData -= 5
-    if (!input.description) businessData -= 5
-    businessData = Math.max(0, businessData)
+function clampInteger(value: number, maximum: number): number {
+    if (!Number.isFinite(value)) return 0
+    return Math.min(maximum, Math.max(0, Math.floor(value)))
+}
 
-    let structuredData = 30
-    if (!input.localBusinessSchema) structuredData -= 10
-    if (!input.industrySubtype) structuredData -= 5
-    if (!input.faqSchema) structuredData -= 8
-    if (!input.orgSchema) structuredData -= 7
-    structuredData = Math.max(0, structuredData)
+export function calculateCoveragePoints(
+    completed: number,
+    eligible: number,
+    maximum: number,
+): number {
+    const safeEligible = clampInteger(eligible, Number.MAX_SAFE_INTEGER)
+    if (safeEligible === 0) return 0
+    const safeCompleted = Math.min(
+        safeEligible,
+        clampInteger(completed, Number.MAX_SAFE_INTEGER),
+    )
+    return Math.floor((maximum * safeCompleted) / safeEligible)
+}
 
-    let aiDiscoverability = 20
-    if (!input.allowsSearchBots) aiDiscoverability -= 12
-    if (!input.sitemapPresent) aiDiscoverability -= 8
-    aiDiscoverability = Math.max(0, aiDiscoverability)
+export function calculateAiDiscoverabilityScore(
+    input: AiDiscoverabilityScoreInput,
+): { score: number; breakdown: AiDiscoverabilityScoreBreakdown } {
+    const breakdown: AiDiscoverabilityScoreBreakdown = {
+        approvedAiCrawlersAllowed: input.approvedAiCrawlersAllowed ? 9 : 0,
+        sitemapPresent: input.sitemapPresent ? 5 : 0,
+        llmsTxtReachable: input.llmsTxtReachable ? 1 : 0,
+    }
+    return {
+        score: Object.values(breakdown).reduce(
+            (total, value) => total + value,
+            0,
+        ),
+        breakdown,
+    }
+}
 
-    let technicalHealth = 15
-    if (!Number.isFinite(input.coreWebVitals) || input.coreWebVitals < 80) technicalHealth -= 8
-    if (!input.mobileResponsive) technicalHealth -= 4
-    if (!input.httpsEnabled) technicalHealth -= 3
-    technicalHealth = Math.max(0, technicalHealth)
+export function calculateTechnicalHealthScore(
+    input: TechnicalHealthScoreInput,
+): { score: number; breakdown: TechnicalHealthScoreBreakdown } {
+    const breakdown: TechnicalHealthScoreBreakdown = {
+        metaTitleCoverage: calculateCoveragePoints(
+            input.metaTitleCount,
+            input.eligibleMetadataCount,
+            8,
+        ),
+        metaDescriptionCoverage: calculateCoveragePoints(
+            input.metaDescriptionCount,
+            input.eligibleMetadataCount,
+            8,
+        ),
+        contentQuality: Math.floor(
+            (clampInteger(input.contentQualityScore, 100) * 8) / 100,
+        ),
+        googleVerification: input.googleVerificationConfigured ? 3 : 0,
+        indexability: calculateCoveragePoints(
+            input.indexablePageCount,
+            input.eligiblePageCount,
+            3,
+        ),
+    }
+    return {
+        score: Object.values(breakdown).reduce(
+            (total, value) => total + value,
+            0,
+        ),
+        breakdown,
+    }
+}
 
-    const score = businessData + structuredData + aiDiscoverability + technicalHealth
+export function calculateLocalSeoScore(
+    input: LocalSeoScoreInput,
+): LocalSeoScoreResult {
+    const businessData = clampInteger(
+        input.businessDataScore,
+        LOCAL_SEO_BUCKET_MAX.businessData,
+    )
+    const schema = clampInteger(input.schemaScore, LOCAL_SEO_BUCKET_MAX.schema)
+    const aiDiscoverability = calculateAiDiscoverabilityScore(
+        input.aiDiscoverability,
+    )
+    const technicalHealth = calculateTechnicalHealthScore(input.technicalHealth)
+    const score =
+        businessData + schema + aiDiscoverability.score + technicalHealth.score
 
     return {
         score: Math.max(0, Math.min(100, score)),
-        breakdown: { businessData, structuredData, aiDiscoverability, technicalHealth },
+        breakdown: {
+            businessData,
+            schema,
+            aiDiscoverability: aiDiscoverability.score,
+            technicalHealth: technicalHealth.score,
+        },
+        details: {
+            aiDiscoverability: aiDiscoverability.breakdown,
+            technicalHealth: technicalHealth.breakdown,
+        },
     }
 }

@@ -501,7 +501,16 @@ export const Orders: CollectionConfig = {
         {
             name: 'pickupScheduledAt',
             type: 'date',
-            admin: { description: 'Chosen courier pickup date/slot (persisted when merchant schedules pickup)' },
+            admin: { description: 'Chosen EasyParcel collection date (used for pickup and drop-off labels)' },
+        },
+        {
+            name: 'collectionMethod',
+            type: 'select',
+            options: [
+                { label: 'Pickup', value: 'pickup' },
+                { label: 'Drop-off', value: 'dropoff' },
+            ],
+            admin: { description: 'Collection method selected when the EasyParcel label was created' },
         },
         {
             name: 'pickupSlot',
@@ -531,6 +540,44 @@ export const Orders: CollectionConfig = {
                 { name: 'status', type: 'text' },
                 { name: 'description', type: 'text' },
                 { name: 'eventTime', type: 'date' },
+                {
+                    name: 'collectionMethod',
+                    type: 'select',
+                    options: [
+                        { label: 'Pickup', value: 'pickup' },
+                        { label: 'Drop-off', value: 'dropoff' },
+                    ],
+                    admin: { description: 'Collection method snapshot for this tracking event' },
+                },
+                {
+                    name: 'source',
+                    type: 'select',
+                    options: [
+                        { label: 'EasyParcel', value: 'easyparcel' },
+                        { label: 'CMS Manual', value: 'cms_manual' },
+                    ],
+                    admin: { hidden: true, description: 'Origin of this fulfillment event' },
+                },
+                {
+                    name: 'actorId',
+                    type: 'text',
+                    admin: { hidden: true, description: 'User ID that performed a manual fulfillment action' },
+                },
+                {
+                    name: 'actorLabel',
+                    type: 'text',
+                    admin: { hidden: true, description: 'User label snapshot retained for fulfillment audit' },
+                },
+                {
+                    name: 'previousStatus',
+                    type: 'text',
+                    admin: { hidden: true, description: 'Order status before this manual fulfillment action' },
+                },
+                {
+                    name: 'nextStatus',
+                    type: 'text',
+                    admin: { hidden: true, description: 'Order status after this manual fulfillment action' },
+                },
             ],
         },
         // --- Cancellation ---

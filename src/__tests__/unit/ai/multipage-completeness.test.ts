@@ -75,12 +75,13 @@ describe('TC-F01-W.22 — About page weaves biz.description', () => {
 })
 
 describe('TC-F01-W.23 — Contact page user fields + FAQ (GH-820: google-maps temporarily disabled)', () => {
-  it('Contact page has ≥5 blocks (nav + hero + contact + faq + footer)', () => {
+  it('Contact page stays compact with navigation, contact, FAQ, and footer', () => {
     const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
     const contact = getPage(result, 'Contact')
     expect(contact).toBeDefined()
     const blocks = getBlocks(contact)
-    expect(blocks.length).toBeGreaterThanOrEqual(5)
+    expect(blocks.length).toBeGreaterThanOrEqual(4)
+    expect(blocks.length).toBeLessThanOrEqual(5)
   })
 
   it('contact block has user phone/email/address verbatim', () => {

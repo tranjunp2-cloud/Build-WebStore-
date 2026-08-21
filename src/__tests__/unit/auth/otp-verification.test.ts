@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { SignJWT } from 'jose'
 import { Users } from '../../../collections/Users'
 import { PayloadRequest } from 'payload'
 
@@ -197,6 +198,7 @@ describe('OTP Verification Endpoints', () => {
                 docs: [{
                     id: 1,
                     email: 'test@test.com',
+                    roles: ['super-admin'],
                     otpHash: 'hashed_123456',
                     // Expired 1 minute ago
                     otpExpiresAt: new Date(Date.now() - 60 * 1000).toISOString()
@@ -240,6 +242,7 @@ describe('OTP Verification Endpoints', () => {
                 docs: [{
                     id: 1,
                     email: 'test@test.com',
+                    roles: ['super-admin'],
                     otpHash: 'hashed_123456',
                     otpAttempts: 0,
                     otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
@@ -257,6 +260,10 @@ describe('OTP Verification Endpoints', () => {
                     otpExpiresAt: null,
                     otpAttempts: 0
                 })
+            }))
+            expect(SignJWT).toHaveBeenCalledWith(expect.objectContaining({
+                mfa_verified: true,
+                roles: ['super-admin'],
             }))
 
             const setCookie = res.headers.get('Set-Cookie')

@@ -77,7 +77,10 @@ vi.mock('openai', () => {
     return { default: OpenAI }
 })
 
-import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import {
+    generateSampleProducts,
+    prepareSampleProducts,
+} from '@/lib/ai/generate-sample-products'
 
 const mockPayload = {
     findByID: mockFindByID,
@@ -263,6 +266,23 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
         expect(stats.noImage).toBeGreaterThan(0)
         // Pin the exact reason code — ensures tierAUploadFailed path, not gallery_failed
         expect(logSpy.mock.calls.some(args => String(args[0]).includes('reason=upload_failed'))).toBe(true)
+    })
+})
+
+describe('[TC-F38-RES-08] deferred product image assignment', () => {
+    it('prepares product copy and demand keywords without calling Pixabay or upload fallbacks', async () => {
+        // Arrange — curated product copy is the deterministic text fallback.
+
+        // Act
+        const prepared = await prepareSampleProducts(businessInfo, 'en')
+
+        // Assert
+        expect(prepared.products).toHaveLength(6)
+        expect(prepared.products.map((product) => product.imageKeyword))
+            .toContain('business card')
+        expect(mockSearchPhotos).not.toHaveBeenCalled()
+        expect(mockUploadImageUrl).not.toHaveBeenCalled()
+        expect(mockFindOrCreateCartonMedia).not.toHaveBeenCalled()
     })
 })
 

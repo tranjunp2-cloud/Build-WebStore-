@@ -19,7 +19,7 @@ import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard, BarChart2, FileText, FileEdit, GitPullRequest,
     History, CalendarClock, Archive, Boxes, Package, Zap,
-    Activity, Bug, Tag, FolderOpen, Settings, Layers,
+    Activity, Bug, Tag, FolderOpen, Settings, Layers, ShieldCheck,
 } from 'lucide-react'
 import { useStudioPreferences } from './theme-density-accent-switcher'
 import type { SidebarCounts } from './sidebar-counts'
@@ -39,6 +39,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio/packs': Package,
     '/studio/performance': Zap,
     '/studio/generations': Activity,
+    '/studio/qa': ShieldCheck,
     '/studio/issues': Bug,
     '/studio/categories': FolderOpen,
     '/studio/tags': Tag,
@@ -91,6 +92,7 @@ const NAV: NavSection[] = [
         section: 'Monitoring',
         items: [
             { href: '/studio/generations', label: 'User generations', liveDot: true },
+            { href: '/studio/qa', label: 'QA Control Center' },
             { href: '/studio/issues', label: 'Issues & feedback', count: (c) => c.issues },
         ],
     },

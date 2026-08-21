@@ -92,6 +92,25 @@ describe('PreviewFrame', () => {
         expect(iframe.getAttribute('src')).toContain('pageId=page-456')
     })
 
+    it('TC-F12-113-03: routes a manual save request from the iframe to the editor shell', async () => {
+        // Arrange
+        const onManualSave = vi.fn(() => Promise.resolve(true))
+        render(<PreviewFrame {...defaultProps} onManualSave={onManualSave} />)
+
+        // Act
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                data: { type: 'MANUAL_SAVE_REQUEST', source: 'footer' },
+                origin: window.location.origin,
+            }))
+        })
+
+        // Assert
+        await waitFor(() => {
+            expect(onManualSave).toHaveBeenCalledWith('footer')
+        })
+    })
+
     // TC-F05-07-06: Click Header → viền highlight xuất hiện, Panel Settings chuyển sang Navigation Links
     it('TC-F05-07-06: shows selection overlay when global block (navigation) is clicked', async () => {
         const onBlockSelect = vi.fn()

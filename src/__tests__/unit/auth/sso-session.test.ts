@@ -71,6 +71,14 @@ const makeReq = (body?: Record<string, unknown>, ip = '1.2.3.4') => ({
     json: vi.fn().mockResolvedValue(body ?? {}),
 })
 
+type MockSsoSessionResponse = {
+    data: { ok?: boolean; redirectTo?: string; error?: string }
+    status: number
+}
+
+const postSession = (body: Record<string, unknown>) =>
+    POST(makeReq(body) as unknown as Parameters<typeof POST>[0]) as unknown as Promise<MockSsoSessionResponse>
+
 const BASE_USER = {
     id: 42,
     email: 'owner@example.com',
@@ -243,20 +251,28 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
     describe('Redirect logic', () => {
         it('TC-SSOPW2-05: tenant-owner with no tenants and no wizard → /onboarding', async () => {
             mockPayload.findByID.mockResolvedValue({ ...BASE_USER, tenants: [] })
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
         })
 
         it('TC-SSOPW2-06: tenant-owner, onboardingCompleted=false, no wizard → /onboarding', async () => {
-            // BASE_USER has onboardingCompleted=false and has_seen_ai_wizard=false
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            // Arrange — BASE_USER keeps both onboarding flags false, but no Step 1 row exists
+            mockPayload.db = {
+                drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [] }) },
+            }
+
+            // Act
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
+
+            // Assert
             expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
+            expect(mockDrizzleExecute).toHaveBeenCalledOnce()
         })
 
         it('TC-SSOPW2-07: tenant-owner who has seen wizard + all steps done → /dashboard', async () => {
             mockPayload.findByID.mockResolvedValue({ ...BASE_USER, has_seen_ai_wizard: true })
             mockPayload.db = { drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }, { step: 2 }, { step: 3 }] }) } }
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
 
@@ -272,8 +288,95 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
                 tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
             })
             mockPayload.db = { drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }, { step: 2 }, { step: 3 }] }) } }
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+        })
+    })
+
+    // ── GH-1725 navigation intent ─────────────────────────────────────────────
+
+    describe('[TC-1725-NAV] Generic and ProductCard navigation intent', () => {
+        const ONBOARDED_USER = {
+            ...BASE_USER,
+            has_seen_ai_wizard: true,
+            tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
+        }
+
+        it('TC-1725-NAV-01: generic callback ignores incomplete-step state and returns /dashboard', async () => {
+            // Arrange
+            mockPayload.findByID.mockResolvedValue(structuredClone(ONBOARDED_USER))
+            mockPayload.db = {
+                drizzle: {
+                    execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }] }),
+                },
+            }
+
+            // Act
+            const res = await postSession({ v2_token: 'valid' })
+
+            // Assert
+            expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+            expect(mockDrizzleExecute).not.toHaveBeenCalled()
+        })
+
+        it('TC-1725-NAV-02: generic callback takes precedence over onboarding state', async () => {
+            // Arrange — BASE_USER matches the current mandatory onboarding predicate
+
+            // Act
+            const res = await postSession({ v2_token: 'valid' })
+
+            // Assert
+            expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+            expect(mockDrizzleExecute).not.toHaveBeenCalled()
+        })
+
+        it.each(['/content-manager/product', '/content-manager/product/'])(
+            'TC-1725-NAV-05: product intent %s returns /products without step lookup',
+            async (redirectUrl) => {
+                // Arrange
+                mockPayload.findByID.mockResolvedValue(structuredClone(ONBOARDED_USER))
+                mockPayload.db = { drizzle: { execute: mockDrizzleExecute } }
+
+                // Act
+                const res = await postSession({ v2_token: 'valid', redirect_url: redirectUrl })
+
+                // Assert
+                expect(res.data).toEqual({ ok: true, redirectTo: '/products' })
+                expect(mockDrizzleExecute).not.toHaveBeenCalled()
+            },
+        )
+
+        it.each([
+            '/unknown-internal-route',
+            'https://evil.example/steal',
+            '//evil.example/steal',
+            'x'.repeat(2049),
+            ['/initial-setting', '/content-manager/product'],
+        ])('TC-1725-NAV-06: unsafe or invalid intent %# falls back to /dashboard', async (redirectUrl) => {
+            // Arrange
+            mockPayload.findByID.mockResolvedValue(structuredClone(ONBOARDED_USER))
+            mockPayload.db = { drizzle: { execute: mockDrizzleExecute } }
+
+            // Act
+            const res = await postSession({ v2_token: 'valid', redirect_url: redirectUrl })
+
+            // Assert
+            expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
+            expect(mockDrizzleExecute).not.toHaveBeenCalled()
+        })
+
+        it('TC-1725-NAV-07: Step 1 state routes to shipping despite stale onboarding flags', async () => {
+            // Arrange — BASE_USER keeps both onboarding flags false after template selection
+            mockPayload.db = {
+                drizzle: { execute: mockDrizzleExecute.mockResolvedValue({ rows: [{ step: 1 }] }) },
+            }
+
+            // Act
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
+
+            // Assert
+            expect(res.data).toEqual({ ok: true, redirectTo: '/settings/shipping' })
+            expect(mockDrizzleExecute).toHaveBeenCalledOnce()
         })
     })
 
@@ -340,27 +443,37 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             mockPayload.findByID.mockResolvedValue(structuredClone(ONBOARDED_USER))
         })
 
-        it('TC-SSOPW2-14: 0 steps completed → /onboarding (start Web Store setup)', async () => {
+        it('TC-SSOPW2-14 / TC-1725-NAV-03: explicit setup with 0 steps → /onboarding', async () => {
+            // Arrange
             withSteps([])
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+
+            // Act
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
+
+            // Assert
             expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
         })
 
-        it('TC-SSOPW2-15: step 1 done → /settings/shipping (setup shipping next)', async () => {
+        it('TC-SSOPW2-15 / TC-1725-NAV-04: explicit setup with step 1 → /settings/shipping', async () => {
+            // Arrange
             withSteps([1])
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+
+            // Act
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
+
+            // Assert
             expect(res.data).toEqual({ ok: true, redirectTo: '/settings/shipping' })
         })
 
-        it('TC-SSOPW2-16: steps 1+2 done → /products/new (add first product next)', async () => {
+        it('TC-SSOPW2-16: steps 1+2 done → /products (show product list next)', async () => {
             withSteps([1, 2])
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
-            expect(res.data).toEqual({ ok: true, redirectTo: '/products/new' })
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
+            expect(res.data).toEqual({ ok: true, redirectTo: '/products' })
         })
 
         it('TC-SSOPW2-17: all 3 steps done → /dashboard (Web Store setup complete)', async () => {
             withSteps([1, 2, 3])
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
 
@@ -368,7 +481,7 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             mockPayload.db = {
                 drizzle: { execute: mockDrizzleExecute.mockRejectedValue(new Error('DB error')) },
             }
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
 
@@ -379,7 +492,7 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
                 tenants: [{ tenant: { id: '1', onboardingCompleted: true } }],
             })
             withSteps([])
-            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            const res = await postSession({ v2_token: 'valid', redirect_url: '/initial-setting' })
             expect(res.data).toEqual({ ok: true, redirectTo: '/onboarding' })
         })
     })

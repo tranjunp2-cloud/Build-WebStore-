@@ -28,7 +28,7 @@
  * Server-only.
  */
 
-import { downloadPhotoBuffer } from './pixabay-client'
+import { downloadPhotoBuffer, registerPixabayMediaSource } from './pixabay-client'
 import { uploadBufferToMedia, Semaphore } from './media-pipeline'
 import type { ImagePool, PoolPhoto } from './image-pool'
 
@@ -102,6 +102,7 @@ export async function preUploadPool(
                             tenantId,
                         })
                         result.set(photo.id, id)
+                        registerPixabayMediaSource(id, photo.url)
                     } catch (err) {
                         console.warn(
                             `[pool-preupload] upload failed for ${photo.id}: ${err instanceof Error ? err.message : String(err)}`,
@@ -114,6 +115,5 @@ export async function preUploadPool(
         ),
     )
 
-    console.info(`[pool-preupload] uploaded=${result.size}/${photos.length}`)
     return result
 }

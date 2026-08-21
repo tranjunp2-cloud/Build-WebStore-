@@ -68,7 +68,7 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
 
         const expectedTitles = [
             'Dashboard',
-            'AI Website Builder',
+            'AI website builder',
             'Blog',
             'Settings',
         ]
@@ -85,7 +85,7 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
         // Verify all 4 feature titles exist to confirm cards rendered correctly.
         const expectedTitles = [
             'Dashboard',
-            'AI Website Builder',
+            'AI website builder',
             'Blog',
             'Settings',
         ]

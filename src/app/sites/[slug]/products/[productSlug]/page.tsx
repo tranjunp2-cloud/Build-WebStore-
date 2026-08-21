@@ -15,7 +15,7 @@ import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
-import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 
 // Force dynamic — uses getPayload() for product data at runtime
@@ -25,16 +25,27 @@ type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }
 
-const getProductData = cache(async function getProductData(slug: string, productSlug: string) {
+const getProductData = cache(async function getProductData(
+    slug: string,
+    productSlug: string,
+    tenantHostname: string | null,
+) {
+    if (slug === 'custom' && !tenantHostname) return null
+
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
         collection: 'tenants',
-        where: { slug: { equals: slug } },
+        where: slug === 'custom'
+            ? { 'customDomains.domain': { equals: tenantHostname } }
+            : { slug: { equals: slug } },
         limit: 1,
     })
     const tenant = tenantsResult.docs[0]
     if (!tenant) return null
+    if (slug === 'custom') {
+        if (!tenantHostname || !hasActiveCustomDomain(tenant, tenantHostname)) return null
+    }
 
     const sitesResult = await payload.find({
         collection: 'sites',
@@ -44,6 +55,7 @@ const getProductData = cache(async function getProductData(slug: string, product
                 { status: { equals: 'published' } },
             ],
         },
+        sort: 'createdAt',
         limit: 1,
     })
     const site = sitesResult.docs[0]
@@ -82,7 +94,9 @@ const getProductData = cache(async function getProductData(slug: string, product
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
-    const data = await getProductData(slug, productSlug)
+    const reqHeaders = await headers()
+    const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const data = await getProductData(slug, productSlug, tenantHostname)
     if (!data) return { title: 'Not Found' }
 
     const { site, product } = data
@@ -91,8 +105,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const ogImage = (product as any).images?.[0]?.image?.url
 
     // BUG-F05-020: Resolve canonical URL for product pages
-    const reqHeaders = await headers()
-    const tenantHostname = reqHeaders.get('x-tenant-hostname')
     const baseUrl = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
     const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
 
@@ -124,7 +136,9 @@ function formatPrice(price: number, currency: string) {
 
 export default async function ProductDetailPage({ params }: Props) {
     const { slug, productSlug } = await params
-    const data = await getProductData(slug, productSlug)
+    const reqHeaders = await headers()
+    const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const data = await getProductData(slug, productSlug, tenantHostname)
 
     if (!data) notFound()
 
@@ -193,7 +207,7 @@ export default async function ProductDetailPage({ params }: Props) {
     const base = await getSiteBasePath(slug)
     const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
 
-    const origin = resolveStorefrontOrigin(tenant as any, { slug })
+    const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const crumbs = [
         { name: 'Home', url: origin },
         ...(p.category?.name ? [{ name: p.category.name, url: undefined }] : []),

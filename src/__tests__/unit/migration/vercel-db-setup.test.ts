@@ -357,3 +357,173 @@ describe('[TC-MIG-DB] MIGRATIONS array conventions (Payload Drizzle naming)', ()
         expect(migrateOnlyBlock).not.toContain('spawnServer')
     })
 })
+
+// ── TC-GH1640-PERF-04: duplicate index cleanup ──────────────────────────────
+describe('[TC-GH1640-PERF-04] duplicate index cleanup is audited and deployment-safe', () => {
+    const DB_SETUP_PATH = path.resolve(process.cwd(), 'scripts/db-setup.js')
+    const {
+        APPROVED_DUPLICATE_INDEX_PAIRS,
+        buildDuplicateIndexCleanupPlan,
+        partitionDetectedDuplicateIndexPairs,
+    } = require(DB_SETUP_PATH) as {
+        APPROVED_DUPLICATE_INDEX_PAIRS: Array<{ table: string; keep: string; drop: string }>
+        buildDuplicateIndexCleanupPlan: (
+            indexRows: Array<Record<string, unknown>>,
+            detectedPairs: Array<Record<string, unknown>>,
+        ) => Array<{ table: string; keep: string; drop: string }>
+        partitionDetectedDuplicateIndexPairs: (
+            detectedPairs: Array<Record<string, unknown>>,
+        ) => {
+            approved: Array<Record<string, unknown>>
+            unapproved: Array<Record<string, unknown>>
+        }
+    }
+
+    const pair = APPROVED_DUPLICATE_INDEX_PAIRS[0]
+    const makeIndex = (indexName: string, overrides: Record<string, unknown> = {}) => ({
+        index_name: indexName,
+        table_name: pair.table,
+        access_method: 'btree',
+        indisvalid: true,
+        indisready: true,
+        indisunique: false,
+        indisprimary: false,
+        indisexclusion: false,
+        indnullsnotdistinct: false,
+        indnkeyatts: 2,
+        indnatts: 2,
+        index_keys: '2 7',
+        operator_classes: '1978 3128',
+        collations: '0 0',
+        options: '0 3',
+        expressions: null,
+        predicate: null,
+        constraint_backed: false,
+        ...overrides,
+    })
+    const detectedApprovedPair = {
+        table_name: pair.table,
+        index_1: pair.keep,
+        index_2: pair.drop,
+    }
+
+    it('plans only the explicitly approved exact duplicate', () => {
+        // Arrange
+        const rows = [makeIndex(pair.keep), makeIndex(pair.drop)]
+
+        // Act
+        const actions = buildDuplicateIndexCleanupPlan(rows, [detectedApprovedPair])
+
+        // Assert
+        expect(actions).toEqual([pair])
+    })
+
+    it('rejects an exact duplicate pair that staging has not audited', () => {
+        // Arrange
+        const rows = [makeIndex(pair.keep), makeIndex(pair.drop)]
+        const unknownPair = {
+            table_name: 'orders_items',
+            index_1: 'orders_items_parent_idx',
+            index_2: 'orders_items_parent_id_idx',
+        }
+
+        // Act + Assert
+        expect(() => buildDuplicateIndexCleanupPlan(rows, [detectedApprovedPair, unknownPair]))
+            .toThrow(/unapproved exact duplicate indexes detected/)
+    })
+
+    it('separates unapproved pairs so deployment can skip them before strict planning', () => {
+        // Arrange
+        const unknownPair = {
+            table_name: 'orders_items',
+            index_1: 'orders_items_parent_idx',
+            index_2: 'orders_items_parent_id_idx',
+        }
+
+        // Act
+        const result = partitionDetectedDuplicateIndexPairs([detectedApprovedPair, unknownPair])
+
+        // Assert
+        expect(result.approved).toEqual([detectedApprovedPair])
+        expect(result.unapproved).toEqual([unknownPair])
+    })
+
+    it('rejects a drop candidate whose structure differs from the canonical index', () => {
+        // Arrange
+        const rows = [
+            makeIndex(pair.keep),
+            makeIndex(pair.drop, { options: '0 0' }),
+        ]
+
+        // Act + Assert
+        expect(() => buildDuplicateIndexCleanupPlan(rows, [detectedApprovedPair]))
+            .toThrow(/not structurally identical/)
+    })
+
+    it('rejects an index that backs a uniqueness or constraint contract', () => {
+        // Arrange
+        const rows = [
+            makeIndex(pair.keep),
+            makeIndex(pair.drop, { constraint_backed: true }),
+        ]
+
+        // Act + Assert
+        expect(() => buildDuplicateIndexCleanupPlan(rows, [detectedApprovedPair]))
+            .toThrow(/backs a uniqueness\/constraint contract/)
+    })
+
+    it('rejects cleanup when the canonical index is missing or invalid', () => {
+        // Arrange
+        const missingCanonical = [makeIndex(pair.drop)]
+        const invalidCanonical = [
+            makeIndex(pair.keep, { indisvalid: false }),
+            makeIndex(pair.drop),
+        ]
+
+        // Act + Assert
+        expect(() => buildDuplicateIndexCleanupPlan(missingCanonical, [detectedApprovedPair]))
+            .toThrow(/canonical index .* is missing, invalid/)
+        expect(() => buildDuplicateIndexCleanupPlan(invalidCanonical, [detectedApprovedPair]))
+            .toThrow(/canonical index .* is missing, invalid/)
+    })
+
+    it('is idempotent when the approved drop candidate is already absent', () => {
+        // Arrange
+        const rows = [makeIndex(pair.keep)]
+
+        // Act
+        const actions = buildDuplicateIndexCleanupPlan(rows, [])
+
+        // Assert
+        expect(actions).toEqual([])
+    })
+
+    it('removes the redundant CREATE and uses concurrent audited cleanup', () => {
+        // Arrange
+        const scriptContent = fs.readFileSync(DB_SETUP_PATH, 'utf-8')
+
+        // Act + Assert
+        expect(scriptContent).not.toContain(
+            'CREATE INDEX IF NOT EXISTS idx_tqs_template_scored',
+        )
+        expect(scriptContent).toContain('DROP INDEX CONCURRENTLY IF EXISTS')
+        expect(scriptContent).toContain('await cleanupApprovedDuplicateIndexes(pool)')
+        expect(scriptContent).toContain('unapproved exact duplicate indexes detected')
+        expect(scriptContent).toContain('skipped unapproved exact duplicate indexes')
+    })
+})
+
+describe('[TC-F37-02-31] schemaSubtype additive SQL migration', () => {
+    it('adds the group column idempotently and never drops it', () => {
+        // Arrange
+        const scriptContent = fs.readFileSync(path.resolve(process.cwd(), 'scripts/db-setup.js'), 'utf-8')
+        const migration = "{ name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' }"
+
+        // Act
+        const occurrences = scriptContent.split(migration).length - 1
+
+        // Assert
+        expect(occurrences).toBe(1)
+        expect(scriptContent).not.toMatch(/DROP\s+(?:COLUMN|TABLE)[^;]*local_business_schema_subtype/i)
+    })
+})

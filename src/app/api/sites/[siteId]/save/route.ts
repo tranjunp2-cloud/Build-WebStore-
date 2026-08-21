@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
-import { saveSiteSchema } from '@/lib/validations/sites'
+import { localBusinessSchema, saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -14,6 +14,8 @@ import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 import { buildEnumSets } from '@/lib/theme/enums'
 import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
+import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
+import type { OpeningHourRow } from '@/components/editor/local-business/types'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -110,6 +112,30 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
+        let validatedLocalBusiness: unknown
+        if (localBusiness !== undefined) {
+            const previousLocalBusiness = existingSite.localBusiness
+            const previousGroup = previousLocalBusiness
+                && typeof previousLocalBusiness === 'object'
+                && !Array.isArray(previousLocalBusiness)
+                ? previousLocalBusiness
+                : {}
+            const effectiveLocalBusiness: Record<string, unknown> = { ...previousGroup, ...localBusiness }
+            if (Array.isArray(effectiveLocalBusiness.openingHours)) {
+                effectiveLocalBusiness.openingHours = sanitizeLegacyOpeningHours(
+                    effectiveLocalBusiness.openingHours as OpeningHourRow[],
+                )
+            }
+            const result = localBusinessSchema.safeParse(effectiveLocalBusiness)
+            if (!result.success) {
+                return NextResponse.json(
+                    { error: 'Invalid local business data', details: result.error.flatten() },
+                    { status: 400 },
+                )
+            }
+            validatedLocalBusiness = result.data
+        }
+
         // Navigation: allow draft links (empty/#) but reject malformed external URLs
         if (headerBlock && typeof headerBlock === 'object') {
             const hb = headerBlock as Record<string, unknown>
@@ -126,6 +152,35 @@ export async function PATCH(
             }
         }
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
+
+        // Validate an explicitly selected page before writing any site fields.
+        // Otherwise a mixed request could persist LocalBusiness and only then
+        // return 400/404 for a malformed or cross-site pageId.
+        const numericSiteId = Number(siteId)
+        type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
+        let resolvedBlockPage: PageDoc | null = null
+        if (normalizedBlocks && pageId) {
+            if (!/^\d+$/.test(pageId)) {
+                return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
+            }
+            try {
+                resolvedBlockPage = await payload.findByID({
+                    collection: 'pages',
+                    id: pageId,
+                    draft: true,
+                }) as PageDoc
+            } catch {
+                resolvedBlockPage = null
+            }
+            const requestedPageSiteId = typeof resolvedBlockPage?.site === 'object'
+                ? resolvedBlockPage.site?.id
+                : resolvedBlockPage?.site
+            if (!resolvedBlockPage || Number(requestedPageSiteId) !== numericSiteId) {
+                // pageId was specified but page not found or belongs to a
+                // different site — refuse rather than partially persisting.
+                return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
+            }
+        }
 
         type SiteUpdateData = Partial<{
             theme: unknown;
@@ -166,7 +221,7 @@ export async function PATCH(
             )
         }
         if (contactInfo) siteUpdateData.contactInfo = contactInfo
-        if (localBusiness) siteUpdateData.localBusiness = localBusiness
+        if (validatedLocalBusiness !== undefined) siteUpdateData.localBusiness = validatedLocalBusiness
         if (socialLinks) siteUpdateData.socialLinks = socialLinks
         if (branding) siteUpdateData.branding = branding
         if (seo) siteUpdateData.seo = seo
@@ -181,35 +236,7 @@ export async function PATCH(
 
         // Update blocks on the selected page if provided
         if (normalizedBlocks) {
-            const numericSiteId = Number(siteId)
-            type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
-            let page: PageDoc | null = null
-
-            if (pageId) {
-                if (!/^\d+$/.test(pageId)) {
-                    return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
-                }
-                let requestedPage: PageDoc | null = null
-                try {
-                    requestedPage = await payload.findByID({
-                        collection: 'pages',
-                        id: pageId,
-                        draft: true,
-                    })
-                } catch {
-                    // Page not found
-                }
-                const requestedPageSiteId =
-                    typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
-
-                if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
-                    page = requestedPage
-                } else {
-                    // pageId was specified but page not found or belongs to different site —
-                    // refuse rather than silently saving to the homepage (data integrity)
-                    return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
-                }
-            }
+            let page = resolvedBlockPage
 
             if (!page) {
                 let pagesResult = await payload.find({

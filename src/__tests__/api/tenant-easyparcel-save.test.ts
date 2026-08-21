@@ -8,9 +8,24 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const { mockNotifyStepComplete, mockAfter } = vi.hoisted(() => ({
+    mockNotifyStepComplete: vi.fn().mockResolvedValue(undefined),
+    mockAfter: vi.fn(),
+}))
+
 const mockUpdate = vi.fn()
 const mockFindByID = vi.fn()
 let mockUser = { id: 1, roles: ['super-admin'], tenants: [] }
+let scheduledAfter: (() => Promise<void>) | undefined
+
+vi.mock('@/lib/sso/sso-api-client', () => ({
+    notifyStepComplete: mockNotifyStepComplete,
+}))
+
+vi.mock('next/server', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('next/server')>()
+    return { ...actual, after: mockAfter }
+})
 
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
@@ -69,6 +84,10 @@ const canonicalWarehouse = {
 describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        scheduledAfter = undefined
+        mockAfter.mockImplementation((callback: () => Promise<void>) => {
+            scheduledAfter = callback
+        })
         mockUser = { id: 1, roles: ['super-admin'], tenants: [] }
         mockFindByID.mockResolvedValue({
             id: 'tenant-1',
@@ -91,6 +110,8 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         expect(res.status).toBe(400)
         expect(body.error?.code).toBe('EP_NOT_READY')
         expect(mockUpdate).not.toHaveBeenCalled()
+        expect(mockAfter).not.toHaveBeenCalled()
+        expect(mockNotifyStepComplete).not.toHaveBeenCalled()
     })
 
     // TC-F14.140 variant: enabled=true + empty warehouses → 400 EP_NOT_READY
@@ -155,7 +176,70 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
                 warehouses: [expect.objectContaining(canonicalWarehouse)],
             },
         })
+        expect(mockAfter).toHaveBeenCalledTimes(1)
+        await scheduledAfter?.()
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
         // NO selectedCouriers or selectedCourier in new spec
+    })
+
+    it('[TC-1724-SYNC-01] enabled=true schedules SSO step 2 only after persistence succeeds', async () => {
+        mockUpdate.mockResolvedValue({ id: 'tenant-1' })
+
+        const res = await callPost('tenant-1', {
+            enabled: true,
+            warehouses: [completeWarehouse],
+        })
+
+        expect(res.status).toBe(200)
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockAfter).toHaveBeenCalledTimes(1)
+
+        await scheduledAfter?.()
+
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
+    })
+
+    it('[TC-1724-SYNC-02] disabled EasyParcel save does not notify SSO step 2', async () => {
+        mockUpdate.mockResolvedValue({ id: 'tenant-1' })
+
+        const res = await callPost('tenant-1', {
+            enabled: false,
+            warehouses: [],
+        })
+
+        expect(res.status).toBe(200)
+        expect(mockAfter).not.toHaveBeenCalled()
+        expect(mockNotifyStepComplete).not.toHaveBeenCalled()
+    })
+
+    it('[TC-1724-SYNC-03] SSO notification failure does not fail EasyParcel activation', async () => {
+        mockUpdate.mockResolvedValue({ id: 'tenant-1' })
+        mockNotifyStepComplete.mockRejectedValueOnce(new Error('SSO unavailable'))
+
+        const res = await callPost('tenant-1', {
+            enabled: true,
+            warehouses: [completeWarehouse],
+        })
+
+        expect(res.status).toBe(200)
+        await scheduledAfter?.()
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
+    })
+
+    it('[TC-1724-SYNC-05] falls back to immediate notification when after() is unavailable', async () => {
+        mockUpdate.mockResolvedValue({ id: 'tenant-1' })
+        mockAfter.mockImplementationOnce(() => {
+            throw new Error('request context unavailable')
+        })
+
+        const res = await callPost('tenant-1', {
+            enabled: true,
+            warehouses: [completeWarehouse],
+        })
+
+        expect(res.status).toBe(200)
+        await Promise.resolve()
+        expect(mockNotifyStepComplete).toHaveBeenCalledWith(expect.anything(), 1, 2, { loginTimeoutMs: 20_000, patchTimeoutMs: 25_000 })
     })
 
     // TC-F14.141 variant: multiple warehouses
@@ -252,6 +336,8 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
 
         expect(res.status).toBe(500)
         expect(body.error?.code).toBe('INTERNAL_ERROR')
+        expect(mockAfter).not.toHaveBeenCalled()
+        expect(mockNotifyStepComplete).not.toHaveBeenCalled()
     })
 
     it('[TC-F36.202] rejects a non-array warehouses payload', async () => {

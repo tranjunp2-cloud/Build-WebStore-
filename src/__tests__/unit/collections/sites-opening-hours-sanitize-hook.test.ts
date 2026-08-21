@@ -68,3 +68,48 @@ describe('[TC-F37-02-28] sanitizeOpeningHoursOnValidate — Sites.ts beforeValid
         expect(result.theme).toEqual({ primaryColor: '#000' })
     })
 })
+
+// ── TC-F37-02-31: direct Payload effective-state merge ────────────────────
+
+describe('[TC-F37-02-31] mergeLocalBusinessOnValidate — direct Payload writes', () => {
+    it('merges a sparse patch with the original group without dropping siblings', async () => {
+        // Arrange
+        const originalDoc = {
+            name: 'Site',
+            localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya' },
+        }
+        const data = { localBusiness: { priceRange: '$$' } }
+
+        // Act
+        const { mergeLocalBusinessOnValidate } = await import('@/collections/Sites')
+        const result = await mergeLocalBusinessOnValidate({ data, originalDoc } as Parameters<typeof mergeLocalBusinessOnValidate>[0])
+
+        // Assert
+        expect(result).toEqual({
+            localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya', priceRange: '$$' },
+        })
+    })
+
+    it('exposes the merged stale pair to the registered schemaSubtype field validator', async () => {
+        // Arrange
+        const { Sites, mergeLocalBusinessOnValidate } = await import('@/collections/Sites')
+        const merged = await mergeLocalBusinessOnValidate({
+            data: { localBusiness: { businessCategory: 'store' } },
+            originalDoc: { localBusiness: { businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery' } },
+        } as Parameters<typeof mergeLocalBusinessOnValidate>[0]) as { localBusiness: Record<string, unknown> }
+        const localBusinessGroup = Sites.fields.find(field => 'name' in field && field.name === 'localBusiness')
+        const subtypeField = localBusinessGroup && 'fields' in localBusinessGroup
+            ? localBusinessGroup.fields.find(field => 'name' in field && field.name === 'schemaSubtype')
+            : undefined
+        const validate = subtypeField && 'validate' in subtypeField ? subtypeField.validate : undefined
+
+        // Act
+        const validation = typeof validate === 'function'
+            ? await validate(merged.localBusiness.schemaSubtype, { siblingData: merged.localBusiness } as never)
+            : true
+
+        // Assert
+        expect(Sites.hooks?.beforeValidate?.[0]).toBe(mergeLocalBusinessOnValidate)
+        expect(validation).toBe('Schema subtype is not compatible with the selected business category')
+    })
+})

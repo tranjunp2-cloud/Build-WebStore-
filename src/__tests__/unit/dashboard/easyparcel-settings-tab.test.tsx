@@ -86,9 +86,17 @@ describe('EasyParcelSettingsTab [TC-F36.203]', () => {
 
         const header = screen.getByTestId('easyparcel-connected-header')
         expect(header).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]')
+        expect(screen.getByTestId('easyparcel-brand-mark').parentElement).toHaveClass('self-start', 'sm:self-center')
+        expect(screen.getByTestId('easyparcel-brand-mark')).toHaveClass('h-[42px]', 'w-[42px]', 'sm:h-[52px]', 'sm:w-[52px]')
         const logoSrc = screen.getByRole('img', { name: 'EasyParcel' }).getAttribute('src') ?? ''
         expect(decodeURIComponent(logoSrc)).toContain('/integrations/easyparcel-box.png')
         expect(header).toContainElement(screen.getByRole('switch', { name: /EasyParcel/i }))
+    })
+
+    it('uses the QA-specified 42px mobile brand mark in the disconnected state', () => {
+        render(<EasyParcelSettingsTab tenantId="tenant-1" initialEpConfig={null} />)
+
+        expect(screen.getByTestId('easyparcel-brand-mark')).toHaveClass('h-[42px]', 'w-[42px]', 'sm:h-[52px]', 'sm:w-[52px]')
     })
 
     it('keeps edits local until Save Settings is clicked', async () => {

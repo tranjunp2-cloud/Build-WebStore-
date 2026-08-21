@@ -18,6 +18,7 @@ vi.mock('@/lib/ai/pixabay-client', () => ({
         mimetype: 'image/jpeg',
         size: 3,
     }),
+    registerPixabayMediaSource: vi.fn(),
     PIXABAY_ORIENTATION_BY_BLOCK: { hero: 'landscape', gallery: 'landscape' },
     PixabayError: class PixabayError extends Error {
         constructor(public readonly code: string) { super(code) }

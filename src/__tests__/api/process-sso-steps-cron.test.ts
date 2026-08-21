@@ -8,7 +8,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockExecute = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ db: { drizzle: { execute: mockExecute } } })),
+    getPayload: vi.fn(() =>
+        Promise.resolve({ db: { drizzle: { execute: mockExecute } } }),
+    ),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -21,13 +23,20 @@ import { GET } from '@/app/api/cron/process-sso-steps/route'
 
 function sqlToText(sqlObj: any): string {
     return sqlObj.queryChunks
-        .map((c: any) => (c && typeof c === 'object' && Array.isArray(c.value) ? c.value.join('') : String(c)))
+        .map((c: any) =>
+            c && typeof c === 'object' && Array.isArray(c.value)
+                ? c.value.join('')
+                : String(c),
+        )
         .join('')
 }
 
 function mockReq() {
     return {
-        headers: { get: (name: string) => (name === 'authorization' ? 'Bearer test-cron-secret' : null) },
+        headers: {
+            get: (name: string) =>
+                name === 'authorization' ? 'Bearer test-cron-secret' : null,
+        },
     } as unknown as Request
 }
 
@@ -43,7 +52,10 @@ function createStatefulDb(initialStatus: string) {
         const text = sqlToText(sqlObj)
         if (text.includes("SET status = 'processing'")) {
             // claim query — always returns the row for these tests
-            return { rows: [{ id: row.id, user_id: row.user_id, step: row.step }], rowCount: 1 }
+            return {
+                rows: [{ id: row.id, user_id: row.user_id, step: row.step }],
+                rowCount: 1,
+            }
         }
         const isFinalizeGuarded = text.includes("AND status = 'processing'")
         const guardMatches = !isFinalizeGuarded || row.status === 'processing'
@@ -77,6 +89,32 @@ describe('[TC-1293-SYNC] GET /api/cron/process-sso-steps', () => {
         expect(row.status).toBe('completed')
         expect(body.succeeded).toBe(1)
         expect(body.raced).toBe(0)
+        expect(body.deferred).toBe(0)
+        expect(body.reclaimed).toBe(0)
+        expect(body.remaining).toBe(0)
+        expect(mockNotify).toHaveBeenCalledWith(expect.anything(), 10, 2, expect.objectContaining({
+            loginTimeoutMs: 20_000,
+            patchTimeoutMs: 25_000,
+        }))
+    })
+
+    it('[TC-1724-CRON-01] rejects requests without the cron secret', async () => {
+        const res = await GET({
+            headers: { get: () => 'Bearer wrong-secret' },
+        } as unknown as Request)
+
+        expect(res.status).toBe(401)
+        expect(mockExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-1724-CRON-02] claims at most two events per invocation', async () => {
+        const { execute } = createStatefulDb('processing')
+        mockExecute.mockImplementation(execute)
+        mockNotify.mockResolvedValue(undefined)
+
+        await GET(mockReq())
+
+        expect(sqlToText(execute.mock.calls[0][0])).toContain('LIMIT 2')
     })
 
     it('[TC-1293-SYNC-10] finalize on failure updates the row and counts it as failed when the guard genuinely matches', async () => {

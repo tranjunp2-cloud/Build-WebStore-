@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { NextRequest } from 'next/server'
 
 // ─── Mocks (top-level, before imports) ─────────────────────────────────
 
@@ -10,13 +11,18 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
-vi.mock('@/lib/seo/canonical', () => ({
-    resolveStorefrontOrigin: vi.fn((tenant: any, opts: any) => {
-        if (opts.fallbackHostname) return `https://${opts.fallbackHostname}`
-        const slug = opts.slug || tenant.slug
-        return `https://${slug}.primeweb.app`
-    }),
-}))
+vi.mock('@/lib/seo/canonical', async () => {
+    const actual = await vi.importActual<typeof import('@/lib/seo/canonical')>('@/lib/seo/canonical')
+
+    return {
+        ...actual,
+        resolveStorefrontOrigin: vi.fn((tenant: any, opts: any) => {
+            if (opts.fallbackHostname) return `https://${opts.fallbackHostname}`
+            const slug = opts.slug || tenant.slug
+            return `https://${slug}.primeweb.app`
+        }),
+    }
+})
 
 import { GET as getLlmsTxt } from '@/app/sites/[slug]/llms.txt/route'
 
@@ -30,7 +36,7 @@ import { GET as getLlmsTxt } from '@/app/sites/[slug]/llms.txt/route'
  */
 describe('[TC-F37-03] llms.txt content contract', () => {
     beforeEach(() => {
-        vi.clearAllMocks()
+        mockFind.mockReset()
     })
 
     // ────────────────────────────────────────────────────────────────
@@ -65,10 +71,11 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         // Assert
         expect(response.status).toBe(200)
         expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8')
+        expect(response.headers.get('Cache-Control')).toBe('no-store')
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-13: Site name heading (AC-6)
+    // TC-F37-03-13: Site name heading
     // ────────────────────────────────────────────────────────────────
     it('TC-F37-03-13: includes site name as markdown h1 heading', async () => {
         // Arrange
@@ -102,7 +109,7 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-14: Description section (AC-6)
+    // TC-F37-03-14: Description section
     // ────────────────────────────────────────────────────────────────
     it('TC-F37-03-14: includes site description in blockquote format', async () => {
         // Arrange
@@ -170,9 +177,9 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-16: At least 5 URLs (AC-6 requirement)
+    // TC-F37-03-16: Key Pages are real, bounded, and deterministic
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-16: contains at least 5 http(s)-prefixed URLs', async () => {
+    it('TC-F37-03-16: lists at most 10 real public URLs with deterministic content-type coverage', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -183,17 +190,22 @@ describe('[TC-F37-03] llms.txt content contract', () => {
             seo: { metaDescription: 'A great cafe' },
         }
         const mockPages = [
-            { id: 'p1', slug: 'about', isHomepage: false, isVisible: true },
-            { id: 'p2', slug: 'contact', isHomepage: false, isVisible: true },
-            { id: 'p3', slug: 'menu', isHomepage: false, isVisible: true },
+            ...Array.from({ length: 7 }, (_, index) => ({
+                id: `p${index + 1}`,
+                slug: `page-${index + 1}`,
+                isHomepage: false,
+                isVisible: true,
+            })),
         ]
         const mockProducts = [
             { id: 'pr1', slug: 'espresso' },
             { id: 'pr2', slug: 'cappuccino' },
             { id: 'pr3', slug: 'latte' },
+            { id: 'pr4', slug: 'mocha' },
         ]
         const mockBlogs = [
             { id: 'b1', slug: 'coffee-facts' },
+            { id: 'b2', slug: 'brewing-guide' },
         ]
 
         mockFind
@@ -212,10 +224,62 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         )
         const body = await response.text()
 
-        // Assert — count https?:// URLs
-        const urlMatches = body.match(/https?:\/\//g)
-        expect(urlMatches).not.toBeNull()
-        expect(urlMatches!.length).toBeGreaterThanOrEqual(5)
+        // Assert
+        const urls = body
+            .split('\n')
+            .filter(line => line.startsWith('- http'))
+            .map(line => line.slice(2))
+        expect(urls).toEqual([
+            'https://mycafe.primeweb.app',
+            'https://mycafe.primeweb.app/page-1',
+            'https://mycafe.primeweb.app/products/espresso',
+            'https://mycafe.primeweb.app/blog/coffee-facts',
+            'https://mycafe.primeweb.app/page-2',
+            'https://mycafe.primeweb.app/products/cappuccino',
+            'https://mycafe.primeweb.app/blog/brewing-guide',
+            'https://mycafe.primeweb.app/page-3',
+            'https://mycafe.primeweb.app/products/latte',
+            'https://mycafe.primeweb.app/page-4',
+        ])
+        expect(urls).toHaveLength(10)
+        expect(body).not.toContain('/products/mocha')
+        expect(body).not.toContain('/page-5')
+        expect(mockFind.mock.calls[2]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true, isHomepage: true } }))
+        expect(mockFind.mock.calls[3]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true } }))
+        expect(mockFind.mock.calls[4]?.[0]).toEqual(expect.objectContaining({ pagination: false, sort: ['createdAt', 'id'], select: { slug: true } }))
+        expect(mockFind.mock.calls[2]?.[0]).not.toHaveProperty('limit')
+        expect(mockFind.mock.calls[3]?.[0]).not.toHaveProperty('limit')
+        expect(mockFind.mock.calls[4]?.[0]).not.toHaveProperty('limit')
+        // The selector must skip a duplicate URL and continue filling from a
+        // non-empty group when another content group has no candidates.
+        mockFind.mockReset()
+        mockFind
+            .mockResolvedValueOnce({ docs: [mockTenant] })
+            .mockResolvedValueOnce({ docs: [mockSite] })
+            .mockResolvedValueOnce({ docs: [
+                { id: 'p1', slug: 'products/espresso', isHomepage: false },
+                { id: 'p2', slug: 'about', isHomepage: false },
+            ] })
+            .mockResolvedValueOnce({ docs: [
+                { id: 'pr1', slug: 'espresso' },
+                { id: 'pr2', slug: 'latte' },
+            ] })
+            .mockResolvedValueOnce({ docs: [] })
+
+        const partialResponse = await getLlmsTxt(
+            { headers: new Map([['x-tenant-hostname', '']]) as any } as any,
+            { params: Promise.resolve({ slug: 'mycafe' }) },
+        )
+        const partialUrls = (await partialResponse.text())
+            .split('\n')
+            .filter(line => line.startsWith('- http'))
+            .map(line => line.slice(2))
+        expect(partialUrls).toEqual([
+            'https://mycafe.primeweb.app',
+            'https://mycafe.primeweb.app/products/espresso',
+            'https://mycafe.primeweb.app/products/latte',
+            'https://mycafe.primeweb.app/about',
+        ])
     })
 
     // ────────────────────────────────────────────────────────────────
@@ -447,11 +511,11 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-43: Blogs/products queries scope by site, not just tenant
-    // (regression: a tenant with multiple sites must not leak sibling
-    // site's blog/product URLs into this site's llms.txt)
+    // TC-F37-03-32: Blogs/products queries scope by both tenant and site
+    // (regression: public discovery must not leak records from another
+    // tenant or sibling site into this site's llms.txt)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-43: scopes blogs and products queries by site.id, not tenant.id alone', async () => {
+    it('TC-F37-03-32: scopes blogs and products queries by tenant.id and site.id', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -477,18 +541,19 @@ describe('[TC-F37-03] llms.txt content contract', () => {
             { params: Promise.resolve({ slug: 'mycafe' }) }
         )
 
-        // Assert — products call (3rd payload.find) and blogs call (4th) both scope by site.id
+        // Assert — products call (3rd payload.find) and blogs call (4th) both scope by tenant.id and site.id
         const productsCall = mockFind.mock.calls[3][0]
         const blogsCall = mockFind.mock.calls[4][0]
         expect(JSON.stringify(productsCall.where)).toContain('"site":{"equals":"site-1"}')
+        expect(JSON.stringify(productsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
         expect(JSON.stringify(blogsCall.where)).toContain('"site":{"equals":"site-1"}')
-        expect(JSON.stringify(blogsCall.where)).not.toContain('"tenant":{"equals":"tenant-1"}')
+        expect(JSON.stringify(blogsCall.where)).toContain('"tenant":{"equals":"tenant-1"}')
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-44: Opening Hours section (from US-F37-01 localBusiness)
+    // TC-F37-03-33: Opening Hours section (from US-F37-01 localBusiness)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-44: includes Opening Hours section with day + time range', async () => {
+    it('TC-F37-03-33: includes Opening Hours section with day + time range', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -528,9 +593,9 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-45: Omits Opening Hours section when no localBusiness data
+    // TC-F37-03-34: Omits Opening Hours section when no localBusiness data
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-45: omits Opening Hours section when localBusiness.openingHours is absent', async () => {
+    it('TC-F37-03-34: omits Opening Hours section when localBusiness.openingHours is absent', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -563,10 +628,10 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-46: Drops an opening-hours row that has a day but no
+    // TC-F37-03-35: Drops an opening-hours row that has a day but no
     // opens/closes and isn't marked closed (incomplete data, no fabrication)
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-46: silently drops an incomplete opening-hours row (day set, no opens/closes, not closed)', async () => {
+    it('TC-F37-03-35: silently drops an incomplete opening-hours row (day set, no opens/closes, not closed)', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'mycafe' }
         const mockSite = {
@@ -680,10 +745,10 @@ describe('[TC-F37-03] llms.txt content contract', () => {
     })
 
     // ────────────────────────────────────────────────────────────────
-    // TC-F37-03-41: Floors at ≥5 URLs for a brand-new site with zero
-    // pages/products/blogs (AC-6 floor guarantee)
+    // TC-F37-03-31: A brand-new site exposes its real homepage without
+    // fabricating transactional or nonexistent content URLs.
     // ────────────────────────────────────────────────────────────────
-    it('TC-F37-03-41: contains at least 5 URLs when site has zero pages/products/blogs', async () => {
+    it('TC-F37-03-31: lists only the storefront home when no public content exists', async () => {
         // Arrange
         const mockTenant = { id: 'tenant-1', slug: 'newshop' }
         const mockSite = {
@@ -713,7 +778,71 @@ describe('[TC-F37-03] llms.txt content contract', () => {
         // Assert
         const urlMatches = body.match(/https?:\/\//g)
         expect(urlMatches).not.toBeNull()
-        expect(urlMatches!.length).toBeGreaterThanOrEqual(5)
+        expect(urlMatches).toEqual(['https://'])
+    })
+
+    it('TC-F37-03-42: omits checkout and private order URLs from Key Pages', async () => {
+        // Arrange
+        const mockTenant = { id: 'tenant-1', slug: 'newshop' }
+        const mockSite = {
+            id: 'site-1',
+            tenant: 'tenant-1',
+            status: 'published',
+            name: 'Brand New Shop',
+            seo: { metaDescription: 'Just launched' },
+        }
+        mockFind
+            .mockResolvedValueOnce({ docs: [mockTenant] })
+            .mockResolvedValueOnce({ docs: [mockSite] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+
+        // Act
+        const response = await getLlmsTxt(
+            { headers: new Map([['x-tenant-hostname', '']]) } as unknown as NextRequest,
+            { params: Promise.resolve({ slug: 'newshop' }) },
+        )
+        const body = await response.text()
+
+        // Assert
+        expect(body).not.toContain('https://newshop.primeweb.app/checkout')
+        expect(body).not.toContain('https://newshop.primeweb.app/orders')
+    })
+
+    it('TC-F37-03-48: keeps seller text inline and encodes public content slugs', async () => {
+        // Arrange
+        const mockTenant = { id: 'tenant-1', slug: 'safe-shop' }
+        const mockSite = {
+            id: 'site-1',
+            tenant: 'tenant-1',
+            status: 'published',
+            name: 'Safe Cafe\n## Injected',
+            seo: { metaDescription: 'Trusted\n- https://evil.example' },
+            contactInfo: { address: 'Main Street\n## Fake Section' },
+        }
+        mockFind
+            .mockResolvedValueOnce({ docs: [mockTenant] })
+            .mockResolvedValueOnce({ docs: [mockSite] })
+            .mockResolvedValueOnce({ docs: [{ slug: 'offers\n## fake' }, { slug: '../admin' }] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [{ slug: 'nested/news' }] })
+
+        // Act
+        const response = await getLlmsTxt(
+            { headers: new Map([['x-tenant-hostname', '']]) } as unknown as NextRequest,
+            { params: Promise.resolve({ slug: 'safe-shop' }) },
+        )
+        const body = await response.text()
+
+        // Assert
+        expect(body).toContain('# Safe Cafe \\#\\# Injected')
+        expect(body).not.toContain('\n## Injected')
+        expect(body).not.toContain('\n## Fake Section')
+        expect(body).not.toContain('\n- https://evil.example')
+        expect(body).toContain('/offers%0A%23%23%20fake')
+        expect(body).not.toContain('/../admin')
+        expect(body).not.toContain('/blog/nested/news')
     })
 
     // ────────────────────────────────────────────────────────────────

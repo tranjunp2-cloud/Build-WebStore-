@@ -175,15 +175,21 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ${blockList}
 
 ## STRUCTURE RULES
-1. Generate 5 pages: Homepage (8-14 blocks), About (7-9 blocks), Services/Products (7-9 blocks), Contact (7-9 blocks), Blog (7-9 blocks with 3-5 seeded posts)
-2. Every page MUST have at least 7 blocks (including navigation and footer) with non-empty body copy — no stub pages
+1. Generate 5 pages with page-specific sizes including navigation and footer: Homepage (8-14 blocks), About (6-8 blocks), Services/Products (6-8 blocks), Contact (3-5 blocks), Blog (5-6 blocks with 3-5 seeded posts)
+2. Keep each subpage focused on its purpose. About needs 4-6 content blocks, Services/Products needs 4-6, Contact needs 1-3, and Blog needs 3-4. Do not pad a page with unrelated sections merely to increase its block count.
 3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
-4. Each block MUST have "blockType" and "variant" fields
-5. blockType MUST be one of the listed types — no custom types
-6. variant MUST be one of the listed variants for that block type
-7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
-8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
-9. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
+4. Every service-cards block MUST contain unique service items. Generate EXACTLY 4 items for variant "featured" (1 featured + 3 supporting cards), and EXACTLY 3 items for variants "grid" and "list". Never repeat the same service-card payload on multiple pages.
+5. Each block MUST have "blockType" and "variant" fields
+6. blockType MUST be one of the listed types — no custom types
+7. variant MUST be one of the listed variants for that block type
+8. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+9. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
+10. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
+11. CANONICAL PAGE OWNERSHIP:
+   - About may use hero, about/story, stats, team, testimonials, and CTA. It MUST NOT include contact, gallery, services, pricing, newsletter, or blog-list.
+   - Services/Products may use hero, service-cards, category-specific service blocks, features, pricing, FAQ, testimonials, logo-cloud, feature-comparison, and CTA. It MUST NOT include contact, gallery, about, team, newsletter, or blog-list.
+   - Contact may use hero, exactly one contact block, and FAQ. It MUST NOT include about, services, service-cards, gallery, testimonials, CTA, team, stats, features, portfolio, newsletter, or blog-list.
+   - Blog may use hero, blog-list, newsletter, and CTA. It MUST NOT include contact, gallery, about, services, service-cards, testimonials, team, stats, features, pricing, or FAQ.
 
 ## LANGUAGE DETECTION
 ${langOverrideRule}- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
@@ -231,11 +237,11 @@ ORDERING RULES:
 - Place a CTA block every 3-4 sections. First in hero, mid-page, and before footer.
 - NEVER place two text-heavy sections back-to-back. Alternate: text-heavy → visual-heavy → text-heavy
 - Features MUST come before stats (stats need context)
-- Subpages (About, Services, Contact, Blog, etc.) MUST have a logical flow of at least 5 content sections:
-  * About Page: navigation → hero → story (or about) → team → stats → cta → footer
-  * Services/Products Page: navigation → hero → service-cards → features → testimonials → cta → footer
-  * Contact Page: navigation → hero → contact → faq → socials → footer
-  * Blog Page: navigation → hero → blog-list → features → newsletter → footer
+- Subpages MUST follow their page-specific flow without borrowing sections from other pages:
+  * About Page: navigation → optional hero → story/about → team or stats → optional testimonials → optional CTA → footer
+  * Services/Products Page: navigation → optional hero → service-cards or category-specific service block → optional features/pricing/testimonials → FAQ or CTA → footer
+  * Contact Page: navigation → optional hero → contact → optional practical FAQ → footer
+  * Blog Page: navigation → optional hero → blog-list → optional newsletter or CTA → footer
 
 ### Content Quality
 - Hero headline must mention the ACTUAL business name — never generic

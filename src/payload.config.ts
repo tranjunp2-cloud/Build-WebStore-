@@ -43,6 +43,14 @@ import { PlanFeatures } from './collections/PlanFeatures'
 import { Discounts } from './collections/Discounts'
 import { DiscountUsageHistory } from './collections/DiscountUsageHistory'
 import { SsoStepEvents } from './collections/SsoStepEvents'
+import { QaTestRuns } from './collections/QaTestRuns'
+import { QaTestResults } from './collections/QaTestResults'
+import { QaChangeSnapshots } from './collections/QaChangeSnapshots'
+import { QaSmokeDispatches } from './collections/QaSmokeDispatches'
+import { QaFixtureLeases } from './collections/QaFixtureLeases'
+import { QaGithubIssues } from './collections/QaGithubIssues'
+import { QaGithubIssueMappingEvents } from './collections/QaGithubIssueMappingEvents'
+import { QaFindings } from './collections/QaFindings'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -157,6 +165,14 @@ export default buildConfig({
     Discounts,
     DiscountUsageHistory,
     SsoStepEvents,
+    QaTestRuns,
+    QaTestResults,
+    QaChangeSnapshots,
+    QaSmokeDispatches,
+    QaFixtureLeases,
+    QaGithubIssues,
+    QaGithubIssueMappingEvents,
+    QaFindings,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

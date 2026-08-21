@@ -40,6 +40,7 @@ describe('GET /api/users/me', () => {
 
         mockPayload = {
             findByID: vi.fn().mockResolvedValue(mockStaffUser),
+            find: vi.fn().mockResolvedValue({ docs: [] }),
         }
 
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
@@ -103,6 +104,36 @@ describe('GET /api/users/me', () => {
         expect(body).toHaveProperty('avatar')
         expect(body).toHaveProperty('roles')
         expect(body).toHaveProperty('tenants')
+        expect(body).not.toHaveProperty('sites')
+        expect(mockPayload.find).not.toHaveBeenCalled()
+    })
+
+    // TC-F37-03-49: account-derived fixtures receive an independent, tenant-scoped site oracle.
+    it('returns site status only for active tenant memberships', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValue(
+            { id: 'user-1' } as unknown as NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
+        )
+        mockPayload.findByID.mockResolvedValue({
+            id: 'user-1',
+            email: 'owner@test.com',
+            tenants: [
+                { status: 'active', tenant: { id: 72, slug: 'owned' } },
+                { status: 'inactive', tenant: { id: 99, slug: 'inactive' } },
+            ],
+        })
+        mockPayload.find.mockResolvedValue({
+            docs: [{ id: 10, tenant: 72, status: 'published', name: 'private name' }],
+        })
+
+        const res = await GET(new NextRequest('http://localhost/api/users/me?include=site-status'))
+        const body = await res.json()
+
+        expect(mockPayload.find).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'sites',
+            limit: 2,
+            where: { tenant: { in: ['72'] } },
+        }))
+        expect(body.sites).toEqual([{ id: 10, tenant: 72, status: 'published' }])
     })
 })
 

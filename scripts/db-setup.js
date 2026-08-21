@@ -264,6 +264,7 @@ const MIGRATIONS = [
   { name: 'sites.local_business_latitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_latitude numeric;' },
   { name: 'sites.local_business_longitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_longitude numeric;' },
   { name: 'sites.local_business_business_category', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_business_category varchar;' },
+  { name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' },
   { name: 'sites.local_business_price_range', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_price_range varchar;' },
   { name: 'sites.local_business_service_area_description', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_service_area_description varchar;' },
   // ── Products: Halal + Weight ──
@@ -3403,14 +3404,309 @@ const MIGRATIONS = [
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
   },
 
-  // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
-  // Composite index on template_quality_scores(template_id, scored_at DESC)
-  // Note: template_quality_scores_template_scored_idx covers (template_id, scored_at DESC)
-  // so idx_tqs_template_scored is a safe alias — CREATE INDEX IF NOT EXISTS skips if identical.
+  // ── F40: QA run / result / immutable deploy-impact snapshot ──────────────
   {
-    name: 'template_quality_scores.idx_tqs_template_scored',
-    sql: `CREATE INDEX IF NOT EXISTS idx_tqs_template_scored ON template_quality_scores(template_id, scored_at DESC);`,
+    name: 'qa_test_runs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_test_runs (
+      id serial PRIMARY KEY,
+      workflow_run_id varchar NOT NULL,
+      attempt integer NOT NULL,
+      ingest_digest varchar NOT NULL,
+      target_id varchar NOT NULL,
+      suite varchar NOT NULL,
+      profile varchar NOT NULL,
+      runner varchar NOT NULL DEFAULT 'smoke',
+      environment varchar NOT NULL,
+      status varchar NOT NULL,
+      pull_request numeric,
+      commit_sha varchar NOT NULL,
+      started_at timestamptz NOT NULL,
+      finished_at timestamptz NOT NULL,
+      summary_passed numeric NOT NULL DEFAULT 0,
+      summary_failed numeric NOT NULL DEFAULT 0,
+      summary_skipped numeric NOT NULL DEFAULT 0,
+      summary_blocked numeric NOT NULL DEFAULT 0,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
   },
+  {
+    name: 'qa_test_runs.unique_execution',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_test_runs_execution_uniq ON qa_test_runs (workflow_run_id, attempt, target_id, suite);`,
+  },
+  {
+    name: 'qa_test_runs.target_finished_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_runs_target_finished_idx ON qa_test_runs (target_id, finished_at DESC);`,
+  },
+  { name: 'qa_test_runs.alter_ingest_digest', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS ingest_digest varchar;` },
+  { name: 'qa_test_runs.alter_runner', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS runner varchar NOT NULL DEFAULT 'smoke';` },
+  { name: 'qa_test_runs.alter_summary_passed', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_passed numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_failed', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_failed numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_skipped', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_skipped numeric NOT NULL DEFAULT 0;` },
+  { name: 'qa_test_runs.alter_summary_blocked', sql: `ALTER TABLE IF EXISTS qa_test_runs ADD COLUMN IF NOT EXISTS summary_blocked numeric NOT NULL DEFAULT 0;` },
+  {
+    name: 'qa_test_runs.ingest_digest_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_runs_ingest_digest_idx ON qa_test_runs (ingest_digest);`,
+  },
+  {
+    name: 'qa_test_results.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_test_results (
+      id serial PRIMARY KEY,
+      run_id integer NOT NULL REFERENCES qa_test_runs(id) ON DELETE CASCADE,
+      suite varchar NOT NULL,
+      test_case_id varchar NOT NULL,
+      status varchar NOT NULL,
+      duration_ms numeric,
+      assertion_code varchar,
+      expected_count numeric,
+      actual_count numeric,
+      fixture_reference varchar,
+      expected_summary varchar,
+      actual_summary varchar,
+      classification varchar,
+      evidence_kind varchar,
+      artifact_url varchar,
+      artifact_expires_at timestamptz,
+      visual_baseline_url varchar,
+      visual_baseline_expires_at timestamptz,
+      visual_current_url varchar,
+      visual_current_expires_at timestamptz,
+      visual_diff_url varchar,
+      visual_diff_expires_at timestamptz,
+      visual_threshold_percent numeric,
+      visual_difference_percent numeric,
+      visual_review_status varchar,
+      visual_reviewed_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      visual_reviewed_at timestamptz,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_test_results.unique_run_suite_case',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_test_results_run_suite_case_uniq ON qa_test_results (run_id, suite, test_case_id);`,
+  },
+  {
+    name: 'qa_test_results.run_status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_test_results_run_status_idx ON qa_test_results (run_id, status);`,
+  },
+  { name: 'qa_test_results.alter_assertion_code', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS assertion_code varchar;` },
+  { name: 'qa_test_results.alter_expected_count', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS expected_count numeric;` },
+  { name: 'qa_test_results.alter_actual_count', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS actual_count numeric;` },
+  { name: 'qa_test_results.alter_fixture_reference', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS fixture_reference varchar;` },
+  { name: 'qa_test_results.alter_expected_summary', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS expected_summary varchar;` },
+  { name: 'qa_test_results.alter_actual_summary', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS actual_summary varchar;` },
+  { name: 'qa_test_results.alter_classification', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS classification varchar;` },
+  { name: 'qa_test_results.alter_evidence_kind', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS evidence_kind varchar;` },
+  { name: 'qa_test_results.alter_visual_baseline_url', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_baseline_url varchar;` },
+  { name: 'qa_test_results.alter_visual_baseline_expires_at', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_baseline_expires_at timestamptz;` },
+  { name: 'qa_test_results.alter_visual_current_url', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_current_url varchar;` },
+  { name: 'qa_test_results.alter_visual_current_expires_at', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_current_expires_at timestamptz;` },
+  { name: 'qa_test_results.alter_visual_diff_url', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_diff_url varchar;` },
+  { name: 'qa_test_results.alter_visual_diff_expires_at', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_diff_expires_at timestamptz;` },
+  { name: 'qa_test_results.alter_visual_threshold_percent', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_threshold_percent numeric;` },
+  { name: 'qa_test_results.alter_visual_difference_percent', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_difference_percent numeric;` },
+  { name: 'qa_test_results.alter_visual_review_status', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_review_status varchar;` },
+  { name: 'qa_test_results.alter_visual_reviewed_by_id', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_reviewed_by_id integer REFERENCES users(id) ON DELETE SET NULL;` },
+  { name: 'qa_test_results.alter_visual_reviewed_at', sql: `ALTER TABLE IF EXISTS qa_test_results ADD COLUMN IF NOT EXISTS visual_reviewed_at timestamptz;` },
+  {
+    name: 'qa_change_snapshots.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_change_snapshots (
+      id serial PRIMARY KEY,
+      pull_request numeric NOT NULL,
+      commit_sha varchar NOT NULL,
+      environment varchar NOT NULL,
+      changed_paths jsonb NOT NULL,
+      mapped_target_ids jsonb NOT NULL,
+      unmapped_paths jsonb NOT NULL,
+      coverage_map_version varchar NOT NULL,
+      snapshot_digest varchar NOT NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_change_snapshots.immutable_key',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_change_snapshots_pr_sha_uniq ON qa_change_snapshots (pull_request, commit_sha, environment);`,
+  },
+  { name: 'qa_change_snapshots.alter_snapshot_digest', sql: `ALTER TABLE IF EXISTS qa_change_snapshots ADD COLUMN IF NOT EXISTS snapshot_digest varchar;` },
+
+  // ── F40-05: sanitized GitHub issue mirror and confirmed target mapping ──
+  {
+    name: 'qa_github_issues.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_github_issues (
+      id serial PRIMARY KEY,
+      issue_number numeric NOT NULL,
+      url varchar NOT NULL,
+      title varchar NOT NULL,
+      state varchar NOT NULL,
+      labels jsonb NOT NULL,
+      severity varchar NOT NULL,
+      github_updated_at timestamptz NOT NULL,
+      last_synced_at timestamptz NOT NULL,
+      target_id varchar,
+      mapping_status varchar NOT NULL DEFAULT 'unknown',
+      mapping_dismiss_reason varchar,
+      suggested_target_id varchar,
+      mapping_confirmed_at timestamptz,
+      mapping_confirmed_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      mapping_history jsonb NOT NULL DEFAULT '[]'::jsonb,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_github_issues.unique_number', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_github_issues_number_uniq ON qa_github_issues (issue_number);` },
+  { name: 'qa_github_issues.health_idx', sql: `CREATE INDEX IF NOT EXISTS qa_github_issues_health_idx ON qa_github_issues (state, severity, mapping_status, target_id);` },
+  { name: 'qa_github_issues.alter_mapping_history', sql: `ALTER TABLE IF EXISTS qa_github_issues ADD COLUMN IF NOT EXISTS mapping_history jsonb NOT NULL DEFAULT '[]'::jsonb;` },
+  { name: 'qa_github_issues.alter_mapping_dismiss_reason', sql: `ALTER TABLE IF EXISTS qa_github_issues ADD COLUMN IF NOT EXISTS mapping_dismiss_reason varchar;` },
+  {
+    name: 'qa_github_issue_mapping_events.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_github_issue_mapping_events (
+      id serial PRIMARY KEY,
+      github_issue_id integer NOT NULL REFERENCES qa_github_issues(id) ON DELETE CASCADE,
+      action varchar NOT NULL,
+      target_id varchar,
+      reason varchar,
+      actor_id integer NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      occurred_at timestamptz NOT NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_github_issue_mapping_events.issue_time_idx', sql: `CREATE INDEX IF NOT EXISTS qa_github_issue_mapping_events_issue_time_idx ON qa_github_issue_mapping_events (github_issue_id, occurred_at DESC);` },
+
+  // ── F40-06: durable failed-test findings and manual GitHub promotion ─────
+  {
+    name: 'qa_findings.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_findings (
+      id serial PRIMARY KEY,
+      fingerprint varchar NOT NULL,
+      target_id varchar NOT NULL,
+      suite varchar NOT NULL,
+      test_case_id varchar NOT NULL,
+      assertion_code varchar NOT NULL,
+      expected_count numeric,
+      actual_count numeric,
+      severity varchar NOT NULL,
+      lifecycle varchar NOT NULL,
+      owner_id integer REFERENCES users(id) ON DELETE SET NULL,
+      owner varchar NOT NULL DEFAULT 'qa-unassigned',
+      latest_run_id integer NOT NULL REFERENCES qa_test_runs(id) ON DELETE RESTRICT,
+      latest_result_id integer NOT NULL REFERENCES qa_test_results(id) ON DELETE RESTRICT,
+      latest_evidence_expires_at timestamptz,
+      promotion_state varchar NOT NULL DEFAULT 'not_requested',
+      promotion_lease_expires_at timestamptz,
+      github_issue_id integer REFERENCES qa_github_issues(id) ON DELETE SET NULL,
+      github_marker varchar,
+      verified_at timestamptz,
+      lifecycle_audit jsonb NOT NULL DEFAULT '[]'::jsonb,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  { name: 'qa_findings.unique_fingerprint', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_findings_fingerprint_uniq ON qa_findings (fingerprint);` },
+  { name: 'qa_findings.target_lifecycle_idx', sql: `CREATE INDEX IF NOT EXISTS qa_findings_target_lifecycle_idx ON qa_findings (target_id, lifecycle);` },
+  { name: 'qa_findings.latest_result_idx', sql: `CREATE INDEX IF NOT EXISTS qa_findings_latest_result_idx ON qa_findings (latest_result_id);` },
+  { name: 'qa_findings.github_marker_uniq', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_findings_github_marker_uniq ON qa_findings (github_marker) WHERE github_marker IS NOT NULL;` },
+  { name: 'qa_findings.owner', sql: `ALTER TABLE IF EXISTS qa_findings ADD COLUMN IF NOT EXISTS owner varchar NOT NULL DEFAULT 'qa-unassigned';` },
+  { name: 'qa_findings.owner.default', sql: `ALTER TABLE IF EXISTS qa_findings ALTER COLUMN owner SET DEFAULT 'qa-unassigned';` },
+  { name: 'qa_findings.owner.backfill', sql: `UPDATE qa_findings SET owner = 'qa-unassigned' WHERE owner IS NULL OR btrim(owner) = '';` },
+  { name: 'qa_findings.owner.not_null', sql: `ALTER TABLE IF EXISTS qa_findings ALTER COLUMN owner SET NOT NULL;` },
+  { name: 'qa_findings.alter_lifecycle_audit', sql: `ALTER TABLE IF EXISTS qa_findings ADD COLUMN IF NOT EXISTS lifecycle_audit jsonb NOT NULL DEFAULT '[]'::jsonb;` },
+
+  // ── F40-03: automatic targeted Smoke dispatch ledger + fixture leases ───
+  {
+    name: 'qa_smoke_dispatches.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_smoke_dispatches (
+      id serial PRIMARY KEY,
+      dispatch_key varchar NOT NULL,
+      request_digest varchar NOT NULL,
+      workflow_nonce varchar NOT NULL,
+      target_id varchar NOT NULL,
+      pack_id varchar NOT NULL,
+      pack_version integer NOT NULL,
+      profile varchar NOT NULL DEFAULT 'targeted-smoke',
+      fixture_key varchar NOT NULL,
+      fixture_capacity integer NOT NULL,
+      environment varchar NOT NULL,
+      pull_request numeric NOT NULL,
+      commit_sha varchar NOT NULL,
+      status varchar NOT NULL,
+      block_code varchar,
+      recovery_hint varchar,
+      workflow_run_id varchar,
+      workflow_attempt integer,
+      terminal_run_id integer REFERENCES qa_test_runs(id) ON DELETE SET NULL,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  {
+    name: 'qa_smoke_dispatches.unique_dispatch_key',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_smoke_dispatches_dispatch_key_uniq ON qa_smoke_dispatches (dispatch_key);`,
+  },
+  { name: 'qa_smoke_dispatches.alter_workflow_nonce', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS workflow_nonce varchar;` },
+  { name: 'qa_smoke_dispatches.alter_profile', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS profile varchar NOT NULL DEFAULT 'targeted-smoke';` },
+  { name: 'qa_smoke_dispatches.alter_runner', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS runner varchar NOT NULL DEFAULT 'smoke';` },
+  { name: 'qa_smoke_dispatches.fixture_optional_for_non_stateful_runner', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ALTER COLUMN fixture_key DROP NOT NULL; ALTER TABLE IF EXISTS qa_smoke_dispatches ALTER COLUMN fixture_capacity DROP NOT NULL;` },
+  {
+    name: 'qa_smoke_dispatches.workflow_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_workflow_idx ON qa_smoke_dispatches (workflow_run_id, workflow_attempt);`,
+  },
+  {
+    name: 'qa_smoke_dispatches.state_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_state_idx ON qa_smoke_dispatches (status, created_at DESC);`,
+  },
+  // ── F40-07: audited manual targeted runs, cancellation and history ──────
+  { name: 'qa_smoke_dispatches.alter_idempotency_key', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS idempotency_key varchar;` },
+  { name: 'qa_smoke_dispatches.alter_requested_by', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS requested_by_id integer REFERENCES users(id) ON DELETE SET NULL;` },
+  { name: 'qa_smoke_dispatches.alter_cancel_reason', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS cancel_reason varchar;` },
+  { name: 'qa_smoke_dispatches.alter_cancel_requested_at', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS cancel_requested_at timestamptz;` },
+  { name: 'qa_smoke_dispatches.alter_cancelled_at', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;` },
+  { name: 'qa_smoke_dispatches.alter_workflow_cancelled_at', sql: `ALTER TABLE IF EXISTS qa_smoke_dispatches ADD COLUMN IF NOT EXISTS workflow_cancelled_at timestamptz;` },
+  { name: 'qa_smoke_dispatches.requester_idempotency_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS qa_smoke_dispatches_requester_idempotency_uniq ON qa_smoke_dispatches (requested_by_id, idempotency_key) WHERE idempotency_key IS NOT NULL;` },
+  { name: 'qa_smoke_dispatches.target_history_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_target_history_idx ON qa_smoke_dispatches (target_id, created_at DESC);` },
+  { name: 'qa_smoke_dispatches.profile_history_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_profile_history_idx ON qa_smoke_dispatches (profile, created_at DESC);` },
+  { name: 'qa_smoke_dispatches.runner_history_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_runner_history_idx ON qa_smoke_dispatches (runner, created_at DESC);` },
+  { name: 'qa_smoke_dispatches.pr_history_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_pr_history_idx ON qa_smoke_dispatches (pull_request, created_at DESC);` },
+  { name: 'qa_smoke_dispatches.sha_history_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_sha_history_idx ON qa_smoke_dispatches (commit_sha, created_at DESC);` },
+  { name: 'qa_smoke_dispatches.history_key_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_history_key_idx ON qa_smoke_dispatches (created_at DESC, id DESC);` },
+  { name: 'qa_smoke_dispatches.terminal_run_idx', sql: `CREATE INDEX IF NOT EXISTS qa_smoke_dispatches_terminal_run_idx ON qa_smoke_dispatches (terminal_run_id);` },
+  { name: 'qa_smoke_dispatch_history_events.atomic_setup', sql: `BEGIN; CREATE TABLE IF NOT EXISTS qa_smoke_dispatch_history_events (sequence bigserial PRIMARY KEY, dispatch_id integer NOT NULL REFERENCES qa_smoke_dispatches(id) ON DELETE CASCADE, status varchar NOT NULL, occurred_at timestamptz NOT NULL DEFAULT now()); CREATE INDEX IF NOT EXISTS qa_smoke_dispatch_history_events_timeline_idx ON qa_smoke_dispatch_history_events (occurred_at DESC, sequence DESC); CREATE INDEX IF NOT EXISTS qa_smoke_dispatch_history_events_dispatch_idx ON qa_smoke_dispatch_history_events (dispatch_id, occurred_at DESC, sequence DESC); CREATE OR REPLACE FUNCTION record_qa_smoke_dispatch_history_event() RETURNS trigger AS $$ BEGIN IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN INSERT INTO qa_smoke_dispatch_history_events (dispatch_id, status, occurred_at) VALUES (NEW.id, NEW.status, now()); END IF; RETURN NEW; END; $$ LANGUAGE plpgsql; DROP TRIGGER IF EXISTS qa_smoke_dispatch_history_event_trigger ON qa_smoke_dispatches; CREATE TRIGGER qa_smoke_dispatch_history_event_trigger AFTER INSERT OR UPDATE OF status ON qa_smoke_dispatches FOR EACH ROW EXECUTE FUNCTION record_qa_smoke_dispatch_history_event(); INSERT INTO qa_smoke_dispatch_history_events (dispatch_id, status, occurred_at) SELECT d.id, d.status, COALESCE(d.cancelled_at, d.updated_at, d.created_at, now()) FROM qa_smoke_dispatches d WHERE NOT EXISTS (SELECT 1 FROM qa_smoke_dispatch_history_events e WHERE e.dispatch_id = d.id); COMMIT;` },
+  { name: 'qa_test_runs.history_finished_key_idx', sql: `CREATE INDEX IF NOT EXISTS qa_test_runs_history_finished_key_idx ON qa_test_runs (finished_at DESC, id DESC);` },
+  { name: 'qa_test_results.case_run_idx', sql: `CREATE INDEX IF NOT EXISTS qa_test_results_case_run_idx ON qa_test_results (test_case_id, run_id);` },
+  { name: 'qa_test_results.run_evidence_idx', sql: `CREATE INDEX IF NOT EXISTS qa_test_results_run_evidence_idx ON qa_test_results (run_id, artifact_expires_at);` },
+  {
+    name: 'qa_fixture_leases.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS qa_fixture_leases (
+      id serial PRIMARY KEY,
+      dispatch_id integer NOT NULL REFERENCES qa_smoke_dispatches(id) ON DELETE CASCADE,
+      environment varchar NOT NULL,
+      fixture_key varchar NOT NULL,
+      capacity_slot integer NOT NULL,
+      status varchar NOT NULL,
+      acquired_at timestamptz NOT NULL,
+      expires_at timestamptz NOT NULL,
+      released_at timestamptz,
+      updated_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    );`,
+  },
+  // Capacity is protected by withQaTargetedDispatchTransaction's per-fixture
+  // pg_advisory_xact_lock. A partial unique index cannot use now() in its
+  // predicate, so expiry is checked while holding that transaction lock.
+  {
+    name: 'qa_fixture_leases.capacity_lookup_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_fixture_leases_capacity_lookup_idx ON qa_fixture_leases (environment, fixture_key, status, expires_at);`,
+  },
+  {
+    name: 'qa_fixture_leases.dispatch_idx',
+    sql: `CREATE INDEX IF NOT EXISTS qa_fixture_leases_dispatch_idx ON qa_fixture_leases (dispatch_id);`,
+  },
+
+  // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
+  // template_quality_scores_template_scored_idx above already covers
+  // (template_id, scored_at DESC). PERF-04 cleanup removes the old alias.
   // Composite index on ai_generation_records(created_at DESC, status)
   {
     name: 'ai_generation_records.idx_agr_created_status',
@@ -4916,6 +5212,12 @@ const MIGRATIONS = [
     status varchar,
     description text,
     event_time timestamp with time zone,
+    collection_method varchar,
+    source varchar,
+    actor_id varchar,
+    actor_label varchar,
+    previous_status varchar,
+    next_status varchar,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
   );` },
@@ -4978,6 +5280,21 @@ const MIGRATIONS = [
   // ── GH-1333 F36: order detail redesign — self-delivery + pickup schedule ──
   { name: 'orders.self_delivery_courier', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS self_delivery_courier varchar;` },
   { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
+  { name: 'orders.collection_method', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  { name: 'orders.shipping_tracking_history.collection_method', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS collection_method varchar;` },
+  // ── GH-1734: structured audit metadata for manual Self-delivery completion ──
+  { name: 'orders.shipping_tracking_history.source', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS source varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_id', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_id varchar;` },
+  { name: 'orders.shipping_tracking_history.actor_label', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS actor_label varchar;` },
+  { name: 'orders.shipping_tracking_history.previous_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS previous_status varchar;` },
+  { name: 'orders.shipping_tracking_history.next_status', sql: `ALTER TABLE orders_shipping_tracking_history ADD COLUMN IF NOT EXISTS next_status varchar;` },
+  // Freeze legacy rows to the title they render today. Missing order-level method currently
+  // displays as Pickup, so use the same fallback instead of letting a future label rewrite it.
+  { name: 'orders.shipping_tracking_history.collection_method_backfill', sql: `UPDATE orders_shipping_tracking_history AS history
+    SET collection_method = COALESCE(orders.collection_method, 'pickup')
+    FROM orders
+    WHERE history._parent_id = orders.id
+      AND history.collection_method IS NULL;` },
   { name: 'orders.pickup_slot', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot varchar;` },
   // ── GH-1333: persist friendly courier name from EP rate response (e.g. "J&T Express") ──
   { name: 'orders.shipping_courier_name', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_name text;` },
@@ -4994,6 +5311,29 @@ const MIGRATIONS = [
   {
     name: 'enum_analytics_event.add_local_business_data_saved',
     sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
+  },
+  // Keep the already-deployed media provenance columns for backward
+  // compatibility. The retired stock-image catalog is no longer provisioned
+  // or queried by the application.
+  {
+    name: 'media.source_provider',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_provider varchar;`,
+  },
+  {
+    name: 'media.source_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS source_url text;`,
+  },
+  {
+    name: 'media.license_name',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_name varchar;`,
+  },
+  {
+    name: 'media.license_url',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS license_url text;`,
+  },
+  {
+    name: 'media.attribution',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS attribution text;`,
   },
   // ── F08 issue #1587: drop unused Category Image field (YAGNI, stored but never rendered) ──
   {
@@ -5012,6 +5352,280 @@ async function runMigrations(pool) {
       // Log but don't fail — column might already exist with different type etc.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
+  }
+}
+
+// PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the
+// deployment before any DROP runs so staging can never be modified from a stale report.
+const APPROVED_DUPLICATE_INDEX_PAIRS = [
+  {
+    table: 'template_quality_scores',
+    keep: 'template_quality_scores_template_scored_idx',
+    drop: 'idx_tqs_template_scored',
+  },
+];
+
+const DUPLICATE_INDEX_CLEANUP_ERROR = 'DUPLICATE_INDEX_CLEANUP_FAILED';
+const INDEX_IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/;
+
+function duplicateIndexCleanupError(message) {
+  const error = new Error(`[PERF-04] ${message}`);
+  error.code = DUPLICATE_INDEX_CLEANUP_ERROR;
+  return error;
+}
+
+function duplicateIndexFingerprint(index) {
+  return [
+    index.table_name,
+    index.access_method,
+    index.indisunique,
+    index.indisexclusion,
+    index.indnullsnotdistinct,
+    index.indnkeyatts,
+    index.indnatts,
+    index.index_keys,
+    index.operator_classes,
+    index.collations,
+    index.options,
+    index.expressions ?? '',
+    index.predicate ?? '',
+  ].map((value) => String(value)).join('|');
+}
+
+function approvedDuplicateGroupMap(approvedPairs) {
+  const groups = new Map();
+  for (const pair of approvedPairs) {
+    for (const identifier of [pair.table, pair.keep, pair.drop]) {
+      if (!INDEX_IDENTIFIER_PATTERN.test(identifier)) {
+        throw duplicateIndexCleanupError(`unsafe index cleanup identifier: ${identifier}`);
+      }
+    }
+
+    const group = `${pair.table}:${pair.keep}`;
+    for (const indexName of [pair.keep, pair.drop]) {
+      const key = `${pair.table}:${indexName}`;
+      const existingGroup = groups.get(key);
+      if (existingGroup && existingGroup !== group) {
+        throw duplicateIndexCleanupError(`${indexName} belongs to multiple cleanup groups`);
+      }
+      groups.set(key, group);
+    }
+  }
+  return groups;
+}
+
+function partitionDetectedDuplicateIndexPairs(
+  detectedPairs,
+  approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS
+) {
+  const approvedGroups = approvedDuplicateGroupMap(approvedPairs);
+  const approved = [];
+  const unapproved = [];
+  for (const pair of detectedPairs) {
+    const firstGroup = approvedGroups.get(`${pair.table_name}:${pair.index_1}`);
+    const secondGroup = approvedGroups.get(`${pair.table_name}:${pair.index_2}`);
+    if (firstGroup && firstGroup === secondGroup) {
+      approved.push(pair);
+    } else {
+      unapproved.push(pair);
+    }
+  }
+  return { approved, unapproved };
+}
+
+function buildDuplicateIndexCleanupPlan(indexRows, detectedPairs, approvedPairs = APPROVED_DUPLICATE_INDEX_PAIRS) {
+  const { unapproved: unknownPairs } = partitionDetectedDuplicateIndexPairs(detectedPairs, approvedPairs);
+  if (unknownPairs.length > 0) {
+    const names = unknownPairs
+      .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
+      .join(', ');
+    throw duplicateIndexCleanupError(
+      `unapproved exact duplicate indexes detected; audit staging and add explicit keep/drop pairs: ${names}`
+    );
+  }
+
+  const indexByName = new Map(indexRows.map((index) => [index.index_name, index]));
+  const actions = [];
+  for (const pair of approvedPairs) {
+    const keep = indexByName.get(pair.keep);
+    const drop = indexByName.get(pair.drop);
+
+    if (!keep || keep.table_name !== pair.table || !keep.indisvalid || !keep.indisready) {
+      throw duplicateIndexCleanupError(
+        `canonical index ${pair.keep} is missing, invalid, or belongs to the wrong table`
+      );
+    }
+
+    // Already-clean databases are valid and remain idempotent.
+    if (!drop) continue;
+
+    if (drop.table_name !== pair.table) {
+      throw duplicateIndexCleanupError(`${pair.drop} belongs to unexpected table ${drop.table_name}`);
+    }
+    if (drop.indisprimary || drop.indisunique || drop.indisexclusion || drop.constraint_backed) {
+      throw duplicateIndexCleanupError(`${pair.drop} backs a uniqueness/constraint contract and cannot be dropped`);
+    }
+    if (duplicateIndexFingerprint(keep) !== duplicateIndexFingerprint(drop)) {
+      throw duplicateIndexCleanupError(`${pair.keep} and ${pair.drop} are not structurally identical`);
+    }
+
+    actions.push(pair);
+  }
+  return actions;
+}
+
+async function loadApprovedIndexMetadata(client) {
+  const indexNames = [...new Set(
+    APPROVED_DUPLICATE_INDEX_PAIRS.flatMap((pair) => [pair.keep, pair.drop])
+  )];
+  const { rows } = await client.query(
+    `SELECT
+       index_class.relname AS index_name,
+       table_class.relname AS table_name,
+       access_method.amname AS access_method,
+       index_metadata.indisvalid,
+       index_metadata.indisready,
+       index_metadata.indisunique,
+       index_metadata.indisprimary,
+       index_metadata.indisexclusion,
+       index_metadata.indnullsnotdistinct,
+       index_metadata.indnkeyatts,
+       index_metadata.indnatts,
+       index_metadata.indkey::text AS index_keys,
+       index_metadata.indclass::text AS operator_classes,
+       index_metadata.indcollation::text AS collations,
+       index_metadata.indoption::text AS options,
+       pg_get_expr(index_metadata.indexprs, index_metadata.indrelid, true) AS expressions,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate,
+       EXISTS (
+         SELECT 1 FROM pg_constraint
+         WHERE pg_constraint.conindid = index_metadata.indexrelid
+       ) AS constraint_backed
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     JOIN pg_am AS access_method ON access_method.oid = index_class.relam
+     WHERE table_namespace.nspname = 'public'
+       AND index_class.relname = ANY($1::text[])`,
+    [indexNames]
+  );
+  return rows;
+}
+
+async function detectExactDuplicateIndexPairs(client) {
+  const { rows } = await client.query(
+    `SELECT
+       table_class.relname AS table_name,
+       first_index_class.relname AS index_1,
+       second_index_class.relname AS index_2
+     FROM pg_index AS first_index
+     JOIN pg_index AS second_index
+       ON first_index.indrelid = second_index.indrelid
+      AND first_index.indexrelid < second_index.indexrelid
+      AND first_index.indkey = second_index.indkey
+      AND first_index.indclass = second_index.indclass
+      AND first_index.indcollation = second_index.indcollation
+      AND first_index.indoption = second_index.indoption
+      AND first_index.indnkeyatts = second_index.indnkeyatts
+      AND first_index.indnatts = second_index.indnatts
+      AND first_index.indisunique = second_index.indisunique
+      AND first_index.indisexclusion = second_index.indisexclusion
+      AND first_index.indnullsnotdistinct = second_index.indnullsnotdistinct
+      AND COALESCE(first_index.indexprs::text, '') = COALESCE(second_index.indexprs::text, '')
+      AND COALESCE(first_index.indpred::text, '') = COALESCE(second_index.indpred::text, '')
+     JOIN pg_class AS table_class ON table_class.oid = first_index.indrelid
+     JOIN pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+     JOIN pg_class AS first_index_class ON first_index_class.oid = first_index.indexrelid
+     JOIN pg_class AS second_index_class ON second_index_class.oid = second_index.indexrelid
+     WHERE table_namespace.nspname = 'public'
+       AND first_index.indisvalid
+       AND second_index.indisvalid
+       AND NOT first_index.indisprimary
+       AND NOT second_index.indisprimary
+       AND NOT first_index.indisunique
+       AND NOT second_index.indisunique
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_constraint
+         WHERE pg_constraint.conindid IN (first_index.indexrelid, second_index.indexrelid)
+       )
+     ORDER BY table_class.relname, first_index_class.relname, second_index_class.relname`
+  );
+  return rows;
+}
+
+function quoteIndexIdentifier(identifier) {
+  if (!INDEX_IDENTIFIER_PATTERN.test(identifier)) {
+    throw duplicateIndexCleanupError(`unsafe index identifier: ${identifier}`);
+  }
+  return `"${identifier}"`;
+}
+
+async function cleanupApprovedDuplicateIndexes(pool) {
+  const client = await pool.connect();
+  let lockAcquired = false;
+  try {
+    const lockResult = await client.query(
+      `SELECT pg_try_advisory_lock(hashtext($1)) AS locked`,
+      ['db-setup:perf-04-duplicate-index-cleanup']
+    );
+    lockAcquired = lockResult.rows[0]?.locked === true;
+    if (!lockAcquired) {
+      throw duplicateIndexCleanupError('another duplicate-index cleanup is already running');
+    }
+
+    const detectedPairs = await detectExactDuplicateIndexPairs(client);
+    const {
+      approved: approvedDetectedPairs,
+      unapproved: unapprovedDetectedPairs,
+    } = partitionDetectedDuplicateIndexPairs(detectedPairs);
+    if (unapprovedDetectedPairs.length > 0) {
+      const names = unapprovedDetectedPairs
+        .map((pair) => `${pair.table_name}(${pair.index_1}, ${pair.index_2})`)
+        .join(', ');
+      console.warn(
+        `[db-setup] ⚠️ PERF-04 skipped unapproved exact duplicate indexes; audit before cleanup: ${names}`
+      );
+    }
+    const beforeRows = await loadApprovedIndexMetadata(client);
+    const actions = buildDuplicateIndexCleanupPlan(beforeRows, approvedDetectedPairs);
+
+    if (actions.length === 0) {
+      console.log('[db-setup] ✅ PERF-04 duplicate indexes already clean');
+      return;
+    }
+
+    // CONCURRENTLY cannot run inside a transaction. Session timeouts keep a busy
+    // staging database from holding the build indefinitely.
+    await client.query(`SET lock_timeout = '5s'`);
+    await client.query(`SET statement_timeout = '60s'`);
+    for (const action of actions) {
+      await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${quoteIndexIdentifier(action.drop)}`);
+      console.log(`[db-setup] ✅ PERF-04 dropped duplicate index ${action.drop}; kept ${action.keep}`);
+    }
+
+    const afterRows = await loadApprovedIndexMetadata(client);
+    const afterByName = new Map(afterRows.map((index) => [index.index_name, index]));
+    for (const pair of APPROVED_DUPLICATE_INDEX_PAIRS) {
+      const keep = afterByName.get(pair.keep);
+      if (!keep || !keep.indisvalid || !keep.indisready || afterByName.has(pair.drop)) {
+        throw duplicateIndexCleanupError(`post-cleanup verification failed for ${pair.table}`);
+      }
+    }
+    console.log('[db-setup] ✅ PERF-04 duplicate-index cleanup verified');
+  } catch (error) {
+    if (error?.code === DUPLICATE_INDEX_CLEANUP_ERROR) throw error;
+    throw duplicateIndexCleanupError(error instanceof Error ? error.message : String(error));
+  } finally {
+    await client.query('RESET lock_timeout').catch(() => {});
+    await client.query('RESET statement_timeout').catch(() => {});
+    if (lockAcquired) {
+      await client.query(
+        `SELECT pg_advisory_unlock(hashtext($1))`,
+        ['db-setup:perf-04-duplicate-index-cleanup']
+      ).catch(() => {});
+    }
+    client.release();
   }
 }
 
@@ -5086,6 +5700,47 @@ async function runCategorySlugTenantMigration(pool) {
   }
 }
 
+async function ensureRuntimeIssueUniqueIndex(pool) {
+  const duplicateRuntimeIssues = await pool.query(
+    `SELECT related_id, COUNT(*)::integer AS duplicate_count
+     FROM template_issues
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL
+     GROUP BY related_id
+     HAVING COUNT(*) > 1
+     ORDER BY duplicate_count DESC, related_id
+     LIMIT 10`
+  );
+  if (duplicateRuntimeIssues.rows.length > 0) {
+    const summary = duplicateRuntimeIssues.rows
+      .map((row) => `${row.related_id} (${row.duplicate_count})`)
+      .join(', ');
+    throw new Error(
+      `Cannot create template_issues_runtime_related_id_uniq: duplicate runtime related_id values exist: ${summary}`
+    );
+  }
+
+  await pool.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_runtime_related_id_uniq
+     ON template_issues (related_id)
+     WHERE related_type = 'runtime' AND related_id IS NOT NULL`
+  );
+  console.log('[db-setup] ✅ template_issues.runtime_related_unique_idx (fail-closed)');
+}
+
+function normalizeIndexPredicate(predicate) {
+  return String(predicate ?? '')
+    .replaceAll('"', '')
+    // PostgreSQL renders enum columns with their concrete type cast (for
+    // example ::enum_template_issues_related_type). Casts do not change the
+    // predicate semantics and vary by schema/type, so remove them before the
+    // exact normalized expression comparison below.
+    .replace(/::[a-z_][a-z0-9_.]*/gi, '')
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 /**
  * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
  * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
@@ -5123,6 +5778,37 @@ async function verifyCriticalIndexes(pool) {
     );
   }
   console.log('[db-setup] ✅ verified categories_tenant_slug_uniq exists');
+
+  // F39: runtime issue promotion uses related_type + related_id as its idempotency
+  // boundary. The general migration loop warns-and-continues, so verify the exact
+  // partial unique index definition and fail the build if uniqueness is absent.
+  const runtimeIssueIndex = await pool.query(
+    `SELECT
+       index_metadata.indisunique,
+       index_metadata.indisvalid,
+       pg_get_indexdef(index_metadata.indexrelid, 1, true) AS indexkey,
+       pg_get_expr(index_metadata.indpred, index_metadata.indrelid, true) AS predicate
+     FROM pg_index AS index_metadata
+     JOIN pg_class AS index_class ON index_class.oid = index_metadata.indexrelid
+     JOIN pg_class AS table_class ON table_class.oid = index_metadata.indrelid
+     JOIN pg_namespace AS index_namespace ON index_namespace.oid = index_class.relnamespace
+     WHERE index_namespace.nspname = 'public'
+       AND index_class.relname = 'template_issues_runtime_related_id_uniq'
+       AND table_class.relname = 'template_issues'`
+  );
+  const runtimeIndex = runtimeIssueIndex.rows[0];
+  const runtimePredicate = normalizeIndexPredicate(runtimeIndex?.predicate);
+  if (
+    !runtimeIndex?.indisunique ||
+    !runtimeIndex?.indisvalid ||
+    runtimeIndex.indexkey !== 'related_id' ||
+    runtimePredicate !== "related_type = 'runtime' and related_id is not null"
+  ) {
+    throw new Error(
+      'template_issues_runtime_related_id_uniq missing or invalid after migrations — exact runtime issue promotion deduplication is not enforced.'
+    );
+  }
+  console.log('[db-setup] ✅ verified template_issues_runtime_related_id_uniq definition');
 
   // GH-1432: these indexes are part of the product-list performance contract.
   // runMigrations() intentionally warns and continues for general migrations, so
@@ -5225,6 +5911,14 @@ const COLLECTION_SLUGS = [
   'discounts',
   'discount_usage_history',
   'sso-step-events',
+  'qa_test_runs',
+  'qa_test_results',
+  'qa_change_snapshots',
+  'qa_smoke_dispatches',
+  'qa_fixture_leases',
+  'qa_github_issues',
+  'qa_github_issue_mapping_events',
+  'qa_findings',
 
 ];
 
@@ -5324,7 +6018,9 @@ async function checkDB() {
     // Run direct SQL migrations (idempotent — always safe)
     if (tableCount > 0) {
       await runMigrations(pool);
+      await cleanupApprovedDuplicateIndexes(pool);
       await runCategorySlugTenantMigration(pool);
+      await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
     }
@@ -5341,6 +6037,7 @@ async function checkDB() {
   } catch (e) {
     console.error('[db-setup] DB check failed:', e.message);
     await pool.end().catch(() => { });
+    if (e?.code === DUPLICATE_INDEX_CLEANUP_ERROR) throw e;
     return { needsPush: false, tableCount: -1 };
   }
 }
@@ -5535,7 +6232,9 @@ async function main() {
 
       if (tableCount > 0) {
         await runMigrations(pool);
+        await cleanupApprovedDuplicateIndexes(pool);
         await runCategorySlugTenantMigration(pool);
+        await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);
@@ -5717,4 +6416,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = { MIGRATIONS };
+module.exports = {
+  MIGRATIONS,
+  APPROVED_DUPLICATE_INDEX_PAIRS,
+  buildDuplicateIndexCleanupPlan,
+  cleanupApprovedDuplicateIndexes,
+  partitionDetectedDuplicateIndexPairs,
+  normalizeIndexPredicate,
+};

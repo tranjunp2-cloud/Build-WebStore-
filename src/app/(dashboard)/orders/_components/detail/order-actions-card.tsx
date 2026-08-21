@@ -5,8 +5,10 @@ import { Info, CheckCircle2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { CancelOrderModal } from '../CancelOrderModal'
 import { RefundDialog } from './refund-dialog'
+import { CompleteOrderDialog } from './complete-order-dialog'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 import './side.css'
 
 // ── Terminal / pre-ship state logic ──────────────────────────────────────────
@@ -50,6 +52,7 @@ export interface OrderActionsCardOrder {
     xenditChannelCode?: string | null
     awbNo?: string | null
     shippingTrackingStatus?: string | null
+    selfDeliveryCourier?: string | null
 }
 
 export function OrderActionsCard({
@@ -67,13 +70,25 @@ export function OrderActionsCard({
     const [isLoading, setIsLoading] = useState(false)
     const [cancelOpen, setCancelOpen] = useState(false)
     const [refundOpen, setRefundOpen] = useState(false)
+    const [completeOpen, setCompleteOpen] = useState(false)
 
-    const { status, id, orderNumber, awbNo, total, currency, paymentMethod, xenditChannelCode } = order
+    const {
+        status,
+        id,
+        orderNumber,
+        awbNo,
+        total,
+        currency,
+        paymentMethod,
+        xenditChannelCode,
+        selfDeliveryCourier,
+    } = order
 
     if (!shouldShowCard(status)) return null
 
     const canCancel = isCancelAllowed(status)
     const canRefund = isRefundAllowed(status)
+    const canComplete = status === 'shipped' && Boolean(selfDeliveryCourier)
     const isRefunded = status === 'refunded'
 
     // Pre-format for dialog and note
@@ -131,14 +146,41 @@ export function OrderActionsCard({
         }
     }
 
+    const handleComplete = async () => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed' }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                console.error('Failed to complete self-delivery order:', data.error)
+                throw new Error('API_ERROR')
+            }
+            toast.success(t.dashboard.orders.complete.success)
+            setCompleteOpen(false)
+            onUpdate()
+        } catch (err: unknown) {
+            console.error('Complete order error:', err)
+            toast.error(t.dashboard.orders.complete.failed)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     // Whether ANY actionable button shows (cancel / refund / refunded chip)
-    const hasAction = canCancel || canRefund || isRefunded
+    const hasAction = canCancel || canComplete || canRefund || isRefunded
+    const actionCount = [canCancel, canComplete, canRefund || isRefunded].filter(Boolean).length
 
     // Note copy: conditional per status. When no action is available (e.g. ready_to_ship
     // — label bought, courier not yet collected) the generic "cancelling a paid order…"
     // copy is misleading (there's no Cancel button), so show a state-specific note.
     const actionNote = isRefunded
         ? ti(r.noteRefunded, { amount: refundAmountFormatted })
+        : canComplete
+        ? t.dashboard.orders.complete.note
         : canRefund
         ? r.noteCanRefund
         : canCancel
@@ -153,7 +195,7 @@ export function OrderActionsCard({
                 {/* Actions row only when there's a button — an empty row leaves dead space.
                     2-col when cancel+refund both visible, 1-col otherwise. */}
                 {hasAction && (
-                <div className={`pay-actions${canCancel ? '' : ' single'}`}>
+                <div className={`pay-actions${actionCount === 1 ? ' single' : ''}`}>
                     {canCancel && (
                         <button
                             className="btn-danger-soft"
@@ -162,6 +204,17 @@ export function OrderActionsCard({
                         >
                             {t.dashboard.orders.actions.cancelOrder}
                         </button>
+                    )}
+                    {canComplete && (
+                        <Button
+                            variant="dashPrimary"
+                            className="w-full h-[38px] rounded-lg text-[13px]"
+                            disabled={isLoading}
+                            onClick={() => setCompleteOpen(true)}
+                        >
+                            <CheckCircle2 style={{ width: 15, height: 15 }} />
+                            {t.dashboard.orders.actions.completeOrder}
+                        </Button>
                     )}
                     {/* Refund button: enabled (btn-refund-soft) or done (btn-outline disabled) */}
                     {isRefunded ? (
@@ -204,6 +257,14 @@ export function OrderActionsCard({
                 isLoading={isLoading}
                 onBack={() => setRefundOpen(false)}
                 onConfirm={handleRefundConfirm}
+            />
+
+            <CompleteOrderDialog
+                orderNumber={orderNumber}
+                isOpen={completeOpen}
+                isLoading={isLoading}
+                onBack={() => setCompleteOpen(false)}
+                onConfirm={handleComplete}
             />
         </>
     )

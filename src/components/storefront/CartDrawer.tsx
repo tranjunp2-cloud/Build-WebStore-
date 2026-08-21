@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useCartStore } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingCart, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,6 +21,10 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount, siteId: activeSiteId, siteSlug: activeSiteSlug, refreshStatus, refreshCart, changes } = useCartStore()
     const isOwner = useIsOwner()
     const { t } = useI18n()
+    const prefersReducedMotion = useReducedMotion()
+    const drawerRef = useRef<HTMLElement>(null)
+    const closeButtonRef = useRef<HTMLButtonElement>(null)
+    const previousFocusRef = useRef<HTMLElement | null>(null)
     const pathname = usePathname()
     const shopBase = pathname.startsWith('/sites/') ? `/sites/${siteSlug}` : ''
     const hasCheckoutRoute = Boolean(siteSlug)
@@ -36,7 +41,59 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
         if (isOpen && activeSiteId && activeSiteSlug) void refreshCart()
     }, [activeSiteId, activeSiteSlug, isOpen, refreshCart])
 
-    if (!isOpen) return null
+    useEffect(() => {
+        if (!isOpen) return
+
+        previousFocusRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+        const focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus())
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault()
+                closeCart()
+                return
+            }
+            if (event.key !== 'Tab') return
+
+            const drawer = drawerRef.current
+            if (!drawer) return
+            const focusable = Array.from(drawer.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ))
+            if (focusable.length === 0) {
+                event.preventDefault()
+                drawer.focus()
+                return
+            }
+
+            const first = focusable[0]!
+            const last = focusable[focusable.length - 1]!
+            const active = document.activeElement
+            if (!drawer.contains(active)) {
+                event.preventDefault()
+                ;(event.shiftKey ? last : first).focus()
+            } else if (event.shiftKey && active === first) {
+                event.preventDefault()
+                last.focus()
+            } else if (!event.shiftKey && active === last) {
+                event.preventDefault()
+                first.focus()
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown)
+        return () => {
+            window.cancelAnimationFrame(focusFrame)
+            document.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [closeCart, isOpen])
+
+    const restorePreviousFocus = useCallback(() => {
+        if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus()
+        previousFocusRef.current = null
+    }, [])
 
     const currency = items[0]?.currency || 'MYR'
     const ctaBtnStyle: React.CSSProperties = {
@@ -50,21 +107,42 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
     }
 
     return (
-        <>
-            <div onClick={closeCart} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 998 }} />
+        <AnimatePresence onExitComplete={restorePreviousFocus}>
+            {isOpen ? (
+                <>
+                    <motion.div
+                        data-testid="cart-drawer-backdrop"
+                        initial={prefersReducedMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.18, ease: 'easeOut' }}
+                        onClick={closeCart}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 998 }}
+                    />
 
-            <div style={{
-                position: 'fixed', top: 0, right: 0, bottom: 0, width: '410px', maxWidth: '100vw',
-                background: '#ffffff', zIndex: 999, display: 'flex', flexDirection: 'column',
-                padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-                fontFamily: CSS_VARS.fontBody, color: '#191c1d',
-            }}>
+                    <motion.aside
+                        ref={drawerRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="cart-drawer-title"
+                        tabIndex={-1}
+                        initial={prefersReducedMotion ? false : { x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={prefersReducedMotion ? { x: 0 } : { x: '100%' }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        style={{
+                            position: 'fixed', top: 0, right: 0, bottom: 0, width: '410px', maxWidth: '100vw',
+                            background: '#ffffff', zIndex: 999, display: 'flex', flexDirection: 'column',
+                            padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                            fontFamily: CSS_VARS.fontBody, color: '#191c1d',
+                        }}
+                    >
                 {/* Header */}
                 <div style={{ paddingBottom: '40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ShoppingCart size={20} style={{ color: CSS_VARS.primary, flexShrink: 0 }} />
                         <div>
-                            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: CSS_VARS.primary, letterSpacing: '-0.5px', lineHeight: '28px', fontFamily: CSS_VARS.fontHeading }}>
+                            <h2 id="cart-drawer-title" style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: CSS_VARS.primary, letterSpacing: '-0.5px', lineHeight: '28px', fontFamily: CSS_VARS.fontHeading }}>
                                 {t.storefront.cart.drawerTitle} ({itemCount()})
                             </h2>
                             <p style={{ margin: 0, fontSize: '12px', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.3px', lineHeight: '16px' }}>
@@ -72,8 +150,8 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                             </p>
                         </div>
                     </div>
-                    <button onClick={closeCart} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '12px' }}>
-                        <X size={14} color={'#71717a'} />
+                    <button ref={closeButtonRef} type="button" onClick={closeCart} aria-label="Close cart" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '12px' }}>
+                        <X size={14} color={'#71717a'} aria-hidden="true" />
                     </button>
                 </div>
 
@@ -117,8 +195,8 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 )}
                                                 {item.unavailable && <p role="alert" style={{ fontSize: '12px', color: '#b42318', margin: '4px 0 0' }}>{t.storefront.cart.itemUnavailable}</p>}
                                             </div>
-                                            <button onClick={() => removeItem(item.productId, item.variantName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: '8px' }}>
-                                                <Trash2 size={11} color={'#71717a'} />
+                                            <button type="button" onClick={() => removeItem(item.productId, item.variantName)} aria-label={`Remove ${item.name} from cart`} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: '8px' }}>
+                                                <Trash2 size={11} color={'#71717a'} aria-hidden="true" />
                                             </button>
                                         </div>
 
@@ -130,19 +208,23 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 borderRadius: '4px',
                                             }}>
                                                 <button
+                                                    type="button"
                                                     onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantName)}
-                                                    disabled={item.unavailable || item.quantity <= 1}
-                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.quantity <= 1 ? 0.3 : 1 }}>
-                                                    <Minus size={7} />
+                                                    disabled={item.unavailable}
+                                                    aria-label={`Decrease quantity for ${item.name}`}
+                                                    style={{ background: 'none', border: 'none', cursor: item.unavailable ? 'not-allowed' : 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.unavailable ? 0.3 : 1 }}>
+                                                    <Minus size={7} aria-hidden="true" />
                                                 </button>
                                                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1d', padding: '4px 12px', lineHeight: '20px' }}>
                                                     {item.quantity}
                                                 </span>
                                                 <button
+                                                    type="button"
                                                     onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantName)}
                                                     disabled={item.unavailable || (item.inventory !== undefined && item.quantity >= item.inventory)}
+                                                    aria-label={`Increase quantity for ${item.name}`}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: (item.inventory !== undefined && item.quantity >= item.inventory) ? 0.3 : 1 }}>
-                                                    <Plus size={7} />
+                                                    <Plus size={7} aria-hidden="true" />
                                                 </button>
                                             </div>
                                             <span style={{ fontSize: '16px', fontWeight: 700, color: CSS_VARS.primary, lineHeight: '24px', fontFamily: CSS_VARS.fontHeading }}>
@@ -190,7 +272,9 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                         )}
                     </div>
                 </div>
-            </div>
-        </>
+                    </motion.aside>
+                </>
+            ) : null}
+        </AnimatePresence>
     )
 }

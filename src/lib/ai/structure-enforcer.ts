@@ -24,6 +24,7 @@ import { buildBlockFromLibrary, padItems, type InjectionContext } from './conten
 import { seededShufflePick, hashString } from './seeded-random'
 import { CATEGORY_RECIPES, type CategoryRecipe, type RecipeCategory } from './category-recipes'
 import { isUnsupportedBlock } from './unsupported-blocks'
+import { TEMPLATE_RULES } from './template-rules'
 
 /**
  * Plan 2253 follow-up (R1 fix) — pick 1 of 3 hand-curated category recipes
@@ -51,6 +52,117 @@ function recipeBlocksUsable(recipe: CategoryRecipe): string[] {
 }
 
 type Block = Record<string, unknown>
+
+const NON_REPEATABLE_CONTENT_BLOCKS = new Set(['contact'])
+const CONTENT_FALLBACK_TYPES = ['features', 'about', 'services', 'contact', 'testimonials', 'faq']
+export const MIN_SUBPAGE_CONTENT_SECTIONS = 5
+
+interface SubpageStructureProfile {
+    allowedBlocks: readonly string[]
+    requiredBlocks: readonly string[]
+    padCandidates: readonly string[]
+    minContentSections: number
+}
+
+function normalizePageSlug(pageSlug?: string): string {
+    if (!pageSlug) return ''
+    return `/${pageSlug.trim().replace(/^\/+|\/+$/g, '').toLowerCase()}`
+}
+
+function getSubpageStructureProfile(
+    category: string,
+    pageSlug?: string,
+): SubpageStructureProfile | null {
+    switch (normalizePageSlug(pageSlug)) {
+        case '/about':
+            return {
+                allowedBlocks: ['hero', 'about', 'features', 'stats', 'team', 'testimonials', 'cta'],
+                requiredBlocks: ['about'],
+                padCandidates: ['about', 'stats', 'features', 'team', 'testimonials', 'cta'],
+                minContentSections: 4,
+            }
+        case '/services':
+        case '/products': {
+            const industryBlocks = TEMPLATE_RULES[category]?.industryBlocks ?? []
+            const allowedBlocks = [...new Set([
+                'hero',
+                'service-cards',
+                ...industryBlocks,
+                'features',
+                'pricing',
+                'faq',
+                'testimonials',
+                'logo-cloud',
+                'feature-comparison',
+                'cta',
+            ])]
+            const padCandidates = [...new Set([
+                'service-cards',
+                ...industryBlocks,
+                'features',
+                'pricing',
+                'faq',
+                'testimonials',
+                'cta',
+            ])]
+            return {
+                allowedBlocks,
+                requiredBlocks: [],
+                padCandidates,
+                minContentSections: 4,
+            }
+        }
+        case '/blog':
+            return {
+                allowedBlocks: ['hero', 'blog-list', 'newsletter', 'cta'],
+                requiredBlocks: ['blog-list'],
+                padCandidates: ['blog-list', 'newsletter', 'cta'],
+                minContentSections: 3,
+            }
+        case '/contact':
+            return {
+                allowedBlocks: ['hero', 'contact', 'faq'],
+                requiredBlocks: ['contact'],
+                padCandidates: ['contact', 'faq'],
+                minContentSections: 1,
+            }
+        default:
+            return null
+    }
+}
+
+export function getSubpageContentTarget(pageSlug?: string): number {
+    const normalized = normalizePageSlug(pageSlug)
+    if (normalized === '/about' || normalized === '/services' || normalized === '/products') return 4
+    if (normalized === '/blog') return 3
+    if (normalized === '/contact') return 1
+    return MIN_SUBPAGE_CONTENT_SECTIONS
+}
+
+function enforceProfileContent(
+    blocks: Block[],
+    profile: SubpageStructureProfile,
+    category: string,
+    ctx: InjectionContext,
+): Block[] {
+    const firstByType = new Map<string, Block>()
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        if (profile.allowedBlocks.includes(blockType) && !firstByType.has(blockType)) {
+            firstByType.set(blockType, block)
+        }
+    }
+
+    for (const blockType of profile.requiredBlocks) {
+        if (firstByType.has(blockType)) continue
+        const block = buildBlockFromLibrary(blockType, category, ctx)
+        if (block) firstByType.set(blockType, block)
+    }
+
+    return profile.allowedBlocks
+        .map((blockType) => firstByType.get(blockType))
+        .filter((block): block is Block => Boolean(block))
+}
 
 /** Insertion index resolver — places new blocks in sensible positions. */
 function findInsertionIndex(blocks: Block[], blockType: string): number {
@@ -271,11 +383,17 @@ export function enforceSubpageStructure(
     blocks: Block[],
     category: string,
     ctx: InjectionContext = {},
+    pageSlug?: string,
 ): Block[] {
     const out = [...blocks]
     const navBlock = out.find((b) => b.blockType === 'navigation')
     const footerBlock = out.find((b) => b.blockType === 'footer')
-    const contentBlocks = out.filter((b) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+    let contentBlocks = out.filter((b) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+    const profile = getSubpageStructureProfile(category, pageSlug)
+
+    if (profile) {
+        contentBlocks = enforceProfileContent(contentBlocks, profile, category, ctx)
+    }
 
     const req = getCategoryRequirement(category)
     const recipe = pickSkeletonRecipe(category, ctx.seed ?? 0)
@@ -285,9 +403,9 @@ export function enforceSubpageStructure(
     )
 
     const padCandidates = [
-        ...usableBlocks,
-        ...req.recommendedBlocks,
-    ].filter((b) => 
+        ...(profile ? profile.padCandidates : usableBlocks),
+        ...(profile ? [] : req.recommendedBlocks),
+    ].filter((b) =>
         b !== 'navigation' && 
         b !== 'footer' && 
         b !== 'hero' &&
@@ -295,21 +413,27 @@ export function enforceSubpageStructure(
         !isUnsupportedBlock(b)
     )
 
-    const fallbackTypes = ['features', 'about', 'services', 'contact', 'testimonials', 'faq']
-    for (const type of fallbackTypes) {
+    for (const type of profile ? [] : CONTENT_FALLBACK_TYPES) {
         if (!padCandidates.includes(type) && !presentTypes.has(type)) {
             padCandidates.push(type)
         }
     }
 
     let guard = 0
-    // Pad content blocks to at least 5 blocks (so total page blocks is at least 7 with nav + footer)
-    while (contentBlocks.length < 5 && guard < padCandidates.length + 10) {
+    const targetContentSections = profile?.minContentSections ?? MIN_SUBPAGE_CONTENT_SECTIONS
+    // Pad content blocks to the page-specific floor (plus navigation and footer).
+    while (
+        contentBlocks.length < targetContentSections
+        && guard < padCandidates.length + 10
+    ) {
         guard++
         const next = padCandidates.find((b) => !presentTypes.has(b))
         if (!next) {
+            if (profile) break
             // Duplicate non-hero/non-nav/non-footer content blocks if candidates exhausted
-            const repeatCandidates = fallbackTypes.filter((b) => b !== 'hero' && b !== 'navigation' && b !== 'footer')
+            const repeatCandidates = CONTENT_FALLBACK_TYPES.filter(
+                (b) => !NON_REPEATABLE_CONTENT_BLOCKS.has(b),
+            )
             const repeat = repeatCandidates[guard % repeatCandidates.length]
             const injected = buildBlockFromLibrary(repeat, category, ctx)
             if (injected) {
@@ -347,6 +471,63 @@ export function enforceSubpageStructure(
     applyStructuralVariantRotation(finalBlocks, category, ctx.seed ?? 0)
 
     return finalBlocks
+}
+
+/**
+ * Restore content removed by cross-page quality checks without re-running the
+ * full structure enforcer. Existing blocks keep their order and variants; only
+ * missing content is inserted immediately before the footer.
+ */
+export function backfillContentSections(
+    blocks: Block[],
+    category: string,
+    targetContentCount: number,
+    ctx: InjectionContext = {},
+    excludedBlockTypes: ReadonlySet<string> = new Set(),
+    pageSlug?: string,
+): Block[] {
+    const out = [...blocks]
+    const isContentBlock = (block: Block) =>
+        block.blockType !== 'navigation' && block.blockType !== 'footer'
+    let contentCount = out.filter(isContentBlock).length
+
+    if (contentCount >= targetContentCount) return out
+
+    const presentTypes = new Set(
+        out.map((block) => (
+            typeof block.blockType === 'string' ? block.blockType : ''
+        )).filter(Boolean),
+    )
+    const recipe = pickSkeletonRecipe(category, ctx.seed ?? 0)
+    const req = getCategoryRequirement(category)
+    const profile = getSubpageStructureProfile(category, pageSlug)
+    const candidates = [
+        ...(profile?.padCandidates ?? (recipe ? recipeBlocksUsable(recipe) : [])),
+        ...(profile ? [] : req.recommendedBlocks),
+        ...(profile ? [] : CONTENT_FALLBACK_TYPES),
+    ].filter((blockType, index, all) =>
+        all.indexOf(blockType) === index
+        && blockType !== 'navigation'
+        && blockType !== 'footer'
+        && blockType !== 'hero'
+        && !excludedBlockTypes.has(blockType)
+        && !isUnsupportedBlock(blockType),
+    )
+
+    for (const blockType of candidates) {
+        if (contentCount >= targetContentCount) break
+        if (presentTypes.has(blockType)) continue
+
+        const injected = buildBlockFromLibrary(blockType, category, ctx)
+        if (!injected) continue
+
+        const footerIndex = out.findIndex((block) => block.blockType === 'footer')
+        out.splice(footerIndex >= 0 ? footerIndex : out.length, 0, injected)
+        presentTypes.add(blockType)
+        contentCount++
+    }
+
+    return out
 }
 
 /**
@@ -398,10 +579,17 @@ export function enforceMinItems(
     const mins = req.minItems
     if (!mins) return blocks
 
-    for (const block of blocks) {
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+        const block = blocks[blockIndex]!
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
         if (!blockType) continue
-        const minCount = mins[blockType]
+        const configuredMin = mins[blockType] ?? 0
+        const isFeaturedServiceCards =
+            blockType === 'service-cards' && block.variant === 'featured'
+        const serviceCardsTarget = blockType === 'service-cards'
+            ? (isFeaturedServiceCards ? 4 : 3)
+            : null
+        const minCount = serviceCardsTarget ?? configuredMin
         if (minCount == null || minCount <= 0) continue
 
         const itemField = ITEM_FIELD_BY_BLOCK[blockType]
@@ -409,6 +597,14 @@ export function enforceMinItems(
 
         const current = block[itemField]
         if (!Array.isArray(current)) continue
+
+        if (serviceCardsTarget && current.length > serviceCardsTarget) {
+            block[itemField] = current.slice(0, serviceCardsTarget)
+            console.info(
+                `[Structure Enforcer] normalized service-cards.${String(block.variant)}: ${current.length} → ${serviceCardsTarget}`,
+            )
+            continue
+        }
         if (current.length >= minCount) continue
 
         const padded = padItems(blockType, current, minCount, category, ctx)
@@ -416,6 +612,16 @@ export function enforceMinItems(
         console.info(
             `[Structure Enforcer] padded ${blockType}.${itemField}: ${current.length} → ${padded.length}`,
         )
+        if (isFeaturedServiceCards && padded.length === 3) {
+            block.variant = 'grid'
+            console.info(
+                `[Structure Enforcer] changed service-cards variant featured → grid because locale-safe padding could not reach 4 items`,
+            )
+        } else if (blockType === 'service-cards' && padded.length < 3) {
+            console.warn(
+                `[Structure Enforcer] kept underfilled service-cards block with ${padded.length} localized item(s); no safe localized padding source was available`,
+            )
+        }
     }
 
     return blocks

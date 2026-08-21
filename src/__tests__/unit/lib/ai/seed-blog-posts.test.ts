@@ -53,6 +53,7 @@ vi.mock('@/lib/ai/pixabay-client', () => {
         }
     }
     return {
+        markPixabayMediaUsed: vi.fn(),
         searchPhotos: vi.fn().mockResolvedValue([
             {
                 id: 'p1',
@@ -655,6 +656,31 @@ describe('TC-F08-BS.24 — prepareBlogPosts waits for pixabayGate before any Pix
 		expect(vi.mocked(searchPhotos)).toHaveBeenCalled()
 		expect(prepared).toHaveLength(3)
 	})
+})
+
+describe('TC-F38-RES-08 — deferred blog thumbnail assignment', () => {
+    it('prepares blog content and image keywords without calling Pixabay or curated uploads', async () => {
+        // Arrange
+        const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+        const searchPhotos = await getSearchPhotos()
+        const payload = makePayload(0)
+
+        // Act
+        const prepared = await prepareBlogPosts({
+            payload,
+            tenantId: 42,
+            category: 'restaurant',
+            businessName: 'TestBiz',
+            skipImages: true,
+        })
+
+        // Assert
+        expect(prepared).toHaveLength(3)
+        expect(prepared?.every((post) => post.imageKeyword)).toBe(true)
+        expect(prepared?.every((post) => post.thumbnailId === undefined)).toBe(true)
+        expect(vi.mocked(searchPhotos)).not.toHaveBeenCalled()
+        expect(payload.create).not.toHaveBeenCalled()
+    })
 })
 
 describe('TC-F08-BS.25 — prepareBlogPosts return contract', () => {

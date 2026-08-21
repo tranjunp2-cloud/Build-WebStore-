@@ -82,7 +82,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.24: renders price input with default value', () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             expect(priceInput).toHaveValue('$29/mo')
         })
 
@@ -108,7 +108,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.27: calls onChange on price blur', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '$99/mo' } })
             fireEvent.blur(priceInput)
 
@@ -232,7 +232,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.36: shows red border on price blur when empty', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '' } })
             fireEvent.blur(priceInput)
 
@@ -263,7 +263,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.38: removes red border when price becomes non-empty', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '' } })
             fireEvent.blur(priceInput)
 
@@ -294,7 +294,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.40: treats whitespace-only price as empty', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '\t\n' } })
             fireEvent.blur(priceInput)
 
@@ -306,10 +306,10 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
 
     // ─────────────────────────────────────────────────────────────────────
     describe('CTA Collapsible: Structure & Visibility', () => {
-        it('TC-F05-891.41: renders CTA Settings collapsible section', () => {
+        it('TC-F05-891.41: renders CTA settings collapsible section', () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            expect(screen.getByText('CTA Settings')).toBeVisible()
+            expect(screen.getByText('CTA settings')).toBeVisible()
         })
 
         it('TC-F05-891.42: opens CTA section by default (ctaOpen = true)', () => {
@@ -323,7 +323,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.43: collapses CTA section when clicking header', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const ctaButton = screen.getByRole('button', { name: 'CTA Settings' })
+            const ctaButton = screen.getByRole('button', { name: 'CTA settings' })
             // CTA is open by default, so clicking closes it
             fireEvent.click(ctaButton)
 
@@ -335,7 +335,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.44: expands CTA section when clicking again', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} />)
 
-            const ctaButton = screen.getByRole('button', { name: 'CTA Settings' })
+            const ctaButton = screen.getByRole('button', { name: 'CTA settings' })
             // Click once to close
             fireEvent.click(ctaButton)
 
@@ -528,7 +528,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.79: non-toggle variant shows single "Price & unit" input', () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} variant="cards" />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             expect(priceInput).toBeVisible()
         })
 
@@ -537,7 +537,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
 
             // Toggle variant now uses the same unified price field as other variants
             // Toggle variant pricing is managed via yearlyDiscount in PricingSettings
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             expect(priceInput).toBeVisible()
         })
 
@@ -552,7 +552,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
         it('TC-F05-891.82: price blur calls onChange("price", value) in toggle variant', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} variant="toggle" />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '$49' } })
             fireEvent.blur(priceInput)
 
@@ -576,62 +576,62 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             // Rendering without errors even if yearlyPrice is present (prop just ignored)
             render(<PlanFields plan={planWithYearlyPrice} onChange={mockOnChange} variant="toggle" />)
 
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.85: yearlyPrice absence does not affect PlanFields rendering', () => {
             const planWithoutYearlyPrice = { ...mockPlan, yearlyPrice: undefined }
             render(<PlanFields plan={planWithoutYearlyPrice} onChange={mockOnChange} variant="toggle" />)
 
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.86: toggle variant renders price input with numeric price', () => {
             const planWithNumericPrice = { ...mockPlan, price: '29' }
             render(<PlanFields plan={planWithNumericPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.87: toggle variant renders price input when price is 0', () => {
             const planWithNumericPrice = { ...mockPlan, price: '0' }
             render(<PlanFields plan={planWithNumericPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.88: toggle variant renders price input with large price value', () => {
             const planWithLargePrice = { ...mockPlan, price: '9999999' }
             render(<PlanFields plan={planWithLargePrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.89: toggle variant renders price input when price is empty string', () => {
             const planWithEmptyPrice = { ...mockPlan, price: '' }
             render(<PlanFields plan={planWithEmptyPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.90: toggle variant renders price input when price is non-numeric', () => {
             const planWithNonNumericPrice = { ...mockPlan, price: '$29/mo' }
             render(<PlanFields plan={planWithNonNumericPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.91: toggle variant renders price input with integer price', () => {
             const planWithPrice = { ...mockPlan, price: '100' }
             render(<PlanFields plan={planWithPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.92: toggle variant renders price input with decimal price', () => {
             const planWithDecimalPrice = { ...mockPlan, price: '29.99' }
             render(<PlanFields plan={planWithDecimalPrice} onChange={mockOnChange} variant="toggle" />)
-            expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
+            expect(screen.getByPlaceholderText('e.g. RM29/mo')).toBeVisible()
         })
 
         it('TC-F05-891.93: price validation still works in toggle variant', async () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} variant="toggle" />)
 
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             fireEvent.change(priceInput, { target: { value: '' } })
             fireEvent.blur(priceInput)
 
@@ -644,7 +644,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} variant="toggle" />)
 
             // Since yearly price inputs no longer exist in PlanFields, this test verifies the unified price field
-            const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
+            const priceInput = screen.getByPlaceholderText('e.g. RM29/mo')
             expect(priceInput).toBeVisible()
             // Price field is required, so blank value would trigger validation
         })
@@ -717,7 +717,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             expect(screen.queryByPlaceholderText(/5 Projects/)).not.toBeInTheDocument()
 
             // CTA section should still be visible (header is visible)
-            expect(screen.getByText('CTA Settings')).toBeVisible()
+            expect(screen.getByText('CTA settings')).toBeVisible()
         })
 
         it('TC-F05-891.104: description + features hidden but CTA section still visible for comparison', () => {
@@ -728,7 +728,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             expect(screen.queryByPlaceholderText(/5 Projects/)).not.toBeInTheDocument()
 
             // CTA section should still be visible (header is visible)
-            expect(screen.getByText('CTA Settings')).toBeVisible()
+            expect(screen.getByText('CTA settings')).toBeVisible()
         })
     })
 })

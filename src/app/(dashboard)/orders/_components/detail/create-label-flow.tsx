@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { forwardRef, useImperativeHandle, useState, useRef, useEffect, useMemo } from 'react'
 import { Info, Check, ExternalLink, RefreshCw, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -35,13 +35,17 @@ interface CreateLabelFlowProps {
   onCodBlocked?: () => void
 }
 
+export interface CreateLabelFlowHandle {
+  submit: () => void
+}
+
 /**
  * Ready-to-ship flow: CourierPreset + cost line + CTA.
  * Single POST to /create-label; cosmetic submitting→paying phases.
  * Handles EASYPARCEL_WALLET_LOW → wallet-low error state.
  * Wallet balance omitted (API doesn't return it).
  */
-export function CreateLabelFlow({
+export const CreateLabelFlow = forwardRef<CreateLabelFlowHandle, CreateLabelFlowProps>(function CreateLabelFlow({
   orderId,
   courierId,
   courierName,
@@ -50,7 +54,7 @@ export function CreateLabelFlow({
   shippingFee,
   onSuccess,
   onCodBlocked,
-}: CreateLabelFlowProps) {
+}, ref) {
   const { t, ti } = useI18n()
   const cl = t.dashboard.orders.createLabel
   const [step, setStep] = useState<Step>('idle')
@@ -172,6 +176,13 @@ export function CreateLabelFlow({
 
   const busy = step === 'submitting' || step === 'paying'
   const displayName = courierName ?? courierId ?? 'Preset courier'
+
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      if (busy || !dateValid || unsupported.includes(method)) return
+      void handleShip()
+    },
+  }), [busy, dateValid, unsupported, method, handleShip])
 
   // ── Error: wallet low ─────────────────────────────────────────────
   if (step === 'wallet-low') {
@@ -403,4 +414,4 @@ export function CreateLabelFlow({
       </div>
     </div>
   )
-}
+})

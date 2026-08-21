@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { useI18n } from '@/i18n'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 import { updateValueAtPath } from '@/lib/editor/update-value-at-path'
@@ -54,6 +54,8 @@ interface PreviewFrameProps {
     hideBlockActionBar?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
+    /** Called by an explicit Cmd/Ctrl+S inside the preview iframe. */
+    onManualSave?: (source: 'iframe' | 'footer') => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
     onHandleReady?: (handle: PreviewFrameHandle | null) => void
     /** Called when a footer field is edited inline in the preview — dedicated footer channel. */
@@ -232,6 +234,7 @@ function PreviewFrameInner({
     disableDragDrop = false,
     hideBlockActionBar = false,
     onInlineEditSave,
+    onManualSave,
     onHandleReady,
     onFooterUpdate,
     onFooterInlineEdit,
@@ -239,6 +242,7 @@ function PreviewFrameInner({
     onLocaleSwitch,
 }: PreviewFrameProps) {
     const { t } = useI18n()
+    const { upload: uploadImage } = useUploadProgress()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
     const isCartLocked = useMemo(
         () => blocks.some(b => COMMERCE_BLOCK_TYPES.has((b as Record<string, unknown>).blockType as string ?? '')),
@@ -250,6 +254,8 @@ function PreviewFrameInner({
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const onInlineEditSaveRef = useRef(onInlineEditSave)
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
+    const onManualSaveRef = useRef(onManualSave)
+    useEffect(() => { onManualSaveRef.current = onManualSave }, [onManualSave])
     const onFooterUpdateRef = useRef(onFooterUpdate)
     useEffect(() => { onFooterUpdateRef.current = onFooterUpdate }, [onFooterUpdate])
     const onFooterInlineEditRef = useRef(onFooterInlineEdit)
@@ -680,6 +686,9 @@ function PreviewFrameInner({
                 try { if (href && safeProtocols.has(new URL(href).protocol)) window.open(href, '_blank', 'noopener,noreferrer') } catch { /* invalid URL */ }
             } else if (e.data?.type === 'SAVE_CHECKPOINT') {
                 void (onInlineEditSaveRef.current?.() ?? performSave(false))
+            } else if (e.data?.type === 'MANUAL_SAVE_REQUEST') {
+                const source = e.data.source === 'footer' ? 'footer' : 'iframe'
+                void (onManualSaveRef.current?.(source) ?? onInlineEditSaveRef.current?.() ?? performSave(true))
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
                 // GH-1381: ACK back to the iframe overlay so it toasts success only after the
@@ -727,10 +736,7 @@ function PreviewFrameInner({
                         window.location.origin,
                     )
                     void performSave(true).then(saved => {
-                        // false + pendingManualSave means this save was queued behind an in-flight
-                        // one and re-fires with the same store blocks — the change WILL persist.
-                        const queued = useEditorStore.getState().pendingManualSave
-                        if (saved || queued) replyResult(true)
+                        if (saved) replyResult(true)
                         else replyResult(false, 'Could not save the change — please try again')
                     }).catch(() => replyResult(false, 'Could not save the change — please try again'))
                 } catch (err) {
@@ -849,7 +855,7 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', t.editor.preview.altUploadedImage)
 
-            const uploadedMedia = await uploadMediaAction(formData)
+            const uploadedMedia = await uploadImage(formData)
             const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
@@ -1099,7 +1105,7 @@ function PreviewFrameInner({
         } finally {
             setIsImageProcessing(false)
         }
-    }, [blocks, imageClickData, onImageReplaced, updateBlock])
+    }, [blocks, imageClickData, onImageReplaced, updateBlock, uploadImage])
 
     const isDragging = dragState !== null
     const dragSourceIndex = dragState?.sourceIndex

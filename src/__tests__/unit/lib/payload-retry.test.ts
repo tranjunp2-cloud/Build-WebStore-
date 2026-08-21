@@ -53,6 +53,11 @@ describe('classifyTransientError', () => {
             const err = new TypeError("Cannot read properties of undefined (reading 'title')")
             expect(classifyTransientError(err)).toBe('type-error-title')
         })
+
+        it('detects Payload Drizzle undefined read-back after a write', () => {
+            const err = new TypeError("Cannot use 'in' operator to search for '_rels' in undefined")
+            expect(classifyTransientError(err)).toBe('type-error-transform')
+        })
     })
 
     describe('TC-F01-PR-02: ignores non-transient errors', () => {
@@ -116,6 +121,21 @@ describe('withPayloadRetry', () => {
 
             const result = await withPayloadRetry(fn, { baseDelayMs: 1 })
             expect(result).toBe('ok')
+            expect(fn).toHaveBeenCalledTimes(2)
+        })
+
+        it('retries on Payload Drizzle undefined read-back', async () => {
+            let attempts = 0
+            const fn = vi.fn(async () => {
+                attempts++
+                if (attempts === 1) {
+                    throw new TypeError("Cannot use 'in' operator to search for '_rels' in undefined")
+                }
+                return { id: 42 }
+            })
+
+            const result = await withPayloadRetry(fn, { baseDelayMs: 1 })
+            expect(result).toEqual({ id: 42 })
             expect(fn).toHaveBeenCalledTimes(2)
         })
 
