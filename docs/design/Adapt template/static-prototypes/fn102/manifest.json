@@ -25,10 +25,6 @@
       "file": "checkout/index.html"
     },
     {
-      "route": "/about-us",
-      "file": "about-us/index.html"
-    },
-    {
       "route": "/contact",
       "file": "contact/index.html"
     },

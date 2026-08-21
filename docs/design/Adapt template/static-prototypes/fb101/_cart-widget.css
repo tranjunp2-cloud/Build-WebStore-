@@ -1,0 +1,87 @@
+.pw-cart-widget {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 60;
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 48px;
+  min-width: 44px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 12px;
+  border: 1px solid rgba(128, 181, 0, 0.34);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #80b500, #527800);
+  color: #fff;
+  font:
+    600 0.9375rem/1 Inter,
+    Arial,
+    sans-serif;
+  text-decoration: none;
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.22);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+body:has(.pw-cart-widget) .bag,
+body:has(.pw-cart-widget) .mini-cart-icon {
+  display: none !important;
+}
+.pw-cart-widget:hover {
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.27);
+}
+.pw-cart-widget[aria-expanded="true"] {
+  z-index: 39;
+}
+.pw-cart-widget:focus-visible {
+  outline: 3px solid #071c1f;
+  outline-offset: 3px;
+}
+.pw-cart-widget svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pw-cart-widget .pw-cart-label {
+  display: none;
+}
+.pw-cart-widget .pw-cart-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: inline-flex;
+  min-width: 24px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #fff;
+  color: #071c1f;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+@media (max-width: 520px) {
+  .pw-cart-widget {
+    bottom: 16px;
+    left: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pw-cart-widget {
+    transition: none;
+  }
+}

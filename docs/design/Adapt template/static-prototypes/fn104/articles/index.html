@@ -1,149 +1,988 @@
 <!doctype html>
-<html lang="en" class=" js flexbox flexboxlegacy canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths js flexbox canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths"><head>
-        <meta charset="UTF-8">
-        <link rel="icon" id="favicon" href="">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Article</title>
-        <meta name="description" content="">
-        <meta name="keywords" content="">
-        <link href="../_assets/19164a264782-remixicon.css" rel="stylesheet">
-      
-      <link rel="stylesheet" href="../_assets/cb859bc1b7d4-index.2b167f6a.css">
-    <style type="text/css">
-.vfm--fixed[data-v-2836fdb5] {
-  position: fixed;
-}
-.vfm--absolute[data-v-2836fdb5] {
-  position: absolute;
-}
-.vfm--inset[data-v-2836fdb5] {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-.vfm--overlay[data-v-2836fdb5] {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-.vfm--prevent-none[data-v-2836fdb5] {
-  pointer-events: none;
-}
-.vfm--prevent-auto[data-v-2836fdb5] {
-  pointer-events: auto;
-}
-.vfm--outline-none[data-v-2836fdb5]:focus {
-  outline: none;
-}
-.vfm-enter-active[data-v-2836fdb5],
-.vfm-leave-active[data-v-2836fdb5] {
-  transition: opacity 0.2s;
-}
-.vfm-enter-from[data-v-2836fdb5],
-.vfm-leave-to[data-v-2836fdb5] {
-  opacity: 0;
-}
-.vfm--touch-none[data-v-2836fdb5] {
-  touch-action: none;
-}
-.vfm--select-none[data-v-2836fdb5] {
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
-}
-.vfm--resize-tr[data-v-2836fdb5],
-.vfm--resize-br[data-v-2836fdb5],
-.vfm--resize-bl[data-v-2836fdb5],
-.vfm--resize-tl[data-v-2836fdb5] {
-  width: 12px;
-  height: 12px;
-  z-index: 10;
-}
-.vfm--resize-t[data-v-2836fdb5] {
-  top: -6px;
-  left: 0;
-  width: 100%;
-  height: 12px;
-  cursor: ns-resize;
-}
-.vfm--resize-tr[data-v-2836fdb5] {
-  top: -6px;
-  right: -6px;
-  cursor: nesw-resize;
-}
-.vfm--resize-r[data-v-2836fdb5] {
-  top: 0;
-  right: -6px;
-  width: 12px;
-  height: 100%;
-  cursor: ew-resize;
-}
-.vfm--resize-br[data-v-2836fdb5] {
-  bottom: -6px;
-  right: -6px;
-  cursor: nwse-resize;
-}
-.vfm--resize-b[data-v-2836fdb5] {
-  bottom: -6px;
-  left: 0;
-  width: 100%;
-  height: 12px;
-  cursor: ns-resize;
-}
-.vfm--resize-bl[data-v-2836fdb5] {
-  bottom: -6px;
-  left: -6px;
-  cursor: nesw-resize;
-}
-.vfm--resize-l[data-v-2836fdb5] {
-  top: 0;
-  left: -6px;
-  width: 12px;
-  height: 100%;
-  cursor: ew-resize;
-}
-.vfm--resize-tl[data-v-2836fdb5] {
-  top: -6px;
-  left: -6px;
-  cursor: nwse-resize;
-}
-</style><link href="../_assets/7e96bd3584b4-settings.css" type="text/css" rel="stylesheet"><link href="../_assets/31d41451da25-bootstrap.min.css" type="text/css" rel="stylesheet"><link href="../_assets/c92ec111ccdf-font-awesome.min.css" type="text/css" rel="stylesheet"><link href="../_assets/db0a087edf03-ionicons.min.css" type="text/css" rel="stylesheet"><link href="../_assets/52310f0942bd-main.css" type="text/css" rel="stylesheet"><link href="../_assets/a2d9fc315831-style.css" type="text/css" rel="stylesheet"><link href="../_assets/9e8bb5534abc-responsive.css" type="text/css" rel="stylesheet"><link href="../_assets/b3dc0f8f17d4-modernizr.js" type="text/css" rel="stylesheet"><link href="../_assets/24b6e0665926-css" type="text/css" rel="stylesheet"><link href="../_assets/23178ff82f75-css" type="text/css" rel="stylesheet"><link rel="stylesheet" href="../_assets/03045466a2f0-NavBar.fec300ff.css"><link rel="stylesheet" href="../_assets/a5a7ed696a18-Footer.054e6fe9.css"><link rel="stylesheet" href="../_assets/7cc216ea6b9f-LoadingComponent.c6df4ab8.css"><link rel="stylesheet" href="../_assets/253871125e02-Breadcrumb.1960de7b.css"><link rel="stylesheet" href="../_assets/7dba89f97328-ArticleFilter.ab6424b1.css"><link rel="stylesheet" href="../_assets/5fb3f451d488-ArticleItem.34a82724.css"><meta name="prototype-source" content="https://fn104.web.ecommercehub.unifi.com.my/articles"></head>
-
-    <body>
-        <div id="app"><!----><div><header data-v-2bd35454=""><div id="undefined-sticky-wrapper" class="sticky-wrapper" style="height: 78px;"><div class="sticky" data-v-2bd35454="" style=""><div class="container" data-v-2bd35454=""><div class="logo" data-v-2bd35454=""><a href="../index.html" class="!w-[217px] !h-[50px] !block" data-v-2bd35454=""><img class="img-responsive !w-full !h-full !object-contain" src="../_assets/139af7e21611-Uxfuo1EVFRhYd0hNuKyNmXT9PrbJ3i-yAdXZlXSazt0.png" alt="" data-v-2bd35454=""></a></div><nav class="navbar ownmenu" data-v-2bd35454=""><div class="navbar-header" data-v-2bd35454=""><button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#nav-open-btn" aria-expanded="false" data-v-2bd35454=""><span class="sr-only" data-v-2bd35454="">Toggle navigation</span> <span class="icon-bar" data-v-2bd35454=""><i class="fa fa-navicon" data-v-2bd35454=""></i></span></button></div><div class="collapse navbar-collapse" id="nav-open-btn" data-v-2bd35454=""><ul class="nav" data-v-2bd35454=""><li class="" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a href="../index.html" class="!w-fit !static !inline-block" data-v-2bd35454="">Home</a></div><!----></li><li class="" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a href="../products/index.html" class="!w-fit !static !inline-block" data-v-2bd35454="">Product</a></div><!----></li><li class="active" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active !w-fit !static !inline-block" data-v-2bd35454="">Blog</a></div><!----></li><li class="" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a href="../cart/index.html" class="!w-fit !static !inline-block" data-v-2bd35454="">Cart</a></div><!----></li><li class="" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a href="../checkout/index.html" class="!w-fit !static !inline-block" data-v-2bd35454="">Checkout</a></div><!----></li><li class="" data-v-2bd35454=""><div class="nav-link" data-toggle="" data-v-2bd35454=""><a href="../order-tracking/index.html" class="!w-fit !static !inline-block" data-v-2bd35454="">Order tracking</a></div><!----></li><!----></ul></div><div class="nav-right" data-v-2bd35454=""><ul class="navbar-right" data-v-2bd35454=""><li class="dropdown user-basket" data-v-2bd35454=""><a href="../index.html" class="dropdown-toggle relative" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="true" data-v-2bd35454=""><i class="icon-basket-loaded" data-v-2bd35454=""></i></a><ul class="dropdown-menu" data-v-2bd35454=""><div class="min-h-[80px] max-h-[320px] overflow-x-auto" data-v-2bd35454=""><div class="w-full" data-v-2bd35454=""><div class="flex flex-col text-center space-y-4 w-full align-center justify-center"><!----><img alt="empty" src="../_assets/8cbe2e31b4d2-empty-cart.svg" class="w-[200px] h-[200px] mx-auto"><div class="mt-6"><p class="font-semibold text-[22px] mb-1">There are no items in this cart</p></div><div class="mx-auto mt-6"><a class="bg-primary-color w-fit px-[14px] py-[8px] text-[14px] text-white hover:text-white uppercase rounded" href="../products/index.html"></a><a href="../products/index.html" class=""><span class="text-text-color">Continue Shopping</span></a></div><!----><!----><!----><!----><!----></div></div></div></ul><!----></li><li class="dropdown" data-v-2bd35454=""><a href="javascript:void(0);" class="search-open" data-v-2bd35454=""><i class="icon-magnifier" data-v-2bd35454=""></i></a><div class="search-inside animated bounceInUp" data-v-2bd35454=""><i class="icon-close search-close" data-v-2bd35454=""></i><div class="search-overlay" data-v-2bd35454=""></div><div class="position-center-center" data-v-2bd35454=""><div class="search" data-v-2bd35454=""><form data-v-2bd35454="" action="../products/index.html" method="get"><input type="search" placeholder="Search Shop" data-v-2bd35454=""><button disabled="" type="submit" data-v-2bd35454=""><i class="icon-check" data-v-2bd35454=""></i></button></form></div></div></div></li></ul></div></nav></div></div></div></header><div id="breadcrumb"><section class="sub-bnr mb-20" data-stellar-background-ratio="0.5" data-v-45f1f980="" style="background-position: 0% -69px;"><div class="position-center-center" data-v-45f1f980=""><div class="container" data-v-45f1f980=""><h4 data-v-45f1f980=""></h4><p data-v-45f1f980=""></p><ol class="breadcrumb" data-v-45f1f980=""><li class="duc-link" data-v-45f1f980=""><a href="../index.html" class="" data-v-45f1f980="">Home</a></li><li class="duc-link" data-v-45f1f980=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-45f1f980="">articles</a></li></ol></div></div></section></div><div class="space-y-2"><!----><!----><main id="mt-main"><div class="mt-blog-detail style1"><div class="container"><div class="row"><div class="col-xs-12 wow fadeInLeft col-sm-9" data-wow-delay="0.4s"><div><div><div class="item-display"><div class="row"><div class="col-xs-12"><div class="pull-left"><div class="btn-group bootstrap-select"><button type="button" class="btn dropdown-toggle btn-default" data-toggle="dropdown" title="Short By" aria-expanded="false"><span class="filter-option pull-left inline-block !w-fit !mr-2">Oldest created date</span><i class="ri-arrow-down-s-fill"></i></button><div class="dropdown-menu open" style="max-height: 729px; overflow: hidden; min-height: 0px;"><ul class="dropdown-menu inner" role="menu" style="max-height: 718px; overflow-y: auto; min-height: 0px;"><li data-original-index="0" class="selected"><a tabindex="0" class="" data-tokens="null"><span class="text">Oldest created date</span><span class="glyphicon glyphicon-ok check-mark"></span></a></li><li data-original-index="0" class="selected"><a tabindex="1" class="" data-tokens="null"><span class="text">Latest created date</span><span class="glyphicon glyphicon-ok check-mark"></span></a></li></ul></div></div></div></div></div></div></div><!----><section class="blog-list"><article class=""><div data-v-7cdb231a=""><div class="max-h-[313.84px]" data-v-7cdb231a=""><img class="w-full aspect-[720/313.84] object-cover max-h-[313.84px]" src="../_assets/3888444fa49a-2D9NZjRhIm07MW_Qgl_YBAgMZcLC7SI8KpMYAZ98ht0.jpg" alt="" data-v-7cdb231a=""></div><div class="post-tittle left" data-v-7cdb231a=""><a href="logitech-pop-mouse/index.html" class="tittle" data-v-7cdb231a="">Bathroom ideas – 4 bathroom designs you will love</a><span data-v-7cdb231a=""><i class="primary-color icon-calendar" data-v-7cdb231a=""></i> 04 Aug 2022</span></div><div class="text-left" data-v-7cdb231a=""><p class="show-more" data-v-7cdb231a="">Bathroom ideas – 4 bathroom designs you will love</p><a href="logitech-pop-mouse/index.html" class="" data-v-7cdb231a=""></a><a class="btn" data-v-7cdb231a="">Read more</a></div></div></article><article class=""><div data-v-7cdb231a=""><div class="max-h-[313.84px]" data-v-7cdb231a=""><img class="w-full aspect-[720/313.84] object-cover max-h-[313.84px]" src="../_assets/8746bb3c05ab-BHhqwGXvQoxKFvcD1_m4SpQY-uDK51i35EbYYI4DkT8.jpg" alt="" data-v-7cdb231a=""></div><div class="post-tittle left" data-v-7cdb231a=""><a href="logitech-pop-mouse/index.html" class="tittle" data-v-7cdb231a="">5 Living Room Ideas That Are Fun and Functional</a><span data-v-7cdb231a=""><i class="primary-color icon-calendar" data-v-7cdb231a=""></i> 04 Aug 2022</span></div><div class="text-left" data-v-7cdb231a=""><p class="show-more" data-v-7cdb231a="">5 Living Room Ideas That Are Fun and Functional</p><a href="logitech-pop-mouse/index.html" class="" data-v-7cdb231a=""></a><a class="btn" data-v-7cdb231a="">Read more</a></div></div></article><article class=""><div data-v-7cdb231a=""><div class="max-h-[313.84px]" data-v-7cdb231a=""><img class="w-full aspect-[720/313.84] object-cover max-h-[313.84px]" src="../_assets/458e89c43cbc-4FhFRwqbgV-jX8Gwy-FWxT5V5Lr3I8nQc0d568FOe6k.jpg" alt="" data-v-7cdb231a=""></div><div class="post-tittle left" data-v-7cdb231a=""><a href="logitech-pop-mouse/index.html" class="tittle" data-v-7cdb231a="">72 bedroom ideas to create the dreamiest sanctuary</a><span data-v-7cdb231a=""><i class="primary-color icon-calendar" data-v-7cdb231a=""></i> 04 Aug 2022</span></div><div class="text-left" data-v-7cdb231a=""><p class="show-more" data-v-7cdb231a="">72 bedroom ideas to create the dreamiest sanctuary</p><a href="logitech-pop-mouse/index.html" class="" data-v-7cdb231a=""></a><a class="btn" data-v-7cdb231a="">Read more</a></div></div></article></section><!----><ul class="pagination in-center"><li class="cursor-pointer"><a><i class="ri-arrow-left-s-line"></i></a></li><li class="cursor-pointer active"><a>1</a></li><li class="cursor-pointer"><a><i class="ri-arrow-right-s-line"></i></a></li></ul></div></div><div class="col-xs-12 col-sm-3 text-right sidebar wow fadeInRight" data-wow-delay="0.4s"><div data-v-1fbd5e38=""><h5 class="shop-tittle margin-bottom-30 text-left" data-v-1fbd5e38="">Categories <!----></h5><ul class="shop-cate" data-v-1fbd5e38=""><li data-v-1fbd5e38=""><a class="text-left cursor-pointer" data-v-1fbd5e38="">Recent News <span data-v-1fbd5e38=""><i class="ri-links-fill" data-v-1fbd5e38=""></i></span></a></li></ul></div></div></div></div></div></main><div class="container"><template></template></div><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----></div><!----><footer class="mt-[40px]" data-v-683c86a8=""><div class="container" data-v-683c86a8=""><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4" data-v-683c86a8=""><div class="!mb-[20px]" data-v-683c86a8=""><div class="about-footer !w-[217px]" data-v-683c86a8=""><img class="margin-bottom-30 w-full !h-[50px] object-contain" src="../_assets/139af7e21611-Uxfuo1EVFRhYd0hNuKyNmXT9PrbJ3i-yAdXZlXSazt0.png" alt="" data-v-683c86a8=""><p class="format-text" data-v-683c86a8=""><i class="icon-pointer" data-v-683c86a8=""></i>  BUSINESS SUITE 19A-24-3, LEVEL 24, UOA CENTRE, NO 19, JALAN PINANG 50450 KUALA LUMPUR.</p><p data-v-683c86a8=""><i class="icon-call-end" data-v-683c86a8=""></i>  </p><p class="format-text" data-v-683c86a8=""><i class="icon-envelope" data-v-683c86a8=""></i> fn104@primeweb.asia</p></div></div><div class="" data-v-683c86a8=""><h6 class="mb-4" data-v-683c86a8="">QUALITY PRODUCTS</h6><ul class="link" data-v-683c86a8=""><li data-v-683c86a8=""><!----><a data-v-683c86a8=""></a><a href="../products/index.html" class="" data-v-683c86a8="">Popular Products</a><!----><!----></li><li data-v-683c86a8=""><!----><a data-v-683c86a8=""></a><a href="../products/index.html" class="" data-v-683c86a8="">Best Selling</a><!----><!----></li><li data-v-683c86a8=""><!----><a data-v-683c86a8=""></a><a href="../products/index.html" class="" data-v-683c86a8="">About Us</a><!----><!----></li><li data-v-683c86a8=""><!----><a data-v-683c86a8=""></a><a href="../products/index.html" class="" data-v-683c86a8="">Deal Of The Day</a><!----><!----></li></ul></div><div class="" data-v-683c86a8=""><h6 class="mb-4" data-v-683c86a8="">SUPPORT POLICY</h6><ul class="link" data-v-683c86a8=""><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Order Details</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Credit Offers</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Addresses</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Personal Details</a><!----><!----><!----></li></ul></div><div class="" data-v-683c86a8=""><h6 class="mb-4" data-v-683c86a8="">INTRODUCE</h6><ul class="link" data-v-683c86a8=""><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Order Details</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Credit Offers</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Addresses</a><!----><!----><!----></li><li data-v-683c86a8=""><a href="https://primecommerce.asia/en/support" data-v-683c86a8="">My Personal Details</a><!----><!----><!----></li></ul></div><div class="" data-v-683c86a8=""><h6 class="mb-4" data-v-683c86a8="">FOLLOW US</h6><ul class="link" data-v-683c86a8=""><li data-v-683c86a8=""><!----><!----><!----><div class="" data-v-683c86a8=""><a href="https://www.facebook.com/" target="_blank" class="inline-block" data-v-683c86a8=""><img src="../_assets/533c7a158227-facebook_2.png" data-v-683c86a8="" style="width: 32px; height: 32px;"></a><a href="https://www.youtube.com/" target="_blank" class="inline-block" data-v-683c86a8=""><img src="../_assets/3a7f71059d7f-youtube_2.png" data-v-683c86a8="" style="width: 32px; height: 32px;"></a><a href="https://www.instagram.com/" target="_blank" class="inline-block" data-v-683c86a8=""><img src="../_assets/5567a234aef8-instagram_2.png" data-v-683c86a8="" style="width: 32px; height: 32px;"></a></div></li></ul></div></div><div class="rights" data-v-683c86a8=""><p data-v-683c86a8="">Copyright © 2022 by Prime Commerce</p><div class="scroll" data-v-683c86a8=""><a href="../index.html" class="go-up" data-v-683c86a8=""><i class="lnr lnr-arrow-up" data-v-683c86a8=""></i></a></div></div></div></footer></div></div>
-
-        
-    
-
-<!-- FN104_INTERACTIONS_START -->
-<style>
-  .fn104-shade{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;visibility:hidden;transition:.22s;z-index:99990}
-  .fn104-cart-drawer{position:fixed;right:0;top:0;width:390px;max-width:92vw;height:100vh;background:#fff;z-index:99991;transform:translateX(100%);transition:.25s;box-shadow:-8px 0 30px #0002;padding:26px;color:#222}
-  .fn104-shade.open{opacity:1;visibility:visible}.fn104-cart-drawer.open{transform:none}
-  .fn104-drawer-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:15px}
-  .fn104-drawer-head h2{font-size:19px;letter-spacing:1px;margin:0}.fn104-close{border:0;background:none;font-size:32px;line-height:1;cursor:pointer}
-  .fn104-drawer-body{text-align:center;padding:48px 8px}.fn104-drawer-body img{width:135px;height:135px;object-fit:contain;margin:0 auto 20px}
-  .fn104-drawer-body p{margin:10px 0}.fn104-drawer-body strong{font-size:18px}
-  .fn104-drawer-btn{display:inline-block;background:#222;color:#fff!important;padding:13px 24px;margin-top:22px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-  .user-basket>a{cursor:pointer}.blog-list article{cursor:pointer}.blog-list article .btn{pointer-events:auto}
-</style>
-<div class="fn104-shade"></div>
-<aside class="fn104-cart-drawer" aria-label="Shopping cart">
-  <div class="fn104-drawer-head"><h2>YOUR CART</h2><button class="fn104-close" aria-label="Close cart">×</button></div>
-  <div class="fn104-drawer-body"></div>
-</aside>
-<script>
-(function(){
-  const detail="../articles/logitech-pop-mouse/index.html", cartUrl="../cart/index.html", productsUrl="../products/index.html", assets="../_assets/";
-  const shade=document.querySelector('.fn104-shade'),drawer=document.querySelector('.fn104-cart-drawer'),body=document.querySelector('.fn104-drawer-body');
-  function currentCart(){try{return JSON.parse(localStorage.getItem('fn104-cart')||'null')}catch(e){return null}}
-  function render(){const c=currentCart();body.innerHTML=c?'<img src="'+assets+'ec950ab1b207-E-VExR-Vex2OUqj_hRA_3GyM0phodSP1dXfoneAbUok.jpg"><h3>'+c.name+'</h3><p>QTY: '+c.qty+'</p><strong>RM '+(c.price*c.qty).toFixed(2)+'</strong><br><a class="fn104-drawer-btn" href="'+cartUrl+'">VIEW CART</a>':'<img src="'+assets+'8cbe2e31b4d2-empty-cart.svg"><h3>There are no items in this cart</h3><a class="fn104-drawer-btn" href="'+productsUrl+'">CONTINUE SHOPPING</a>'}
-  function openCart(e){if(e)e.preventDefault();render();shade.classList.add('open');drawer.classList.add('open')}
-  function closeCart(){shade.classList.remove('open');drawer.classList.remove('open')}
-  document.querySelectorAll('.user-basket > a,.icon-basket-loaded').forEach(el=>el.addEventListener('click',openCart));
-  document.querySelector('.fn104-close').addEventListener('click',closeCart);shade.addEventListener('click',closeCart);
-  const badgeQty=currentCart()?.qty||0;document.querySelectorAll('.user-basket > a').forEach(a=>{let b=a.querySelector('.fn104-badge');if(!b){b=document.createElement('b');b.className='fn104-badge';b.style.cssText='position:absolute;right:-8px;top:-8px;background:#d99c2b;color:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:10px';a.appendChild(b)}b.textContent=badgeQty});
-  document.querySelectorAll('.blog-list article').forEach(card=>{card.setAttribute('tabindex','0');card.addEventListener('click',e=>{if(e.target.closest('a')?.getAttribute('href'))return;location.href=detail});card.addEventListener('keydown',e=>{if(e.key==='Enter')location.href=detail});card.querySelectorAll('a.btn,a:not([href]),a[href=""]').forEach(a=>a.setAttribute('href',detail));const image=card.querySelector('img');if(image)image.addEventListener('click',()=>location.href=detail)});
-})();
-</script>
-<!-- FN104_INTERACTIONS_END --></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Journal — ECOSHOP</title>
+    <meta
+      name="description"
+      content="Practical ideas for calmer, considered homes from ECOSHOP."
+    />
+    <meta
+      name="prototype-source"
+      content="https://fn104.web.ecommercehub.unifi.com.my/articles"
+    />
+    <script>
+      document.documentElement.classList.add("js");
+    </script>
+    <link rel="stylesheet" href="../_v2-shell.css" />
+    <style>
+      :root {
+        --navy: #10243f;
+        --yellow: #f6c844;
+        --paper: #fffdf6;
+        --soft: #f6f2e7;
+        --ink: #142033;
+        --muted: #667085;
+        --line: #ddd7c8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.6 Inter,
+          system-ui,
+          sans-serif;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .container {
+        width: min(1160px, calc(100% - 40px));
+        margin: auto;
+      }
+      .announcement {
+        padding: 9px 16px;
+        background: var(--navy);
+        color: #fff;
+        text-align: center;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+      }
+      .nav {
+        position: sticky;
+        z-index: 20;
+        top: 0;
+        border-bottom: 1px solid #10243f1a;
+        background: #fffdf6ed;
+        backdrop-filter: blur(18px);
+      }
+      .nav-in {
+        position: relative;
+        display: flex;
+        height: 72px;
+        align-items: center;
+      }
+      .links {
+        display: flex;
+        gap: 4px;
+      }
+      .nav-in > .links:first-of-type {
+        margin-right: auto;
+      }
+      .nav-in > .links:last-of-type {
+        margin-left: auto;
+      }
+      .links a,
+      .mobile a {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+      .links a:hover,
+      .links a[aria-current="page"],
+      .mobile a:hover,
+      .mobile a[aria-current="page"] {
+        background: var(--yellow);
+      }
+      .brand {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        font: 900 1.22rem Georgia;
+        letter-spacing: 0.15em;
+      }
+      .brand b,
+      .brand-foot b {
+        color: #d39a00;
+      }
+      .menu {
+        display: none;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: #fff;
+      }
+      .mobile {
+        display: block;
+        padding: 10px 20px 18px;
+        border-top: 1px solid var(--line);
+      }
+      .mobile a {
+        display: flex;
+      }
+      .js .mobile {
+        display: none;
+      }
+      .js .mobile.open {
+        display: block;
+      }
+      .hero {
+        padding: 82px 0 70px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(135deg, #fff8d8, var(--paper) 55%, #edf2f7);
+      }
+      .hero-inner {
+        max-width: 750px;
+        text-align: center;
+      }
+      .eyebrow {
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        color: #9b7200;
+      }
+      .hero h1 {
+        margin: 8px 0 16px;
+        font: 700 clamp(2.8rem, 7vw, 5.6rem)/0.98 Georgia;
+        color: var(--navy);
+      }
+      .hero p {
+        max-width: 610px;
+        margin: auto;
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+      .section {
+        padding: 82px 0;
+      }
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 30px;
+        margin-bottom: 34px;
+      }
+      .section-head h2 {
+        margin: 5px 0 0;
+        font: 700 clamp(2rem, 4vw, 3.2rem)/1.05 Georgia;
+        color: var(--navy);
+      }
+      .section-head p {
+        max-width: 440px;
+        margin: 0;
+        color: var(--muted);
+      }
+      .blog-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      .article {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        background: #fff;
+        overflow: hidden;
+        transition: 0.2s;
+      }
+      .article:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 18px 45px #10243f17;
+      }
+      .article-media {
+        aspect-ratio: 720/314;
+        overflow: hidden;
+        background: var(--soft);
+      }
+      .article-copy {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        padding: 24px;
+      }
+      .meta {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: #8b6b10;
+        font-size: 0.73rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .meta:before {
+        content: "";
+        width: 20px;
+        height: 2px;
+        background: var(--yellow);
+      }
+      .article h2 {
+        margin: 13px 0 12px;
+        font: 700 1.48rem/1.18 Georgia;
+        color: var(--navy);
+      }
+      .article p {
+        margin: 0 0 24px;
+        color: var(--muted);
+      }
+      .read {
+        margin-top: auto;
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .read:after {
+        content: " →";
+      }
+      .preview {
+        padding: 64px 0;
+        background: var(--yellow);
+      }
+      .newsletter {
+        display: grid;
+        grid-template-columns: 1fr minmax(360px, 0.8fr);
+        align-items: center;
+        gap: 60px;
+      }
+      .newsletter h2 {
+        margin: 4px 0 8px;
+        font: 700 clamp(2rem, 4vw, 3.15rem)/1.05 Georgia;
+        color: var(--navy);
+      }
+      .newsletter p {
+        margin: 0;
+        color: #25364d;
+      }
+      .signup {
+        display: flex;
+      }
+      .signup label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      .signup input {
+        min-width: 0;
+        flex: 1;
+        height: 52px;
+        padding: 0 16px;
+        border: 1px solid #10243f66;
+      }
+      .signup button {
+        height: 52px;
+        padding: 0 22px;
+        border: 1px solid var(--navy);
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      .preview-note {
+        margin-top: 9px !important;
+        font-size: 0.75rem;
+      }
+      .footer {
+        padding: 48px 0 24px;
+        background: var(--navy);
+        color: #fff;
+      }
+      .footer-main {
+        display: flex;
+        justify-content: space-between;
+        gap: 40px;
+      }
+      .brand-foot {
+        font: 900 1.1rem Georgia;
+        letter-spacing: 0.15em;
+      }
+      .footer p {
+        color: #cbd3df;
+        font-size: 0.86rem;
+      }
+      .footer-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 24px;
+      }
+      .fine {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 38px;
+        padding-top: 20px;
+        border-top: 1px solid #ffffff24;
+        color: #aeb9c8;
+        font-size: 0.75rem;
+      }
+      .cart {
+        position: fixed;
+        z-index: 30;
+        left: 24px;
+        bottom: 24px;
+        display: grid;
+        width: 54px;
+        height: 50px;
+        place-items: center;
+        border: 1px solid #ffffff40;
+        border-radius: 16px;
+        background: linear-gradient(135deg, var(--yellow), #d69b13);
+        color: var(--navy);
+        box-shadow: 0 12px 35px #10243f38;
+      }
+      .cart svg {
+        width: 22px;
+      }
+      .badge {
+        position: absolute;
+        right: -5px;
+        top: -7px;
+        display: grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.67rem;
+      }
+      .shade {
+        position: fixed;
+        z-index: 40;
+        inset: 0;
+        background: #07111f99;
+      }
+      .drawer {
+        position: fixed;
+        z-index: 41;
+        left: 0;
+        top: 0;
+        width: min(400px, 100%);
+        height: 100%;
+        padding: 26px;
+        background: var(--paper);
+      }
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+      }
+      .drawer-head h2 {
+        font: 700 1.3rem Georgia;
+      }
+      .close {
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: #fff;
+        font-size: 1.5rem;
+      }
+      .empty {
+        display: grid;
+        height: 70%;
+        place-items: center;
+        text-align: center;
+      }
+      .empty p {
+        color: var(--muted);
+      }
+      .empty a {
+        display: inline-flex;
+        min-height: 46px;
+        padding: 0 20px;
+        align-items: center;
+        background: var(--navy);
+        color: #fff;
+        font-weight: 750;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      :focus-visible {
+        outline: 3px solid #e0a500;
+        outline-offset: 3px;
+      }
+      @media (max-width: 880px) {
+        .brand {
+          position: static;
+          transform: none;
+          margin-right: auto;
+        }
+        .links {
+          display: none;
+        }
+        .menu {
+          display: grid;
+        }
+        .blog-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .newsletter {
+          grid-template-columns: 1fr;
+          gap: 28px;
+        }
+        .footer-main {
+          flex-direction: column;
+        }
+      }
+      @media (max-width: 620px) {
+        .container {
+          width: calc(100% - 28px);
+        }
+        .hero,
+        .section {
+          padding: 60px 0;
+        }
+        .section-head {
+          align-items: start;
+          flex-direction: column;
+        }
+        .blog-grid {
+          grid-template-columns: 1fr;
+        }
+        .newsletter {
+          gap: 24px;
+        }
+        .signup {
+          display: grid;
+          gap: 10px;
+        }
+        .footer-nav {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .fine {
+          flex-direction: column;
+          gap: 8px;
+        }
+        .cart {
+          left: 16px;
+          bottom: 16px;
+        }
+      }
+      .nav-in {
+        height: 64px;
+      }
+      .footer {
+        padding: 30px 0;
+      }
+      .footer-main {
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+      .footer-main > span {
+        color: #aeb9c8;
+        font-size: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header
+      class="nav"
+      data-block-type="navigation"
+      data-block-variant="centered"
+      data-mapping-status="mirrors-v2"
+    >
+      <div class="container nav-in">
+        <nav class="links" aria-label="Primary navigation">
+          <a href="../index.html">Home</a
+          ><a href="../products/index.html">Products</a>
+        </nav>
+        <a class="brand" href="../index.html" aria-label="ECOSHOP home"
+          ><img
+            src="../_assets/139af7e21611-Uxfuo1EVFRhYd0hNuKyNmXT9PrbJ3i-yAdXZlXSazt0.png"
+            alt="ECOSHOP"
+        /></a>
+        <nav class="links" aria-label="Secondary navigation">
+          <a
+            href="./index.html"
+            aria-current="page"
+            data-canonical-route="/blog"
+            >Blog</a
+          ><a href="../contact/index.html">Contact</a>
+        </nav>
+        <button
+          type="button"
+          class="menu"
+          aria-label="Open navigation"
+          aria-controls="mobile-nav"
+          aria-expanded="false"
+        >
+          ☰
+        </button>
+      </div>
+      <nav id="mobile-nav" class="mobile" aria-label="Mobile navigation">
+        <a href="../index.html">Home</a
+        ><a href="../products/index.html">Products</a
+        ><a href="./index.html" aria-current="page" data-canonical-route="/blog"
+          >Blog</a
+        ><a href="../contact/index.html">Contact</a>
+      </nav>
+    </header>
+    <main>
+      <section
+        class="hero"
+        data-block-type="hero"
+        data-block-variant="minimal"
+        data-mapping-status="mirrors-v2"
+      >
+        <div class="container hero-inner">
+          <div class="eyebrow">The ECOSHOP journal</div>
+          <h1>Ideas for living well.</h1>
+          <p>
+            Useful guides and fresh perspectives for creating rooms that feel
+            thoughtful, functional and entirely your own.
+          </p>
+        </div>
+      </section>
+      <section
+        class="section"
+        data-block-type="blog-list"
+        data-block-variant="cards"
+        data-mapping-status="mirrors-v2"
+      >
+        <div class="container">
+          <header class="section-head">
+            <div>
+              <div class="eyebrow">Latest stories</div>
+              <h2>From the journal</h2>
+            </div>
+            <p>Three practical reads from the original FN104 collection.</p>
+          </header>
+          <div class="blog-grid">
+            <article class="article">
+              <a class="article-media" href="./logitech-pop-mouse/index.html"
+                ><img
+                  src="../_assets/3888444fa49a-2D9NZjRhIm07MW_Qgl_YBAgMZcLC7SI8KpMYAZ98ht0.jpg"
+                  alt="Warm contemporary bathroom interior"
+              /></a>
+              <div class="article-copy">
+                <div class="meta">
+                  <time datetime="2022-08-04">04 Aug 2022</time>
+                </div>
+                <h2>
+                  <a href="./logitech-pop-mouse/index.html"
+                    >Bathroom ideas – 4 bathroom designs you will love</a
+                  >
+                </h2>
+                <p>
+                  Discover four considered approaches to making a bathroom
+                  calmer and easier to live with.
+                </p>
+                <a class="read" href="./logitech-pop-mouse/index.html"
+                  >Read article</a
+                >
+              </div>
+            </article>
+            <article class="article" aria-label="Article preview">
+              <div class="article-media">
+                <img
+                  src="../_assets/8746bb3c05ab-BHhqwGXvQoxKFvcD1_m4SpQY-uDK51i35EbYYI4DkT8.jpg"
+                  alt="Comfortable living room arranged for everyday use"
+                />
+              </div>
+              <div class="article-copy">
+                <div class="meta">
+                  <time datetime="2022-08-04">04 Aug 2022</time>
+                </div>
+                <h2>5 Living Room Ideas That Are Fun and Functional</h2>
+                <p>
+                  Balance comfort, personality and practicality with five
+                  flexible living-room ideas.
+                </p>
+                <span class="read" aria-label="Static article preview"
+                  >Article preview</span
+                >
+              </div>
+            </article>
+            <article class="article" aria-label="Article preview">
+              <div class="article-media">
+                <img
+                  src="../_assets/458e89c43cbc-4FhFRwqbgV-jX8Gwy-FWxT5V5Lr3I8nQc0d568FOe6k.jpg"
+                  alt="Restful bedroom with layered neutral furnishings"
+                />
+              </div>
+              <div class="article-copy">
+                <div class="meta">
+                  <time datetime="2022-08-04">04 Aug 2022</time>
+                </div>
+                <h2>72 bedroom ideas to create the dreamiest sanctuary</h2>
+                <p>
+                  Explore restful layouts, soft textures and storage ideas for a
+                  restorative bedroom.
+                </p>
+                <span class="read" aria-label="Static article preview"
+                  >Article preview</span
+                >
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section
+        class="preview"
+        data-block-type="newsletter"
+        data-block-variant="inline"
+        data-mapping-status="supported-static-preview"
+      >
+        <div class="container newsletter">
+          <div>
+            <div class="eyebrow">Notes from ECOSHOP</div>
+            <h2>Good ideas, occasionally.</h2>
+            <p>
+              Receive considered interiors, useful product stories and
+              thoughtful updates.
+            </p>
+          </div>
+          <form class="signup" data-static-preview="true">
+            <label for="email">Email address</label
+            ><input
+              id="email"
+              type="email"
+              placeholder="Email address"
+              autocomplete="email"
+              required
+            /><button type="submit">Subscribe</button>
+            <p class="preview-note" hidden aria-live="polite">
+              Thanks — this is a static preview.
+            </p>
+          </form>
+        </div>
+      </section>
+    </main>
+    <footer
+      class="footer v2-dark-footer page-shell"
+      data-block-type="footer"
+      data-block-variant="dark-gradient"
+      data-mapping-status="renderer-mirror"
+    >
+      <div class="v2-dark-footer-line" aria-hidden="true"></div>
+      <div class="v2-dark-footer-inner">
+        <div class="v2-dark-footer-layout">
+          <div class="v2-dark-footer-brand">
+            <div class="v2-dark-footer-brand-logo">
+              <img
+                class="v2-dark-footer-logo"
+                src="../_assets/139af7e21611-Uxfuo1EVFRhYd0hNuKyNmXT9PrbJ3i-yAdXZlXSazt0.png"
+                alt="ECOSHOP logo"
+              />
+            </div>
+            <p class="v2-dark-footer-tagline" data-footer-field="tagline">
+              Business Suite 19A-24-3, Level 24, UOA Centre, No. 19, Jalan
+              Pinang, 50450 Kuala Lumpur.<br />fn104@primeweb.asia
+            </p>
+          </div>
+          <div class="v2-dark-footer-columns">
+            <div class="v2-dark-footer-column">
+              <h4>QUALITY PRODUCTS</h4>
+              <ul>
+                <li>
+                  <a href="../products/index.html"
+                    ><span>Popular Products</span></a
+                  >
+                </li>
+                <li>
+                  <a href="../products/index.html"><span>Best Selling</span></a>
+                </li>
+                <li>
+                  <a href="../about-us/index.html"><span>About Us</span></a>
+                </li>
+                <li>
+                  <a href="../products/index.html"
+                    ><span>Deal Of The Day</span></a
+                  >
+                </li>
+              </ul>
+            </div>
+            <div class="v2-dark-footer-column">
+              <h4>SUPPORT POLICY</h4>
+              <ul>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Order Details</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Credit Offers</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Addresses</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Personal Details</span></a
+                  >
+                </li>
+              </ul>
+            </div>
+            <div class="v2-dark-footer-column">
+              <h4>INTRODUCE</h4>
+              <ul>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Order Details</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Credit Offers</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Addresses</span></a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://primecommerce.asia/en/support"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    ><span>My Personal Details</span></a
+                  >
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="v2-dark-footer-socials" aria-label="Social links">
+            <a
+              class="v2-dark-footer-social"
+              href="https://www.facebook.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Visit Facebook"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"
+                /></svg
+            ></a>
+            <a
+              class="v2-dark-footer-social"
+              href="https://www.youtube.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Visit YouTube"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"
+                />
+                <path d="m10 15 5-3-5-3z" /></svg
+            ></a>
+            <a
+              class="v2-dark-footer-social"
+              href="https://www.instagram.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Visit Instagram"
+              ><svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg
+            ></a>
+          </div>
+        </div>
+        <div class="v2-dark-footer-copyright">
+          <span data-footer-field="copyrightText"
+            >Copyright © 2026 by Prime Commerce</span
+          >
+        </div>
+      </div>
+    </footer>
+    <button
+      type="button"
+      class="cart"
+      aria-label="Open shopping cart"
+      aria-controls="cart-drawer"
+      aria-expanded="false"
+      data-block-type="cartWidget"
+      data-block-variant="floating"
+      data-mapping-status="runtime-mirror"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <circle cx="9" cy="20" r="1" />
+        <circle cx="19" cy="20" r="1" />
+        <path
+          d="M3 3h2l2.4 11.8a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"
+        /></svg
+      ><span class="badge" aria-label="0 items">0</span>
+    </button>
+    <div class="shade" hidden></div>
+    <aside
+      id="cart-drawer"
+      class="drawer"
+      aria-label="Shopping cart"
+      aria-modal="true"
+      role="dialog"
+      hidden
+    >
+      <div class="drawer-head">
+        <h2>Your cart</h2>
+        <button type="button" class="close" aria-label="Close cart">×</button>
+      </div>
+      <div class="empty">
+        <div>
+          <h3>Your cart is empty</h3>
+          <p>Explore the collection to find something useful.</p>
+          <a href="../products/index.html">Continue shopping</a>
+        </div>
+      </div>
+    </aside>
+    <script>
+      (() => {
+        const q = (s) => document.querySelector(s),
+          menu = q(".menu"),
+          mobile = q(".mobile"),
+          cart = q(".cart"),
+          drawer = q(".drawer"),
+          shade = q(".shade"),
+          close = q(".close"),
+          form = q(".signup"),
+          background = [q(".nav"), q("main"), q(".footer")];
+        let returnFocus = null;
+        menu.addEventListener("click", () => {
+          const open = mobile.classList.toggle("open");
+          menu.setAttribute("aria-expanded", String(open));
+          menu.setAttribute(
+            "aria-label",
+            open ? "Close navigation" : "Open navigation",
+          );
+        });
+        function setCart(open) {
+          if (open) {
+            returnFocus = document.activeElement;
+            drawer.hidden = false;
+            shade.hidden = false;
+            document.body.style.overflow = "hidden";
+            background.forEach((el) => (el.inert = true));
+            cart.setAttribute("aria-expanded", "true");
+            close.focus();
+          } else {
+            drawer.hidden = true;
+            shade.hidden = true;
+            document.body.style.overflow = "";
+            background.forEach((el) => (el.inert = false));
+            cart.setAttribute("aria-expanded", "false");
+            (returnFocus || cart).focus();
+          }
+        }
+        cart.addEventListener("click", () => setCart(true));
+        close.addEventListener("click", () => setCart(false));
+        shade.addEventListener("click", () => setCart(false));
+        document.addEventListener("keydown", (e) => {
+          if (
+            e.key === "Escape" &&
+            menu.getAttribute("aria-expanded") === "true"
+          ) {
+            menu.setAttribute("aria-expanded", "false");
+            menu.setAttribute("aria-label", "Open navigation");
+            mobile.classList.remove("open");
+            menu.focus();
+          }
+          if (drawer.hidden) return;
+          if (e.key === "Escape") setCart(false);
+          if (e.key === "Tab") {
+            const items = [...drawer.querySelectorAll("button,a[href]")],
+              first = items[0],
+              last = items.at(-1);
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        });
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          q(".preview-note").hidden = false;
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>OrganicNest — Organic food, simply chosen</title>
+    <title>fb101</title>
     <style>
       :root {
-        --ink: #173d2b;
-        --muted: #617266;
-        --leaf: #1f6b45;
-        --lime: #b3d366;
-        --cream: #f7f5ec;
-        --line: #dfe6df;
+        --ink: #071c1f;
+        --muted: #041113;
+        --leaf: #80b500;
+        --lime: #80b500;
+        --cream: #ffffff;
+        --line: #80b500;
       }
       * {
         box-sizing: border-box;
@@ -104,7 +104,7 @@
         line-height: 1.05;
       }
       h1 {
-        font-size: clamp(3rem, 6vw, 5.4rem);
+        font-size: clamp(2.8rem, 5.2vw, 4.8rem);
         margin: 12px 0 20px;
       }
       .hero p,
@@ -156,7 +156,7 @@
         height: 50px;
         margin: auto;
         border-radius: 50%;
-        background: #edf5df;
+        background: #ffffff;
         font-style: normal;
       }
       .feature h3 {
@@ -202,7 +202,7 @@
         margin: 0;
       }
       .featured {
-        background: #153c2b;
+        background: #071c1f;
         color: white;
       }
       .featured .heading p {
@@ -264,8 +264,74 @@
         margin: 8px 0;
       }
       .cta {
-        padding: 64px 0;
-        background: #eaf3d7;
+        position: relative;
+        overflow: hidden;
+        padding: 80px 0;
+        background-color: #31562a;
+        background-image:
+          linear-gradient(90deg, rgba(7, 28, 31, 0.82), rgba(7, 28, 31, 0.6)),
+          url("_assets/fb101-cta-honey-background-v2.png");
+        background-position: center;
+        background-size: cover;
+        color: #fff;
+      }
+      .cta-mesh {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.35;
+        background-image:
+          radial-gradient(at 20% 30%, #80b500 0, transparent 50%),
+          radial-gradient(at 80% 20%, #31562a 0, transparent 50%),
+          radial-gradient(at 40% 80%, #80b500 0, transparent 50%),
+          radial-gradient(at 90% 90%, #31562a 0, transparent 50%);
+        filter: blur(40px);
+      }
+      .cta-banner-content {
+        position: relative;
+        z-index: 1;
+        width: min(768px, calc(100% - 40px));
+        margin: 0 auto;
+        text-align: center;
+      }
+      .cta-banner-content h2 {
+        margin: 0 0 16px;
+        color: #fff;
+        line-height: 1.1;
+      }
+      .cta .cta-banner-content p {
+        max-width: 576px;
+        margin: 0 auto 32px;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 1.125rem;
+      }
+      .cta-banner-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 16px;
+      }
+      .cta-banner-primary {
+        display: inline-flex;
+        min-width: 44px;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        padding: 14px 32px;
+        border-radius: 8px;
+        background: #fff;
+        color: #527800;
+        font-size: 0.875rem;
+        font-weight: 700;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+      .cta-banner-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-2px) scale(1.03);
+      }
+      .cta-banner-primary:focus-visible {
+        outline: 3px solid #fff;
+        outline-offset: 4px;
       }
       .cta-in,
       .news-in {
@@ -275,7 +341,7 @@
         gap: 40px;
       }
       .newsletter {
-        background: #f4f7f1;
+        background: #ffffff;
       }
       .newsletter form {
         display: flex;
@@ -293,7 +359,7 @@
       }
       .footer {
         padding: 56px 0 26px;
-        background: #0f2e20;
+        background: #071c1f;
         color: white;
       }
       .footer-grid {
@@ -410,64 +476,95 @@
     </style>
     <style>
       :root {
-        --lime: #66862d;
-        --lime-bg: #b3d366;
+        --lime: #80b500;
+        --lime-bg: #80b500;
       }
       button:focus-visible,
       a:focus-visible,
       input:focus-visible {
-        outline: 3px solid #e1a92c;
+        outline: 3px solid #80b500;
         outline-offset: 3px;
       }
-      .carousel-shell {
-        position: relative;
-        overflow: hidden;
-      }
-      .cards {
-        display: flex !important;
-        transition: transform 0.35s ease;
-      }
-      .category {
-        flex: 0 0 100%;
-        height: 390px;
-      }
-      .carousel-controls,
-      .feature-controls {
+      .portfolio-filters {
         display: flex;
+        flex-wrap: wrap;
         justify-content: center;
-        gap: 10px;
-        margin-top: 20px;
+        gap: 12px;
+        margin-bottom: 48px;
       }
-      .carousel-controls button,
-      .feature-controls button {
-        width: 44px;
-        height: 44px;
+      .portfolio-filter {
+        min-height: 44px;
+        padding: 8px 20px;
         border: 1px solid var(--line);
-        border-radius: 50%;
+        border-radius: 999px;
         background: #fff;
         color: var(--ink);
-        font-size: 1.15rem;
+        font:
+          600 0.875rem Inter,
+          sans-serif;
+        cursor: pointer;
       }
-      .dot {
-        width: 44px !important;
-        height: 44px !important;
-        padding: 0;
-        border: 0 !important;
-        background: transparent !important;
+      .portfolio-filter.active {
+        border-color: var(--lime);
+        background: var(--lime);
+        color: #071c1f;
+      }
+      .portfolio-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+      .portfolio-project {
         position: relative;
+        display: block;
+        overflow: hidden;
+        aspect-ratio: 4 / 3;
+        border-radius: 16px;
+        background: #f1f1f1;
       }
-      .dot:before {
-        content: "";
+      .portfolio-project[hidden] {
+        display: none;
+      }
+      .portfolio-project img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+      }
+      .portfolio-project:hover img,
+      .portfolio-project:focus-visible img {
+        transform: scale(1.1);
+      }
+      .portfolio-overlay {
         position: absolute;
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
-        background: #bcc8bf;
-        inset: 50%;
-        transform: translate(-50%, -50%);
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 24px;
+        color: #fff;
+        background: linear-gradient(transparent, rgba(7, 28, 31, 0.88));
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
       }
-      .dot.active:before {
-        background: var(--leaf);
+      .portfolio-project:hover .portfolio-overlay,
+      .portfolio-project:focus-visible .portfolio-overlay {
+        opacity: 1;
+      }
+      .portfolio-overlay span {
+        margin-bottom: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .portfolio-overlay h3 {
+        margin: 0;
+        color: inherit;
+        font:
+          700 1.25rem Georgia,
+          serif;
       }
       .featured-viewport {
         overflow-x: auto;
@@ -496,7 +593,7 @@
         color: #fff;
       }
       .featured .product-body small {
-        color: #d9e4dc;
+        color: #ffffff;
       }
       .featured .price {
         color: #d9f096;
@@ -611,7 +708,7 @@
         background: #fff;
       }
       .remove {
-        color: #8b2d2d;
+        color: #071c1f;
       }
       .empty-cart[hidden] {
         display: none;
@@ -634,48 +731,68 @@
           font-size: 1rem;
         }
       }
+      .brand img {
+        width: 154px;
+        height: 42px;
+        object-fit: contain;
+      }
+      .about-media img {
+        object-fit: cover;
+      }
+      @media (max-width: 720px) {
+        .portfolio-grid {
+          grid-template-columns: 1fr;
+        }
+        .portfolio-overlay {
+          opacity: 1;
+        }
+      }
+      @media (min-width: 721px) and (max-width: 1023px) {
+        .portfolio-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 768px) {
+        .cta {
+          padding: 112px 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cta-banner-primary {
+          transition: none;
+        }
+        .cta-banner-primary:hover {
+          transform: none;
+        }
+      }
     </style>
+    <link rel="stylesheet" href="_cart-widget.css" />
+    <link rel="stylesheet" href="_footer-dark.css" />
   </head>
   <body>
-    <!-- source replacements + about/cta coverage additions; cart is runtime-owned -->
-    <header
-      class="nav"
-      data-block-type="navigation"
-      data-block-variant="default"
-      data-mapping-status="approximation"
-      data-react-component="NavigationBlock"
-    >
-      <div class="container nav-in">
-        <a class="brand" href="index.html">Organic<b>Nest</b></a>
-        <nav class="links" aria-label="Primary">
-          <a aria-current="page" href="index.html">Home</a
-          ><a href="products/index.html">Products</a
-          ><a href="articles/index.html" data-production-href="/blog">Blog</a
-          ><a href="about-us/index.html">About</a
-          ><a href="contact/index.html">Contact</a
-          ><a class="btn" href="products/index.html">Shop organic</a>
+    <!-- FB101 legacy data mapped to the approved Prime Web v2 review recipe. -->
+    <link rel="stylesheet" href="_navigation.css" />
+    <header class="pw-site-nav" data-fb101-navigation data-block-type="navigation" data-block-variant="default" data-mapping-status="approximation" data-react-component="NavigationBlock">
+      <div class="pw-site-nav__inner">
+        <a class="pw-site-nav__brand" href="index.html" aria-label="fb101 home"><img src="_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png" alt="fb101" width="154" height="42" /></a>
+        <nav class="pw-site-nav__links" aria-label="Primary">
+          <a aria-current="page" href="index.html">Home</a>
+          <a href="products/index.html">Products</a>
+          <a href="articles/index.html" data-production-href="/blog">Blog</a>
+          <a href="contact/index.html">Contact</a>
+          <a href="order-tracking/index.html" data-production-href="/orders">Tracking order</a>
         </nav>
-        <button
-          class="menu"
-          type="button"
-          aria-label="Open menu"
-          aria-expanded="false"
-          aria-controls="mobile-navigation"
-        >
-          ☰
-        </button>
+        <button class="pw-site-nav__menu" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="fb101-mobile-navigation" data-navigation-menu>☰</button>
+        <button class="bag pw-site-nav__compat-cart" type="button" tabindex="-1" aria-hidden="true"><b class="badge">0</b></button>
       </div>
-      <nav
-        class="mobile"
-        id="mobile-navigation"
-        aria-label="Mobile navigation"
-        hidden
-      >
-        <a href="products/index.html">Products</a
-        ><a href="articles/index.html" data-production-href="/blog">Blog</a
-        ><a href="about-us/index.html">About</a
-        ><a href="contact/index.html">Contact</a>
+      <nav class="pw-site-nav__mobile" id="fb101-mobile-navigation" aria-label="Mobile navigation" data-navigation-mobile hidden>
+        <a aria-current="page" href="index.html">Home</a>
+        <a href="products/index.html">Products</a>
+        <a href="articles/index.html" data-production-href="/blog">Blog</a>
+        <a href="contact/index.html">Contact</a>
+        <a href="order-tracking/index.html" data-production-href="/orders">Tracking order</a>
       </nav>
+      <script src="_navigation.js" defer></script>
     </header>
     <main>
       <section
@@ -683,220 +800,118 @@
         data-block-type="hero"
         data-block-variant="split-left"
         data-mapping-status="approximation"
+        data-legacy-component-id="1365"
         data-react-component="HeroBlock"
       >
         <div class="container hero-grid">
           <div>
-            <span class="eyebrow">Fresh from trusted growers</span>
-            <h1>Tasty &amp; healthy organic food</h1>
-            <p>
-              Everyday produce, pantry staples and nourishing ingredients
-              selected to make better meals feel simple.
-            </p>
+            <h1>Tasty &amp; Healthy Organic Food</h1>
+            <p>100% genuine Products</p>
             <a class="btn" href="products/index.html">Explore products</a>
           </div>
           <div class="hero-media">
             <img
-              src="_assets/60a064b61df0-9.jpg"
-              alt="Fresh organic produce arranged for a meal"
+              src="_assets/8383f07b8226-K0gHlByzi6iftFXaP0vI7jdj7vj-XHSt3K2-s7qrPBw.png"
+              alt="Tasty and healthy organic food"
             />
           </div>
         </div>
       </section>
       <section
-        class="features"
-        data-block-type="features"
-        data-block-variant="icon-top"
-        data-mapping-status="approximation"
-        data-react-component="FeaturesBlock"
-      >
-        <div class="container heading">
-          <span class="eyebrow">Why OrganicNest</span>
-          <h2>Better essentials, made easier</h2>
-          <p>Simple service from thoughtful selection through delivery.</p>
-        </div>
-        <div class="container feature-grid">
-          <article class="feature">
-            <i>✓</i>
-            <h3>Quality products</h3>
-            <p>Carefully selected pantry and fresh food.</p>
-          </article>
-          <article class="feature">
-            <i>↗</i>
-            <h3>Fast delivery</h3>
-            <p>Convenient delivery for everyday essentials.</p>
-          </article>
-          <article class="feature">
-            <i>♡</i>
-            <h3>Support policy</h3>
-            <p>Helpful support from browse to basket.</p>
-          </article>
-        </div>
-      </section>
-      <section
         class="section"
-        data-block-type="carousel"
-        data-block-variant="cards"
+        data-block-type="portfolio-grid"
+        data-block-variant="grid"
         data-mapping-status="approximation"
-        data-react-component="CarouselBlock"
+        data-legacy-component-id="1540"
+        data-react-component="PortfolioGridBlock"
       >
         <div class="container">
           <div class="heading">
-            <span class="eyebrow">Browse categories</span>
-            <h2>What are you cooking today?</h2>
-            <p>
-              Start with a collection, then find a new favorite for your
-              kitchen.
-            </p>
+            <h2>Your interest!!!</h2>
           </div>
-          <div class="carousel-shell">
-            <div class="cards">
-              <a class="category" href="products/index.html"
-                ><img
-                  src="_assets/83c6b538b25b-UIFnKZSjXyvIGJvLCo86_0I0Dd3arxCjsJJwF3skXyY.jpg"
-                  alt="Fresh vegetables"
-                />
-                <div class="copy">
-                  <h3>Garden vegetables</h3>
-                  <span>Shop collection →</span>
-                </div></a
-              ><a class="category" href="products/index.html"
-                ><img
-                  src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
-                  alt="Pantry essentials"
-                />
-                <div class="copy">
-                  <h3>Pantry essentials</h3>
-                  <span>Shop collection →</span>
-                </div></a
-              ><a class="category" href="products/index.html"
-                ><img
-                  src="_assets/4142ffbf5204-qmG15agXS9zd6W31BrnNWmYxBt97jOPe98UozoPknVM.jpg"
-                  alt="Fresh ingredients"
-                />
-                <div class="copy">
-                  <h3>Fresh picks</h3>
-                  <span>Shop collection →</span>
-                </div></a
-              >
-            </div>
-          </div>
-          <div class="carousel-controls">
+          <div class="portfolio-filters" aria-label="Filter interests">
             <button
-              class="category-prev"
+              class="portfolio-filter active"
               type="button"
-              aria-label="Previous category"
+              data-filter="all"
+              aria-pressed="true"
             >
-              ←
+              All
             </button>
-            <div class="dots" aria-label="Category slides">
-              <button
-                class="dot active"
-                type="button"
-                aria-label="Category 1"
-                aria-current="true"
-              ></button
-              ><button
-                class="dot"
-                type="button"
-                aria-label="Category 2"
-              ></button
-              ><button
-                class="dot"
-                type="button"
-                aria-label="Category 3"
-              ></button>
-            </div>
             <button
-              class="category-next"
+              class="portfolio-filter"
               type="button"
-              aria-label="Next category"
+              data-filter="vegetables"
+              aria-pressed="false"
             >
-              →
+              VEGETABLES
+            </button>
+            <button
+              class="portfolio-filter"
+              type="button"
+              data-filter="fruits"
+              aria-pressed="false"
+            >
+              FRUITS
+            </button>
+            <button
+              class="portfolio-filter"
+              type="button"
+              data-filter="food"
+              aria-pressed="false"
+            >
+              FOOD
             </button>
           </div>
-        </div>
-      </section>
-      <section
-        class="section featured"
-        data-block-type="products-featured"
-        data-block-variant="carousel"
-        data-mapping-status="approximation"
-        data-react-component="ProductsFeaturedBlock"
-      >
-        <div class="container">
-          <div class="heading">
-            <span class="eyebrow">Featured shelf</span>
-            <h2>OrganicNest favorites</h2>
-            <p>Popular picks customers return to week after week.</p>
-          </div>
-          <div class="featured-viewport">
-            <div class="products">
-              <a class="product" href="products/index.html"
-                ><div class="product-media">
-                  <img
-                    src="_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg"
-                    alt="Sea Salt Grinder"
-                  />
-                </div>
-                <div class="product-body">
-                  <small>Condiment &amp; sauce</small>
-                  <h3>McCormick Sea Salt Grinder</h3>
-                  <b class="price">RM 15.00</b>
-                </div></a
-              ><a class="product" href="products/index.html"
-                ><div class="product-media">
-                  <img
-                    src="_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg"
-                    alt="Mo Qua Squash"
-                  />
-                </div>
-                <div class="product-body">
-                  <small>Garden vegetables</small>
-                  <h3>Fresh Mo Qua Squash</h3>
-                  <b class="price">RM 10.00</b>
-                </div></a
-              ><a class="product" href="products/index.html"
-                ><div class="product-media">
-                  <img
-                    src="_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg"
-                    alt="Pork Ribeye Chops"
-                  />
-                </div>
-                <div class="product-body">
-                  <small>Fresh</small>
-                  <h3>Pork Ribeye Chops Boneless</h3>
-                  <b class="price">RM 33.00</b>
-                </div></a
-              ><a class="product" href="products/index.html"
-                ><div class="product-media">
-                  <img
-                    src="_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg"
-                    alt="Purple Onion"
-                  />
-                </div>
-                <div class="product-body">
-                  <small>Seasoning</small>
-                  <h3>Purple Onion Hasfarm Green+</h3>
-                  <b class="price">RM 3.80</b>
-                </div></a
-              >
-            </div>
-          </div>
-          <div class="feature-controls">
-            <button
-              class="featured-prev"
-              type="button"
-              aria-label="Previous featured product"
+          <div class="portfolio-grid">
+            <a
+              class="portfolio-project"
+              href="products/index.html?category=fresh"
+              data-production-href="/products?category=stores"
+              data-local-category="fresh"
+              data-legacy-category-id="3446"
+              data-project-category="vegetables"
+              ><img
+                src="_assets/fb101-category-vegetables-v2.png"
+                width="1448"
+                height="1086"
+                alt="Freshly harvested organic vegetables in a garden basket"
+              />
+              <div class="portfolio-overlay">
+                <span>VEGETABLES</span>
+                <h3>VEGETABLES</h3>
+              </div></a
+            ><a
+              class="portfolio-project"
+              href="products/index.html?category=fresh"
+              data-production-href="/products?category=accessories"
+              data-local-category="fresh"
+              data-legacy-category-id="3454"
+              data-project-category="fruits"
+              ><img
+                src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
+                alt="FRUITS"
+              />
+              <div class="portfolio-overlay">
+                <span>FRUITS</span>
+                <h3>FRUITS</h3>
+              </div></a
+            ><a
+              class="portfolio-project"
+              href="products/index.html?category=pantry"
+              data-production-href="/products?category=balo-bags"
+              data-local-category="pantry"
+              data-legacy-category-id="3459"
+              data-project-category="food"
+              ><img
+                src="_assets/4142ffbf5204-qmG15agXS9zd6W31BrnNWmYxBt97jOPe98UozoPknVM.jpg"
+                alt="FOOD"
+              />
+              <div class="portfolio-overlay">
+                <span>FOOD</span>
+                <h3>FOOD</h3>
+              </div></a
             >
-              ←</button
-            ><button
-              class="featured-next"
-              type="button"
-              aria-label="Next featured product"
-            >
-              →
-            </button>
           </div>
         </div>
       </section>
@@ -905,18 +920,84 @@
         data-block-type="products-grid"
         data-block-variant="grid-4"
         data-mapping-status="approximation"
+        data-legacy-component-id="1541"
+        data-legacy-order-by="created_at"
+        data-legacy-list-type="all"
         data-react-component="ProductsGridBlock"
       >
         <div class="container">
           <div class="heading">
-            <span class="eyebrow">Our products</span>
-            <h2>Stock the kitchen well</h2>
-            <p>
-              Reliable basics and fresh ingredients, ready for your next meal.
-            </p>
+            <h2>Our products</h2>
           </div>
           <div class="products">
-            <a class="product" href="products/index.html"
+            <a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="usb-transcend-jet-flash"
+            >
+              <div class="product-media">
+                <img
+                  src="_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg"
+                  alt="McCormick Sea Salt Grinder, 2.12 oz"
+                />
+              </div>
+              <div class="product-body">
+                <h3>McCormick Sea Salt Grinder, 2.12 oz</h3>
+                <b class="price">RM 15.00</b>
+              </div>
+            </a>
+            <a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="dell-ultrasharp-4k-u2720q"
+            >
+              <div class="product-media">
+                <img
+                  src="_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg"
+                  alt="Fresh Mo Qua Squash, by weight"
+                />
+              </div>
+              <div class="product-body">
+                <h3>Fresh Mo Qua Squash, by weight</h3>
+                <b class="price">RM 10.00</b>
+              </div>
+            </a>
+            <a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="asus-proart-pa248qv-24"
+            >
+              <div class="product-media">
+                <img
+                  src="_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg"
+                  alt="Pork Ribeye Chops Boneless"
+                />
+              </div>
+              <div class="product-body">
+                <h3>Pork Ribeye Chops Boneless</h3>
+                <b class="price">RM 33.00</b>
+              </div>
+            </a>
+            <a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="hyperdrive-hdmi-4k-3-in-1"
+            >
+              <div class="product-media">
+                <img
+                  src="_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg"
+                  alt="Purple Onion Hasfarm Green+"
+                />
+              </div>
+              <div class="product-body">
+                <h3>Purple Onion Hasfarm Green+</h3>
+                <b class="price">RM 3.80</b>
+              </div>
+            </a>
+            <a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="sac-mophie-usb-c-18w"
               ><div class="product-media">
                 <img
                   src="_assets/d6cf6255767a-dqDs_txwjJ9hOkGsIvTN7M9ZhkMy2NcuEDNfQa8SalU.jpg"
@@ -928,7 +1009,10 @@
                 <h3>Butterhead Lettuce Hasfarm Green+</h3>
                 <b class="price">RM 2.00</b>
               </div></a
-            ><a class="product" href="products/index.html"
+            ><a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="usb-transcend-jetflash"
               ><div class="product-media">
                 <img
                   src="_assets/f0a2e0efb68c-V0KNhEph0FiS9o-BCuNWxa4mhSC4UPsRSzY3zRRv4zc.jpg"
@@ -940,7 +1024,10 @@
                 <h3>Prego Homestyle Alfredo Sauce</h3>
                 <b class="price">RM 18.00</b>
               </div></a
-            ><a class="product" href="products/index.html"
+            ><a
+              class="product"
+              href="products/index.html"
+              data-legacy-slug="tucano"
               ><div class="product-media">
                 <img
                   src="_assets/a5d19052a083-NIG13ymL6iWxcwIpc_cdbK5zT8DWHt2RugmdtMDLU1w.jpg"
@@ -949,10 +1036,13 @@
               </div>
               <div class="product-body">
                 <small>Pantry</small>
-                <h3>Traditional Pasta Sauce</h3>
+                <h3>Great Value Traditional Pasta Sauce, 24 oz</h3>
                 <b class="price">RM 18.00</b>
               </div></a
-            ><a class="product" href="products/index.html"
+            ><a
+              class="product"
+              href="products/benq-el2870u-4k/index.html"
+              data-legacy-slug="benq-el2870u-4k"
               ><div class="product-media">
                 <img
                   src="_assets/f50cfb1b1956-Pj945HmXAbf_QvQ6qY0woXoYAX1iMwodftb1tCqnUhU.jpg"
@@ -969,29 +1059,21 @@
         </div>
       </section>
       <section
-        class="section about"
-        data-block-type="about"
-        data-block-variant="split"
+        class="cta"
+        data-block-type="cta"
+        data-block-variant="banner"
         data-mapping-status="approximation"
-        data-coverage-role="rich-text"
-        data-react-component="AboutBlock"
+        data-react-component="CTABlock"
+        data-legacy-component-id="1543"
       >
-        <div class="container about-grid">
-          <div class="about-media">
-            <img
-              src="_assets/5b13a166e850-1.jpg"
-              alt="Organic ingredients selected with care"
-            />
-          </div>
-          <div>
-            <span class="eyebrow">Our approach</span>
-            <h2>Good food begins with thoughtful choices</h2>
-            <p>
-              OrganicNest brings useful ingredients together in one calm,
-              approachable shop. We focus on quality, clarity and the everyday
-              pleasure of cooking well.
-            </p>
-            <a class="btn" href="about-us/index.html">Meet OrganicNest</a>
+        <div class="cta-mesh" aria-hidden="true"></div>
+        <div class="cta-banner-content">
+          <h2>Original Stock Honey Combo Package</h2>
+          <p>Todays Hot Deals</p>
+          <div class="cta-banner-actions">
+            <a class="cta-banner-primary" href="products/index.html"
+              >Explore Products</a
+            >
           </div>
         </div>
       </section>
@@ -1000,54 +1082,61 @@
         data-block-type="blog-list"
         data-block-variant="cards"
         data-mapping-status="approximation"
+        data-legacy-component-id="1544"
+        data-legacy-order-by="created_at"
         data-react-component="BlogListBlock"
       >
         <div class="container">
           <div class="heading">
             <span class="eyebrow">Our articles</span>
-            <h2>Ideas for a fresher table</h2>
-            <p>
-              Simple guides, ingredient notes and practical ways to eat well.
-            </p>
+            <h2>Our articles</h2>
           </div>
           <div class="blogs">
             <a
               class="blog"
               href="articles/index.html"
-              data-production-href="/blog"
-              ><div class="blog-media">
-                <img src="_assets/e0162c479c97-2.jpg" alt="Fresh ingredients" />
-              </div>
-              <div class="blog-body">
-                <small>Kitchen notes · 6 min</small>
-                <h3>Build a better everyday pantry</h3>
-                <span>Read article →</span>
-              </div></a
-            ><a
-              class="blog"
-              href="articles/index.html"
-              data-production-href="/blog"
-              ><div class="blog-media">
-                <img src="_assets/60a064b61df0-9.jpg" alt="Organic produce" />
-              </div>
-              <div class="blog-body">
-                <small>Fresh food · 4 min</small>
-                <h3>How to choose seasonal vegetables</h3>
-                <span>Read article →</span>
-              </div></a
-            ><a
-              class="blog"
-              href="articles/index.html"
-              data-production-href="/blog"
+              data-legacy-slug="logitech-pop-mouse"
               ><div class="blog-media">
                 <img
-                  src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
-                  alt="Cooking sauces"
+                  src="_assets/4142ffbf5204-qmG15agXS9zd6W31BrnNWmYxBt97jOPe98UozoPknVM.jpg"
+                  alt="5 Foods That Are Good for Your Eyes"
                 />
               </div>
               <div class="blog-body">
-                <small>Quick meals · 5 min</small>
-                <h3>Three sauces, five weeknight dinners</h3>
+                <small>2022-08-04</small>
+                <h3>5 Foods That Are Good for Your Eyes</h3>
+                <span>Read article →</span>
+              </div></a
+            ><a
+              class="blog"
+              href="articles/index.html"
+              data-legacy-slug="audio-technica-s220bt"
+              ><div class="blog-media">
+                <img
+                  src="_assets/5bb5aea2e891-kJVUfVA06qA-yagjj6F0aNCJKy8YYRW58bgZZOanLmg.jpg"
+                  alt="Nutrition advice for adults during the COVID-19 outbreak"
+                />
+              </div>
+              <div class="blog-body">
+                <small>2022-08-04</small>
+                <h3>
+                  Nutrition advice for adults during the COVID-19 outbreak
+                </h3>
+                <span>Read article →</span>
+              </div></a
+            ><a
+              class="blog"
+              href="articles/index.html"
+              data-legacy-slug="logitech-pop-keys"
+              ><div class="blog-media">
+                <img
+                  src="_assets/b7f50b4f2008-vUafGrW2V8tYDfIeRx6DQ-wyLvxt2hMeo8d0gN9P22w.jpg"
+                  alt="5 delish Malaysian curry recipes to master at home"
+                />
+              </div>
+              <div class="blog-body">
+                <small>2022-08-04</small>
+                <h3>5 delish Malaysian curry recipes to master at home</h3>
                 <span>Read article →</span>
               </div></a
             >
@@ -1055,89 +1144,147 @@
         </div>
       </section>
       <section
-        class="cta"
-        data-block-type="cta"
-        data-block-variant="banner"
+        class="section about"
+        data-block-type="about"
+        data-block-variant="split"
         data-mapping-status="approximation"
-        data-coverage-role="small-banner"
-        data-react-component="CTABlock"
+        data-legacy-source="store-profile-131"
+        data-react-component="AboutBlock"
       >
-        <div class="container cta-in">
+        <div class="container about-grid">
+          <div class="about-media">
+            <img
+              src="_assets/fb101-about-organic-produce-v2.png"
+              alt="Fresh organic vegetables arranged with a reusable grocery bag"
+              width="1448"
+              height="1086"
+            />
+          </div>
           <div>
-            <span class="eyebrow">Your interest, naturally</span>
-            <h2>Make the next meal a little greener</h2>
+            <h2>fb101</h2>
             <p>
-              Explore fresh produce and pantry staples for everyday cooking.
+              Lorem Ipsum is simply dummy text of the printing and typesetting
+              industry. Lorem Ipsum has been the industry's standard dummy text
+              ever since the 1500s
+            </p>
+            <p>
+              BUSINESS SUITE 19A-24-3, LEVEL 24, UOA CENTRE, NO 19, JALAN PINANG
+              50450 KUALA LUMPUR.
+            </p>
+            <p>
+              <a href="tel:02866542688">02866542688</a> ·
+              <a href="mailto:fb101@primeweb.asia">fb101@primeweb.asia</a>
             </p>
           </div>
-          <a class="btn" href="products/index.html">Shop all products</a>
-        </div>
-      </section>
-      <section
-        class="section newsletter"
-        data-block-type="newsletter"
-        data-block-variant="inline"
-        data-mapping-status="approximation"
-        data-react-component="NewsletterBlock"
-      >
-        <div class="container news-in">
-          <div>
-            <span class="eyebrow">OrganicNest notes</span>
-            <h2>Fresh ideas in your inbox</h2>
-            <p>Seasonal picks, product news and simple recipes.</p>
-          </div>
-          <form onsubmit="event.preventDefault()">
-            <input
-              type="email"
-              aria-label="Email address"
-              placeholder="you@example.com"
-              required
-            /><button class="btn">Subscribe</button>
-          </form>
         </div>
       </section>
     </main>
     <footer
-      class="footer"
+      class="pw-footer-dark"
       data-block-type="footer"
-      data-block-variant="simple"
+      data-block-variant="dark-gradient"
       data-mapping-status="approximation"
       data-react-component="FooterBlock"
     >
-      <div class="container">
-        <div class="footer-grid">
-          <div>
-            <a class="brand" href="index.html">Organic<b>Nest</b></a>
-            <p>Thoughtfully selected food for naturally better meals.</p>
+      <div class="pw-footer-container">
+        <div class="pw-footer-main">
+          <div class="pw-footer-brand">
+            <a href="index.html" aria-label="fb101 home"
+              ><img
+                src="_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png"
+                alt="fb101"
+                width="154"
+                height="42"
+            /></a>
+            <p class="pw-footer-tagline">
+              Lorem Ipsum is simply dummy text of the printing and typesetting
+              industry. Lorem Ipsum has been the industry's standard dummy text
+              ever since the 1500s
+            </p>
+            <ul class="pw-footer-contact">
+              <li>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></svg>BUSINESS SUITE 19A-24-3, LEVEL 24, UOA CENTRE, NO 19,
+                JALAN PINANG 50450 KUALA LUMPUR.
+              </li>
+              <li><a href="tel:02866542688"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"/></svg>02866542688</a></li>
+              <li>
+                <a href="mailto:fb101@primeweb.asia"
+                  ><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>fb101@primeweb.asia</a
+                >
+              </li>
+            </ul>
           </div>
-          <div>
-            <h3>Shop</h3>
-            <nav>
-              <a href="products/index.html">Products</a
-              ><a href="articles/index.html" data-production-href="/blog"
-                >Blog</a
-              ><a href="about-us/index.html">About us</a>
-            </nav>
+          <div class="pw-footer-column">
+            <h3>Quality products</h3>
+            <ul>
+              <li><a href="products/index.html">Popular Products</a></li>
+              <li><a href="products/index.html">Best Selling</a></li>
+              <li><a href="products/index.html">Deal Of The Day</a></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.facebook.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                ><img src="_assets/44fec0fbcbfd-facebook.png" alt=""
+              /></a>
+            </div>
           </div>
-          <div>
-            <h3>Help</h3>
-            <nav>
-              <a href="contact/index.html">Contact</a
-              ><a
-                href="order-tracking/index.html"
-                data-production-href="/orders"
-                >Track an order</a
-              ><a href="cart/index.html">Cart</a>
-            </nav>
+          <div class="pw-footer-column">
+            <h3>Support policy</h3>
+            <ul>
+              <li>
+                <a
+                  href="order-tracking/index.html"
+                  data-production-href="/orders"
+                  >My Order Details</a
+                >
+              </li>
+              <li><span>My Credit Offers</span></li>
+              <li><span>My Addresses</span></li>
+              <li><span>My Personal Details</span></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.youtube.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube"
+                ><img src="_assets/02aa56fea786-youtube.png" alt=""
+              /></a>
+            </div>
+          </div>
+          <div class="pw-footer-column">
+            <h3>Introduce</h3>
+            <ul>
+              <li>
+                <a
+                  href="order-tracking/index.html"
+                  data-production-href="/orders"
+                  >My Order Details</a
+                >
+              </li>
+              <li><span>My Credit Offers</span></li>
+              <li><span>My Addresses</span></li>
+              <li><span>My Personal Details</span></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                ><img src="_assets/1711b9f1f51e-instagram.png" alt=""
+              /></a>
+            </div>
           </div>
         </div>
-        <p class="copyright">
-          © 2026 OrganicNest. Static adaptation for Prime Web v2 review.
-        </p>
+        <p class="pw-footer-copyright">Copyright © 2022 by Prime Commerce</p>
       </div>
     </footer>
     <button
-      class="cart"
+      class="cart pw-cart-widget"
       type="button"
       aria-label="Open cart"
       aria-expanded="false"
@@ -1147,7 +1294,13 @@
       data-mapping-status="runtime"
       data-runtime-component="CartDrawer"
     >
-      Cart <span>2</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M3 3h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6" />
+        <circle cx="10" cy="20" r="1" />
+        <circle cx="18" cy="20" r="1" />
+      </svg>
+      <span class="pw-cart-label">Cart</span>
+      <span class="pw-cart-count">0</span>
     </button>
     <div class="overlay" aria-hidden="true">
       <aside
@@ -1159,12 +1312,12 @@
       >
         <div class="drawer-head">
           <div>
-            <small>OrganicNest basket</small>
-            <h2 id="cart-title">Your cart (2)</h2>
+            <small>fb101 basket</small>
+            <h2 id="cart-title">Your cart (0)</h2>
           </div>
           <button class="close" type="button" aria-label="Close cart">×</button>
         </div>
-        <article class="drawer-item">
+        <article class="drawer-item" hidden>
           <img
             src="_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg"
             alt="McCormick Sea Salt Grinder"
@@ -1196,12 +1349,11 @@
             <strong class="line-total">RM 30.00</strong>
           </div>
         </article>
-        <div class="empty-cart" hidden>
+        <div class="empty-cart">
           <h3>Your cart is empty</h3>
-          <p>Add a few OrganicNest favorites to begin.</p>
           <a class="btn" href="products/index.html">Browse products</a>
         </div>
-        <div class="drawer-foot">
+        <div class="drawer-foot" hidden>
           <div class="subtotal">
             <span>Subtotal</span
             ><strong class="subtotal-total">RM 30.00</strong>
@@ -1212,42 +1364,26 @@
       </aside>
     </div>
     <script>
-      const b = document.querySelector(".menu"),
-        m = document.querySelector(".mobile");
-      b.onclick = () => {
-        const o = m.classList.toggle("open");
-        b.setAttribute("aria-expanded", o);
-        b.setAttribute("aria-label", o ? "Close menu" : "Open menu");
-        b.textContent = o ? "×" : "☰";
-        m.hidden = !o;
-      };
-      const track = document.querySelector(".cards"),
-        dots = [...document.querySelectorAll(".dot")];
-      let categoryIndex = 0;
-      const showCategory = (i) => {
-        categoryIndex = (i + 3) % 3;
-        track.style.transform = `translateX(-${categoryIndex * 100}%)`;
-        dots.forEach((dot, n) => {
-          dot.classList.toggle("active", n === categoryIndex);
-          if (n === categoryIndex) dot.setAttribute("aria-current", "true");
-          else dot.removeAttribute("aria-current");
-        });
-      };
-      document.querySelector(".category-prev").onclick = () =>
-        showCategory(categoryIndex - 1);
-      document.querySelector(".category-next").onclick = () =>
-        showCategory(categoryIndex + 1);
-      dots.forEach((dot, i) => (dot.onclick = () => showCategory(i)));
-      const viewport = document.querySelector(".featured-viewport");
-      const featuredStep = () => {
-        const card = viewport.querySelector(".product"),
-          styles = getComputedStyle(viewport.querySelector(".products"));
-        return card.getBoundingClientRect().width + parseFloat(styles.gap || 0);
-      };
-      document.querySelector(".featured-prev").onclick = () =>
-        viewport.scrollBy({ left: -featuredStep(), behavior: "smooth" });
-      document.querySelector(".featured-next").onclick = () =>
-        viewport.scrollBy({ left: featuredStep(), behavior: "smooth" });
+      const portfolioFilters = [
+          ...document.querySelectorAll(".portfolio-filter"),
+        ],
+        portfolioProjects = [
+          ...document.querySelectorAll(".portfolio-project"),
+        ];
+      portfolioFilters.forEach((button) => {
+        button.onclick = () => {
+          const filter = button.dataset.filter;
+          portfolioFilters.forEach((item) => {
+            const active = item === button;
+            item.classList.toggle("active", active);
+            item.setAttribute("aria-pressed", String(active));
+          });
+          portfolioProjects.forEach((project) => {
+            project.hidden =
+              filter !== "all" && project.dataset.projectCategory !== filter;
+          });
+        };
+      });
       const cart = document.querySelector(".cart"),
         overlay = document.querySelector(".overlay"),
         close = document.querySelector(".close");
@@ -1281,7 +1417,7 @@
         qty.textContent = n;
         minus.disabled = n <= 1;
         document.querySelector("#cart-title").textContent = `Your cart (${n})`;
-        cart.querySelector("span").textContent = n;
+        cart.querySelector(".pw-cart-count").textContent = n;
         document.querySelector(".line-total").textContent =
           `RM ${(n * 15).toFixed(2)}`;
         document.querySelector(".subtotal-total").textContent =
@@ -1294,20 +1430,12 @@
         empty.hidden = false;
         foot.hidden = true;
         document.querySelector("#cart-title").textContent = "Your cart (0)";
-        cart.querySelector("span").textContent = "0";
+        cart.querySelector(".pw-cart-count").textContent = "0";
         close.focus();
       };
       addEventListener("keydown", (e) => {
         if (e.key === "Escape" && overlay.classList.contains("open"))
           setCart(false);
-        if (e.key === "Escape" && !m.hidden) {
-          m.hidden = true;
-          m.classList.remove("open");
-          b.setAttribute("aria-expanded", "false");
-          b.setAttribute("aria-label", "Open menu");
-          b.textContent = "☰";
-          b.focus();
-        }
         if (e.key === "Tab" && overlay.classList.contains("open")) {
           const focusable = [
             ...overlay.querySelectorAll("button,a[href]"),

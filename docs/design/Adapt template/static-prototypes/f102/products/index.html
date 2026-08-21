@@ -6,7 +6,35 @@
     <base href="../" />
     <title>Shop — NIXX</title>
     <link rel="stylesheet" href="_v2.css" />
-  <style>
+    <style>
+    /* ProductsGridBlock / grid-3 + filter-sidebar (showCategoryFilter: true) */
+    .pg-layout { display: grid; gap: 40px; }
+    @media (min-width: 1024px) { .pg-layout { grid-template-columns: 260px 1fr; align-items: start; } }
+
+    /* Sidebar */
+    .filter-sidebar { display: none; }
+    @media (min-width: 1024px) { .filter-sidebar { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 100px; } }
+    .filter-panel { border: 1px solid var(--line); border-radius: 16px; padding: 24px; background: var(--card); }
+    .filter-panel-title { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink); margin: 0 0 18px; }
+    .filter-panel-title::before { content: ''; display: block; width: 24px; height: 2px; background: var(--p); flex-shrink: 0; }
+    .filter-cat-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; color: var(--ink); cursor: pointer; transition: color .2s; text-decoration: none; }
+    .filter-cat-item:last-child { border-bottom: none; }
+    .filter-cat-item:hover, .filter-cat-item.active { color: var(--p); font-weight: 600; }
+    .filter-cat-item svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; }
+    .filter-search-box { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+    .filter-search-box svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; flex-shrink: 0; }
+    .filter-search-box input { border: none; background: transparent; font-size: 0.88rem; color: var(--ink); width: 100%; outline: none; font-family: inherit; }
+    .filter-search-box input::placeholder { color: var(--muted); }
+
+    /* Toolbar */
+    .pg-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+    .pg-count { font-size: 0.82rem; color: var(--muted); }
+    .pg-sort { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+    .pg-sort select { border: none; background: transparent; font-family: inherit; font-size: 0.82rem; color: var(--ink); font-weight: 600; cursor: pointer; outline: none; }
+
+    /* Product grid */
+    .product-grid-v2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 767px) { .product-grid-v2 { grid-template-columns: repeat(2, 1fr); gap: 16px; } }
 
     /* FooterBlock / custom f102 */
     .footer-custom { padding: 64px 0 0; background: #fff; font-family: inherit; }
@@ -30,7 +58,7 @@
     .footer-bottom { margin-top: 64px; border-top: 1px solid #eaeaea; text-align: center; padding: 24px 0; font-size: 0.8rem; color: #666; }
     .footer-bottom p { margin: 0; }
 
-</style>
+  </style>
   </head>
   <body>
     <a class="skip" href="#main-content">Skip to content</a>
@@ -92,117 +120,122 @@
         </div>
       </header>
       <section
-        class="section"
-        data-block-type="products-grid"
-        data-block-variant="grid-3"
-        data-mapping-status="approximation"
-      >
-        <div class="container">
-          <div class="filters" role="group" aria-label="Product filters">
-            <details class="filter-dropdown">
-              <summary>All collections</summary>
-              <div
-                class="filter-options"
-                role="group"
-                aria-label="Collection options"
-              >
-                <button type="button" class="selected" aria-pressed="true">
-                  All collections
-                </button>
-                <button type="button" aria-pressed="false">Essentials</button>
-                <button type="button" aria-pressed="false">Accessories</button>
-              </div>
-            </details>
-            <input
-              class="filter-search"
-              type="search"
-              placeholder="Search the collection"
-              aria-label="Search products"
-            />
-            <details class="filter-dropdown">
-              <summary>Featured</summary>
-              <div
-                class="filter-options"
-                role="group"
-                aria-label="Sort options"
-              >
-                <button type="button" class="selected" aria-pressed="true">
-                  Featured
-                </button>
-                <button type="button" aria-pressed="false">
-                  Price: low to high
-                </button>
-              </div>
-            </details>
-          </div>
-          <div class="cards product-grid">
-            <a
-              class="card"
-              href="products/high-collar-t-shirt-with-ribbed-fabric/index.html"
-              ><div class="card-media">
-                <img
-                  src="_assets/1c766da801db-epF8MyFvrq0BTcnAECAQ9iiHZ_u3rN5DfV3sbcwxM48.jpeg"
-                  width="900"
-                  height="675"
-                  alt="High collar ribbed T-shirt"
-                />
-              </div>
-              <div class="card-body">
-                <span class="kicker">Essentials</span>
-                <h2>High Collar T-shirt</h2>
-                <span class="price">$50.00</span>
-              </div></a
-            ><a class="card" href="products/apple-tv/index.html"
-              ><div class="card-media">
-                <img
-                  src="_assets/040b3cc2377b-as0xngAXOzhvR2RoGHrWSReyyIbIt39RuP409JiajUk.jpeg"
-                  width="900"
-                  height="675"
-                  alt="Classic white NIXX T-shirt"
-                />
-              </div>
-              <div class="card-body">
-                <span class="kicker">Core collection</span>
-                <h2>Classic White T-shirt</h2>
-                <span class="price">$45.00</span>
-              </div></a
-            >
-            <article class="card">
-              <div class="card-media">
-                <img
-                  src="_assets/3dd8ce277bb9-6wm70LVm0EUVnY-jM3Svg3Fni629r1BM2Mrw82aE13U.jpeg"
-                  width="900"
-                  height="675"
-                  alt="Sculptural black heels"
-                />
-              </div>
-              <div class="card-body">
-                <span class="kicker">Accessories</span>
-                <h2>Sculptural Heels</h2>
-                <span class="price">$72.00</span>
-              </div>
-            </article>
-            <article class="card">
-              <div class="card-media">
-                <img
-                  src="_assets/b2267c2592c2-w1pg2UoFESBL-TQYIAgFUp54bcZCChUXA_B_5TKQo4U.jpeg"
-                  width="900"
-                  height="675"
-                  alt="Wide leg culottes"
-                />
-              </div>
-              <div class="card-body">
-                <span class="kicker">New arrival</span>
-                <h2>Wide-leg Culottes</h2>
-                <span class="price">$64.00</span>
-              </div>
-            </article>
-          </div>
-          <div class="pagination" aria-label="Pagination">
-            <span class="active">1</span><span>2</span><span>→</span>
-          </div>
-        </div>
-      </section>
+         class="section"
+         data-block-type="products-grid"
+         data-block-variant="grid-3"
+         data-mapping-status="exact"
+         data-react-component="ProductsGridBlock"
+         data-mapping-note="showCategoryFilter:true — sidebar layout matches v2 ProductFilterSidebar"
+       >
+         <div class="container">
+
+           <!-- v2 layout: 260px sidebar + grid -->
+           <div class="pg-layout">
+
+             <!-- ── LEFT SIDEBAR ── -->
+             <aside class="filter-sidebar" aria-label="Product filters">
+
+               <!-- Categories panel -->
+               <div class="filter-panel">
+                 <h3 class="filter-panel-title">Categories</h3>
+                 <a href="#" class="filter-cat-item active" aria-pressed="true">
+                   All collections
+                   <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                 </a>
+                 <a href="#" class="filter-cat-item" aria-pressed="false">
+                   Essentials
+                   <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                 </a>
+                 <a href="#" class="filter-cat-item" aria-pressed="false">
+                   Accessories
+                   <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                 </a>
+                 <a href="#" class="filter-cat-item" aria-pressed="false">
+                   New Arrivals
+                   <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                 </a>
+               </div>
+
+               <!-- Search panel -->
+               <div class="filter-panel">
+                 <h3 class="filter-panel-title">Search Products</h3>
+                 <div class="filter-search-box">
+                   <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                   <input type="search" placeholder="Search your keyword..." aria-label="Search products" />
+                 </div>
+               </div>
+
+             </aside>
+
+             <!-- ── RIGHT: TOOLBAR + GRID ── -->
+             <div>
+               <!-- Toolbar -->
+               <div class="pg-toolbar">
+                 <span class="pg-count">4 products</span>
+                 <div class="pg-sort">
+                   Sort by:
+                   <select aria-label="Sort products">
+                     <option>Featured</option>
+                     <option>Price: low to high</option>
+                     <option>Price: high to low</option>
+                     <option>Newest</option>
+                   </select>
+                 </div>
+               </div>
+
+               <!-- Product grid -->
+               <div class="product-grid-v2">
+                 <a class="card" href="products/high-collar-t-shirt-with-ribbed-fabric/index.html">
+                   <div class="card-media">
+                     <img src="_assets/1c766da801db-epF8MyFvrq0BTcnAECAQ9iiHZ_u3rN5DfV3sbcwxM48.jpeg" width="900" height="675" alt="High collar ribbed T-shirt" loading="lazy" />
+                   </div>
+                   <div class="card-body">
+                     <span class="kicker">Essentials</span>
+                     <h2>High Collar T-shirt</h2>
+                     <span class="price">$50.00</span>
+                   </div>
+                 </a>
+                 <a class="card" href="products/apple-tv/index.html">
+                   <div class="card-media">
+                     <img src="_assets/040b3cc2377b-as0xngAXOzhvR2RoGHrWSReyyIbIt39RuP409JiajUk.jpeg" width="900" height="675" alt="Classic white NIXX T-shirt" loading="lazy" />
+                   </div>
+                   <div class="card-body">
+                     <span class="kicker">Core collection</span>
+                     <h2>Classic White T-shirt</h2>
+                     <span class="price">$45.00</span>
+                   </div>
+                 </a>
+                 <article class="card">
+                   <div class="card-media">
+                     <img src="_assets/3dd8ce277bb9-6wm70LVm0EUVnY-jM3Svg3Fni629r1BM2Mrw82aE13U.jpeg" width="900" height="675" alt="Sculptural heels" loading="lazy" />
+                   </div>
+                   <div class="card-body">
+                     <span class="kicker">Accessories</span>
+                     <h2>Sculptural Heels</h2>
+                     <span class="price">$72.00</span>
+                   </div>
+                 </article>
+                 <article class="card">
+                   <div class="card-media">
+                     <img src="_assets/b2267c2592c2-w1pg2UoFESBL-TQYIAgFUp54bcZCChUXA_B_5TKQo4U.jpeg" width="900" height="675" alt="Wide leg culottes" loading="lazy" />
+                   </div>
+                   <div class="card-body">
+                     <span class="kicker">New arrival</span>
+                     <h2>Wide-leg Culottes</h2>
+                     <span class="price">$64.00</span>
+                   </div>
+                 </article>
+               </div>
+
+               <!-- Pagination -->
+               <div class="pagination" aria-label="Pagination" style="margin-top:40px">
+                 <span class="active">1</span><span>2</span><span>→</span>
+               </div>
+             </div>
+
+           </div><!-- end .pg-layout -->
+         </div>
+       </section>
     </main>
     
   <footer class="footer footer-custom" data-block-type="footer" data-block-variant="custom" data-mapping-status="exact" data-react-component="FooterBlock">

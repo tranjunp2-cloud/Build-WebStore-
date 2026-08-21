@@ -14,7 +14,8 @@
     },
     {
       "route": "/articles",
-      "file": "articles/index.html"
+      "file": "articles/index.html",
+      "canonicalRoute": "/blog"
     },
     {
       "route": "/cart",
@@ -25,16 +26,13 @@
       "file": "checkout/index.html"
     },
     {
-      "route": "/about-us",
-      "file": "about-us/index.html"
-    },
-    {
       "route": "/contact",
       "file": "contact/index.html"
     },
     {
       "route": "/order-tracking",
-      "file": "order-tracking/index.html"
+      "file": "order-tracking/index.html",
+      "canonicalRoute": "/orders"
     },
     {
       "route": "/products/stand",
@@ -51,5 +49,12 @@
       "asset": "https://freebw.com/templates/novas/images/right-sidebar-member-signature.png",
       "error": "HTTP 526"
     }
-  ]
+  ],
+  "adaptation": {
+    "status": "needs-ui-review",
+    "scope": "9/9 routes rebuilt from Prime Web v2 renderer anatomy",
+    "sourceOfTruth": "src/blocks/** plus owned storefront runtime components",
+    "fidelity": "hierarchy-spacing-responsive-interaction",
+    "humanReview": "pending"
+  }
 }

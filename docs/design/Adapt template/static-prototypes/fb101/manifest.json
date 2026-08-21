@@ -26,10 +26,6 @@
       "file": "checkout/index.html"
     },
     {
-      "route": "/about-us",
-      "file": "about-us/index.html"
-    },
-    {
       "route": "/contact",
       "file": "contact/index.html"
     },
@@ -50,14 +46,20 @@
   "assetCount": 141,
   "failures": [],
   "adaptation": {
-    "status": "needs-ui-review",
-    "scope": "homepage",
+    "status": "needs-renderer-migration",
+    "scope": "homepage-and-selected-child-routes",
+    "adaptedRoutes": [
+      "/",
+      "/products",
+      "/articles",
+      "/contact",
+      "/order-tracking"
+    ],
+    "removedRoutes": ["/about-us"],
     "blockCoverage": [
       "navigation",
       "hero",
-      "features",
-      "carousel",
-      "products-featured",
+      "portfolio-grid",
       "products-grid",
       "about",
       "blog-list",

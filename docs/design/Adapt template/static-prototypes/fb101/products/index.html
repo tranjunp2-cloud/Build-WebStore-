@@ -1,118 +1,458 @@
 <!doctype html>
-<html lang="en" class=" js flexbox canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths"><head>
-        <meta charset="UTF-8">
-        <link rel="icon" id="favicon" href="">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Product</title>
-        <meta name="description" content="">
-        <meta name="keywords" content="">
-        <link href="../_assets/19164a264782-remixicon.css" rel="stylesheet">
-      
-      <link rel="stylesheet" href="../_assets/b2b963fd2b79-index.2b167f6a.css">
-    <style type="text/css">
-.vfm--fixed[data-v-2836fdb5] {
-  position: fixed;
-}
-.vfm--absolute[data-v-2836fdb5] {
-  position: absolute;
-}
-.vfm--inset[data-v-2836fdb5] {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-.vfm--overlay[data-v-2836fdb5] {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-.vfm--prevent-none[data-v-2836fdb5] {
-  pointer-events: none;
-}
-.vfm--prevent-auto[data-v-2836fdb5] {
-  pointer-events: auto;
-}
-.vfm--outline-none[data-v-2836fdb5]:focus {
-  outline: none;
-}
-.vfm-enter-active[data-v-2836fdb5],
-.vfm-leave-active[data-v-2836fdb5] {
-  transition: opacity 0.2s;
-}
-.vfm-enter-from[data-v-2836fdb5],
-.vfm-leave-to[data-v-2836fdb5] {
-  opacity: 0;
-}
-.vfm--touch-none[data-v-2836fdb5] {
-  touch-action: none;
-}
-.vfm--select-none[data-v-2836fdb5] {
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
-}
-.vfm--resize-tr[data-v-2836fdb5],
-.vfm--resize-br[data-v-2836fdb5],
-.vfm--resize-bl[data-v-2836fdb5],
-.vfm--resize-tl[data-v-2836fdb5] {
-  width: 12px;
-  height: 12px;
-  z-index: 10;
-}
-.vfm--resize-t[data-v-2836fdb5] {
-  top: -6px;
-  left: 0;
-  width: 100%;
-  height: 12px;
-  cursor: ns-resize;
-}
-.vfm--resize-tr[data-v-2836fdb5] {
-  top: -6px;
-  right: -6px;
-  cursor: nesw-resize;
-}
-.vfm--resize-r[data-v-2836fdb5] {
-  top: 0;
-  right: -6px;
-  width: 12px;
-  height: 100%;
-  cursor: ew-resize;
-}
-.vfm--resize-br[data-v-2836fdb5] {
-  bottom: -6px;
-  right: -6px;
-  cursor: nwse-resize;
-}
-.vfm--resize-b[data-v-2836fdb5] {
-  bottom: -6px;
-  left: 0;
-  width: 100%;
-  height: 12px;
-  cursor: ns-resize;
-}
-.vfm--resize-bl[data-v-2836fdb5] {
-  bottom: -6px;
-  left: -6px;
-  cursor: nesw-resize;
-}
-.vfm--resize-l[data-v-2836fdb5] {
-  top: 0;
-  left: -6px;
-  width: 12px;
-  height: 100%;
-  cursor: ew-resize;
-}
-.vfm--resize-tl[data-v-2836fdb5] {
-  top: -6px;
-  left: -6px;
-  cursor: nwse-resize;
-}
-</style><link rel="stylesheet" href="../_assets/9d2e0514e13f-TemplateLayout.8425de1e.css"><link href="../_assets/fddf4a66b950-font-icons.css" type="text/css" rel="stylesheet"><link href="../_assets/97c703acdb52-plugins.css" type="text/css" rel="stylesheet"><link href="../_assets/53222119bbe5-style.css" type="text/css" rel="stylesheet"><link href="../_assets/5de6dfe3e717-responsive.css" type="text/css" rel="stylesheet"><link rel="stylesheet" href="../_assets/3524c993f4c5-GlobalLoading.989a4d31.css"><link rel="stylesheet" href="../_assets/9d5afb418eaf-NavBar.a314c20f.css"><link rel="stylesheet" href="../_assets/c9515ea22347-Footer.441c5248.css"><link rel="stylesheet" href="../_assets/bcab61652ef2-LoadingComponent.c6df4ab8.css"><link rel="stylesheet" href="../_assets/6e74f5134b4a-Breadcrumb.ba63a81f.css"><link rel="stylesheet" href="../_assets/0dcd40b26a9b-ProductCategory.41dab04b.css"><link rel="stylesheet" href="../_assets/802559984808-ProductPrice.21609594.css"><link rel="stylesheet" href="../_assets/af6b74f23b0f-ProductBrand.a8b889e1.css"><link rel="stylesheet" href="../_assets/0a35572372cc-ProductVariant.93a8ec3e.css"><link rel="stylesheet" href="../_assets/5bd9729a18c1-ProductSort.9aeccd06.css"><link rel="stylesheet" href="../_assets/16c338590426-ProductItem.77a2bdf1.css"><link rel="stylesheet" href="../_assets/c355c1a373a4-ProductQuickView.288d2a9b.css"><link rel="stylesheet" href="../_assets/82d663658ae6-carousel.b5aa6378.css"><meta name="prototype-source" content="https://fb101.web.ecommercehub.unifi.com.my/products"></head>
-
-    <body>
-        <div id="app"><!----><div class="body-wrapper h-screen" data-v-4ace73e2=""><header class="ltn__header-area ltn__header-5 gradient-color-4--- !bg-white" data-v-958d2a98=""><div class="ltn__header-middle-area ltn__header-sticky sticky-active-into-mobile--- plr--9--- sticky-active" data-v-958d2a98=""><div class="container" data-v-958d2a98=""><div class="row" data-v-958d2a98=""><div class="col" data-v-958d2a98=""><div class="site-logo-wrap" data-v-958d2a98=""><div class="site-logo w-[9.625rem] h-[2.625rem]" data-v-958d2a98=""><a href="../index.html" class="w-[9.625rem] !block" data-v-958d2a98=""><img src="../_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png" class="w-full h-full max-h-[3.5rem] object-contain" alt="Logo" data-v-958d2a98=""></a></div></div></div><div class="col header-menu-column menu-color-white---" data-v-958d2a98=""><div class="header-menu d-none d-xl-block" data-v-958d2a98=""><nav data-v-958d2a98=""><div class="ltn__main-menu" data-v-958d2a98=""><ul data-v-958d2a98=""><li class="" data-v-958d2a98=""><a href="../index.html" class="" data-v-958d2a98="">Home</a><!----></li><li class="" data-v-958d2a98=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-958d2a98="">Product</a><!----></li><li class="" data-v-958d2a98=""><a href="../articles/index.html" class="" data-v-958d2a98="">Blog</a><!----></li><li class="" data-v-958d2a98=""><a href="../cart/index.html" class="" data-v-958d2a98="">Cart</a><!----></li><li class="" data-v-958d2a98=""><a href="../checkout/index.html" class="" data-v-958d2a98="">Checkout</a><!----></li><li class="" data-v-958d2a98=""><a href="../order-tracking/index.html" class="" data-v-958d2a98="">Order tracking</a><!----></li><!----></ul></div></nav></div></div><div class="ltn__header-options ltn__header-options-2" data-v-958d2a98=""><div class="header-search-wrap" data-v-958d2a98=""><div class="header-search-1" data-v-958d2a98=""><div class="search-icon" data-v-958d2a98=""><i class="icon-search for-search-show" data-v-958d2a98=""></i><i class="icon-cancel for-search-close" data-v-958d2a98=""></i></div></div><div class="header-search-1-form" data-v-958d2a98=""><form id="#" method="get" action="index.html" class="border-2 border-[#e4ecf2]" data-v-958d2a98=""><input class="pl-[20px]" type="text" name="search" placeholder="Search here..." data-v-958d2a98=""><button disabled="" type="submit" data-v-958d2a98=""><span data-v-958d2a98=""><i class="icon-search" data-v-958d2a98=""></i></span></button></form></div></div><div class="mini-cart-icon" data-v-958d2a98=""><a href="../index.html" class="ltn__utilize-toggle" data-v-958d2a98=""><i class="icon-shopping-cart" data-v-958d2a98=""></i><!----></a></div><div class="mobile-menu-toggle d-xl-none" data-v-958d2a98=""><a href="../index.html" class="ltn__utilize-toggle" data-v-958d2a98=""><svg viewBox="0 0 800 600" data-v-958d2a98=""><path d="M300,220 C300,220 520,220 540,220 C740,220 640,540 520,420 C440,340 300,200 300,200" id="top" data-v-958d2a98=""></path><path d="M300,320 L540,320" id="middle" data-v-958d2a98=""></path><path d="M300,210 C300,210 520,210 540,210 C740,210 640,530 520,410 C440,330 300,190 300,190" id="bottom" transform="translate(480, 320) scale(1, -1) translate(-480, -318) " data-v-958d2a98=""></path></svg></a></div></div></div></div></div></header><div id="ltn__utilize-cart-menu" class="ltn__utilize ltn__utilize-cart-menu" data-v-958d2a98=""><div class="ltn__utilize-menu-inner ltn__scrollbar" data-v-958d2a98=""><div class="ltn__utilize-menu-head" data-v-958d2a98=""><span class="ltn__utilize-menu-title" data-v-958d2a98="">Shopping cart</span><button class="ltn__utilize-close" data-v-958d2a98="">×</button></div><div class="w-full" data-v-958d2a98=""><div class="flex flex-col text-center space-y-4 w-full align-center justify-center"><!----><!----><img alt="empty" src="../_assets/c30acf6c3277-empty-cart-navbar.svg" class="w-[140px] h-[140px] mx-auto"><div class="mt-6"><p class="font-semibold text-[22px] mb-1">Your shopping cart is empty</p></div><div class="mx-auto mt-6"><a class="bg-primary-color w-fit px-[14px] py-[8px] text-[14px] text-white hover:text-white uppercase rounded" href="index.html"></a><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active"><span class="text-text-color">Continue Shopping</span></a></div><!----><!----><!----><!----></div></div></div></div><div id="ltn__utilize-mobile-menu" class="ltn__utilize ltn__utilize-mobile-menu" data-v-958d2a98=""><div class="ltn__utilize-menu-inner ltn__scrollbar" data-v-958d2a98=""><div class="ltn__utilize-menu-head" data-v-958d2a98=""><div class="site-logo !w-[154px] !h-[42px]" data-v-958d2a98=""><a href="../index.html" class="!block !w-full !h-full" data-v-958d2a98=""><img src="../_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png" class="w-full h-full object-cover" alt="Logo" data-v-958d2a98=""></a></div><button class="ltn__utilize-close" data-v-958d2a98="">×</button></div><div class="ltn__utilize-menu" data-v-958d2a98=""><ul data-v-958d2a98=""><li data-v-958d2a98=""><!----><a href="../index.html" class="" data-v-958d2a98="">Home</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><li data-v-958d2a98=""><!----><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-958d2a98="">Product</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><li data-v-958d2a98=""><!----><a href="../articles/index.html" class="" data-v-958d2a98="">Blog</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><li data-v-958d2a98=""><!----><a href="../cart/index.html" class="" data-v-958d2a98="">Cart</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><li data-v-958d2a98=""><!----><a href="../checkout/index.html" class="" data-v-958d2a98="">Checkout</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><li data-v-958d2a98=""><!----><a href="../order-tracking/index.html" class="" data-v-958d2a98="">Order tracking</a><ul class="h-[0px] overflow-hidden transition-all duration-500" data-v-958d2a98=""></ul></li><!----></ul></div></div></div><div id="breadcrumb" data-v-4ace73e2=""><div class="ltn__breadcrumb-area ltn__breadcrumb-area-2 ltn__breadcrumb-color-white bg-overlay-theme-black-90 bg-image !mb-12" data-bg="/templates/fb101/img/bg/9.jpg" data-v-03959648="" style="background-image: url(&quot;../_assets/60a064b61df0-9.jpg&quot;);"><div class="container" data-v-03959648=""><div class="row" data-v-03959648=""><div class="col-lg-12" data-v-03959648=""><div class="ltn__breadcrumb-inner ltn__breadcrumb-inner-2 justify-content-between" data-v-03959648=""><div class="section-title-area ltn__section-title-2" data-v-03959648=""><h1 class="section-title white-color" data-v-03959648="">Product Listing</h1></div><div class="ltn__breadcrumb-list" data-v-03959648=""><ul data-v-03959648=""><li class="duc-link" data-v-03959648=""><a href="../index.html" class="capitalize" data-v-03959648="">Home</a></li><li class="duc-link" data-v-03959648=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active capitalize" data-v-03959648="">products</a></li></ul></div></div></div></div></div></div></div><div class="ltn__utilize-overlay" data-v-4ace73e2=""></div><div class="space-y-2"><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><!----><section class="ltn__product-area ltn__product-gutter"><div class="container"><!----><div class="row"><!----><div class="col-lg-8"><div class="row"><div class="col-lg-12"><div class="ltn__shop-options" data-v-cd28e5ba=""><ul class="flex items-center justify-between" data-v-cd28e5ba=""><li data-v-cd28e5ba=""><div class="showing-product-number text-right" data-v-cd28e5ba=""><span data-v-cd28e5ba="">Showing 1-10 of 20 results</span></div></li><li class="relative border-2 border-solid border-[#ededed]" data-v-cd28e5ba=""><button class="min-w-[150px] h-[50px] pl-[18px] flex items-center relative duc-sort font-bold" data-v-cd28e5ba="">Sort By Default <i class="ri-arrow-drop-down-line ml-[10px] text-2xl transition-transform ease-in-out" data-v-cd28e5ba=""></i></button><!----></li></ul></div></div></div><div class="row ltn__tab-product-slider-one-active--- slick-arrow-1"><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/adbfd007edc1-vxmVdMkd-SSO7F1ByLz1ELscjeGRsvDl92D4k2vs-1Y.png" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Green Garden Organic Freeze Dried Parsley, 0.19 oz</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 25</span><!----></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Purple Onion Hasfarm Green + </a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 3.80</span><!----></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/d6cf6255767a-dqDs_txwjJ9hOkGsIvTN7M9ZhkMy2NcuEDNfQa8SalU.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Butterhead Lettuce Hasfarm Green +</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 2</span><!----></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><div class="product-badge" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li class="sale-badge" data-v-5cb9d711="">-8%</li></ul></div><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Pork Ribeye Chops Boneless, 2.0 - 3.3 lb</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 33</span><del class="!text-[14px]" data-v-5cb9d711="">RM 40</del></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/a5d19052a083-NIG13ymL6iWxcwIpc_cdbK5zT8DWHt2RugmdtMDLU1w.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><div class="product-badge" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li class="sale-badge" data-v-5cb9d711="">-8%</li></ul></div><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Marketside Antibiotic-Free Boneless Skinless Chicken Breasts, 1.3 - 3.0 lb</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 33</span><del class="!text-[14px]" data-v-5cb9d711="">RM 35</del></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/f0a2e0efb68c-V0KNhEph0FiS9o-BCuNWxa4mhSC4UPsRSzY3zRRv4zc.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><div class="product-badge" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li class="sale-badge" data-v-5cb9d711="">-8%</li></ul></div><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Beyond Meat Beyond Sausage Brat Originial</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 33</span><del class="!text-[14px]" data-v-5cb9d711="">RM 36</del></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Fresh Mo Qua Squash, by weight</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 10</span><!----></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">McCormick Sea Salt Grinder, 2.12 oz</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 15</span><!----></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/fc19c7963f12-pxXLqGbmGWtxvgA3zPiK0Li4essFN7ynGbGghIxBTuQ.png" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><div class="product-badge" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li class="sale-badge" data-v-5cb9d711="">-8%</li></ul></div><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Prego Pasta Sauce, Homestyle Alfredo Sauce, 22 Ounce Jar</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 33</span><del class="!text-[14px]" data-v-5cb9d711="">RM 36</del></div></div></div></div><div class="col-lg-3 col-md-4 col-sm-6 col-6 col-lg-4" data-v-5cb9d711=""><div class="ltn__product-item ltn__product-item-3 text-left" data-v-5cb9d711=""><div class="product-img" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" data-v-5cb9d711=""><img src="../_assets/2935d477ef65-1VTnGtSxQ26Y_Fd0QwCp3YSAh1grPWnqnrMGgQyBoMw.png" class="aspect-[233/233] object-cover" alt="" data-v-5cb9d711=""></a><!----><div class="!hidden md:!block product-hover-action" data-v-5cb9d711=""><ul data-v-5cb9d711=""><li data-v-5cb9d711=""><a href="../index.html" title="Quick View" data-toggle="modal" data-v-5cb9d711=""><i class="far fa-eye" data-v-5cb9d711=""></i></a></li><li data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="" title="Wishlist" data-target="#liton_wishlist_modal" data-v-5cb9d711=""><i class="ri-send-plane-line" data-v-5cb9d711=""></i></a></li></ul></div></div><div class="product-info" data-v-5cb9d711=""><h2 class="product-title" data-v-5cb9d711=""><a href="benq-el2870u-4k/index.html" class="header-post" data-v-5cb9d711="">Great Value Traditional Pasta Sauce, 24 oz</a></h2><div class="product-price" data-v-5cb9d711=""><span class="text-[18px]" data-v-5cb9d711="">RM 18</span><!----></div></div></div></div></div><!----><div class="ltn__pagination-area text-center" totalpage="1"><div class="ltn__pagination"><ul><li><a><i class="fas fa-angle-double-left"></i></a></li><li class="active"><a class="active">1</a></li><li class=""><a class="">2</a></li><li><a><i class="fas fa-angle-double-right"></i></a></li></ul></div></div></div><div class="col-lg-4 block"><aside class="sidebar ltn__shop-sidebar ltn__right-sidebar"><div class="widget ltn__menu-widget" data-v-046165d5=""><h4 class="ltn__widget-title ltn__widget-title-border flex justify-between !mb-4" data-v-046165d5="">Categories <!----></h4><button id="btn-0" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">VEGETABLES</div><div id="btn-child-0" class="w-[50px] h-[50px] flex items-center accordion bg-[#041113] justify-center" data-v-046165d5=""><p class="mb-0 text-white mr-[5px]" data-v-046165d5="">2</p><i id="arrow-0" class="ri-arrow-up-s-line accordion" data-v-046165d5=""></i></div></button><div class="panel" data-v-046165d5=""><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Garden vegetables</span><span class="num block" data-v-046165d5="">5</span></a></div><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Seasoning products</span><span class="num block" data-v-046165d5="">2</span></a></div></div><button id="btn-1" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px] mt-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">FRUITS</div><div id="btn-child-1" class="w-[50px] h-[50px] flex items-center accordion bg-[#041113] justify-center" data-v-046165d5=""><p class="mb-0 text-white mr-[5px]" data-v-046165d5="">2</p><i id="arrow-1" class="ri-arrow-up-s-line accordion" data-v-046165d5=""></i></div></button><div class="panel" data-v-046165d5=""><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Domestic fruits</span><span class="num block" data-v-046165d5="">2</span></a></div><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Imported fruits</span><span class="num block" data-v-046165d5="">2</span></a></div></div><button id="btn-2" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px] mt-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">FOOD</div><div id="btn-child-2" class="w-[50px] h-[50px] flex items-center accordion bg-[#041113] justify-center" data-v-046165d5=""><p class="mb-0 text-white mr-[5px]" data-v-046165d5="">3</p><i id="arrow-2" class="ri-arrow-up-s-line accordion" data-v-046165d5=""></i></div></button><div class="panel" data-v-046165d5=""><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Fresh</span><span class="num block" data-v-046165d5="">1</span></a></div><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Frozen</span><span class="num block" data-v-046165d5="">1</span></a></div><div class="w-full min-h-[37px] pl-[12px] bg-[#071C1F] mt-[10px] hover:bg-[#80b500]" data-v-046165d5=""><a class="cursor-pointer flex justify-between py-2 px-2 duc text-white" data-v-046165d5=""><span class="name block" data-v-046165d5="">Dry</span><span class="num block" data-v-046165d5="">2</span></a></div></div><button id="btn-3" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px] mt-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">CONDIMENT &amp; SAUCE</div><!----></button><div class="panel" data-v-046165d5=""></div><button id="btn-4" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px] mt-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">DRINKS</div><!----></button><div class="panel" data-v-046165d5=""></div><button id="btn-5" class="btn-accordion flex items-center justify-between w-full h-[65px] pl-[30px] pr-[10px] mt-[10px]" data-v-046165d5=""><div class="flex items-center" data-v-046165d5="">OTHER</div><!----></button><div class="panel" data-v-046165d5=""></div></div><div class="widget ltn__price-filter-widget" data-v-17446946=""><h4 class="ltn__widget-title ltn__widget-title-border flex items-center justify-between" data-v-17446946="">Price <!----></h4><div class="price_filter" data-v-17446946=""><div class="price_slider_amount" data-v-17446946=""><input type="submit" value="Your range:" data-v-17446946=""><span class="font-bold" data-v-17446946="">RM 0.00</span> - <span class="font-bold" data-v-17446946="">RM 40</span></div><div class="" data-v-17446946=""><div id="handle-slider" class="slider-red slider-target slider-tooltip-drag slider-ltr slider-horizontal slider-txt-dir-ltr" data-v-17446946=""><div class="slider-base"><div class="slider-connects"><div class="slider-connect" style="transform: translate(0%, 0px) scale(1, 1);"></div></div><div class="slider-origin" style="transform: translate(-100%, 0px); z-index: 5;"><div class="slider-handle slider-handle-lower" data-handle="0" tabindex="0" role="slider" aria-orientation="horizontal" aria-valuemin="0.0" aria-valuemax="40.0" aria-valuenow="0.0" aria-valuetext="0.00"><div class="slider-touch-area"></div><div class=" slider-tooltip slider-tooltip-top">RM 0.00</div></div></div><div class="slider-origin" style="transform: translate(0%, 0px); z-index: 4;"><div class="slider-handle slider-handle-upper" data-handle="1" tabindex="0" role="slider" aria-orientation="horizontal" aria-valuemin="0.0" aria-valuemax="40.0" aria-valuenow="40.0" aria-valuetext="40.00"><div class="slider-touch-area"></div><div class=" slider-tooltip slider-tooltip-top">RM 40</div></div></div></div></div></div></div></div><div class="widget ltn__menu-widget" data-v-6b85d8bb=""><h4 class="ltn__widget-title ltn__widget-title-border flex items-center" data-v-6b85d8bb="">Brand <!----></h4><ul data-v-6b85d8bb=""><li class="cursor-pointer hover:!text-[#80B500]" data-v-6b85d8bb=""><a class="" data-v-6b85d8bb="">Hasfarm Green + <span data-v-6b85d8bb=""><i class="fas fa-long-arrow-alt-right" data-v-6b85d8bb=""></i></span></a></li></ul></div><div class="w-full flex items-start justify-between" data-v-151ba27c=""><h4 class="ltn__widget-title ltn__widget-title-border flex items-center" data-v-151ba27c="">Variant <!----></h4><i class="ri-arrow-down-s-line cursor-pointer h-fit text-3xl translate-y-[-6px] transition-transform" data-v-151ba27c=""></i></div><div class="variants overflow-hidden" data-v-151ba27c=""><div class="widget ltn__tagcloud-widget ltn__size-widget" data-v-151ba27c=""><h4 class="ltn__widget-title ltn__widget-title-border" data-v-151ba27c="">STYLE</h4><ul data-v-151ba27c=""><li class="cursor-pointer" data-v-151ba27c=""><a class="hover:!text-white" data-v-151ba27c="">Fresh </a></li><li class="cursor-pointer" data-v-151ba27c=""><a class="hover:!text-white" data-v-151ba27c="">Frozen </a></li><li class="cursor-pointer" data-v-151ba27c=""><a class="hover:!text-white" data-v-151ba27c="">Dry </a></li></ul></div></div></aside></div></div></div></section><!----><!----><!----><!----><!----><!----></div><!----><footer class="ltn__footer-area mt-[82px] mb-[30px]" data-v-058604da="" data-v-4ace73e2=""><div class="footer-top-area section-bg-1 plr--5" data-v-058604da=""><div class="container-fluid" data-v-058604da=""><div class="row" data-v-058604da=""><div class="col-xl-4 col-md-6 col-sm-6 col-12" data-v-058604da=""><div class="footer-widget footer-about-widget" data-v-058604da=""><div class="footer-logo" data-v-058604da=""><div class="site-logo !w-[154px] !max-h-[60px]" data-v-058604da=""><img src="../_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png" class="w-full h-full !max-h-[60px] object-contain" alt="Logo" data-v-058604da=""></div></div><p class="format-text" data-v-058604da="">Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p><div class="footer-address" data-v-058604da=""><ul data-v-058604da=""><li data-v-058604da=""><div class="footer-address-icon" data-v-058604da=""><i class="icon-placeholder" data-v-058604da=""></i></div><div class="footer-address-info address" data-v-058604da=""><p data-v-058604da="">BUSINESS SUITE 19A-24-3, LEVEL 24, UOA CENTRE, NO 19, JALAN PINANG 50450 KUALA LUMPUR. </p></div></li><li data-v-058604da=""><div class="footer-address-icon" data-v-058604da=""><i class="icon-call" data-v-058604da=""></i></div><div class="footer-address-info" data-v-058604da=""><p data-v-058604da=""><a data-v-058604da="">02866542688 </a></p></div></li><li data-v-058604da=""><div class="footer-address-icon" data-v-058604da=""><i class="icon-mail" data-v-058604da=""></i></div><div class="footer-address-info" data-v-058604da=""><p data-v-058604da=""><a data-v-058604da="">fb101@primeweb.asia</a></p></div></li></ul></div></div></div><div class="col-xl-2 col-md-6 col-sm-6 col-12" data-v-058604da=""><div class="footer-widget footer-menu-widget clearfix" data-v-058604da=""><h4 class="footer-title" data-v-058604da="">QUALITY PRODUCTS</h4><div class="footer-menu" data-v-058604da=""><ul data-v-058604da=""><li data-v-058604da=""><!----><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-058604da="">Popular Products</a><!----><!----></li><li data-v-058604da=""><!----><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-058604da="">Best Selling</a><!----><!----></li><li data-v-058604da=""><!----><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-058604da="">About Us</a><!----><!----></li><li data-v-058604da=""><!----><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-058604da="">Deal Of The Day</a><!----><!----></li><li data-v-058604da=""><!----><!----><!----><a href="https://www.facebook.com/" target="_blank" class="inline-block" data-v-058604da=""><img src="../_assets/44fec0fbcbfd-facebook.png" data-v-058604da="" style="width: 32px; height: 32px;"></a></li></ul></div></div></div><div class="col-xl-2 col-md-6 col-sm-6 col-12" data-v-058604da=""><div class="footer-widget footer-menu-widget clearfix" data-v-058604da=""><h4 class="footer-title" data-v-058604da="">SUPPORT POLICY</h4><div class="footer-menu" data-v-058604da=""><ul data-v-058604da=""><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Order Details</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Credit Offers</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Addresses</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Personal Details</a><!----><!----><!----></li><li data-v-058604da=""><!----><!----><!----><a href="https://www.youtube.com/" target="_blank" class="inline-block" data-v-058604da=""><img src="../_assets/02aa56fea786-youtube.png" data-v-058604da="" style="width: 32px; height: 32px;"></a></li></ul></div></div></div><div class="col-xl-2 col-md-6 col-sm-6 col-12" data-v-058604da=""><div class="footer-widget footer-menu-widget clearfix" data-v-058604da=""><h4 class="footer-title" data-v-058604da="">INTRODUCE</h4><div class="footer-menu" data-v-058604da=""><ul data-v-058604da=""><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Order Details</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Credit Offers</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Addresses</a><!----><!----><!----></li><li data-v-058604da=""><a href="https://primecommerce.asia/en/support" data-v-058604da="">My Personal Details</a><!----><!----><!----></li><li data-v-058604da=""><!----><!----><!----><a href="https://www.instagram.com/" target="_blank" class="inline-block" data-v-058604da=""><img src="../_assets/1711b9f1f51e-instagram.png" data-v-058604da="" style="width: 32px; height: 32px;"></a></li></ul></div></div></div></div></div></div><div class="ltn__copyright-area ltn__copyright-2 section-bg-2 ltn__border-top-2--- plr--5" data-v-058604da=""><div class="container-fluid" data-v-058604da=""><div class="row" data-v-058604da=""><div class="col-md-12 col-12 flex justify-center" data-v-058604da=""><div class="ltn__copyright-design clearfix w-fit" data-v-058604da=""><p data-v-058604da="">Copyright © 2022 by Prime Commerce</p></div></div></div></div></div></footer></div><!----></div>
-
-        
-    
-
-<a id="scrollUp" href="../index.html" style="position: fixed; z-index: 2147483647;"><i class="fa fa-angle-up"></i></a><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/adbfd007edc1-vxmVdMkd-SSO7F1ByLz1ELscjeGRsvDl92D4k2vs-1Y.png" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Green Garden Organic Freeze Dried Parsley, 0.19 oz</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 25</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Dry</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Purple Onion Hasfarm Green + </h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 3.80</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Seasoning products</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/d6cf6255767a-dqDs_txwjJ9hOkGsIvTN7M9ZhkMy2NcuEDNfQa8SalU.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Butterhead Lettuce Hasfarm Green +</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">1000 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 2</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Garden vegetables</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Pork Ribeye Chops Boneless, 2.0 - 3.3 lb</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 33</span><del class="!text-4xl text-[#b3d366]" data-v-246103da="" data-v-2836fdb5-s="">RM 40</del></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Fresh</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/a5d19052a083-NIG13ymL6iWxcwIpc_cdbK5zT8DWHt2RugmdtMDLU1w.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Marketside Antibiotic-Free Boneless Skinless Chicken Breasts, 1.3 - 3.0 lb</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 33</span><del class="!text-4xl text-[#b3d366]" data-v-246103da="" data-v-2836fdb5-s="">RM 35</del></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Frozen</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/f0a2e0efb68c-V0KNhEph0FiS9o-BCuNWxa4mhSC4UPsRSzY3zRRv4zc.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Beyond Meat Beyond Sausage Brat Originial</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 33</span><del class="!text-4xl text-[#b3d366]" data-v-246103da="" data-v-2836fdb5-s="">RM 36</del></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Dry</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Fresh Mo Qua Squash, by weight</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 10</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">Garden vegetables</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/df923c14a889-Ua7SI7-4lLeNXrCRlZT-3UDUyFs_cgTVHNvg98dC78Y.jpg" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">McCormick Sea Salt Grinder, 2.12 oz</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 15</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">CONDIMENT &amp; SAUCE</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/fc19c7963f12-pxXLqGbmGWtxvgA3zPiK0Li4essFN7ynGbGghIxBTuQ.png" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Prego Pasta Sauce, Homestyle Alfredo Sauce, 22 Ounce Jar</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 33</span><del class="!text-4xl text-[#b3d366]" data-v-246103da="" data-v-2836fdb5-s="">RM 36</del></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">CONDIMENT &amp; SAUCE</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div><div class="vfm vfm--inset vfm--fixed" data-v-2836fdb5="" data-v-246103da="" style="z-index: 1000; display: none;"><!--v-if--><div class="vfm__container vfm--absolute vfm--inset vfm--outline-none flex justify-center items-center" aria-expanded="false" role="dialog" aria-modal="true" tabindex="-1" data-v-2836fdb5="" style="display: none;"><div class="vfm__content text-center rounded shadow-2xl bg-white overflow-y-auto relative" data-v-2836fdb5=""><div class="product-action-view-content overflow-auto relative pt-4 w-full lg:w-[65rem] lg:max-h-[31.8125rem]" data-v-246103da="" data-v-2836fdb5-s=""><button type="button" class="text-black absolute top-2 right-2 w-[50px] h-[50px] flex items-center justify-center cursor-pointer hover:text-secondary-color z-10" data-v-246103da="" data-v-2836fdb5-s=""><i class="fa fa-times" data-v-246103da="" data-v-2836fdb5-s=""></i></button><div class="ltn__shop-details-area" data-v-246103da="" data-v-2836fdb5-s=""><div class="container" data-v-246103da="" data-v-2836fdb5-s=""><div class="row justify-content-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-lg-12 col-md-12" data-v-246103da="" data-v-2836fdb5-s=""><div class="ltn__shop-details-inner mb-20" data-v-246103da="" data-v-2836fdb5-s=""><div class="row" data-v-246103da="" data-v-2836fdb5-s=""><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="duc" data-v-246103da="" data-v-2836fdb5-s=""><div class="xl:h-[27.75rem] xl:w-[28.86rem] mb-[10px] bg-[#e1e1e5]" data-v-246103da="" data-v-2836fdb5-s=""><img class="w-full h-full object-cover" src="../_assets/2935d477ef65-1VTnGtSxQ26Y_Fd0QwCp3YSAh1grPWnqnrMGgQyBoMw.png" alt="image descrption" data-v-246103da="" data-v-2836fdb5-s=""></div></div></div><div class="col-md-6" data-v-246103da="" data-v-2836fdb5-s=""><div class="modal-product-info shop-details-info pl-0 text-left" data-v-246103da="" data-v-2836fdb5-s=""><h3 class="mb-1" data-v-246103da="" data-v-2836fdb5-s="">Great Value Traditional Pasta Sauce, 24 oz</h3><p class="font-[400] text-base mb-1" data-v-246103da="" data-v-2836fdb5-s="">100 available pieces</p><div class="product-price lg:mt-[0.3rem]" data-v-246103da="" data-v-2836fdb5-s=""><span class="text-5xl lg:mr-[1.3rem]" data-v-246103da="" data-v-2836fdb5-s="">RM 18</span><!----></div><div class="modal-product-meta ltn__product-details-menu-1" data-v-246103da="" data-v-2836fdb5-s=""><ul data-v-246103da="" data-v-2836fdb5-s=""><li data-v-246103da="" data-v-2836fdb5-s=""><strong data-v-246103da="" data-v-2836fdb5-s="">Categories:</strong><span data-v-246103da="" data-v-2836fdb5-s=""><a aria-current="page" href="index.html" class="router-link-active router-link-exact-active" data-v-246103da="" data-v-2836fdb5-s="">FOOD</a></span></li></ul></div><!----><div class="ltn__product-details-menu-2 h-fit" data-v-246103da="" data-v-2836fdb5-s=""><ul class="flex items-start" data-v-246103da="" data-v-2836fdb5-s=""><li class="mt-0" data-v-246103da="" data-v-2836fdb5-s=""><div class="cart-plus-minus !w-[9.625rem] !lg:h-[3.875rem] flex items-center" data-v-246103da="" data-v-2836fdb5-s=""><div class="dec qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> - </div><input type="text" name="qtybutton" class="cart-plus-minus-box" data-v-246103da="" data-v-2836fdb5-s="" style="flex: 1 1 0%;"><div class="inc qtybutton !w-[42px] flex items-center justify-center" data-v-246103da="" data-v-2836fdb5-s=""> + </div></div></li><li class="mt-0 !lg:h-[3.875rem]" data-v-246103da="" data-v-2836fdb5-s=""><a class="theme-btn-1 btn btn-effect-1 w-[180px] h-[3.875rem] !flex items-center justify-center px-0 py-0 text-white hover:!text-black" title="Add to Cart" data-v-246103da="" data-v-2836fdb5-s=""><i class="fas fa-shopping-cart !text-sm mr-1" data-v-246103da="" data-v-2836fdb5-s=""></i><span class="!text-md uppercase" data-v-246103da="" data-v-2836fdb5-s="">Add to cart</span></a></li></ul></div></div></div></div></div></div></div></div></div></div><!--v-if--></div></div></div></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Products — OrganicNest</title>
+    <meta
+      name="description"
+      content="Browse OrganicNest pantry staples and fresh ingredients."
+    />
+    <link rel="stylesheet" href="../_v2-child.css" />
+    <link rel="stylesheet" href="../_product-filter.css" />
+    <link rel="stylesheet" href="../_cart-widget.css" />
+    <link rel="stylesheet" href="../_footer-dark.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <link rel="stylesheet" href="../_navigation.css" />
+    <header class="pw-site-nav" data-fb101-navigation data-block-type="navigation" data-block-variant="default" data-mapping-status="approximation" data-react-component="NavigationBlock">
+      <div class="pw-site-nav__inner">
+        <a class="pw-site-nav__brand" href="../index.html" aria-label="fb101 home"><img src="../_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png" alt="fb101" width="154" height="42" /></a>
+        <nav class="pw-site-nav__links" aria-label="Primary">
+          <a href="../index.html">Home</a>
+          <a aria-current="page" href="../products/index.html">Products</a>
+          <a href="../articles/index.html" data-production-href="/blog">Blog</a>
+          <a href="../contact/index.html">Contact</a>
+          <a href="../order-tracking/index.html" data-production-href="/orders">Tracking order</a>
+        </nav>
+        <button class="pw-site-nav__menu" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="fb101-mobile-navigation" data-navigation-menu>☰</button>
+        <button class="bag pw-site-nav__compat-cart" type="button" tabindex="-1" aria-hidden="true"><b class="badge">0</b></button>
+      </div>
+      <nav class="pw-site-nav__mobile" id="fb101-mobile-navigation" aria-label="Mobile navigation" data-navigation-mobile hidden>
+        <a href="../index.html">Home</a>
+        <a aria-current="page" href="../products/index.html">Products</a>
+        <a href="../articles/index.html" data-production-href="/blog">Blog</a>
+        <a href="../contact/index.html">Contact</a>
+        <a href="../order-tracking/index.html" data-production-href="/orders">Tracking order</a>
+      </nav>
+      <script src="../_navigation.js" defer></script>
+    </header>
+    <main id="main">
+      <header
+        class="page-hero"
+        data-block-type="hero"
+        data-block-variant="minimal"
+        data-mapping-status="approximation"
+        data-react-component="HeroBlock"
+      >
+        <div class="container">
+          <span class="kicker">OrganicNest market</span>
+          <h1>Good ingredients for everyday cooking</h1>
+          <p>
+            Browse fresh produce, pantry essentials and plant-based favorites
+            selected for reliable, uncomplicated meals.
+          </p>
+        </div>
+      </header>
+      <section
+        class="section"
+        data-block-type="products-grid"
+        data-block-variant="grid-3"
+        data-mapping-status="approximation"
+        data-react-component="ProductsGridBlock"
+      >
+        <div class="container">
+          <div class="section-head">
+            <span class="kicker">Our products</span>
+            <h2>Stock the kitchen well</h2>
+            <p>
+              Fresh picks and dependable staples, gathered in one easy-to-browse
+              market.
+            </p>
+          </div>
+          <div class="products-layout">
+            <aside class="filter-sidebar" aria-label="Product filters">
+              <form
+                class="filter-panel"
+                role="search"
+                data-product-controls
+                onsubmit="event.preventDefault()"
+              >
+                <div class="filter-panel-head">
+                  <div>
+                    <span class="kicker">Refine results</span>
+                    <h3>Shop filters</h3>
+                  </div>
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M4 6h16M7 12h10M10 18h4" />
+                  </svg>
+                </div>
+                <fieldset class="filter-group">
+                  <legend>Categories</legend>
+                  <label class="filter-select-wrap">
+                    <span class="skip">Category</span>
+                    <select class="select" name="category">
+                      <option value="all">All categories</option>
+                      <option value="fresh">Fresh produce</option>
+                      <option value="pantry">Pantry essentials</option>
+                      <option value="plant">Plant based</option>
+                    </select>
+                  </label>
+                  <ul class="filter-category-summary" aria-hidden="true">
+                    <li><span>Fresh produce</span><b>5</b></li>
+                    <li><span>Pantry essentials</span><b>2</b></li>
+                    <li><span>Plant based</span><b>1</b></li>
+                  </ul>
+                </fieldset>
+                <fieldset class="filter-group">
+                  <legend>Search products</legend>
+                  <label class="filter-search">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-4-4" />
+                    </svg>
+                    <span class="skip">Search products</span>
+                    <input
+                      class="field"
+                      type="search"
+                      name="search"
+                      autocomplete="off"
+                      placeholder="Search products…"
+                    />
+                  </label>
+                </fieldset>
+                <fieldset class="filter-group">
+                  <legend>Sort by</legend>
+                  <label class="filter-select-wrap">
+                    <span class="skip">Sort products</span>
+                    <select class="select" name="sort">
+                      <option value="featured">Featured</option>
+                      <option value="price">Price: low to high</option>
+                    </select>
+                  </label>
+                </fieldset>
+                <button class="filter-reset" type="button" data-reset-filters>
+                  Reset filters
+                </button>
+              </form>
+            </aside>
+            <div class="products-content">
+              <div class="products-content-head">
+                <span data-result-count>Showing 8 products</span>
+                <span>Fresh groceries, ready to browse</span>
+              </div>
+              <div class="product-grid">
+            <a
+              class="product-card"
+              href="benq-el2870u-4k/index.html"
+              data-name="carrots group scal22"
+              data-category="fresh"
+              data-price="3.80"
+              ><div class="product-media">
+                <img
+                  src="../_assets/adbfd007edc1-vxmVdMkd-SSO7F1ByLz1ELscjeGRsvDl92D4k2vs-1Y.png"
+                  alt="Carrots Group Scal22"
+                  width="500"
+                  height="692"
+                /><span class="tag">Featured</span>
+              </div>
+              <div class="product-body">
+                <span class="meta">Fresh produce</span>
+                <h4>Carrots Group Scal22</h4>
+                <span class="price">RM 3.80</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="fresh mo qua squash"
+              data-category="fresh"
+              data-price="10"
+              ><div class="product-media">
+                <img
+                  src="../_assets/0e55a6006bea-HI-Y4zMfva6nem310N5fS1OCIr-mzAdLAzcvcgEWIxc.jpg"
+                  alt="Fresh Mo Qua Squash"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                />
+              </div>
+              <div class="product-body">
+                <span class="meta">Garden vegetables</span>
+                <h4>Fresh Mo Qua Squash</h4>
+                <span class="price">RM 10.00</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="pork ribeye chops boneless"
+              data-category="fresh"
+              data-price="33"
+              ><div class="product-media">
+                <img
+                  src="../_assets/5f8678958196-yFjuahaPgM0lh99O03ypZ9k1n3c57THZGGlVd-YRj6E.jpg"
+                  alt="Pork Ribeye Chops Boneless"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                /><span class="tag">Fresh</span>
+              </div>
+              <div class="product-body">
+                <span class="meta">Fresh</span>
+                <h4>Pork Ribeye Chops Boneless</h4>
+                <span class="price">RM 33.00</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="purple onion hasfarm green"
+              data-category="fresh"
+              data-price="3.8"
+              ><div class="product-media">
+                <img
+                  src="../_assets/e72bcb848fe0-6qvUoMZD0ZOTmgAoHdPYzSLaI_2-iBMdFX4tavVNrYk.jpg"
+                  alt="Purple Onion Hasfarm Green Plus"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                />
+              </div>
+              <div class="product-body">
+                <span class="meta">Seasoning</span>
+                <h4>Purple Onion Hasfarm Green+</h4>
+                <span class="price">RM 3.80</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="butterhead lettuce hasfarm green"
+              data-category="fresh"
+              data-price="2"
+              ><div class="product-media">
+                <img
+                  src="../_assets/d6cf6255767a-dqDs_txwjJ9hOkGsIvTN7M9ZhkMy2NcuEDNfQa8SalU.jpg"
+                  alt="Butterhead Lettuce Hasfarm Green Plus"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                />
+              </div>
+              <div class="product-body">
+                <span class="meta">Garden vegetables</span>
+                <h4>Butterhead Lettuce Hasfarm Green+</h4>
+                <span class="price">RM 2.00</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="prego homestyle alfredo sauce"
+              data-category="pantry"
+              data-price="18"
+              ><div class="product-media">
+                <img
+                  src="../_assets/f0a2e0efb68c-V0KNhEph0FiS9o-BCuNWxa4mhSC4UPsRSzY3zRRv4zc.jpg"
+                  alt="Prego Homestyle Alfredo Sauce"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                />
+              </div>
+              <div class="product-body">
+                <span class="meta">Pantry</span>
+                <h4>Prego Homestyle Alfredo Sauce</h4>
+                <span class="price">RM 18.00</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="traditional pasta sauce"
+              data-category="pantry"
+              data-price="18"
+              ><div class="product-media">
+                <img
+                  src="../_assets/a5d19052a083-NIG13ymL6iWxcwIpc_cdbK5zT8DWHt2RugmdtMDLU1w.jpg"
+                  alt="Traditional Pasta Sauce"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                />
+              </div>
+              <div class="product-body">
+                <span class="meta">Pantry</span>
+                <h4>Traditional Pasta Sauce</h4>
+                <span class="price">RM 18.00</span>
+              </div></a
+            ><a
+              class="product-card"
+              role="article"
+              data-name="beyond meat sausage original"
+              data-category="plant"
+              data-price="36"
+              ><div class="product-media">
+                <img
+                  src="../_assets/f50cfb1b1956-Pj945HmXAbf_QvQ6qY0woXoYAX1iMwodftb1tCqnUhU.jpg"
+                  alt="Beyond Meat Sausage Original"
+                  loading="lazy"
+                  width="500"
+                  height="692"
+                /><span class="tag">Plant based</span>
+              </div>
+              <div class="product-body">
+                <span class="meta">Plant based</span>
+                <h4>Beyond Meat Sausage Original</h4>
+                <span class="price">RM 36.00</span>
+              </div></a
+            >
+              </div>
+              <div class="results">
+                <nav class="pagination" aria-label="Product pages">
+                  <button type="button" aria-current="page">1</button
+                  ><button type="button" aria-label="Page 2" disabled>2</button
+                  ><button type="button" aria-label="Next page" disabled
+                    >→</button
+                  >
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        class="route-cta"
+        data-block-type="cta"
+        data-block-variant="banner"
+        data-mapping-status="approximation"
+        data-react-component="CTABlock"
+      >
+        <div class="container">
+          <div>
+            <span class="kicker">Need a hand?</span>
+            <h2>Ask about an ingredient or order</h2>
+            <p>
+              Our team can help you choose a product or check an existing
+              delivery.
+            </p>
+          </div>
+          <a class="button" href="../contact/index.html">Contact OrganicNest</a>
+        </div>
+      </section>
+    </main>
+    <footer
+      class="pw-footer-dark"
+      data-block-type="footer"
+      data-block-variant="dark-gradient"
+      data-mapping-status="approximation"
+      data-react-component="FooterBlock"
+    >
+      <div class="pw-footer-container">
+        <div class="pw-footer-main">
+          <div class="pw-footer-brand">
+            <a href="../index.html" aria-label="fb101 home"
+              ><img
+                src="../_assets/581207f8014b-eLM5HeXJltdyfLqzgi-xkSVyZddfCybGvWkJfsH85UA.png"
+                alt="fb101"
+                width="154"
+                height="42"
+            /></a>
+            <p class="pw-footer-tagline">
+              Lorem Ipsum is simply dummy text of the printing and typesetting
+              industry. Lorem Ipsum has been the industry&apos;s standard dummy
+              text ever since the 1500s
+            </p>
+            <ul class="pw-footer-contact">
+              <li>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></svg>BUSINESS SUITE 19A-24-3, LEVEL 24, UOA CENTRE, NO 19,
+                JALAN PINANG 50450 KUALA LUMPUR.
+              </li>
+              <li><a href="tel:02866542688"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"/></svg>02866542688</a></li>
+              <li><a href="mailto:fb101@primeweb.asia"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>fb101@primeweb.asia</a></li>
+            </ul>
+          </div>
+          <div class="pw-footer-column">
+            <h3>Quality products</h3>
+            <ul>
+              <li><a href="../products/index.html">Popular Products</a></li>
+              <li><a href="../products/index.html">Best Selling</a></li>
+              <li><a href="../products/index.html">Deal Of The Day</a></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.facebook.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                ><img src="../_assets/44fec0fbcbfd-facebook.png" alt=""
+              /></a>
+            </div>
+          </div>
+          <div class="pw-footer-column">
+            <h3>Support policy</h3>
+            <ul>
+              <li>
+                <a
+                  href="../order-tracking/index.html"
+                  data-production-href="/orders"
+                  >My Order Details</a
+                >
+              </li>
+              <li><span>My Credit Offers</span></li>
+              <li><span>My Addresses</span></li>
+              <li><span>My Personal Details</span></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.youtube.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube"
+                ><img src="../_assets/02aa56fea786-youtube.png" alt=""
+              /></a>
+            </div>
+          </div>
+          <div class="pw-footer-column">
+            <h3>Introduce</h3>
+            <ul>
+              <li>
+                <a
+                  href="../order-tracking/index.html"
+                  data-production-href="/orders"
+                  >My Order Details</a
+                >
+              </li>
+              <li><span>My Credit Offers</span></li>
+              <li><span>My Addresses</span></li>
+              <li><span>My Personal Details</span></li>
+            </ul>
+            <div class="pw-footer-socials">
+              <a
+                href="https://www.instagram.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                ><img src="../_assets/1711b9f1f51e-instagram.png" alt=""
+              /></a>
+            </div>
+          </div>
+        </div>
+        <p class="pw-footer-copyright">Copyright © 2022 by Prime Commerce</p>
+      </div>
+    </footer>
+    <a
+      class="cart-link pw-cart-widget"
+      href="../cart/index.html"
+      data-block-type="cartWidget"
+      data-block-variant="floating"
+      data-mapping-status="runtime"
+      data-runtime-component="CartDrawer"
+      aria-label="Open cart"
+      aria-expanded="false"
+      ><svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M3 3h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6" />
+        <circle cx="10" cy="20" r="1" />
+        <circle cx="18" cy="20" r="1" /></svg
+      ><span class="pw-cart-label">Cart</span
+      ><span class="pw-cart-count">0</span></a
+    >
+    <script src="../_v2-child.js"></script>
+  </body>
+</html>

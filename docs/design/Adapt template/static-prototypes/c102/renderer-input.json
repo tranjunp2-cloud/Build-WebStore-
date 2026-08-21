@@ -1,0 +1,95 @@
+{
+  "template": "c102",
+  "footerContent": {
+    "copyrightText": "Copyright © 2022 IAM",
+    "visibleCopyrightYear": 2026
+  },
+  "rendererRevision": "f3cfd75190dc91db3a8f9c9ec7dc8cda8cddea2e",
+  "rendererSources": [
+    "src/blocks/navigation/index.tsx",
+    "src/blocks/hero/variants/slideshow.tsx",
+    "src/blocks/features/index.tsx",
+    "src/blocks/carousel/index.tsx",
+    "src/blocks/cta/index.tsx",
+    "src/blocks/products-featured/index.tsx",
+    "src/blocks/products-grid/index.tsx",
+    "src/blocks/products-grid/ProductCard.tsx",
+    "src/blocks/about/index.tsx",
+    "src/blocks/blog-list/index.tsx",
+    "src/blocks/footer/index.tsx",
+    "src/blocks/cart-widget/index.tsx",
+    "src/components/storefront/CartDrawer.tsx",
+    "src/app/sites/[slug]/checkout/CheckoutClient.tsx",
+    "src/app/sites/[slug]/checkout/CheckoutOrderSummary.tsx",
+    "src/app/sites/[slug]/checkout/CheckoutPaymentSection.tsx",
+    "src/app/sites/[slug]/orders/OrderLookupClient.tsx",
+    "src/app/sites/[slug]/products/[productSlug]/page.tsx",
+    "src/app/sites/[slug]/blog/[blogSlug]/page.tsx"
+  ],
+  "routes": [
+    "index.html",
+    "products/index.html",
+    "articles/index.html",
+    "cart/index.html",
+    "checkout/index.html",
+    "contact/index.html",
+    "order-tracking/index.html",
+    "products/the-saem-cover-perfection-fixealer/index.html",
+    "articles/ideal-skincare-routine-oily-skin/index.html"
+  ],
+  "homepageContracts": {
+    "navigation": "centered",
+    "hero": "slideshow",
+    "features": "icon-top",
+    "carousel": "cards",
+    "products-featured": "carousel",
+    "about": "image-overlay",
+    "blog-list": "cards",
+    "footer": "dark-gradient"
+  },
+  "navigationOffsetContract": {
+    "announcementAbsentAllNavRoutes": true,
+    "navigationTopPx": 0,
+    "navigationRouteCount": 7
+  },
+  "navigationShellComposition": {
+    "userAuthorized": true,
+    "canonicalSourceRoute": "index.html",
+    "navigationRouteCount": 7,
+    "orderTrackingRoute": "order-tracking/index.html",
+    "preservedRuntimeHierarchy": "OrderLookupClient > order-lookup-card",
+    "standaloneExceptions": ["cart/index.html", "checkout/index.html"]
+  },
+  "articlesListAdaptation": {
+    "sourceRoute": "articles/index.html",
+    "userAuthorizedNewsletterRemoval": true,
+    "orderedMainBlocks": ["hero", "blog-list"],
+    "newsletterBlockCount": 0,
+    "blogListDirectlyPrecedesFooter": true
+  },
+  "productDetailAdaptation": {
+    "sourceRoute": "products/the-saem-cover-perfection-fixealer/index.html",
+    "mixedParentMappingStatus": "approximation",
+    "preciseRuntimeSubtrees": ["ProductImageGallery", "AddToCartButton", "ProductDetailPage.description"],
+    "singleImageState": true,
+    "variantSelectionInitiallyFirst": "01 Clear Beige",
+    "variantLabel": "Phân loại",
+    "variantSelectorMappingStatus": "approximation",
+    "variantSelectorStructuralReference": "src/components/storefront/ProductVariantSelector.tsx",
+    "variantSelectorAcceptedLoss": "First variant is preselected and selection cannot be cleared so AddToCart remains safely enabled",
+    "previewAddToCartLossAccepted": true,
+    "previewAddToCartBehavior": "accessible-status-without-cart-mutation",
+    "quantitySelectorMappingStatus": "approximation",
+    "quantitySelectorStructuralReference": "src/components/storefront/CartDrawer.tsx",
+    "quantitySelectorAcceptedLoss": "PDP owner has no quantity control; preview quantity is not persisted to cart",
+    "merchantShortDescriptionPreserved": true,
+    "unsupportedFieldsOmitted": ["comparePrice", "sku", "specifications", "inventory"]
+  },
+  "runtimeContracts": {
+    "cart/index.html": "CartDrawer",
+    "checkout/index.html": "CheckoutClient",
+    "order-tracking/index.html": "OrderLookupClient",
+    "products/the-saem-cover-perfection-fixealer/index.html": "ProductDetailPage",
+    "articles/ideal-skincare-routine-oily-skin/index.html": "BlogDetailPage"
+  }
+}

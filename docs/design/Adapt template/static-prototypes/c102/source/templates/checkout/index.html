@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Checkout — GlowBeauty</title>
+    <link rel="stylesheet" href="../_assets/c102-v2.css?v=renderer-exact-3" />
+  </head>
+  <body class="checkout-page">
+    <main data-runtime-component="CheckoutClient" data-mapping-status="runtime">
+      <header class="checkout-head">
+        <a href="../index.html" class="checkout-brand">GlowBeauty</a
+        ><a href="../cart/index.html">← Back to cart</a>
+      </header>
+      <div class="checkout-shell">
+        <form class="checkout-form" data-checkout-form>
+          <section class="ck-card">
+            <div class="ck-ch">
+              <span class="ck-num">01</span>
+              <h1 class="ck-ct">Contact information</h1>
+            </div>
+            <div class="ck-fields">
+              <label class="field full"
+                >Full name<input
+                  name="name"
+                  autocomplete="name"
+                  required /></label
+              ><label class="field"
+                >Email<input
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required /></label
+              ><label class="field"
+                >Phone<input
+                  name="phone"
+                  type="tel"
+                  autocomplete="tel"
+                  required
+              /></label>
+            </div>
+          </section>
+          <section class="ck-card">
+            <div class="ck-ch">
+              <span class="ck-num">02</span>
+              <h2 class="ck-ct">Shipping address</h2>
+            </div>
+            <div class="ck-fields">
+              <label class="field full"
+                >Address line 1<input
+                  name="line1"
+                  autocomplete="address-line1"
+                  required /></label
+              ><label class="field full"
+                >Address line 2 <span>Optional</span
+                ><input name="line2" autocomplete="address-line2" /></label
+              ><label class="field"
+                >State<select name="state" required>
+                  <option value="">Select state</option>
+                  <option>Kuala Lumpur</option>
+                  <option>Selangor</option>
+                </select></label
+              ><label class="field"
+                >City<input
+                  name="city"
+                  autocomplete="address-level2"
+                  required /></label
+              ><label class="field"
+                >Postcode<input
+                  name="postcode"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
+                  required
+              /></label>
+              <div class="shipping-option full">
+                <span aria-hidden="true">▣</span>
+                <div>
+                  <strong>Standard delivery</strong
+                  ><small>3–5 business days</small>
+                </div>
+                <b>RM 8.00</b>
+              </div>
+            </div>
+          </section>
+          <section class="ck-card">
+            <div class="ck-ch">
+              <span class="ck-num">03</span>
+              <h2 class="ck-ct">Payment method</h2>
+              <span class="ck-aux">⌕ Encrypted</span>
+            </div>
+            <div class="pm-list">
+              <label class="pm active"
+                ><input type="radio" name="payment" value="cod" checked /><span
+                  class="pm-rad"
+                ></span
+                ><span class="pm-body"
+                  ><strong>Cash on delivery</strong
+                  ><small>Pay when your parcel arrives</small
+                  ><em>No extra fee</em></span
+                ></label
+              ><label class="pm"
+                ><input
+                  type="radio"
+                  name="payment"
+                  value="bank_transfer"
+                /><span class="pm-rad"></span
+                ><span class="pm-body"
+                  ><strong>Bank transfer / QR</strong
+                  ><small>Upload payment proof after ordering</small
+                  ><em>Seller verified</em></span
+                ></label
+              >
+            </div>
+          </section>
+        </form>
+        <aside class="sum-card">
+          <h2>Order Summary</h2>
+          <article class="sum-item">
+            <div class="s-th">
+              <img
+                src="../_assets/96845a6154a5-9_ZQI4YtvY5P9pET8fN1vwCHGrVkPHKNy0aaIicEMuk.webp"
+                alt="The Saem Cover Perfection Fixealer"
+              />
+            </div>
+            <div class="s-info">
+              <strong>The Saem Cover Perfection Fixealer</strong
+              ><small>×1 RM 24.00</small>
+            </div>
+            <b>RM 24.00</b>
+          </article>
+          <div class="sum-row"><span>Subtotal (1)</span><b>RM 24.00</b></div>
+          <div class="sum-row">
+            <span>Shipping (West MY)</span><b>RM 8.00</b>
+          </div>
+          <div class="sum-total">
+            <span>Total</span><strong><small>RM</small>32.00</strong>
+          </div>
+          <button
+            type="submit"
+            form="none"
+            class="place-order"
+            data-place-order
+          >
+            Place order
+          </button>
+          <p class="checkout-trust">✓ Encrypted Checkout</p>
+          <p class="field-error" data-checkout-error role="alert"></p>
+        </aside>
+      </div>
+    </main>
+    <script src="../_assets/c102-v2.js?v=renderer-exact-3"></script>
+  </body>
+</html>
