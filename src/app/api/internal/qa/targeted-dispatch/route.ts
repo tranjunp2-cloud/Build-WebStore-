@@ -112,7 +112,7 @@ async function persistChangeSnapshot(
 export async function POST(req: NextRequest) {
   if (process.env.F40_TARGETED_SMOKE_ENABLED !== "true")
     return NextResponse.json({ error: "Targeted Smoke dispatch is disabled" }, { status: 503 });
-  const secret = process.env.QA_TARGETED_DISPATCH_SECRET;
+  const secret = process.env.QA_TARGETED_DISPATCH_SECRET || process.env.QA_INGEST_SECRET;
   if (!secret)
     return NextResponse.json({ error: "Targeted Smoke dispatch is not configured" }, { status: 503 });
 

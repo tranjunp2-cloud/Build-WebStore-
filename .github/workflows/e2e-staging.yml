@@ -60,17 +60,17 @@ jobs:
           #
           # Vercel deploy typically takes 2-3 min for Next.js apps.
           sleep 45
-          for i in {1..30}; do
+          for i in {1..50}; do
             HEALTH=$(curl -fsS "$URL/api/health" || true)
             DEPLOYED_SHA=$(printf '%s' "$HEALTH" | jq -r '.commitSha // empty' 2>/dev/null || true)
             if [ "$DEPLOYED_SHA" = "$GITHUB_SHA" ]; then
               echo "Expected staging deploy $DEPLOYED_SHA is live on attempt $i"
               exit 0
             fi
-            echo "Attempt $i/30: deployed SHA '${DEPLOYED_SHA:-unavailable}' is not '$GITHUB_SHA', retrying in 10s..."
+            echo "Attempt $i/50: deployed SHA '${DEPLOYED_SHA:-unavailable}' is not '$GITHUB_SHA', retrying in 10s..."
             sleep 10
           done
-          echo "::error::New deploy didn't appear after 6 min — aborting"
+          echo "::error::New deploy didn't appear after 10 min — aborting"
           exit 1
 
       - name: Ensure E2E test user exists
@@ -173,7 +173,7 @@ jobs:
         if: always() && steps.staging_deploy.outcome == 'success' && steps.qa_context.outcome == 'success' && steps.qa_impact.outcome == 'success'
         env:
           BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
-          QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET }}
+          QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET || secrets.QA_INGEST_SECRET }}
           F40_TARGETED_SMOKE_ENABLED: ${{ vars.F40_TARGETED_SMOKE_ENABLED || 'false' }}
           QA_PULL_REQUEST: ${{ steps.qa_context.outputs.pull_request }}
         run: |
