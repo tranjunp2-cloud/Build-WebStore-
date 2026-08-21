@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
@@ -642,13 +643,21 @@ export function VisualCmsReviewClient() {
     const bug = impact.bug;
 
     if (overlayMode === "clean") {
-      return <div className={className}>{children}</div>;
+      return (
+        <div data-testid={`impact-node-${targetId}`} className={className}>
+          {children}
+        </div>
+      );
     }
 
     const isFilteredOut =
       filterDomain !== "all" && impact.target?.domain !== filterDomain;
     if (isFilteredOut) {
-      return <div className={className}>{children}</div>;
+      return (
+        <div data-testid={`impact-node-${targetId}`} className={className}>
+          {children}
+        </div>
+      );
     }
 
     let borderClass = "";
@@ -667,6 +676,7 @@ export function VisualCmsReviewClient() {
 
     return (
       <div
+        data-testid={`impact-node-${targetId}`}
         onClick={(e) => {
           if (bug || impact.hasFailingTest || impact.isImpacted) {
             e.stopPropagation();
@@ -925,6 +935,7 @@ export function VisualCmsReviewClient() {
                       return (
                         <button
                           key={item.id}
+                          data-testid={`nav-${item.id}`}
                           type="button"
                           onClick={() => setCurrentPage(item.id as CmsPageView)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-colors cursor-pointer ${
@@ -1425,40 +1436,58 @@ export function VisualCmsReviewClient() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-5 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setSelectedTargetId(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer"
-              >
-                Đóng
-              </button>
+            <div className="px-5 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex flex-col gap-2 shrink-0">
+              {retestMessage && (
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+                  <span>{retestMessage}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTargetId(null)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium cursor-pointer text-xs"
+                >
+                  Đóng
+                </button>
 
-              <div className="flex items-center gap-2">
-                {activeTargetDetail.bug?.status !== "passed" ? (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      handleToggleBugStatus(activeTargetDetail.targetId, "passed");
-                      setSelectedTargetId(null);
-                    }}
-                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    disabled={retestingTargetId === activeTargetDetail.targetId}
+                    onClick={() => handleRetest(activeTargetDetail.targetId)}
+                    className="px-3.5 py-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 font-bold flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
                   >
-                    <CheckCircle2 className="size-3.5" />
-                    <span>Đánh Dấu ĐÃ PASS 🟢</span>
+                    <RefreshCw className={`size-3.5 ${retestingTargetId === activeTargetDetail.targetId ? "animate-spin" : ""}`} />
+                    <span>{retestingTargetId === activeTargetDetail.targetId ? "Đang chạy test runner..." : "Chạy Test Lại 🔄"}</span>
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleToggleBugStatus(activeTargetDetail.targetId, "failing");
-                    }}
-                    className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    <Flame className="size-3.5" />
-                    <span>Báo Lỗi Lại 🔴</span>
-                  </button>
-                )}
+
+                  {activeTargetDetail.bug?.status !== "passed" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleToggleBugStatus(activeTargetDetail.targetId, "passed");
+                        setSelectedTargetId(null);
+                      }}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 text-xs shadow-sm cursor-pointer"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      <span>Đánh Dấu ĐÃ PASS 🟢</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleToggleBugStatus(activeTargetDetail.targetId, "failing");
+                      }}
+                      className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold flex items-center gap-1.5 text-xs shadow-sm cursor-pointer"
+                    >
+                      <Flame className="size-3.5" />
+                      <span>Báo Lỗi Lại 🔴</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2562,6 +2591,8 @@ function EditorScreenStaging({
           {/* 4 Mode Grid Tabs (2x2) */}
           <div className="p-2 border-b border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-1 bg-slate-50/50 dark:bg-slate-800/40">
             <button
+              key="global"
+              data-testid="right-tab-global"
               type="button"
               onClick={() => setRightTab("global")}
               className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
@@ -2571,6 +2602,8 @@ function EditorScreenStaging({
               <Settings className="size-3.5" /> Global
             </button>
             <button
+              key="seo"
+              data-testid="right-tab-seo"
               type="button"
               onClick={() => setRightTab("seo")}
               className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
@@ -2580,6 +2613,8 @@ function EditorScreenStaging({
               <Search className="size-3.5" /> SEO
             </button>
             <button
+              key="menu"
+              data-testid="right-tab-menu"
               type="button"
               onClick={() => setRightTab("menu")}
               className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
@@ -2589,6 +2624,8 @@ function EditorScreenStaging({
               <Compass className="size-3.5" /> Menu
             </button>
             <button
+              key="block"
+              data-testid="right-tab-block"
               type="button"
               onClick={() => setRightTab("block")}
               className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${

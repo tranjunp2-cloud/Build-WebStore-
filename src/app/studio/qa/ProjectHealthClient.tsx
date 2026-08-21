@@ -27,6 +27,7 @@ import {
 import { ManualRunPanel } from "./ManualRunPanel";
 import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
 import { VisualCmsReviewClient } from "./visual-review/VisualCmsReviewClient";
+import { ALL_TEST_CASES_DIRECTORY } from "@/lib/admin/qa/test-case-directory";
 
 interface ProjectHealthClientProps {
   initialData: QaControlCenterData;
@@ -485,7 +486,7 @@ function FeatureHealthDetail({
                   </div>
                 </td>
                 <td className="p-3 text-zinc-600 dark:text-zinc-400">
-                  Hỗ trợ cả chạy nhanh trên Web lẫn chạy toàn diện 240 kịch bản trong CI/CD.
+                  Hỗ trợ cả chạy nhanh trên Web lẫn chạy toàn diện {ALL_TEST_CASES_DIRECTORY.length} kịch bản trong CI/CD.
                 </td>
               </tr>
             </tbody>
@@ -2498,7 +2499,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           <FolderTree className="size-4 shrink-0" />
           <span>Danh mục Test Cases</span>
           <span className="ml-1 rounded-full bg-cyan-950 border border-cyan-700/80 px-2 py-0.5 text-xs text-cyan-300 font-bold font-mono">
-            240
+            {ALL_TEST_CASES_DIRECTORY.length}
           </span>
         </button>
 
