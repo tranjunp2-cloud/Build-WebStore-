@@ -27,6 +27,11 @@ import {
   ArrowLeft,
   X,
   Sliders,
+  ShoppingBag,
+  Heart,
+  Star,
+  Globe,
+  Monitor,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -40,7 +45,7 @@ export function MigrationDiffClient() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
-  // Deep Diff Modal State (null by default so overview grid is shown)
+  // Deep Diff Modal State (null by default)
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [visualMode, setVisualMode] = useState<"swipe" | "side">("swipe");
@@ -121,7 +126,7 @@ ${store.pages[0]?.defects
       )}
 
       {/* Top Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800/80 pb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
@@ -145,11 +150,11 @@ ${store.pages[0]?.defects
 
         {/* Action & Database Status Bar */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>PW1 MySQL: <strong className="text-emerald-400 font-mono">Live Read-Only</strong></span>
           </div>
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-indigo-400 animate-pulse" />
             <span>PW2 Postgres: <strong className="text-indigo-400 font-mono">Connected</strong></span>
           </div>
@@ -417,11 +422,11 @@ ${store.pages[0]?.defects
       {/* DEEP DIFF & VISUAL INSPECTOR MODAL POPUP (US-F40-11 & US-F40-12) */}
       {/* ========================================================================= */}
       {selectedDiff && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-lg flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-6xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/90">
-              <div className="flex items-center gap-3.5">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-950/90 shrink-0">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveStoreId(null)}
                   className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
@@ -432,7 +437,7 @@ ${store.pages[0]?.defects
                   <Database className="size-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2.5 font-black text-white text-lg">
+                  <div className="flex items-center gap-2.5 font-black text-white text-base sm:text-lg">
                     <span>{selectedDiff.name}</span>
                     <span className="text-xs font-mono text-indigo-400">({selectedDiff.id})</span>
                     <span
@@ -447,7 +452,7 @@ ${store.pages[0]?.defects
                       {selectedDiff.status === "passed" ? "QC Pass" : selectedDiff.status === "warning" ? "Cần Sửa Nhẹ" : "Lỗi P0 Blocker"}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3">
+                  <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
                     <span>Template: <strong className="text-slate-200">{selectedDiff.templateCode} — {selectedDiff.templateName}</strong></span>
                     <span>•</span>
                     <span>Ngành: <strong className="text-slate-200">{selectedDiff.sector}</strong></span>
@@ -455,24 +460,24 @@ ${store.pages[0]?.defects
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleCopyTicket(selectedDiff)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition"
                 >
                   <Copy className="size-3.5" />
-                  <span>Xuất Ticket Lỗi</span>
+                  <span className="hidden sm:inline">Xuất Ticket Lỗi</span>
                 </button>
                 <button
                   onClick={() => handleApprovePass(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-xl transition shadow-lg shadow-emerald-600/30"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-xl transition shadow-lg shadow-emerald-600/30"
                 >
                   <CheckCircle2 className="size-3.5" />
-                  <span>Đóng Dấu QC Pass</span>
+                  <span className="hidden sm:inline">Đóng Dấu QC Pass</span>
                 </button>
                 <button
                   onClick={() => setActiveStoreId(null)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition"
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition ml-1"
                 >
                   <X className="size-4" />
                 </button>
@@ -480,25 +485,25 @@ ${store.pages[0]?.defects
             </div>
 
             {/* Modal Body: Scrollable */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
               {/* 4 Score Breakdown Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
                   <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Commerce (30%)</div>
                   <div className="text-xl font-black text-white mt-1">{selectedDiff.commerceScore}</div>
                   <div className="text-[10px] text-slate-500 mt-1">Sản Phẩm & Biến Thể SKU</div>
                 </div>
-                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
                   <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Text & Content (25%)</div>
                   <div className="text-xl font-black text-white mt-1">{selectedDiff.textScore}</div>
                   <div className="text-[10px] text-slate-500 mt-1">Tiêu Đề & Mô Tả Tiếng Việt</div>
                 </div>
-                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
                   <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Media & Assets (25%)</div>
                   <div className="text-xl font-black text-white mt-1">{selectedDiff.mediaScore}</div>
                   <div className="text-[10px] text-slate-500 mt-1">Ảnh Sản Phẩm & CDN Links</div>
                 </div>
-                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
+                <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl">
                   <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Layout Blocks (20%)</div>
                   <div className="text-xl font-black text-white mt-1">{selectedDiff.blockScore}</div>
                   <div className="text-[10px] text-slate-500 mt-1">Thứ Tự & Bố Cục Khối</div>
@@ -511,7 +516,7 @@ ${store.pages[0]?.defects
                   <button
                     key={p.path}
                     onClick={() => setActivePageIndex(idx)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap ${
                       activePageIndex === idx
                         ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                         : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800"
@@ -524,18 +529,18 @@ ${store.pages[0]?.defects
 
               {/* Defects Alert Banner */}
               {selectedDiff.pages[activePageIndex]?.defects?.length > 0 && (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-2">
                     <AlertOctagon className="size-4" /> Các Lỗi Cần Xử Lý Ngay (Blockers):
                   </h4>
                   {selectedDiff.pages[activePageIndex].defects.map((d, i) => (
                     <div
                       key={i}
-                      className="p-4 bg-rose-950/30 border border-rose-500/40 rounded-2xl flex items-start gap-3.5"
+                      className="p-3.5 bg-rose-950/30 border border-rose-500/40 rounded-2xl flex items-start gap-3"
                     >
                       <span className="text-xl mt-0.5">{d.icon}</span>
                       <div className="text-xs space-y-1">
-                        <div className="font-bold text-rose-200 text-sm">{d.title}</div>
+                        <div className="font-bold text-rose-200">{d.title}</div>
                         <div className="text-slate-300">{d.desc}</div>
                         <div className="text-rose-400 font-mono text-[11px] font-semibold">➔ Hướng Khắc Phục: {d.fix}</div>
                       </div>
@@ -544,8 +549,8 @@ ${store.pages[0]?.defects
                 </div>
               )}
 
-              {/* Visual Parity Inspection Box */}
-              <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              {/* VISUAL PARITY INSPECTOR (MOCKUP STOREFRONT RENDERER) */}
+              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
                     <Eye className="size-4 text-indigo-400" /> So Sánh Giao Diện Trực Quan (Visual Parity)
@@ -581,61 +586,143 @@ ${store.pages[0]?.defects
                   </div>
                 </div>
 
-                {/* Real Visual Comparison Container */}
+                {/* SWIPE VIEWER WITH COMPLETE MOCKUP STOREFRONT */}
                 {visualMode === "swipe" ? (
-                  <div className="relative w-full h-96 bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 select-none shadow-inner">
-                    {/* Layer PW2: Next.js 15 Rendering Preview */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/60 p-6 flex flex-col justify-between">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full">
-                          🚀 PW2 (Next.js 15 + Payload CMS 3)
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">{selectedDiff.migratedDomain}</span>
-                      </div>
-
-                      <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl backdrop-blur-md max-w-lg mx-auto w-full text-center space-y-2 shadow-2xl">
-                        <div className="text-sm font-black text-white">{selectedDiff.name} — Storefront Preview</div>
-                        <div className="text-xs text-slate-400">
-                          Bố cục chuẩn 6 khối: Hero Banner ➔ Category Listing ➔ Product Grid ➔ CTA ➔ Blog ➔ Footer
+                  <div className="relative w-full h-[450px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 select-none shadow-2xl">
+                    {/* LAYER 2 (RIGHT): PW2 Next.js 15 Storefront UI */}
+                    <div className="absolute inset-0 bg-slate-950 flex flex-col overflow-y-auto">
+                      {/* Browser Mockup Top Bar */}
+                      <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                        <div className="flex items-center gap-2 font-mono text-[11px]">
+                          <span className="size-2.5 rounded-full bg-rose-500/80 inline-block" />
+                          <span className="size-2.5 rounded-full bg-amber-500/80 inline-block" />
+                          <span className="size-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                          <span className="ml-2 font-bold text-indigo-400">PW2 (Next.js 15)</span>
+                          <span className="text-slate-600">|</span>
+                          <span>{selectedDiff.migratedDomain}</span>
                         </div>
-                        {showDefectOverlay && selectedDiff.status === "failed" && (
-                          <div className="p-2.5 bg-rose-950/80 border border-rose-500 text-rose-200 text-xs rounded-xl font-mono font-bold animate-pulse">
-                            🚨 PHÁT HIỆN LỖI DATA: MẤT BIẾN THỂ CAN 1L (320.000đ)
-                          </div>
-                        )}
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono">Payload CMS 3</span>
                       </div>
 
-                      <div className="text-[11px] text-slate-500 text-center font-mono">
-                        Kéo thanh trượt ngang bên dưới để so khớp trực quan 1-1 với bản gốc PW1
+                      {/* Storefront Hero Mockup (PW2) */}
+                      <div className="p-6 bg-gradient-to-r from-emerald-950/60 to-slate-900 border-b border-slate-800">
+                        <div className="max-w-xl">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">
+                            100% Organic Products
+                          </span>
+                          <h3 className="text-2xl font-black text-white mt-2">Tasty & Healthy Organic Food</h3>
+                          <p className="text-xs text-slate-400 mt-1">Nông trại sạch tiêu chuẩn VietGAP, thu hoạch hàng ngày.</p>
+                          <button className="mt-3 px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg shadow">
+                            Khám Phá Ngay
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Products Grid Mockup (PW2) */}
+                      <div className="p-6 grid grid-cols-3 gap-4">
+                        {/* Product Card 1 (Failed SKU) */}
+                        <div className={`bg-slate-900 p-3.5 rounded-xl border relative transition ${
+                          showDefectOverlay && selectedDiff.status === "failed"
+                            ? "border-rose-500 ring-2 ring-rose-500/40 bg-rose-950/20 animate-pulse"
+                            : "border-slate-800"
+                        }`}>
+                          {showDefectOverlay && selectedDiff.status === "failed" && (
+                            <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow">
+                              🚨 MẤT BIẾN THỂ 1L
+                            </span>
+                          )}
+                          <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🍯</div>
+                          <div className="font-bold text-white text-xs mt-2">Mật Ong Rừng Ba Vì</div>
+                          <div className="text-[11px] text-emerald-400 font-mono font-bold mt-1">180.000đ <span className="text-slate-500 text-[9px] font-normal">(Hũ 500ml)</span></div>
+                          <div className="text-[10px] text-rose-400 font-mono mt-1">
+                            {selectedDiff.status === "failed" ? "⚠️ Biến thể 1L: KHÔNG TÌM THẤY" : "Đủ 2 biến thể"}
+                          </div>
+                        </div>
+
+                        {/* Product Card 2 */}
+                        <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                          <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🍋</div>
+                          <div className="font-bold text-white text-xs mt-2">Chanh Vàng Không Hạt</div>
+                          <div className="text-[11px] text-emerald-400 font-mono font-bold mt-1">45.000đ / kg</div>
+                          <div className="text-[10px] text-emerald-400 font-mono mt-1">✓ Khớp 100%</div>
+                        </div>
+
+                        {/* Product Card 3 */}
+                        <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                          <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🥜</div>
+                          <div className="font-bold text-white text-xs mt-2">Hạt Hạnh Nhân Sấy</div>
+                          <div className="text-[11px] text-emerald-400 font-mono font-bold mt-1">120.000đ / túi</div>
+                          <div className="text-[10px] text-emerald-400 font-mono mt-1">✓ Khớp 100%</div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Layer PW1: Design Snapshot (Clipped) */}
+                    {/* LAYER 1 (LEFT): PW1 Legacy Design (Clipped) */}
                     <div
-                      className="absolute inset-0 bg-slate-950 border-r-2 border-indigo-400 overflow-hidden flex flex-col justify-between p-6 shadow-2xl"
+                      className="absolute inset-0 bg-slate-950 flex flex-col border-r-2 border-indigo-400 overflow-hidden shadow-2xl"
                       style={{ width: `${sliderPos}%` }}
                     >
-                      <div className="min-w-[650px] flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full">
-                          📸 PW1 (Thiết Kế Gốc CDN / Live V1)
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">{selectedDiff.legacyDomain}</span>
-                      </div>
-
-                      <div className="min-w-[650px] max-w-lg mx-auto w-full text-center p-4 bg-slate-900/90 border border-amber-500/40 rounded-2xl space-y-2">
-                        <div className="text-sm font-black text-amber-200">{selectedDiff.name} — Snapshot Gốc</div>
-                        <div className="text-xs text-slate-300">
-                          Đầy đủ 24 Sản phẩm • Đủ 2 biến thể 500ml & 1L • Brand: Nông Trại Ba Vì
+                      <div className="min-w-[700px] flex flex-col h-full overflow-hidden">
+                        {/* Browser Mockup Top Bar (PW1) */}
+                        <div className="bg-amber-950/80 px-4 py-2 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-200 shrink-0">
+                          <div className="flex items-center gap-2 font-mono text-[11px]">
+                            <span className="size-2.5 rounded-full bg-rose-500/80 inline-block" />
+                            <span className="size-2.5 rounded-full bg-amber-500/80 inline-block" />
+                            <span className="size-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                            <span className="ml-2 font-bold text-amber-300">PW1 (Laravel MySQL Snapshot)</span>
+                            <span className="text-amber-500">|</span>
+                            <span>{selectedDiff.legacyDomain}</span>
+                          </div>
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono">Bản Gốc</span>
                         </div>
-                      </div>
 
-                      <div className="min-w-[650px] text-[11px] text-amber-400 text-center font-mono">
-                        ✓ Bản gốc chuẩn từ Cột E Excel & CDN DigitalOcean Spaces
+                        {/* Storefront Hero Mockup (PW1) */}
+                        <div className="p-6 bg-gradient-to-r from-emerald-900/60 to-slate-900 border-b border-slate-800">
+                          <div className="max-w-xl">
+                            <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider bg-amber-950 px-2 py-0.5 rounded border border-amber-500/30">
+                              100% Organic Products (Gốc)
+                            </span>
+                            <h3 className="text-2xl font-black text-amber-100 mt-2">Tasty & Healthy Organic Food</h3>
+                            <p className="text-xs text-slate-300 mt-1">Nông trại sạch tiêu chuẩn VietGAP, thu hoạch hàng ngày.</p>
+                            <button className="mt-3 px-4 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg shadow">
+                              Khám Phá Ngay
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Products Grid Mockup (PW1) */}
+                        <div className="p-6 grid grid-cols-3 gap-4">
+                          {/* Product Card 1 (Complete 2 SKUs in PW1) */}
+                          <div className="bg-slate-900 p-3.5 rounded-xl border border-amber-500/40">
+                            <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🍯</div>
+                            <div className="font-bold text-amber-200 text-xs mt-2">Mật Ong Rừng Ba Vì</div>
+                            <div className="text-[11px] text-amber-400 font-mono font-bold mt-1">180.000đ - 320.000đ</div>
+                            <div className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
+                              ✓ Đủ 2 Biến Thể: 500ml & 1 Lít
+                            </div>
+                          </div>
+
+                          {/* Product Card 2 */}
+                          <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                            <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🍋</div>
+                            <div className="font-bold text-white text-xs mt-2">Chanh Vàng Không Hạt</div>
+                            <div className="text-[11px] text-amber-400 font-mono font-bold mt-1">45.000đ / kg</div>
+                            <div className="text-[10px] text-emerald-400 font-mono mt-1">✓ Đủ dữ liệu</div>
+                          </div>
+
+                          {/* Product Card 3 */}
+                          <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+                            <div className="h-24 bg-slate-800 rounded-lg flex items-center justify-center text-3xl">🥜</div>
+                            <div className="font-bold text-white text-xs mt-2">Hạt Hạnh Nhân Sấy</div>
+                            <div className="text-[11px] text-amber-400 font-mono font-bold mt-1">120.000đ / túi</div>
+                            <div className="text-[10px] text-emerald-400 font-mono mt-1">✓ Đủ dữ liệu</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Interactive Slider Input */}
-                    <div className="absolute inset-x-6 bottom-4 z-30 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-800">
+                    {/* Interactive Slider Controller Bar */}
+                    <div className="absolute inset-x-6 bottom-4 z-30 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-700 shadow-2xl">
                       <Sliders className="size-4 text-indigo-400" />
                       <input
                         type="range"
@@ -645,47 +732,59 @@ ${store.pages[0]?.defects
                         onChange={(e) => setSliderPos(Number(e.target.value))}
                         className="w-full cursor-ew-resize accent-indigo-500"
                       />
-                      <span className="text-xs font-mono font-bold text-slate-300 w-12 text-right">{sliderPos}%</span>
+                      <span className="text-xs font-mono font-bold text-indigo-300 w-12 text-right">{sliderPos}%</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-96">
-                    <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <span className="text-xs font-mono font-bold text-amber-400">PW1 (Gốc)</span>
-                        <a href={selectedDiff.legacyDomain} target="_blank" rel="noreferrer" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-                          Live V1 <ExternalLink className="size-3" />
-                        </a>
+                  /* SIDE-BY-SIDE VIEW */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[420px]">
+                    {/* PW1 Window */}
+                    <div className="bg-slate-950 border border-amber-500/40 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+                      <div className="bg-amber-950/80 px-4 py-2 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+                        <span className="font-bold font-mono">📸 PW1: {selectedDiff.legacyDomain}</span>
+                        <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded font-mono">Bản Gốc MySQL</span>
                       </div>
-                      <div className="text-center py-6">
-                        <div className="text-base font-black text-white">{selectedDiff.name}</div>
-                        <div className="text-xs text-slate-400 mt-1">Đủ 2 biến thể: Hũ 500ml & Can 1L</div>
-                        <div className="text-xs text-emerald-400 mt-2 font-mono">✓ Brand ID: Nông Trại Ba Vì</div>
-                      </div>
-                      <div className="text-[11px] text-slate-500 text-center font-mono border-t border-slate-800 pt-3">
-                        MySQL Database: 24 Products, 48 SKUs
+                      <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                          <div className="text-xs font-bold text-amber-300">Hero Section</div>
+                          <div className="text-sm font-black text-white mt-0.5">Tasty & Healthy Organic Food</div>
+                        </div>
+                        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                          <div className="text-xs font-bold text-amber-300">Sản Phẩm & SKU Biến Thể</div>
+                          <div className="text-xs text-slate-300 mt-1 font-mono">
+                            • Mật Ong Rừng (500ml: 180k, Can 1L: 320k)<br/>
+                            • Brand ID: Nông Trại Hữu Cơ Ba Vì
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <span className="text-xs font-mono font-bold text-indigo-400">PW2 (Next.js 15)</span>
-                        <a href={selectedDiff.migratedDomain} target="_blank" rel="noreferrer" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-                          Live V2 <ExternalLink className="size-3" />
-                        </a>
+                    {/* PW2 Window */}
+                    <div className="bg-slate-950 border border-indigo-500/40 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+                      <div className="bg-indigo-950/80 px-4 py-2 border-b border-indigo-500/30 flex items-center justify-between text-xs text-indigo-200">
+                        <span className="font-bold font-mono">🚀 PW2: {selectedDiff.migratedDomain}</span>
+                        <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded font-mono">Next.js 15 Payload</span>
                       </div>
-                      <div className="text-center py-6">
-                        <div className="text-base font-black text-white">{selectedDiff.name}</div>
-                        {selectedDiff.status === "failed" ? (
-                          <div className="text-xs text-rose-400 mt-1 font-mono font-bold">
-                            ⚠️ MẤT BIẾN THỂ 1L (Chỉ còn 500ml) • brand_id: NULL
+                      <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                          <div className="text-xs font-bold text-indigo-300">Hero Section (hero/split-left)</div>
+                          <div className="text-sm font-black text-white mt-0.5">Tasty & Healthy Organic Food</div>
+                        </div>
+                        <div className={`p-3 rounded-xl border ${
+                          selectedDiff.status === "failed" ? "bg-rose-950/40 border-rose-500" : "bg-slate-900 border-slate-800"
+                        }`}>
+                          <div className="text-xs font-bold text-rose-300">Sản Phẩm & SKU Biến Thể</div>
+                          <div className="text-xs text-slate-300 mt-1 font-mono">
+                            {selectedDiff.status === "failed" ? (
+                              <span className="text-rose-400 font-bold">
+                                🚨 MẤT BIẾN THỂ CAN 1L (320.000đ)<br/>
+                                🚨 brand_id: NULL (Thiếu collection brands)
+                              </span>
+                            ) : (
+                              "✓ Đầy đủ 100% SKU"
+                            )}
                           </div>
-                        ) : (
-                          <div className="text-xs text-emerald-400 mt-1 font-mono">✓ Khớp 100% Data</div>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-500 text-center font-mono border-t border-slate-800 pt-3">
-                        PostgreSQL: Payload CMS 3 Collections
+                        </div>
                       </div>
                     </div>
                   </div>
