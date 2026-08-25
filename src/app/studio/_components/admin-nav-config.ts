@@ -52,6 +52,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { href: '/studio/issues', label: 'Issues & feedback', phase: 6, badge: '8' },
             { href: '/studio/qa', label: 'QA Control Center', phase: 8 },
             { href: '/studio/qa/visual-review', label: 'Visual CMS Review', phase: 8, badge: 'NEW' },
+            { href: '/studio/qa/migration-diff', label: 'Site Migration Diff', phase: 8, badge: '2,000' },
         ],
     },
     {
