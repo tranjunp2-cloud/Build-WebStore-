@@ -541,10 +541,17 @@ ${
                   <Store className="size-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-lg font-black text-white">{selectedDiff.name}</h2>
                     <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
                       {selectedDiff.id}
+                    </span>
+                    <span className="text-xs text-slate-200 font-mono bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-md font-semibold">
+                      📧 {selectedDiff.ownerEmail}
+                    </span>
+                    <span className="text-xs text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-md font-semibold flex items-center gap-1">
+                      <Globe className="size-3 text-emerald-400" />
+                      {selectedDiff.domain}
                     </span>
                     <span
                       className={`text-[11px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider border shadow-sm ${

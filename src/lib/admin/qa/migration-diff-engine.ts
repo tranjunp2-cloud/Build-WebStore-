@@ -184,6 +184,8 @@ export interface DynamicStorePage {
 export interface StoreDeepDiff {
   id: string;
   name: string;
+  ownerEmail: string;
+  domain: string;
   templateCode: string;
   templateName: string;
   sector: string;
