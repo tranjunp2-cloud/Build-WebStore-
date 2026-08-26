@@ -1,13 +1,9 @@
 /**
- * Migration Reconciliation Engine & Data Diff Analyzer (PW1 -> PW2)
- * Supports complete e-commerce lifecycle parity:
- *   1. Home Page Layout (6 Canonical Blocks + Universal RichText)
- *   2. Product Catalog & Filter/Sort (/products)
- *   3. Product Detail & RichText Description (/products/:slug)
- *   4. Universal RichText Editor Inspector (HTML WYSIWYG -> Lexical AST)
- *   5. Blog Listing & Article RichText Detail (/blog & /blog/:slug)
- *   6. Search Bar & Cart Drawer Flow (/search & /cart)
- *   7. Contact & Order Tracking (/contact & /order-tracking)
+ * Migration Reconciliation Engine & Full-Stack Dynamic Layout Analyzer (PW1 -> PW2)
+ * Supports realistic merchant arbitrary multi-block page streams:
+ *   - Arbitrary sequences: Hero -> Multiple Small Banners -> Multiple RichTexts -> Product Grids -> Blog -> Footer
+ *   - Synchronized full-page scrolling inspection
+ *   - Multi-page selector: Home, About Us, Products Catalog, Product Detail, Blog, Contact
  */
 
 export interface StoreSummary {
@@ -57,34 +53,43 @@ export interface BlockBreakdownItem {
   fix: string;
 }
 
-export interface RichTextAuditItem {
-  sectionName: string;
-  location: string;
-  pw1HtmlSample: string;
-  pw2LexicalSample: string;
-  embeddedImagesCountPW1: number;
-  embeddedImagesCountPW2: number;
-  hasTablesPW1: boolean;
-  hasTablesPW2: boolean;
-  utf8VietnameseValid: boolean;
+export interface PageBlockItem {
+  id: string;
+  order: number;
+  blockType: "hero" | "banner" | "richtext" | "products" | "categories" | "blog" | "footer" | "contact" | "filter";
+  title: string;
+  pw1Component: string;
+  pw2Block: string;
+  pw1Preview: {
+    headline?: string;
+    subheadline?: string;
+    bodyText?: string;
+    imageCount?: number;
+    hasTable?: boolean;
+    productCount?: number;
+    badgeText?: string;
+  };
+  pw2Preview: {
+    headline?: string;
+    subheadline?: string;
+    bodyText?: string;
+    imageCount?: number;
+    hasTable?: boolean;
+    productCount?: number;
+    badgeText?: string;
+  };
   status: "pass" | "warn" | "fail";
-  notes: string;
+  discrepancyNote?: string;
 }
 
-export interface StorePageDetail {
+export interface StorePageStream {
   id: string;
   name: string;
   path: string;
-  category: "home" | "catalog" | "product_detail" | "richtext_editor" | "blog" | "cart_search" | "contact_tracking";
-  defects: DefectItem[];
+  totalBlocks: number;
+  blocks: PageBlockItem[];
   breakdown: BlockBreakdownItem[];
-  interactiveChecks: {
-    name: string;
-    pw1Behavior: string;
-    pw2Behavior: string;
-    status: "pass" | "warn" | "fail";
-  }[];
-  richTextAudits?: RichTextAuditItem[];
+  defects: DefectItem[];
 }
 
 export interface StoreDeepDiff {
@@ -104,7 +109,7 @@ export interface StoreDeepDiff {
   mediaScore: string;
   commerceScore: string;
   blockScore: string;
-  pages: StorePageDetail[];
+  pages: StorePageStream[];
   reconciliationAudit: {
     totalProductsV1: number;
     totalProductsV2: number;
@@ -130,7 +135,7 @@ export interface MigrationDashboardMetrics {
   lastSyncTimestamp: string;
 }
 
-// 9 Standard Canonical Templates Metadata from Excel Design Mapping
+// 9 Standard Canonical Templates Metadata
 export const CANONICAL_TEMPLATES = [
   {
     code: "FB101",
@@ -248,7 +253,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (65 + (i % 15) * 1.1).toFixed(1);
       score = `${val}%`;
       status = "failed";
-      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "RichText Rớt Bảng Báo Giá"];
+      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "RichText Rớt Bảng VietGAP"];
       textScore = "85.0%";
       mediaScore = "90.0%";
       commerceScore = "65.0%";
@@ -287,7 +292,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       failedBlocks,
       subdomain1: `${slug}.ech.my`,
       subdomain2: `${slug}.primeweb.io`,
-      pageCount: 7,
+      pageCount: 5,
       textScore,
       mediaScore,
       commerceScore,
@@ -300,7 +305,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Get deep store diff across all 7 core e-commerce pages & flows (including RichText)
+ * Get deep store diff with true dynamic multi-block stream layout
  */
 export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
@@ -325,7 +330,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       {
         type: "p0",
         icon: "🚨",
-        title: "Mất Biến Thể Size 1 Lít (SKU Variant Missing)",
+        title: "Khối #04 (Product Listing): Mất Biến Thể Size 1 Lít",
         desc: "Sản phẩm Mật Ong Rừng SKU 'ONG-RUNG' chỉ migrate được hũ 500ml, bị mất biến thể Can 1 Lít (giá 320.000đ).",
         fix: "Dev chạy lại script ETL converter cho bảng `product_variants`.",
         affectedField: "variants[].sku",
@@ -334,23 +339,13 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       {
         type: "p0",
         icon: "🚨",
-        title: "RichText: Bảng Biểu Báo Giá Bị Biến Dạng (Table AST Loss)",
-        desc: "Đoạn văn bản HTML chứa bảng so sánh dinh dưỡng <table> bị mất thẻ <tr> khiến số liệu bị dồn cục.",
-        fix: "Dev cập nhật Lexical HTML parser để hỗ trợ đầy đủ Table Block.",
+        title: "Khối #07 (RichText #2): Bảng Biểu Cam Kết <table> Bị Mất Cấu Trúc",
+        desc: "Bảng 3 cột cam kết chất lượng VietGAP bị mất thẻ <tr> <td> khi chuyển từ TinyMCE sang Lexical AST.",
+        fix: "Dev cập nhật Lexical HTML parser hỗ trợ TableBlock.",
         affectedField: "rich_text.content",
         entityType: "richtext",
       }
     );
-  } else if (isWarn) {
-    defects.push({
-      type: "p1",
-      icon: "⚠️",
-      title: "1 Ảnh Gallery Chi Tiết Bị Lỗi Link (404 Not Found)",
-      desc: "Ảnh gallery chi tiết mat_ong_1l_detail.jpg trả về mã HTTP 404 trên CDN mới.",
-      fix: "Dev re-upload lại ảnh từ bản backup S3 cũ.",
-      affectedField: "media.url",
-      entityType: "products",
-    });
   }
 
   return {
@@ -358,14 +353,14 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
     pages: [
       {
         id: "page-home",
-        name: "Trang Chủ",
+        name: "Trang Chủ (10 Khối Tuần Tự)",
         path: "/",
-        category: "home",
+        totalBlocks: 10,
         defects,
         breakdown: [
           {
             pos: "#01",
-            leg: "banner (Hero Banner 1365)",
+            leg: "Hero Banner 1365",
             mig: "hero/split-left",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -377,7 +372,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           },
           {
             pos: "#02",
-            leg: "category_listing (1540)",
+            leg: "Category Listing 1540",
             mig: "portfolio-grid/grid",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -389,7 +384,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           },
           {
             pos: "#03",
-            leg: "product_listing (1541)",
+            leg: "Product Listing 1541",
             mig: "products-grid/grid-4",
             layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
             layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -401,7 +396,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           },
           {
             pos: "#04",
-            leg: "banner (Small Banner 1543)",
+            leg: "Small Promo Banner 1543",
             mig: "cta/banner",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -413,7 +408,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           },
           {
             pos: "#05",
-            leg: "article_listing (1544)",
+            leg: "Article Listing 1544",
             mig: "blog-list/cards",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -423,387 +418,252 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
             pw2Val: "3 Bài viết mới nhất",
             fix: "✓ Khớp chuẩn 100%",
           },
-          {
-            pos: "#06",
-            leg: "Footer Custom (1553)",
-            mig: "footer/dark-gradient",
-            layer: isWarn ? "Needs Review" : "Layer 1 (Mapped)",
-            layerCls: isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: isWarn ? "THIẾU MAP NHÚNG" : "KHỚP 100%",
-            badge: isWarn ? "badge-warn" : "badge-pass",
-            pw1Val: "4 Cột + Hotline + Bản đồ nhúng",
-            pw2Val: isWarn ? "4 Cột chuẩn (chưa có iframe map)" : "4 Cột chuẩn",
-            fix: isWarn ? "QC duyệt hoặc Dev thêm cấu hình Map" : "✓ Khớp chuẩn 100%",
-          },
         ],
-        interactiveChecks: [
+        blocks: [
           {
-            name: "Sticky Header Navigation",
-            pw1Behavior: "Header cố định khi cuộn, có logo + giỏ hàng",
-            pw2Behavior: "Header Next.js 15 mượt mà, đồng bộ giỏ hàng",
-            status: "pass",
-          },
-        ],
-      },
-      {
-        id: "page-richtext-editor",
-        name: "Khối RichText (WYSIWYG Word Editor)",
-        path: "/#story-richtext",
-        category: "richtext_editor",
-        defects: isFailed
-          ? [
-              {
-                type: "p0",
-                icon: "🚨",
-                title: "RichText: Mất Cấu Trúc Bảng Dinh Dưỡng <table>",
-                desc: "Đoạn văn bản HTML chứa bảng so sánh dinh dưỡng <table> bị mất thẻ <tr> khiến số liệu bị dồn cục.",
-                fix: "Dev cập nhật Lexical HTML parser để hỗ trợ đầy đủ Table Block.",
-                affectedField: "rich_text.content",
-                entityType: "richtext",
-              },
-            ]
-          : [],
-        breakdown: [
-          {
-            pos: "#01",
-            leg: "rich_text (Câu Chuyện Thương Hiệu & Giới Thiệu)",
-            mig: "about/split (Lexical AST)",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Văn bản HTML 850 chữ + In đậm + Tiêu đề H2",
-            pw2Val: "Văn bản Lexical 850 chữ + In đậm + Tiêu đề H2",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#02",
-            leg: "rich_text (Ảnh Chèn Xen Kẽ Giữa Đoạn Văn)",
-            mig: "lexical-image-nodes",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "2 Ảnh chụp nhà vườn xen kẽ đoạn văn bản",
-            pw2Val: "2 Ảnh chụp nhà vườn xen kẽ đoạn văn bản",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#03",
-            leg: "rich_text (Bảng Biểu Cam Kết Chất Lượng <table>)",
-            mig: "lexical-table-node",
-            layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
-            layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: isFailed ? "MẤT CẤU TRÚC BẢNG" : "KHỚP 100%",
-            badge: isFailed ? "badge-fail" : "badge-pass",
-            pw1Val: "Bảng 3 cột: Tiêu chí | Chuẩn VietGAP | OrganicNest",
-            pw2Val: isFailed ? "Dữ liệu bị dồn thành 1 dòng text thô" : "Bảng 3 cột hiển thị chuẩn xác",
-            fix: isFailed ? "Dev bổ sung lexical TablePlugin" : "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Giữ nguyên định dạng In đậm, In nghiêng, Căn giữa",
-            pw1Behavior: "Chữ in đậm và căn giữa đẹp mắt",
-            pw2Behavior: "Chữ in đậm và căn giữa đẹp mắt",
+            id: "block-01",
+            order: 1,
+            blockType: "hero",
+            title: "Khối #01: Hero Banner Đầu Trang",
+            pw1Component: "banner (Hero Single 1365)",
+            pw2Block: "hero/split-left",
+            pw1Preview: {
+              headline: "Tasty & Healthy Organic Food",
+              subheadline: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.",
+              badgeText: "100% Organic",
+            },
+            pw2Preview: {
+              headline: "Tasty & Healthy Organic Food",
+              subheadline: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.",
+              badgeText: "100% Organic",
+            },
             status: "pass",
           },
           {
-            name: "Hiển thị ảnh chèn trong bài viết (Inline Images)",
-            pw1Behavior: "2 Ảnh hiển thị đúng vị trí giữa đoạn 2 và 3",
-            pw2Behavior: "2 Ảnh hiển thị đúng vị trí",
+            id: "block-02",
+            order: 2,
+            blockType: "banner",
+            title: "Khối #02: Banner Khuyến Mãi Nhỏ #1",
+            pw1Component: "banner (Promo Banner 1543)",
+            pw2Block: "cta/banner-promo",
+            pw1Preview: {
+              headline: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+              subheadline: "Áp dụng cho đơn hàng đầu tiên từ 300.000đ",
+              badgeText: "Giảm 50.000đ",
+            },
+            pw2Preview: {
+              headline: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+              subheadline: "Áp dụng cho đơn hàng đầu tiên từ 300.000đ",
+              badgeText: "Giảm 50.000đ",
+            },
             status: "pass",
           },
           {
-            name: "Mã hóa tiếng Việt có dấu UTF-8",
-            pw1Behavior: "100% Tiếng Việt chuẩn dấu (Đ, ê, ư, ơ, ố)",
-            pw2Behavior: "100% Tiếng Việt chuẩn dấu",
+            id: "block-03",
+            order: 3,
+            blockType: "richtext",
+            title: "Khối #03: RichText #1 (Câu Chuyện Thương Hiệu)",
+            pw1Component: "rich_text (WYSIWYG Word Editor)",
+            pw2Block: "about/split (Lexical RichText)",
+            pw1Preview: {
+              headline: "Hành Trình 10 Năm Gieo Mầm Xanh Ba Vì",
+              bodyText: "Chúng tôi cam kết mang lại thực phẩm thuần khiết 100% tự nhiên không hóa chất...",
+              imageCount: 2,
+              hasTable: false,
+            },
+            pw2Preview: {
+              headline: "Hành Trình 10 Năm Gieo Mầm Xanh Ba Vì",
+              bodyText: "Chúng tôi cam kết mang lại thực phẩm thuần khiết 100% tự nhiên không hóa chất...",
+              imageCount: 2,
+              hasTable: false,
+            },
             status: "pass",
           },
-        ],
-        richTextAudits: [
           {
-            sectionName: "Câu Chuyện Nông Trại Hữu Cơ Ba Vì",
-            location: "Trang Chủ / Khối RichText #06",
-            pw1HtmlSample: "<h2>Hành Trình 10 Năm</h2><p>Chúng tôi cam kết mang lại <strong>thực phẩm sạch 100%</strong>...</p><img src='https://cdn.../farm.jpg' />",
-            pw2LexicalSample: "{\"root\":{\"children\":[{\"type\":\"heading\",\"tag\":\"h2\"},{\"type\":\"paragraph\"},{\"type\":\"image\"}]}}",
-            embeddedImagesCountPW1: 2,
-            embeddedImagesCountPW2: 2,
-            hasTablesPW1: true,
-            hasTablesPW2: !isFailed,
-            utf8VietnameseValid: true,
+            id: "block-04",
+            order: 4,
+            blockType: "products",
+            title: "Khối #04: Danh Sách Sản Phẩm Nổi Bật",
+            pw1Component: "product_listing (Lưới Sản Phẩm 1541)",
+            pw2Block: "products-grid/grid-4",
+            pw1Preview: {
+              headline: "Sản Phẩm Tươi Ngon Bán Chạy",
+              productCount: 8,
+              badgeText: "Đủ 2 Biến Thể (500ml & 1L)",
+            },
+            pw2Preview: {
+              headline: "Sản Phẩm Tươi Ngon Bán Chạy",
+              productCount: 8,
+              badgeText: isFailed ? "🚨 MẤT BIẾN THỂ 1L" : "Đủ 2 Biến Thể (500ml & 1L)",
+            },
             status: isFailed ? "fail" : "pass",
-            notes: isFailed ? "Bị mất bảng <table> khi convert sang Lexical" : "Convert hoàn hảo 100%",
-          },
-        ],
-      },
-      {
-        id: "page-catalog",
-        name: "Danh Mục & Bộ Lọc Sản Phẩm",
-        path: "/products",
-        category: "catalog",
-        defects: [],
-        breakdown: [
-          {
-            pos: "#01",
-            leg: "product_filter (Bộ lọc danh mục & khoảng giá)",
-            mig: "products-filter/sidebar",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Lọc theo 4 Danh mục + Thanh kéo khoảng giá 0 - 500k",
-            pw2Val: "Lọc theo 4 Danh mục + Thanh kéo khoảng giá 0 - 500k",
-            fix: "✓ Khớp chuẩn 100%",
+            discrepancyNote: isFailed ? "Mất biến thể Can 1L (giá 320.000đ) của SKU ONG-RUNG" : undefined,
           },
           {
-            pos: "#02",
-            leg: "product_sort (Sắp xếp giá & độ mới)",
-            mig: "products-sort/dropdown",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Mới nhất, Giá tăng dần, Giá giảm dần",
-            pw2Val: "Mới nhất, Giá tăng dần, Giá giảm dần",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#03",
-            leg: "product_listing (Lưới sản phẩm phân trang)",
-            mig: "products-grid/paginated",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "24 Sản phẩm, 12 SP/trang (2 trang)",
-            pw2Val: "24 Sản phẩm, 12 SP/trang (2 trang)",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Lọc theo danh mục 'Mật Ong & Dược Liệu'",
-            pw1Behavior: "Hiển thị 6 sản phẩm",
-            pw2Behavior: "Hiển thị đúng 6 sản phẩm tương ứng",
+            id: "block-05",
+            order: 5,
+            blockType: "banner",
+            title: "Khối #05: Banner Khuyến Mãi Nhỏ #2 (Combo)",
+            pw1Component: "banner (Combo Promo Banner)",
+            pw2Block: "cta/banner-split",
+            pw1Preview: {
+              headline: "COMBO SỨC KHỎE: MẬT ONG + CHANH VÀNG",
+              subheadline: "Tiết kiệm 20% khi mua combo sáng nay",
+              badgeText: "Tiết Kiệm 20%",
+            },
+            pw2Preview: {
+              headline: "COMBO SỨC KHỎE: MẬT ONG + CHANH VÀNG",
+              subheadline: "Tiết kiệm 20% khi mua combo sáng nay",
+              badgeText: "Tiết Kiệm 20%",
+            },
             status: "pass",
           },
           {
-            name: "Sắp xếp theo 'Giá: Cao ➔ Thấp'",
-            pw1Behavior: "SP đắt nhất đứng đầu (320.000đ)",
-            pw2Behavior: "SP đắt nhất đứng đầu",
+            id: "block-06",
+            order: 6,
+            blockType: "banner",
+            title: "Khối #06: Banner Khuyến Mãi Nhỏ #3 (Freeship)",
+            pw1Component: "banner (Freeship Banner)",
+            pw2Block: "cta/banner-minimal",
+            pw1Preview: {
+              headline: "MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC",
+              subheadline: "Đơn hàng từ 500k được giao hỏa tốc 2H",
+              badgeText: "Freeship 0đ",
+            },
+            pw2Preview: {
+              headline: "MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC",
+              subheadline: "Đơn hàng từ 500k được giao hỏa tốc 2H",
+              badgeText: "Freeship 0đ",
+            },
             status: "pass",
           },
-        ],
-      },
-      {
-        id: "page-product-detail",
-        name: "Chi Tiết Sản Phẩm & Biến Thể",
-        path: "/products/mat-ong-rung-ba-vi",
-        category: "product_detail",
-        defects: isFailed
-          ? [
-              {
-                type: "p0",
-                icon: "🚨",
-                title: "Mất Chọn Biến Thể Can 1 Lít (Variant Selector)",
-                desc: "Khi người dùng click chọn biến thể Can 1L, giá không nhảy sang 320.000đ do DB thiếu SKU.",
-                fix: "Dev chạy lại ETL cho `products_variants`.",
-                affectedField: "variants[].sku",
-                entityType: "variants",
-              },
-            ]
-          : [],
-        breakdown: [
           {
-            pos: "#01",
-            leg: "Product Gallery (Ảnh lớn + 3 Ảnh phụ)",
-            mig: "product-gallery/thumbnails",
-            layer: isWarn ? "Needs Review" : "Layer 1 (Mapped)",
-            layerCls: isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: isWarn ? "1 ẢNH THUMBNAIL 404" : "KHỚP 100%",
-            badge: isWarn ? "badge-warn" : "badge-pass",
-            pw1Val: "4 Ảnh chụp hũ mật ong chất lượng cao",
-            pw2Val: isWarn ? "3 Ảnh hiển thị (1 ảnh lỗi 404)" : "4 Ảnh hiển thị đầy đủ",
-            fix: isWarn ? "Re-upload lại ảnh S3" : "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#02",
-            leg: "Variant Selector (Chọn Size / Dung tích)",
-            mig: "product-variants/pill-selector",
-            layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
-            layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: isFailed ? "MẤT BIẾN THỂ CAN 1L" : "KHỚP 100%",
-            badge: isFailed ? "badge-fail" : "badge-pass",
-            pw1Val: "2 Nút chọn: Hũ 500ml (180k) & Can 1L (320k)",
-            pw2Val: isFailed ? "Chỉ có 1 nút: Hũ 500ml (180k)" : "Đủ 2 nút chọn",
-            fix: isFailed ? "Dev migrate đủ SKU" : "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#03",
-            leg: "Rich Text Description (Mô tả chi tiết)",
-            mig: "product-description/lexical",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Mô tả nguồn gốc mật ong rừng nguyên chất 100%",
-            pw2Val: "Mô tả nguồn gốc mật ong rừng nguyên chất 100%",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Click chọn nút 'Can 1 Lít'",
-            pw1Behavior: "Giá nhảy từ 180.000đ ➔ 320.000đ",
-            pw2Behavior: isFailed ? "Không có nút 1L để chọn (Lỗi P0)" : "Giá nhảy sang 320.000đ",
+            id: "block-07",
+            order: 7,
+            blockType: "richtext",
+            title: "Khối #07: RichText #2 (Bảng Cam Kết Chất Lượng VietGAP)",
+            pw1Component: "rich_text (Bảng 3 Cột <table>)",
+            pw2Block: "lexical-table-node",
+            pw1Preview: {
+              headline: "Bảng So Sánh Tiêu Chuẩn Nông Sản",
+              bodyText: "Tiêu Chí | Mật Ong Thường | Mật Ong Ba Vì (Đậm đặc >23%, Ngọt thanh)",
+              hasTable: true,
+              imageCount: 1,
+            },
+            pw2Preview: {
+              headline: "Bảng So Sánh Tiêu Chuẩn Nông Sản",
+              bodyText: isFailed ? "Tiêu Chí Mật Ong Thường Mật Ong Ba Vì (Dữ liệu bị dồn cục)" : "Tiêu Chí | Mật Ong Thường | Mật Ong Ba Vì",
+              hasTable: !isFailed,
+              imageCount: 1,
+            },
             status: isFailed ? "fail" : "pass",
+            discrepancyNote: isFailed ? "Mất thẻ <table> làm số liệu bị dồn thành 1 dòng text thô" : undefined,
           },
           {
-            name: "Nút 'Thêm Vào Giỏ Hàng'",
-            pw1Behavior: "Bật popup giỏ hàng với đúng SKU",
-            pw2Behavior: "Bật Cart Drawer với đúng SKU",
+            id: "block-08",
+            order: 8,
+            blockType: "banner",
+            title: "Khối #08: Banner Khuyến Mãi Nhỏ #4 (Tải App)",
+            pw1Component: "banner (App Download Banner)",
+            pw2Block: "cta/download-app",
+            pw1Preview: {
+              headline: "TẢI APP ORGANICNEST NHẬN QUÀ 100K",
+              subheadline: "Có mặt trên cả App Store và Google Play",
+              badgeText: "Quà 100K",
+            },
+            pw2Preview: {
+              headline: "TẢI APP ORGANICNEST NHẬN QUÀ 100K",
+              subheadline: "Có mặt trên cả App Store và Google Play",
+              badgeText: "Quà 100K",
+            },
+            status: "pass",
+          },
+          {
+            id: "block-09",
+            order: 9,
+            blockType: "blog",
+            title: "Khối #09: Danh Sách Tin Tức & Cẩm Nang",
+            pw1Component: "article_listing (Blog Posts 1544)",
+            pw2Block: "blog-list/cards-3",
+            pw1Preview: {
+              headline: "Cẩm Nang Sức Khỏe & Mẹo Nhà Nông",
+              bodyText: "3 Bài viết mới nhất về phân biệt mật ong thật và cách pha trà",
+            },
+            pw2Preview: {
+              headline: "Cẩm Nang Sức Khỏe & Mẹo Nhà Nông",
+              bodyText: "3 Bài viết mới nhất về phân biệt mật ong thật và cách pha trà",
+            },
+            status: "pass",
+          },
+          {
+            id: "block-10",
+            order: 10,
+            blockType: "footer",
+            title: "Khối #10: Chân Trang Đa Cột (Footer)",
+            pw1Component: "Footer Custom Multi-column (1553)",
+            pw2Block: "footer/dark-gradient",
+            pw1Preview: {
+              headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền & Map",
+              bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán",
+            },
+            pw2Preview: {
+              headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền & Map",
+              bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán",
+            },
             status: "pass",
           },
         ],
       },
       {
-        id: "page-blog",
-        name: "Tin Tức & Chi Tiết Bài Viết",
-        path: "/blog/huong-dan-phan-biet-mat-ong-that",
-        category: "blog",
+        id: "page-about",
+        name: "Trang Giới Thiệu (/about)",
+        path: "/about",
+        totalBlocks: 4,
         defects: [],
-        breakdown: [
+        breakdown: [],
+        blocks: [
           {
-            pos: "#01",
-            leg: "article_filter (Bộ lọc danh mục bài viết)",
-            mig: "blog-categories/pills",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "3 Danh mục: Cẩm nang sức khỏe, Mẹo nhà nông, Khuyến mãi",
-            pw2Val: "3 Danh mục: Cẩm nang sức khỏe, Mẹo nhà nông, Khuyến mãi",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#02",
-            leg: "Article Detail RichText (Nội dung bài viết)",
-            mig: "article-content/lexical",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Bài viết 1.200 chữ + 2 ảnh minh họa",
-            pw2Val: "Bài viết 1.200 chữ + 2 ảnh minh họa Lexical",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Định dạng font chữ tiếng Việt UTF-8",
-            pw1Behavior: "Hiển thị chuẩn dấu tiếng Việt",
-            pw2Behavior: "Hiển thị chuẩn dấu tiếng Việt",
-            status: "pass",
-          },
-        ],
-      },
-      {
-        id: "page-cart-search",
-        name: "Giỏ Hàng & Tìm Kiếm Toàn Site",
-        path: "/cart",
-        category: "cart_search",
-        defects: [],
-        breakdown: [
-          {
-            pos: "#01",
-            leg: "Global Header Search Bar (Thanh tìm kiếm)",
-            mig: "search-dialog/instant-search",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Tìm theo từ khóa 'mật ong', trả về 4 kết quả",
-            pw2Val: "Tìm theo từ khóa 'mật ong', trả về 4 kết quả",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#02",
-            leg: "cart (Giỏ hàng & Cập nhật số lượng)",
-            mig: "cart-drawer/slide-over",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Thêm 2 hũ 500ml ➔ Tổng tiền: 360.000đ",
-            pw2Val: "Thêm 2 hũ 500ml ➔ Tổng tiền: 360.000đ",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-          {
-            pos: "#03",
-            leg: "checkout (Nút chuyển tiếp thanh toán)",
-            mig: "checkout/redirect",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Chuyển tới cổng thanh toán checkout",
-            pw2Val: "Chuyển tới cổng thanh toán checkout",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Tính năng Tìm kiếm tức thì (Live Search)",
-            pw1Behavior: "Gõ 'chanh' hiện gợi ý sản phẩm",
-            pw2Behavior: "Gõ 'chanh' hiện gợi ý sản phẩm mượt mà",
+            id: "about-01",
+            order: 1,
+            blockType: "hero",
+            title: "Banner Trang Giới Thiệu",
+            pw1Component: "banner (About Cover)",
+            pw2Block: "hero/about-header",
+            pw1Preview: { headline: "Về Nông Trại OrganicNest Ba Vì" },
+            pw2Preview: { headline: "Về Nông Trại OrganicNest Ba Vì" },
             status: "pass",
           },
           {
-            name: "Cập nhật số lượng trong giỏ (+ / -)",
-            pw1Behavior: "Tự động tính lại tổng tiền",
-            pw2Behavior: "Tự động tính lại tổng tiền tức thì",
+            id: "about-02",
+            order: 2,
+            blockType: "richtext",
+            title: "RichText: Câu Chuyện Sáng Lập (1.500 chữ)",
+            pw1Component: "rich_text",
+            pw2Block: "about/content (Lexical)",
+            pw1Preview: { headline: "Sứ Mệnh 10 Năm", imageCount: 3, hasTable: false },
+            pw2Preview: { headline: "Sứ Mệnh 10 Năm", imageCount: 3, hasTable: false },
             status: "pass",
           },
-        ],
-      },
-      {
-        id: "page-contact-tracking",
-        name: "Liên Hệ & Tra Cứu Đơn Hàng",
-        path: "/order-tracking",
-        category: "contact_tracking",
-        defects: [],
-        breakdown: [
           {
-            pos: "#01",
-            leg: "contact (Form gửi thư & Hotline)",
-            mig: "contact/split-form",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Hotline 1900 8888 + Email contact@organicnest.vn",
-            pw2Val: "Hotline 1900 8888 + Email contact@organicnest.vn",
-            fix: "✓ Khớp chuẩn 100%",
+            id: "about-03",
+            order: 3,
+            blockType: "banner",
+            title: "Banner Chứng Nhận VietGAP & ISO",
+            pw1Component: "banner (Certification Banner)",
+            pw2Block: "cta/certificates",
+            pw1Preview: { headline: "Chứng Chỉ Quốc Tế" },
+            pw2Preview: { headline: "Chứng Chỉ Quốc Tế" },
+            status: "pass",
           },
           {
-            pos: "#02",
-            leg: "order_tracking (Tra cứu trạng thái đơn hàng)",
-            mig: "order-tracking/lookup",
-            layer: "Layer 1 (Mapped)",
-            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-            status: "KHỚP 100%",
-            badge: "badge-pass",
-            pw1Val: "Nhập mã đơn 'ORD-12345' ➔ Hiện trạng thái 'Đang giao'",
-            pw2Val: "Nhập mã đơn 'ORD-12345' ➔ Hiện trạng thái 'Đang giao'",
-            fix: "✓ Khớp chuẩn 100%",
-          },
-        ],
-        interactiveChecks: [
-          {
-            name: "Tra cứu đơn hàng bằng Mã Đơn + SĐT",
-            pw1Behavior: "Trả về timeline giao hàng",
-            pw2Behavior: "Trả về timeline giao hàng",
+            id: "about-04",
+            order: 4,
+            blockType: "footer",
+            title: "Chân Trang",
+            pw1Component: "Footer",
+            pw2Block: "footer",
+            pw1Preview: { headline: "Footer 4 Cột" },
+            pw2Preview: { headline: "Footer 4 Cột" },
             status: "pass",
           },
         ],

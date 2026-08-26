@@ -8,6 +8,7 @@ import {
   CANONICAL_TEMPLATES,
   type StoreSummary,
   type StoreDeepDiff,
+  type PageBlockItem,
 } from "@/lib/admin/qa/migration-diff-engine";
 import {
   Layers,
@@ -32,7 +33,8 @@ import {
   FileText,
   Image as ImageIcon,
   Table as TableIcon,
-  Check,
+  Package,
+  Layers as BlockTreeIcon,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -49,8 +51,7 @@ export function MigrationDiffClient() {
   // Deep Diff Modal State
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
-  const [visualMode, setVisualMode] = useState<"side" | "swipe">("side");
-  const [sliderPos, setSliderPos] = useState(50);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -58,6 +59,8 @@ export function MigrationDiffClient() {
     if (!activeStoreId) return null;
     return getStoreDeepDiff(activeStoreId);
   }, [activeStoreId]);
+
+  const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
   // Filter logic for overview table
   const filteredStores = useMemo(() => {
@@ -88,16 +91,16 @@ export function MigrationDiffClient() {
   };
 
   const handleCopyTicket = (store: StoreDeepDiff) => {
-    const activePage = store.pages[activePageIndex] || store.pages[0];
+    const page = store.pages[activePageIndex] || store.pages[0];
     const text = `### 🚨 [QC MIGRATION BLOCKER] Cửa Hàng: ${store.name} (${store.id})
 - **Template:** ${store.templateCode} (${store.templateName})
-- **Trang Đang Bị Lỗi:** ${activePage.name} (${activePage.path})
+- **Trang Đang Bị Lỗi:** ${page.name} (${page.path})
 - **Độ Tương Thích:** ${store.score} (Trạng Thái: ${store.status.toUpperCase()})
 - **Web Cũ (Phiên Bản V1):** ${store.legacyDomain}
 - **Web Mới (Phiên Bản V2):** ${store.migratedDomain}
 
-#### ❌ Chi Tiết Lỗi Dữ Liệu & Tính Năng Cần Sửa:
-${activePage.defects
+#### ❌ Chi Tiết Lỗi Dữ Liệu Khối Tuần Tự Cần Sửa:
+${page.defects
   ?.map(
     (d, i) =>
       `${i + 1}. **[${d.type.toUpperCase()}] ${d.title}**\n   - Chi tiết: ${d.desc}\n   - Hướng khắc phục: \`${d.fix}\``
@@ -116,6 +119,14 @@ ${activePage.defects
     );
     showToast(`✓ Đã đóng dấu QC Pass cho ${storeId}!`);
     setActiveStoreId(null);
+  };
+
+  const scrollToBlock = (blockId: string) => {
+    setSelectedBlockId(blockId);
+    const element = document.getElementById(blockId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   return (
@@ -145,7 +156,7 @@ ${activePage.defects
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Kiểm thử toàn diện 7 luồng e-commerce: <strong>Trang Chủ, Khối RichText Word-like, Danh Mục & Filter, Chi Tiết SP, Blog, Giỏ Hàng & Search, Tra Cứu Đơn</strong>
+                So sánh đối chiếu toàn diện <strong>Chuỗi Khối Tuần Tự Bố Cục Thực Tế (Full-Page Sequential Stream)</strong> của Khách Hàng
               </p>
             </div>
           </div>
@@ -382,6 +393,7 @@ ${activePage.defects
                       onClick={() => {
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
+                        setSelectedBlockId(null);
                       }}
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-105"
                     >
@@ -422,12 +434,12 @@ ${activePage.defects
       </div>
 
       {/* ========================================================================= */}
-      {/* REDESIGNED FULL-LIFECYCLE E-COMMERCE INSPECTOR MODAL (7 CORE TABS) */}
+      {/* FULL-PAGE SEQUENTIAL STREAM & BLOCK TREE NAVIGATOR MODAL */}
       {/* ========================================================================= */}
-      {selectedDiff && (
+      {selectedDiff && activePage && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-7xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
-            {/* Modal Header: Store Identity */}
+            {/* Modal Top Header */}
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-950/90 shrink-0">
               <div className="flex items-center gap-3.5">
                 <button
@@ -487,20 +499,26 @@ ${activePage.defects
               </div>
             </div>
 
-            {/* 7 Comprehensive Page & Feature Tabs (including RichText) */}
-            <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0 overflow-x-auto">
-              <div className="flex items-center gap-2">
+            {/* Page Tabs Bar */}
+            <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
                 {selectedDiff.pages.map((p, idx) => (
                   <button
                     key={p.id}
-                    onClick={() => setActivePageIndex(idx)}
-                    className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+                    onClick={() => {
+                      setActivePageIndex(idx);
+                      setSelectedBlockId(null);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition ${
                       activePageIndex === idx
                         ? "border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t-xl"
                         : "border-transparent text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>{idx + 1}. {p.name}</span>
+                    <span>{p.name}</span>
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full font-mono text-slate-400">
+                      {p.totalBlocks} Khối
+                    </span>
                     {p.defects.length > 0 && (
                       <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
                         {p.defects.length} LỖI
@@ -510,397 +528,178 @@ ${activePage.defects
                 ))}
               </div>
 
-              {/* Error filter toggle */}
-              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none shrink-0 ml-4">
+              {/* Quick error toggle */}
+              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none">
                 <input
                   type="checkbox"
                   checked={showOnlyErrors}
                   onChange={(e) => setShowOnlyErrors(e.target.checked)}
                   className="rounded border-slate-700 text-indigo-600 focus:ring-0"
                 />
-                <span className="font-semibold text-rose-400">🔴 Chỉ hiện dòng LỆCH / LỖI</span>
+                <span className="font-semibold text-rose-400">🔴 Chỉ hiện khối LỆCH / LỖI</span>
               </label>
             </div>
 
-            {/* Modal Body: Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-              {/* Active Page Header Info */}
-              <div className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                <div>
-                  <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                    Đang Kiểm Thử: {selectedDiff.pages[activePageIndex]?.name}
-                  </div>
-                  <div className="text-sm font-black text-white mt-0.5">
-                    Đường dẫn: <span className="font-mono text-slate-300">{selectedDiff.pages[activePageIndex]?.path}</span>
-                  </div>
+            {/* Modal Body: Left Sidebar (Block Tree Navigator) + Right Main (Synchronized Vertical Page Stream) */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+              {/* LEFT SIDEBAR: BLOCK TREE NAVIGATOR */}
+              <div className="w-full md:w-80 bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                  <BlockTreeIcon className="size-4 text-indigo-400" />
+                  <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
                 </div>
-                <div className="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs">
-                  <button
-                    onClick={() => setVisualMode("side")}
-                    className={`px-3 py-1 rounded-lg font-bold transition ${
-                      visualMode === "side" ? "bg-indigo-600 text-white shadow" : "text-slate-400"
-                    }`}
-                  >
-                    🎨 2 Cửa Sổ Song Song
-                  </button>
-                  <button
-                    onClick={() => setVisualMode("swipe")}
-                    className={`px-3 py-1 rounded-lg font-bold transition ${
-                      visualMode === "swipe" ? "bg-indigo-600 text-white shadow" : "text-slate-400"
-                    }`}
-                  >
-                    🔍 Kéo Trượt (Swipe)
-                  </button>
+                <div className="text-[11px] text-slate-500">
+                  Bấm vào khối để tự động cuộn đến vị trí tương ứng trên trang web:
+                </div>
+
+                <div className="space-y-1.5">
+                  {activePage.blocks.map((block) => (
+                    <button
+                      key={block.id}
+                      onClick={() => scrollToBlock(block.id)}
+                      className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
+                        selectedBlockId === block.id
+                          ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                          : block.status === "fail"
+                          ? "bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-950/60"
+                          : "bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="font-mono text-[10px] font-bold opacity-70">
+                          #{String(block.order).padStart(2, "0")}
+                        </span>
+                        <span className="font-semibold truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
+                      </div>
+                      {block.status === "fail" ? (
+                        <span className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded">LỖI</span>
+                      ) : (
+                        <span className="text-[10px] text-emerald-400 font-bold">✓</span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Defects Alert Banner if any */}
-              {selectedDiff.pages[activePageIndex]?.defects?.length > 0 && (
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-2">
-                    <AlertOctagon className="size-4" /> Các Lỗi Cần Dev Sửa Ngay (Blockers):
-                  </h4>
-                  {selectedDiff.pages[activePageIndex].defects.map((d, i) => (
-                    <div
-                      key={i}
-                      className="p-4 bg-rose-950/30 border border-rose-500/40 rounded-2xl flex items-start gap-3.5"
-                    >
-                      <span className="text-xl mt-0.5">{d.icon}</span>
-                      <div className="text-xs space-y-1">
-                        <div className="font-bold text-rose-200 text-sm">{d.title}</div>
-                        <div className="text-slate-300">{d.desc}</div>
-                        <div className="text-rose-400 font-mono text-[11px] font-semibold">➔ Hướng Khắc Phục: {d.fix}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* SPECIAL RICHTEXT WYSIWYG AUDIT SECTION (If on RichText tab) */}
-              {selectedDiff.pages[activePageIndex]?.category === "richtext_editor" && (
-                <div className="bg-slate-950 p-5 rounded-2xl border border-indigo-500/40 space-y-4 shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-300">
-                      <FileText className="size-4 text-indigo-400" />
-                      <span>Đối Soát Văn Bản Trình Soạn Thảo (Word-like WYSIWYG HTML ➔ Lexical AST)</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="flex items-center gap-1 text-slate-300">
-                        <ImageIcon className="size-3.5 text-cyan-400" /> 2 Ảnh Nhúng Trong Bài
-                      </span>
-                      <span className="flex items-center gap-1 text-slate-300">
-                        <TableIcon className="size-3.5 text-amber-400" /> 1 Bảng 3 Cột Dinh Dưỡng
-                      </span>
-                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                        <Check className="size-3.5" /> 100% UTF-8
-                      </span>
-                    </div>
+              {/* RIGHT MAIN AREA: DUAL FULL-PAGE SYNCHRONIZED VERTICAL STACK */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-900/50">
+                {/* Browser Windows Dual Top Banner */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md pb-3 border-b border-slate-800">
+                  <div className="bg-amber-950/80 px-4 py-2 rounded-xl border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+                    <span className="font-bold font-mono">👈 BẢN CŨ PW1 (LARAVEL MYSQL)</span>
+                    <a href={selectedDiff.legacyDomain} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
+                      Live V1 <ExternalLink className="size-3" />
+                    </a>
                   </div>
+                  <div className="bg-indigo-950/80 px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center justify-between text-xs text-indigo-200">
+                    <span className="font-bold font-mono">👉 BẢN MỚI PW2 (NEXT.JS 15 PAYLOAD)</span>
+                    <a href={selectedDiff.migratedDomain} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-1">
+                      Live V2 <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                </div>
 
-                  {/* Dual Word Document Preview */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* PW1 RichText Word View */}
-                    <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
-                      <div className="text-[11px] font-bold text-amber-300 font-mono uppercase border-b border-slate-800 pb-2 flex items-center justify-between">
-                        <span>👈 Văn Bản Gốc PW1 (HTML TinyMCE)</span>
-                        <span className="text-slate-400 font-normal">850 từ • 2 ảnh</span>
-                      </div>
-                      <div className="text-xs text-slate-200 space-y-2 bg-slate-950 p-4 rounded-lg border border-slate-800">
-                        <h4 className="font-bold text-sm text-white">Hành Trình 10 Năm Nông Trại Hữu Cơ Ba Vì</h4>
-                        <p className="text-slate-300">
-                          Chúng tôi tự hào mang đến cho quý khách hàng những sản phẩm <strong>mật ong nguyên chất 100%</strong> được thu hoạch trực tiếp từ các cánh rừng tự nhiên tại Ba Vì...
-                        </p>
-                        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-center text-slate-400 text-[11px] flex items-center justify-center gap-2">
-                          <ImageIcon className="size-3 text-cyan-400" /> [Ảnh minh họa 1: farm_harvest_2026.jpg]
-                        </div>
-                        <div className="border border-slate-700 rounded overflow-hidden mt-2">
-                          <table className="w-full text-[10px] text-left">
-                            <thead className="bg-slate-800 text-slate-300 font-bold">
-                              <tr>
-                                <th className="p-1.5">Tiêu Chí</th>
-                                <th className="p-1.5">Mật Ong Thường</th>
-                                <th className="p-1.5">Mật Ong Ba Vì</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800 text-slate-400">
-                              <tr>
-                                <td className="p-1.5">Độ đậm đặc</td>
-                                <td className="p-1.5">Loãng 18%</td>
-                                <td className="p-1.5 text-emerald-400 font-bold">Đậm đặc &gt; 23%</td>
-                              </tr>
-                              <tr>
-                                <td className="p-1.5">Hương vị</td>
-                                <td className="p-1.5">Ngọt gắt đường</td>
-                                <td className="p-1.5 text-emerald-400 font-bold">Ngọt thanh hoa rừng</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PW2 RichText Lexical View */}
-                    <div className="bg-slate-900 border border-indigo-500/30 rounded-xl p-4 space-y-3">
-                      <div className="text-[11px] font-bold text-indigo-300 font-mono uppercase border-b border-slate-800 pb-2 flex items-center justify-between">
-                        <span>👉 Văn Bản Mới PW2 (Payload Lexical AST)</span>
-                        <span className="text-slate-400 font-normal">Next.js 15 Render</span>
-                      </div>
-                      <div className="text-xs text-slate-200 space-y-2 bg-slate-950 p-4 rounded-lg border border-slate-800">
-                        <h4 className="font-bold text-sm text-white">Hành Trình 10 Năm Nông Trại Hữu Cơ Ba Vì</h4>
-                        <p className="text-slate-300">
-                          Chúng tôi tự hào mang đến cho quý khách hàng những sản phẩm <strong>mật ong nguyên chất 100%</strong> được thu hoạch trực tiếp từ các cánh rừng tự nhiên tại Ba Vì...
-                        </p>
-                        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-center text-slate-400 text-[11px] flex items-center justify-center gap-2">
-                          <ImageIcon className="size-3 text-cyan-400" /> [Ảnh minh họa 1: farm_harvest_2026.jpg]
-                        </div>
-                        {selectedDiff.status === "failed" ? (
-                          <div className="p-2.5 bg-rose-950/80 border border-rose-500 rounded text-rose-200 font-mono text-[11px] space-y-1">
-                            <div className="font-bold">🚨 PHÁT HIỆN LỖI P0: MẤT THẺ BẢNG &lt;table&gt;</div>
-                            <div className="text-slate-300 text-[10px]">
-                              Số liệu bị dồn: "Tiêu Chí Mật Ong Thường Mật Ong Ba Vì Độ đậm đặc Loãng 18% Đậm đặc &gt; 23%..."
+                {/* Sequential Block Stack */}
+                <div className="space-y-4">
+                  {activePage.blocks
+                    .filter((b) => !showOnlyErrors || b.status === "fail")
+                    .map((block) => (
+                      <div
+                        key={block.id}
+                        id={block.id}
+                        className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3 ${
+                          block.status === "fail"
+                            ? "bg-rose-950/20 border-rose-500 ring-1 ring-rose-500/40"
+                            : selectedBlockId === block.id
+                            ? "bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl"
+                            : "bg-slate-950/80 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        {/* Block Header */}
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="p-1.5 bg-slate-800 text-indigo-400 font-mono font-bold text-xs rounded-lg">
+                              #{String(block.order).padStart(2, "0")}
+                            </span>
+                            <div>
+                              <div className="font-black text-white text-sm">{block.title}</div>
+                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-indigo-300">{block.pw2Block}</strong>
+                              </div>
                             </div>
                           </div>
-                        ) : (
-                          <div className="border border-slate-700 rounded overflow-hidden mt-2">
-                            <table className="w-full text-[10px] text-left">
-                              <thead className="bg-slate-800 text-slate-300 font-bold">
-                                <tr>
-                                  <th className="p-1.5">Tiêu Chí</th>
-                                  <th className="p-1.5">Mật Ong Thường</th>
-                                  <th className="p-1.5">Mật Ong Ba Vì</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800 text-slate-400">
-                                <tr>
-                                  <td className="p-1.5">Độ đậm đặc</td>
-                                  <td className="p-1.5">Loãng 18%</td>
-                                  <td className="p-1.5 text-emerald-400 font-bold">Đậm đặc &gt; 23%</td>
-                                </tr>
-                                <tr>
-                                  <td className="p-1.5">Hương vị</td>
-                                  <td className="p-1.5">Ngọt gắt đường</td>
-                                  <td className="p-1.5 text-emerald-400 font-bold">Ngọt thanh hoa rừng</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* 1. INTERACTIVE FEATURE VALIDATION MATRIX (Filter, Search, Variant Selectors, Cart) */}
-              {selectedDiff.pages[activePageIndex]?.interactiveChecks?.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                    <Sparkles className="size-4 text-cyan-400" /> Kiểm Thử Tính Năng Tương Tác
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {selectedDiff.pages[activePageIndex].interactiveChecks.map((ic, i) => (
-                      <div key={i} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-white text-xs">{ic.name}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                              ic.status === "pass"
-                                ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
-                                : "bg-rose-950 text-rose-300 border border-rose-500/40"
-                            }`}
-                          >
-                            {ic.status === "pass" ? "✓ Khớp Chuẩn" : "🚨 Lệch Luồng"}
-                          </span>
+                          <div>
+                            {block.status === "fail" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
+                                🚨 LỖI P0: {block.discrepancyNote}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                <CheckCircle2 className="size-3" /> KHỚP 100%
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400 space-y-0.5">
-                          <div>👈 Web Cũ: <span className="text-amber-300 font-medium">{ic.pw1Behavior}</span></div>
-                          <div>👉 Web Mới: <span className={ic.status === "fail" ? "text-rose-400 font-bold" : "text-indigo-300 font-medium"}>{ic.pw2Behavior}</span></div>
+
+                        {/* Dual Column Content Preview for this specific Block */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* PW1 Block Preview */}
+                          <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3.5 text-xs text-slate-200 space-y-1.5">
+                            <div className="text-[10px] uppercase font-bold text-amber-400 font-mono">Bản Gốc PW1</div>
+                            {block.pw1Preview.headline && (
+                              <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
+                            )}
+                            {block.pw1Preview.subheadline && (
+                              <div className="text-slate-300">{block.pw1Preview.subheadline}</div>
+                            )}
+                            {block.pw1Preview.bodyText && (
+                              <div className="text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800">
+                                {block.pw1Preview.bodyText}
+                              </div>
+                            )}
+                            {block.pw1Preview.badgeText && (
+                              <span className="inline-block text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded font-bold border border-emerald-500/30">
+                                {block.pw1Preview.badgeText}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* PW2 Block Preview */}
+                          <div className={`rounded-xl p-3.5 text-xs text-slate-200 space-y-1.5 border ${
+                            block.status === "fail"
+                              ? "bg-rose-950/40 border-rose-500"
+                              : "bg-slate-900/90 border-indigo-500/20"
+                          }`}>
+                            <div className="text-[10px] uppercase font-bold text-indigo-400 font-mono">Bản Mới PW2 (Next.js 15)</div>
+                            {block.pw2Preview.headline && (
+                              <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
+                            )}
+                            {block.pw2Preview.subheadline && (
+                              <div className="text-slate-300">{block.pw2Preview.subheadline}</div>
+                            )}
+                            {block.pw2Preview.bodyText && (
+                              <div className={`font-mono p-2 rounded border ${
+                                block.status === "fail"
+                                  ? "bg-rose-950/60 border-rose-500 text-rose-200 font-bold"
+                                  : "bg-slate-950 border-slate-800 text-slate-300"
+                              }`}>
+                                {block.pw2Preview.bodyText}
+                              </div>
+                            )}
+                            {block.pw2Preview.badgeText && (
+                              <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-bold border ${
+                                block.status === "fail"
+                                  ? "bg-rose-950 text-rose-300 border-rose-500"
+                                  : "bg-emerald-950 text-emerald-300 border-emerald-500/30"
+                              }`}>
+                                {block.pw2Preview.badgeText}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 2. LIVE BROWSER DUAL WINDOWS COMPARISON */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                  <Eye className="size-4 text-indigo-400" /> Đối Chiếu Trực Tiếp Giao Diện Web Khách Hàng (Live Web Parity)
-                </h4>
-                {visualMode === "side" ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Old Version Browser Window */}
-                    <div className="bg-slate-950 border border-amber-500/40 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[480px]">
-                      <div className="bg-slate-900/90 px-4 py-2.5 border-b border-amber-500/30 flex items-center justify-between text-xs shrink-0">
-                        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300">
-                          <span className="size-2.5 rounded-full bg-rose-500/80 inline-block" />
-                          <span className="size-2.5 rounded-full bg-amber-500/80 inline-block" />
-                          <span className="size-2.5 rounded-full bg-emerald-500/80 inline-block" />
-                          <span className="ml-2 font-bold text-amber-300">👈 WEB KHÁCH HÀNG (BẢN CŨ V1)</span>
-                        </div>
-                        <a
-                          href={`${selectedDiff.legacyDomain}${selectedDiff.pages[activePageIndex]?.path.replace("/", "")}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-mono"
-                        >
-                          Mở Live V1 <ExternalLink className="size-3" />
-                        </a>
-                      </div>
-                      <div className="flex-1 p-5 bg-gradient-to-b from-slate-900 to-slate-950 overflow-y-auto space-y-3">
-                        <div className="text-xs font-bold text-amber-300 uppercase font-mono">
-                          {selectedDiff.name} — {selectedDiff.pages[activePageIndex]?.name} (Gốc)
-                        </div>
-                        <div className="p-3 bg-slate-900 border border-amber-500/20 rounded-xl text-xs text-slate-300 space-y-1.5 font-mono">
-                          {selectedDiff.pages[activePageIndex]?.breakdown?.map((b, i) => (
-                            <div key={i}>• {b.leg}: <strong className="text-white">{b.pw1Val}</strong></div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* New Version Browser Window */}
-                    <div className="bg-slate-950 border border-indigo-500/40 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[480px]">
-                      <div className="bg-slate-900/90 px-4 py-2.5 border-b border-indigo-500/30 flex items-center justify-between text-xs shrink-0">
-                        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300">
-                          <span className="size-2.5 rounded-full bg-rose-500/80 inline-block" />
-                          <span className="size-2.5 rounded-full bg-amber-500/80 inline-block" />
-                          <span className="size-2.5 rounded-full bg-emerald-500/80 inline-block" />
-                          <span className="ml-2 font-bold text-indigo-300">👉 WEB KHÁCH HÀNG (BẢN MỚI V2)</span>
-                        </div>
-                        <a
-                          href={`${selectedDiff.migratedDomain}${selectedDiff.pages[activePageIndex]?.path.replace("/", "")}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 font-mono"
-                        >
-                          Mở Live V2 <ExternalLink className="size-3" />
-                        </a>
-                      </div>
-                      <div className="flex-1 p-5 bg-gradient-to-b from-slate-900 to-slate-950 overflow-y-auto space-y-3">
-                        <div className="text-xs font-bold text-indigo-300 uppercase font-mono">
-                          {selectedDiff.name} — {selectedDiff.pages[activePageIndex]?.name} (Next.js 15)
-                        </div>
-                        <div className="p-3 bg-slate-900 border border-indigo-500/20 rounded-xl text-xs text-slate-300 space-y-1.5 font-mono">
-                          {selectedDiff.pages[activePageIndex]?.breakdown?.map((b, i) => (
-                            <div key={i}>
-                              • {b.mig}:{" "}
-                              <strong className={b.badge === "badge-fail" ? "text-rose-400" : "text-white"}>
-                                {b.pw2Val}
-                              </strong>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* SWIPE SLIDER */
-                  <div className="relative w-full h-[450px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 select-none shadow-2xl">
-                    <div className="absolute inset-0 bg-slate-950 p-6 flex flex-col justify-between">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-950 px-3 py-1 rounded-full">
-                          👉 WEB KHÁCH HÀNG (BẢN MỚI NEXT.JS 15)
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">{selectedDiff.migratedDomain}</span>
-                      </div>
-                      <div className="max-w-md mx-auto text-center space-y-3">
-                        <h3 className="text-2xl font-black text-white">{selectedDiff.name} — {selectedDiff.pages[activePageIndex]?.name}</h3>
-                        <div className="text-xs text-slate-400">Payload CMS 3 + PostgreSQL Engine</div>
-                      </div>
-                      <div className="text-center text-xs text-slate-500 font-mono">
-                        Kéo thanh trượt để so sánh trực quan với Bản Cũ
-                      </div>
-                    </div>
-
-                    <div
-                      className="absolute inset-0 bg-slate-900 border-r-2 border-indigo-400 p-6 flex flex-col justify-between shadow-2xl"
-                      style={{ width: `${sliderPos}%` }}
-                    >
-                      <div className="min-w-[650px] flex items-center justify-between border-b border-amber-500/30 pb-3">
-                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950 px-3 py-1 rounded-full">
-                          👈 WEB KHÁCH HÀNG (BẢN CŨ LARAVEL)
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">{selectedDiff.legacyDomain}</span>
-                      </div>
-                      <div className="min-w-[650px] max-w-md mx-auto text-center space-y-3">
-                        <h3 className="text-2xl font-black text-amber-200">{selectedDiff.name} — {selectedDiff.pages[activePageIndex]?.name}</h3>
-                        <div className="text-xs text-amber-400/80">MySQL Live Database Engine</div>
-                      </div>
-                      <div className="min-w-[650px] text-center text-xs text-amber-400 font-mono">
-                        Dữ liệu gốc từ Bản Cũ
-                      </div>
-                    </div>
-
-                    <div className="absolute inset-x-6 bottom-4 z-30 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-700 shadow-2xl">
-                      <Sliders className="size-4 text-indigo-400" />
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={sliderPos}
-                        onChange={(e) => setSliderPos(Number(e.target.value))}
-                        className="w-full cursor-ew-resize accent-indigo-500"
-                      />
-                      <span className="text-xs font-mono font-bold text-indigo-300 w-12 text-right">{sliderPos}%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. 1-1 FIELD MAPPING & DATABASE AUDIT TABLE */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                  <Database className="size-4 text-emerald-400" /> Bảng Đối Soát Dữ Liệu Từng Khối & Trường Database (1-1 Field Mapping)
-                </h4>
-                <div className="border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-800 tracking-wider">
-                      <tr>
-                        <th className="py-3 px-4">Vị Trí</th>
-                        <th className="py-3 px-4">Khối Giao Diện Bản Cũ (PW1)</th>
-                        <th className="py-3 px-4">Khối Giao Diện Bản Mới (PW2)</th>
-                        <th className="py-3 px-4">👈 Dữ Liệu Khách Nhập (Bản Cũ)</th>
-                        <th className="py-3 px-4">👉 Dữ Liệu Sau Chuyển Đổi (Bản Mới)</th>
-                        <th className="py-3 px-4">Trạng Thái</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50">
-                      {selectedDiff.pages[activePageIndex]?.breakdown?.map((b, i) => (
-                        <tr
-                          key={i}
-                          className={`transition ${
-                            b.badge === "badge-fail"
-                              ? "bg-rose-950/30 hover:bg-rose-950/40"
-                              : "hover:bg-slate-800/40"
-                          }`}
-                        >
-                          <td className="py-3 px-4 font-mono font-bold text-slate-400">{b.pos}</td>
-                          <td className="py-3 px-4 text-slate-300 font-semibold">{b.leg}</td>
-                          <td className="py-3 px-4 text-indigo-300 font-mono">{b.mig}</td>
-                          <td className="py-3 px-4 text-slate-400">{b.pw1Val}</td>
-                          <td className="py-3 px-4 text-slate-200 font-medium">
-                            <span className={b.badge === "badge-fail" ? "text-rose-400 font-bold" : ""}>
-                              {b.pw2Val}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`text-[10px] px-2.5 py-1 rounded-md font-bold ${
-                                b.badge === "badge-pass"
-                                  ? "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40"
-                                  : b.badge === "badge-warn"
-                                  ? "bg-amber-950/80 text-amber-300 border border-amber-500/40"
-                                  : "bg-rose-950/80 text-rose-300 border border-rose-500/40"
-                              }`}
-                            >
-                              {b.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
