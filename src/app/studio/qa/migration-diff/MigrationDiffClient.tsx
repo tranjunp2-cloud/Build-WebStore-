@@ -745,40 +745,42 @@ export function MigrationDiffClient() {
                 {/* Right Main Area: Dual Browser Mockups Comparison Stream */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-900/30 min-h-0">
                   
-                  {/* Browser Dual Windows Header */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md pb-3 border-b border-slate-800">
-                    {/* Left Browser Bar */}
-                    <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-amber-500/30 flex items-center justify-between shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="flex gap-1.5">
-                          <span className="size-2.5 rounded-full bg-rose-500/80" />
-                          <span className="size-2.5 rounded-full bg-amber-500/80" />
-                          <span className="size-2.5 rounded-full bg-emerald-500/80" />
+                  {/* Browser Dual Windows Header - 100% Solid Non-transparent Background */}
+                  <div className="sticky top-0 z-30 bg-slate-900 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 px-4 pt-4 sm:px-6 sm:pt-6 pb-4 border-b border-slate-800 shadow-xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left Browser Bar */}
+                      <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-amber-500/40 flex items-center justify-between shadow-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1.5">
+                            <span className="size-2.5 rounded-full bg-rose-500" />
+                            <span className="size-2.5 rounded-full bg-amber-500" />
+                            <span className="size-2.5 rounded-full bg-emerald-500" />
+                          </div>
+                          <span className="font-bold text-xs text-amber-300 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
                         </div>
-                        <span className="font-bold text-xs text-amber-300 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
-                      </div>
-                      <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1">
-                        <span>Live V1</span> <ExternalLink className="size-3" />
-                      </a>
-                    </div>
-
-                    {/* Right Browser Bar */}
-                    <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-indigo-500/30 flex items-center justify-between shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="flex gap-1.5">
-                          <span className="size-2.5 rounded-full bg-rose-500/80" />
-                          <span className="size-2.5 rounded-full bg-amber-500/80" />
-                          <span className="size-2.5 rounded-full bg-emerald-500/80" />
-                        </div>
-                        <span className="font-bold text-xs text-indigo-300 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
-                      </div>
-                      {activePage.existsInPW2 ? (
-                        <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline flex items-center gap-1">
-                          <span>Live V2</span> <ExternalLink className="size-3" />
+                        <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
+                          <span>Live V1</span> <ExternalLink className="size-3" />
                         </a>
-                      ) : (
-                        <span className="text-xs text-rose-400 font-bold font-mono">🚨 CHƯA CÓ TRANG</span>
-                      )}
+                      </div>
+
+                      {/* Right Browser Bar */}
+                      <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-indigo-500/40 flex items-center justify-between shadow-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1.5">
+                            <span className="size-2.5 rounded-full bg-rose-500" />
+                            <span className="size-2.5 rounded-full bg-amber-500" />
+                            <span className="size-2.5 rounded-full bg-emerald-500" />
+                          </div>
+                          <span className="font-bold text-xs text-indigo-300 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
+                        </div>
+                        {activePage.existsInPW2 ? (
+                          <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline flex items-center gap-1 font-medium">
+                            <span>Live V2</span> <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-rose-400 font-bold font-mono">🚨 CHƯA CÓ TRANG</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
