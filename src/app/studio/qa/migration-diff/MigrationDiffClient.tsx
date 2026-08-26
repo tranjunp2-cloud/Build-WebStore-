@@ -24,6 +24,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  LayoutTemplate,
   Sparkles,
   RefreshCw,
   Eye,
@@ -70,9 +72,31 @@ export function MigrationDiffClient() {
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  const templateDropdownRef = React.useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
+
+  const selectedTemplateObj = useMemo(() => {
+    if (filterTemplate === "all") return null;
+    return CANONICAL_TEMPLATES.find((t) => t.code === filterTemplate) || null;
+  }, [filterTemplate]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        templateDropdownRef.current &&
+        !templateDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsTemplateDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Detail Modal States
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
@@ -341,21 +365,91 @@ export function MigrationDiffClient() {
             ))}
           </div>
 
-          <select
-            value={filterTemplate}
-            onChange={(e) => {
-              setFilterTemplate(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold rounded-xl px-3.5 py-2 outline-none focus:border-blue-500 transition"
-          >
-            <option value="all">Tất Cả 9 Nhóm Giao Diện Gốc</option>
-            {CANONICAL_TEMPLATES.map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.code} — {t.name} ({t.sector})
-              </option>
-            ))}
-          </select>
+          {/* Custom Template Filter Dropdown Popover */}
+          <div className="relative" ref={templateDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsTemplateDropdownOpen((prev) => !prev)}
+              className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all border select-none ${
+                filterTemplate !== "all"
+                  ? "bg-blue-600/10 text-blue-400 border-blue-500/40 hover:bg-blue-600/20"
+                  : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+              }`}
+            >
+              <LayoutTemplate className="size-3.5 text-blue-400 shrink-0" />
+              <span>
+                {selectedTemplateObj
+                  ? `${selectedTemplateObj.code} — ${selectedTemplateObj.name}`
+                  : "Tất Cả 9 Nhóm Giao Diện"}
+              </span>
+              <ChevronDown
+                className={`size-3.5 text-slate-400 transition-transform duration-200 ${
+                  isTemplateDropdownOpen ? "rotate-180 text-blue-400" : ""
+                }`}
+              />
+            </button>
+
+            {isTemplateDropdownOpen && (
+              <div className="absolute top-full left-0 mt-2 w-80 max-h-96 overflow-y-auto bg-slate-900/95 backdrop-blur-xl border border-slate-800/90 rounded-2xl shadow-2xl z-50 p-1.5 space-y-0.5 ring-1 ring-white/10 scrollbar-thin">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5 border-b border-slate-800/60 mb-1">
+                  Nhóm Giao Diện Gốc (PW1)
+                </div>
+
+                {/* Option All */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterTemplate("all");
+                    setIsTemplateDropdownOpen(false);
+                    setCurrentPage(1);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition ${
+                    filterTemplate === "all"
+                      ? "bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30"
+                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-blue-400" />
+                    <span>Tất Cả 9 Nhóm Giao Diện Gốc</span>
+                  </div>
+                  {filterTemplate === "all" && <Check className="size-3.5 text-blue-400" />}
+                </button>
+
+                {/* 9 Canonical Template Options */}
+                {CANONICAL_TEMPLATES.map((t) => {
+                  const isSelected = filterTemplate === t.code;
+                  return (
+                    <button
+                      key={t.code}
+                      type="button"
+                      onClick={() => {
+                        setFilterTemplate(t.code);
+                        setIsTemplateDropdownOpen(false);
+                        setCurrentPage(1);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition ${
+                        isSelected
+                          ? "bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30"
+                          : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-bold px-1.5 py-0.2 bg-slate-800 text-sky-400 rounded border border-slate-700">
+                            {t.code}
+                          </span>
+                          <span className="font-bold text-white text-xs">{t.name}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 pl-0.5">{t.sector}</div>
+                      </div>
+                      {isSelected && <Check className="size-4 text-blue-400 shrink-0 ml-2" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="relative w-full md:w-96">
