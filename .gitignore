@@ -1,0 +1,99 @@
+# PrimeWeb
+
+## Dependencies
+node_modules/
+# Repo uses npm (package-lock.json). Stray pnpm/yarn lockfiles break
+# `vercel build` — it auto-detects pnpm from the file and spawns a pnpm
+# binary that does not exist on the GH Actions runner (ENOENT). Seen
+# twice: 83f91a75, then PR #555 (commit e4d0448c) reintroduced it.
+pnpm-lock.yaml
+yarn.lock
+
+## Next.js
+.next/
+out/
+
+## Build
+dist/
+build/
+
+## Environment
+.env
+.env.local
+.env.production
+.env.staging
+.env.qc-test
+
+## JMeter (QC test env — never commit real creds or results)
+.jmx-config/*.properties
+!.jmx-config/*.properties.example
+.jmx-results/
+*.jtl
+
+## k6 (QC perf test raw output — analyse locally, commit only summaries)
+reports/perf/
+!reports/perf/.gitkeep
+
+## Bot config (personality controlled by PM/Lead only)
+.bot-config.json
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Media uploads
+public/media/*
+!public/media/.gitkeep
+
+## Payload generated
+src/payload-types.ts
+
+## TypeScript build cache
+*.tsbuildinfo
+
+## Logs
+*.log
+npm-debug.log*
+docs/qa/qa-automation/target/
+docs/qa/qa-automation/auth-state.json
+
+## Test and AI Agent data
+test-results/
+playwright-report/
+.agents/
+.agent/
+_agents/
+_agent/
+
+## Worktrees
+.worktrees/
+.gitnexus
+
+## Vercel CLI (project link + pulled env files)
+.vercel/
+
+# Playwright auth state
+e2e/.auth/
+coverage/
+
+## Test harness output (Phase F01V test coverage)
+.harness-out/
+
+## Claude / ClaudeKit ephemeral runtime artifacts
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/session-state/
+.claude/hooks/.logs/
+.claude/settings.local.json
+
+## MCP / tool caches (local per dev)
+.serena/
+.wiki-repo/
+.env*.local
+.gstack/

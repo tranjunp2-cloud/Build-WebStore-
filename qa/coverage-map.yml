@@ -1,0 +1,175 @@
+# v1 is intentionally conservative: maps source change paths directly to active CMS targets.
+version: 1
+defaultForUnmappedProductionPath:
+  status: unmapped
+  action: create_coverage_gap
+  owner: qa-lead
+rules:
+  - {
+      source: "src/app/(auth)/**",
+      targets: [identity-login-otp, identity-password-recovery, identity-sso-session, identity-staff-invitation],
+      evidence: [docs/qa/F02-auth.md],
+    }
+  - {
+      source: "src/app/(builder)/**",
+      targets:
+        [
+          builder-generate-site,
+          builder-draft-recovery,
+          builder-preview-completion,
+          builder-variety-template-apply,
+          builder-url-scraper-import,
+        ],
+      evidence: [docs/qa/F01-ai-chat-builder.md],
+    }
+  - {
+      source: "src/app/(editor)/**",
+      targets:
+        [
+          editor-load-and-tenant-access,
+          editor-block-content,
+          editor-pages-navigation,
+          editor-publish-lifecycle,
+          editor-productgrid-variants,
+          editor-seo-local-business,
+        ],
+      evidence: [docs/qa/F05-ai-editor-testcases.md],
+    }
+  - {
+      source: "src/app/(dashboard)/products/**",
+      targets:
+        [
+          products-list-search-filter,
+          products-crud-publish-guard,
+          products-variants-inventory,
+          products-bulk-create,
+          product-categories,
+          products-ai-description,
+        ],
+      evidence: [docs/qa/F08-product-crud.md],
+    }
+  - {
+      source: "src/app/(dashboard)/orders/**",
+      targets:
+        [
+          orders-list-search-metrics,
+          order-payment-verification,
+          order-refund-cancel-retry,
+          order-fulfilment-self-delivery,
+          order-shipping-label,
+          order-tracking-stream,
+        ],
+      evidence: [docs/qa/F10-orders-management.md],
+    }
+  - {
+      source: "src/app/(dashboard)/settings/**",
+      targets:
+        [
+          payment-settings-manual,
+          stripe-connect-lifecycle,
+          xendit-connect-checkout,
+          shipping-rates-pickup-config,
+          easyparcel-oauth-lifecycle,
+          domains-custom-domain-primary,
+          email-template-management,
+          staff-rbac-management,
+        ],
+      evidence: [docs/qa/F13-payment-gateway.md],
+    }
+  - {
+      source: "src/app/sites/**",
+      targets:
+        [
+          public-page-routing,
+          storefront-product-discovery,
+          storefront-cart,
+          storefront-discount-checkout,
+          storefront-order-confirm-track,
+          storefront-blog-contact,
+          public-seo-discovery,
+          tenant-domain-routing,
+        ],
+      evidence: [docs/qa/F09-storefront-commerce.md],
+    }
+  - {
+      source: "src/app/api/orders/[id]/cancel/route.ts",
+      targets: [order-refund-cancel-retry],
+      evidence: [docs/qa/F10-orders-management.md, src/__tests__/api/orders-cancel.test.ts],
+    }
+  - {
+      source: "src/app/api/orders/**",
+      targets:
+        [
+          orders-list-search-metrics,
+          order-payment-verification,
+          order-refund-cancel-retry,
+          order-fulfilment-self-delivery,
+          order-shipping-label,
+          order-tracking-stream,
+          storefront-discount-checkout,
+        ],
+      evidence: [docs/qa/F10-orders-management.md],
+    }
+  - {
+      source: "src/app/api/seo/**",
+      targets:
+        [
+          editor-seo-local-business,
+          public-seo-discovery,
+          seo-tools-automation,
+          local-seo-gbp-map,
+          seo-rank-keyword-density,
+          tracking-analytics-config,
+        ],
+      evidence: [docs/qa/F37-local-seo.md],
+    }
+  - {
+      source: "src/app/api/shipping/**",
+      targets:
+        [
+          easyparcel-shipment-booking,
+          shipping-rate-calculator,
+          easyparcel-tracking-webhooks,
+          cod-eligibility-check,
+        ],
+      evidence: [docs/qa/F36-shipping.md],
+    }
+  - {
+      source: "src/app/api/blogs/**",
+      targets: [blog-post-management, blog-category-management, storefront-blog-contact],
+      evidence: [docs/qa/F12-blog.md],
+    }
+  - {
+      source: "src/app/api/discounts/**",
+      targets: [discount-rules-coupons, storefront-discount-checkout],
+      evidence: [docs/qa/F12-blog.md],
+    }
+  - {
+      source: "src/app/api/broadcasts/**",
+      targets: [broadcast-announcement-banner],
+      evidence: [docs/qa/F12-blog.md],
+    }
+  - {
+      source: "src/app/api/notifications/**",
+      targets: [shop-customers-directory, contact-lead-submissions, newsletter-subscription],
+      evidence: [docs/qa/F11-notifications.md],
+    }
+  - {
+      source: "src/app/api/subscriptions/**",
+      targets: [plan-subscription-billing, feature-guard-enforcement, payment-expiry-cron],
+      evidence: [docs/qa/F39-subscriptions.md],
+    }
+  - {
+      source: "src/app/api/webhooks/**",
+      targets: [webhook-contracts, easyparcel-tracking-webhooks, stripe-connect-lifecycle, xendit-connect-checkout],
+      evidence: [docs/qa/F13-payment-gateway.md, docs/qa/F14-shipping.md],
+    }
+  - {
+      source: "src/app/api/media/**",
+      targets: [media-library-upload],
+      evidence: [docs/qa/F14-media.md],
+    }
+governance:
+  precedence: most_specific_source_glob
+  exclusionsRequire: [reason, owner, expiry]
+  targetRetirement: retain_id_and_mark_deprecated

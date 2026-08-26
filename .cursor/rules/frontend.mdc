@@ -1,0 +1,114 @@
+---
+description: Next.js + Payload CMS frontend rules
+globs: src/**/*
+alwaysApply: false
+---
+
+# Frontend Rules (Next.js 15 + Payload CMS 3)
+
+## Server vs Client Components
+```
+Server Components (default):
+- Pages (app/**/page.tsx)
+- Layouts (app/**/layout.tsx)
+- Data fetching components
+- Payload CMS API calls
+
+Client Components ('use client'):
+- Interactive UI (drag-drop editor, modals, forms)
+- State management (zustand stores)
+- Browser APIs (localStorage, window)
+- Event handlers (onClick, onChange)
+```
+
+## Data Fetching Pattern (Server)
+```typescript
+// ✅ CORRECT: Payload Local API in Server Components
+import { getPayload } from 'payload'
+import config from '@/payload.config'
+
+export default async function SitePage({ params }: Props) {
+  const payload = await getPayload({ config })
+  const site = await payload.find({
+    collection: 'sites',
+    where: { tenant: { equals: tenantId } },
+  })
+  return <SiteRenderer site={site.docs[0]} />
+}
+```
+
+## Data Fetching Pattern (Client)
+```typescript
+// ✅ CORRECT: TanStack Query for client-side data
+import { useQuery, useMutation } from '@tanstack/react-query'
+
+export function useBlocks(pageId: string) {
+  return useQuery({
+    queryKey: ['blocks', pageId],
+    queryFn: () => fetch(`/api/pages/${pageId}`).then(r => r.json()),
+  })
+}
+
+export function useUpdateBlock() {
+  return useMutation({
+    mutationFn: (data: UpdateBlockDTO) =>
+      fetch(`/api/pages/${data.pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => toast.success('Block đã được cập nhật'),
+    onError: () => toast.error('Không thể cập nhật block. Thử lại'),
+  })
+}
+```
+
+## Component Pattern (3 States Required)
+```typescript
+export function BlockList({ pageId }: { pageId: string }) {
+  const { data, isLoading, isError, refetch } = useBlocks(pageId)
+
+  if (isLoading) return <BlockListSkeleton />
+
+  if (isError) return (
+    <Alert variant="destructive">
+      <AlertDescription>
+        Không thể tải blocks.{' '}
+        <Button variant="link" onClick={() => refetch()}>Thử lại</Button>
+      </AlertDescription>
+    </Alert>
+  )
+
+  if (!data?.length) return (
+    <EmptyState
+      icon={<LayoutGrid />}
+      title="Chưa có block nào"
+      description="Thêm block từ thư viện bên trái"
+      action={<Button>Thêm Block</Button>}
+    />
+  )
+
+  return <div>{data.map(b => <BlockEditor key={b.id} block={b} />)}</div>
+}
+```
+
+## Form Pattern (Zod + react-hook-form)
+```typescript
+const siteSettingsSchema = z.object({
+  name: z.string().min(1, 'Tên website không được trống'),
+  description: z.string().max(160, 'Mô tả tối đa 160 ký tự'),
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Mã màu không hợp lệ'),
+})
+
+type SiteSettings = z.infer<typeof siteSettingsSchema>
+```
+
+## Theme System
+- Global theme (colors, fonts) applies to entire tenant site
+- Per-block variant selection (not per-element styling)
+- CSS variables for theme tokens: `--primary`, `--font-heading`, `--font-body`
+- Dark/Light mode toggle via CSS variables, not duplicate styles
+
+## Payload CMS Admin Customization
+- Custom views go in `src/app/(payload)/admin/`
+- Custom components for blocks in `src/components/admin/`
+- Use Payload's `useField`, `useForm` hooks inside admin components

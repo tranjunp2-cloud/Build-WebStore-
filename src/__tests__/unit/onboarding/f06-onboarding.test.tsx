@@ -1,0 +1,377 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
+import '@testing-library/jest-dom'
+
+// ── Mocks ─────────────────────────────────────────────────────────────
+
+// Mock router. navMock.pathname is mutable so tests can simulate soft navigation
+// (change value + rerender) — the wizard reopens itself based on usePathname().
+const navMock = vi.hoisted(() => ({ pathname: '/dashboard' }))
+vi.mock('next/navigation', () => ({
+    useRouter: vi.fn(() => ({ push: vi.fn() })),
+    usePathname: vi.fn(() => navMock.pathname),
+}))
+
+// Mock Next.js Image to prevent warnings/errors during testing
+vi.mock('next/image', () => ({
+    default: (props: ComponentProps<'img'>) => {
+        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+        return <img {...props} />
+    }
+}))
+
+// Mock next/link
+vi.mock('next/link', () => ({
+    default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & ComponentProps<'a'>) => {
+        return (
+            <a href={href} {...rest}>
+                {children}
+            </a>
+        )
+    }
+}))
+
+// Mock i18n
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            onboarding: {
+                welcome: {
+                    title: "Welcome to Web Store",
+                    subtitle: "Start building your store. Complete it in just 5 minutes.",
+                    createStore: "Create My Store",
+                    skip: "Skip & Go to Dashboard",
+                    step: "Step 1 of 2: Create Store"
+                },
+                wizard: {
+                    title: "Discover the Power of AI",
+                    slides: {
+                        editor: { title: "AI Editor", description: "Design assist" },
+                        content: { title: "AI Content", description: "Write blog posts" },
+                        seo: { title: "AI SEO", description: "Improve rankings" }
+                    },
+                    footer: {
+                        skip: "Skip",
+                        skipInstructions: "Skip instructions",
+                        goBack: "Go back",
+                        continue: "Continue",
+                        explore: "Explore CMS"
+                    }
+                }
+            }
+        }
+    })
+}))
+
+// Mock Auth
+vi.mock('@/lib/auth', () => ({
+    getCurrentUser: vi.fn(),
+}))
+
+import { WelcomeScreenClient } from '@/app/(frontend)/onboarding/_components/WelcomeScreenClient'
+import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
+
+// ── TC-F06.02 & TC-F06.03: Welcome Screen ──────────────────────────────
+describe('WelcomeScreenClient', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('[TC-F06.02] Welcome Screen: Renders Create Store CTA with instant redirect to /builder/new', () => {
+        render(<WelcomeScreenClient />)
+        
+        const createStoreBtn = screen.getByText('Create My Store')
+        expect(createStoreBtn).toBeVisible()
+        
+        // Assert the Link wraps the text pointing to /builder/new
+        const createStoreLink = createStoreBtn.closest('a')
+        expect(createStoreLink).toHaveAttribute('href', '/builder/new')
+    })
+
+    it('[TC-F06.03] Welcome Screen: Bỏ qua Onboarding (Skip Path) Redirects to /dashboard', () => {
+        render(<WelcomeScreenClient />)
+
+        const skipBtn = screen.getByText('Skip & Go to Dashboard')
+        expect(skipBtn).toBeVisible()
+        
+        // Assert the Skip Link points to /dashboard
+        const skipLink = skipBtn.closest('a')
+        expect(skipLink).toHaveAttribute('href', '/dashboard')
+    })
+})
+
+// ── TC-F06.04 & F06.09: AI Discovery Wizard ─────────────────────────────
+describe('AIDiscoveryWizard', () => {
+    const originalFetch = global.fetch
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        navMock.pathname = '/dashboard'
+        document.body.style.overflow = ''
+        // Default Mock Fetch Implementation (Success)
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true })
+        })
+    })
+
+    afterEach(() => {
+        global.fetch = originalFetch
+    })
+
+    it('[TC-F06.04] Kích hoạt Wizard tự động tại Dashboard', () => {
+        // Arrange & Act: When component is rendered, isOpen is true by default
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Assert: Modal Title should be visible
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI Editor')).toBeVisible() // Slide 1
+    })
+
+    it('[TC-F06.09] Đóng Wizard & Patch Database Flag', async () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Find the Skip Button (to dismiss directly)
+        const skipBtn = screen.getByText('Skip instructions')
+        
+        // Act
+        fireEvent.click(skipBtn)
+
+        // Assert: It should trigger API (POST /api/user/dismiss-wizard)
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+                method: 'POST',
+                credentials: 'include',
+            }))
+        })
+        
+        // Output DOM does not contain the Wizard title anymore
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.12] Check trạng thái cho Legacy Users (Wizard Guard)', () => {
+        // NOTE: In the current architecture, AIDiscoveryWizard component unconditionally renders 
+        // if rendered directly. The logic (!user.has_seen_ai_wizard) is handled in app/(dashboard)/layout.tsx.
+        // This test simulates the Dashboard layout bypassing AIDiscoveryWizard for legacy users.
+        const mockDashboardLayoutLogic = (hasSeenWizard: boolean) => {
+            if (!hasSeenWizard) return <AIDiscoveryWizard userId="legacy" />
+            return <div data-testid="dashboard-content">Dashboard Content</div>
+        }
+
+        render(mockDashboardLayoutLogic(true))
+
+        // Assert legacy users do NOT see the wizard
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+        expect(screen.getByTestId('dashboard-content')).toBeVisible()
+    })
+
+    it('[TC-F06.20] X button đóng tạm — KHÔNG gọi API dismiss, vẫn phát wizard-closed', () => {
+        const wizardClosedSpy = vi.fn()
+        window.addEventListener('wizard-closed', wizardClosedSpy)
+
+        try {
+            render(<AIDiscoveryWizard userId="u-123" />)
+            fireEvent.click(screen.getByLabelText('Close'))
+
+            // Wizard UI closed
+            expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+            // PushOptInPrompt is still notified that the wizard UI is gone
+            expect(wizardClosedSpy).toHaveBeenCalledTimes(1)
+            // NO persistence — X must not touch /api/user/dismiss-wizard (GH #1609, refines #755)
+            expect(global.fetch).not.toHaveBeenCalled()
+        } finally {
+            window.removeEventListener('wizard-closed', wizardClosedSpy)
+        }
+    })
+
+    it('[TC-F06.21] Đóng ở slide 2/3 rồi quay lại /dashboard thì wizard mở lại tại slide 1; sau Skip thì ẩn hẳn', async () => {
+        vi.useFakeTimers()
+        const { rerender } = render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Move away from slide 1, then X-close while on /dashboard
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Content')).toBeVisible()
+        fireEvent.click(screen.getByLabelText('Close'))
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        // Navigate away — wizard stays hidden
+        navMock.pathname = '/orders'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        // Reopen is EXACT-match on /dashboard — a real sub-route must not trigger it
+        navMock.pathname = '/dashboard/settings'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        // Return to dashboard home — X was only a temporary close, wizard reopens at step 1
+        navMock.pathname = '/dashboard'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        expect(screen.queryByText('AI Content')).not.toBeInTheDocument()
+
+        // Slide 3 behaves the same — close temporary, reopen reset to step 1
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        fireEvent.click(screen.getByLabelText('Close'))
+        navMock.pathname = '/orders'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        navMock.pathname = '/dashboard'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        expect(screen.queryByText('AI SEO')).not.toBeInTheDocument()
+
+        vi.useRealTimers()
+
+        // Skip instructions — permanent dismissal, persisted to DB
+        fireEvent.click(screen.getByText('Skip instructions'))
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+                method: 'POST',
+                credentials: 'include',
+            }))
+        })
+
+        // Navigating away and back must NOT reopen it anymore
+        navMock.pathname = '/orders'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        navMock.pathname = '/dashboard'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.23] Body overflow là hidden khi wizard mở và restore sau khi đóng', () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        expect(document.body.style.overflow).toBe('hidden')
+
+        fireEvent.click(screen.getByLabelText('Close'))
+        expect(document.body.style.overflow).toBe('')
+    })
+
+    it('[TC-F06.22] Explore ở slide cuối cũng persist vĩnh viễn — không reopen khi quay lại /dashboard', () => {
+        vi.useFakeTimers()
+        const { rerender } = render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Walk all 3 slides to the final CTA
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Explore CMS'))
+
+        // Permanent dismissal — UI closed + persisted (fetch is called synchronously)
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+        expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+            method: 'POST',
+            credentials: 'include',
+        }))
+
+        // Returning to dashboard home must NOT reopen it
+        navMock.pathname = '/orders'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        navMock.pathname = '/dashboard'
+        rerender(<AIDiscoveryWizard userId="u-123" />)
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        vi.useRealTimers()
+    })
+
+    it('[TC-F06.19] Security Integrity - Unauthorized Patch Fallback', async () => {
+        // Arrange
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        
+        // Simulate a 403 Forbidden return from fetch API network call
+        global.fetch = vi.fn().mockImplementationOnce(() => Promise.reject(new Error('403 Forbidden')))
+
+        render(<AIDiscoveryWizard userId="unauthorized-user" />)
+        
+        // Find Skip button to trigger patch
+        const skipBtn = screen.getByText('Skip instructions')
+        
+        // Act
+        fireEvent.click(skipBtn)
+
+        // Assert: Fetch was called but caught by component's error handler
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalled()
+            expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to persist wizard dismiss state', expect.any(Error))
+        })
+        
+        consoleErrorSpy.mockRestore()
+    })
+
+    // Safety net: restore real timers if any test fails mid-execution
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('[TC-F06.05] Slide navigation: Continue advances to next slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI Content')).toBeVisible()
+    })
+
+    it('[TC-F06.07] Slide 3 shows Explore CTA instead of Continue', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to slide 3
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(screen.getByText('Explore CMS')).toBeVisible()
+        expect(screen.queryByText('Continue')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.08] Go back button navigates to previous slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Content')).toBeVisible()
+
+        fireEvent.click(screen.getByText('Go back'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Editor')).toBeVisible()
+    })
+
+    it('[BUG-F06-011] Swipe left on last slide does NOT dismiss wizard', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to last slide (slide 3)
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI SEO')).toBeVisible()
+
+        // Simulate swipe left on the modal container
+        const modal = screen.getByText('AI SEO').closest('[class*="touch-pan-y"]')!
+        fireEvent.touchStart(modal, { targetTouches: [{ clientX: 300 }] })
+        fireEvent.touchMove(modal, { targetTouches: [{ clientX: 100 }] })
+        fireEvent.touchEnd(modal)
+
+        // Wizard should still be open — NOT dismissed
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+})

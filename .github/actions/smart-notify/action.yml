@@ -1,0 +1,163 @@
+# Smart Notify — Bot API only
+#
+# Sends CI/deploy notifications via prime-bot-assistant.
+#
+# Previously this action had a direct-Lark-webhook fallback that posted
+# from a custom group bot identity ("PrimeWeb CI/CD") if the bot endpoint
+# was unreachable. The fallback caused a parallel notification path with
+# an inconsistent bot identity. It has been removed — prime-bot-assistant
+# is now the single sender for all CI/deploy notifications.
+#
+# If the bot endpoint fails, this action logs a warning and exits 0 — the
+# workflow continues, no Lark message is sent. Recovery: re-run the
+# workflow once the bot is back up, or check the bot's heartbeat cron.
+name: 'Smart Notify'
+description: 'Send notification via prime-bot-assistant /api/ci/notify'
+
+inputs:
+  bot-url:
+    description: 'Bot API base URL (e.g. https://bot.example.com)'
+    required: true
+  bot-secret:
+    description: 'Bot Bearer auth token (matches bot CRON_SECRET)'
+    required: true
+
+  # Deprecated inputs — kept so existing callers don't break. Ignored.
+  # Remove from caller workflows in a follow-up cleanup PR.
+  lark-webhook-url:
+    description: '[DEPRECATED] No longer used — fallback removed'
+    required: false
+    default: ''
+  lark-sign-key:
+    description: '[DEPRECATED] No longer used — fallback removed'
+    required: false
+    default: ''
+  staging-url:
+    description: '[DEPRECATED] No longer used'
+    required: false
+    default: ''
+
+  event:
+    description: 'Event type: ci_pass | ci_fail | deploy_success | deploy_fail'
+    required: true
+  project:
+    description: 'Project slug (used for bot routing)'
+    required: false
+    default: 'PrimeWeb'
+  branch:
+    description: 'Branch name'
+    required: true
+  environment:
+    description: 'Deploy environment: staging or production'
+    required: false
+    default: 'staging'
+  author:
+    description: 'GitHub actor who triggered the workflow'
+    required: true
+  commit-sha:
+    description: 'Commit SHA (short or full)'
+    required: false
+    default: ''
+  commit-msg:
+    description: 'Commit message (truncate to 80 chars)'
+    required: false
+    default: ''
+  pr-number:
+    description: 'PR number if applicable'
+    required: false
+    default: ''
+  pr-title:
+    description: 'PR title'
+    required: false
+    default: ''
+  pr-url:
+    description: 'PR URL'
+    required: false
+    default: ''
+  ci-status:
+    description: 'CI status line, e.g. "Lint ✅ TypeCheck ✅ Test ❌ Build ⬜"'
+    required: false
+    default: ''
+  failed-step:
+    description: 'Which CI step failed (e.g. "TypeCheck")'
+    required: false
+    default: ''
+  run-url:
+    description: 'GitHub Actions run URL'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Notify via prime-bot-assistant
+      shell: bash
+      env:
+        BOT_URL: ${{ inputs.bot-url }}
+        BOT_SECRET: ${{ inputs.bot-secret }}
+        EVENT: ${{ inputs.event }}
+        PROJECT: ${{ inputs.project }}
+        BRANCH: ${{ inputs.branch }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        AUTHOR: ${{ inputs.author }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        COMMIT_MSG: ${{ inputs.commit-msg }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        PR_TITLE: ${{ inputs.pr-title }}
+        PR_URL: ${{ inputs.pr-url }}
+        CI_STATUS: ${{ inputs.ci-status }}
+        FAILED_STEP: ${{ inputs.failed-step }}
+        RUN_URL: ${{ inputs.run-url }}
+      run: |
+        if [ -z "$BOT_URL" ] || [ -z "$BOT_SECRET" ]; then
+          echo "::warning::bot-url or bot-secret not configured — skipping notification"
+          exit 0
+        fi
+
+        # JSON-escape every field via jq so newlines, quotes, and backslashes
+        # in commit messages or PR titles can't break the payload.
+        PAYLOAD=$(jq -nc \
+          --arg event       "$EVENT" \
+          --arg project     "$PROJECT" \
+          --arg branch      "$BRANCH" \
+          --arg environment "$ENVIRONMENT" \
+          --arg author      "$AUTHOR" \
+          --arg commit_sha  "$COMMIT_SHA" \
+          --arg commit_msg  "$COMMIT_MSG" \
+          --arg pr_number   "$PR_NUMBER" \
+          --arg pr_title    "$PR_TITLE" \
+          --arg pr_url      "$PR_URL" \
+          --arg status_line "$CI_STATUS" \
+          --arg failed_step "$FAILED_STEP" \
+          --arg run_url     "$RUN_URL" \
+          '{
+            event:       $event,
+            project:     $project,
+            branch:      $branch,
+            environment: $environment,
+            author:      $author,
+            commit:      { sha: $commit_sha, message: $commit_msg },
+            pr:          (if $pr_number == "" then null else { number: $pr_number, title: $pr_title, url: $pr_url } end),
+            ci:          { statusLine: $status_line, failedStep: $failed_step },
+            github_run_url: $run_url
+          }')
+
+        echo "🤖 POST $BOT_URL/api/ci/notify (event=$EVENT project=$PROJECT branch=$BRANCH)"
+
+        HTTP_CODE=$(curl -sS -o /tmp/bot-response.json -w "%{http_code}" \
+          --max-time 15 \
+          --connect-timeout 5 \
+          -X POST "$BOT_URL/api/ci/notify" \
+          -H "Authorization: Bearer $BOT_SECRET" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD" 2>/dev/null || echo "000")
+
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+          echo "✅ Bot notification sent (HTTP $HTTP_CODE)"
+        else
+          echo "::warning::Bot returned HTTP $HTTP_CODE — notification not delivered"
+          echo "Response body:"
+          cat /tmp/bot-response.json 2>/dev/null || echo "(no response body)"
+          # Exit 0 anyway: don't fail the workflow over a missed notification.
+          exit 0
+        fi

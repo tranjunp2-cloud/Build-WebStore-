@@ -1,0 +1,283 @@
+/* ============================================================================
+   Items Table — .itab* classes
+   Ported from f36.css, design tokens mapped to --dash-* from order-detail.css.
+
+   Token mapping (mirrors order-detail.css):
+     --bg-surface-1  → var(--dash-secondary-bg)
+     --bg-surface-2  → var(--dash-surface)
+     --fg-1          → var(--dash-text)
+     --fg-3          → var(--dash-text-muted)
+     --fg-4          → var(--dash-text-muted)
+     --border-1      → var(--dash-border)
+     --border-2      → var(--dash-border)
+     --success-fg    → hsl(var(--success))
+   ============================================================================ */
+
+/* ── Table grid ──────────────────────────────────────────────────────────────── */
+/* 4-col: item cell (flex) · qty · weight · price
+   When weight is absent a 3-col variant is applied via .itab--no-weight */
+.itab {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.itab-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 68px 90px;
+  gap: 10px;
+  padding: 8px 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-text-muted);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.itab--no-weight .itab-head {
+  grid-template-columns: minmax(0, 1fr) 44px 90px;
+}
+
+.itab-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 68px 90px;
+  gap: 10px;
+  padding: 12px 2px;
+  align-items: center;
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.itab--no-weight .itab-row {
+  grid-template-columns: minmax(0, 1fr) 44px 90px;
+}
+
+.itab-row:last-of-type {
+  border-bottom: none;
+}
+
+/* ── Text alignment helpers ──────────────────────────────────────────────────── */
+.ta-c { text-align: center; }
+.ta-r { text-align: right; }
+
+/* ── Item cell (thumbnail + text stack) ─────────────────────────────────────── */
+.it-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Thumbnail — product image or monogram fallback */
+.it-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  position: relative;
+}
+
+.it-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Text block beside thumbnail */
+.it-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.it-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dash-text);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.it-sku {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--dash-text-muted);
+  letter-spacing: 0.01em;
+}
+
+.it-sku svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.it-attrs {
+  font-size: 11.5px;
+  color: var(--dash-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Qty / weight / price cells */
+.it-qty {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+.it-kg {
+  font-size: 12px;
+  color: var(--dash-text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.it-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dash-text);
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+
+/* ── Expand/collapse ─────────────────────────────────────────────────────────── */
+.itab-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: hsl(var(--info));
+  background: none;
+  border: none;
+  border-top: 1px solid var(--dash-border);
+  cursor: pointer;
+  width: 100%;
+  transition: color 0.14s;
+}
+
+.itab-more:hover {
+  color: hsl(var(--info) / 0.8);
+}
+
+.itab-more svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Summary block ───────────────────────────────────────────────────────────── */
+.itab-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--dash-border);
+}
+
+.is-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.is-k {
+  color: var(--dash-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-v {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--dash-text);
+  white-space: nowrap;
+}
+
+/* Voucher code chip */
+.is-voucher {
+  display: inline-block;
+  font-size: 10.5px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: hsl(var(--success) / 0.12);
+  color: hsl(var(--success));
+  border: 1px solid hsl(var(--success) / 0.25);
+  letter-spacing: 0.04em;
+}
+
+/* Voucher row value (green discount) */
+.is-row--voucher .is-v {
+  color: hsl(var(--success));
+}
+
+/* Grand total row */
+.is-total {
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--dash-border);
+}
+
+.is-total .is-k {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dash-text);
+}
+
+.is-total .is-v {
+  font-size: 16px;
+  font-weight: 800;
+  color: hsl(var(--primary));
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .itab-head,
+  .itab-row {
+    grid-template-columns: minmax(0, 1fr) 40px 80px;
+    gap: 8px;
+    padding: 10px 2px;
+  }
+
+  /* hide weight column on mobile (3rd column in 4-col variant) */
+  .itab-head span:nth-child(3),
+  .itab-row .it-kg {
+    display: none;
+  }
+
+  .itab--no-weight .itab-head,
+  .itab--no-weight .itab-row {
+    grid-template-columns: minmax(0, 1fr) 40px 80px;
+  }
+
+  .it-thumb {
+    width: 34px;
+    height: 34px;
+  }
+
+  .it-name { font-size: 12px; }
+  .it-sku  { font-size: 10px; }
+  .it-attrs { font-size: 10.5px; }
+}

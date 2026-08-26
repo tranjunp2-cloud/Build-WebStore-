@@ -1,0 +1,81 @@
+/**
+ * POST /api/sites/[siteId]/seed-images
+ * Seed gallery images from Unsplash → S3 for a site the current user owns.
+ * Awaits seed completion then returns the imageLibraryS3 map so the editor
+ * can push it into the iframe via postMessage (no iframe reload needed).
+ * Idempotent: if gallery slots are already seeded the seeder skips after one DB query.
+ */
+export const dynamic = 'force-dynamic'
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
+import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { seedImageLibraryForSite } from '@/lib/images/image-library-seeder'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+
+type TenantRef = string | number | { id: string | number } | null | undefined
+const resolveTenantId = (t: TenantRef): string | null =>
+    t == null ? null : String(typeof t === 'object' ? t.id : t)
+
+type SiteWithGenerationMetadata = {
+    siteType?: unknown
+    aiGenerationMetadata?: { originalPrompt?: unknown } | null
+    seo?: { trackedKeywords?: Array<{ keyword?: unknown }> } | null
+}
+
+function deriveProductTerms(site: SiteWithGenerationMetadata): string | null {
+    const originalPrompt =
+        site.aiGenerationMetadata &&
+            typeof site.aiGenerationMetadata === 'object' &&
+            typeof site.aiGenerationMetadata.originalPrompt === 'string'
+            ? site.aiGenerationMetadata.originalPrompt
+            : ''
+
+    const promptProducts = originalPrompt.split('|').at(-1)?.trim() ?? ''
+    const parsedProducts = parseProductsString(promptProducts)
+    if (parsedProducts.length > 0) return parsedProducts.join(' ')
+
+    const trackedKeywords = Array.isArray(site.seo?.trackedKeywords)
+        ? site.seo.trackedKeywords
+            .map((entry) => (typeof entry?.keyword === 'string' ? entry.keyword.trim() : ''))
+            .filter(Boolean)
+        : []
+
+    return trackedKeywords.length > 0 ? trackedKeywords.join(' ') : null
+}
+
+export async function POST(
+    _req: NextRequest,
+    { params }: { params: Promise<{ siteId: string }> },
+) {
+    const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { siteId } = await params
+    const payload = await getPayload({ config })
+
+    const site = await payload.findByID({ collection: 'sites', id: siteId, depth: 1 })
+    if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+
+    const siteTenantId = resolveTenantId(site.tenant as TenantRef)
+    const userTenants = (user as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+    if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const category = (site.siteType as string) || 'business'
+    const productTerms = deriveProductTerms(site as SiteWithGenerationMetadata)
+
+    // Await seed so we can return the S3 map immediately for postMessage live-update.
+    // Only gallery slots (~6 images, ~5–10s). Never throws.
+    await seedImageLibraryForSite(payload, siteTenantId, siteId, category,
+        (slot) => slot.startsWith('gallery'),
+        productTerms,
+    )
+
+    const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
+    return NextResponse.json({ ok: true, imageLibraryS3 })
+}

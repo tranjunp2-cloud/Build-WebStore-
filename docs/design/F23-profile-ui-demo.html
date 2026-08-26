@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F23 Account Settings — UI Demo (matches real code)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/*
+  F23 Personal Profile / Account Settings — faithful reproduction of the real dashboard UI.
+  Source of truth:
+    src/app/(dashboard)/settings/profile/_components/*
+    src/i18n/locales/en.json  (profile.*)
+    src/app/globals.css        (.dark token block)
+  Dark theme tokens (from globals.css .dark):
+    --background #0B1120  --card #161E2E  --secondary #1F2937  --border #2A3645
+    --foreground #FFFFFF  --muted-foreground #9CA3AF
+    --primary (teal) #2DD4BF   --info (blue) #3B82F6   --destructive #EF4444
+  dashPrimary button = linear-gradient(90deg,#3b82f6,#2dd4bf); white text.
+*/
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --background:#0B1120;--card:#161E2E;--secondary:#1F2937;--border:#2A3645;
+  --foreground:#FFFFFF;--muted:#9CA3AF;--primary:#2DD4BF;--info:#3B82F6;
+  --destructive:#EF4444;--radius:8px;--font:'Inter',system-ui,sans-serif;
+  --dash-primary:linear-gradient(90deg,#3B82F6 0%,#2DD4BF 100%);
+}
+body{font-family:var(--font);background:var(--background);color:var(--foreground);min-height:100vh}
+
+/* === TOP BAR (dashboard chrome, context only) === */
+.topbar{height:64px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50}
+.brand{font-size:18px;font-weight:800;background:var(--dash-primary);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-avatar{width:36px;height:36px;border-radius:50%;background:var(--info);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff}
+.topbar-name{font-size:14px;font-weight:500}
+
+/* === DEMO CONTROL BAR === */
+.demo-wrap{max-width:940px;margin:0 auto;padding:24px}
+.demo-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;flex-wrap:wrap;gap:12px}
+.demo-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.role-toggle{display:flex;gap:4px;background:var(--secondary);border-radius:8px;padding:3px}
+.role-btn{padding:6px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font);background:transparent;color:var(--muted)}
+.role-btn.active{background:var(--dash-primary);color:#fff}
+
+/* === PAGE ROOT (AccountSettingsClient: flex-col gap-8) === */
+.page{display:flex;flex-direction:column;gap:32px}
+.page-h1{font-size:32px;font-weight:900;letter-spacing:-0.9px;line-height:40px}
+
+/* === PROFILE BANNER === */
+/* Compact banner: small avatar + name/tag inline on one center line (was a tall social-profile block) */
+.banner{background:var(--background);border:1px solid var(--border);border-radius:16px;padding:16px 20px;display:flex;align-items:center;gap:16px;overflow:hidden;width:100%}
+.banner-avatar{position:relative;flex-shrink:0}
+.avatar-circle{position:relative;width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--info);box-shadow:0 0 0 3px rgba(59,130,246,.3);background-size:cover;background-position:center}
+.avatar-initial{font-size:30px;font-weight:600;color:#fff;line-height:1;user-select:none}
+.avatar-cam{position:absolute;bottom:-2px;right:-2px;z-index:2;background:var(--primary);border-radius:10px;padding:5px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 6px -1px rgba(0,0,0,.2);transition:opacity .2s}
+.avatar-cam:hover{opacity:.9}
+.avatar-cam svg{width:11px;height:11px;color:#0B1120}
+.banner-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.banner-name-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner-name{font-size:22px;font-weight:700;letter-spacing:-0.4px;line-height:28px}
+.role-badge{background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.2);padding:5px 13px;border-radius:12px;flex-shrink:0}
+.role-badge span{color:var(--primary);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+.banner-email{font-size:16px;color:var(--muted)}
+
+/* === STAFF SINGLE-PAGE (stacked section cards) === */
+.staff-view{display:flex;flex-direction:column;gap:24px}
+/* Each concern is its own bordered card, stacked vertically */
+.staff-view #panel-general,
+.staff-view #panel-security{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+.section-head{display:flex;flex-direction:column;gap:2px;margin-bottom:20px}
+.section-title{font-size:18px;font-weight:700;line-height:24px}
+.section-sub{font-size:13px;color:var(--muted)}
+/* Collapsed password state — static summary + outline trigger */
+.pw-collapsed{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.pw-collapsed-text{font-size:14px;color:var(--muted)}
+.btn-outline{height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--foreground);font-size:14px;font-weight:500;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s}
+.btn-outline:hover{background:rgba(255,255,255,.05)}
+/* In-card save bar sits inside the card (transparent, no floating surface) */
+.staff-view .action-bar{background:transparent;padding:0;height:auto;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+
+/* === FORMS === */
+.form{display:flex;flex-direction:column;gap:24px;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.field{display:flex;flex-direction:column;gap:8px}
+.label{font-size:14px;font-weight:500;color:var(--muted);line-height:22px}
+/* Field mirrors <Input> primitive: bg=--card, border=--input-border (#2A3645, = --border in dark), focus ring=--ring (teal) */
+.input{height:48px;border-radius:8px;padding:0 12px;font-size:14px;color:var(--foreground);font-family:var(--font);background:var(--card);border:1px solid var(--border);box-shadow:0 1px 1px rgba(0,0,0,.1);transition:border-color .2s,box-shadow .2s;width:100%}
+.input::placeholder{color:var(--muted)}
+.input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+/* Read-only email: matches real field — secondary bg + not-allowed cursor, text stays --foreground (no off-token dimming) */
+.input.readonly{background:var(--secondary);cursor:not-allowed}
+/* Lock affordance for read-only fields (email is login identity — not editable) */
+.field-lock{position:relative}
+.field-lock .input{padding-right:38px}
+.field-lock .lock-ic{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted);pointer-events:none}
+.input.err{border-color:var(--destructive)}
+.field-err{font-size:12px;color:var(--destructive)}
+.email-helper{font-size:10px;font-style:italic;color:var(--muted);letter-spacing:1px}
+
+/* Phone input */
+.phone-row{display:flex;gap:8px;width:100%}
+.phone-code{height:48px;border-radius:8px;padding:0 8px;background:var(--card);border:1px solid var(--border);box-shadow:0 1px 1px rgba(0,0,0,.1);color:var(--foreground);font-family:var(--font);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;-webkit-appearance:none;appearance:none;flex-shrink:0}
+.phone-code:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.phone-num{flex:1}
+
+/* Password field (eye toggle on the right; no left lock icon — that reads as disabled) */
+.pw-wrap{position:relative}
+.pw-wrap .input{padding-right:40px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color .2s,background .2s}
+.pw-eye:hover{color:var(--foreground);background:rgba(255,255,255,.05)}
+.pw-eye svg{width:16px;height:16px}
+
+/* Password rules checklist (horizontal) */
+.pw-rules{display:flex;gap:24px;flex-wrap:wrap}
+.pw-rule{display:flex;align-items:center;gap:8px}
+.pw-rule svg{width:16px;height:16px;flex-shrink:0}
+.pw-rule .txt{font-size:12px}
+.pw-rule.met svg{color:var(--primary)}
+.pw-rule.met .txt{color:var(--primary)}
+.pw-rule.unmet svg{color:var(--muted)}
+.pw-rule.unmet .txt{color:var(--muted)}
+
+/* Dirty action bar */
+.action-bar{display:none;align-items:center;justify-content:flex-end;gap:12px;height:72px;background:rgba(11,17,32,.5);border-radius:12px;padding:0 24px;margin-top:8px}
+.action-bar.show{display:flex}
+.btn{height:48px;border-radius:10px;padding:0 10px;font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;transition:opacity .2s,background .2s}
+.btn svg{width:16px;height:16px}
+.btn-primary{background:var(--dash-primary);color:#fff;font-weight:600}
+.btn-primary:hover{opacity:.9}
+.btn-secondary{background:transparent;color:var(--foreground);border:1px solid var(--border)}
+.btn-secondary:hover{background:rgba(255,255,255,.05)}
+.btn-save{min-width:150px}
+.btn-update{min-width:187px}
+
+/* === OWNER SINGLE-PAGE VIEW (SSO-protected, view-only) === */
+/* 2-col: left profile card (2/3) merges identity + read-only info, right SSO widget (1/3) */
+.owner-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;align-items:stretch}
+
+/* Left: identity + read-only info in ONE card (no input boxes, no lock icons) */
+.owner-profile-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:24px}
+/* Identity row: small avatar + name + role tag */
+.owner-id{display:flex;align-items:center;gap:16px}
+.owner-id-avatar{position:relative;flex-shrink:0;width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--info);box-shadow:0 0 0 3px rgba(59,130,246,.3);background-size:cover;background-position:center}
+.owner-id-avatar .init{font-size:30px;font-weight:600;color:#fff;line-height:1;user-select:none}
+.owner-id-meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+.owner-id-name{font-size:22px;font-weight:700;letter-spacing:-0.4px;line-height:28px}
+/* Read-only info as plain text (label above, value below) — no boxes, no locks.
+   Divider = border-top; 24px above (card gap) + 24px below (padding-top) for breathing room. */
+.owner-fields{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:24px;border-top:1px solid var(--border)}
+.owner-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.owner-field.full{grid-column:1 / -1}
+/* Label dimmer than value → data reads as the primary info */
+.owner-field-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);opacity:.6}
+.owner-field-value{font-size:15px;font-weight:500;color:var(--foreground);line-height:22px;word-break:break-word}
+.owner-field-value.mask{letter-spacing:2px;color:var(--muted)}
+/* 2FA plain status tag — green text + dot, no box */
+.status-badge{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
+.status-badge.on{color:#22C55E}
+.status-badge .dot{width:8px;height:8px;border-radius:50%;background:#22C55E;flex-shrink:0}
+
+/* Unified SSO widget (sidebar) */
+.sso-widget{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px}
+.sso-widget-icon{width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;color:var(--info)}
+.sso-widget-icon svg{width:22px;height:22px}
+.sso-widget-title{font-size:18px;font-weight:700;line-height:24px}
+.sso-widget-desc{font-size:13px;color:var(--muted);line-height:20px}
+.btn-sso-cta{width:100%;height:48px;margin-top:auto;border-radius:10px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--info);color:#fff;border:none;transition:opacity .2s}
+.btn-sso-cta:hover{opacity:.9}
+.btn-sso-cta svg{width:16px;height:16px}
+
+/* === TOAST (sonner-style) === */
+.toast-region{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:200}
+.toast{padding:14px 18px;border-radius:10px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);box-shadow:0 10px 25px rgba(0,0,0,.4);transform:translateY(12px);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);min-width:260px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--primary)}
+.toast.success .toast-ico{color:var(--primary)}
+.toast.error{border-color:var(--destructive)}
+.toast.error .toast-ico{color:var(--destructive)}
+.toast-ico{width:18px;height:18px;flex-shrink:0}
+
+@media(max-width:768px){
+  .demo-wrap{padding:16px}
+  .grid2{grid-template-columns:1fr}
+  .banner{flex-direction:column;text-align:center;padding:24px 16px;gap:20px}
+  .banner-info{align-items:center}
+  .banner-name-row{justify-content:center}
+  .topbar-name{display:none}
+  .demo-bar{flex-direction:column;align-items:stretch}
+  .owner-grid{grid-template-columns:1fr}
+  .owner-fields{grid-template-columns:1fr}
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .25s ease}
+</style>
+</head>
+<body>
+
+<!-- Dashboard chrome (context only — not part of F23) -->
+<header class="topbar">
+  <span class="brand">PrimeWeb</span>
+  <div class="topbar-right">
+    <div class="topbar-avatar" id="chromeAvatar">N</div>
+    <span class="topbar-name" id="chromeName">Nguyen Van A</span>
+  </div>
+</header>
+
+<div class="demo-wrap">
+
+  <!-- DEMO ROLE SWITCH -->
+  <div class="demo-bar">
+    <div>
+      <div class="demo-label">Demo · Role Switch</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">Staff = editable forms · Owner = SSO-managed (read-only guard)</div>
+    </div>
+    <div class="role-toggle">
+      <button class="role-btn active" data-role="staff" onclick="setRole('staff')">Staff</button>
+      <button class="role-btn" data-role="owner" onclick="setRole('owner')">Owner</button>
+    </div>
+  </div>
+
+  <!-- ============ AccountSettingsClient ============ -->
+  <div class="page">
+    <h1 class="page-h1">Account Settings</h1>
+
+    <!-- ProfileBanner -->
+    <div class="banner fade-in">
+      <div class="banner-avatar">
+        <div class="avatar-circle" id="avatarCircle">
+          <span class="avatar-initial" id="avatarInitial">N</span>
+        </div>
+        <button class="avatar-cam" title="Click to upload avatar" onclick="document.getElementById('avatarFile').click()" aria-label="Click to upload avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+        </button>
+        <input type="file" id="avatarFile" accept="image/jpeg,image/png" hidden onchange="handleAvatar(event)">
+      </div>
+      <div class="banner-info">
+        <div class="banner-name-row">
+          <span class="banner-name" id="bannerName">Nguyen Van A</span>
+          <div class="role-badge"><span id="roleBadge">Staff</span></div>
+        </div>
+        <!-- Email under the name — shown for both Staff and Owner. -->
+        <span class="banner-email" id="bannerEmail">staff@primecommerce.asia</span>
+        <!-- NOTE for Dev: the old "Active Now" status + banner phone were removed.
+             "Active Now" was hard-coded (always green regardless of real presence) → drop it, don't ship a fake status. -->
+      </div>
+    </div>
+
+    <!-- Staff: single-page, two stacked section cards (no tabs) -->
+    <div class="staff-view">
+
+      <!-- ===== CARD: General Info ===== -->
+      <div id="panel-general">
+        <div class="section-head">
+          <span class="section-title">Personal Information</span>
+          <span class="section-sub">Your name and contact details.</span>
+        </div>
+
+        <!-- Staff: editable form -->
+        <form id="generalStaff" class="form fade-in" onsubmit="return false">
+          <div class="grid2">
+            <div class="field">
+              <label class="label">First Name</label>
+              <input class="input" id="fnInput" value="Nguyen" oninput="markGeneralDirty()">
+              <p class="field-err" id="fnErr" style="display:none">First name must be 2–50 characters</p>
+            </div>
+            <div class="field">
+              <label class="label">Last Name</label>
+              <input class="input" id="lnInput" value="Van A" oninput="markGeneralDirty()">
+              <p class="field-err" id="lnErr" style="display:none">Last name must be 2–50 characters</p>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label class="label">Email Address</label>
+              <div class="field-lock">
+                <input class="input readonly" value="staff@primecommerce.asia" readonly disabled>
+                <svg class="lock-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <p class="email-helper">Email cannot be changed (Login identity)</p>
+            </div>
+            <div class="field">
+              <label class="label">Phone Number</label>
+              <div class="phone-row">
+                <select class="phone-code" id="phoneCode" onchange="markGeneralDirty()">
+                  <option value="+60">🇲🇾 +60 MY</option>
+                  <option value="+84">🇻🇳 +84 VN</option>
+                </select>
+                <input class="input phone-num" id="phoneNum" type="tel" inputmode="numeric" value="123456789" placeholder="123456789" oninput="onPhoneInput()">
+              </div>
+              <p class="field-err" id="phoneErr" style="display:none">Please enter a valid phone number</p>
+            </div>
+          </div>
+
+          <!-- Action bar — only when dirty -->
+          <div class="action-bar" id="generalActions">
+            <button type="button" class="btn btn-secondary" onclick="resetGeneral()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary btn-save" onclick="saveGeneral()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Save Change
+            </button>
+          </div>
+        </form>
+
+      </div>
+
+      <!-- ===== CARD: Security ===== -->
+      <div id="panel-security">
+        <div class="section-head">
+          <span class="section-title">Password &amp; Security</span>
+        </div>
+
+        <!-- Collapsed state (default): static summary + trigger. Keeps the page short & clean. -->
+        <div id="pwCollapsed" class="pw-collapsed">
+          <span class="pw-collapsed-text">Password was last changed 3 months ago.</span>
+          <button type="button" class="btn-outline" onclick="expandPassword()">Change Password</button>
+        </div>
+
+        <!-- Staff: password change form (hidden until "Change Password") -->
+        <form id="securityStaff" class="form fade-in" onsubmit="return false" style="display:none">
+          <!-- Current password (full width) -->
+          <div class="field">
+            <label class="label">Current Password</label>
+            <div class="pw-wrap">              <input class="input" id="curPw" type="password" autocomplete="current-password" oninput="markSecurityDirty()">
+              <button type="button" class="pw-eye" onclick="togglePw('curPw',this)" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <p class="field-err" id="curPwErr" style="display:none">Current password is incorrect</p>
+          </div>
+
+          <!-- New + confirm (2-col) -->
+          <div class="grid2">
+            <div class="field">
+              <label class="label">New Password</label>
+              <div class="pw-wrap">                <input class="input" id="newPw" type="password" autocomplete="new-password" oninput="onNewPw()">
+                <button type="button" class="pw-eye" onclick="togglePw('newPw',this)" aria-label="Show password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <p class="field-err" id="newPwErr" style="display:none">New password must differ from current password</p>
+            </div>
+            <div class="field">
+              <label class="label">Confirm New Password</label>
+              <div class="pw-wrap">                <input class="input" id="confPw" type="password" autocomplete="new-password" oninput="markSecurityDirty()">
+                <button type="button" class="pw-eye" onclick="togglePw('confPw',this)" aria-label="Show password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <p class="field-err" id="confPwErr" style="display:none">Passwords do not match</p>
+            </div>
+          </div>
+
+          <!-- Password rules (horizontal checklist) -->
+          <div class="pw-rules">
+            <div class="pw-rule unmet" id="ruleLen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-x"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-check" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="txt">At least 8 characters</span>
+            </div>
+            <div class="pw-rule unmet" id="ruleUpper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-x"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-check" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="txt">One uppercase letter</span>
+            </div>
+            <div class="pw-rule unmet" id="ruleNum">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-x"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-check" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="txt">One number</span>
+            </div>
+          </div>
+
+          <!-- Action bar — only when dirty -->
+          <div class="action-bar" id="securityActions">
+            <button type="button" class="btn btn-secondary" onclick="resetSecurity()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary btn-update" onclick="changePassword()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Update Password
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- ============ OWNER SINGLE-PAGE VIEW (view-only / SSO-protected) ============ -->
+    <!-- Replaces the two "stub" tabs for Owner: transparent read-only info + one clear exit to SSO. -->
+    <div id="ownerView" style="display:none">
+      <div class="owner-grid">
+
+        <!-- LEFT: identity + read-only info in ONE card (plain text, no boxes/locks) -->
+        <div class="owner-profile-card fade-in">
+          <!-- Identity: small avatar + name + role tag -->
+          <div class="owner-id">
+            <div class="owner-id-avatar"><span class="init" id="ov-init">J</span></div>
+            <div class="owner-id-meta">
+              <div class="banner-name-row">
+                <span class="owner-id-name" id="ov-name">Jun Tran-02</span>
+                <div class="role-badge"><span>Owner</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Read-only info as plain text -->
+          <div class="owner-fields">
+            <div class="owner-field">
+              <span class="owner-field-label">Email Address</span>
+              <span class="owner-field-value" id="ov-email">juntran02@yopmail.com</span>
+            </div>
+            <div class="owner-field">
+              <span class="owner-field-label">Phone Number</span>
+              <span class="owner-field-value" id="ov-phone">094448462579</span>
+            </div>
+            <div class="owner-field">
+              <span class="owner-field-label">Password</span>
+              <span class="owner-field-value mask">••••••••••••</span>
+            </div>
+            <div class="owner-field">
+              <span class="owner-field-label">Two-Factor Authentication (2FA)</span>
+              <span class="status-badge on"><span class="dot"></span>Enabled</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Unified SSO widget -->
+        <aside class="sso-widget fade-in">
+          <div class="sso-widget-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3 class="sso-widget-title">Account Managed by SSO</h3>
+          <p class="sso-widget-desc">Your personal profile fields, password, and security configurations are managed centrally by the Single Sign-On system. Changes made there will sync here automatically.</p>
+          <button class="btn-sso-cta" onclick="openSSO()">
+            Go to SSO Portal
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-region" id="toastRegion"></div>
+
+<script>
+/* Demo state mirrors AccountSettingsClient: role decides staff-form vs owner-SSO-guard.
+   Values are demo placeholders; behavior/validation mirrors src/lib/profile/schemas.ts. */
+const DATA = {
+  staff: { first:'Nguyen', last:'Van A', name:'Nguyen Van A', email:'staff@primecommerce.asia', initial:'N', code:'+60', num:'123456789' },
+  owner: { first:'Jun', last:'Tran-02', name:'Jun Tran-02', email:'juntran02@yopmail.com', initial:'J', phone:'094448462579' },
+};
+let role = 'staff';
+
+function setRole(r){
+  role = r;
+  const d = DATA[r], isOwner = r === 'owner';
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.toggle('active', b.dataset.role === r));
+
+  // Banner
+  document.getElementById('avatarInitial').textContent = d.initial;
+  const ac = document.getElementById('avatarCircle');
+  ac.style.backgroundImage = ''; document.getElementById('avatarInitial').style.display = '';
+  document.getElementById('bannerName').textContent = d.name;
+  document.getElementById('bannerEmail').textContent = d.email;
+  document.getElementById('roleBadge').textContent = isOwner ? 'Owner' : 'Staff';
+  document.getElementById('chromeAvatar').textContent = d.initial;
+  document.getElementById('chromeName').textContent = d.name;
+
+  document.getElementById('bannerEmail').style.display = 'block';
+
+  if (isOwner) {
+    // Owner: read-only view. Identity lives inside the left card, so hide the top banner.
+    document.querySelector('.banner').style.display = 'none';
+    document.getElementById('ownerView').style.display = 'block';
+    document.querySelector('.staff-view').style.display = 'none';
+    document.getElementById('ov-init').textContent = d.initial;
+    document.getElementById('ov-name').textContent = d.name;
+    document.getElementById('ov-email').textContent = d.email;
+    document.getElementById('ov-phone').textContent = d.phone;
+    return;
+  }
+
+  // Staff: single-page editable view (two stacked section cards) with the top banner.
+  document.querySelector('.banner').style.display = 'flex';
+  document.getElementById('ownerView').style.display = 'none';
+  document.querySelector('.staff-view').style.display = 'flex';
+  document.getElementById('fnInput').value = d.first;
+  document.getElementById('lnInput').value = d.last;
+  document.getElementById('phoneCode').value = d.code;
+  document.getElementById('phoneNum').value = d.num;
+
+  resetGeneral(); resetSecurity();
+}
+
+/* ---- General Info (staff) ---- */
+function markGeneralDirty(){ document.getElementById('generalActions').classList.add('show'); }
+function onPhoneInput(){
+  // Mirror PhoneInput: strip non-digits
+  const el = document.getElementById('phoneNum');
+  el.value = el.value.replace(/\D/g,'');
+  markGeneralDirty();
+}
+function saveGeneral(){
+  clearErr(['fnInput','fnErr','lnInput','lnErr','phoneNum','phoneErr']);
+  let ok = true;
+  const fn = document.getElementById('fnInput').value.trim();
+  const ln = document.getElementById('lnInput').value.trim();
+  const num = document.getElementById('phoneNum').value.trim();
+  // schema: firstName/lastName min2 max50
+  if (fn.length < 2 || fn.length > 50){ showErr('fnInput','fnErr'); ok = false; }
+  if (ln.length < 2 || ln.length > 50){ showErr('lnInput','lnErr'); ok = false; }
+  // schema: phone = +code + 8..15 digits (full E.164)  → require 8..15 digits after code
+  if (num && !/^\d{8,15}$/.test(num)){ showErr('phoneNum','phoneErr'); ok = false; }
+  if (!ok) return;
+  toast('Profile updated','success');
+  document.getElementById('generalActions').classList.remove('show');
+}
+function resetGeneral(){
+  const d = DATA[role];
+  document.getElementById('fnInput').value = d.first;
+  document.getElementById('lnInput').value = d.last;
+  document.getElementById('phoneCode').value = d.code;
+  document.getElementById('phoneNum').value = d.num;
+  clearErr(['fnInput','fnErr','lnInput','lnErr','phoneNum','phoneErr']);
+  document.getElementById('generalActions').classList.remove('show');
+}
+
+/* ---- Security (staff) ---- */
+function markSecurityDirty(){ document.getElementById('securityActions').classList.add('show'); }
+function expandPassword(){
+  // Collapsed summary → reveal the 3-field form; focus current password.
+  document.getElementById('pwCollapsed').style.display = 'none';
+  document.getElementById('securityStaff').style.display = 'flex';
+  document.getElementById('curPw').focus();
+}
+function collapsePassword(){
+  // Back to the clean default: hide form, show summary row.
+  document.getElementById('securityStaff').style.display = 'none';
+  document.getElementById('pwCollapsed').style.display = 'flex';
+}
+function onNewPw(){
+  markSecurityDirty();
+  const pw = document.getElementById('newPw').value;
+  setRule('ruleLen',   pw.length >= 8);
+  setRule('ruleUpper', /[A-Z]/.test(pw));
+  setRule('ruleNum',   /\d/.test(pw));
+}
+function setRule(id, met){
+  const el = document.getElementById(id);
+  el.classList.toggle('met', met);
+  el.classList.toggle('unmet', !met);
+  el.querySelector('.ico-check').style.display = met ? 'block' : 'none';
+  el.querySelector('.ico-x').style.display = met ? 'none' : 'block';
+}
+function changePassword(){
+  clearErr(['curPw','curPwErr','newPw','newPwErr','confPw','confPwErr']);
+  let ok = true;
+  const cur = document.getElementById('curPw').value;
+  const np  = document.getElementById('newPw').value;
+  const cf  = document.getElementById('confPw').value;
+  if (!cur){ showErr('curPw','curPwErr','Please enter your current password'); ok = false; }
+  // schema: min8 + uppercase + number
+  if (np.length < 8 || !/[A-Z]/.test(np) || !/\d/.test(np)){
+    showErr('newPw','newPwErr','Password does not meet the requirements'); ok = false;
+  } else if (cur && np === cur){
+    showErr('newPw','newPwErr','New password must differ from current password'); ok = false;
+  }
+  if (!cf || np !== cf){ showErr('confPw','confPwErr'); ok = false; }
+  if (!ok) return;
+  toast('Password changed successfully','success');
+  resetSecurity();
+}
+function resetSecurity(){
+  ['curPw','newPw','confPw'].forEach(id => document.getElementById(id).value = '');
+  clearErr(['curPw','curPwErr','newPw','newPwErr','confPw','confPwErr']);
+  setRule('ruleLen',false); setRule('ruleUpper',false); setRule('ruleNum',false);
+  document.getElementById('securityActions').classList.remove('show');
+  collapsePassword();   // Cancel / success / role-switch → back to collapsed summary
+}
+
+/* ---- Shared ---- */
+function togglePw(id, btn){
+  const inp = document.getElementById(id);
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  btn.innerHTML = showing
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-7-10-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+}
+function handleAvatar(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  // schema: AVATAR_ALLOWED_MIME = jpeg/png, AVATAR_MAX_BYTES = 2MB
+  if (!['image/jpeg','image/png'].includes(file.type)){ toast('Avatar must be JPG or PNG','error'); e.target.value=''; return; }
+  if (file.size > 2*1024*1024){ toast('Avatar must be 2MB or smaller','error'); e.target.value=''; return; }
+  const url = URL.createObjectURL(file);
+  const ac = document.getElementById('avatarCircle');
+  ac.style.backgroundImage = `url(${url})`;
+  document.getElementById('avatarInitial').style.display = 'none';
+  toast('Click to upload avatar','success');
+  e.target.value = '';
+}
+function openSSO(){ toast('Opening SSO portal…','success'); }
+
+function showErr(inputId, errId, msg){
+  document.getElementById(inputId).classList.add('err');
+  const e = document.getElementById(errId);
+  if (msg) e.textContent = msg;
+  e.style.display = 'block';
+}
+function clearErr(ids){
+  for (let i=0;i<ids.length;i+=2){
+    document.getElementById(ids[i]).classList.remove('err');
+    document.getElementById(ids[i+1]).style.display = 'none';
+  }
+}
+function toast(msg, type){
+  const region = document.getElementById('toastRegion');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const ico = type === 'success'
+    ? '<svg class="toast-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+    : '<svg class="toast-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+  el.innerHTML = ico + `<span>${msg}</span>`;
+  region.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+}
+
+setRole('staff');
+</script>
+</body>
+</html>

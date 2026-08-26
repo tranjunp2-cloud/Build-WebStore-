@@ -1,0 +1,779 @@
+/**
+ * Phase 05 (plan 260703-1341-gen-perf-async-parallel) — parallel GPT split.
+ * Splits the single mega-call (home + 4 subpages in one JSON response, ~60-80s)
+ * into 3 parallel calls: home ∥ subpages batch 1 (About+Services) ∥ batch 2
+ * (Contact+Blog). Wall-clock drops to ~max of the three. Started as a 2-call
+ * split, escalated per plan after measurement showed the 4-subpage call was
+ * the long pole and could produce incomplete output. Behind env flag
+ * GEN_PARALLEL_PAGES — default ON; setting it to false restores the single-call path.
+ *
+ * Brand consistency (palette/tone/CTA labels) is already shared automatically
+ * because both calls reuse the SAME base systemPrompt + userPromptText. Only
+ * nav labels can diverge between two independent completions — `buildBrief`
+ * resolves them deterministically (when known) and both prompts inject them.
+ */
+
+import type OpenAI from 'openai'
+import { getNavLabels, hasDedicatedStrings, type NavLabels } from './block-i18n'
+import { selectModel } from './config'
+import { buildNavigation } from './template-composer'
+import { normalizeComposerCategory } from './composer-category-resolver'
+import type { BusinessSample } from './content/types'
+import { composeTemplateResult } from './fallback-adapter'
+import type { BusinessInfoInput } from './system-prompt'
+import type { GenerationResult } from './generate-blocks'
+import { logAiUsage } from './log-usage'
+import { detectLanguageFromText } from '@/lib/language-detection'
+import {
+    resolveLocaleStructuralStrings,
+    type LocaleStructuralStrings,
+} from './locale-structural-strings'
+
+// 3-call split (home ∥ batch1 ∥ batch2). Measured 2026-07-03: a single
+// 4-subpage call produced ~6000+ output tokens for vi content and was the
+// long pole (~80s ≈ no win over the mega-call, since home is only ~2k of the
+// ~7.5k total tokens). Two 2-page batches halve the long pole.
+// Batch 2 keeps its own model route so it can be tuned independently via
+// AI_MODEL_SITEGEN_SUB_LIGHT. Both routes default to GPT-5.4 mini.
+const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly string[]; light: boolean }> = [
+    { pages: ['About', 'Services/Products'], slugs: ['/about', '/services'], light: false },
+    { pages: ['Contact', 'Blog'], slugs: ['/contact', '/blog'], light: true },
+]
+
+/** '/About ' → 'about' — one comparison form for model-emitted slugs. */
+function canonicalSlug(s: unknown): string {
+    return String(s ?? '').trim().toLowerCase().replace(/^\/+/, '')
+}
+
+const NON_CONTENT_KEYS = new Set([
+    'blockType',
+    'variant',
+    'url',
+    'href',
+    'slug',
+    'style',
+    'fieldType',
+    'layout',
+    'alignment',
+    'image',
+    'backgroundImage',
+    'videoUrl',
+    'icon',
+    'id',
+    '_uuid',
+    'date',
+    'publishedAt',
+    'currency',
+    'price',
+    'amount',
+    'rating',
+    'platform',
+])
+
+function collectHumanText(value: unknown, key = ''): string[] {
+    if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (
+            !trimmed
+            || NON_CONTENT_KEYS.has(key)
+            || /^https?:\/\//i.test(trimmed)
+            || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+            || /^#[0-9a-f]{3,8}$/i.test(trimmed)
+        ) {
+            return []
+        }
+        return [trimmed]
+    }
+    if (Array.isArray(value)) return value.flatMap((item) => collectHumanText(item, key))
+    if (!value || typeof value !== 'object') return []
+    return Object.entries(value as Record<string, unknown>)
+        .flatMap(([childKey, childValue]) => collectHumanText(childValue, childKey))
+}
+
+/**
+ * Reject substantial page copy that is still in another language. Short pages
+ * are left alone because language detection is noisy on one- or two-word labels.
+ */
+function pageMatchesLocale(page: Record<string, unknown>, targetLocale: string): boolean {
+    if (targetLocale.split('-')[0] === 'en') return true
+    const text = collectHumanText(page.blocks).join(' ')
+    if (text.replace(/[^\p{L}]/gu, '').length < 80) return true
+    const detected = detectLanguageFromText(text)
+    return detected.locale === targetLocale.split('-')[0] || detected.confidence < 0.7
+}
+
+/** Shared final guard for both parallel and legacy single-call generation. */
+export function outputMatchesLocale(
+    output: Record<string, unknown>,
+    targetLocale: string,
+): boolean {
+    if (targetLocale.split('-')[0] === 'en') return true
+    const pages = Array.isArray(output.pages)
+        ? output.pages.filter(
+            (page): page is Record<string, unknown> =>
+                Boolean(page) && typeof page === 'object',
+        )
+        : []
+    if (pages.length > 0) return pages.every((page) => pageMatchesLocale(page, targetLocale))
+
+    const blocks = Array.isArray(output.blocks) ? output.blocks : []
+    return pageMatchesLocale({ blocks }, targetLocale)
+}
+
+export type PageSplitBrief = {
+    navLabels: NavLabels | null
+    targetLocale: string
+    needsLocaleContext: boolean
+}
+
+/** Deterministic, no GPT round-trip. Page plan (5 fixed pages/slugs) is
+ *  already baked into the system prompt's STRUCTURE RULES — this only
+ *  resolves the one field (nav labels) that must be shared explicitly. */
+export function buildBrief(blockLang: string): PageSplitBrief {
+    return {
+        navLabels: getNavLabels(blockLang),
+        targetLocale: blockLang,
+        needsLocaleContext: blockLang.split('-')[0] !== 'en' && !hasDedicatedStrings(blockLang),
+    }
+}
+
+function navLabelsHint(brief: PageSplitBrief): string {
+    if (!brief.navLabels) return ''
+    const { home, about, services, contact } = brief.navLabels
+    return `\nFor brand consistency, use these EXACT navigation link labels on every page (already decided, do not re-translate): Home="${home}", About="${about}", Services="${services}", Contact="${contact}".`
+}
+
+function localeContextHint(brief: PageSplitBrief): string {
+    if (!brief.needsLocaleContext) return ''
+    return `
+
+## REQUIRED LOCALE CONTEXT
+Also return a top-level "localeStrings" object. Every value MUST be natural ${brief.targetLocale} text. This object is structural UI copy for the same website; never use English placeholders.
+Use EXACTLY this shape and include every key:
+{
+  "navigation": { "home": "", "about": "", "services": "", "contact": "", "getStarted": "", "blog": "" },
+  "sections": {
+    "about": "", "gallery": "", "contact": "", "features": "", "testimonials": "",
+    "faq": "", "team": "", "serviceCards": "", "stats": "", "pricing": "",
+    "newsletter": "", "clientLogos": "", "blogList": "", "contactSubmitLabel": "",
+    "aboutHeadlinePrefix": ""
+  },
+  "newsletter": { "buttonLabel": "", "emailPlaceholder": "" },
+  "blogList": { "readArticleLabel": "", "uncategorizedLabel": "", "emptyStateLabel": "" },
+  "contact": {
+    "headline": "", "subheadline": "", "nameLabel": "", "emailLabel": "",
+    "phoneLabel": "", "addressLabel": "", "messageLabel": "", "submitLabel": ""
+  },
+  "footer": { "exploreLabel": "", "allRightsReserved": "" }
+}`
+}
+
+// gen-perf phase-09 (token diet): navigation is injected deterministically
+// post-merge (buildNavigation) and subpage footers are cloned from the home
+// footer — GPT must not spend output tokens on them. Copy caps trim the
+// long-tail verbosity that put subpage batches near the token ceiling.
+const CONCISE_RULE = '\nKeep copy tight: headlines <= 8 words, subheadlines <= 18 words, item descriptions and quotes <= 25 words. Do not pad.'
+const OMIT_NAV_RULE = '\nDo NOT include any "navigation" block on any page — navigation is injected automatically after generation.'
+
+export function buildHomeSystemPrompt(base: string, brief: PageSplitBrief): string {
+    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES THE HOMEPAGE ONLY\nReturn the "pages" array with EXACTLY ONE entry: the Homepage ("isHomepage": true, "slug": "/", 8-14 blocks per STRUCTURE RULES). Do NOT include About, Services, Contact, or Blog pages — they are generated in a separate parallel call.${OMIT_NAV_RULE} DO include the "footer" block on the Homepage.${CONCISE_RULE}${navLabelsHint(brief)}${localeContextHint(brief)}`
+}
+
+export function buildSubpagesSystemPrompt(base: string, brief: PageSplitBrief, batch: readonly string[]): string {
+    const pageRules = batch.map((page) => {
+        if (page === 'About') {
+            return 'About: 4-6 content blocks from hero, about/story, stats, team, testimonials, and CTA only.'
+        }
+        if (page === 'Services/Products') {
+            return 'Services/Products: 4-6 content blocks from hero, service-cards, category-specific service blocks, features, pricing, FAQ, testimonials, logo-cloud, feature-comparison, and CTA only.'
+        }
+        if (page === 'Contact') {
+            return 'Contact: exactly one contact block, plus an optional short hero and at most one practical FAQ.'
+        }
+        if (page === 'Blog') {
+            return 'Blog: 3-4 content blocks from hero, blog-list, newsletter, and CTA only; blog-list needs >=3 posts.'
+        }
+        return `${page}: use only content relevant to this page.`
+    }).join('\n')
+    return `${base}\n\n## SCOPE OVERRIDE — THIS CALL GENERATES ${batch.length} SUBPAGES ONLY (NO HOMEPAGE)\nThe 5-page STRUCTURE RULES above describe the FULL site, which is being produced by several parallel calls. THIS call's output is only a slice of it: return the "pages" array with EXACTLY ${batch.length} entries, in this order: ${batch.join(', ')}.\n${pageRules}\nDo NOT add contact or gallery blocks to About, Services/Products, or Blog. Set "isHomepage": false on every entry. Do NOT include a Homepage or any other page in this response.${OMIT_NAV_RULE}\nDo NOT include any "footer" block — the site-wide footer is applied automatically.${CONCISE_RULE}${navLabelsHint(brief)}`
+}
+
+/** Scope repeated at the END of the user message — measured 2026-07-03 that
+ *  a system-prompt-only override loses to the base STRUCTURE RULES: both
+ *  subpage calls wrote the whole 5-page site and returned incomplete output. */
+export function scopedUserPrompt(baseUser: string, scopeLine: string): string {
+    return `${baseUser}\n\nIMPORTANT — OUTPUT SCOPE FOR THIS RESPONSE: ${scopeLine} Any additional page in the output is an error and will be discarded.`
+}
+
+/** Same parse-with-repair as the legacy single-call path: truncated JSON is
+ *  trimmed to the last complete `}` before giving up. Null-valued keys are
+ *  stripped recursively: GPT emits `"badge": null` for optional fields it
+ *  skipped, but Zod block schemas expect ABSENT, not null — every null
+ *  produced a noisy "Block validation warning" per gen (seen live
+ *  2026-07-03). Nulls inside arrays are preserved (positional). */
+export function safeParseJson(content: string): Record<string, unknown> {
+    try {
+        return stripNullsDeep(JSON.parse(content)) as Record<string, unknown>
+    } catch {
+        const lastBrace = content.lastIndexOf('}')
+        if (lastBrace <= 0) throw new Error('Invalid JSON response from AI')
+        return stripNullsDeep(JSON.parse(content.slice(0, lastBrace + 1))) as Record<string, unknown>
+    }
+}
+
+function stripNullsDeep(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(stripNullsDeep)
+    if (value && typeof value === 'object') {
+        const out: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(value)) {
+            if (v === null) continue
+            out[k] = stripNullsDeep(v)
+        }
+        return out
+    }
+    return value
+}
+
+type SplitCallOutcome = {
+    parsed: Record<string, unknown> | null
+    model: string
+    tokensIn: number
+    tokensOut: number
+    durationMs: number
+    errorMessage?: string
+}
+
+async function runSplitCall(
+    openai: OpenAI,
+    model: string,
+    systemPrompt: string,
+    userPrompt: string,
+    timeoutMs = 38_000,
+): Promise<SplitCallOutcome> {
+    const start = Date.now()
+    try {
+        const completion = await openai.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+        }, { timeout: timeoutMs })
+        const choice = completion.choices[0]
+        const content = choice?.message?.content
+        if (!content) throw new Error('Empty AI response')
+        if (choice?.finish_reason === 'length') {
+            console.warn(`[gen-page-split] AI response truncated due to token limit (finish_reason: length)`)
+        }
+        const usage = completion.usage
+        return { parsed: safeParseJson(content), model: completion.model, tokensIn: usage?.prompt_tokens ?? 0, tokensOut: usage?.completion_tokens ?? 0, durationMs: Date.now() - start }
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        return { parsed: null, model, tokensIn: 0, tokensOut: 0, durationMs: Date.now() - start, errorMessage }
+    }
+}
+
+function logOutcome(outcome: SplitCallOutcome): void {
+    logAiUsage({
+        endpoint: 'site-generation',
+        model: outcome.model,
+        tokensIn: outcome.tokensIn,
+        tokensOut: outcome.tokensOut,
+        durationMs: outcome.durationMs,
+        success: outcome.parsed !== null,
+        errorCode: outcome.errorMessage,
+    })
+}
+
+/** Supports both the scoped `pages: [home]` shape and the legacy root-level
+ *  `blocks` shape, in case GPT ignores the scoped hint. */
+function extractHomePage(parsed: Record<string, unknown>): Record<string, unknown> | null {
+    const pages = Array.isArray(parsed.pages) ? (parsed.pages as Record<string, unknown>[]) : null
+    // Slug forced to '/' regardless of what the model emitted: a scope-ignoring
+    // home call can return a subpage (same failure class measured on batches
+    // 2026-07-03), and its slug would collide with the real batch page at
+    // page-create time (unique site+slug constraint).
+    if (pages && pages.length > 0) return { ...pages[0], isHomepage: true, slug: '/' }
+    if (Array.isArray(parsed.blocks)) {
+        return { title: parsed.siteName ?? 'Homepage', slug: '/', isHomepage: true, blocks: parsed.blocks, seo: parsed.seo ?? {} }
+    }
+    return null
+}
+
+function extractSubPages(parsed: Record<string, unknown>): Record<string, unknown>[] {
+    const pages = Array.isArray(parsed.pages) ? (parsed.pages as Record<string, unknown>[]) : []
+    return pages.map((p) => ({ ...p, isHomepage: false }))
+}
+
+/** Merges the 2 independently-resolved responses into the shape the legacy
+ *  single-call path produced: top-level fields from the home call (owns site
+ *  identity + homepage SEO), `pages` = [home, ...subpages]. */
+export function mergeSplitParsed(homeParsed: Record<string, unknown>, subsParsed: Record<string, unknown>): Record<string, unknown> {
+    const homePage = extractHomePage(homeParsed)
+    const subPages = extractSubPages(subsParsed)
+    return {
+        siteName: homeParsed.siteName,
+        category: homeParsed.category,
+        theme: homeParsed.theme,
+        seo: homeParsed.seo,
+        language: homeParsed.language,
+        localeStrings: homeParsed.localeStrings,
+        pages: homePage ? [homePage, ...subPages] : subPages,
+    }
+}
+
+/**
+ * gen-perf phase-09: deterministic "chrome" — navigation on every page from
+ * buildNavigation (i18n, links guaranteed correct), footer cloned from the
+ * home page onto subpages (single source, no per-page GPT drift). Strips any
+ * stray nav/footer the model emitted despite the omit rules, and any
+ * composer-fallback chrome, so every path converges on the same shape.
+ * Exported for tests.
+ */
+export function applyDeterministicChrome(
+    merged: Record<string, unknown>,
+    businessInfo: BusinessInfoInput,
+    blockLang: string,
+): void {
+    const pages = Array.isArray(merged.pages) ? (merged.pages as Record<string, unknown>[]) : []
+    if (pages.length === 0) return
+
+    const slugs = pages.map((p) => (typeof p.slug === 'string' && p.slug ? p.slug : '/'))
+    const localeStrings = resolveLocaleStructuralStrings(blockLang, merged.localeStrings)
+    const nav = buildNavigation(
+        { name: businessInfo.businessName } as BusinessSample,
+        slugs,
+        // GH-1611: industry arrives as a resolved composer key from the builder
+        // form — normalize (idempotent); re-resolving turns 'fnb' into 'business'.
+        normalizeComposerCategory(businessInfo.industry),
+        undefined,
+        blockLang,
+        localeStrings,
+    )
+    if (blockLang.split('-')[0] !== 'en' && !localeStrings) {
+        const service = splitServices(businessInfo.products)[0] ?? businessInfo.businessName
+        const links = Array.isArray(nav.links) ? nav.links as Record<string, unknown>[] : []
+        nav.links = links.map((link) => ({
+            ...link,
+            label: link.url === '/services' ? service : businessInfo.businessName,
+        }))
+        nav.ctaButton = {
+            ...(nav.ctaButton as Record<string, unknown>),
+            label: service,
+        }
+        nav.ariaLabel = businessInfo.businessName
+        nav.breadcrumbConfig = {
+            ...(nav.breadcrumbConfig as Record<string, unknown>),
+            homeLabel: businessInfo.businessName,
+        }
+    }
+
+    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
+    const homeFooter = homeBlocks.find((b) => b.blockType === 'footer') ?? null
+
+    pages.forEach((page, i) => {
+        const blocks = Array.isArray(page.blocks) ? (page.blocks as Record<string, unknown>[]) : []
+        const body = blocks.filter((b) => b.blockType !== 'navigation' && (i === 0 || b.blockType !== 'footer'))
+        // structuredClone (not spread): downstream passes mutate blocks in
+        // place (structure enforcer, grid alignment) — pages must not share
+        // nav/footer references, including nested arrays like nav items.
+        const footer = i === 0 ? [] : homeFooter ? [structuredClone(homeFooter)] : []
+        page.blocks = [structuredClone(nav), ...body, ...footer]
+    })
+}
+
+/**
+ * Re-sync subpage footers from the (possibly enforcer-modified) homepage
+ * footer. applyDeterministicChrome clones the footer BEFORE the structure
+ * enforcer runs, and the enforcer may then restyle the HOMEPAGE footer per
+ * its recipe — leaving subpages on the stale clone (live finding 2026-07-03:
+ * home footer one variant, every other page another). Call AFTER per-page
+ * enforcement. Generic over the caller's page/block shape.
+ */
+export function syncFooterAcrossPages(pages: Array<{ blocks?: unknown[] }>): void {
+    if (pages.length < 2) return
+    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
+    const homeFooter = homeBlocks.find((b) => b?.blockType === 'footer')
+    if (!homeFooter) return
+    for (let i = 1; i < pages.length; i++) {
+        const blocks = Array.isArray(pages[i]?.blocks) ? (pages[i]!.blocks as Record<string, unknown>[]) : []
+        pages[i]!.blocks = [...blocks.filter((b) => b?.blockType !== 'footer'), structuredClone(homeFooter)]
+    }
+}
+
+/** composeTemplateResult is pure/synchronous (fallback-adapter.ts) — safe to
+ *  call inline as a per-call fallback without an extra async round-trip. */
+function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Record<string, unknown> | null {
+    if (!gr.pages || gr.pages.length === 0) return null
+    if (scope === 'home') {
+        return { siteName: gr.siteName, category: gr.siteType, theme: gr.theme, seo: gr.seo, language: gr.language, pages: [gr.pages[0]] }
+    }
+    const candidates = gr.pages.slice(1)
+    if (candidates.length === 0) return null
+
+    const unused = new Set(candidates.map((_page, index) => index))
+    const slots = [
+        { title: 'About', slug: '/about', matches: /about|story|company/i },
+        { title: 'Services', slug: '/services', matches: /service|product|menu|program|class|treatment/i },
+        { title: 'Contact', slug: '/contact', matches: /contact|book|visit|location|get-in-touch/i },
+        { title: 'Blog', slug: '/blog', matches: /blog|news|article|insight/i },
+    ] as const
+
+    const pages = slots.map((slot) => {
+        const matchedIndex = candidates.findIndex((page, index) => {
+            if (!unused.has(index)) return false
+            return slot.matches.test(`${String(page.slug ?? '')} ${String(page.title ?? '')}`)
+        })
+        const fallbackIndex = matchedIndex >= 0 ? matchedIndex : [...unused][0]
+        const source = fallbackIndex === undefined ? candidates[0]! : candidates[fallbackIndex]!
+        if (fallbackIndex !== undefined) unused.delete(fallbackIndex)
+        return {
+            ...structuredClone(source),
+            title: slot.title,
+            slug: slot.slug,
+            isHomepage: false,
+        }
+    })
+    return { pages }
+}
+
+function splitServices(products: string): string[] {
+    const services = products
+        .split(/[\n,;|]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    return services.length > 0 ? services : []
+}
+
+function blockSectionLabel(
+    blockType: string,
+    strings: LocaleStructuralStrings | null,
+    businessName: string,
+): string {
+    if (!strings) return businessName
+    const labels: Record<string, string> = {
+        about: strings.sections.about,
+        gallery: strings.sections.gallery,
+        contact: strings.sections.contact,
+        features: strings.sections.features,
+        testimonials: strings.sections.testimonials,
+        faq: strings.sections.faq,
+        team: strings.sections.team,
+        'service-cards': strings.sections.serviceCards,
+        stats: strings.sections.stats,
+        pricing: strings.sections.pricing,
+        newsletter: strings.sections.newsletter,
+        'client-logos': strings.sections.clientLogos,
+        'blog-list': strings.sections.blogList,
+    }
+    return labels[blockType] ?? businessName
+}
+
+/**
+ * A locale mismatch must never add another network call. Replace the known
+ * English fallback payload locally with user-provided copy and the locale
+ * context returned by the homepage call. The block structure, URLs, media and
+ * CTA count stay intact.
+ */
+export function materializeLocaleSafePage(
+    page: Record<string, unknown>,
+    businessInfo: BusinessInfoInput,
+    strings: LocaleStructuralStrings | null,
+    targetLocale: string,
+): Record<string, unknown> {
+    const businessName = businessInfo.businessName
+    const matchesTargetLocale = (text: string): boolean => {
+        if (!text.trim()) return false
+        const detected = detectLanguageFromText(text)
+        return detected.locale === targetLocale.split('-')[0]
+    }
+    const inputServices = splitServices(businessInfo.products)
+    const services = inputServices.filter(matchesTargetLocale)
+    if (services.length === 0) {
+        services.push(strings?.sections.serviceCards ?? businessName)
+    }
+    const inputDescription = businessInfo.shortDescription || businessInfo.tagline || ''
+    const description = matchesTargetLocale(inputDescription)
+        ? inputDescription
+        : strings?.contact.subheadline ?? businessName
+    let itemIndex = 0
+
+    const replacement = (
+        key: string,
+        blockType: string,
+        parent: Record<string, unknown> | null,
+        currentValue: string,
+    ): string => {
+        const service = services[itemIndex++ % Math.max(services.length, 1)] ?? businessName
+        const url = typeof parent?.url === 'string' ? parent.url : ''
+
+        if (key === 'email') return businessInfo.email || businessName
+        if (key === 'phone') return businessInfo.phone || businessName
+        if (key === 'address') return businessInfo.address || businessName
+        if (key === 'logoText') return businessName
+        if (key === 'copyrightText') {
+            const rights = strings?.footer.allRightsReserved
+            return `© ${new Date().getFullYear()} ${businessName}${rights ? `. ${rights}` : ''}`
+        }
+        if (blockType === 'footer' && key === 'title') {
+            const footerTitles: Record<string, string | undefined> = {
+                explore: strings?.footer.exploreLabel,
+                company: strings?.footer.companyLabel,
+                support: strings?.footer.supportLabel,
+                legal: strings?.footer.legalLabel,
+            }
+            return footerTitles[currentValue.trim().toLowerCase()]
+                ?? strings?.footer.exploreLabel
+                ?? businessName
+        }
+        if (key.toLowerCase().includes('placeholder')) {
+            return strings?.newsletter.emailPlaceholder || businessInfo.email || businessName
+        }
+        if (key === 'ariaLabel') return businessName
+        if (key === 'label' || key.endsWith('Label')) {
+            if (url === '/') return strings?.navigation.home || businessName
+            if (url === '/about') return strings?.navigation.about || businessName
+            if (url === '/services') return strings?.navigation.services || service
+            if (url === '/contact') return strings?.navigation.contact || businessName
+            if (url === '/blog') return strings?.navigation.blog || businessName
+            return strings?.navigation.getStarted || service
+        }
+        if (
+            key === 'headline'
+            || key === 'title'
+            || key === 'sectionLabel'
+            || key === 'heading'
+            || key === 'question'
+        ) {
+            return blockSectionLabel(blockType, strings, service)
+        }
+        if (key === 'name' || key === 'role' || key === 'category') return service
+        return description
+    }
+
+    const visit = (
+        value: unknown,
+        key = '',
+        blockType = '',
+        parent: Record<string, unknown> | null = null,
+    ): unknown => {
+        if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (
+                !trimmed
+                || NON_CONTENT_KEYS.has(key)
+                || /^https?:\/\//i.test(trimmed)
+                || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+                || /^#[0-9a-f]{3,8}$/i.test(trimmed)
+            ) return value
+            return replacement(key, blockType, parent, value)
+        }
+        if (Array.isArray(value)) return value.map((item) => visit(item, key, blockType, parent))
+        if (!value || typeof value !== 'object') return value
+
+        const record = value as Record<string, unknown>
+        const nextBlockType = typeof record.blockType === 'string' ? record.blockType : blockType
+        return Object.fromEntries(
+            Object.entries(record).map(([childKey, childValue]) => [
+                childKey,
+                visit(childValue, childKey, nextBlockType, record),
+            ]),
+        )
+    }
+
+    return visit(page) as Record<string, unknown>
+}
+
+export type ParallelSplitInput = {
+    openai: OpenAI
+    model: string
+    systemPrompt: string
+    userPromptText: string
+    promptText: string
+    businessInfo: BusinessInfoInput
+    seed: number
+    language: 'en' | 'ms' | 'vi'
+    blockLang: string
+}
+
+/** Call A (home) ∥ Call B/C (subpage batches), logs usage for all, falls
+ *  back per-scope to the deterministic composer (never the whole gen).
+ *  If ANY subpage batch fails, ALL subpages come from the composer — mixing
+ *  GPT pages with composer pages would produce an inconsistent page set
+ *  (composer uses its own page plan, e.g. /menu + /gallery). */
+export async function runParallelPageSplit(input: ParallelSplitInput): Promise<Record<string, unknown>> {
+    const brief = buildBrief(input.blockLang)
+    const [homeOutcome, ...batchOutcomes] = await Promise.all([
+        runSplitCall(
+            input.openai, input.model,
+            buildHomeSystemPrompt(input.systemPrompt, brief),
+            scopedUserPrompt(input.userPromptText, 'generate ONLY the Homepage page (pages array with exactly 1 entry).'),
+        ),
+        ...SUBPAGE_BATCHES.map((batch) =>
+            runSplitCall(
+                input.openai,
+                batch.light ? selectModel('site-generation-subpages-light') : input.model,
+                buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
+                scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
+            ),
+        ),
+    ])
+    logOutcome(homeOutcome)
+    batchOutcomes.forEach(logOutcome)
+    console.info(
+        `[AI][GEN_PARALLEL_PAGES] home=${homeOutcome.durationMs}ms ` +
+            batchOutcomes.map((o, i) => `subs${i + 1}=${o.durationMs}ms`).join(' ') +
+            ` ok=${[homeOutcome, ...batchOutcomes].filter((o) => o.parsed).length}/${1 + batchOutcomes.length}`,
+    )
+
+    let homeParsed = homeOutcome.parsed
+    const initialHomePage = homeParsed ? extractHomePage(homeParsed) : null
+    if (homeParsed && !initialHomePage) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] home response has no usable homepage')
+        homeParsed = null
+    }
+    // Scope enforcement in CODE, not just prompt: a scope-ignoring batch (the
+    // measured failure mode) may emit a stray homepage or extra pages.
+    // - a real homepage duplicate (slug '/') is discarded;
+    // - a batch page merely MIS-FLAGGED isHomepage:true is kept and coerced
+    //   (dropping it produced 4-page sites — seen live 2026-07-03 16:42);
+    // - each batch is capped at its requested page count;
+    // - a batch missing pages (nano sometimes returns 1 of 2) counts as
+    //   FAILED → composer fallback for ALL subpages. Never a short site.
+    // Slot matching BY SLUG, not by position/count: live 2026-07-03 17:55 the
+    // Contact+Blog batch returned an About page again — right count, wrong
+    // pages — which slipped a duplicate "Giới Thiệu" into the nav and dropped
+    // /contact. Each batch slot must be filled by a page whose slug matches
+    // the deterministic plan; the slug is then rewritten to the canonical
+    // '/x' form (kills 'about' vs '/about' ambiguity in one move).
+    const extractBatchPages = (o: SplitCallOutcome, i: number): Record<string, unknown>[] => {
+        const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as Record<string, unknown>[]) : []
+        const bySlug = new Map<string, Record<string, unknown>>()
+        for (const p of pages) {
+            const key = canonicalSlug(p.slug)
+            if (key && key !== '' && !bySlug.has(key)) bySlug.set(key, p)
+        }
+        const out: Record<string, unknown>[] = []
+        for (const slug of SUBPAGE_BATCHES[i]!.slugs) {
+            const p = bySlug.get(canonicalSlug(slug))
+            if (p) out.push({ ...p, slug, isHomepage: false })
+        }
+        return out
+    }
+    let batchPages = batchOutcomes.map(extractBatchPages)
+
+    // Retry pass (live finding 2026-07-03 17:40, Nha Khoa case): a failed
+    // batch used to drop straight to composer fallback, whose per-category
+    // templates may not include a /contact page at all (3 of 4 health
+    // templates use Book Now / Get in Touch instead) → user-visible "missing
+    // contact page". One retry on the MAIN model rescues nearly all
+    // intermittent nano/parse failures; composer stays as the last resort.
+    const failedIdx = batchOutcomes
+        .map((o, i) => {
+            const pages = batchPages[i]!
+            const incomplete = pages.length !== SUBPAGE_BATCHES[i]!.pages.length
+            // Preserve the measured optimization contract: only a parsed but
+            // structurally incomplete batch gets one bounded retry. Transport,
+            // parse and locale failures fall back locally without another call.
+            return o.parsed !== null && incomplete ? i : -1
+        })
+        .filter((i) => i >= 0)
+    if (failedIdx.length > 0) {
+        console.warn(`[AI][GEN_PARALLEL_PAGES] retrying ${failedIdx.length} failed batch(es) with main model`)
+        const retries = await Promise.all(
+            failedIdx.map((i) => {
+                const batch = SUBPAGE_BATCHES[i]!
+                return runSplitCall(
+                    input.openai, input.model,
+                    buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
+                    scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
+                    10_000,
+                )
+            }),
+        )
+        retries.forEach((o, k) => {
+            const i = failedIdx[k]!
+            logOutcome(o)
+            batchOutcomes[i] = o
+            batchPages[i] = extractBatchPages(o, i)
+        })
+    }
+    // Slug sanity across ALL batch pages: non-empty string, unique after
+    // normalization. A dup/empty slug would fail Payload's unique-per-site
+    // validation at page-create time ("field is invalid: site_id, slug" —
+    // seen intermittently live 2026-07-03 17:02) → composer fallback instead.
+    const seenSlugs = new Set<string>(['/'])
+    const slugsOk = batchPages.flat().every((p) => {
+        const slug = typeof p.slug === 'string' ? p.slug.trim().toLowerCase() : ''
+        if (!slug || seenSlugs.has(slug)) return false
+        seenSlugs.add(slug)
+        return true
+    })
+    if (!slugsOk) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] duplicate/empty subpage slug detected — composer fallback for subpages')
+    }
+    const allBatchesOk = slugsOk && batchOutcomes.every(
+        (o, i) =>
+            o.parsed !== null
+            && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length,
+    )
+    if (!allBatchesOk) {
+        console.warn(
+            '[AI][GEN_PARALLEL_PAGES] batch page counts: ' +
+                batchPages.map((p, i) => `subs${i + 1}=${p.length}/${SUBPAGE_BATCHES[i]!.pages.length}`).join(' '),
+        )
+    }
+    let subsParsed: Record<string, unknown> | null = allBatchesOk ? { pages: batchPages.flat() } : null
+
+    let usedComposerHomeFallback = false
+    let usedComposerSubpagesFallback = false
+    if (!homeParsed || !subsParsed) {
+        // Lazy, computed at most once — covers any scope failing. Seed matches
+        // the deterministic theme/category choice already made in
+        // generateSiteWithAI so the fallback page set stays on-brand.
+        const composerResult = composeTemplateResult(input.promptText, input.seed, input.language, input.businessInfo)
+        if (!homeParsed) {
+            usedComposerHomeFallback = true
+            homeParsed = (composerResult && composerFallback(composerResult, 'home')) ??
+                { siteName: input.businessInfo.businessName, category: 'business', theme: {}, seo: {}, language: input.language, pages: [] }
+            console.warn(`[AI][GEN_PARALLEL_PAGES] home call failed (${homeOutcome.errorMessage ?? 'unknown'}) — composer fallback applied`)
+        }
+        if (!subsParsed) {
+            usedComposerSubpagesFallback = true
+            const failed = batchOutcomes.filter((o) => !o.parsed).map((o) => o.errorMessage ?? 'unknown').join('; ')
+            subsParsed = (composerResult && composerFallback(composerResult, 'subpages')) ?? { pages: [] }
+            console.warn(`[AI][GEN_PARALLEL_PAGES] subpage batch(es) failed (${failed}) — composer fallback applied for ALL subpages`)
+        }
+    }
+
+    const merged = mergeSplitParsed(homeParsed, subsParsed)
+    if (input.blockLang.split('-')[0] !== 'en') {
+        const localeStrings = resolveLocaleStructuralStrings(input.blockLang, merged.localeStrings)
+        const pages = Array.isArray(merged.pages) ? merged.pages as Record<string, unknown>[] : []
+        let repairedLocaleMismatch = false
+        merged.pages = pages.map((page) => {
+            const isHomepage = page.isHomepage === true || canonicalSlug(page.slug) === ''
+            const usedComposerForPage = isHomepage
+                ? usedComposerHomeFallback
+                : usedComposerSubpagesFallback
+            if (!usedComposerForPage && pageMatchesLocale(page, input.blockLang)) return page
+            repairedLocaleMismatch = true
+            console.warn(
+                `[AI][GEN_PARALLEL_PAGES] locale mismatch slug=${String(page.slug ?? '')} ` +
+                `locale=${input.blockLang} — applying local locale-safe copy`,
+            )
+            return materializeLocaleSafePage(page, input.businessInfo, localeStrings, input.blockLang)
+        })
+        if (repairedLocaleMismatch) {
+            merged.siteName = input.businessInfo.businessName
+            merged.seo = {
+                title: input.businessInfo.businessName,
+                description: localeStrings?.contact.subheadline ?? input.businessInfo.businessName,
+            }
+        }
+    }
+    applyDeterministicChrome(merged, input.businessInfo, input.blockLang)
+    return merged
+}

@@ -1,0 +1,41 @@
+{
+  "buildCommand": "bash scripts/build.sh",
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 120
+    },
+    "src/app/(payload)/api/[...slug]/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/(payload)/admin/[[...segments]]/page.tsx": {
+      "maxDuration": 60
+    }
+  },
+  "git": {
+    "deploymentEnabled": false
+  },
+  "crons": [
+    {
+      "path": "/api/cron/keep-alive",
+      "schedule": "*/4 * * * *"
+    },
+    {
+      "path": "/api/cron/payment-expiry",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-orders",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/process-sso-steps",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-qa-targeted-smoke",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

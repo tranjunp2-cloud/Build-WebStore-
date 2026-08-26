@@ -1,0 +1,23 @@
+node_modules
+.next
+.git
+.gitignore
+.DS_Store
+.env*
+
+# Docker files (no recursion)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Media uploads (persisted via volume)
+public/media/*
+
+# Docs (don't need in container)
+*.md
+!README.md
+
+# IDE
+.cursor
+.vscode
+.idea

@@ -1,0 +1,104 @@
+---
+description: CMS Block system and Visual Editor rules
+globs: src/components/**/*,src/collections/**/*
+alwaysApply: false
+---
+
+# CMS Block System Rules (PrimeWeb)
+
+## Block Architecture
+Mỗi Block Type có 3 phần tách rời:
+```
+src/blocks/{block-name}/
+├── config.ts          ← Payload CMS field definition (schema)
+├── Component.tsx      ← SSR render component (cho published site)
+└── Editor.tsx         ← Editor UI component (cho visual editor)
+```
+
+## Block Config Pattern (Payload CMS)
+```typescript
+import type { Block } from 'payload'
+
+export const HeroBlock: Block = {
+  slug: 'hero',
+  labels: { singular: 'Hero Banner', plural: 'Hero Banners' },
+  imageURL: '/blocks/hero-preview.png',
+  fields: [
+    {
+      name: 'variant',
+      type: 'select',
+      defaultValue: 'centered',
+      options: [
+        { label: 'Centered', value: 'centered' },
+        { label: 'Split (Image Right)', value: 'split' },
+        { label: 'Fullscreen Background', value: 'fullscreen' },
+      ],
+    },
+    { name: 'heading', type: 'text', required: true },
+    { name: 'subheading', type: 'textarea' },
+    { name: 'ctaText', type: 'text', defaultValue: 'Get Started' },
+    { name: 'ctaLink', type: 'text', defaultValue: '#contact' },
+    { name: 'backgroundImage', type: 'upload', relationTo: 'media' },
+  ],
+}
+```
+
+## Block Render Component Pattern
+```typescript
+// Server Component — renders on published tenant site (SSR)
+interface HeroProps {
+  variant: 'centered' | 'split' | 'fullscreen'
+  heading: string
+  subheading?: string
+  ctaText?: string
+  ctaLink?: string
+  backgroundImage?: Media
+  theme: SiteTheme
+}
+
+export function HeroSection({ variant, heading, theme, ...props }: HeroProps) {
+  // Render PURE HTML with theme CSS variables
+  // No interactive state, no client hooks
+  // Must be SEO-crawlable
+}
+```
+
+## Block Editor Component Pattern
+```typescript
+'use client'
+// Editor Component — interactive UI inside Visual Editor
+export function HeroEditor({ block, onUpdate }: BlockEditorProps) {
+  // Inline editing (contentEditable for text)
+  // Variant selector dropdown
+  // Image picker modal
+  // Calls onUpdate() to save changes via API
+}
+```
+
+## Available Block Types (Current)
+1. `navigation` — Site header/menu
+2. `hero` — Main banner (centered/split/fullscreen)
+3. `about` — About section (image-left/image-right/grid)
+4. `features` — Feature cards (3-col/2-col grid)
+5. `testimonials` — Customer reviews (grid/carousel)
+6. `contact` — Contact form + map
+7. `gallery` — Image gallery (masonry/grid)
+8. `footer` — Site footer
+
+## Planned Block Types (Phase 2+)
+9. `pricing` — Pricing table
+10. `blog-list` — Blog post grid
+11. `faq` — Accordion FAQ
+12. `cta` — Call-to-action banner
+13. `stats` — Statistics/numbers section
+14. `team` — Team members grid
+15. `video` — Video embed section
+16. `logo-cloud` — Partner/client logos
+
+## Rules
+- Blocks must be self-contained (no cross-block dependencies)
+- Theme colors applied via CSS variables, NOT hardcoded colors
+- Every block MUST have at least 2 variants
+- Block content must be serializable to JSON (for Payload storage)
+- Published site blocks = Server Components (SSR, no JavaScript)
+- Editor blocks = Client Components (interactive, with state)

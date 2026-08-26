@@ -1,0 +1,781 @@
+# CI Pipeline — quality + test on PRs, CI-driven Vercel deploy on push
+#
+# PR            → quality-check + test + metrics comment
+# Push staging  → deploy-staging                    (via VERCEL_TOKEN)
+# Push main     → deploy-production                 (via VERCEL_TOKEN)
+#
+# Quality/test DO NOT run on push — merge commits on staging/main are
+# already validated by the PR's own CI run. Branch protection blocks
+# direct push, so every commit passes through CI on its PR exactly once.
+# This removes the 5+ min duplicate-CI tax from deploy time.
+#
+# Why CI-driven deploy instead of Vercel git webhook:
+#   Vercel Pro blocks commits from non-team-members with
+#   "commit author does not have contributing access". CI deploys under the
+#   token owner's identity, so any team member's push can land.
+#   See plans/260413-1126-vercel-deploy-blocked/ for full diagnosis.
+#
+# Architecture:
+#   quality-check (1.5m, PR only): lint + typecheck + migrations
+#   test (3.5m, PR only, needs: quality-check)
+#   metrics (PR only, needs: test)
+#   deploy-staging    (push staging, no needs — CI already ran on PR)
+#   deploy-production (push main,    no needs — CI already ran on PR)
+#   notify-fail (PR only, if failure)
+name: CI
+
+on:
+  push:
+    branches: [main, staging, qc-test]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CONTRIBUTING.md'
+      - '.github/GIT_AND_CI_RULES.md'
+      - '.github/pull_request_template.md'
+      - '*.md'
+      - 'LICENSE'
+  pull_request:
+    branches: [main, staging]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CONTRIBUTING.md'
+      - '.github/GIT_AND_CI_RULES.md'
+      - '.github/pull_request_template.md'
+      - '*.md'
+      - 'LICENSE'
+  # Manual dispatch lets sync-staging-to-qc-test.yml re-trigger the
+  # deploy-qc-test job after it pushes to qc-test with GITHUB_TOKEN.
+  # GITHUB_TOKEN pushes do not fire push events, but workflow_dispatch
+  # from another workflow does create a new run.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────
+  # Job 1: Quality Check — Lint + Typecheck + Migrations (1.5 min)
+  # ──────────────────────────────────────
+  quality-check:
+    name: "Quality: Lint + Typecheck"
+    # pull_request only — merge commits on staging/main are already
+    # validated by the PR's own CI run. GitHub branch protection blocks
+    # direct push, so every code change passes through this job at
+    # least once before it can land.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Guard against stray lockfiles
+        # Repo uses npm only. A stray pnpm-lock.yaml / yarn.lock makes
+        # `vercel build` auto-detect pnpm/yarn and spawn a binary the
+        # runner does not have (ENOENT), breaking deploy. Seen twice:
+        # 83f91a75, then PR #555 (commit e4d0448c) reintroduced it and
+        # broke staging deploy run 24412315694. Fail fast here before
+        # npm install so dev gets the signal in ~1 second.
+        run: |
+          STRAY=$(ls pnpm-lock.yaml yarn.lock 2>/dev/null || true)
+          if [ -n "$STRAY" ]; then
+            echo "::error::Stray lockfile detected: $STRAY"
+            echo "::error::Repo uses npm only. Delete with: git rm $STRAY && git commit"
+            echo "::error::Background: vercel build auto-detects pnpm/yarn from lockfile"
+            echo "::error::and spawns a binary not installed on the CI runner (ENOENT)."
+            echo "::error::See plans/260413-1126-vercel-deploy-blocked/ for history."
+            exit 1
+          fi
+          echo "✓ no stray lockfiles"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check DB migrations
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin staging --depth=1
+          node scripts/check-migrations.js origin/staging
+
+      - name: Check environment variable manifests
+        run: node scripts/check-env-vars.js origin/staging
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  # ──────────────────────────────────────
+  # Job 2: Test (parallel with build, 3.5 min)
+  # ──────────────────────────────────────
+  test:
+    name: "Test"
+    # pull_request only — see quality-check rationale above.
+    needs: quality-check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --include=optional
+
+      - name: Test
+        id: test
+        run: |
+          set -o pipefail
+          npm run test -- --coverage 2>&1 | tee test-output.log
+          PASSED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || echo "0")
+          FAILED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ failed' | grep -oE '^[0-9]+' | head -1 || echo "0")
+          TOTAL=$((${PASSED:-0} + ${FAILED:-0}))
+          echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Drift check (block registry ↔ templates)
+        # Plan 260419-2022 Phase 03 — fail PR if block variant/schema drift
+        # grows beyond baseline. Source-only scan (no DB), <30s.
+        run: npm run drift:check
+
+      - name: Harness quick gen
+        # Plan 260419-2022 Phase 03 — smoke test composer on 3 fixtures.
+        # Fails fast if composer blows up on real schemas.
+        run: npm run harness:quick
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 3
+
+  # ──────────────────────────────────────
+  # Build skipped in CI — Vercel handles build + deploy.
+  # Typecheck catches 99% of build errors. Vercel is the safety net.
+  # Re-enable build job if needed: uncomment and add to notify-fail needs.
+  # ──────────────────────────────────────
+
+  # ──────────────────────────────────────
+  # Job 3: Quality Metrics (PR only, after test)
+  # ──────────────────────────────────────
+  metrics:
+    name: "PR Metrics"
+    needs: [test]
+    if: success() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Download coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+      - name: Parse coverage report
+        id: coverage
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            LINES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.lines.pct)")
+            BRANCHES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.branches.pct)")
+            FUNCTIONS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.functions.pct)")
+            STATEMENTS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.statements.pct)")
+          else
+            LINES="N/A"; BRANCHES="N/A"; FUNCTIONS="N/A"; STATEMENTS="N/A"
+          fi
+          echo "lines=$LINES" >> "$GITHUB_OUTPUT"
+          echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
+          echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
+          echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
+
+      - name: Comment quality metrics on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = {
+              lines: '${{ steps.coverage.outputs.lines }}',
+              branches: '${{ steps.coverage.outputs.branches }}',
+              functions: '${{ steps.coverage.outputs.functions }}',
+              statements: '${{ steps.coverage.outputs.statements }}',
+            };
+            const minimums = { lines: 60, branches: 65, functions: 55, statements: 60 };
+            const targets = { lines: 95, branches: 85, functions: 90, statements: 95 };
+
+            function badge(val, min, target) {
+              const v = parseFloat(val);
+              if (isNaN(v)) return '⚪';
+              if (v >= target) return '💎';
+              if (v >= min) return '✅';
+              return '🔴';
+            }
+
+            const marker = '<!-- quality-metrics -->';
+            const body = [
+              marker,
+              '## 📊 Quality Metrics',
+              '',
+              '### Test Coverage',
+              '| Metric | Current | Min | Target | Status |',
+              '|--------|---------|-----|--------|--------|',
+              `| Lines | ${coverage.lines}% | ${minimums.lines}% | ${targets.lines}% | ${badge(coverage.lines, minimums.lines, targets.lines)} |`,
+              `| Branches | ${coverage.branches}% | ${minimums.branches}% | ${targets.branches}% | ${badge(coverage.branches, minimums.branches, targets.branches)} |`,
+              `| Functions | ${coverage.functions}% | ${minimums.functions}% | ${targets.functions}% | ${badge(coverage.functions, minimums.functions, targets.functions)} |`,
+              `| Statements | ${coverage.statements}% | ${minimums.statements}% | ${targets.statements}% | ${badge(coverage.statements, minimums.statements, targets.statements)} |`,
+              '',
+              '---',
+              `_Updated: ${new Date().toISOString()} | [View CI Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number, body,
+              });
+            }
+
+  # ──────────────────────────────────────
+  # Job 5: Notify on CI Failure
+  # ──────────────────────────────────────
+  notify-fail:
+    name: "Notify: CI Failed"
+    # pull_request only — deploy jobs have their own dedicated
+    # deploy_fail notification; this job catches quality/test failures.
+    needs: [quality-check, test]
+    if: failure() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare failure info
+        id: fail_info
+        run: |
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify CI Failed
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'ci_fail'
+          branch: ${{ github.ref_name }}
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.fail_info.outputs.short_sha }}
+          commit-msg: ${{ steps.fail_info.outputs.commit_msg }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 6: Deploy to Vercel (staging branch)
+  # ──────────────────────────────────────
+  deploy-staging:
+    name: "Deploy: Vercel (staging)"
+    # No `needs` — quality-check and test only run on pull_request, and
+    # this job only runs on push, so a `needs` would make the job
+    # permanently skipped. GitHub branch protection guarantees every
+    # merge commit was already CI-validated on its source PR.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (staging custom environment)
+        # --environment=staging pulls the custom env directly, which stamps
+        # .vercel/.env.staging.local with VERCEL_TARGET_ENV=staging. This
+        # metadata must match `vercel build --target=staging` and
+        # `vercel deploy --prebuilt --target=staging` below, otherwise the
+        # CLI aborts with a "prebuilt environment mismatch" error.
+        run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          # Ensure the DB is reachable from the runner before build runs migrations.
+          # Reads DATABASE_URI from the env file that vercel pull just wrote.
+          set -e
+          ENV_FILE=".vercel/.env.staging.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build --target=staging
+        # --target=staging must match both the pulled env metadata
+        # (VERCEL_TARGET_ENV=staging from --environment=staging) and the
+        # deploy flag below. Without it, vercel build stamps the prebuilt
+        # output with target=preview and vercel deploy --prebuilt
+        # --target=staging fails the prebuilt environment mismatch check.
+        run: vercel build --target=staging --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --target=staging
+        id: deploy
+        run: |
+          # --target=staging routes this deploy at the custom "staging"
+          # environment so Vercel auto-aliases it to web-v2.dev.ecommercehub.my.
+          # Without --target the deploy lands in generic Preview and the
+          # staging alias stays on the previous deployment.
+          set -e
+          URL=$(vercel deploy --prebuilt --target=staging --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Verify alias rollover
+        run: |
+          # Authoritative API check — does web-v2.dev.ecommercehub.my now
+          # point at the deployment we just created? If not, fail the job
+          # with a clear error so we don't silently serve stale staging.
+          set -e
+          DEPLOY_URL="${{ steps.deploy.outputs.url }}"
+          EXPECTED="${DEPLOY_URL#https://}"
+          for i in 1 2 3 4 5; do
+            # -s (silent) not -sf — HTTP errors still pipe body to node,
+            # which returns empty string via try/catch. `set -e` therefore
+            # never aborts the loop on a transient API blip.
+            ACTUAL=$(curl -s \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v4/aliases/web-v2.dev.ecommercehub.my?teamId=$VERCEL_ORG_ID" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).deployment?.url||'')}catch{console.log('')}})")
+            if [ "$ACTUAL" = "$EXPECTED" ]; then
+              echo "✓ alias rolled over: web-v2.dev.ecommercehub.my -> $ACTUAL"
+              exit 0
+            fi
+            echo "attempt $i: expected=$EXPECTED actual=$ACTUAL — retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::alias web-v2.dev.ecommercehub.my did not roll over to $EXPECTED (still $ACTUAL)"
+          exit 1
+
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — force replace-all reseed against the
+        # freshly aliased deploy. Keeps Payload Templates in sync with
+        # shipped block code. ADR: force strategy chosen because admin
+        # doesn't edit templates directly today; revisit when editing UI
+        # lands. SEED_TOKEN mirrored in Vercel env (staging scope).
+        env:
+          DEPLOY_URL: https://web-v2.dev.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 7: Deploy to Vercel (main branch → production)
+  # ──────────────────────────────────────
+  deploy-production:
+    name: "Deploy: Vercel (production)"
+    # No `needs` — see deploy-staging rationale above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (production)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.production.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (prod)
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --prod
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — mirror of staging seed step against prod
+        # alias. SEED_TOKEN must be mirrored in Vercel production env.
+        # NOTE: staging freshness gate deferred (see plan.md — nice-to-have).
+        env:
+          DEPLOY_URL: https://web-v2.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 8: Deploy to Vercel (qc-test branch → Preview scope with branch-filter)
+  # ──────────────────────────────────────
+  # Isolated QC environment for JMeter / load / E2E tests.
+  #
+  # Architecture:
+  #   - Neon project ech-prime-web-v2-qc-test (Free tier) — data + compute
+  #     + quota isolated from staging
+  #   - Vercel Preview scope with branch-filter (branch=qc-test) — env vars
+  #     (DATABASE_URI, APP_ENV, QC_SEED_PASSWORD) override staging values
+  #     only for this specific branch. Pro plan does not permit a second
+  #     custom environment (staging already occupies the slot), so we
+  #     leverage Vercel's built-in branch-filter feature instead.
+  #   - Branch `qc-test` protected — QC lead + dev owner push only
+  #
+  # Deploy target is `preview` (default) — Vercel picks branch-scoped env
+  # vars automatically based on `github.ref`. No `--target=qc-test` flag
+  # because there is no custom env named `qc-test` on Vercel.
+  # Plan: plans/260702-1719-qc-test-env-setup/
+  deploy-qc-test:
+    name: "Deploy: Vercel (qc-test)"
+    # Accepts both push (normal branch push) and workflow_dispatch (invoked
+    # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-qc-test
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (Preview scope + branch=qc-test overrides)
+        # `--environment=preview --git-branch=qc-test` pulls the branch-
+        # scoped Preview vars: base Preview vars first, then any var whose
+        # scope filter says "Preview + branch: qc-test" wins. Stamps
+        # .vercel/.env.preview.local with VERCEL_TARGET_ENV=preview.
+        run: |
+          vercel pull --yes \
+            --environment=preview \
+            --git-branch=qc-test \
+            --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.preview.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # Sanity check: must resolve to QC endpoint, not staging.
+          if echo "$DATABASE_URI" | grep -q "ep-blue-king-a1qufqjg"; then
+            echo "::error::DATABASE_URI points at staging endpoint — branch-filter override missing"
+            echo "::error::Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
+            exit 1
+          fi
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (preview)
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt (preview)
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Promote alias → ech-prime-web-v2-qc.vercel.app
+        # vercel deploy creates a per-deploy URL. The stable QC domain needs an
+        # explicit alias to each new deploy — Vercel's automatic branch-alias
+        # rollover does NOT apply to preview scope. Without this, QA keeps
+        # hitting whichever deploy first claimed the alias (as happened on
+        # 2026-07-09: OTP bypass deploy built successfully but alias stayed
+        # pinned to a 6-day-old deploy).
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          URL="${URL#https://}"
+          vercel alias set "$URL" ech-prime-web-v2-qc.vercel.app --token="$VERCEL_TOKEN"
+          echo "Alias rolled: ech-prime-web-v2-qc.vercel.app → $URL"
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

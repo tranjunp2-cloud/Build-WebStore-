@@ -1,0 +1,661 @@
+import { describe, it, expect, vi } from 'vitest'
+import {
+    slugify,
+    buildSavePayload,
+    generateFallbackSku,
+    normalizeDraftProductName,
+} from '@/components/dashboard/BulkCreateModal'
+
+// ─── TC-F08-04-01: Bulk product creation utilities ──────────────────────
+
+describe('slugify [TC-F08-04-01]', () => {
+    it('converts basic text to kebab-case', () => {
+        expect(slugify('Hello World')).toBe('hello-world')
+    })
+
+    it('removes diacritics (Vietnamese)', () => {
+        // đ → d + combining stroke → NFD removes combining → 'a'
+        // Actual behavior: 'đ' NFD decompose drops the stroke
+        expect(slugify('Cà phê sữa đá')).toBe('ca-phe-sua-a')
+    })
+
+    it('removes special characters', () => {
+        expect(slugify('Hello @#$% World!')).toBe('hello-world')
+    })
+
+    it('strips leading and trailing hyphens', () => {
+        expect(slugify('--hello--')).toBe('hello')
+    })
+
+    it('collapses multiple hyphens', () => {
+        expect(slugify('hello   world')).toBe('hello-world')
+    })
+
+    it('handles empty string', () => {
+        expect(slugify('')).toBe('')
+    })
+
+    it('converts uppercase to lowercase', () => {
+        expect(slugify('UPPER CASE')).toBe('upper-case')
+    })
+
+    it('handles numbers', () => {
+        expect(slugify('Product 123 ABC')).toBe('product-123-abc')
+    })
+})
+
+describe('normalizeDraftProductName [TC-F08-04-118]', () => {
+    it('keeps product names single-value while allowing the textarea to wrap visually', () => {
+        // Arrange
+        const pastedName = 'Premium Backpack\r\nWith Extended\u2028Product\u2029Name'
+
+        // Act
+        const result = normalizeDraftProductName(pastedName)
+
+        // Assert
+        expect(result).toBe('Premium Backpack With Extended Product Name')
+    })
+
+    it('TC-F08-04-118: preserves a Product Name at the canonical 120-code-unit limit', () => {
+        // Arrange
+        const maxLengthName = 'A'.repeat(120)
+
+        // Act
+        const result = normalizeDraftProductName(maxLengthName)
+
+        // Assert
+        expect(result).toBe(maxLengthName)
+    })
+
+    it('TC-F08-04-118: discards Product Name characters beyond the canonical limit', () => {
+        // Arrange
+        const overlongName = 'A'.repeat(121)
+
+        // Act
+        const result = normalizeDraftProductName(overlongName)
+
+        // Assert
+        expect(result).toHaveLength(120)
+    })
+
+    it('TC-F08-04-118: never leaves an unpaired surrogate when truncating Unicode', () => {
+        // Arrange
+        const emojiAtBoundary = `${'A'.repeat(118)}😀`
+        const emojiAcrossBoundary = `${'A'.repeat(119)}😀`
+
+        // Act
+        const exactResult = normalizeDraftProductName(emojiAtBoundary)
+        const result = normalizeDraftProductName(emojiAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(emojiAtBoundary)
+        expect(result).toBe('A'.repeat(119))
+        expect(result).not.toMatch(/[\uD800-\uDFFF]$/)
+    })
+
+    it('TC-F08-04-118: preserves combining-mark graphemes at the limit and drops the whole cluster across it', () => {
+        // Arrange
+        const exactLimitName = `${'A'.repeat(118)}e\u0301`
+        const graphemeAcrossBoundary = `${'A'.repeat(119)}e\u0301`
+
+        // Act
+        const exactResult = normalizeDraftProductName(exactLimitName)
+        const truncatedResult = normalizeDraftProductName(graphemeAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(exactLimitName)
+        expect(exactResult).toHaveLength(120)
+        expect(truncatedResult).toBe('A'.repeat(119))
+    })
+
+    it('TC-F08-04-118: preserves ZWJ emoji at the limit and drops the whole cluster across it', () => {
+        // Arrange
+        const exactLimitName = `${'A'.repeat(115)}👩‍💻`
+        const graphemeAcrossBoundary = `${'A'.repeat(118)}👩‍💻`
+
+        // Act
+        const exactResult = normalizeDraftProductName(exactLimitName)
+        const truncatedResult = normalizeDraftProductName(graphemeAcrossBoundary)
+
+        // Assert
+        expect(exactResult).toBe(exactLimitName)
+        expect(exactResult).toHaveLength(120)
+        expect(truncatedResult).toBe('A'.repeat(118))
+    })
+
+    it('TC-F08-04-118: preserves Unicode instead of guessing boundaries when Intl.Segmenter is unavailable', async () => {
+        // Arrange
+        const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter')
+        vi.resetModules()
+        Object.defineProperty(Intl, 'Segmenter', {
+            configurable: true,
+            writable: true,
+            value: undefined,
+        })
+
+        try {
+            // Act
+            const { normalizeDraftProductName: normalizeWithoutIntlSegmenter } = await import(
+                '@/components/dashboard/BulkCreateModal'
+            )
+            const names = [
+                `${'A'.repeat(119)}e\u0301`,
+                `${'A'.repeat(118)}👩‍💻`,
+                `${'A'.repeat(118)}🇻🇳`,
+                `${'A'.repeat(119)}가`,
+                `${'A'.repeat(118)}क्ष`,
+                'X'.repeat(4097),
+            ]
+
+            // Assert
+            expect(names.map(normalizeWithoutIntlSegmenter)).toEqual(names)
+        } finally {
+            if (segmenterDescriptor) {
+                Object.defineProperty(Intl, 'Segmenter', segmenterDescriptor)
+            } else {
+                Reflect.deleteProperty(Intl, 'Segmenter')
+            }
+            vi.resetModules()
+        }
+    })
+
+    it('TC-F08-04-118: bounds work for an oversized pasted or AI-generated name', () => {
+        // Arrange
+        const oversizedName = `${'\n'.repeat(4094)}e\u0301\u0301${'X'.repeat(1_000_000)}`
+
+        // Act
+        const result = normalizeDraftProductName(oversizedName)
+
+        // Assert
+        expect(result).toBe(' ')
+    })
+})
+
+describe('generateFallbackSku [TC-F08-04-43]', () => {
+    it('produces a non-empty uppercase SKU from a product name', () => {
+        const sku = generateFallbackSku('Leather Jacket')
+        expect(sku).toBeTruthy()
+        expect(sku).toBe(sku.toUpperCase())
+    })
+
+    it('falls back to a generic base when the name has no alphanumeric characters', () => {
+        const sku = generateFallbackSku('!!!')
+        expect(sku).toMatch(/^PRD-[A-Z0-9]{4}$/)
+    })
+
+    it('generates different suffixes across calls (collision-resistant)', () => {
+        const sku1 = generateFallbackSku('Same Name')
+        const sku2 = generateFallbackSku('Same Name')
+        expect(sku1).not.toBe(sku2)
+    })
+})
+
+describe('buildSavePayload [TC-F08-04-01]', () => {
+    it('builds payload for simple product (no variants)', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.name).toBe('Nasi Lemak')
+        expect(payload.price).toBe(12.5)
+        expect(payload.status).toBe('draft')
+        expect(payload.hasVariants).toBe(false)
+        expect(payload.variants).toBeUndefined()
+        expect(payload.slug).toContain('nasi-lemak')
+    })
+
+    it('TC-F08-04-42: no-variant product defaults inventory to 0 (out of stock)', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(0)
+    })
+
+    it('TC-F08-04-53 (review-drawer stock field): no-variant product uses the merchant-edited stock value', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+            stock: 25,
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(25)
+    })
+
+    it('TC-F08-04-54 (review-drawer stock field): variant product ignores top-level prod.stock — inventory is the sum of variant stocks instead', () => {
+        // Products.ts beforeChange hook recomputes inventory server-side as the sum of variant
+        // stocks regardless, but buildSavePayload computes the same sum itself so the payload it
+        // sends is internally consistent with what the review drawer's Stock field displayed
+        // (editing it there distributes the value to every variant uniformly — see
+        // updateAllVariantsStock in BulkCreateModal).
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            stock: 25, // top-level stock is ignored for variant products — not summed in
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 5 },
+                { name: 'Large', price: 39.9, sku: 'TS-L', stock: 3 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(8)
+    })
+
+    it('TC-F08-04-59 (adversarial-review follow-up): buildSavePayload itself coerces a non-numeric variant/top-level stock — not just the drawer parse-time path', () => {
+        // TC-F08-04-58 (bulk-create-save.test.tsx) only exercises coerceFiniteNumber's parse-time
+        // call site (the uniqueMap dedup step) — by the time buildSavePayload runs in that test,
+        // stock is already clean. This calls buildSavePayload directly with raw non-numeric stock,
+        // exercising its own two coerceFiniteNumber call sites (variant stock + inventory sum).
+        const variantProduct = {
+            selected: true,
+            name: 'Weird Stock Product',
+            price: 10,
+            category: '',
+            variants: [{ name: 'Default', price: 10, sku: 'WS-001-D', stock: 'N/A' }],
+        }
+        const variantPayload = buildSavePayload(variantProduct, null, null)
+
+        expect(variantPayload.variants![0].stock).toBe(0)
+        expect(variantPayload.inventory).toBe(0)
+
+        const noVariantProduct = {
+            selected: true,
+            name: 'Weird Stock Product 2',
+            price: 10,
+            category: '',
+            variants: [],
+            stock: 'N/A',
+        }
+        const noVariantPayload = buildSavePayload(noVariantProduct, null, null)
+
+        expect(noVariantPayload.inventory).toBe(0)
+    })
+
+    it('TC-F08-04-43: generates a fallback SKU when the AI omits one', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.sku).toBeTruthy()
+        expect(payload.sku.length).toBeGreaterThan(0)
+    })
+
+    it('TC-F08-04-43b: preserves the AI-provided SKU when present', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            sku: 'NL-CUSTOM-01',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.sku).toBe('NL-CUSTOM-01')
+    })
+
+    it('TC-F08-04-44: generates a fallback SKU per variant when the AI omits it', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            variants: [
+                { name: 'Small', price: 39.9, sku: '', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].sku).toBeTruthy()
+    })
+
+    it('TC-F08-04-45: variant stock preserves an explicit 0 (no forced default of 10)', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].stock).toBe(0)
+    })
+
+    // ── TC-F08-1525-40..41: variant compareAtPrice fallback (GH-1525 follow-up) ──
+    // Reported: AI-generated products showed compareAtPrice at the product level
+    // (e.g. 390 vs price 300) but each variant row's Compare Price was blank —
+    // the bulk-parse AI prompt never asked for a per-variant compareAtPrice, and
+    // even if it had, buildSavePayload's variant map didn't pass it through at all.
+
+    it('TC-F08-1525-40: variant with no AI-provided compareAtPrice falls back to the product-level value', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'M', price: 300, sku: 'TS-M', stock: 0 },
+                { name: 'L', price: 300, sku: 'TS-L', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBe(390)
+        expect(payload.variants![1].compareAtPrice).toBe(390)
+    })
+
+    it('TC-F08-1525-41a: variant-level compareAtPrice (when AI does provide one) takes priority over the product-level fallback', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'XL', price: 300, compareAtPrice: 450, sku: 'TS-XL', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBe(450)
+    })
+
+    it('TC-F08-1525-41b: fallback compareAtPrice is dropped (null) when it would not exceed the variant\'s own price', () => {
+        // Variant price (500) overridden higher than the product-level compareAtPrice (390) —
+        // applying 390 as-is would violate the "compareAtPrice > price" invariant.
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'XL (premium)', price: 500, sku: 'TS-XL', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBeNull()
+    })
+
+    it('TC-F08-1525-41c: no product-level compareAtPrice and no variant-level one → null, not an error', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            category: 'Fashion',
+            variants: [
+                { name: 'M', price: 300, sku: 'TS-M', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBeNull()
+    })
+
+    it('TC-F08-04-34: marks the payload as pending AI review', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.aiReviewPending).toBe(true)
+    })
+
+    it('builds payload with variants', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 10 },
+                { name: 'Medium', price: 39.9, sku: 'TS-M', stock: 20 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.hasVariants).toBe(true)
+        expect(payload.variants).toHaveLength(2)
+        expect(payload.variants![0].name).toBe('Small')
+        expect(payload.variants![1].stock).toBe(20)
+    })
+
+    it('defaults variant name to "Default" when empty', () => {
+        const product = {
+            selected: true,
+            name: 'Product',
+            price: 10,
+            category: '',
+            variants: [{ name: '', price: 0, sku: '', stock: 0 }],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].name).toBe('Default')
+    })
+
+    it('TC-F08-04-76: keeps only case-insensitively unique SKUs across base and variants', () => {
+        const payload = buildSavePayload({
+            selected: true,
+            name: 'Wool Coat',
+            price: 100,
+            sku: 'COAT-001',
+            category: '',
+            variants: [
+                { name: 'Red - M', price: 100, sku: 'COAT-RED-M', stock: 0 },
+                { name: 'Red - L', price: 100, sku: 'coat-red-m', stock: 0 },
+                { name: 'Yellow - M', price: 100, sku: 'COAT-001', stock: 0 },
+                { name: 'Yellow - L', price: 100, sku: '', stock: 0 },
+            ],
+        }, null, null)
+
+        const skus = [payload.sku, ...payload.variants!.map(variant => variant.sku)]
+        expect(payload.sku).toBe('COAT-001')
+        expect(payload.variants![0].sku).toBe('COAT-RED-M')
+        expect(new Set(skus.map(sku => sku.toLowerCase())).size).toBe(skus.length)
+    })
+
+    it('TC-F08-04-67: generates variantConfigs with default EN tier labels from 2-tier variants', () => {
+        const product = {
+            selected: true,
+            name: 'Fashion Dress',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Red - S', price: 50, sku: 'DR-RD-S', stock: 10 },
+                { name: 'Red - M', price: 50, sku: 'DR-RD-M', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2)
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Red' }])
+        expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('TC-F08-04-68: uses provided localized tier labels when regenerating variantConfigs', () => {
+        const product = {
+            selected: true,
+            name: 'Fashion Dress',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Putih - S', price: 50, sku: 'DR-WH-S', stock: 10 },
+                { name: 'Putih - M', price: 50, sku: 'DR-WH-M', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null, 'Default', { first: 'Warna', second: 'Saiz' })
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2)
+        expect(payload.variantConfigs![0].name).toBe('Warna')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Putih' }])
+        expect(payload.variantConfigs![1].name).toBe('Saiz')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('TC-F08-02-04: limits generated variantConfigs to maximum 2 tiers by dropping extra tiers', () => {
+        const product = {
+            selected: true,
+            name: 'Excessive Tiers',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Red - S - Cotton', price: 50, sku: 'R-S-C', stock: 10 },
+                { name: 'Red - M - Cotton', price: 50, sku: 'R-M-C', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2) 
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Red' }])
+        expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('TC-F08-04-69: ignores AI provided variantConfigs and regenerates options from variant names', () => {
+        const product = {
+            selected: true,
+            name: 'Perfume',
+            price: 100,
+            category: '',
+            variants: [
+                { name: 'Rose - 50ml', price: 100, sku: 'P-R-50', stock: 5 }
+            ],
+            variantConfigs: [
+                { name: 'Scent', options: [{ value: 'Lavender' }] },
+                { name: 'Volume', options: [{ value: '100ml' }] }
+            ]
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Rose' }])
+        expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: '50ml' }])
+    })
+
+    it('defaults variant price to product price when 0', () => {
+        const product = {
+            selected: true,
+            name: 'Product',
+            price: 50,
+            category: '',
+            variants: [{ name: 'Default', price: 0, sku: '', stock: 0 }],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].price).toBe(50)
+    })
+
+    it('TC-F08-04-06/TC-F08-04-51: sanitizes HTML/XSS script tags from text inputs (incl. description)', () => {
+        const product = {
+            selected: true,
+            name: '<script>alert(1)</script>Hacked Name',
+            price: 50,
+            description: '<script>alert(1)</script>Normal description <b>text</b>',
+            seoTitle: '<iframe src="malicious"/>SEO',
+            seoDescription: 'Normal <b>Desc</b>',
+            category: 'Hacks',
+            variants: [
+                { name: 'Red <img src=x onerror=alert(1)>', price: 50, sku: 'R-<script>S</script>', stock: 10 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.name).toBe('Hacked Name')
+        expect(payload.seo.title).toBe('SEO')
+        // It completely strips out tags, including <b>
+        expect(payload.seo.description).toBe('Normal Desc')
+        expect(payload.variants![0].name).toBe('Red')
+        expect(payload.variants![0].sku).toBe('R-')
+        // TC-F08-04-51 (code-review follow-up): description also goes through sanitizeXSS
+        // before textToLexical — previously the only unsanitized text field in this function.
+        expect(payload.description!.root.children[0].children[0].text).toBe('Normal description text')
+    })
+
+    it('generates unique slug with random suffix', () => {
+        const product = {
+            selected: true,
+            name: 'Same Name',
+            price: 10,
+            category: '',
+            variants: [],
+        }
+        const slug1 = buildSavePayload(product, null, null).slug
+        const slug2 = buildSavePayload(product, null, null).slug
+
+        expect(slug1).toContain('same-name-')
+        expect(slug2).toContain('same-name-')
+        // Random suffix makes them different (very high probability)
+        // Not asserting inequality since it's random — just check format
+        expect(slug1).toMatch(/^same-name-[a-z0-9]{5}$/)
+    })
+
+    it('uses the draft UUID as a stable persisted idempotency key', () => {
+        const product = {
+            _id: '12345678-90ab-cdef-1234-567890abcdef',
+            _draftOrdinal: 1,
+            selected: true,
+            name: 'Same Name',
+            price: 10,
+            categoryId: null,
+            variants: [],
+        }
+
+        const slug1 = buildSavePayload(product, null, null).slug
+        const slug2 = buildSavePayload(product, null, null).slug
+        const otherSlug = buildSavePayload({
+            ...product,
+            _id: 'fedcba09-8765-4321-fedc-ba0987654321',
+        }, null, null).slug
+        const customBaseSlug = buildSavePayload({
+            ...product, slug: 'Custom Product Slug',
+        }, null, null).slug
+        const nonLatinBaseSlug = buildSavePayload({
+            ...product, name: '商品',
+        }, null, null).slug
+
+        expect(slug1).toBe('same-name-ai-1234567890abcdef1234567890abcdef')
+        expect(slug2).toBe(slug1)
+        expect(otherSlug).not.toBe(slug1)
+        expect(customBaseSlug).toBe('custom-product-slug-ai-1234567890abcdef1234567890abcdef')
+        expect(nonLatinBaseSlug).toBe('product-ai-1234567890abcdef1234567890abcdef')
+    })
+})

@@ -1,0 +1,121 @@
+'use client'
+
+import { useState } from 'react'
+import type { BlockProps } from '../types'
+import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
+import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
+import { Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { Facebook, Instagram, Linkedin, Youtube, MessageCircle } from 'lucide-react'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
+
+const SW_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+const PLATFORM_META: Record<SocialPlatform, { label: string; icon: React.ComponentType<{ size?: number }>; accent: string }> = {
+    facebook: { label: 'Facebook', icon: Facebook, accent: '#2563eb' },
+    whatsapp: { label: 'WhatsApp', icon: MessageCircle, accent: '#16a34a' },
+    instagram: { label: 'Instagram', icon: Instagram, accent: '#db2777' },
+    linkedin: { label: 'LinkedIn', icon: Linkedin, accent: '#0284c7' },
+    youtube: { label: 'YouTube', icon: Youtube, accent: '#dc2626' },
+}
+
+function normalizeUrl(platform: SocialPlatform, value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return '#'
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+
+    if (platform === 'whatsapp') {
+        const digits = trimmed.replace(/[^\d]/g, '')
+        return digits ? `https://wa.me/${digits}` : '#'
+    }
+
+    return `https://${trimmed}`
+}
+
+function getPlatformStyles(platform: SocialPlatform) {
+    const accent = PLATFORM_META[platform].accent
+
+    return {
+        background: `linear-gradient(135deg, ${accent}20, rgba(var(--brand-primary-rgb), 0.086))`,
+        borderColor: `${accent}40`,
+        color: accent,
+    }
+}
+
+function PlatformBadge({ platform }: { platform: SocialPlatform }) {
+    const meta = PLATFORM_META[platform]
+    const Icon = meta.icon
+
+    return (
+        <span
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+            style={{ color: meta.accent, borderColor: `${meta.accent}22` }}
+        >
+            <Icon size={16} />
+        </span>
+    )
+}
+
+type SocialLinkAnchorProps = {
+    platform: SocialPlatform
+    url: string
+    showLabelAlways?: boolean
+    extraClassName?: string
+}
+
+/** Social platform link anchor. Meets TOUCH_TARGET.min. */
+function SocialLinkAnchor({ platform, url, showLabelAlways = false, extraClassName = '' }: SocialLinkAnchorProps) {
+    const meta = PLATFORM_META[platform]
+    const style = getPlatformStyles(platform)
+    const [hovered, setHovered] = useState(false)
+
+    const labelCls = showLabelAlways
+        ? 'text-sm font-medium text-white/85'
+        : `text-sm font-medium overflow-hidden transition-all duration-300 whitespace-nowrap ${hovered ? 'max-w-xs ml-3' : 'max-w-0'}`
+
+    return (
+        <a
+            href={normalizeUrl(platform, url)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={meta.label}
+            data-no-text-edit
+            onMouseEnter={showLabelAlways ? undefined : () => setHovered(true)}
+            onMouseLeave={showLabelAlways ? undefined : () => setHovered(false)}
+            className={`flex items-center ${showLabelAlways ? 'gap-3' : ''} rounded-2xl border px-3 py-2 transition-transform duration-200 hover:-translate-y-0.5 ${TOUCH_TARGET.min} ${extraClassName}`.trim()}
+            style={style}
+        >
+            <PlatformBadge platform={platform} />
+            <span data-no-text-edit className={labelCls}>{meta.label}</span>
+        </a>
+    )
+}
+
+export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig>) {
+    const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(block, site?.socialLinks))
+    let links = normalizedBlock.links.filter((item: SocialLinkItem) => item.enabled !== false)
+    if (links.length === 0) {
+        links = getDefaultSocialWidgetLinks().filter(item => item.enabled !== false)
+    }
+    const inContainer = useInFloatingContainer()
+
+    return (
+        <section className={inContainer ? '' : 'fixed bottom-6 right-6 z-40'}>
+            <div data-no-text-edit className="flex flex-col items-end gap-3">
+                {normalizedBlock.headline ? (
+                    <Caption data-text-editable className="mb-1 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
+                ) : null}
+                <div data-no-text-edit className="flex flex-col items-end gap-3">
+                    {links.map(item => (
+                        <SocialLinkAnchor
+                            key={item.platform}
+                            platform={item.platform}
+                            url={item.url}
+                            extraClassName="shadow-[0_14px_32px_rgba(15,23,42,0.18)] backdrop-blur-sm"
+                        />
+                    ))}
+                </div>
+            </div>
+        </section>
+    )
+}

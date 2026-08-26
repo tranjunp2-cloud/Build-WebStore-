@@ -1,0 +1,651 @@
+# PR Lifecycle — Full PR automation (notify, assign, remind, stale check)
+name: PR Lifecycle
+
+on:
+  pull_request:
+    types: [opened, closed, review_requested]
+  pull_request_review:
+    types: [submitted]
+  schedule:
+    # 2x/day, weekdays only (UTC) — stale/reminder checks
+    # 9 AM MYT (1 UTC) + 5 PM MYT (9 UTC) — saves ~60% vs every 4h
+    - cron: '0 1,9 * * 1-5'
+
+env:
+  PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+
+jobs:
+  # ──────────────────────────────────────
+  # PR Opened — Notify team + auto-label size
+  # ──────────────────────────────────────
+  pr-opened:
+    name: 'PR Opened'
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+      repository-projects: write
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Auto-assign author + label + detect type + check issue link
+        uses: actions/github-script@v7
+        id: size
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // ── 1. Auto-assign PR author ──
+            await github.rest.issues.addAssignees({
+              owner, repo,
+              issue_number: prNumber,
+              assignees: [pr.user.login],
+            });
+
+            // ── 2. Get changed files + compute size ──
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner, repo,
+              pull_number: prNumber,
+            });
+
+            const changes = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+            let sizeLabel = 'size:S';
+            if (changes > 500) sizeLabel = 'size:XL';
+            else if (changes > 200) sizeLabel = 'size:L';
+            else if (changes > 50) sizeLabel = 'size:M';
+
+            // ── 3. Auto-detect type labels from branch name ──
+            const branch = pr.head.ref;
+            const labels = [sizeLabel];
+
+            if (branch.startsWith('feature/')) labels.push('type:feature');
+            else if (branch.startsWith('fix/')) labels.push('type:fix');
+            else if (branch.startsWith('hotfix/')) labels.push('type:hotfix');
+            else if (branch.startsWith('chore/')) labels.push('type:chore');
+            else if (branch.startsWith('docs/')) labels.push('type:docs');
+            else if (branch.startsWith('refactor/')) labels.push('type:refactor');
+
+            // ── 4. Auto-detect area labels from changed files ──
+            const paths = files.map(f => f.filename);
+            const areas = new Set();
+
+            for (const p of paths) {
+              if (p.startsWith('src/app/') || p.startsWith('src/components/') || p.startsWith('src/blocks/') || p.startsWith('src/store/')) areas.add('area:frontend');
+              if (p.startsWith('src/collections/') || p.startsWith('src/app/api/') || p === 'src/payload.config.ts') areas.add('area:backend');
+              if (p.startsWith('.github/') || p.startsWith('Dockerfile') || p.startsWith('docker-compose') || p.startsWith('scripts/')) areas.add('area:infra');
+              if (p.startsWith('docs/') || p === 'SPEC.md' || p === 'CLAUDE.md') areas.add('area:docs');
+            }
+
+            for (const area of areas) labels.push(area);
+
+            // ── 5. Auto-link PR → Issue (Relates to — KHÔNG auto-close) ──
+            let body = pr.body || '';
+            const linkRe = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|relates?\s+to)\s+#(\d+)/gi;
+            const linkedIssues = [];
+            let match;
+            while ((match = linkRe.exec(body)) !== null) {
+              linkedIssues.push(parseInt(match[1]));
+            }
+
+            // Skip for chore/docs/refactor branches
+            const skipTypes = ['chore/', 'docs/', 'refactor/'];
+            const shouldCheck = !skipTypes.some(t => branch.startsWith(t));
+
+            if (shouldCheck && linkedIssues.length === 0) {
+              const title = pr.title || '';
+
+              // Strategy 1: Exact match from PR title — [US-F01-03] pattern
+              const storyMatch = title.match(/\[?(US-F\d{2}-\d{2})\]?/i);
+              let autoLinked = false;
+
+              if (storyMatch) {
+                const storyId = storyMatch[1].toUpperCase();
+                const { data: exactMatches } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'open', per_page: 5,
+                });
+                const exactIssue = exactMatches.find(i =>
+                  !i.pull_request && i.title.toUpperCase().includes(`[${storyId}]`)
+                );
+
+                if (exactIssue) {
+                  // Auto-inject "Relates to #N" (KHÔNG dùng Closes)
+                  const updatedBody = body.replace(
+                    /- \*\*(?:Closes|Issue):\*\* #(?:<!--.*?-->)?/,
+                    `- **Issue:** Relates to #${exactIssue.number}`
+                  );
+                  const finalBody = updatedBody !== body
+                    ? updatedBody
+                    : `Relates to #${exactIssue.number}\n\n${body}`;
+
+                  await github.rest.pulls.update({
+                    owner, repo, pull_number: prNumber,
+                    body: finalBody,
+                  });
+
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `🔗 Auto-linked to **#${exactIssue.number}** (${exactIssue.title}).\n📌 Issue sẽ chuyển **QA Testing** khi PR merged (QC close issue khi test pass).`,
+                  });
+
+                  linkedIssues.push(exactIssue.number);
+                  autoLinked = true;
+
+                  // Auto-label wave:X from linked issue's milestone
+                  if (exactIssue.milestone) {
+                    const milestoneTitle = exactIssue.milestone.title;
+                    const waveMatch = milestoneTitle.match(/Wave\s+(\d+)/i);
+                    if (waveMatch) {
+                      labels.push(`wave:${waveMatch[1]}`);
+                    }
+                  }
+                }
+              }
+
+              // Strategy 2: Feature code from branch — feature/F01-xxx
+              if (!autoLinked) {
+                const featureMatch = branch.match(/\b(F\d{2})\b/i);
+                if (featureMatch) {
+                  const featureCode = featureMatch[1].toUpperCase();
+                  const { data: candidates } = await github.rest.issues.listForRepo({
+                    owner, repo, state: 'open',
+                    labels: `feature:${featureCode}`,
+                    per_page: 10,
+                  });
+                  const issues = candidates.filter(i => !i.pull_request);
+
+                  if (issues.length === 1) {
+                    const issue = issues[0];
+                    const updatedBody = body.replace(
+                      /- \*\*(?:Closes|Issue):\*\* #(?:<!--.*?-->)?/,
+                      `- **Issue:** Relates to #${issue.number}`
+                    );
+                    const finalBody = updatedBody !== body
+                      ? updatedBody
+                      : `Relates to #${issue.number}\n\n${body}`;
+
+                    await github.rest.pulls.update({
+                      owner, repo, pull_number: prNumber,
+                      body: finalBody,
+                    });
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `🔗 Auto-linked to **#${issue.number}** (${issue.title}) — only open issue for \`${featureCode}\`.\n📌 Issue sẽ chuyển **QA Testing** khi PR merged.`,
+                    });
+                    linkedIssues.push(issue.number);
+
+                    // Auto-label wave:X
+                    if (issue.milestone) {
+                      const waveMatch = issue.milestone.title.match(/Wave\s+(\d+)/i);
+                      if (waveMatch) labels.push(`wave:${waveMatch[1]}`);
+                    }
+                  } else if (issues.length > 1) {
+                    const list = issues
+                      .map(i => `- \`Relates to #${i.number}\` — ${i.title}`)
+                      .slice(0, 5)
+                      .join('\n');
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Tìm thấy ${issues.length} issues cho \`${featureCode}\`:\n\n${list}\n\n👉 Edit PR description → thêm \`Relates to #<số>\` vào dòng **Issue:**`,
+                    });
+                  } else {
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Không tìm thấy issue nào cho \`${featureCode}\`.\n\n👉 Tìm issue phù hợp trong tab Issues → thêm \`Relates to #<số>\` vào PR description.`,
+                    });
+                  }
+                } else {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `⚠️ **Chưa link issue.** Thêm \`Relates to #<số>\` vào PR description để link với user story.\n\n> _Tab Issues → tìm story → copy số → điền vào PR._`,
+                  });
+                }
+              }
+            }
+
+            await github.rest.issues.addLabels({
+              owner, repo,
+              issue_number: prNumber,
+              labels,
+            });
+
+            core.setOutput('size_label', sizeLabel);
+            core.setOutput('changes', changes);
+            core.setOutput('file_count', files.length);
+            core.setOutput('labels', labels.join(', '));
+            core.setOutput('linked_issues', linkedIssues.join(', ') || 'none');
+
+      - name: Notify Lark (PR Opened)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🆕 New PR #${{ github.event.pull_request.number }}"
+          template: 'blue'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}"
+          meta2-left-label: "📊 Size"
+          meta2-left-value: "${{ steps.size.outputs.size_label }} (${{ steps.size.outputs.changes }} lines)"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.event.pull_request.user.login }}"
+          content: |
+            📝 ${{ github.event.pull_request.title }}
+            📁 ${{ steps.size.outputs.file_count }} files changed
+          buttons: '[{"text":"🔍 Review PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"},{"text":"📄 View Files","url":"${{ github.event.pull_request.html_url }}/files","type":"default"}]'
+
+  # ──────────────────────────────────────
+  # PR Review Submitted — Notify + auto-label
+  # ──────────────────────────────────────
+  pr-review:
+    name: 'PR Review'
+    if: github.event_name == 'pull_request_review'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+      checks: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Auto-label approved + ready-to-merge
+        if: github.event.review.state == 'approved'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = pr.number;
+
+            // Add "approved" label
+            const labelsToAdd = ['approved'];
+
+            // Check if CI has passed (all checks successful)
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner, repo,
+              ref: pr.head.sha,
+            });
+
+            const ciChecks = checks.check_runs.filter(c => c.name !== 'PR Review');
+            const allPassed = ciChecks.length > 0 && ciChecks.every(c =>
+              c.conclusion === 'success' || c.conclusion === 'skipped'
+            );
+
+            if (allPassed) {
+              labelsToAdd.push('ready-to-merge');
+              console.log('CI passed + approved → adding ready-to-merge label');
+            }
+
+            await github.rest.issues.addLabels({
+              owner, repo,
+              issue_number: prNumber,
+              labels: labelsToAdd,
+            });
+
+      - name: Notify Lark (Approved)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "✅ PR Approved #${{ github.event.pull_request.number }}"
+          template: 'green'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "✅ Reviewer"
+          meta-right-value: "${{ github.event.review.user.login }}"
+          content: |
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            🎉 **Ready to merge!**
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
+
+      - name: Remove approved labels on changes requested
+        if: github.event.review.state == 'changes_requested'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request.number;
+            for (const label of ['approved', 'ready-to-merge']) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                console.log(`Removed ${label} from PR #${prNumber}`);
+              } catch (e) {
+                if (e.status !== 404) console.warn(`Failed to remove ${label} from PR #${prNumber}: ${e.message}`);
+              }
+            }
+
+      - name: Notify Lark (Changes Requested)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "⚠️ Changes Requested #${{ github.event.pull_request.number }}"
+          template: 'yellow'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "👀 Reviewer"
+          meta-right-value: "${{ github.event.review.user.login }}"
+          content: |
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            ⚠️ Please address review feedback.
+          buttons: '[{"text":"📝 View Review","url":"${{ github.event.review.html_url }}","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # PR Merged — Label issues qa:pending + update board → QA Testing
+  # ──────────────────────────────────────
+  pr-merged:
+    name: 'PR Merged'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      issues: write
+      contents: read
+      repository-projects: write
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Move linked issues to QA Testing
+        id: qa_issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const body = pr.body || '';
+
+            // Find linked issues: "Relates to #N" or "Closes #N" (backward compat)
+            const linkRe = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|relates?\s+to)\s+#(\d+)/gi;
+            const linkedIssues = [];
+            let match;
+            while ((match = linkRe.exec(body)) !== null) {
+              linkedIssues.push(parseInt(match[1]));
+            }
+
+            if (linkedIssues.length === 0) {
+              console.log('No linked issues found');
+              core.setOutput('issues', '');
+              core.setOutput('issues_text', '');
+              return;
+            }
+
+            console.log(`Found linked issues: ${linkedIssues.join(', ')}`);
+
+            // Collect issue info for Lark notification
+            const issueInfos = [];
+
+            // Label each linked issue as qa:pending
+            for (const issueNumber of linkedIssues) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner, repo, issue_number: issueNumber,
+                });
+
+                await github.rest.issues.addLabels({
+                  owner, repo,
+                  issue_number: issueNumber,
+                  labels: ['qa:pending'],
+                });
+
+                // Remove stale QA labels from previous test cycle
+                for (const oldLabel of ['qa:failed', 'qa:passed']) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner, repo,
+                      issue_number: issueNumber,
+                      name: oldLabel,
+                    });
+                    console.log(`Removed ${oldLabel} from #${issueNumber}`);
+                  } catch (e) {
+                    if (e.status !== 404) console.warn(`Failed to remove ${oldLabel} from #${issueNumber}: ${e.message}`);
+                  }
+                }
+
+                // Comment on issue
+                await github.rest.issues.createComment({
+                  owner, repo,
+                  issue_number: issueNumber,
+                  body: `🧪 PR #${pr.number} đã merge → staging. Chờ **QC test**.\n\n> QC: test xong thì close issue (pass) hoặc thêm label \`qa:failed\` (fail).`,
+                });
+
+                issueInfos.push({
+                  number: issueNumber,
+                  title: issue.title,
+                  url: issue.html_url,
+                });
+
+                console.log(`Issue #${issueNumber} → qa:pending`);
+              } catch (e) {
+                console.log(`Failed to label issue #${issueNumber}: ${e.message}`);
+              }
+            }
+
+            // Output for Lark notification
+            core.setOutput('issues', linkedIssues.map(n => `#${n}`).join(', '));
+            core.setOutput('issues_text', issueInfos.map(i => `• #${i.number} ${i.title}`).join('\n'));
+
+            // Update Projects board → QA Testing
+            const projectNumber = parseInt('${{ env.PROJECT_NUMBER }}');
+            if (!projectNumber) {
+              console.log('PROJECT_NUMBER not set, skipping board update');
+              return;
+            }
+
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options { id name }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+
+            let project;
+            try {
+              const result = await github.graphql(projectQuery, {
+                org: owner, number: projectNumber,
+              });
+              project = result.organization.projectV2;
+            } catch (e) {
+              console.log(`Could not find project: ${e.message}`);
+              return;
+            }
+
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) return;
+
+            const qaOption = statusField.options.find(o => o.name === 'QA Testing');
+            if (!qaOption) {
+              console.log(`No "QA Testing" status found. Available: ${statusField.options.map(o => o.name).join(', ')}`);
+              return;
+            }
+
+            for (const issueNumber of linkedIssues) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner, repo, issue_number: issueNumber,
+                });
+
+                const addMutation = `mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item { id }
+                  }
+                }`;
+
+                const { addProjectV2ItemById } = await github.graphql(addMutation, {
+                  projectId: project.id,
+                  contentId: issue.node_id,
+                });
+
+                const updateMutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId, itemId: $itemId,
+                    fieldId: $fieldId, value: { singleSelectOptionId: $value }
+                  }) {
+                    projectV2Item { id }
+                  }
+                }`;
+
+                await github.graphql(updateMutation, {
+                  projectId: project.id,
+                  itemId: addProjectV2ItemById.item.id,
+                  fieldId: statusField.id,
+                  value: qaOption.id,
+                });
+
+                console.log(`Issue #${issueNumber} board → QA Testing`);
+              } catch (e) {
+                console.log(`Failed to update board for #${issueNumber}: ${e.message}`);
+              }
+            }
+
+      - name: Notify Lark (QA Ready)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🧪 QA Ready — ${{ steps.qa_issues.outputs.issues }}"
+          template: 'orange'
+          meta-left-label: "👤 Dev"
+          meta-left-value: "${{ github.event.pull_request.user.login }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.base.ref }}"
+          content: |
+            **PR #${{ github.event.pull_request.number }}** đã merge → staging
+
+            **Issues chờ QC test:**
+            ${{ steps.qa_issues.outputs.issues_text }}
+
+            ⚡ QC: test trên staging → **pass** thì close issue, **fail** thì gắn label `qa:failed`
+          buttons: '[{"text":"📋 QA Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Aqa%3Apending","type":"primary"},{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"default"}]'
+
+      - name: Notify Lark (Merged — no issues)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🎉 PR Merged #${{ github.event.pull_request.number }}"
+          template: 'green'
+          meta-left-label: "👤 Author"
+          meta-left-value: "${{ github.event.pull_request.user.login }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.base.ref }}"
+          content: |
+            📝 ${{ github.event.pull_request.title }}
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # Stale PR Check — Remind reviewers and authors
+  # ──────────────────────────────────────
+  stale-pr-check:
+    name: 'Stale PR Check'
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Check for stale PRs
+        uses: actions/github-script@v7
+        id: stale
+        with:
+          script: |
+            const now = new Date();
+            const FOUR_HOURS = 4 * 60 * 60 * 1000;
+            const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+            const MAX_NOTIFICATIONS = 5;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'updated',
+              direction: 'asc',
+              per_page: 30,
+            });
+
+            const needsReview = [];
+            const stale = [];
+
+            for (const pr of prs) {
+              if (pr.draft) continue;
+
+              const updatedAt = new Date(pr.updated_at);
+              const timeSinceUpdate = now - updatedAt;
+
+              if (pr.requested_reviewers.length > 0 && timeSinceUpdate > FOUR_HOURS) {
+                const reviewers = pr.requested_reviewers.map(r => r.login).join(', ');
+                needsReview.push(`#${pr.number} "${pr.title}" — waiting: ${reviewers}`);
+              }
+
+              if (timeSinceUpdate > FIVE_DAYS) {
+                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} — ${Math.floor(timeSinceUpdate / (24*60*60*1000))}d inactive`);
+              }
+            }
+
+            let content = '';
+
+            if (needsReview.length > 0) {
+              const items = needsReview.slice(0, MAX_NOTIFICATIONS).join('\n');
+              content += `**⏳ Pending Review (>4h):**\n${items}\n\n`;
+            }
+
+            if (stale.length > 0) {
+              const items = stale.slice(0, MAX_NOTIFICATIONS).join('\n');
+              content += `**🕸️ Stale PRs (>5 days):**\n${items}`;
+            }
+
+            core.setOutput('has_issues', content.length > 0 ? 'true' : 'false');
+            core.setOutput('content', content);
+            core.setOutput('count', needsReview.length + stale.length);
+
+      - name: Notify Lark (Stale PRs)
+        if: false # Disabled — duplicate with prime-bot
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "⏰ Stale PR Alert — ${{ steps.stale.outputs.count }} items"
+          template: 'yellow'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📊 Total"
+          meta-right-value: "${{ steps.stale.outputs.count }} items"
+          content: ${{ steps.stale.outputs.content }}
+          buttons: '[{"text":"📋 View Open PRs","url":"${{ github.server_url }}/${{ github.repository }}/pulls","type":"primary"}]'

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navigation Menu Builder — Parent có submenu</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.31.0/tabler-icons.min.css">
+<style>
+  :root {
+    --bg: #0a1120;
+    --panel: #111827;
+    --row: #1c2433;
+    --row-hover: #243044;
+    --border: #2c3645;
+    --border-strong: #3a4656;
+    --text: #e8edf7;
+    --text-2: #8b95a7;
+    --text-3: #5e6878;
+    --info: #4f8cff;
+    --info-bg: #16203c;
+    --danger: #ff6b6b;
+    --warning: #f5b945;
+    --success: #4ec78a;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #060b16;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .col { width: 100%; max-width: 360px; }
+  .col-title {
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+    margin: 0 0 12px; padding: 4px 10px; border-radius: var(--radius);
+    display: inline-block; background: var(--panel);
+  }
+  .builder { background: var(--panel); border-radius: var(--radius-lg); padding: 18px 16px 20px; }
+  .heading { font-size: 12px; color: var(--text-2); margin: 0 0 14px; }
+
+  .row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 11px 12px; background: var(--row);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 7px; font-size: 14px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .row:hover { background: var(--row-hover); }
+  .grip { color: var(--text-3); font-size: 16px; cursor: grab; line-height: 1; }
+  .chev { color: var(--text-2); font-size: 15px; line-height: 1; }
+  .row-label { flex: 1; color: var(--text); }
+  .pencil { color: var(--text-3); font-size: 16px; }
+  .pencil:hover { color: var(--text); }
+  .badge-count {
+    font-size: 11px; color: var(--text-2); background: var(--bg);
+    padding: 2px 9px; border-radius: 11px;
+  }
+  .state-tip { font-size: 11px; color: var(--warning); white-space: nowrap; }
+
+  /* ===== Cụm thao tác menu cha: header + toolbar gộp chung ===== */
+  .parent-group {
+    border: 1px solid var(--info);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 2px rgba(79,140,255,.18);
+    margin-bottom: 7px;
+    overflow: hidden;
+  }
+  /* Khối đang mở nhưng KHÔNG phải mục đang focus (vd menu cha khi đang sửa con) */
+  .parent-group.dim {
+    border-color: var(--border-strong);
+    box-shadow: none;
+  }
+  .parent-group .pg-header {
+    display: flex; align-items: center; gap: 9px;
+    padding: 11px 12px; background: var(--row);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .parent-group .pg-header .grip { cursor: grab; }
+  .parent-group .pg-header .row-label { flex: 1; }
+  .parent-group .pg-body {
+    background: var(--row); padding: 12px;
+  }
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .tbtn {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-2);
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 10px; cursor: pointer;
+  }
+  .tbtn:hover { border-color: var(--border-strong); color: var(--text); }
+  .tbtn.danger { color: var(--danger); }
+  .tbtn.danger:hover { border-color: var(--danger); }
+
+  /* config cho link thường (chưa có submenu) */
+  .config {
+    background: var(--row); border: 1px solid var(--info);
+    border-radius: var(--radius); padding: 12px; margin-bottom: 7px;
+  }
+  .field-lbl { font-size: 11px; color: var(--text-2); margin: 0 0 4px; }
+  .field-lbl + .select, .field-lbl + .input { margin-bottom: 12px; }
+  .select, .input {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 11px; font-size: 13px;
+    color: var(--text); display: flex; align-items: center; justify-content: space-between;
+  }
+  .input.placeholder { color: var(--text-3); }
+
+  .child-wrap {
+    border-left: 2px solid var(--border-strong);
+    margin-left: 16px; padding-left: 12px; margin-bottom: 7px;
+  }
+  .child-wrap .row { margin-bottom: 7px; }
+  .child-wrap .row:last-of-type { margin-bottom: 8px; }
+  .child-wrap .parent-group { margin-bottom: 7px; }
+
+  .add-btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 13px; color: var(--text-2); padding: 9px;
+    border: 1px dashed var(--border-strong); border-radius: var(--radius);
+    margin-top: 7px; cursor: pointer;
+  }
+  .add-btn:hover { color: var(--text); border-color: var(--info); }
+  .add-btn.primary {
+    margin-top: 14px; background: var(--info-bg); border-style: solid;
+    border-color: var(--info); color: var(--info); font-weight: 500;
+  }
+  .legend { margin-top: 18px; font-size: 11px; color: var(--text-3); line-height: 1.7; }
+  .legend b { color: var(--text-2); font-weight: 500; }
+  .note-vertical { width: 100%; max-width: 360px; }
+
+  /* ===== Dialog confirm flatten ===== */
+  .scene {
+    position: relative;
+    background: var(--panel);
+    border-radius: var(--radius-lg);
+    padding: 18px 16px 20px;
+    overflow: hidden;
+    min-height: 560px;
+  }
+  .scene-dim { opacity: .35; pointer-events: none; }
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(4,8,16,.62);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px 16px; border-radius: var(--radius-lg);
+  }
+  .dialog {
+    width: 100%; max-width: 320px;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 18px 18px 16px;
+    box-shadow: 0 18px 48px rgba(0,0,0,.5);
+  }
+  .dlg-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: rgba(245,185,69,.14); color: var(--warning);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; margin-bottom: 12px;
+  }
+  .dlg-title { font-size: 15px; font-weight: 500; color: var(--text); margin: 0 0 8px; }
+  .dlg-body { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0 0 14px; }
+  .dlg-body b { color: var(--text); font-weight: 500; }
+  /* preview before/after */
+  .preview { display: flex; gap: 10px; margin: 0 0 16px; }
+  .pv-col { flex: 1; }
+  .pv-cap { font-size: 10.5px; color: var(--text-3); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .4px; }
+  .pv-box { background: var(--row); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; }
+  .pv-item { font-size: 11.5px; color: var(--text); padding: 3px 0; display: flex; align-items: center; gap: 5px; }
+  .pv-item.sub { color: var(--text-2); padding-left: 12px; }
+  .pv-item.sub2 { color: var(--text-3); padding-left: 24px; }
+  .pv-item i { font-size: 12px; color: var(--text-3); }
+  .pv-warn { color: var(--warning) !important; }
+  .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn {
+    font-size: 12.5px; padding: 8px 14px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: transparent;
+    color: var(--text-2); cursor: pointer;
+  }
+  .btn:hover { color: var(--text); }
+  .btn-primary {
+    background: var(--info); border-color: var(--info); color: #fff;
+  }
+  .btn-primary:hover { color: #fff; opacity: .92; }
+  /* drag ghost */
+  .row.dragging {
+    border: 1px dashed var(--info);
+    background: var(--info-bg);
+    opacity: .9;
+  }
+  .drop-line {
+    height: 2px; background: var(--info);
+    border-radius: 2px; margin: 2px 0 2px 16px;
+    box-shadow: 0 0 6px rgba(79,140,255,.6);
+  }
+</style>
+</head>
+<body>
+
+  <!-- TRẠNG THÁI A: Parent ở GIỮA list — đủ Lên / Xuống / Tách cấp / Xóa -->
+  <div class="col">
+    <span class="col-title">A — Menu cha ở giữa danh sách</span>
+    <div class="builder">
+      <p class="heading">Navigation links</p>
+
+      <div class="row">
+        <span class="grip">⠿</span>
+        <span class="row-label">Über uns</span>
+        <i class="ti ti-pencil pencil" aria-hidden="true"></i>
+      </div>
+
+      <div class="parent-group">
+        <div class="pg-header">
+          <span class="grip">⠿</span>
+          <i class="ti ti-chevron-down chev" aria-hidden="true"></i>
+          <span class="row-label">Startseite</span>
+          <span class="badge-count">2 submenu</span>
+        </div>
+        <div class="pg-body">
+          <div class="toolbar">
+            <span class="tbtn"><i class="ti ti-arrow-up" aria-hidden="true"></i> Lên</span>
+            <span class="tbtn"><i class="ti ti-arrow-down" aria-hidden="true"></i> Xuống</span>
+            <span class="tbtn"><i class="ti ti-arrow-bar-right" aria-hidden="true"></i> Lồng vào</span>
+            <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="child-wrap">
+        <div class="row"><span class="grip">⠿</span><span class="row-label">Preise</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">FAQ</span><span class="state-tip">· thiếu URL</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="add-btn" style="margin-top:0"><i class="ti ti-plus" aria-hidden="true"></i> Thêm submenu</div>
+      </div>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <div class="add-btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Thêm link</div>
+
+      <div class="legend">
+        Header + toolbar <b>gộp chung một khối</b> → user biết đang thao tác cho menu cha <b>Startseite</b>.
+        Là cấp 1 nên nút lồng cấp hướng <b>phải</b> (Lồng vào menu phía trên).
+      </div>
+    </div>
+  </div>
+
+  <!-- TRẠNG THÁI B: Parent ở TRÊN CÙNG — ẩn "Lên" -->
+  <div class="col">
+    <span class="col-title">B — Menu cha ở trên cùng (ẩn “Lên”)</span>
+    <div class="builder">
+      <p class="heading">Navigation links</p>
+
+      <div class="parent-group">
+        <div class="pg-header">
+          <span class="grip">⠿</span>
+          <i class="ti ti-chevron-down chev" aria-hidden="true"></i>
+          <span class="row-label">Startseite</span>
+          <span class="badge-count">2 submenu</span>
+        </div>
+        <div class="pg-body">
+          <div class="toolbar">
+            <span class="tbtn"><i class="ti ti-arrow-down" aria-hidden="true"></i> Xuống</span>
+            <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="child-wrap">
+        <div class="row"><span class="grip">⠿</span><span class="row-label">Preise</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">FAQ</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="add-btn" style="margin-top:0"><i class="ti ti-plus" aria-hidden="true"></i> Thêm submenu</div>
+      </div>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Über uns</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <div class="add-btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Thêm link</div>
+
+      <div class="legend">
+        Ở <b>trên cùng</b> → ẩn cả <b>Lên</b> và <b>Lồng vào</b> (không có mục phía trên để lồng vào).
+      </div>
+    </div>
+  </div>
+
+  <!-- TRẠNG THÁI C: Parent ở DƯỚI CÙNG — ẩn "Xuống" -->
+  <div class="col">
+    <span class="col-title">C — Menu cha ở dưới cùng (ẩn “Xuống”)</span>
+    <div class="builder">
+      <p class="heading">Navigation links</p>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Über uns</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <div class="parent-group">
+        <div class="pg-header">
+          <span class="grip">⠿</span>
+          <i class="ti ti-chevron-down chev" aria-hidden="true"></i>
+          <span class="row-label">Startseite</span>
+          <span class="badge-count">2 submenu</span>
+        </div>
+        <div class="pg-body">
+          <div class="toolbar">
+            <span class="tbtn"><i class="ti ti-arrow-up" aria-hidden="true"></i> Lên</span>
+            <span class="tbtn"><i class="ti ti-arrow-bar-right" aria-hidden="true"></i> Lồng vào</span>
+            <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="child-wrap">
+        <div class="row"><span class="grip">⠿</span><span class="row-label">Preise</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">FAQ</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="add-btn" style="margin-top:0"><i class="ti ti-plus" aria-hidden="true"></i> Thêm submenu</div>
+      </div>
+
+      <div class="add-btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Thêm link</div>
+
+      <div class="legend">
+        Ở <b>dưới cùng</b> → ẩn nút <b>Xuống</b>. Là cấp 1 nên hiện <b>Lồng vào</b> (mũi tên phải) khi có mục phía trên.
+      </div>
+    </div>
+  </div>
+
+  <!-- TRẠNG THÁI D: Link thường (chưa có submenu) -->
+  <div class="col">
+    <span class="col-title">D — Link thường (chưa có submenu)</span>
+    <div class="builder">
+      <p class="heading">Navigation links</p>
+
+      <div class="parent-group">
+        <div class="pg-header">
+          <span class="grip">⠿</span>
+          <span class="row-label">Über uns</span>
+        </div>
+        <div class="pg-body">
+          <p class="field-lbl">Loại liên kết</p>
+          <div class="select">
+            <span><i class="ti ti-external-link" style="margin-right:6px" aria-hidden="true"></i>External URL</span>
+            <i class="ti ti-chevron-down" aria-hidden="true"></i>
+          </div>
+          <p class="field-lbl" style="margin-top:12px">Đường dẫn</p>
+          <div class="input placeholder">https://...</div>
+          <div class="toolbar" style="margin-top:12px">
+            <span class="tbtn"><i class="ti ti-arrow-down" aria-hidden="true"></i> Xuống</span>
+            <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="add-btn" style="margin-left:0"><i class="ti ti-plus" aria-hidden="true"></i> Thêm submenu</div>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <div class="add-btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Thêm link</div>
+
+      <div class="legend">
+        <b>Chưa có submenu</b> → hiện đầy đủ field <b>Loại liên kết</b> + <b>Đường dẫn</b>. Ở <b>trên cùng</b> nên ẩn <b>Lên</b> và <b>Lồng vào</b>.
+      </div>
+    </div>
+  </div>
+
+  <!-- TRẠNG THÁI E: Menu CON đang được edit -->
+  <div class="col">
+    <span class="col-title">E — Menu con (Tách cấp mũi tên trái)</span>
+    <div class="builder">
+      <p class="heading">Navigation links</p>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Home</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <!-- Menu CHA vẫn đang mở: giữ header + toolbar thao tác của cha -->
+      <div class="parent-group dim">
+        <div class="pg-header">
+          <span class="grip">⠿</span>
+          <i class="ti ti-chevron-down chev" aria-hidden="true"></i>
+          <span class="row-label">Startseite</span>
+          <span class="badge-count">2 submenu</span>
+        </div>
+        <div class="pg-body">
+          <div class="toolbar">
+            <span class="tbtn"><i class="ti ti-arrow-up" aria-hidden="true"></i> Lên</span>
+            <span class="tbtn"><i class="ti ti-arrow-down" aria-hidden="true"></i> Xuống</span>
+            <span class="tbtn"><i class="ti ti-arrow-bar-right" aria-hidden="true"></i> Lồng vào</span>
+            <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="child-wrap">
+        <!-- Menu con đang edit: gộp header + config thành 1 khối -->
+        <div class="parent-group">
+          <div class="pg-header">
+            <span class="grip">⠿</span>
+            <span class="row-label">Preise</span>
+          </div>
+          <div class="pg-body">
+            <p class="field-lbl">Loại liên kết</p>
+            <div class="select">
+              <span><i class="ti ti-file" style="margin-right:6px" aria-hidden="true"></i>Internal Page</span>
+              <i class="ti ti-chevron-down" aria-hidden="true"></i>
+            </div>
+            <p class="field-lbl" style="margin-top:12px">Trang</p>
+            <div class="select" style="margin-top:0"><span>Leistungen</span><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
+            <div class="toolbar" style="margin-top:12px">
+              <span class="tbtn"><i class="ti ti-arrow-down" aria-hidden="true"></i> Xuống</span>
+              <span class="tbtn"><i class="ti ti-arrow-bar-left" aria-hidden="true"></i> Tách cấp</span>
+              <span class="tbtn danger" style="margin-left:auto"><i class="ti ti-trash" aria-hidden="true"></i> Xóa</span>
+            </div>
+          </div>
+        </div>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">FAQ</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="add-btn" style="margin-top:0"><i class="ti ti-plus" aria-hidden="true"></i> Thêm submenu</div>
+      </div>
+
+      <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+
+      <div class="add-btn primary"><i class="ti ti-plus" aria-hidden="true"></i> Thêm link</div>
+
+      <div class="legend">
+        Khi mở sửa menu con <b>Preise</b>, khối thao tác của menu cha <b>Startseite</b> <b>vẫn giữ nguyên</b> → user luôn biết cách thao tác cho cha.
+        Startseite không còn ở trên cùng (có <b>Home</b> phía trên) nên hiện đủ <b>Lên</b> + <b>Lồng vào</b>. Menu con dùng <b>Tách cấp</b> (mũi tên trái ←).
+      </div>
+    </div>
+  </div>
+
+  <!-- TRẠNG THÁI F: Dialog confirm flatten khi kéo-thả -->
+  <div class="col" style="max-width: 380px;">
+    <span class="col-title">F — Kéo parent-có-con vào parent khác</span>
+    <div class="scene">
+      <div class="scene-dim">
+        <p class="heading">Navigation links</p>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">Home</span><i class="ti ti-pencil pencil" aria-hidden="true"></i></div>
+        <div class="row" style="margin-bottom:2px"><span class="grip">⠿</span><i class="ti ti-chevron-down chev" aria-hidden="true"></i><span class="row-label">Über uns</span><span class="badge-count">2 submenu</span></div>
+        <div class="drop-line"></div>
+        <div class="child-wrap" style="margin-bottom:2px">
+          <div class="row" style="margin-bottom:7px"><span class="grip">⠿</span><span class="row-label">Team</span></div>
+        </div>
+        <div class="row dragging"><span class="grip">⠿</span><i class="ti ti-chevron-down chev" aria-hidden="true"></i><span class="row-label">Startseite</span><span class="badge-count">2 submenu</span></div>
+        <div class="row"><span class="grip">⠿</span><span class="row-label">Kontakt</span></div>
+      </div>
+
+      <div class="overlay">
+        <div class="dialog">
+          <div class="dlg-icon"><i class="ti ti-stack-2" aria-hidden="true"></i></div>
+          <p class="dlg-title">Lồng menu này vào sẽ vượt 2 cấp</p>
+          <p class="dlg-body">
+            <b>Startseite</b> đang chứa 2 submenu. Menu chỉ hỗ trợ <b>2 cấp</b>. Khi lồng vào <b>Über uns</b>, các submenu của Startseite sẽ được đưa lên <b>cùng cấp</b> với nó (làm con của Über uns).
+          </p>
+
+          <div class="preview">
+            <div class="pv-col">
+              <p class="pv-cap">Trước</p>
+              <div class="pv-box">
+                <div class="pv-item"><i class="ti ti-folder" aria-hidden="true"></i>Startseite</div>
+                <div class="pv-item sub">Preise</div>
+                <div class="pv-item sub">FAQ</div>
+              </div>
+            </div>
+            <div class="pv-col">
+              <p class="pv-cap">Sau</p>
+              <div class="pv-box">
+                <div class="pv-item"><i class="ti ti-folder" aria-hidden="true"></i>Über uns</div>
+                <div class="pv-item sub">Team</div>
+                <div class="pv-item sub pv-warn">Startseite</div>
+                <div class="pv-item sub pv-warn">Preise</div>
+                <div class="pv-item sub pv-warn">FAQ</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dlg-actions">
+            <button class="btn">Hủy</button>
+            <button class="btn btn-primary">Lồng &amp; san phẳng</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      User kéo <b>Startseite</b> (đang có 2 submenu) thả vào trong <b>Über uns</b> → sẽ thành 3 cấp.
+      Hệ thống chặn lại bằng dialog, giải thích rõ và <b>preview Trước / Sau</b>, cho user chọn <b>Lồng &amp; san phẳng</b> (các con kéo lên cùng cấp) hoặc <b>Hủy</b>.
+    </div>
+  </div>
+
+  <!-- GHI CHÚ logic ẩn nút -->
+  <div class="note-vertical">
+    <div class="legend" style="margin-top:0; background:var(--panel); padding:14px 16px; border-radius:var(--radius-lg); line-height:1.8;">
+      <b style="color:var(--text); font-size:12px;">Quy tắc ẩn nút theo ngữ cảnh</b><br>
+      • <b>Lên</b> — ẩn khi mục đang ở vị trí trên cùng trong nhóm của nó.<br>
+      • <b>Xuống</b> — ẩn khi mục đang ở vị trí dưới cùng trong nhóm của nó.<br>
+      • <b>Lồng vào</b> (mũi tên <b>phải</b> →) — cho mục <b>cấp 1</b>, lồng nó vào làm con của mục ngay phía trên. Ẩn khi ở trên cùng (không có mục phía trên).<br>
+      • <b>Tách cấp</b> (mũi tên <b>trái</b> ←) — cho mục <b>cấp con</b>, kéo nó ra khỏi cha thành cấp 1. Chỉ hiện ở menu con.<br>
+      • Nếu chỉ còn đúng 1 mục trong nhóm → ẩn cả Lên và Xuống.<br>
+      • <b>Xóa</b> — luôn hiện.<br>
+      <br>
+      <b style="color:var(--text); font-size:12px;">Chống vượt 2 cấp (cấp 3)</b><br>
+      • <b>Nút "Lồng vào"</b> — disable khi mục đang chứa submenu (lồng vào sẽ đẩy con xuống cấp 3).<br>
+      • <b>Kéo-thả</b> một parent-có-con vào trong parent khác → hiện <b>dialog confirm</b> với preview Trước/Sau, cho chọn <b>Lồng &amp; san phẳng</b> (con kéo lên cùng cấp) hoặc Hủy.<br>
+      • Luôn kiểm tra ở <b>tầng logic khi drop/indent/import</b>, không chỉ dựa vào ẩn nút.
+    </div>
+  </div>
+
+</body>
+</html>

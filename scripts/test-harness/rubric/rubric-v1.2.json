@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "name": "wix-pro-v1.2",
+  "description": "Stricter rubric — 10 dims (8 + Accessibility + Category DNA), 58 criteria, weight 97. Kills 6 v1.1 ceilings, tightens 5 criteria, adds a11y + per-category mandatory blocks check. Target avg 5.8-6.5 for real differentiation.",
+  "thresholds": {
+    "pass": 7,
+    "warn": 5
+  },
+  "dimensions": [
+    {
+      "id": "visual-richness",
+      "name": "Visual Richness",
+      "weight": 12,
+      "description": "Visual variety — decorative blocks, imagery, variant diversity, icon usage.",
+      "criteria": [
+        {
+          "id": "hero-variant-diverse",
+          "label": "Hero uses non-default variant",
+          "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-left", "split-right", "fullscreen", "video", "magazine", "minimal", "cards-overlay", "gradient", "parallax", "slideshow", "split-video"] },
+          "passPoints": 3
+        },
+        {
+          "id": "gallery-present",
+          "label": "Gallery / portfolio block present",
+          "check": { "type": "presence", "blockType": "gallery,gallery-masonry,portfolio-grid" },
+          "passPoints": 2
+        },
+        {
+          "id": "stats-present",
+          "label": "Stats block present",
+          "check": { "type": "presence", "blockType": "stats" },
+          "passPoints": 2
+        },
+        {
+          "id": "logo-cloud-present",
+          "label": "Logo Cloud / Trust Bar present",
+          "check": { "type": "presence", "blockType": "client-logos,logo-cloud" },
+          "passPoints": 2
+        },
+        {
+          "id": "image-coverage",
+          "label": "Gallery present OR hero has non-SVG background image",
+          "check": { "type": "custom", "evaluator": "imageCoverage" },
+          "passPoints": 3
+        },
+        {
+          "id": "features-have-icons",
+          "label": "Icon-variant features ≥70% items có icon field",
+          "check": { "type": "custom", "evaluator": "featuresHaveIcons" },
+          "passPoints": 2
+        }
+      ]
+    },
+    {
+      "id": "typography-hierarchy",
+      "name": "Typography Hierarchy",
+      "weight": 12,
+      "description": "Distinct font pairing, strict headline length, high coverage.",
+      "criteria": [
+        {
+          "id": "hero-headline-present",
+          "label": "Hero has non-empty headline",
+          "check": { "type": "custom", "evaluator": "heroHasHeadline" },
+          "passPoints": 2
+        },
+        {
+          "id": "single-hero",
+          "label": "Exactly 1 hero block",
+          "check": { "type": "custom", "evaluator": "singleHero" },
+          "passPoints": 2
+        },
+        {
+          "id": "theme-heading-body-distinct",
+          "label": "Theme defines distinct fontHeading + fontBody (explicit)",
+          "check": { "type": "custom", "evaluator": "themeHeadingBodyDistinct" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-subheadline",
+          "label": "Hero has subheadline",
+          "check": { "type": "custom", "evaluator": "heroHasSubheadline" },
+          "passPoints": 1
+        },
+        {
+          "id": "section-headlines-coverage-85",
+          "label": "≥85% content blocks có headline/sectionLabel",
+          "check": { "type": "custom", "evaluator": "sectionHeadlinesCoverage85" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-headline-length-strict",
+          "label": "Hero headline 25-70 chars (strict)",
+          "check": { "type": "custom", "evaluator": "heroHeadlineLengthStrict" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-subheadline-length",
+          "label": "Hero subheadline 30-200 chars",
+          "check": { "type": "custom", "evaluator": "heroSubheadlineLength" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "social-proof",
+      "name": "Social Proof & Trust",
+      "weight": 10,
+      "description": "Testimonials, logos, stats, ratings, avatars.",
+      "criteria": [
+        {
+          "id": "testimonials-present",
+          "label": "Testimonials block present",
+          "check": { "type": "presence", "blockType": "testimonials" },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonials-count-3plus",
+          "label": "Testimonials ≥3 items",
+          "check": { "type": "count", "blockType": "testimonials", "field": "testimonials", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "logos-count-4plus",
+          "label": "Logo cloud ≥4 logos",
+          "check": { "type": "count", "blockType": "client-logos,logo-cloud", "field": "logos", "min": 4 },
+          "passPoints": 2
+        },
+        {
+          "id": "stats-count-3plus",
+          "label": "Stats ≥3 items",
+          "check": { "type": "count", "blockType": "stats", "field": "stats", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonial-avatar",
+          "label": "≥1 testimonial có avatar URL",
+          "check": { "type": "custom", "evaluator": "testimonialHasAvatar" },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonials-have-ratings",
+          "label": "≥50% testimonials có rating field",
+          "check": { "type": "custom", "evaluator": "testimonialsHaveRatings" },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonial-quote-length",
+          "label": "≥80% testimonials có quote 80-300 chars",
+          "check": { "type": "custom", "evaluator": "testimonialQuoteLength" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "micro-interactions",
+      "name": "Micro-Interactions",
+      "weight": 9,
+      "description": "Nav variant, CTA blocks, forms, block diversity.",
+      "criteria": [
+        {
+          "id": "nav-variant-rich",
+          "label": "Nav non-basic variant",
+          "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega", "transparent", "sidebar", "floating"] },
+          "passPoints": 2
+        },
+        {
+          "id": "cta-block-present",
+          "label": "Standalone CTA block present",
+          "check": { "type": "presence", "blockType": "cta" },
+          "passPoints": 2
+        },
+        {
+          "id": "interactive-form",
+          "label": "Newsletter or contact form present",
+          "check": { "type": "presence", "blockType": "newsletter,contact" },
+          "passPoints": 2
+        },
+        {
+          "id": "block-variety-8plus",
+          "label": "≥8 distinct block types",
+          "check": { "type": "custom", "evaluator": "distinctBlockTypes8" },
+          "passPoints": 2
+        },
+        {
+          "id": "nav-links-balanced",
+          "label": "Nav 3-7 links",
+          "check": { "type": "custom", "evaluator": "navLinksBalanced" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "spacing-rhythm",
+      "name": "Spacing & Rhythm",
+      "weight": 10,
+      "description": "Block count sweet spot, no consecutive dups, spacing token rhythm.",
+      "criteria": [
+        {
+          "id": "block-count-sweet-spot",
+          "label": "9-14 blocks (partial 7-8 or 15-16)",
+          "check": { "type": "custom", "evaluator": "blockCountSweetSpot" },
+          "passPoints": 4,
+          "partialPoints": 2
+        },
+        {
+          "id": "no-consecutive-duplicates",
+          "label": "No 2 adjacent blocks same type",
+          "check": { "type": "custom", "evaluator": "noConsecutiveDuplicates" },
+          "passPoints": 2
+        },
+        {
+          "id": "theme-has-spacing-preset",
+          "label": "Theme spacingPreset defined",
+          "check": { "type": "custom", "evaluator": "themeHasSpacingPreset" },
+          "passPoints": 1
+        },
+        {
+          "id": "spacing-rhythm-token-only",
+          "label": "Block padding/margin use preset scale (8/12/16/24/32/48/64/80)",
+          "check": { "type": "custom", "evaluator": "spacingRhythmTokenOnly" },
+          "passPoints": 3
+        }
+      ]
+    },
+    {
+      "id": "conversion-path",
+      "name": "Conversion Path Clarity",
+      "weight": 10,
+      "description": "Hero CTA, mid-CTA, newsletter, CTA copy specificity, CTA style variety.",
+      "criteria": [
+        {
+          "id": "hero-has-cta",
+          "label": "Hero has CTA button",
+          "check": { "type": "custom", "evaluator": "heroHasCta" },
+          "passPoints": 2
+        },
+        {
+          "id": "mid-cta-present",
+          "label": "Mid-page CTA block present",
+          "check": { "type": "presence", "blockType": "cta" },
+          "passPoints": 2
+        },
+        {
+          "id": "newsletter-present",
+          "label": "Newsletter lead capture",
+          "check": { "type": "presence", "blockType": "newsletter" },
+          "passPoints": 1
+        },
+        {
+          "id": "cta-text-quality-specific-2x",
+          "label": "CTAs ≥2 non-generic labels (avoid Click Here / Learn More only)",
+          "check": { "type": "custom", "evaluator": "ctaTextQualitySpecific2x" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-cta-variety",
+          "label": "Hero CTAs có primary + secondary style khác nhau",
+          "check": { "type": "custom", "evaluator": "heroCtaVariety" },
+          "passPoints": 3
+        }
+      ]
+    },
+    {
+      "id": "content-authenticity",
+      "name": "Content Authenticity",
+      "weight": 8,
+      "description": "No Lorem, substantive copy depth, category richness.",
+      "criteria": [
+        {
+          "id": "no-lorem-broad",
+          "label": "No Lorem/ipsum/dolor sit/adipiscing/consectetur anywhere",
+          "check": { "type": "custom", "evaluator": "noLoremBroad" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-headline-substantial",
+          "label": "Hero headline ≥10 chars",
+          "check": { "type": "custom", "evaluator": "heroHeadlineSubstantial" },
+          "passPoints": 1
+        },
+        {
+          "id": "features-count-3plus",
+          "label": "Features ≥3 items",
+          "check": { "type": "count", "blockType": "features", "field": "features", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "faq-count-4plus",
+          "label": "FAQ ≥4 items",
+          "check": { "type": "count", "blockType": "faq", "field": "items", "min": 4 },
+          "passPoints": 2
+        },
+        {
+          "id": "content-depth-500",
+          "label": "Hero + section labels total ≥500 chars",
+          "check": { "type": "custom", "evaluator": "contentDepth500" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "information-density",
+      "name": "Information Density",
+      "weight": 8,
+      "description": "Block count max, variety ≥85%, footer mega, unique nav labels.",
+      "criteria": [
+        {
+          "id": "block-count-max-16",
+          "label": "Homepage ≤16 blocks",
+          "check": { "type": "custom", "evaluator": "blockCountMax16" },
+          "passPoints": 2
+        },
+        {
+          "id": "variety-unique-85",
+          "label": "Distinct block types ≥85% of total",
+          "check": { "type": "custom", "evaluator": "varietyUnique85" },
+          "passPoints": 3
+        },
+        {
+          "id": "footer-mega-columns",
+          "label": "Footer mega variant ≥4 link columns",
+          "check": { "type": "custom", "evaluator": "footerMegaColumns" },
+          "passPoints": 2
+        },
+        {
+          "id": "nav-links-not-repeat",
+          "label": "Nav links không có duplicate labels",
+          "check": { "type": "custom", "evaluator": "navLinksNotRepeat" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "accessibility",
+      "name": "Accessibility",
+      "weight": 8,
+      "description": "WCAG 2.1 AA measurable checks — alt text, heading order, contrast, ARIA, focus.",
+      "criteria": [
+        {
+          "id": "alt-text-coverage-80",
+          "label": "≥80% images có alt text",
+          "check": { "type": "custom", "evaluator": "altTextCoverage80" },
+          "passPoints": 2
+        },
+        {
+          "id": "heading-order-no-skip",
+          "label": "Heading hierarchy no skip (H1→H2→H3 progression)",
+          "check": { "type": "custom", "evaluator": "headingOrderNoSkip" },
+          "passPoints": 2
+        },
+        {
+          "id": "theme-color-contrast",
+          "label": "Theme color contrast ≥4.5:1 (WCAG AA)",
+          "check": { "type": "custom", "evaluator": "themeColorContrast" },
+          "passPoints": 2
+        },
+        {
+          "id": "nav-aria-label",
+          "label": "Navigation có ariaLabel hoặc title fields",
+          "check": { "type": "custom", "evaluator": "navAriaLabel" },
+          "passPoints": 1
+        },
+        {
+          "id": "focus-indicator-defined",
+          "label": "Theme defines focus indicator",
+          "check": { "type": "custom", "evaluator": "focusIndicatorDefined" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "category-dna",
+      "name": "Category DNA",
+      "weight": 10,
+      "description": "Per-category mandatory blocks compliance (Wix standard §4.1).",
+      "criteria": [
+        {
+          "id": "category-dna-compliance",
+          "label": "Category mandatory blocks present (Restaurant: menu+booking, Tech: pricing+features ≥4, etc.)",
+          "check": { "type": "custom", "evaluator": "categoryDnaCompliance" },
+          "passPoints": 6,
+          "partialPoints": 3
+        },
+        {
+          "id": "category-signature-variety",
+          "label": "Category has ≥2 signature industry blocks",
+          "check": { "type": "custom", "evaluator": "categorySignatureVariety" },
+          "passPoints": 4,
+          "partialPoints": 2
+        }
+      ]
+    }
+  ]
+}

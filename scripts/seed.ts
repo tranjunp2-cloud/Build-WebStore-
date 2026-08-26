@@ -1,0 +1,477 @@
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+import { SEED_TEMPLATES } from '../src/lib/ai/seed-templates'
+
+async function seed() {
+  const payload = await getPayload({ config })
+
+  console.log('🌱 Seeding database...')
+
+  // 1. Tạo user
+  const existingUser = await payload.find({
+    collection: 'users',
+    where: { email: { equals: 'demo@primeweb.app' } },
+  })
+
+  let user = existingUser.docs[0]
+  if (!user) {
+    user = await payload.create({
+      collection: 'users',
+      data: {
+        email: 'demo@primeweb.app',
+        password: 'password123',
+        firstName: 'Admin',
+        lastName: 'Demo',
+        roles: ['super-admin', 'tenant-owner'],
+      },
+    })
+    console.log('  ✓ User created:', user.email)
+  } else {
+    console.log('  ✓ User already exists:', user.email)
+  }
+
+  // 2. Tạo tenant
+  const existingTenant = await payload.find({
+    collection: 'tenants',
+    where: { slug: { equals: 'kedai-demo' } },
+  })
+
+  let tenant = existingTenant.docs[0]
+  if (!tenant) {
+    tenant = await payload.create({
+      collection: 'tenants',
+      data: {
+        name: 'Kedai Demo',
+        slug: 'kedai-demo',
+        plan: 'free',
+        status: 'active',
+      },
+    })
+
+    // Link user to tenant
+    await payload.update({
+      collection: 'users',
+      id: user.id as number,
+      data: {
+        tenants: [{ tenant: tenant.id as number, role: 'owner' }],
+      },
+    })
+    console.log('  ✓ Tenant created:', tenant.name)
+  } else {
+    console.log('  ✓ Tenant already exists:', tenant.name)
+  }
+
+  // 3. Tạo site
+  const existingSite = await payload.find({
+    collection: 'sites',
+    where: { tenant: { equals: tenant.id as number } },
+  })
+
+  let site = existingSite.docs[0]
+  if (!site) {
+    site = await payload.create({
+      collection: 'sites',
+      data: {
+        name: 'Kedai Demo Site',
+        tenant: tenant.id as number,
+        status: 'published',
+        siteType: 'ecommerce',
+        domain: 'kedai-demo.primeweb.app',
+      },
+    })
+    console.log('  ✓ Site created:', site.name)
+  } else {
+    console.log('  ✓ Site already exists:', site.name)
+  }
+
+  // 4. Tạo categories (3 cấp) — phải tạo trước products vì product.category required
+  type CategoryLite = { id: number; slug: string }
+
+  const existingCategories = await payload.find({
+    collection: 'categories',
+    where: { site: { equals: site.id as number } },
+  })
+
+  let bajuKurungCat: CategoryLite | null = null
+  let tudungCat: CategoryLite | null = null
+  let sneakerCat: CategoryLite | null = null
+
+  if (existingCategories.totalDocs === 0) {
+    const fesyenWanita = await payload.create({
+      collection: 'categories',
+      data: { name: 'Fesyen Wanita', slug: 'fesyen-wanita', site: site.id as number, tenant: tenant.id as number, description: 'Pakaian dan aksesori untuk wanita' },
+    })
+
+    const pakaian = await payload.create({
+      collection: 'categories',
+      data: { name: 'Pakaian', slug: 'fesyen-wanita-pakaian', parent: fesyenWanita.id as number, site: site.id as number, tenant: tenant.id as number },
+    })
+
+    bajuKurungCat = await payload.create({
+      collection: 'categories',
+      data: { name: 'Baju Kurung', slug: 'baju-kurung', parent: pakaian.id as number, site: site.id as number, tenant: tenant.id as number },
+    }) as unknown as CategoryLite
+
+    tudungCat = await payload.create({
+      collection: 'categories',
+      data: { name: 'Tudung', slug: 'tudung', parent: pakaian.id as number, site: site.id as number, tenant: tenant.id as number },
+    }) as unknown as CategoryLite
+
+    const kasut = await payload.create({
+      collection: 'categories',
+      data: { name: 'Kasut', slug: 'fesyen-wanita-kasut', parent: fesyenWanita.id as number, site: site.id as number, tenant: tenant.id as number },
+    })
+
+    sneakerCat = await payload.create({
+      collection: 'categories',
+      data: { name: 'Sneaker Wanita', slug: 'sneaker-wanita', parent: kasut.id as number, site: site.id as number, tenant: tenant.id as number },
+    }) as unknown as CategoryLite
+
+    const makanan = await payload.create({
+      collection: 'categories',
+      data: { name: 'Makanan & Minuman', slug: 'makanan-minuman', site: site.id as number, tenant: tenant.id as number },
+    })
+
+    const snek = await payload.create({
+      collection: 'categories',
+      data: { name: 'Snek', slug: 'snek', parent: makanan.id as number, site: site.id as number, tenant: tenant.id as number },
+    })
+
+    await payload.create({
+      collection: 'categories',
+      data: { name: 'Kerepek', slug: 'kerepek', parent: snek.id as number, site: site.id as number, tenant: tenant.id as number },
+    })
+
+    console.log('  ✓ Created hierarchical categories (up to 3 levels)')
+  } else {
+    console.log(`  ✓ Categories already exist (${existingCategories.totalDocs})`)
+    const allCats = await payload.find({ collection: 'categories', where: { site: { equals: site.id as number } }, limit: 100 })
+    bajuKurungCat = (allCats.docs.find((c) => c.slug === 'baju-kurung') as unknown as CategoryLite) ?? null
+    tudungCat = (allCats.docs.find((c) => c.slug === 'tudung') as unknown as CategoryLite) ?? null
+    sneakerCat = (allCats.docs.find((c) => c.slug === 'sneaker-wanita') as unknown as CategoryLite) ?? null
+  }
+
+  // 5. Tạo 5 products (với category)
+  const defaultCatId = bajuKurungCat?.id ?? tudungCat?.id ?? sneakerCat?.id
+  if (!defaultCatId) {
+    throw new Error('No category found — cannot seed products without at least one category')
+  }
+
+  const productList = [
+    { name: 'Baju Kurung Pink', price: 189, inventory: 50, slug: 'baju-kurung-pink', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-001' },
+    { name: 'Tudung Bawal Basic', price: 35, inventory: 100, slug: 'tudung-bawal-basic', category: [tudungCat?.id ?? defaultCatId], sku: 'DEMO-002' },
+    { name: 'Telekung Premium', price: 250, inventory: 30, slug: 'telekung-premium', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-003' },
+    { name: 'Beg Tangan Kulit', price: 120, inventory: 40, slug: 'beg-tangan-kulit', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-004' },
+    { name: 'Kasut Perempuan', price: 89, inventory: 60, slug: 'kasut-perempuan', category: [sneakerCat?.id ?? defaultCatId], sku: 'DEMO-005' },
+  ]
+
+  const existingProducts = await payload.find({
+    collection: 'products',
+    where: { site: { equals: site.id as number } },
+  })
+
+  const createdProducts = [...existingProducts.docs]
+  if (existingProducts.totalDocs < 5) {
+    for (const p of productList) {
+      const product = await payload.create({
+        collection: 'products',
+        data: {
+          name: p.name,
+          slug: p.slug,
+          price: p.price,
+          inventory: p.inventory,
+          category: p.category,
+          site: site.id as number,
+          tenant: tenant.id as number,
+          status: 'active',
+          currency: 'MYR',
+          sku: p.sku,
+          // Publishing gate (GH-1458) requires weight > 0 for status:'active' — the collection's
+          // own defaultValue:0 is treated as missing. Seed data has no per-product weight, so a
+          // flat placeholder is used (dev/demo data only).
+          weight: 500,
+        },
+      })
+      createdProducts.push(product)
+    }
+    console.log(`  ✓ Created ${productList.length} products`)
+  } else {
+    console.log('  ✓ Products already exist')
+  }
+
+  // 6. Tạo 3 orders (trạng thái khác nhau)
+  const existingOrders = await payload.find({
+    collection: 'orders',
+    where: { site: { equals: site.id as number } },
+  })
+
+  if (existingOrders.totalDocs < 3 && createdProducts.length >= 2) {
+    const statuses = ['pending', 'processing', 'completed'] as const
+    let counter = 1001
+    const p1 = createdProducts[0]
+    const p2 = createdProducts[1]
+
+    for (const status of statuses) {
+      await payload.create({
+        collection: 'orders',
+        data: {
+          tenant: tenant.id as number,
+          site: site.id as number,
+          orderNumber: `ORD-${counter++}`,
+          status,
+          currency: 'MYR',
+          customerName: 'Ahmad Albab',
+          customerEmail: 'ahmad@example.com',
+          customerPhone: '+60123456789',
+          subtotal: p1.price + p2.price * 2,
+          total: p1.price + p2.price * 2,
+          items: [
+            { product: p1.id as number, productName: p1.name, quantity: 1, unitPrice: p1.price },
+            { product: p2.id as number, productName: p2.name, quantity: 2, unitPrice: p2.price },
+          ],
+          shippingAddress: {
+            line1: '123 Jalan Ampang',
+            city: 'Kuala Lumpur',
+            state: 'KL',
+            postcode: '50450',
+            country: 'Malaysia',
+          },
+        },
+      })
+    }
+    console.log('  ✓ Created 3 orders (pending, processing, completed)')
+  } else {
+    console.log('  ✓ Orders already exist')
+  }
+
+  // 7. Seed 10+ Industry Templates (Additive Update)
+  console.log('  🔍 Checking for new industry templates...')
+  let createdCount = 0
+  for (const tpl of SEED_TEMPLATES) {
+    const existing = await payload.find({
+      collection: 'templates',
+      where: { name: { equals: tpl.name } },
+      limit: 1,
+    })
+
+    if (existing.totalDocs === 0) {
+      await payload.create({
+        collection: 'templates',
+        data: {
+          name: tpl.name,
+          description: tpl.description,
+          category: tpl.category as any,
+          defaultTheme: tpl.defaultTheme,
+          defaultBlocks: tpl.defaultBlocks,
+          pages: (tpl.pages || enrichWithDefaultPages(tpl)).map((p: any) => ({
+            ...p,
+            layout: (p.slug === 'index' && (!p.layout || p.layout.length === 0)) 
+                ? tpl.defaultBlocks 
+                : p.layout
+          })),
+          tags: tpl.tags,
+          sortOrder: tpl.sortOrder,
+          isPremium: tpl.isPremium,
+          isFeatured: tpl.isFeatured,
+        },
+      })
+      createdCount++
+    } else {
+      // Update existing template
+      await payload.update({
+        collection: 'templates',
+        id: existing.docs[0].id,
+        data: {
+          description: tpl.description,
+          category: tpl.category as any,
+          defaultTheme: tpl.defaultTheme,
+          defaultBlocks: tpl.defaultBlocks,
+          pages: (tpl.pages || enrichWithDefaultPages(tpl)).map((p: any) => ({
+            ...p,
+            layout: (p.slug === 'index' && (!p.layout || p.layout.length === 0)) 
+                ? tpl.defaultBlocks 
+                : p.layout
+          })),
+          tags: tpl.tags,
+          sortOrder: tpl.sortOrder,
+          isPremium: tpl.isPremium,
+          isFeatured: tpl.isFeatured,
+        },
+      })
+    }
+  }
+  console.log(`  ✓ Updated/Created ${SEED_TEMPLATES.length} industry templates`)
+
+/**
+ * Helper to generate 4 standard pages for a template that only has defaultBlocks (Home).
+ */
+function enrichWithDefaultPages(tpl: any) {
+    const blocks = tpl.defaultBlocks || []
+    const nav = blocks.find((b: any) => b.blockType === 'navigation')
+    const footer = blocks.find((b: any) => b.blockType === 'footer')
+    
+    // Find industry-specific blocks to reuse on secondary pages
+    const aboutBlock = blocks.find((b: any) => b.blockType === 'about')
+    const contactBlock = blocks.find((b: any) => b.blockType === 'contact')
+    const featuresBlock = blocks.find((b: any) => b.blockType === 'features')
+    const pricingBlock = blocks.find((b: any) => b.blockType === 'pricing')
+    
+    return [
+        {
+            slug: 'home',
+            title: 'Home',
+            layout: blocks
+        },
+        {
+            slug: 'about',
+            title: 'About Us',
+            layout: [
+                nav,
+                aboutBlock || { blockType: 'about', headline: `About ${tpl.name}`, body: 'Providing professional services since 2020.', sectionLabel: 'Our Story' },
+                { blockType: 'stats', headline: 'Our Milestone', stats: [{ value: '100+', label: 'Happy Clients' }, { value: '5+', label: 'Years Experience' }] },
+                footer
+            ].filter(Boolean)
+        },
+        {
+            slug: 'products',
+            title: 'Products & Services',
+            layout: [
+                nav,
+                featuresBlock || { blockType: 'features', headline: 'Our Services', subheadline: 'What we offer', features: [{ icon: '✨', title: 'Service 1', description: 'Quality service guaranteed.' }] },
+                pricingBlock,
+                footer
+            ].filter(Boolean)
+        },
+        {
+            slug: 'contact',
+            title: 'Contact Us',
+            layout: [
+                nav,
+                contactBlock || { blockType: 'contact', headline: 'Get In Touch', email: 'hello@example.com', phone: '+60 12-345 6789' },
+                footer
+            ].filter(Boolean)
+        }
+    ]
+}
+
+  // 8. Seed Pages (homepage + about + contact)
+  const existingPages = await payload.find({
+    collection: 'pages',
+    where: { site: { equals: site.id as number } },
+    limit: 1,
+  })
+
+  if (existingPages.totalDocs === 0) {
+    // Homepage
+    await payload.create({
+      collection: 'pages',
+      data: {
+        title: 'Home',
+        slug: '/',
+        site: site.id as number,
+        isHomepage: true,
+        publishedAt: new Date().toISOString(),
+        layout: [
+          {
+            blockType: 'navigation',
+            logoText: 'Kedai Demo',
+            links: [
+              { label: 'Home', url: '/' },
+              { label: 'Products', url: '/products' },
+              { label: 'About', url: '/about' },
+              { label: 'Contact', url: '/contact' },
+            ],
+            ctaButton: { show: true, label: 'Shop Now', url: '/products' },
+          },
+          {
+            blockType: 'hero',
+            variant: 'centered',
+            headline: 'Fesyen Muslim Premium Malaysia',
+            subheadline: 'Koleksi baju kurung, tudung, dan telekung berkualiti tinggi untuk wanita moden.',
+            badge: { show: true, text: '✨ Koleksi Baru 2026' },
+            ctaButtons: [
+              { label: 'Beli Sekarang', url: '/products', style: 'primary' },
+              { label: 'Lihat Koleksi', url: '/products', style: 'outline' },
+            ],
+          },
+          {
+            blockType: 'features',
+            headline: 'Kenapa Pilih Kami?',
+            subheadline: 'Kami komited untuk memberikan yang terbaik',
+            sectionLabel: 'Kelebihan Kami',
+            features: [
+              { icon: '✅', title: 'Kualiti Premium', description: 'Bahan pilihan berkualiti tinggi, selesa dipakai seharian.' },
+              { icon: '🚚', title: 'Penghantaran Pantas', description: 'Penghantaran ke seluruh Malaysia dalam 2-3 hari bekerja.' },
+              { icon: '🔄', title: 'Pulangan Mudah', description: 'Polisi pulangan 30 hari tanpa soal jawab.' },
+            ],
+          },
+        ],
+        seo: {
+          title: 'Kedai Demo — Fesyen Muslim Premium Malaysia',
+          description: 'Baju kurung, tudung, dan telekung berkualiti tinggi untuk wanita moden Malaysia.',
+        },
+      },
+    })
+
+    // About page
+    await payload.create({
+      collection: 'pages',
+      data: {
+        title: 'About Us',
+        slug: '/about',
+        site: site.id as number,
+        isHomepage: false,
+        publishedAt: new Date().toISOString(),
+        layout: [
+          {
+            blockType: 'about',
+            headline: 'Tentang Kedai Demo',
+            sectionLabel: 'Kisah Kami',
+            layout: 'image-right',
+          },
+        ],
+        seo: { title: 'Tentang Kami — Kedai Demo', description: 'Kenali lebih lanjut tentang Kedai Demo dan misi kami.' },
+      },
+    })
+
+    // Contact page
+    await payload.create({
+      collection: 'pages',
+      data: {
+        title: 'Contact',
+        slug: '/contact',
+        site: site.id as number,
+        isHomepage: false,
+        publishedAt: new Date().toISOString(),
+        layout: [
+          {
+            blockType: 'contact',
+            headline: 'Hubungi Kami',
+            subtext: 'Ada soalan? Kami sedia membantu!',
+            email: 'hello@kedaidemo.my',
+            phone: '+60 12-345 6789',
+            address: '123 Jalan Demo, Kuala Lumpur',
+            formFields: [
+              { fieldName: 'name', label: 'Nama Penuh', fieldType: 'text', required: true, placeholder: 'Nama anda' },
+              { fieldName: 'email', label: 'E-mel', fieldType: 'email', required: true, placeholder: 'email@example.com' },
+              { fieldName: 'message', label: 'Mesej', fieldType: 'textarea', required: true, placeholder: 'Tulis mesej anda...' },
+            ],
+          },
+        ],
+        seo: { title: 'Hubungi Kami — Kedai Demo', description: 'Hubungi pasukan Kedai Demo untuk pertanyaan dan bantuan.' },
+      },
+    })
+
+    console.log('  ✓ Created 3 pages (home, about, contact) with blocks')
+  } else {
+    console.log(`  ✓ Pages already exist (${existingPages.totalDocs})`)
+  }
+
+  console.log('\n✅ Seeded: 1 user, 1 tenant, 1 site, categories, 5 products, 3 orders, templates, 3 pages')
+  process.exit(0)
+}
+
+seed().catch((err) => {
+  console.error('❌ Seed failed:', err)
+  process.exit(1)
+})

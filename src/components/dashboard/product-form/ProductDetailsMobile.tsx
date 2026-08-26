@@ -1,0 +1,223 @@
+import { useState } from 'react';
+import { DetailedProduct } from '../ProductQuickViewModal';
+import { ArrowLeft, Package, Trash2, Edit2 } from 'lucide-react';
+import Image from 'next/image';
+import { ProductImageWithFallback } from '../ProductImageWithFallback';
+import { useI18n } from '@/i18n';
+import { Button } from '@/components/ui/button';
+
+interface ProductDetailsMobileProps {
+    product: DetailedProduct;
+    onClose: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}
+
+function getImageUrl(image: any): string | null {
+    if (!image || typeof image === 'string') return null
+    let url = image.url || image.thumbnailURL || null
+    if (!url) return null
+    
+    // Fix existing broken local URLs directly to S3 because MinIO stores them
+    if (url.includes('/api/media/file/')) {
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
+    }
+    
+    return url
+}
+
+export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: ProductDetailsMobileProps) {
+    const { t } = useI18n();
+    const [activeIdx, setActiveIdx] = useState(0)
+    // Process Images — carry alt alongside url so render sites can use stored alt text
+    const displayImages = (product.images ?? [])
+        .map(img => ({ url: getImageUrl(img.image), alt: img.alt }))
+        .filter(img => img.url !== null) as { url: string; alt?: string }[]
+
+    // Description extracting raw text from Payload RichText if available
+    let descText = product.shortDescription || ''
+    if (!descText && product.description?.root) {
+        try {
+            descText = product.description.root.children.map((c: any) => c.children?.map((tc: any) => tc?.text || '').join(' ')).join('\n')
+        } catch(e) {}
+    }
+    if (!descText && typeof product.description === 'string') {
+        descText = product.description;
+    }
+
+
+    // Helper to calculate total stock if variants exist
+    const totalStock = product.hasVariants 
+        ? product.variants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0
+        : product.inventory || 0;
+
+    // Helper to get minimum price if variants exist
+    const displayPrice = product.hasVariants && product.variants && product.variants.length > 0
+        ? Math.min(...product.variants.map(v => Number(v.price) || 0))
+        : Number(product.price) || 0;
+
+    const displayComparePrice = product.compareAtPrice 
+        ? Number(product.compareAtPrice) 
+        : undefined;
+
+    return (
+        <div className="flex flex-col min-h-[calc(100vh-80px)] w-full sm:max-w-[560px] sm:mx-auto xl:hidden bg-background text-foreground pt-6 pb-[120px] relative" style={{ fontFamily: "'Inter', sans-serif" }}>
+
+            {/* Header */}
+            <div className="flex items-center gap-4 px-4 mb-8">
+                <button onClick={onClose} className="p-2 -ml-2 rounded-xl shrink-0 transition-opacity hover:opacity-70 bg-transparent border-none appearance-none outline-none">
+                    <ArrowLeft className="w-6 h-6 text-foreground" />
+                </button>
+                <h1 className="text-[24px] font-bold text-foreground uppercase tracking-wider">{t.dashboard?.products?.mobile?.productDetails || 'PRODUCT DETAILS'}</h1>
+            </div>
+
+            <div className="flex flex-col gap-6">
+                
+                {/* Visuals Section (Edge-to-Edge) */}
+                <div className="flex flex-col w-full relative mb-2">
+                    <div className="relative w-full aspect-[4/5] max-h-[500px] bg-secondary">
+                        <ProductImageWithFallback
+                            imgUrl={displayImages[activeIdx]?.url ?? displayImages[0]?.url ?? null}
+                            alt={displayImages[activeIdx]?.alt || product.name || 'Product Image'}
+                            size="lg"
+                            sizes="100vw"
+                        />
+                    </div>
+                    {/* Thumbnails Overlay */}
+                    {displayImages.length > 1 && (
+                        <div className="relative flex items-center gap-2 overflow-x-auto px-4 scrollbar-none z-10 -mt-10 pb-2">
+                            {displayImages.map((img, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setActiveIdx(idx)}
+                                    className={`w-16 h-16 shrink-0 rounded overflow-hidden relative transition-all shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] bg-[#10131A] ${
+                                        activeIdx === idx
+                                            ? 'border-2 border-primary'
+                                            : 'border-2 border-transparent'
+                                    }`}
+                                >
+                                    <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="64px" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Main Info Section */}
+                <div className="flex flex-col gap-4 px-5">
+                    <div className="flex flex-col gap-1">
+                        <h2 className="m-0 p-0 text-[24px] font-normal text-foreground leading-[1.25] tracking-[-0.025em]">
+                            {product.name || t.dashboard?.products?.mobile?.unnamedProduct || 'Unnamed Product'}
+                        </h2>
+                        <p className="m-0 p-0 text-[12px] font-normal text-muted-foreground tracking-[0.05em]">
+                            SKU: {product.hasVariants ? (t.dashboard?.products?.mobile?.multipleSkus || 'Multiple SKUs') : (product.sku || 'N/A')} | {t.dashboard?.products?.list?.category || 'Category'}: {product.category?.length ? product.category.map(c => typeof c === 'string' ? c : c.name).join(', ') : (t.dashboard?.products?.mobile?.none || 'None')}
+                        </p>
+                    </div>
+
+                    {/* Price Module */}
+                    <div className="flex items-baseline gap-3 mt-1">
+                        <span className="text-[22px] font-bold text-foreground leading-tight">RM {displayPrice.toFixed(2)}</span>
+                        {displayComparePrice ? (
+                            <span className="text-[15px] text-muted-foreground line-through opacity-60">RM {displayComparePrice.toFixed(2)}</span>
+                        ) : null}
+                    </div>
+
+                    {/* Stock Indicator Card */}
+                    <div className="bg-card border border-border/20 rounded-lg p-4 flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-3">
+                            <Package className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+                            <div className="flex flex-col">
+                                <span className="text-[14px] text-foreground font-medium leading-[1.42]">{t.dashboard?.products?.mobile?.stockLevel || 'Stock Level'}</span>
+                                <span className="text-[12px] text-muted-foreground font-normal leading-[1.33]">{t.dashboard?.products?.mobile?.centralWarehouse || 'Central Warehouse'}</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[20px] font-bold text-foreground leading-[1.4]">{totalStock}</span>
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-[-0.05em] leading-[1.5]">{t.dashboard?.products?.mobile?.unitsAvailable || 'Units Available'}</span>
+                        </div>
+                    </div>
+
+                    {/* Variants List Section */}
+                    {product.hasVariants && product.variants && product.variants.length > 0 && (
+                        <div className="flex flex-col gap-3 mt-2">
+                            <h3 className="m-0 p-0 text-[12px] font-bold text-muted-foreground uppercase tracking-[0.1em] leading-[1.33]">{t.dashboard?.products?.mobile?.productVariants || 'Product Variants'}</h3>
+                            <div className="flex flex-col gap-2">
+                                {product.variants.map((variant, idx) => (
+                                    <div key={variant.id || idx} className="bg-secondary/50 rounded p-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {/* Swatch placeholder matching Figma layout_YFHICY exactly */}
+                                            <div 
+                                                className="w-4 h-4 shrink-0 rounded-[12px] shadow-[inset_0px_2px_4px_0px_rgba(0,0,0,0.05)]" 
+                                                style={{ 
+                                                    backgroundColor: variant.name.toLowerCase().includes('blue') ? '#2563EB' : 
+                                                                     variant.name.toLowerCase().includes('red') ? '#DC2626' : 
+                                                                     variant.name.toLowerCase().includes('green') ? '#16A34A' : 
+                                                                     variant.name.toLowerCase().includes('black') ? '#171717' : 
+                                                                     variant.name.toLowerCase().includes('white') ? '#FAFAFA' : 
+                                                                     '#3F3F46' 
+                                                }}
+                                            />
+                                            <span className="text-[14px] font-medium text-foreground leading-[1.42]">
+                                                {(() => {
+                                                    const formatted = variant.name.replace(/\s*-\s*/g, ' | ');
+                                                    const parts = formatted.split(' | ');
+                                                    if (parts.length > 1) {
+                                                        const last = parts[parts.length - 1].trim();
+                                                        if (/^(S|M|L|XL|XXL|[0-9]{2})$/i.test(last) && !/^size/i.test(last)) {
+                                                            parts[parts.length - 1] = `Size ${last.toUpperCase()}`;
+                                                        }
+                                                    }
+                                                    return parts.join(' | ');
+                                                })()}
+                                            </span>
+                                        </div>
+                                        <span className="text-[14px] font-normal text-muted-foreground leading-[1.42] font-mono">{t.dashboard?.products?.list?.stock || 'Stock'} {variant.stock}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Description Section */}
+                    {descText ? (
+                        <div className="flex flex-col gap-[7px] mt-2">
+                            <h3 className="m-0 p-0 text-[12px] font-bold text-muted-foreground uppercase tracking-[0.1em] leading-[1.33]">{t.dashboard?.products?.mobile?.productFeatures || 'Product Features'}</h3>
+                            <div className="m-0 p-0 text-[14px] font-normal text-muted-foreground leading-[1.625] whitespace-pre-wrap">
+                                {descText}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* Sticky Footer — DS buttons (match the desktop QuickView modal: dashSecondary destructive + dashPrimary).
+                Confined to the 488px detail panel from md up (mobile stays full-width) so the bar sits under
+                the panel, not centered across the whole viewport. */}
+            <div className="fixed bottom-0 left-0 right-0 md:left-auto md:w-[488px] bg-background/90 backdrop-blur-md border-t border-white/10 p-4 pb-8 z-50">
+                <div className="flex gap-3 sm:max-w-[560px] sm:mx-auto">
+                    <Button
+                        variant="dashSecondary"
+                        size="dash"
+                        onClick={onDelete}
+                        className="flex-1 flex items-center justify-center gap-2 [border:1px_solid_hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {t.dashboard?.products?.form?.delete || 'DELETE PRODUCT'}
+                    </Button>
+                    <Button
+                        variant="dashPrimary"
+                        size="dash"
+                        onClick={onEdit}
+                        className="flex-1 flex items-center justify-center gap-2"
+                    >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        {t.dashboard?.products?.form?.editProduct || 'EDIT PRODUCT'}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}

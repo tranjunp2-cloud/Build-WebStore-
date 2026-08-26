@@ -1,0 +1,1608 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* ── CSS Variables ──────────────────────────────────────────────────────── */
+:root {
+  --brand-primary: #0ea5e9;
+  --brand-accent: #d946ef;
+  --brand-dark: #0c4a6e;
+  --surface-1: #09090b;
+  --surface-2: #18181b;
+  --surface-3: #27272a;
+  /* GH-1192: renamed from --border — site-renderer/storefront baseline. The shadcn
+     themed --border (light/dark) is defined in the GH-1192 token section below. */
+  --border-legacy: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --radius: 0.5rem;
+
+  /* Semantic layer (Plan B Phase 03) — dark baseline for admin + non-theme
+     contexts. Per-site generateThemeCSS() overrides these via <style> tag. */
+  --accent: var(--brand-primary);
+  --accent-hover: #0284c7;
+  --accent-rgb: 14, 165, 233;
+  --surface-primary: var(--surface-1);
+  --surface-secondary: var(--surface-2);
+  --surface-card: var(--surface-3);
+  --text-inverse: #09090b;
+  --text-muted: var(--text-secondary);
+  --border-semantic: var(--border-legacy);
+  --divider: var(--border-legacy);
+
+  /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
+  --nav-height: 64px;
+
+  /* Dashboard tokens — GH-1192: aliased to shadcn semantic (tự đổi light/dark).
+     Mappable → semantic; specialized (sidebar/divider/overlay/error/save-bar) giữ riêng. */
+  --dash-bg: hsl(var(--background));
+  --dash-surface: hsl(var(--card));
+  --dash-surface-hover: hsl(var(--muted));
+  --dash-text: hsl(var(--foreground));
+  --dash-text-muted: hsl(var(--muted-foreground));
+  --dash-border: hsl(var(--border));
+  --dash-accent: hsl(var(--primary));        /* GH-1192: nay = TEAL (đổi từ #2563EB) */
+  --dash-secondary-bg: hsl(var(--secondary));
+  /* Specialized — không có semantic tương đương (vẫn override theo .dark bên dưới) */
+  --dash-sidebar-bg: #FFFFFF;
+  --dash-col-divider-color: transparent; /* light: bỏ viền dọc giữa sidebar/header và content (dark đã transparent) */
+  --dash-divider: #CBD5E1;
+  --dash-error: #FB2C36;
+  --dash-warning: #B45309;
+  --dash-overlay: rgba(0, 0, 0, 0.35);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(25, 32, 56, 0.10);
+
+  /* Editor semantic tokens — light mode */
+  --editor-bg: #F1F5F9;
+  --editor-bg-rgb: 241 245 249;            /* GH-1192: channel-split for /opacity glass overlays */
+  --editor-surface: #FFFFFF;
+  --editor-surface-deep: #F8FAFC;
+  --editor-surface-elevated: #FFFFFF;
+  --editor-surface-elevated-rgb: 255 255 255;
+  --editor-text: #22313F;         /* GH-1192: CHÍNH — khớp dashboard --foreground (orders/discounts) */
+  --editor-text-muted: #475569;   /* GH-1192: PHỤ — slate-600, đậm dễ đọc ở light */
+  --editor-text-subtle: #475569;  /* GH-1192: gộp = phụ (bỏ cấp 3 cho đỡ lộn xộn) */
+  --editor-border: rgba(0, 0, 0, 0.08);
+  --editor-border-subtle: rgba(0, 0, 0, 0.05);
+  --editor-overlay-bg: rgba(0, 0, 0, 0.04);
+  --editor-overlay-hover: rgba(0, 0, 0, 0.06);
+  --editor-slider-track: #CBD5E1;              /* slate-300 — visible groove on white panel */
+}
+
+/* Dashboard + Editor semantic tokens — dark mode overrides */
+.dark {
+  /* GH-1192: các token dash mappable đã alias về semantic ở :root (semantic tự đổi
+     theo .dark) → chỉ giữ override cho token specialized. */
+  --dash-sidebar-bg: #060B18;
+  --dash-col-divider-color: transparent;
+  --dash-divider: #232E3D;
+  --dash-warning: #F5B945;
+  --dash-overlay: rgba(0, 0, 0, 0.5);
+  --save-bar-bg: hsl(var(--card));
+  --save-bar-shadow: 0px 8px 24px 0px rgba(0, 0, 0, 0.60);
+
+  /* Editor semantic tokens — dark mode */
+  --editor-bg: #0B1120;
+  --editor-bg-rgb: 11 17 32;               /* GH-1192: channel-split for /opacity glass overlays */
+  --editor-surface: #0F172A;
+  --editor-surface-deep: #0B1120;
+  --editor-surface-elevated: #1E293B;
+  --editor-surface-elevated-rgb: 30 41 59;
+  --editor-text: #F8FAFC;
+  --editor-text-muted: #94A3B8;
+  --editor-text-subtle: #64748B;
+  --editor-border: rgba(255, 255, 255, 0.06);
+  --editor-border-subtle: rgba(255, 255, 255, 0.04);
+  --editor-overlay-bg: rgba(255, 255, 255, 0.04);
+  --editor-overlay-hover: rgba(255, 255, 255, 0.06);
+  --editor-slider-track: #0B1120;              /* = editor-bg — darker groove on slate-800 panel */
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GH-1192 — Design System tokens (shadcn semantic). Nguồn: docs/design/Design system/.
+   Light = :root, Dark = .dark. Brand primary = TEAL; Blue = info / AI (KHONG phai
+   primary). Gia tri neo theo dashboard hien hanh (zero-shift) — tru --primary co y = teal.
+   Phase 02 wire vao tailwind hsl(var(x)) + alias token dash / editor / auth.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Primitive palette (lưu dạng "H S% L%" để semantic dùng hsl(var(--x) / <a>)) ── */
+  --p-teal-400: 172.46 66.01% 50.39%;  /* #2DD4BF (HSL decimal → khớp hex chính xác) */
+  --p-teal-600: 180.28 100% 41.57%;  /* #00D3D4 (light brand teal — GH-1192 update; HSL decimal khớp hex) */
+  --p-blue-500: 217.22 91.22% 59.8%;   /* #3B82F6 */
+  --p-blue-600: 221.21 83.19% 53.33%;  /* #2563EB */
+  --p-slate-50: 210 40% 98.04%;        /* #F8FAFC */
+  --p-slate-100: 210 40% 96.08%;       /* #F1F5F9 */
+  --p-slate-200: 214.29 31.82% 91.37%; /* #E2E8F0 */
+  --p-slate-500: 215.38 16.32% 46.86%; /* #64748B */
+  --p-slate-800: 215 27.91% 16.86%;    /* #1F2937 */
+  --p-slate-900: 222.22 47.37% 11.18%; /* #0F172A */
+  --p-slate-950: 222.86 48.84% 8.43%;  /* #0B1120 */
+  --p-gray-400: 217.89 10.61% 64.9%;   /* #9CA3AF */
+  --p-emerald-500: 160.12 84.08% 39.41%; /* #10B981 */
+  --p-emerald-600: 161.38 93.55% 30.39%; /* #059669 */
+  --p-red-500: 0 84.24% 60.2%;         /* #EF4444 */
+  --p-red-600: 0 72.22% 50.59%;        /* #DC2626 */
+  --p-amber-500: 37.69 92.13% 50.2%;   /* #F59E0B */
+  --p-amber-600: 32.13 94.62% 43.73%;  /* #D97706 */
+  --p-violet-300: 244.24 98.02% 80.2%; /* #A29BFE — AI glow */
+
+  /* ── Semantic — Light ── */
+  --background: var(--p-slate-50);
+  --foreground: 208.96 29.9% 19.02%;       /* #22313F — chữ body light (GH-1192) */
+  --card: 0 0% 100%;
+  --card-foreground: var(--p-slate-900);
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--p-slate-900);
+  --primary: var(--p-teal-600);            /* Teal #00D3D4 (light) */
+  --primary-foreground: var(--p-slate-900); /* #0F172A — chữ đậm trên teal sáng (WCAG ~9:1, GH-1192) */
+  --secondary: var(--p-slate-100);
+  --secondary-foreground: var(--p-slate-900);
+  --muted: var(--p-slate-100);
+  --muted-foreground: var(--p-slate-500);  /* #64748B — chữ phụ light */
+  --border: var(--p-slate-200);            /* #E2E8F0 */
+  --input: var(--p-slate-200);
+  --input-border: 210 7% 72%;              /* #B3B8BD = rgba(1,18,34,0.30) trên nền trắng — viền input (GH-1192) */
+  --ring: var(--p-teal-600);
+  /* --radius: 0.5rem đã khai ở :root phía trên */
+  --success: var(--p-emerald-600);    --success-foreground: 0 0% 100%;
+  --warning: var(--p-amber-600);      --warning-foreground: 0 0% 100%;
+  --destructive: var(--p-red-600);    --destructive-foreground: 0 0% 100%;
+  --info: var(--p-blue-600);          --info-foreground: 0 0% 100%;
+  --brand-teal: var(--p-teal-600);
+  --ai-glow: var(--p-violet-300);
+}
+
+.dark {
+  /* ── Semantic — Dark (neo theo --dash-* hiện hành; primary = teal) ── */
+  --background: var(--p-slate-950);        /* #0B1120 */
+  --foreground: 0 0% 100%;                 /* #FFFFFF (zero-shift dashboard) */
+  --card: 220 35.29% 13.33%;               /* #161E2E (HSL decimal exact) */
+  --card-foreground: 0 0% 100%;
+  --popover: 220 35.29% 13.33%;            /* #161E2E — elevated như card (overlay nổi trên nền #0B1120) */
+  --popover-foreground: 0 0% 100%;
+  --primary: var(--p-teal-400);            /* Teal #2DD4BF */
+  --primary-foreground: var(--p-slate-950); /* chữ tối #0B1120 trên teal sáng */
+  --secondary: 215 27.91% 16.86%;                /* #1F2937 */
+  --secondary-foreground: 0 0% 100%;
+  --muted: 215 27.91% 16.86%;                    /* #1F2937 */
+  --muted-foreground: var(--p-gray-400);   /* #9CA3AF */
+  --border: 213.33 24.32% 21.76%;                   /* #2A3645 — fix #1222 (table row border hover) đã về staging */
+  --input: 213.33 24.32% 21.76%;
+  --input-border: 213.33 24.32% 21.76%;             /* #2A3645 — dark giữ nguyên (viền input) */
+  --ring: var(--p-teal-400);
+  --success: var(--p-emerald-500);
+  --warning: var(--p-amber-500);
+  --destructive: var(--p-red-500);
+  --info: var(--p-blue-500);
+  --brand-teal: var(--p-teal-400);
+}
+
+/* Sidebar/content vertical divider. Preflight is OFF (tailwind.config.js corePlugins),
+   so `border-r` alone has no border-style and renders invisible — declare the full
+   shorthand here so the line actually paints. Desktop only (mobile has no fixed sidebar). */
+@media (min-width: 768px) {
+  .dash-col-divider { border-right: 1px solid var(--dash-col-divider-color); }
+}
+
+/* Tab trigger underline (shadcn Tabs use data-state, can't toggle via inline style).
+   Same preflight-off reason as above — paint the 2px underline here so it shows. */
+.dash-tab-trigger { border-bottom: 2px solid transparent; }
+.dash-tab-trigger[data-state="active"] { border-bottom-color: var(--dash-accent); }
+
+/* ── Base Table (GH-1222) ───────────────────────────────────────────────────
+   Preflight is OFF, so `border-b`/`divide-y` utilities emit border-width but no
+   border-style and render invisible. Paint row separators here with the full
+   shorthand so every dashboard <table className="dash-table"> shows lines in
+   both themes. `:last-child` drops the trailing line (the wrapper's own border
+   closes the box). Header row + body rows use the themed --dash-border. */
+.dash-table { width: 100%; border-collapse: collapse; }
+.dash-table thead tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr:last-child { border-bottom: none; }
+
+/* ── Shared compact table sizing (CMS dashboard) ─────────────────────────────
+   Opt-in: <Table className="dash-table-compact">. Unifies header/body font across
+   EVERY dashboard table at all widths so sizes stay consistent:
+     • desktop (>= xl / 1280px): header 10px / body 12px
+     • tablet band (< xl):       header 8px  / body 10px  (+ 8px cell padding so a
+                                  wide table fits without horizontal scroll)
+   Column ratios stay per-page via each table's <colgroup>; element sizes that aren't
+   text (thumbnails, action buttons) are tuned per-page. Higher specificity (class +
+   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px].
+   `:not([aria-hidden])` excludes decorative status dots (Badge's `dot` prop,
+   AiReviewIndicator's pulse dot) — those are tiny fixed-size spans with no text; the
+   8px cell padding this rule adds below xl was stretching them into ellipse/pill
+   shapes since padding eats into their `w-1.5` (6px) box under border-box sizing. */
+.dash-table-compact th { font-size: 10px; }
+.dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 12px; }
+@media (max-width: 1279.98px) {
+  .dash-table-compact th { font-size: 8px; padding-left: 8px; padding-right: 8px; }
+  .dash-table-compact td, .dash-table-compact td span:not([aria-hidden]) { font-size: 10px; padding-left: 8px; padding-right: 8px; }
+}
+
+/* ── Auth semantic tokens ───────────────────────────────────────────────── */
+/* Dark mode (default — matches current hardcoded values) */
+:root {
+  --auth-bg: #0A0E1A;
+  --auth-card-bg: rgba(30, 41, 59, 0.6);
+  --auth-card-border: rgba(59, 130, 246, 0.15);
+  --auth-card-shadow: 0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05);
+  --auth-text: #F8FAFC;
+  --auth-text-muted: #94A3B8;
+  --auth-text-subtle: rgba(248, 250, 252, 0.5);
+  --auth-input-bg: rgba(30, 41, 59, 0.6);
+  --auth-input-border: rgba(59, 130, 246, 0.15);
+  --auth-footer-color: #94A3B8;
+}
+
+/* Light mode overrides */
+html:not(.dark) {
+  --auth-bg: #F1F5F9;
+  --auth-card-bg: rgba(255, 255, 255, 0.92);
+  --auth-card-border: rgba(59, 130, 246, 0.18);
+  --auth-card-shadow: 0px 8px 32px rgba(0,0,0,0.08), inset 0px 1px 0px rgba(255,255,255,0.8);
+  --auth-text: #0F172A;
+  --auth-text-muted: #475569;
+  --auth-text-subtle: rgba(15, 23, 42, 0.5);
+  --auth-input-bg: rgba(255, 255, 255, 0.85);
+  --auth-input-border: rgba(59, 130, 246, 0.2);
+  --auth-footer-color: #64748B;
+}
+
+/* ── Customer Feature (F25) semantic tokens ─────────────────────────────── */
+/* Dark mode (default — matches current hardcoded values exactly) */
+:root {
+  --cus-surface-card: rgba(15,23,42,0.4);
+  --cus-surface-header: rgba(15,23,42,0.7);
+  --cus-surface-dropdown: #1e293b;
+  --cus-surface-select: #1e293b;
+  --cus-surface-input: rgba(255,255,255,0.04);
+  --cus-surface-sticky: rgba(10,17,33,0.96);
+  --cus-surface-info: rgba(15,23,42,0.6);
+  --cus-border-subtle: rgba(255,255,255,0.04);
+  --cus-border-medium: rgba(255,255,255,0.08);
+  --cus-border-strong: rgba(255,255,255,0.14);
+  --cus-text-secondary: rgba(255,255,255,0.65);
+  --cus-text-muted: #94a3b8;
+  --cus-text-subtle: rgba(255,255,255,0.40);
+  --cus-text-faint: rgba(255,255,255,0.30);
+  --cus-code-bg: rgba(255,255,255,0.06);
+  --cus-code-border: rgba(255,255,255,0.10);
+  --cus-code-fg: #94a3b8;
+  --cus-skeleton: rgba(255,255,255,0.06);
+  --cus-dot-sep: #475569;
+  /* Rank badges */
+  --cus-rank-vip-fg: #c4b5fd;    --cus-rank-vip-bg: rgba(124,58,237,0.10);    --cus-rank-vip-border: rgba(124,58,237,0.28);
+  --cus-rank-gold-fg: #fbbf24;   --cus-rank-gold-bg: rgba(245,158,11,0.10);   --cus-rank-gold-border: rgba(245,158,11,0.30);
+  --cus-rank-silver-fg: #cbd5e1; --cus-rank-silver-bg: rgba(148,163,184,0.14); --cus-rank-silver-border: rgba(148,163,184,0.35);
+  --cus-rank-bronze-fg: #fb923c; --cus-rank-bronze-bg: rgba(180,83,9,0.10);   --cus-rank-bronze-border: rgba(180,83,9,0.28);
+}
+
+/* Customer feature — light mode overrides */
+html:not(.dark) {
+  --cus-surface-card: rgba(248,250,252,0.85);
+  --cus-surface-header: rgba(241,245,249,0.95);
+  --cus-surface-dropdown: #ffffff;
+  --cus-surface-select: #f8fafc;
+  --cus-surface-input: #ffffff;
+  --cus-surface-sticky: rgba(248,250,252,0.96);
+  --cus-surface-info: rgba(248,250,252,0.9);
+  --cus-border-subtle: rgba(0,0,0,0.04);
+  --cus-border-medium: rgba(0,0,0,0.08);
+  --cus-border-strong: rgba(0,0,0,0.14);
+  --cus-text-secondary: #334155;
+  --cus-text-muted: #64748b;
+  --cus-text-subtle: rgba(15,23,42,0.40);
+  --cus-text-faint: rgba(15,23,42,0.30);
+  --cus-code-bg: rgba(0,0,0,0.05);
+  --cus-code-border: rgba(0,0,0,0.10);
+  --cus-code-fg: #475569;
+  --cus-skeleton: rgba(0,0,0,0.06);
+  --cus-dot-sep: #94a3b8;
+  /* Rank badges */
+  --cus-rank-vip-fg: #6d28d9;    --cus-rank-vip-bg: rgba(109,40,217,0.08);   --cus-rank-vip-border: rgba(109,40,217,0.22);
+  --cus-rank-gold-fg: #b45309;   --cus-rank-gold-bg: rgba(180,83,9,0.08);    --cus-rank-gold-border: rgba(180,83,9,0.24);
+  --cus-rank-silver-fg: #475569; --cus-rank-silver-bg: rgba(71,85,105,0.10); --cus-rank-silver-border: rgba(71,85,105,0.28);
+  --cus-rank-bronze-fg: #92400e; --cus-rank-bronze-bg: rgba(146,64,14,0.08); --cus-rank-bronze-border: rgba(146,64,14,0.24);
+}
+
+
+/* ── Dashboard Shell — Legacy Color Overrides ────────────────────────────── */
+/* Remaps hardcoded Tailwind dark utilities to dash-* semantic tokens.
+   Scoped to .dash-shell so storefront/studio are unaffected.
+   New components should use dash-* tokens directly instead of zinc/slate. */
+.dash-shell {
+  background-color: var(--dash-bg);
+  color: var(--dash-text);
+}
+
+/* --dash-content-pl: mép TRÁI của CỘT NỘI DUNG (sidebar + gutter trang md:p-8 = 2rem),
+   dùng cho các save bar `fixed ... lg:left-[var(--dash-content-pl)]` (settings/discounts/
+   customers/products). Trước đây var này set inline = 250px (mép sidebar, không cộng gutter,
+   không theo sidebar responsive 246/250) → bar nhô ~28-32px so với card nội dung (GH-1592).
+   Width sidebar phải khớp Sidebar.tsx (`w-[246px] 2xl:w-[250px]`, mini `w-[64px]`).
+   Scope vào `.dash-shell-root` (marker chỉ có trên layout root — CMSLayoutClient, nơi toggle
+   `.dash-sidebar-mini`), KHÔNG dùng `.dash-shell` trần: nhiều modal/popover tự gắn `dash-shell`
+   để ăn theme, nếu match sẽ re-declare var này mà không có gate mini → consumer lồng bên trong
+   đọc sai offset khi sidebar thu gọn; var định nghĩa ở root tự inherit xuống toàn cây. */
+@media (min-width: 1024px) {
+  .dash-shell-root { --dash-content-pl: calc(246px + 2rem); }
+  .dash-shell-root.dash-sidebar-mini { --dash-content-pl: calc(64px + 2rem); }
+}
+@media (min-width: 1536px) {
+  .dash-shell-root:not(.dash-sidebar-mini) { --dash-content-pl: calc(250px + 2rem); }
+}
+
+.dash-shell .bg-zinc-950,
+.dash-shell .bg-\[\#0B1120\],
+.dash-shell .bg-\[\#0f1729\],
+.dash-shell .bg-\[\#0d1525\] { background-color: var(--dash-bg); }
+.dash-shell .bg-zinc-900,
+.dash-shell .bg-slate-900,
+.dash-shell .bg-\[\#161E2E\],
+.dash-shell .bg-\[\#141e2e\],
+.dash-shell .bg-\[\#1a2540\] { background-color: var(--dash-surface); }
+.dash-shell .bg-zinc-800,
+.dash-shell .bg-slate-800,
+.dash-shell .bg-\[\#1E293B\],
+.dash-shell .bg-\[\#1e293b\],
+.dash-shell .bg-\[\#1F2937\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .hover\:bg-zinc-900:hover,
+.dash-shell .hover\:bg-zinc-800:hover,
+.dash-shell .hover\:bg-zinc-700:hover,
+.dash-shell .hover\:bg-slate-800:hover,
+.dash-shell .hover\:bg-slate-700:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .border-zinc-700,
+.dash-shell .border-zinc-800,
+.dash-shell .border-slate-700,
+.dash-shell .border-slate-800,
+.dash-shell .border-white\/\[0\.08\],
+.dash-shell .border-white\/\[0\.06\],
+.dash-shell .border-white\/30,
+.dash-shell .border-\[\#1F2937\],
+.dash-shell .border-\[\#334155\] { border-color: var(--dash-border); }
+.dash-shell .text-zinc-100,
+.dash-shell .text-zinc-200,
+.dash-shell .text-slate-100,
+.dash-shell .text-slate-50 { color: var(--dash-text); }
+.dash-shell .text-slate-50\/60,
+.dash-shell .text-slate-50\/50 { color: var(--dash-text-muted); }
+.dash-shell .text-zinc-300 { color: var(--dash-text-muted); }
+.dash-shell .text-zinc-400,
+.dash-shell .text-zinc-500,
+.dash-shell .text-slate-300,
+.dash-shell .text-slate-400,
+.dash-shell .text-slate-500,
+.dash-shell .text-\[\#9CA3AF\],
+.dash-shell .text-gray-500 { color: var(--dash-text-muted); }
+/* text-white: remap to theme text; preserve white on gradient/colored backgrounds */
+.dash-shell .text-white { color: var(--dash-text); }
+.dash-shell [class*="from-"].text-white,
+.dash-shell [class*="from-"] .text-white,
+.dash-shell [class*="bg-gradient"].text-white,
+.dash-shell [class*="bg-gradient"] .text-white,
+.dash-shell [style*="linear-gradient"].text-white,
+.dash-shell [style*="linear-gradient"] .text-white,
+.dash-shell .bg-blue-600 .text-white,
+.dash-shell .bg-blue-500 .text-white,
+.dash-shell .bg-red-600 .text-white,
+.dash-shell .bg-green-600 .text-white,
+.dash-shell .bg-\[\#FB2C36\] .text-white,
+.dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
+/* AI Fix All Issues gradient btn — light=white, dark=black */
+.dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #fff !important; }
+/* GH-1578: checkbox ticks on bg-[hsl(var(--primary))] / bg-[#10B981] bypass this remap via
+   inline style={{ color: '#fff' }} instead of an exception here — those bg values are dynamic
+   CSS-var/arbitrary classes that don't lend themselves to a static selector exception. See
+   StaffDrawer.tsx and AIFixModal.tsx. If you add a new text-white element on a colored/checked
+   background, it WILL get remapped unless you either add an exception above or use inline style. */
+.dark .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #0F172A !important; }
+/* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
+html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-white\/8 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .hover\:bg-white\/5:hover,
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+.dash-shell .hover\:border-white\/20:hover { border-color: var(--dash-border); }
+/* text-gray-200/300 (dark-mode text, nearly invisible on white) */
+.dash-shell .text-gray-200,
+.dash-shell .text-gray-300 { color: var(--dash-text); }
+.dash-shell .text-gray-400 { color: var(--dash-text-muted); }
+/* bg-slate-800/60 opacity variant — include md: responsive variant (OrdersTable container) */
+.dash-shell .bg-slate-800\/60,
+.dash-shell .md\:bg-slate-800\/60 { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-slate-800\/50 { background-color: var(--dash-secondary-bg); }
+/* Gap 1: bg-[#0F172A] used as modal/panel bg → remap to surface */
+.dash-shell .bg-\[\#0F172A\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0F172A\]\/95 { background-color: var(--dash-surface); }
+/* Gap 2: bg-[#0B1120] opacity variants — light mode only; dark mode keeps original depth overlay */
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/50 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/60 { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/80 { background-color: rgba(0,0,0,0.06); }
+/* Gap 3: divide-white/opacity → invisible dividers on white bg */
+.dash-shell .divide-white\/5 > * + * { border-color: var(--dash-border); }
+.dash-shell .divide-white\/10 > * + * { border-color: var(--dash-border); }
+.dash-shell .divide-white\/\[0\.05\] > * + * { border-color: var(--dash-border); }
+/* Gap 4: border-white/10,12 → invisible border on white bg */
+.dash-shell .border-white\/10 { border-color: var(--dash-border); }
+.dash-shell .border-white\/\[0\.12\] { border-color: var(--dash-border); }
+/* Gap 5: placeholder too light on white bg */
+.dash-shell .placeholder\:text-slate-50\/30::placeholder { color: var(--dash-text-muted); }
+/* rgba() className patterns — text */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.6\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.4\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.3\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.2\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.8\)\] { color: var(--dash-text); }
+/* rgba() className patterns — border */
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.1\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.16\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.3\)\] { border-color: var(--dash-border); }
+/* rgba() className patterns — bg (light mode only for rgba(0,0,0,...) values) */
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.1\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.2\)\] { background-color: rgba(0,0,0,0.08); }
+.dash-shell .bg-\[rgba\(30\,41\,59\,0\.60\)\] { background-color: var(--dash-secondary-bg); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(0,0,0,0.06); }
+/* fill (SVG step indicator inactive) */
+.dash-shell .fill-\[rgba\(255\,255\,255\,0\.1\)\] { fill: var(--dash-border); }
+/* Group A: new hex bg values (ProductQuickViewModal, CategoryManager, PaymentsForm) */
+.dash-shell .bg-\[\#111827\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#191C22\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#1D2026\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#10131A\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#0b1b36\] { background-color: var(--dash-surface); }
+/* Group B: hover variants of dark hex values */
+.dash-shell .hover\:bg-\[\#1E293B\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#1E293B\]\/80:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#161E2E\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#0B1120\]\/80:hover { background-color: var(--dash-surface-hover); }
+html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color: rgba(0,0,0,0.04); }
+.dash-shell .hover\:bg-\[\#283548\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#1C263B\]:hover { background-color: var(--dash-surface-hover); }
+/* Group C: remaining dark bg hex — one-shot complete sweep */
+.dash-shell .bg-\[\#000000\],
+.dash-shell .bg-\[\#0b1120\],
+.dash-shell .bg-\[\#0B0E14\],
+.dash-shell .bg-\[\#0F141E\],
+.dash-shell .bg-\[\#0f1729\] { background-color: var(--dash-bg); }
+/* after:bg-[#0b1120] — timeline line masking pseudo-element (customer-detail-panel) */
+.dash-shell .after\:bg-\[\#0b1120\]::after { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#141e2e\],
+.dash-shell .bg-\[\#0d1525\],
+.dash-shell .bg-\[\#161e2e\],
+.dash-shell .bg-\[\#172033\],
+.dash-shell .bg-\[\#1A2236\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#1a2540\],
+.dash-shell .bg-\[\#1C263B\],
+.dash-shell .bg-\[\#1E2536\],
+.dash-shell .bg-\[\#272A31\],
+.dash-shell .bg-\[\#283548\],
+.dash-shell .bg-\[\#374151\] { background-color: var(--dash-secondary-bg); }
+/* AC-5: modal overlay — Light: rgba(0,0,0,0.4) / Dark: rgba(0,0,0,0.7) per Design System */
+.dash-shell .bg-black\/60 { background-color: rgba(0,0,0,0.4); }
+.dash-shell .bg-black\/80 { background-color: rgba(0,0,0,0.4); }
+.dark .dash-shell .bg-black\/60 { background-color: rgba(0,0,0,0.7); }
+.dark .dash-shell .bg-black\/80 { background-color: rgba(0,0,0,0.7); }
+/* Design System §3: card shadow — Light: subtle / Dark: deeper */
+.dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1); }
+.dark .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.5); }
+/* GH-1192: dark shadow boost cho util to (md/lg/xl/2xl) theo doc §3 — opacity 0.6→0.8 */
+.dark .dash-shell .shadow-md  { box-shadow: 0 4px 6px -1px rgb(0 0 0/0.6), 0 2px 4px -2px rgb(0 0 0/0.6); }
+.dark .dash-shell .shadow-lg  { box-shadow: 0 10px 15px -3px rgb(0 0 0/0.7), 0 4px 6px -4px rgb(0 0 0/0.7); }
+.dark .dash-shell .shadow-xl  { box-shadow: 0 20px 25px -5px rgb(0 0 0/0.8), 0 8px 10px -6px rgb(0 0 0/0.8); }
+.dark .dash-shell .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0/0.8); }
+
+/* ── Text color sweep — Design System §1 ─────────────────────────────────── */
+/* Dark text values (fine in light, invisible in dark → remap to dash-text) */
+.dash-shell .text-\[\#0b1120\],
+.dash-shell .text-\[\#0B1120\],
+.dash-shell .text-\[\#0F172A\] { color: var(--dash-text); }
+/* Dark-ish muted (fine in light, invisible in dark → remap to dash-text-muted) */
+.dash-shell .text-\[\#374151\],
+.dash-shell .text-\[\#6B7280\],
+.dash-shell .text-\[\#737373\] { color: var(--dash-text-muted); }
+/* Light gray text (invisible in light mode → remap to dash-text-muted) */
+.dash-shell .text-\[\#9CA3AF\],
+.dash-shell .text-\[\#9ca3af\],
+.dash-shell .text-\[\#9f9fa9\],
+.dash-shell .text-\[\#9F9FA9\],
+.dash-shell .text-\[\#99A1AF\],
+.dash-shell .text-\[\#94a3b8\],
+.dash-shell .text-\[\#94A3B8\],
+.dash-shell .text-\[\#c1c6d7\],
+.dash-shell .text-\[\#C1C6D7\],
+.dash-shell .text-\[\#c2c6d6\],
+.dash-shell .text-\[\#CBD5E1\],
+.dash-shell .text-\[\#E5E7EB\] { color: var(--dash-text-muted); }
+/* Pastel badge text (designed for dark bg — too light on white) */
+.dash-shell .text-\[\#B9F8CF\] { color: #059669; }
+.dash-shell .text-\[\#C4B5FD\] { color: #7c3aed; }
+/* Near-white text (invisible in light mode → remap to dash-text) */
+.dash-shell .text-\[\#dde2f8\],
+.dash-shell .text-\[\#DDE2F8\],
+.dash-shell .text-\[\#e1e2eb\],
+.dash-shell .text-\[\#E1E2EB\],
+.dash-shell .text-\[\#f1f5f9\],
+.dash-shell .text-\[\#F1F5F9\],
+.dash-shell .text-\[\#f8fafc\],
+.dash-shell .text-\[\#F8FAFC\],
+.dash-shell .md\:text-\[\#F8FAFC\],
+.dash-shell .text-\[\#FAFAFA\],
+.dash-shell .text-\[\#FFFFFF\] { color: var(--dash-text); }
+
+/* ── Border color sweep ───────────────────────────────────────────────────── */
+.dash-shell .border-\[\#0b1120\],
+.dash-shell .border-\[\#374151\],
+.dash-shell .border-\[\#414754\] { border-color: var(--dash-border); }
+/* Near-white border (invisible on white bg) */
+.dash-shell .border-\[\#F8FAFC\] { border-color: var(--dash-border); }
+/* Near-white border opacity variants (invisible on white bg) */
+.dash-shell .border-\[\#F8FAFC\]\/30,
+.dash-shell .border-\[\#F8FAFC\]\/20,
+.dash-shell .border-\[\#F8FAFC\]\/10 { border-color: var(--dash-border); }
+
+/* ── Text opacity variants of near-white (invisible on light bg) ─────────── */
+.dash-shell .text-\[\#F8FAFC\]\/90,
+.dash-shell .text-\[\#F8FAFC\]\/80 { color: var(--dash-text); }
+.dash-shell .text-\[\#F8FAFC\]\/60,
+.dash-shell .text-\[\#F8FAFC\]\/50 { color: var(--dash-text-muted); }
+.dash-shell .text-\[\#F8FAFC\]\/40,
+.dash-shell .text-\[\#F8FAFC\]\/30 { color: var(--dash-text-muted); }
+
+/* ── Placeholder sweep ───────────────────────────────────────────────────── */
+/* Near-white placeholders (invisible on white bg) */
+.dash-shell .placeholder\:text-\[\#F8FAFC\]::placeholder,
+.dash-shell .placeholder\:text-\[\#F8FAFC\]\/40::placeholder,
+.dash-shell .placeholder\:text-\[rgba\(248\,250\,252\,0\.4\)\]::placeholder,
+.dash-shell .placeholder-\[rgba\(248\,250\,252\,0\.4\)\]::placeholder { color: var(--dash-text-muted); }
+/* placeholder:text-white/* opacity variants (invisible on white bg) */
+.dash-shell .placeholder\:text-white\/40::placeholder,
+.dash-shell .placeholder\:text-white\/50::placeholder,
+.dash-shell .placeholder\:text-white\/60::placeholder { color: var(--dash-text-muted); }
+/* Light gray placeholders (low contrast on white) */
+.dash-shell .placeholder-\[\#9f9fa9\]::placeholder,
+.dash-shell .placeholder-\[\#9F9FA9\]::placeholder,
+.dash-shell .placeholder-\[rgba\(159\,159\,169\,1\)\]::placeholder,
+.dash-shell .placeholder-\[\#374151\]::placeholder { color: var(--dash-text-muted); }
+
+/* ── Phase 06: hover text sweep (near-white → readable in light mode) ───── */
+.dash-shell .hover\:text-white:hover,
+.dash-shell .hover\:text-\[\#E5E7EB\]:hover,
+.dash-shell .hover\:text-\[\#F8FAFC\]:hover { color: var(--dash-text); }
+
+/* ── Phase 06: text-white/* opacity variants (invisible on light bg) ─────── */
+.dash-shell .text-white\/90,
+.dash-shell .text-white\/80 { color: var(--dash-text); }
+.dash-shell .text-white\/70,
+.dash-shell .text-white\/60,
+.dash-shell .text-white\/50,
+.dash-shell .text-white\/40,
+.dash-shell .text-white\/30,
+.dash-shell .text-white\/20 { color: var(--dash-text-muted); }
+/* F25 Customers — intermediate opacity variants not in original sweep */
+.dash-shell .text-white\/75 { color: var(--dash-text); }
+.dash-shell .text-white\/65,
+.dash-shell .text-white\/55,
+.dash-shell .text-white\/45,
+.dash-shell .text-white\/35 { color: var(--dash-text-muted); }
+
+/* ── Phase 06: rgba 0.6 near-white text (complement to 0.7/0.9 above) ───── */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.6\)\] { color: var(--dash-text-muted); }
+
+/* ── Phase 06: bg hex opacity variants (light mode only — dark mode keeps original depth) ── */
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/30,
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/40 { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/70,
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/90,
+html:not(.dark) .dash-shell .bg-\[\#0b1120\]\/50 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-\[\#0F172A\]\/30 { background-color: rgba(0,0,0,0.04); }
+.dash-shell .bg-\[\#0F172A\]\/80 { background-color: var(--dash-surface); }
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/20,
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/30,
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/40 { background-color: rgba(0,0,0,0.03); }
+.dash-shell .bg-\[\#1E293B\]\/50,
+.dash-shell .bg-\[\#1E293B\]\/60,
+.dash-shell .bg-\[\#1e293b\]\/60,
+.dash-shell .bg-\[\#1E293B\]\/70,
+.dash-shell .bg-\[\#1E293B\]\/95 { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#000000\]\/60 { background-color: rgba(0,0,0,0.4); }
+.dash-shell .bg-\[\#0B0E14\]\/80 { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#272A31\]\/50 { background-color: var(--dash-secondary-bg); }
+
+/* ── Phase 06: border variants ───────────────────────────────────────────── */
+.dash-shell .border-\[\#1f2937\] { border-color: var(--dash-border); }
+.dash-shell .border-\[\#1E293B\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(65\,71\,84\,0\.1\)\],
+.dash-shell .border-\[rgba\(66\,71\,84\,0\.2\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.05\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(248\,250\,252\,0\.15\)\] { border-color: var(--dash-border); }
+
+/* ── Phase 06: hover bg ──────────────────────────────────────────────────── */
+.dash-shell .hover\:bg-\[\#1F2937\]:hover { background-color: var(--dash-surface-hover); }
+
+/* ── Phase 06: rgba text ─────────────────────────────────────────────────── */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.7\)\],
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.9\)\] { color: var(--dash-text); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.5\)\],
+.dash-shell .text-\[rgba\(255\,255\,255\,0\.5\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[\#737373\] { color: var(--dash-text-muted); }
+.dash-shell .hover\:bg-\[rgba\(248\,250\,252\,0\.05\)\]:hover { background-color: var(--dash-surface-hover); }
+
+/* ── Phase 06: rgba bg (light mode only — dark mode preserves original overlays) ── */
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.6\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.8\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(15\,23\,42\,0\.7\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(0,0,0,0.15); }
+
+/* ── Phase 06: portal modal hex variants (outside dash-shell scope fix) ─── */
+.dash-shell .bg-\[\#191C22\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0B0E14\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#1D2026\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#1E2536\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0F141E\],
+.dash-shell .bg-\[\#0f141e\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#374151\] { background-color: var(--dash-border); }
+.dash-shell .border-white\/5,
+.dash-shell .border-white\/\[0\.05\] { border-color: var(--dash-border); }
+
+/* ── TopHeader: force opaque background to prevent scroll overlap ─ */
+/* Top header bg matches the sidebar column so the two read as one surface. */
+.dash-shell header {
+    background-color: var(--dash-sidebar-bg) !important;
+}
+/* Bỏ viền ngang dưới header ở cả light + dark (TopHeader dùng --dash-divider trực tiếp).
+   Line này cũng là đường dưới logo của sidebar → bỏ cho cả header + sidebar. */
+.dash-shell header { border-bottom-color: transparent; }
+
+/* Sidebar footer (LanguageToggle): giữ viền trên ở cả light + dark. */
+.dash-sidebar-footer { border-top: 1px solid var(--dash-divider); }
+
+/* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
+.dash-shell .text-slate-300,
+.dash-shell .text-slate-400 { color: var(--dash-text-muted); }
+
+/* ── Phase 06: hover text slate (drag handle, arrows) ───────────────────── */
+.dash-shell .hover\:text-slate-300:hover,
+.dash-shell .hover\:text-slate-400:hover { color: var(--dash-text-muted); }
+/* near-white hover text (invisible on light bg) */
+.dash-shell .hover\:text-slate-50:hover,
+.dash-shell .hover\:text-white:hover { color: var(--dash-text); }
+/* near-white hover bg (invisible on light bg) */
+.dash-shell .hover\:bg-white\/\[0\.04\]:hover,
+.dash-shell .hover\:bg-white\/\[0\.05\]:hover,
+.dash-shell .hover\:bg-white\/\[0\.08\]:hover { background-color: var(--dash-surface-hover); }
+/* near-white hover border */
+.dash-shell .hover\:border-white\/\[0\.18\]:hover { border-color: var(--dash-border); }
+
+/* ── Phase 06: near-white text variants ──────────────────────────────────── */
+.dash-shell .text-\[\#FAFAFA\] { color: var(--dash-text); }
+
+/* ── Phase 06: checkbox/input border-white/20 (invisible on white bg) ───── */
+.dash-shell .border-white\/20 { border-color: var(--dash-border); }
+
+/* ── Phase 06: row hover + cancel button bg (DashboardCustomizeModal) ───── */
+.dash-shell .hover\:bg-\[\#1C263B\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .bg-\[\#172033\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[rgba\(248\,250\,252\,0\.6\)\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[rgba\(30\,41\,59\,0\.6\)\] { background-color: var(--dash-secondary-bg); }
+
+/* ── Phase 06: payments + shipping pages (light-mode gaps) ───────────────── */
+.dash-shell .text-slate-200 { color: var(--dash-text); }
+.dash-shell .text-\[\#e1e2eb\] { color: var(--dash-text); }
+.dash-shell .border-white\/\[0\.12\] { border-color: var(--dash-border); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
+/* F25 Customers — skeleton bg + subtle row dividers (light mode only) */
+html:not(.dark) .dash-shell .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .border-white\/\[0\.04\] { border-color: rgba(0,0,0,0.04); }
+
+/* ── Editor Shell — Legacy Color Overrides ────────────────────────────── */
+/* Remaps hardcoded Tailwind dark utilities to editor-* semantic tokens.
+   Scoped to .editor-shell; the preview <iframe> is a separate document — unaffected.
+   New components should use editor-* tokens directly. */
+.editor-shell {
+  background-color: var(--editor-bg);
+  color: var(--editor-text);
+}
+
+/* Solid dark hex bgs → editor surface tokens */
+.editor-shell .bg-\[\#0B1120\],
+.editor-shell .bg-\[\#0b1120\],
+.editor-shell .bg-\[\#080e1d\] { background-color: var(--editor-bg); }
+.editor-shell .bg-\[\#0F172A\],
+.editor-shell .bg-\[\#0f172a\],
+.editor-shell .bg-\[\#0f1923\],
+.editor-shell .bg-\[\#111827\],
+.editor-shell .bg-\[\#111A2D\],
+.editor-shell .bg-\[\#151b2b\],
+.editor-shell .bg-\[\#172033\] { background-color: var(--editor-surface); }
+.editor-shell .bg-\[\#1E293B\],
+.editor-shell .bg-\[\#1e293b\],
+.editor-shell .bg-\[\#1F2937\],
+.editor-shell .bg-\[\#1f2937\],
+.editor-shell .bg-\[\#253046\] { background-color: var(--editor-surface-elevated); }
+
+/* Tailwind named dark bg classes */
+.editor-shell .bg-slate-900,
+.editor-shell .bg-gray-900 { background-color: var(--editor-bg); }
+.editor-shell .bg-slate-800,
+.editor-shell .bg-gray-800 { background-color: var(--editor-surface); }
+.editor-shell .bg-slate-700,
+.editor-shell .bg-gray-700 { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-shell .bg-slate-800\/30 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0.06); }
+
+/* Hover bg hex variants */
+.editor-shell .hover\:bg-\[\#2A3750\]:hover { background-color: var(--editor-surface-elevated); }
+.editor-shell .hover\:bg-\[\#0d1528\]:hover { background-color: var(--editor-bg); }
+
+/* text-white: remap to theme text; preserve white on gradient/colored bgs */
+.editor-shell .text-white { color: var(--editor-text); }
+.editor-shell [class*="from-"].text-white,
+.editor-shell [class*="from-"] .text-white,
+.editor-shell [class*="bg-gradient"].text-white,
+.editor-shell [class*="bg-gradient"] .text-white,
+.editor-shell [class*="linear-gradient"].text-white,
+.editor-shell [class*="linear-gradient"] .text-white { color: #fff !important; }
+
+/* solid blue accents keep white text both themes (block-name chip trên canvas,
+   badge undo/redo mobile, nút template modal) — blue bg không bị remap theo theme */
+.editor-shell .bg-blue-400.text-white,
+.editor-shell .bg-blue-500.text-white,
+.editor-shell .bg-blue-600.text-white,
+.editor-shell .bg-blue-400 .text-white,
+.editor-shell .bg-blue-500 .text-white,
+.editor-shell .bg-blue-600 .text-white { color: #fff !important; }
+
+/* solid teal primary accent giữ chữ trắng cả 2 theme (nút Next/Done coach marks) —
+   bg-[hsl(var(--primary))] là teal đặc cố định, không bị remap theo theme (GH-1584) */
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\].text-white,
+.editor-shell .bg-\[hsl\(var\(--primary\)\)\] .text-white { color: #fff !important; }
+
+/* dark scrim overlays (bg-black/NN) keep white text/icons both themes — hover
+   preview overlay (TemplateCard), upload-progress overlay (BlockImageEditor) —
+   these always sit on a dark backdrop regardless of theme. */
+.editor-shell [class*="bg-black/"].text-white,
+.editor-shell [class*="bg-black/"] .text-white { color: #fff !important; }
+
+/* text-white opacity variants */
+.editor-shell .text-white\/80,
+.editor-shell .text-white\/70,
+.editor-shell .text-white\/60 { color: var(--editor-text); }
+.editor-shell .text-white\/50,
+.editor-shell .text-white\/40,
+.editor-shell .text-white\/30 { color: var(--editor-text-muted); }
+
+/* Slate text → editor text tokens */
+.editor-shell .text-slate-50,
+.editor-shell .text-slate-100,
+.editor-shell .text-slate-200 { color: var(--editor-text); }
+.editor-shell .text-slate-300,
+.editor-shell .text-slate-400,
+.editor-shell .text-slate-500 { color: var(--editor-text-muted); }
+
+/* gray text → editor text tokens */
+.editor-shell .text-gray-200 { color: var(--editor-text); }
+.editor-shell .text-gray-300,
+.editor-shell .text-gray-400,
+.editor-shell .text-gray-500,
+.editor-shell .text-gray-600 { color: var(--editor-text-muted); }
+
+/* Hex text — near-white (invisible in light) → editor-text */
+.editor-shell .text-\[\#F8FAFC\],
+.editor-shell .text-\[\#f8fafc\] { color: var(--editor-text); }
+.editor-shell .text-\[\#94A3B8\],
+.editor-shell .text-\[\#94a3b8\],
+.editor-shell .text-\[\#CBD5E1\],
+.editor-shell .text-\[\#c2c6d6\] { color: var(--editor-text-muted); }
+/* dark hex text (fine in light, invisible in dark) */
+.editor-shell .text-\[\#0B1120\] { color: var(--editor-text); }
+/* rgba near-white text */
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.7\)\] { color: var(--editor-text); }
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.6\)\],
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--editor-text-muted); }
+
+/* info-card pale text (light-colored for dark bg) → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#B9F8CF\],
+html:not(.dark) .editor-shell .text-\[\#b9f8cf\] { color: #15803d; }
+html:not(.dark) .editor-shell .text-\[rgba\(185\,248\,207\,0\.7\)\] { color: #166534; }
+html:not(.dark) .editor-shell .text-\[\#FFF085\] { color: #854d0e; }
+html:not(.dark) .editor-shell .text-\[rgba\(255\,240\,133\,0\.7\)\] { color: #92400e; }
+html:not(.dark) .editor-shell .text-\[\#FCA5A5\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[rgba\(252\,165\,165\,0\.7\)\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[\#93C5FD\] { color: #1d4ed8; }
+html:not(.dark) .editor-shell .text-\[rgba\(147\,197\,253\,0\.7\)\] { color: #1e40af; }
+html:not(.dark) .editor-shell .text-cyan-300 { color: #0e7490; }
+html:not(.dark) .editor-shell .text-cyan-400 { color: #0e7490; }
+html:not(.dark) .editor-shell .text-cyan-200\/70 { color: #155e75; }
+html:not(.dark) .editor-shell .text-amber-300 { color: #92400e; }
+html:not(.dark) .editor-shell .text-amber-300\/80 { color: #92400e; }
+html:not(.dark) .editor-shell .text-amber-400 { color: #b45309; }
+html:not(.dark) .editor-shell .text-amber-400\/70 { color: #b45309; }
+html:not(.dark) .editor-shell .text-emerald-400 { color: #15803d; }
+/* Draft badge: pale gray text/bg/border → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#d1d5dc\] { color: #475569; }
+html:not(.dark) .editor-shell .bg-\[rgba\(106\,114\,130\,0\.2\)\] { background-color: rgba(71,85,105,0.12); }
+html:not(.dark) .editor-shell .border-\[rgba\(106\,114\,130\,0\.3\)\] { border-color: rgba(71,85,105,0.3); }
+/* Delete button pale pink text → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#FFC9C9\] { color: #b91c1c; }
+/* Other pale accent colors → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#adc6ff\] { color: #1d4ed8; }
+html:not(.dark) .editor-shell .hover\:text-\[\#5EEAD4\]:hover { color: #0e7490; }
+
+/* Borders → editor border tokens */
+.editor-shell .border-white\/5,
+.editor-shell .border-white\/\[0\.05\] { border-color: var(--editor-border-subtle); }
+.editor-shell .border-white\/10,
+.editor-shell .border-white\/\[0\.06\],
+.editor-shell .border-white\/\[0\.08\],
+.editor-shell .border-white\/20 { border-color: var(--editor-border); }
+.editor-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+/* GH-1192 Phase 2 — remap gaps */
+.editor-shell .border-\[\#1F2937\],
+.editor-shell .border-\[\#1f2937\],
+.editor-shell .border-\[\#25324A\],
+.editor-shell .border-\[\#25324a\] { border-color: var(--editor-border); }
+.editor-shell .text-\[\#9CA3AF\],
+.editor-shell .text-\[\#9ca3af\],
+.editor-shell .text-\[\#64748B\],
+.editor-shell .text-\[\#64748b\] { color: var(--editor-text-muted); }
+/* dark hex text — invisible in dark → editor-text */
+.editor-shell .text-\[\#202124\] { color: var(--editor-text); }
+/* pale accent text → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#ff9b8f\],
+html:not(.dark) .editor-shell .text-\[\#FF9B8F\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[\#4ede9f\],
+html:not(.dark) .editor-shell .text-\[\#4EDE9F\] { color: #15803d; }
+
+/* hover:text → remap to readable values in light mode */
+.editor-shell .hover\:text-white:hover,
+.editor-shell .hover\:text-slate-50:hover,
+.editor-shell .hover\:text-slate-200:hover,
+.editor-shell .hover\:text-\[\#F8FAFC\]:hover,
+.editor-shell .hover\:text-\[\#f8fafc\]:hover { color: var(--editor-text); }
+.editor-shell .hover\:text-slate-300:hover,
+.editor-shell .hover\:text-slate-400:hover,
+.editor-shell .hover\:text-slate-500:hover { color: var(--editor-text-muted); }
+
+/* Placeholder text */
+.editor-shell .placeholder\:text-slate-500::placeholder,
+.editor-shell .placeholder\:text-slate-400::placeholder { color: var(--editor-text-muted); }
+
+/* bg-white/opacity → light mode only: white-on-white → dark tint */
+html:not(.dark) .editor-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-shell .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-\[rgba\(255\,255\,255\,0\.08\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .hover\:bg-\[rgba\(255\,255\,255\,0\.05\)\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .hover\:bg-\[rgba\(255\,255\,255\,0\.08\)\]:hover { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(248\,250\,252\,0\.6\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* dark rgba bgs → light mode only: remap to subtle tints */
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.3\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.3\)\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.6\)\],
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.8\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(31\,41\,55\,0\.5\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[rgba\(17\,24\,39\,0\.55\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[rgba\(15\,23\,42\,0\.7\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.72\)\] { background-color: rgba(0,0,0,0.06); }
+
+/* bg-[rgba(11,17,32,0.5)] — editor variant Input/Textarea bg */
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* hex bg opacity variants — header/panel with backdrop-blur use these */
+.editor-shell .bg-\[\#0F172A\]\/90 { background-color: var(--editor-surface); }
+.editor-shell .bg-\[\#1E293B\]\/80,
+.editor-shell .bg-\[\#1E293B\]\/95 { background-color: var(--editor-surface-elevated); }
+/* focus-within variant not in main sweep — light mode: stays themed white on focus */
+html:not(.dark) .editor-shell .focus-within\:bg-\[\#1E293B\]:focus-within { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/60 { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/80 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/95 { background-color: rgba(0,0,0,0.07); }
+
+/* hover:bg-white/opacity → light mode only: invisible hover → dark tint */
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-shell .hover\:bg-white\/15:hover { background-color: rgba(0,0,0,0.09); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-color: rgba(0,0,0,0.08); }
+
+/* ── GH-1367: Block action toolbar — consistent dark pill in both themes ───── */
+/* The toolbar is a single dark pill (#334155) in BOTH editor themes so it stays
+   identifiable floating over ANY website content (white or dark). Its icons are
+   light. In light mode the editor-shell remap would darken those light icons /
+   white-tint dividers — re-assert the dark-theme values so light mode renders
+   identically to dark. Dark mode renders these natively (no override needed).
+   The extra .block-action-toolbar class wins on specificity (no !important). */
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400,
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #94a3b8; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #fcd34d; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-red-400 { color: #f87171; }
+html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(255,255,255,0.1); }
+html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.1); }
+
+/* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
+/* bg overrides turn input bgs white (same as page bg) → need distinct bg */
+html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
+html:not(.dark) .editor-shell textarea,
+html:not(.dark) .editor-shell select {
+  background-color: #F8FAFC !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: var(--editor-text) !important;
+}
+html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"])::placeholder,
+html:not(.dark) .editor-shell textarea::placeholder {
+  color: var(--editor-text-subtle) !important;
+}
+
+/* ── Editor Portal — portal-rendered dialogs/dropdowns (outside .editor-shell) ── */
+/* Same remapping as .editor-shell but scoped to .editor-portal class.
+   Add editor-portal to DialogContent / DropdownMenu.Content in editor components. */
+.editor-portal {
+  background-color: var(--editor-bg);
+  color: var(--editor-text);
+}
+.editor-portal .bg-\[\#0B1120\],
+.editor-portal .bg-\[\#0b1120\],
+.editor-portal .bg-\[\#080e1d\] { background-color: var(--editor-bg); }
+.editor-portal .bg-\[\#0F172A\],
+.editor-portal .bg-\[\#0f172a\],
+.editor-portal .bg-\[\#0f1923\],
+.editor-portal .bg-\[\#111827\],
+.editor-portal .bg-\[\#111A2D\],
+.editor-portal .bg-\[\#151b2b\],
+.editor-portal .bg-\[\#172033\] { background-color: var(--editor-surface); }
+.editor-portal .bg-\[\#1E293B\],
+.editor-portal .bg-\[\#1e293b\],
+.editor-portal .bg-\[\#1F2937\],
+.editor-portal .bg-\[\#1f2937\],
+.editor-portal .bg-\[\#253046\] { background-color: var(--editor-surface-elevated); }
+.editor-portal .text-white { color: var(--editor-text); }
+.editor-portal [class*="from-"].text-white,
+.editor-portal [class*="from-"] .text-white,
+.editor-portal [class*="bg-gradient"].text-white,
+.editor-portal [class*="bg-gradient"] .text-white { color: #fff !important; }
+.editor-portal [class*="bg-black/"].text-white,
+.editor-portal [class*="bg-black/"] .text-white { color: #fff !important; }
+.editor-portal .text-white\/80,
+.editor-portal .text-white\/70 { color: var(--editor-text); }
+.editor-portal .text-white\/50,
+.editor-portal .text-white\/40,
+.editor-portal .text-white\/30 { color: var(--editor-text-muted); }
+.editor-portal .text-slate-50,
+.editor-portal .text-slate-100,
+.editor-portal .text-slate-200 { color: var(--editor-text); }
+.editor-portal .text-slate-300,
+.editor-portal .text-slate-400,
+.editor-portal .text-slate-500 { color: var(--editor-text-muted); }
+.editor-portal .text-gray-200 { color: var(--editor-text); }
+.editor-portal .text-gray-300,
+.editor-portal .text-gray-400,
+.editor-portal .text-gray-500,
+.editor-portal .text-gray-600 { color: var(--editor-text-muted); }
+.editor-portal .text-\[\#F8FAFC\],
+.editor-portal .text-\[\#f8fafc\] { color: var(--editor-text); }
+.editor-portal .text-\[\#94A3B8\],
+.editor-portal .text-\[\#94a3b8\],
+.editor-portal .text-\[\#CBD5E1\] { color: var(--editor-text-muted); }
+.editor-portal .text-\[\#0B1120\] { color: var(--editor-text); }
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.7\)\] { color: var(--editor-text); }
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.6\)\],
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--editor-text-muted); }
+.editor-portal .hover\:text-white:hover,
+.editor-portal .hover\:text-slate-50:hover,
+.editor-portal .hover\:text-slate-200:hover,
+.editor-portal .hover\:text-\[\#F8FAFC\]:hover,
+.editor-portal .hover\:text-\[\#f8fafc\]:hover { color: var(--editor-text); }
+.editor-portal .hover\:text-slate-300:hover,
+.editor-portal .hover\:text-slate-400:hover,
+.editor-portal .hover\:text-slate-500:hover { color: var(--editor-text-muted); }
+.editor-portal .border-white\/5,
+.editor-portal .border-white\/\[0\.05\] { border-color: var(--editor-border-subtle); }
+.editor-portal .border-white\/10,
+.editor-portal .border-white\/\[0\.06\],
+.editor-portal .border-white\/\[0\.08\],
+.editor-portal .border-white\/20 { border-color: var(--editor-border); }
+.editor-portal .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-portal .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-portal .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-portal .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-portal .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-portal .hover\:bg-\[rgba\(255\,255\,255\,0\.05\)\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .hover\:bg-\[rgba\(255\,255\,255\,0\.08\)\]:hover { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-portal .bg-\[rgba\(30\,41\,59\,0\.3\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-\[rgba\(11\,17\,32\,0\.3\)\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-portal .bg-\[rgba\(30\,41\,59\,0\.6\)\] { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-portal .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* info-card pale text → readable colors in light mode */
+html:not(.dark) .editor-portal .text-\[\#B9F8CF\] { color: #15803d; }
+html:not(.dark) .editor-portal .text-\[rgba\(185\,248\,207\,0\.7\)\] { color: #166534; }
+html:not(.dark) .editor-portal .text-\[\#FFF085\] { color: #854d0e; }
+html:not(.dark) .editor-portal .text-\[rgba\(255\,240\,133\,0\.7\)\] { color: #92400e; }
+html:not(.dark) .editor-portal .text-\[\#FCA5A5\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[rgba\(252\,165\,165\,0\.7\)\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[\#93C5FD\] { color: #1d4ed8; }
+html:not(.dark) .editor-portal .text-\[rgba\(147\,197\,253\,0\.7\)\] { color: #1e40af; }
+html:not(.dark) .editor-portal .text-\[\#F0B100\] { color: #92400e; }
+html:not(.dark) .editor-portal .text-\[\#F87171\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[\#60A5FA\] { color: #1d4ed8; }
+html:not(.dark) .editor-portal .text-\[\#4ede9f\] { color: #15803d; }
+html:not(.dark) .editor-portal .text-\[\#ff9b8f\] { color: #c2410c; }
+html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
+
+/* ── Base Styles ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    font-family: var(--font-body, var(--font-inter)), system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  ul,
+  ol,
+  dl,
+  blockquote,
+  figure {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    padding: 0;
+    list-style: none;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    margin: 0;
+    padding: 0;
+  }
+
+  input,
+  textarea,
+  select {
+    appearance: none;
+    margin: 0;
+    /* Preflight is OFF, so the `border` utility sets width+color but not style —
+       browsers then fall back to the UA default `border-style: inset` (beveled:
+       top/left darker than bottom/right). Force solid so borders render evenly. */
+    border-style: solid;
+  }
+
+  /* Radix <Select> item hover/highlight (ui/select.tsx SelectItem) — written as plain CSS
+     instead of a Tailwind data-[highlighted]: class because the class doesn't reliably
+     paint on this portaled content (same issue as the SelectContent bg-popover fix). */
+  .select-item[data-highlighted] {
+    background-color: hsl(var(--muted));
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  ::selection {
+    @apply bg-sky-500/30 text-sky-100;
+  }
+  .blog-ckeditor-wrapper .ck-editor__editable ::selection {
+    color: inherit;
+  }
+
+  /* Override Chrome/Safari autofill backgrounds — theme-aware (GH-1192) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px hsl(var(--card)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Select/option styling */
+  select option {
+    background-color: #fff;
+    color: #0F172A;
+  }
+
+  .dark select option {
+    background-color: #1E293B;
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-200;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-zinc-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-400 rounded-full;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-500;
+  }
+}
+
+/* ── Component Utilities ──────────────────────────────────────────────────── */
+@layer components {
+
+  /* Faint sidebar scrollbar — transparent track, low-opacity thumb that brightens
+     on hover (F18 #1138; default global scrollbar reads too solid/visible). */
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.18) transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.18);
+    border-radius: 9999px;
+  }
+  .sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+  }
+
+  /* Glass card effect */
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+  }
+
+  .glass-hover {
+    @apply hover:bg-white/10 hover:border-white/20 transition-all duration-300;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400;
+  }
+
+  .gradient-text-brand {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-500 to-purple-600;
+  }
+
+  /* Glow effects */
+  .glow-brand {
+    box-shadow: 0 0 40px rgba(14, 165, 233, 0.2);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 40px rgba(217, 70, 239, 0.2);
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold hover:from-sky-400 hover:to-blue-500 shadow-lg shadow-sky-500/25 transition-all duration-200 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 active:scale-95;
+    background-color: var(--dash-secondary-bg);
+    border: 1px solid var(--dash-border);
+    color: var(--dash-text);
+  }
+  .btn-secondary:hover {
+    background-color: var(--dash-surface-hover);
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold hover:from-purple-400 hover:to-pink-500 shadow-lg shadow-purple-500/25 transition-all duration-200 active:scale-95;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 transition-all duration-200;
+    background-color: var(--dash-surface);
+    border-color: var(--dash-border);
+    color: var(--dash-text);
+    --tw-ring-color: color-mix(in srgb, var(--dash-accent) 20%, transparent);
+  }
+  .input::placeholder {
+    color: var(--dash-text-muted);
+  }
+  .input:focus {
+    border-color: var(--dash-accent);
+  }
+
+  /* Card styles */
+  .card {
+    @apply rounded-2xl border;
+    background-color: var(--dash-surface);
+    border-color: var(--dash-border);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 cursor-pointer;
+  }
+  .card-hover:hover {
+    background-color: var(--dash-surface-hover);
+    border-color: var(--dash-border);
+  }
+
+  /* Shimmer loading effect — light/dark gradient */
+  .shimmer {
+    @apply animate-shimmer bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800;
+    background-size: 200% 100%;
+  }
+
+  /* Sidebar navigation item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+    color: var(--dash-text-muted);
+  }
+  .nav-item:hover {
+    background-color: var(--dash-surface-hover);
+    color: var(--dash-text);
+  }
+
+  .nav-item-active {
+    @apply bg-blue-600/10 text-blue-600 border border-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20;
+  }
+
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  /* LadiPage-style: floating components */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+  }
+
+  .animate-float-delay {
+    animation: float 6s ease-in-out infinite;
+    animation-delay: 1.5s;
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  .hero-laptop-shadow {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Section entrance (LadiPage-style) */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+
+  .animate-fade-in-up-1 {
+    animation-delay: 0.1s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-2 {
+    animation-delay: 0.2s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-3 {
+    animation-delay: 0.3s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-4 {
+    animation-delay: 0.4s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-5 {
+    animation-delay: 0.5s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-6 {
+    animation-delay: 0.6s;
+    opacity: 0;
+  }
+
+  @keyframes wizardFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-wizard-fade-in {
+    animation: wizardFadeIn 0.25s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide content when switching tabs */
+  .animate-slide-in-right {
+    animation: slideInRight 0.4s ease-out forwards;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.4s ease-out forwards;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+/* Payment Settings animations */
+  @keyframes payFadeUp {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes payHeroIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes scbPulse {
+    0%, 100% { box-shadow: 0 0 0 0   rgba(16, 185, 129, 0.40); }
+    50%      { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.00); }
+  }
+  .anim-pay-card  { animation: payFadeUp 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .anim-pay-card-d1 { animation: payFadeUp 420ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both; }
+  .anim-pay-card-d2 { animation: payFadeUp 420ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both; }
+  .anim-pay-hero  { animation: payHeroIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .anim-scb-pulse { animation: scbPulse 2.2s ease-in-out infinite; }
+
+/* Notification dropdown inside editor sidebar — open upward instead of downward */
+.notification-bell-sidebar > .relative > [class*="top-"][class*="rounded-"] {
+  top: auto !important;
+  bottom: 60px !important;
+  left: 12px !important;
+  right: auto !important;
+  transform: none !important;
+  width: 320px !important;
+  max-width: 320px !important;
+}
+
+/* ── Sidebar always-dark (.sb-dark) ──────────────────────────────────────────
+   Sidebar (dashboard + editor menu drawer + logo segment) phải trông Y HỆT dark
+   ở cả light lẫn dark. Class `dark` trên các container đó đã flip token --dash-*;
+   block này khôi phục các utility bị `html:not(.dark) .dash-shell …` remap sang
+   rgba(0,0,0,…) (chỉ chạy ở light) về lại giá trị dark — chỉ trong .sb-dark. */
+.sb-dark .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .bg-white\/5 { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-white\/8 { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .bg-white\/10 { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-white\/\[0\.08\] { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(255,255,255,0.02) !important; }
+.sb-dark .hover\:bg-white\/5:hover,
+.sb-dark .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-\[\#0B1120\]\/50 { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[\#0B1120\]\/60 { background-color: rgba(11,17,32,0.6) !important; }
+.sb-dark .bg-\[\#0B1120\]\/80 { background-color: rgba(11,17,32,0.8) !important; }
+.sb-dark .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.1\)\] { background-color: rgba(255,255,255,0.1) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.2\)\] { background-color: rgba(255,255,255,0.2) !important; }
+.sb-dark .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(248,250,252,0.3) !important; }
+
+/* SET CỨNG màu dark trực tiếp (không qua token/cascade) — sidebar luôn dark thật.
+   Dark palette: bg #060B18, surface #161E2E, secondary/muted #1F2937, border #2A3645,
+   text #FFFFFF, text-muted #9CA3AF, teal #2DD4BF. */
+.sb-dark { --primary: var(--p-teal-400) !important; --dash-sidebar-bg: #060B18 !important; --dash-divider: #232E3D !important; }
+.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: #060B18 !important; }
+.sb-dark .text-dash-text { color: #FFFFFF !important; }
+.sb-dark .text-dash-text-muted { color: #9CA3AF !important; }
+.sb-dark .hover\:text-dash-text:hover { color: #FFFFFF !important; }
+.sb-dark .bg-dash-surface { background-color: #161E2E !important; }
+.sb-dark .bg-dash-surface-hover { background-color: #1F2937 !important; }
+.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: #1F2937 !important; }
+.sb-dark .border-dash-border { border-color: #2A3645 !important; }
+
+/* ── Logo segment: MOBILE follows theme (not sidebar-dark) ────────────────────
+   Top-bar left cluster (☰ + ⊞ + logo) dùng .sb-dark để KHỚP cột sidebar ở
+   DESKTOP (lg+). Dưới lg sidebar = drawer nên cụm này chỉ là control của
+   top-bar; forced-dark tạo "khoảng đen" trên header sáng. Dưới đây: ở mọi
+   width dưới lg (mobile + tablet portrait, gồm iPad Mini 768px), neutralize
+   sb-dark về theme hiện hành (light = trắng, dark = giữ tối). Breakpoint khớp
+   `lg:` của shell (1024px) — trước đây dừng ở 767px nên dải 768–1023 còn dark.
+   Đặt SAU block .sb-dark + selector compound (.dash-logo-seg.sb-dark) → thắng
+   cascade. Desktop (lg+) giữ nguyên 100%. */
+@media (max-width: 1023.98px) {
+  .dash-logo-seg.sb-dark { --dash-sidebar-bg: #FFFFFF !important; }
+  .dark .dash-logo-seg.sb-dark { --dash-sidebar-bg: #060B18 !important; }
+  .dash-logo-seg.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: var(--dash-sidebar-bg) !important; }
+  .dash-logo-seg.sb-dark .text-dash-text { color: hsl(var(--foreground)) !important; }
+  .dash-logo-seg.sb-dark .text-dash-text-muted { color: hsl(var(--muted-foreground)) !important; }
+  .dash-logo-seg.sb-dark .hover\:text-dash-text:hover { color: hsl(var(--foreground)) !important; }
+  .dash-logo-seg.sb-dark .bg-dash-surface { background-color: hsl(var(--card)) !important; }
+  .dash-logo-seg.sb-dark .bg-dash-surface-hover { background-color: hsl(var(--muted)) !important; }
+  .dash-logo-seg.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: hsl(var(--muted)) !important; }
+  .dash-logo-seg.sb-dark .border-dash-border { border-color: hsl(var(--border)) !important; }
+}
+} /* end @layer utilities */
+
+/* Storefront product gallery nav buttons — outside @layer so cascade priority is correct */
+.gallery-nav-btn {
+  transform: translateY(-50%);
+  transition: background 0.15s, transform 0.1s;
+}
+.gallery-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.7) !important;
+  transform: translateY(-50%) scale(1.08);
+}

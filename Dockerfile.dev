@@ -1,0 +1,27 @@
+# ── PrimeWeb Dev Dockerfile (Optimized) ──────────────────────────────────
+# Hot reload via volume mount in docker-compose.yml
+# npm install cached — chỉ re-run khi package.json thay đổi
+# ────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+# Required for sharp (image processing) + native modules
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# 1. Copy ONLY package files first (cache layer for npm install)
+COPY package.json package-lock.json* ./
+COPY scripts ./scripts
+COPY node-polyfill.js ./
+
+# 2. Install with npm cache mount — tránh download lại mỗi lần build
+RUN --mount=type=cache,target=/root/.npm \
+    npm install 2>&1 && echo "✅ npm install OK" || (echo "❌ npm install FAILED" && exit 1)
+
+# 3. Copy config files only (NOT src/ — mounted via docker-compose volume)
+COPY next.config.ts tsconfig.json tailwind.config.js postcss.config.js ./
+COPY public ./public
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

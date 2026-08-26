@@ -1,0 +1,1025 @@
+import type { BlockData, ThemeData } from '@/types/editor'
+import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { getTeamAvatar } from '@/lib/images/industry-images'
+import { dedupSectionLabel } from './dedup-section-label'
+import { resolveBlockContent } from './add-section-content'
+import { isUnsupportedBlock } from './unsupported-blocks'
+
+export type SupportedAddSectionType =
+    | 'testimonials'
+    | 'faq'
+    | 'gallery'
+    | 'features'
+    | 'team'
+    | 'newsletter'
+    | 'banner'
+    | 'cta'
+    | 'socialWidget'
+    | 'cartWidget'
+    // v1.1 new blocks
+    // | 'pricing-table' // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // | 'gallery-masonry' // hidden: BLOCKS_TEMP_HIDDEN
+    | 'whatsapp-button'
+    | 'google-maps'
+    // | 'social-proof' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // | 'countdown-timer' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // | 'before-after' // hidden: BLOCKS_TEMP_HIDDEN
+    | 'feature-comparison'
+    // | 'download-cta' // hidden: aiVisible:false GH-1145
+    // | 'video-background' // hidden: aiVisible:false GH-1145
+    // | 'breadcrumb' // hidden: aiVisible:false GH-1145
+    | 'divider'
+    | 'announcement-bar'
+    // | 'client-logos' // hidden: replaced by logo-cloud GH-1145
+    // | 'accordion' // hidden: aiVisible:false GH-1145
+    // | 'step-process' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    | 'portfolio-grid'
+    | 'menu-food'
+    | 'service-cards'
+    | 'carousel'
+    | 'hero'
+    | 'about'
+    | 'contact'
+    | 'pricing'
+    | 'stats'
+    | 'video'
+    | 'blog-list'
+    | 'products-grid'
+    | 'logo-cloud'
+    // | 'custom-html' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    | 'products-featured'
+    // v2.0 industry blocks
+    // | 'booking-widget' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    | 'review-cards'
+    // | 'video-showcase' // temporarily hidden (aiVisible: false, archived)
+    // | 'class-schedule' // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // | 'doctor-profile' // hidden: BLOCKS_TEMP_HIDDEN
+    // | 'property-card' // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
+    | 'product-quick-view'
+
+export type AddSectionLocale = 'en' | 'ms'
+
+type AddSectionContext = {
+    instruction: string
+    siteName?: string
+    theme?: ThemeData
+    requestedType?: string
+    /** Site locale — defaults to 'en' when absent (back-compat). */
+    locale?: AddSectionLocale
+}
+
+const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
+    // v2.0 industry blocks — placed before conflicting entries (review-cards before testimonials, etc.)
+    ['review-cards', [/\breview-cards?\b/i]],
+    ['testimonials', [/\btestimonial(s)?\b/i, /\breview(s)?\b/i, /\bcustomer review(s)?\b/i]],
+    ['faq', [/\bfaq\b/i, /\bquestion(s)?\b/i, /\bq&a\b/i]],
+    ['gallery', [/\bgallery\b/i, /\bphoto(s)?\b/i, /\bimage(s)?\b/i]],
+    ['features', [/\bfeature(s)?\b/i, /\bservice(s)?\b/i, /\bbenefit(s)?\b/i]],
+    ['team', [/\bteam\b/i, /\bstaff\b/i, /\bmember(s)?\b/i]],
+    ['newsletter', [/\bnewsletter\b/i, /\bsubscribe\b/i, /\bemail capture\b/i]],
+    ['banner', [/\bbanner\b/i, /\bpromo\b/i, /\bpromotion\b/i]],
+    ['cta', [/\bcta\b/i, /\bcall to action\b/i]],
+    ['socialWidget', [/\bsocial\s*widget\b/i, /\bsocial\s*media\b/i, /\bsocial\s*links?\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
+    ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
+    // v1.1 new blocks
+    // ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]], // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
+    ['whatsapp-button', [/\bwhatsapp\b/i, /\bwa\s*button\b/i]],
+    ['google-maps', [/\bgoogle\s*maps?\b/i, /\bmap\b/i, /\blocation\b/i, /\baddress\b/i]],
+    // ['social-proof', [/\bsocial\s*proof\b/i, /\breview\b/i, /\brating\b/i, /\bstar\b/i]], // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // ['countdown-timer', [/\bcountdown\b/i, /\btimer\b/i, /\burgency\b/i]], // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // ['before-after', [/\bbefore\s*after\b/i, /\bcomparison\s*slider\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
+    ['feature-comparison', [/\bfeature\s*comparison\b/i, /\bcompare\s*plan\b/i, /\bvs\b/i]],
+    // ['download-cta', [/\bdownload\b/i, /\bfile\b/i, /\bebook\b/i, /\bpdf\b/i]], // hidden: aiVisible:false GH-1145
+    // ['video-background', [/\bvideo\s*background\b/i, /\bvideo\s*hero\b/i, /\bfull\s*video\b/i]], // hidden: aiVisible:false GH-1145
+    // ['breadcrumb', [/\bbreadcrumb\b/i]], // hidden: aiVisible:false GH-1145
+    ['divider', [/\bdivider\b/i, /\bspacer\b/i, /\bseparator\b/i]],
+    ['announcement-bar', [/\bannouncement\b/i, /\bbanner\s*bar\b/i, /\btop\s*bar\b/i]],
+    // ['client-logos', [/\bclient\s*logo\b/i, /\bpartner\s*logo\b/i, /\blogo\s*cloud\b/i, /\btrust\s*badge\b/i]], // hidden: replaced by logo-cloud GH-1145
+    // ['accordion', [/\baccordion\b/i, /\bcollapsible\b/i, /\bexpandable\b/i]], // hidden: aiVisible:false GH-1145
+    // ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]], // feat/fix-broken-block-variants: temporarily hidden
+    ['portfolio-grid', [/\bportfolio\b/i, /\bproject\b/i, /\bshowcase\b/i, /\bwork\b/i]],
+    ['menu-food', [/\bmenu-food\b/i, /\bmenu\s+food\b/i, /\bfood\s+menu\b/i, /\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
+    ['service-cards', [/\bservice\b/i, /\boffering\b/i]],
+    ['carousel', [/\bcarousel\b/i, /\bslider\b/i, /\bslideshow\b/i]],
+    ['hero', [/\bhero\b/i, /\bbanner\b/i, /\blanding\b/i]],
+    ['about', [/\babout\b/i, /\bstory\b/i, /\bwho\s*we\b/i]],
+    ['contact', [/\bcontact\b/i, /\bform\b/i, /\breach\s*us\b/i]],
+    ['pricing', [/\bpricing\b/i, /\bplan(s)?\b/i, /\bpackage\b/i]],
+    ['stats', [/\bstat(s)?\b/i, /\bnumber(s)?\b/i, /\bcounter\b/i]],
+    // ['video-showcase', [/\bvideo-showcase\b/i, /\bvideo\s+showcase\b/i]], // temporarily hidden (aiVisible: false, archived)
+    ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
+    ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
+    ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
+    // ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]], // feat/fix-broken-block-variants: temporarily hidden
+    // ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]], // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
+    // ['property-card', [/\bproperty(-card)?\b/i, /\breal[-\s]estate\b/i, /\blisting\b/i]], // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
+    ['products-grid', [/\bproduct(s)?\b/i, /\bshop\b/i, /\bstore\b/i]],
+    ['logo-cloud', [/\blogo\b/i, /\bpartner\b/i, /\btrusted\b/i, /\btrust\s*badge\b/i]],
+    // ['custom-html', [/\bcustom\s*html\b/i, /\bembed\b/i, /\bhtml\b/i, /\bcode\b/i]], // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    ['products-featured', [/\bfeatured\s*product\b/i, /\bhero\s*product\b/i]],
+]
+
+const ADD_SECTION_INTENT_MATCHERS = [/\badd\b/i, /\binsert\b/i, /\bappend\b/i, /\bcreate\b/i]
+const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
+    testimonials: 'testimonials',
+    faq: 'FAQ',
+    gallery: 'gallery',
+    features: 'features',
+    team: 'team',
+    newsletter: 'newsletter',
+    banner: 'banner',
+    cta: 'CTA',
+    socialWidget: 'social media',
+    cartWidget: 'cart',
+    // 'pricing-table': 'pricing table', // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // 'gallery-masonry': 'masonry gallery', // hidden: BLOCKS_TEMP_HIDDEN
+    'whatsapp-button': 'WhatsApp button',
+    'google-maps': 'Google Maps',
+    // 'social-proof': 'social proof', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // 'countdown-timer': 'countdown timer', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    // 'before-after': 'before/after comparison', // hidden: BLOCKS_TEMP_HIDDEN
+    'feature-comparison': 'feature comparison',
+    // 'download-cta': 'download CTA', // hidden: aiVisible:false GH-1145
+    // 'video-background': 'video background', // hidden: aiVisible:false GH-1145
+    // breadcrumb: 'breadcrumb', // hidden: aiVisible:false GH-1145
+    divider: 'divider',
+    'announcement-bar': 'announcement bar',
+    // 'client-logos': 'client logos', // hidden: replaced by logo-cloud GH-1145
+    // accordion: 'accordion', // hidden: aiVisible:false GH-1145
+    // 'step-process': 'step process', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    'portfolio-grid': 'portfolio grid',
+    'menu-food': 'food menu',
+    'service-cards': 'service cards',
+    carousel: 'carousel',
+    hero: 'hero',
+    about: 'about',
+    contact: 'contact',
+    pricing: 'pricing',
+    stats: 'stats',
+    video: 'video',
+    'blog-list': 'blog list',
+    'products-grid': 'products grid',
+    'logo-cloud': 'logo cloud',
+    // 'custom-html': 'custom HTML', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    'products-featured': 'featured products',
+    // v2.0 industry blocks
+    // 'booking-widget': 'booking widget', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    'review-cards': 'review cards',
+    // 'video-showcase': 'video showcase', // temporarily hidden (aiVisible: false, archived)
+    // 'class-schedule': 'class schedule', // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // 'doctor-profile': 'doctor profile', // hidden: BLOCKS_TEMP_HIDDEN
+    // 'property-card': 'property card', // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
+    'product-quick-view': 'product quick view',
+}
+
+function getPlaceholderImage(index: number) {
+    // Leave url empty so the gallery block's render-time fallback picks the correct
+    // category + S3 images based on site.siteType and site.imageLibraryS3.
+    // Storing a real CDN URL here bypasses the siteType/S3 logic entirely.
+    return {
+        image: { url: '', alt: `Gallery image ${index + 1}` },
+        caption: `Highlight ${index + 1}`,
+    }
+}
+
+function getRequestedCount(instruction: string, fallback: number) {
+    const countMatch = instruction.match(/\b(\d+)\b/)
+    if (!countMatch) return fallback
+
+    const parsed = Number(countMatch[1])
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+    return Math.min(parsed, 8)
+}
+
+export function inferAddSectionType(instruction: string, requestedType?: string): SupportedAddSectionType | null {
+    // Direct match: exact block type from drag-and-drop panel bypasses regex matching
+    if (requestedType && Object.prototype.hasOwnProperty.call(SECTION_TYPE_LABELS, requestedType)) {
+        return requestedType as SupportedAddSectionType
+    }
+
+    const haystack = `${requestedType || ''} ${instruction}`.trim()
+
+    for (const [sectionType, matchers] of SECTION_TYPE_MATCHERS) {
+        if (matchers.some(matcher => matcher.test(haystack))) {
+            return sectionType
+        }
+    }
+
+    return null
+}
+
+export function getAddSectionLabel(sectionType: SupportedAddSectionType | null) {
+    if (!sectionType) return 'section'
+    return SECTION_TYPE_LABELS[sectionType]
+}
+
+export function isAddSectionInstruction(instruction: string) {
+    return ADD_SECTION_INTENT_MATCHERS.some(matcher => matcher.test(instruction))
+}
+
+export function createAddSectionBlock({
+    instruction,
+    siteName,
+    requestedType,
+    locale: rawLocale,
+}: AddSectionContext): BlockData | null {
+    const sectionType = inferAddSectionType(instruction, requestedType)
+    if (!sectionType || isUnsupportedBlock(sectionType)) return null
+    const brandName = siteName?.trim() || 'Your Brand'
+    const locale: AddSectionLocale = rawLocale === 'ms' ? 'ms' : 'en'
+
+    switch (sectionType) {
+        case 'testimonials': {
+            const reviewCount = getRequestedCount(instruction, 3)
+            const r = resolveBlockContent('testimonials', locale, brandName)
+            const c = r.content as {
+                headline: string
+                quoteTemplate: string
+                nameTemplate: string
+                title: string
+            }
+            return {
+                blockType: 'testimonials',
+                variant: 'grid',
+                headline: c.headline,
+                testimonials: Array.from({ length: reviewCount }, (_, index) => ({
+                    quote: c.quoteTemplate.replace(/\{n\}/g, String(index + 1)),
+                    name: c.nameTemplate.replace(/\{n\}/g, String(index + 1)),
+                    title: c.title,
+                    company: brandName,
+                    rating: 5,
+                })),
+            }
+        }
+
+        case 'faq': {
+            const r = resolveBlockContent('faq', locale, brandName)
+            const c = r.content as { headline: string; items: Array<{ question: string; answer: string }> }
+            return {
+                blockType: 'faq',
+                headline: c.headline,
+                faqs: c.items,
+            }
+        }
+
+        case 'gallery': {
+            const r = resolveBlockContent('gallery', locale, brandName)
+            const c = r.content as { headline: string }
+            return {
+                blockType: 'gallery',
+                layout: 'grid',
+                headline: c.headline,
+                images: Array.from({ length: getRequestedCount(instruction, 6) }, (_, index) =>
+                    getPlaceholderImage(index),
+                ),
+            }
+        }
+
+        case 'features': {
+            const r = resolveBlockContent('features', locale, brandName)
+            const c = r.content as {
+                sectionLabelBase: string
+                headline: string
+                subheadline: string
+                items: Array<{ icon: string; title: string; description: string }>
+            }
+            return {
+                blockType: 'features',
+                layout: 'grid-3',
+                sectionLabel: dedupSectionLabel(c.sectionLabelBase, c.headline),
+                headline: c.headline,
+                subheadline: c.subheadline,
+                features: c.items,
+            }
+        }
+
+        case 'team': {
+            const r = resolveBlockContent('team', locale, brandName)
+            const c = r.content as {
+                headline: string
+                members: Array<{ name: string; role: string; bio: string }>
+            }
+            return {
+                blockType: 'team',
+                headline: c.headline,
+                members: c.members.map((m, i) => ({
+                    ...m,
+                    avatar: { url: getTeamAvatar('business', i), alt: m.name },
+                })),
+            }
+        }
+
+        case 'newsletter': {
+            const r = resolveBlockContent('newsletter', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; buttonLabel: string; placeholder: string }
+            return {
+                blockType: 'newsletter',
+                variant: 'inline',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                buttonLabel: c.buttonLabel,
+                placeholder: c.placeholder,
+            }
+        }
+
+        // 'banner' has no dedicated block — keep it mapped to a centered hero.
+        case 'banner': {
+            const r = resolveBlockContent('cta', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; ctaLabel: string }
+            return {
+                blockType: 'hero',
+                variant: 'centered',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaButtons: [{ label: c.ctaLabel, url: '#contact', style: 'primary' }],
+            }
+        }
+
+        // GH-1412 — CTA is a real registered block; insert it as `cta`, not `hero`.
+        case 'cta': {
+            const r = resolveBlockContent('cta', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; ctaLabel: string }
+            return {
+                blockType: 'cta',
+                variant: 'banner',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaLabel: c.ctaLabel,
+                ctaUrl: '#contact',
+            }
+        }
+
+        case 'socialWidget':
+            return normalizeSocialWidgetConfig({
+                blockType: 'socialWidget',
+                variant: 'floating',
+                headline: 'Stay connected',
+                links: getDefaultSocialWidgetLinks(),
+            })
+
+        case 'cartWidget':
+            return { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: false }
+
+        // ── v1.1 New Blocks ─────────────────────────────────────────
+
+        // case 'pricing-table': // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+        //     return {
+        //         blockType: 'pricing-table',
+        //         variant: 'columns',
+        //         headline: `Choose the right plan for you`,
+        //         subheadline: 'Simple, transparent pricing. No hidden fees.',
+        //         plans: [
+        //             { name: 'Starter', price: 29, currency: 'RM', features: ['1 project', 'Basic support', '1GB storage'], cta: { label: 'Get Started', url: '#contact' } },
+        //             { name: 'Business', price: 69, currency: 'RM', features: ['5 projects', 'Priority support', '10GB storage', 'Custom domain'], cta: { label: 'Get Started', url: '#contact' }, popular: true },
+        //             { name: 'Enterprise', price: 149, currency: 'RM', features: ['Unlimited projects', '24/7 support', '100GB storage', 'API access', 'White label'], cta: { label: 'Contact Us', url: '#contact' } },
+        //         ],
+        //     }
+
+        // case 'gallery-masonry': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'gallery-masonry',
+        //         variant: 'masonry',
+        //         headline: `${brandName} Gallery`,
+        //         images: Array.from({ length: 6 }, (_, i) => ({ url: '', alt: `Gallery image ${i + 1}`, caption: `Photo ${i + 1}` })),
+        //     }
+
+        case 'whatsapp-button':
+            return {
+                blockType: 'whatsapp-button',
+                variant: 'floating',
+                phoneNumber: '+60123456789',
+                message: `Hi ${brandName}, I'd like to know more!`,
+                label: 'Chat with us',
+                position: 'bottom-right',
+            }
+
+        case 'google-maps':
+            return {
+                blockType: 'google-maps',
+                variant: 'card',
+                headline: 'Find Us',
+                embedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3983.8!2d101.69!3d3.14!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zM8KwMDgnMjQuMCJOIDEwMcKwNDEnMjQuMCJF!5e0!3m2!1sen!2smy!4v1',
+                address: '123 Jalan Example, 50000 Kuala Lumpur, Malaysia',
+                height: 400,
+            }
+
+        // case 'social-proof': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+        //     return {
+        //         blockType: 'social-proof',
+        //         variant: 'cards',
+        //         headline: `What our customers say`,
+        //         reviews: [
+        //             { author: 'Sarah M.', role: 'Business Owner', content: `${brandName} exceeded my expectations. Highly recommended!`, rating: 5 },
+        //             { author: 'Ahmad R.', role: 'Marketing Manager', content: 'Professional service and great results. Will use again.', rating: 5 },
+        //             { author: 'Lisa T.', role: 'Freelancer', content: 'Easy to work with and delivered on time. Very satisfied.', rating: 4 },
+        //         ],
+        //     }
+
+        // case 'countdown-timer': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+        //     return {
+        //         blockType: 'countdown-timer',
+        //         variant: 'banner',
+        //         headline: 'Limited Time Offer!',
+        //         targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        //         expiredMessage: 'This offer has ended.',
+        //     }
+
+        // case 'before-after': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'before-after',
+        //         variant: 'slider',
+        //         headline: 'See the Transformation',
+        //         beforeImage: { url: '', alt: 'Before', label: 'Before' },
+        //         afterImage: { url: '', alt: 'After', label: 'After' },
+        //     }
+
+        case 'feature-comparison':
+            return {
+                blockType: 'feature-comparison',
+                variant: 'table',
+                headline: 'Compare Our Plans',
+                products: [{ name: 'Basic', highlighted: false }, { name: 'Pro', highlighted: true }],
+                features: [
+                    { name: 'Custom Domain', values: [false, true] },
+                    { name: 'SSL Certificate', values: [true, true] },
+                    { name: 'Analytics', values: [false, true] },
+                    { name: 'Priority Support', values: [false, true] },
+                ],
+            }
+
+        // case 'download-cta': // hidden: aiVisible:false GH-1145
+        //     return {
+        //         blockType: 'download-cta',
+        //         variant: 'card',
+        //         headline: 'Download Our Free Guide',
+        //         description: `Get the ultimate guide to growing your business with ${brandName}.`,
+        //         fileUrl: '#',
+        //         fileName: 'Free-Guide.pdf',
+        //         fileSize: '2.4 MB',
+        //         buttonLabel: 'Download Now',
+        //         requireEmail: false,
+        //     }
+
+        // case 'video-background': // hidden: aiVisible:false GH-1145
+        //     return {
+        //         blockType: 'video-background',
+        //         variant: 'full',
+        //         headline: `Welcome to ${brandName}`,
+        //         subheadline: 'Watch our story unfold.',
+        //         videoUrl: '',
+        //         posterImage: { url: '' },
+        //         overlayOpacity: 50,
+        //         cta: { label: 'Learn More', url: '#about' },
+        //     }
+
+        // case 'breadcrumb': // hidden: aiVisible:false GH-1145
+        //     return {
+        //         blockType: 'breadcrumb',
+        //         variant: 'simple',
+        //         items: [
+        //             { label: 'Home', url: '/' },
+        //             { label: 'Products', url: '/products' },
+        //             { label: 'Current Page' },
+        //         ],
+        //     }
+
+        case 'divider':
+            return {
+                blockType: 'divider',
+                variant: 'line',
+                height: 40,
+            }
+
+        case 'announcement-bar':
+            return {
+                blockType: 'announcement-bar',
+                variant: 'gradient',
+                message: 'Free shipping on all orders this week!',
+                linkText: 'Shop Now',
+                linkUrl: '#products',
+                dismissible: true,
+            }
+
+        // case 'client-logos': // hidden: replaced by logo-cloud GH-1145
+        //     return {
+        //         blockType: 'logo-cloud',
+        //         variant: 'scroll',
+        //         headline: 'Trusted by leading brands',
+        //         logos: Array.from({ length: 6 }, (_, i) => ({ url: '', alt: `Partner ${i + 1}` })),
+        //     }
+
+        // case 'accordion': { // hidden: aiVisible:false GH-1145
+        //     const r = resolveBlockContent('accordion', locale, brandName)
+        //     const c = r.content as { headline: string; items: Array<{ title: string; content: string }> }
+        //     return {
+        //         blockType: 'accordion',
+        //         variant: 'bordered',
+        //         headline: c.headline,
+        //         items: c.items,
+        //     }
+        // }
+
+        // case 'step-process': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+        //     return {
+        //         blockType: 'step-process',
+        //         variant: 'horizontal',
+        //         headline: 'How It Works',
+        //         subheadline: 'Get started in just 3 easy steps.',
+        //         steps: [
+        //             { title: 'Choose Your Plan', description: 'Select the package that fits your needs.', icon: '1️⃣' },
+        //             { title: 'Set Up Your Account', description: 'Quick setup takes less than 5 minutes.', icon: '2️⃣' },
+        //             { title: 'Start Growing', description: 'Launch and watch your business grow.', icon: '3️⃣' },
+        //         ],
+        //     }
+
+        case 'portfolio-grid':
+            return {
+                blockType: 'portfolio-grid',
+                variant: 'grid',
+                headline: 'Our Work',
+                subheadline: `See what ${brandName} has accomplished.`,
+                projects: [
+                    { title: 'Project Alpha', description: 'A complete brand redesign for a tech startup.', imageUrl: '', category: 'Branding' },
+                    { title: 'Project Beta', description: 'E-commerce platform with 200% growth.', imageUrl: '', category: 'Web' },
+                    { title: 'Project Gamma', description: 'Mobile app with 50K downloads in 3 months.', imageUrl: '', category: 'Mobile' },
+                ],
+            }
+
+        case 'menu-food':
+            return {
+                blockType: 'menu-food',
+                variant: 'classic',
+                headline: `${brandName} Menu`,
+                categories: [
+                    {
+                        name: 'Main Course',
+                        items: [
+                            { name: 'Nasi Lemak Special', description: 'Fragrant rice with sambal, egg, and chicken', price: '12.90', currency: 'RM', tag: 'Popular' },
+                            { name: 'Mee Goreng', description: 'Stir-fried noodles with prawns and vegetables', price: '10.90', currency: 'RM' },
+                            { name: 'Roti Canai', description: 'Flaky flatbread with curry dipping sauce', price: '5.90', currency: 'RM' },
+                        ],
+                    },
+                    {
+                        name: 'Beverages',
+                        items: [
+                            { name: 'Teh Tarik', description: 'Pulled milk tea', price: '3.50', currency: 'RM', tag: 'Best Seller' },
+                            { name: 'Kopi O', description: 'Traditional black coffee', price: '2.90', currency: 'RM' },
+                            { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
+                        ],
+                    },
+                ],
+            }
+
+        case 'service-cards': {
+            const r = resolveBlockContent('service-cards', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                services: Array<{ title: string; description: string; icon: string; price: string; priceUnit: string }>
+            }
+            return {
+                blockType: 'service-cards',
+                variant: 'grid',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                services: c.services,
+            }
+        }
+
+        case 'carousel':
+            return {
+                blockType: 'carousel',
+                variant: 'images',
+                headline: 'Featured Highlights',
+                autoplay: true,
+                interval: 5000,
+                items: [
+                    { imageUrl: '', title: 'Slide 1', description: `Discover what ${brandName} has to offer.` },
+                    { imageUrl: '', title: 'Slide 2', description: 'Quality products and exceptional service.' },
+                    { imageUrl: '', title: 'Slide 3', description: 'Join thousands of satisfied customers.' },
+                ],
+            }
+
+        case 'hero': {
+            const r = resolveBlockContent('hero', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                ctaButtons: Array<{ label: string; url: string; style: string }>
+            }
+            return {
+                blockType: 'hero',
+                variant: 'centered',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaButtons: c.ctaButtons,
+            }
+        }
+
+        case 'about': {
+            const r = resolveBlockContent('about', locale, brandName)
+            const c = r.content as { sectionLabelBase: string; headline: string; body: string }
+            return {
+                blockType: 'about',
+                variant: 'simple',
+                sectionLabel: dedupSectionLabel(c.sectionLabelBase, c.headline),
+                headline: c.headline,
+                body: c.body,
+            }
+        }
+
+        case 'contact': {
+            const r = resolveBlockContent('contact', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subtext: string
+                formFields: Array<{ fieldName: string; label: string; fieldType: string; required: boolean }>
+            }
+            return {
+                blockType: 'contact',
+                headline: c.headline,
+                subtext: c.subtext,
+                email: 'hello@example.com',
+                phone: '+1 (555) 123-4567',
+                address: '123 Business Street, Suite 100\nCity, State 10001',
+                formFields: c.formFields,
+            }
+        }
+
+        case 'pricing': {
+            const r = resolveBlockContent('pricing', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                plans: Array<Record<string, unknown>>
+            }
+            return {
+                blockType: 'pricing',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                plans: c.plans,
+            }
+        }
+
+        case 'stats': {
+            const r = resolveBlockContent('stats', locale, brandName)
+            const c = r.content as { headline: string; items: Array<{ value: string; label: string }> }
+            return {
+                blockType: 'stats',
+                headline: c.headline,
+                stats: c.items,
+            }
+        }
+
+        case 'video':
+            return {
+                blockType: 'video',
+                variant: 'embed',
+                headline: 'See Us in Action',
+                subheadline: 'Watch our story and learn what drives us forward.',
+                videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw',
+            }
+
+        case 'blog-list':
+            return {
+                blockType: 'blog-list',
+                variant: 'cards',
+                headline: 'Latest from Our Blog',
+                subheadline: 'Insights, tips, and stories from our team.',
+                limit: 3,
+            }
+
+        case 'products-grid': {
+            const r = resolveBlockContent('products', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string }
+            return {
+                blockType: 'products-grid',
+                variant: 'grid-3',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                limit: 6,
+            }
+        }
+
+        case 'logo-cloud':
+            return {
+                blockType: 'logo-cloud',
+                variant: 'row',
+                headline: 'Trusted By Leading Brands',
+                logos: [
+                    { name: 'Partner 1' },
+                    { name: 'Partner 2' },
+                    { name: 'Partner 3' },
+                    { name: 'Partner 4' },
+                ],
+            }
+
+        // case 'custom-html': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+        //     return {
+        //         blockType: 'custom-html',
+        //         html: `<div style="padding: 2rem; text-align: center; background: #f8f8f8; border-radius: 8px;">
+        //   <h3 style="margin-bottom: 0.5rem;">Custom HTML Block</h3>
+        //   <p style="color: #666;">Edit this HTML to add any custom content, embeds, or widgets.</p>
+        // </div>`,
+        //     }
+
+        case 'products-featured':
+            return {
+                blockType: 'products-featured',
+                variant: 'hero-product',
+                headline: 'Featured Products',
+                subheadline: 'Hand-picked selections just for you.',
+            }
+
+        // menu-display removed — GH-1024: use menu-food instead
+
+        // case 'booking-widget': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+        //     return {
+        //         blockType: 'booking-widget',
+        //         variant: 'inline',
+        //         headline: `Book a Session with ${brandName}`,
+        //         subheadline: 'Choose a service and pick a time that suits you.',
+        //         availableDays: [1, 2, 3, 4, 5],
+        //         timeSlotInterval: 30,
+        //         startTime: '09:00',
+        //         endTime: '18:00',
+        //         showPrice: true,
+        //         services: [
+        //             { name: 'Consultation', duration: 60, price: 150, description: 'One-on-one consultation session.' },
+        //             { name: 'Follow-up', duration: 30, price: 80, description: 'Review and next steps.' },
+        //         ],
+        //     }
+
+        case 'review-cards':
+            return {
+                blockType: 'review-cards',
+                variant: 'grid',
+                headline: `What customers say about ${brandName}`,
+                showAverage: true,
+                reviews: [
+                    { name: 'Customer A', rating: 5, text: `Really impressed with ${brandName}. The quality and service exceeded my expectations.`, verified: true },
+                    { name: 'Customer B', rating: 5, text: 'Smooth experience from start to finish. Would highly recommend.', verified: true },
+                    { name: 'Customer C', rating: 4, text: 'Great product, fast delivery. Will be back for more.', verified: true },
+                ],
+            }
+
+        // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
+        //     return {
+        //         blockType: 'video-showcase',
+        //         variant: 'grid',
+        //         headline: `${brandName} in Action`,
+        //         subheadline: 'Watch our latest content.',
+        //         showCategories: true,
+        //         autoplay: false,
+        //         videos: [
+        //             { title: 'Our Story', videoUrl: '', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
+        //             { title: 'Product Demo', videoUrl: '', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
+        //             { title: 'Customer Story', videoUrl: '', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
+        //         ],
+        //     }
+
+        // case 'class-schedule': // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+        //     return {
+        //         blockType: 'class-schedule',
+        //         variant: 'grid',
+        //         headline: `${brandName} Class Schedule`,
+        //         showCapacity: true,
+        //         highlightToday: true,
+        //         classes: [
+        //             { name: 'Morning Session', instructor: 'Instructor A', day: 1, startTime: '07:00', endTime: '08:00', capacity: 15, enrolled: 8, level: 'Beginner' },
+        //             { name: 'Afternoon Workshop', instructor: 'Instructor B', day: 3, startTime: '14:00', endTime: '15:30', capacity: 20, enrolled: 12, level: 'Intermediate' },
+        //             { name: 'Evening Class', instructor: 'Instructor C', day: 5, startTime: '18:00', endTime: '19:00', capacity: 12, enrolled: 5, level: 'All Levels' },
+        //         ],
+        //     }
+
+        // case 'doctor-profile': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'doctor-profile',
+        //         variant: 'cards',
+        //         headline: 'Meet Our Specialists',
+        //         subheadline: `Trusted professionals at ${brandName}`,
+        //         doctors: [
+        //             { name: 'Dr. Sarah Lee', specialisation: 'General Practice', qualifications: ['MBBS', 'MMed'], availableDays: [1, 2, 3, 4, 5], languages: 'English, Malay', consultationFee: 'RM 80' },
+        //             { name: 'Dr. Ahmad Razif', specialisation: 'Internal Medicine', qualifications: ['MBBS', 'MRCP'], availableDays: [1, 3, 5], languages: 'English, Malay, Arabic', consultationFee: 'RM 120' },
+        //         ],
+        //     }
+
+        // case 'property-card': // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
+        //     return {
+        //         blockType: 'property-card',
+        //         variant: 'grid',
+        //         headline: 'Featured Properties',
+        //         subheadline: `Explore available listings from ${brandName}`,
+        //         showMap: false,
+        //         currency: 'RM',
+        //         properties: [
+        //             { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale', description: 'Modern apartment in a prime location.' },
+        //             { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent', description: 'Cozy studio ideal for working professionals.' },
+        //         ],
+        //     }
+
+        case 'product-quick-view':
+            return {
+                blockType: 'product-quick-view',
+                variant: 'grid',
+                headline: 'Shop Our Products',
+                subheadline: 'Quick-view and add to cart in seconds.',
+                columns: 4 as const,
+                showQuickView: true,
+                currency: 'RM',
+                products: [
+                    { name: 'Product One', price: 49.90, imageUrls: [], description: 'A top-selling item from our collection.', ctaLabel: 'View Details', variants: ['Option A', 'Option B'] },
+                    { name: 'Product Two', price: 89.90, originalPrice: 120.00, imageUrls: [], description: 'Premium quality at an unbeatable price.', badge: 'Sale', ctaLabel: 'View Details' },
+                    { name: 'Product Three', price: 29.90, imageUrls: [], description: 'Compact, reliable, and budget-friendly.', ctaLabel: 'View Details' },
+                ],
+            }
+
+        default:
+            return null
+    }
+}
+
+import { blockRegistry } from '@/blocks/registry'
+
+/** Generate minimal default content for any block type using its Zod schema defaults */
+function createDefaultBlockFromRegistry(blockType: string, brandName: string): BlockData | null {
+    try {
+        if (!blockRegistry.has(blockType)) return null
+
+        const schema = blockRegistry.getSchema(blockType)
+        if (!schema) return { blockType } as BlockData
+
+        // Parse empty object to get Zod defaults
+        const result = schema.safeParse({ blockType })
+        if (result.success) {
+            const data = result.data as Record<string, unknown>
+            // Add placeholder headline if the schema has one
+            if ('headline' in data && !data.headline) {
+                data.headline = `${brandName} — ${blockType.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`
+            }
+            return data as BlockData
+        }
+
+        return { blockType } as BlockData
+    } catch {
+        return null
+    }
+}
+
+export function normalizeAddSectionBlock(context: AddSectionContext, block?: Record<string, unknown> | null) {
+    const brandName = context.siteName?.trim() || 'Your Brand'
+    const locale: AddSectionLocale = context.locale === 'ms' ? 'ms' : 'en'
+    const fallbackBlock =
+        createAddSectionBlock({
+            instruction: context.instruction,
+            siteName: context.siteName,
+            theme: context.theme,
+            requestedType: context.requestedType || String(block?.blockType || ''),
+            locale,
+        }) || undefined
+
+    if (!fallbackBlock) {
+        // For new block types not in createAddSectionBlock, generate from registry schema
+        const registryBlock = createDefaultBlockFromRegistry(
+            String(block?.blockType || context.requestedType || ''),
+            brandName,
+        )
+        if (registryBlock) {
+            const rb = { ...registryBlock, ...(block || {}) } as BlockData
+            const rbKey = String(rb.blockType || '')
+            // Attach locale init slots for registry-backed blocks (AC: 1d coverage)
+            // {n} tokens in testimonials are the caller's responsibility, not resolver's.
+            ;(rb as Record<string, unknown>).__localeInit = {
+                en: resolveBlockContent(rbKey, 'en', brandName).content,
+                ms: resolveBlockContent(rbKey, 'ms', brandName).content,
+            }
+            return rb
+        }
+        return block as BlockData | undefined
+    }
+
+    if (!block || typeof block !== 'object') {
+        // Attach locale init slots for the no-block-override path.
+        const fbTypeKey = String(fallbackBlock.blockType || '')
+        ;(fallbackBlock as Record<string, unknown>).__localeInit = {
+            en: resolveBlockContent(fbTypeKey, 'en', brandName).content,
+            ms: resolveBlockContent(fbTypeKey, 'ms', brandName).content,
+        }
+        return fallbackBlock
+    }
+
+    const mergedBlock = {
+        ...fallbackBlock,
+        ...block,
+    } as BlockData
+
+    // Attach locale init slots so every return branch carries them (phase-02 strips before persisting).
+    const blockTypeKey = String(mergedBlock.blockType || '')
+    ;(mergedBlock as Record<string, unknown>).__localeInit = {
+        en: resolveBlockContent(blockTypeKey, 'en', brandName).content,
+        ms: resolveBlockContent(blockTypeKey, 'ms', brandName).content,
+    }
+
+    if (mergedBlock.blockType === 'faq') {
+        const items = Array.isArray((block as Record<string, unknown>).faqs)
+            ? (block as Record<string, unknown>).faqs
+            : Array.isArray((block as Record<string, unknown>).items)
+                ? (block as Record<string, unknown>).items
+                : fallbackBlock.faqs
+
+        delete mergedBlock.items
+        delete mergedBlock.variant
+        return {
+            ...mergedBlock,
+            faqs: items,
+        }
+    }
+
+    if (mergedBlock.blockType === 'testimonials') {
+        const rawTestimonials = (Array.isArray((block as Record<string, unknown>).testimonials) ? (block as Record<string, unknown>).testimonials : fallbackBlock.testimonials) as Record<string, unknown>[]
+        
+        let safeVariant = mergedBlock.variant
+        if (!['carousel', 'grid', 'masonry', 'single'].includes(String(safeVariant))) safeVariant = 'grid'
+
+        return {
+            ...mergedBlock,
+            variant: safeVariant,
+            testimonials: rawTestimonials
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ quote, name, title, company, rating, avatar }) => ({
+                    quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
+                })),
+        }
+    }
+
+    if (mergedBlock.blockType === 'features') {
+        delete mergedBlock.variant
+        let safeLayout = (block as Record<string, unknown>).layout || fallbackBlock.layout
+        if (!['grid-3', 'grid-2', 'alternating', 'centered-list'].includes(String(safeLayout))) safeLayout = 'grid-3'
+
+        return {
+            ...mergedBlock,
+            layout: safeLayout,
+            features: Array.isArray((block as Record<string, unknown>).features)
+                ? (block as Record<string, unknown>).features
+                : Array.isArray((block as Record<string, unknown>).items)
+                    ? (block as Record<string, unknown>).items
+                    : fallbackBlock.features,
+        }
+    }
+
+    if (mergedBlock.blockType === 'gallery') {
+        delete mergedBlock.variant
+        let safeLayout = (block as Record<string, unknown>).layout || fallbackBlock.layout
+        if (!['masonry', 'grid', 'carousel', 'lightbox'].includes(String(safeLayout))) safeLayout = 'grid'
+
+        const rawImages = (Array.isArray((block as Record<string, unknown>).images) ? (block as Record<string, unknown>).images : fallbackBlock.images) as Record<string, unknown>[]
+        return {
+            ...mergedBlock,
+            layout: safeLayout,
+            images: rawImages
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ image, caption }) => ({
+                    ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
+                })),
+        }
+    }
+
+    if (mergedBlock.blockType === 'team') {
+        delete mergedBlock.variant
+        const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
+        return {
+            ...mergedBlock,
+            members: rawMembers
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ name, role, bio, avatar, socials }) => ({
+                    name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
+                })),
+        }
+    }
+
+    if (mergedBlock.blockType === 'socialWidget') {
+        return normalizeSocialWidgetConfig(mergedBlock)
+    }
+
+    if (mergedBlock.blockType === 'newsletter') {
+        const variant = String(mergedBlock.variant || fallbackBlock.variant || 'inline')
+        return {
+            ...mergedBlock,
+            variant: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'].includes(variant)
+                ? variant
+                : 'inline',
+        }
+    }
+
+    // 'banner' has no dedicated block — keep it mapped to Hero by createAddSectionBlock.
+    // GH-1412: 'cta' is a real block and must NOT be remapped to hero.
+    if (mergedBlock.blockType === 'banner') {
+        mergedBlock.blockType = 'hero'
+        mergedBlock.variant = 'centered'
+    }
+
+    return mergedBlock
+}

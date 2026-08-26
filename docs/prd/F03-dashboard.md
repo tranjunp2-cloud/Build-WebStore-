@@ -1,0 +1,480 @@
+# PRD: Dashboard Suite (F03)
+> **Version:** 2.0 | **Updated:** 2026-03-17 | **Agent:** `project-planner`
+> **Priority:** P0 | **Sprint:** Wave 3 | **Size:** XL
+> **Depends on:** F02 Auth ✅, Published site exists
+> **Reference:** [Bản phân tích tính năng F03 (Larksuite)](https://primecommerce.sg.larksuite.com/docx/ZlD8dKg0booFp4xLsGMl9Z8Yg7b)
+
+---
+
+> [!IMPORTANT]
+> **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
+> Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
+
+
+---
+
+## 0. Story Traceability
+
+| Story ID | Title | File | Status |
+|----------|-------|------|--------|
+| US-F03-01 | Dashboard — Overview | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-02 | Analytics Details | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-03 | SEO Dashboard Overview ⭐ | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-05 | AI Metadata Fix All | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-07 | Mobile Web UX — Responsive Dashboard Metrics & Charts | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+
+---
+
+## 1. Problem Statement
+
+Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức** sức khỏe của website đang vận hành: doanh thu, lượng khách truy cập, số lượng leads (WhatsApp clicks, Orders), và SEO score. Họ không có chuyên môn sâu về Analytics và SEO nên cần mọi thứ được trực quan hóa trên một hệ thống Dashboard tập trung (Dashboard Suite) và có AI hỗ trợ optimize tự động.
+
+---
+
+## 2. Target User
+
+- SME owner đã đăng ký và có website (thường là 1 site).
+- Cần xem overview nhanh khi mở app (Focus vào tiền và lượt xem).
+- Không rành tech, không hiểu sâu về SEO/Analytics — cần UI rõ ràng, AI-driven.
+
+---
+
+## 3. Solution Overview
+
+`F03 Dashboard Suite` quy hoạch lại thành 3 màn hình:
+1. **Home / Dashboard Overview (`/dashboard`):** Là Command Center lấy top metrics từ Analytics và phần Orders. Theo mặc định, hiển thị Traffic, Leads, Clicks/Engagement, và Revenue/Pending orders. Có hỗ trợ filter thời gian và cho phép user **tuỳ chỉnh (thêm/bớt/sắp xếp)** các widget theo ý muốn.
+2. **Analytics Detail (`/dashboard/analytics` hoặc tab `Dashboard > Analytics`):** Màn hình chi tiết chứa website activity từ PostHog: Visitors, Clicks, Orders, Sales, daily bar chart, Top Pages, Top Products.
+3. **SEO Dashboard (`/dashboard/seo`):** Màn hình chi tiết chứa page-level analysis, Keyword Tracker cơ bản, và AI Metadata Fix All cho title/description.
+
+---
+
+## 4. Scope
+
+### In Scope
+- **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget. Cấp số liệu từ **PostHog** + internal analytics fallback.
+- **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị. Trạng thái lọc được hỗ trợ bởi **Redis Cache** dự phòng lỗi Rate Limit.
+- **Analytics Details:** Visitors, Clicks, Orders, Sales, Daily bar chart, Top Pages, Top Products. Dùng PostHog + internal analytics fallback.
+- **SEO Health:** Một score 0–100 theo F37 với 4 bucket bars 2×2 và danh sách root-cause issues dạng 2 cột; mỗi row ghi rõ `AI`/`You`, CTA và destination. AI Fix chỉ áp dụng metadata. Basic Keyword Tracker giữ riêng; không hiển thị SEO Action Tools.
+- **Connectivity:** PostHog analytics integration cho website traffic/clicks/funnels. Không dùng GA4 hoặc Google Search Console vì phần lớn seller dùng platform subdomain.
+
+### Out of Scope
+- Real-time Analytics phức tạp (chỉ fetch phân mảnh).
+- Custom event tracking ngoài các metrics được định nghĩa sẵn.
+- Keyword rank tracking sâu quá 5 keywords mặc định. Backlink analysis.
+
+---
+
+## 5. Success Metrics
+
+| Metric | Target | Measured By |
+|--------|--------|-------------|
+| Dashboard Overview load | < 2s | Timing |
+| AI Fix All resolves metadata issues | ≥ 80% eligible title/description issues | Before/after metadata coverage; seller-owned fields unchanged |
+| Fix All time | < 15 seconds | SSE timing |
+| Data accuracy | ≥ 99% | Validation |
+
+---
+
+## 6. User Story Summary
+
+```text
+AS A   site owner đang vận hành website
+I WANT có một Command Center tổng hợp Analytics, SEO, và to-do list
+SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng traffic dễ dàng
+```
+
+---
+
+## 7. Functional Requirements
+
+| FR-ID | Requirement | Story Ref | Priority | Notes |
+|-------|-------------|-----------|----------|-------|
+| FR-01 | **Overview:** Hiển thị 4 Top Metrics mặc định (Traffic, Leads, Engagement, Orders/Revenue) | US-F03-01 | P0 | Nguồn từ F12, F10 |
+| FR-02 | **Overview:** Bộ lọc thời gian (Today, 7d, 30d) áp dụng cho toàn dashboard overview | US-F03-01 | P0 | |
+| FR-03 | **Overview:** Tùy chỉnh hiển thị (Thêm/ẩn/sắp xếp vị trí) các metrics widget | US-F03-01 | P1 | Lưu preference vào DB/Local |
+| FR-04 | **Overview:** Action Required list (3-5 Pending Orders/Messages mới nhất) | US-F03-01 | P0 | Nguồn từ F10 |
+| FR-05 | **Overview:** SEO Widget (Score + root-cause issue rows); CTA `Fix all with AI` appears only while metadata is AI-fixable | US-F03-01 | P0 | F37 §12.3 |
+| FR-06 | **Analytics:** 4 stat cards: Visitors, Clicks, Orders, Sales | US-F03-02 | P0 | Source: PostHog + Orders |
+| FR-07 | **Analytics:** Daily bar chart with period selector (Today, 7d, 30d) | US-F03-02 | P0 | Low-tech chart, no technical labels |
+| FR-08 | **Analytics:** Top Pages + Top Products list (max 10 rows) | US-F03-02 | P0 | Source: PostHog/internal tracking |
+| FR-09 | **SEO:** Chỉ hiển thị một SEO Health score 0–100 theo F37; bỏ Score History, dùng 4 bucket bars 2×2 không hiện điểm bucket và danh sách root-cause issues theo actor/CTA/destination của F37 §12.3. | US-F03-03 | P0 | F37 §5, §12.3 |
+| FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, rank & trend) | US-F03-06 | P1 | Chỉ nhập từ khoá thủ công (manual input). Không tích hợp Google Search Console trong F03/F37 vì seller dùng platform subdomain. |
+| FR-11 | **SEO:** `Fix all with AI` xử lý batch meta title/description only; CTA chỉ hiện khi còn eligible metadata issue. | US-F03-05 | P0 | < 15s, tối ưu context; không ghi Local Business/schema/content/alt/crawler/publish/domain/verification. |
+| FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all qua DB Transaction) | US-F03-05 | P0 | |
+| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Description 150-160 + CTA) | US-F03-05 | P0 | User-triggered AI Fix uses trackedKeywords naturally and shows preview before apply. Alt text remains human-owned in the approved F37 issue contract. |
+| FR-19 | **Connectivity:** Cài PostHog Next.js integration cho website analytics (`posthog-js`; `posthog-node` nếu cần server events) | US-F03-08 | P0 | Dùng PostHog thay GA4/GSC |
+| FR-20 | **Connectivity:** Giữ `/api/analytics/track` + `analytics` collection làm fallback/backward compatibility trong giai đoạn migrate PostHog | US-F03-08 | P0 | Không thêm Google token |
+| FR-21 | **Error:** Dashboard có empty/cache state khi analytics source lỗi hoặc chưa có data | US-F03-08 | P0 | |
+| FR-14 | **Shared:** Empty state khi chưa có site/data | US-F03-01 | P0 | |
+| FR-15 | **Shared:** Loading skeleton components có shimmer | US-F03-01 | P0 | Không spinner |
+| FR-16 | **[Mobile]** Layout Dashboard hiển thị 4 stat cards thành lưới 2x2. | US-F03-07 | P0 | Không hiển thị 4x1 (scroll mỏi tay) |
+| FR-17 | **[Mobile]** Biểu đồ Analytics giản lược nhãn trục X (tick labels) và hỗ trợ tooltips khi chạm-giữ. | US-F03-07 | P0 | Trống chữ đè nhau |
+| FR-18 | **[Mobile]** Tùy chỉnh Dashboard dùng nút Up/Down thay vì Drag-drop hoặc render dưới dạng Bottom Sheet để chạm đổi vị trí. | US-F03-07 | P0 | Mobile friendly |
+
+---
+
+## 8. Business Rules
+
+- **BR-01:** Chỉ hiển thị Data scope theo tenant của user hiện hành.
+- **BR-02:** Analytics IP hashed SHA-256 cho anonymization (No PII stored), events fail gracefully.
+- **BR-03:** AI-generated SEO meta is previewed before apply, remains manually editable, and enforces length limits.
+- **BR-04:** Fix all with AI cho metadata thực thi dưới 15s và là một single batch cho mục đích Undo/Redo.
+- **BR-05:** MY market: Nếu locale='ms', target BM keywords; format address/JSON-LD theo MY.
+- **BR-06:** AI metadata generation is user-triggered from SEO Issues. It shows old vs proposed values and writes only the rows the seller approves; no background generation runs on publish.
+
+---
+
+## 9. User Flow
+
+```text
+/login → /dashboard (Command Center)
+  │
+  ├── Xem Top Metrics (Tiền & Leads)
+  ├── Click vào Pending Order → Chuyển sang /orders (F10)
+  ├── Click tab [Analytics] → Chuyển sang /dashboard/analytics
+  │     └── Chọn biểu đồ, lọc theo 30 days
+  └── SEO issue CTA
+        ├── [AI] title/description → Fix hoặc Fix all with AI → preview → apply → recalculate
+        └── [You] → Edit / Set up / Publish tại destination của F37 §12.3
+```
+
+---
+
+## 10. Screen Layout
+
+> **[Global CMS Constraint]** Đối với các tính năng quản trị, yêu cầu bắt buộc phải render bên trong Main Content Area của F18 CMS Layout (ngoại trừ các tính năng đặc thù cần Full-screen Editor).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
+### 10.1. Màn hình chính (Dashboard Overview)
+- **Mô tả:** Trang chủ trung tâm hiển thị top metrics và widgets quản lý chung.
+- **Components chính:**
+  - Header: Lời chào user, Time Period Filter (Today, 7d, 30d).
+  - Tabs Navigation: Toolbar gồm 3 tab `[Overview]`, `[Analytics]`, `[SEO Health]` để chuyển đổi màn hình.
+  - Stat Cards View (4 cột): Traffic, Leads, Orders, Revenue.
+  - Action Required List: Các tác vụ đang pending.
+  - SEO Health Widget: Một gauge, 4 bucket bars 2×2 không hiện điểm bucket, conditional AI Fix All strip, và root-cause issues hai cột; AI Fix chỉ xuất hiện cho metadata.
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
+
+### 10.2. Màn hình Chi tiết (Analytics Detail & SEO Dashboard)
+- **Mô tả:** Các màn hình mở rộng Analytics và SEO.
+- **Components chính:**
+  - **Tabs Navigation:** Thanh Tab giống màn hình Overview (đang active ở tab tương ứng).
+  - **Analytics:** 4 stat cards (Visitors, Clicks, Orders, Sales), Daily Bar Chart, Top Pages, Top Products.
+  - **SEO Dashboard:** Bảng Breakdown điểm từng hạng mục, danh sách Keywords Tracker, tiến trình AI Fix All (SSE real-time streaming bar).
+
+- **Design / Wireframe (Analytics Detail):**
+  - docs/design/F37-local-seo-wireframes.md — Screen A: Dashboard > Analytics
+  - docs/design/F37-local-seo-wireframes.html — Analytics frame
+
+- **Design / Wireframe (SEO Dashboard):**
+  - docs/design/F37-local-seo-wireframes.md — Screen B: Dashboard > SEO
+  - docs/design/F37-local-seo-wireframes.html — SEO frame
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Empty State:** User chưa có site -> Hiển thị Prompt tạo website đầu tiên (Illustration box). Dashboards khác sẽ báo "Chưa có dữ liệu" với số liệu là 0.
+- **Loading State:** Skeleton Shimmer thay vì Spinner cho các widget để trải nghiệm mượt.
+- **Error State / Edge Cases:** Toast lỗi "Không thể tải dữ liệu" + Nút "Thử lại".
+- **Modals:** Modal "Tùy chỉnh Dashboard" cho phép user gạch/chọn (checkbox) và Drag-and-drop để reorder các Stat Cards.
+
+---
+
+
+## 11. Acceptance Criteria
+
+> **[BẮT BUỘC]** AC ở đây được copy từ file story đã approve. KHÔNG tự viết AC mới.
+> Nếu cần thêm AC kỹ thuật → bổ sung vào file story trước, sau đó copy sang đây.
+
+### AC-1: Happy Path — Default Dashboard Overview
+
+> 📌 Source: [US-F03-01](../stories/F03-dashboard-stories.md) — AC-1: Happy Path — Default Dashboard Overview
+
+```gherkin
+GIVEN user login và có 1 site đang active
+WHEN  vào /dashboard (mặc định filter 7 ngày qua)
+THEN  hiện 4 stats cards mặc định (theo thứ tự ưu tiên):
+      1. Tỉ lệ người dùng truy cập / Lượt views (Traffic)
+      2. Số lượng clicks vào widgets/call (Leads)
+      3. Tổng số lượng clicks vào sản phẩm/giỏ hàng (Engagement/Sales intent)
+      4. Doanh thu hoặc Pending Orders (Nguồn: F10)
+  AND hiện danh sách 3-5 Pending Orders mới nhất
+  AND hiện SEO Health Widget (Score + CTA Fix)
+```
+
+### AC-2: Time Period Filter on Overview
+
+> 📌 Source: [US-F03-01](../stories/F03-dashboard-stories.md) — AC-2: Time Period Filter on Overview
+
+```gherkin
+GIVEN user ở /dashboard
+WHEN  chọn bộ lọc thời gian (Today, 7 days, 30 days)
+THEN  các giá trị ở stats cards và biểu đồ (nếu có) update ngay lập tức theo khoảng thời gian mới
+  AND lưu lại lựa chọn này cho session hiện tại
+```
+
+### AC-3: Customizing Widgets (Sắp xếp / Ẩn hiện)
+
+> 📌 Source: [US-F03-01](../stories/F03-dashboard-stories.md) — AC-3: Customizing Widgets (Sắp xếp / Ẩn hiện)
+
+```gherkin
+GIVEN user ở /dashboard
+WHEN  click vào nút "Tùy chỉnh Dashboard"
+THEN  hiển thị modal/panel cho phép user chọn các metrics muốn hiển thị:
+      - Views tổng
+      - Lượt mở trang (Page views) theo URL cụ thể
+      - Lượt truy cập Blog nhiều nhất
+      - Lượt Clicks Widget
+      - Checkout/Cart clicks
+  AND user có thể kéo thả để reorder vị trí các metrics
+  AND save lại configuration vào account preference
+```
+
+### AC-4: Empty State
+
+> 📌 Source: [US-F03-01](../stories/F03-dashboard-stories.md) — AC-4: Empty State
+
+```gherkin
+GIVEN user login nhưng chưa có site nào
+WHEN  vào /dashboard
+THEN  empty state: icon + "Tạo website đầu tiên" + CTA → /onboarding
+```
+
+### AC-5: Analytics View
+
+> 📌 Source: [US-F03-02](../stories/F03-dashboard-stories.md) — AC-1: Analytics View
+
+```gherkin
+GIVEN user ở `Dashboard > Analytics`
+WHEN  page load
+THEN  hiện 4 stat cards: Visitors, Clicks, Orders, Sales
+  AND hiện Daily Bar Chart (theo Today, 7d, 30d)
+  AND hiện danh sách hạng mục hiệu quả nhất:
+      - Top Pages (Lượt mở trang nhiều nhất)
+      - Top Products (Sản phẩm được click nhiều nhất)
+  AND không hiển thị GA4/Search Console hoặc thuật ngữ kỹ thuật
+```
+
+### AC-6: Analytics Empty Data State
+
+> 📌 Source: [US-F03-02](../stories/F03-dashboard-stories.md) — AC-2: Empty Data State
+
+```gherkin
+GIVEN user ở /dashboard/analytics
+WHEN  chưa có dữ liệu tracking nào trong kỳ được chọn
+THEN  hiện empty state cho chart: "Chưa có dữ liệu trong khoảng thời gian này"
+  AND giá trị các metrics đều là 0
+```
+
+### AC-5: Analytics API Failure
+
+> 📌 Source: [US-F03-02](../stories/F03-dashboard-stories.md) — AC-3: API Failure
+
+```gherkin
+GIVEN user đang ở /dashboard/analytics
+WHEN  fetch data bị lỗi (timeout hoặc server error)
+THEN  hiển thị toast error "Không thể tải dữ liệu Analytics"
+  AND cho phép user nhấn "Thử lại"
+```
+
+### AC-10: AC-11, AC-12, AC-13, AC-14: (Đã dịch index +2 do thêm AC-2, AC-3)
+
+*(Đã update ngầm thứ tự AC cho phù hợp)*
+
+### AC-11: Manage Tracked Keywords
+
+> 📌 Source: [US-F03-06](../stories/F03-dashboard-stories.md) — AC-1: Happy Path — Manage Tracked Keywords
+
+```gherkin
+GIVEN user ở /dashboard/seo
+WHEN  cuộn đến phần "Keyword Tracker"
+THEN  hiển thị dashboard nhỏ cho phép add tối đa 5 từ khóa (Core keywords)
+  AND có ô input để "Thêm từ khóa mới" (disable nếu đã đủ 5)
+```
+
+### AC-12: View Keyword Ranks
+
+> 📌 Source: [US-F03-06](../stories/F03-dashboard-stories.md) — AC-2: View Keyword Ranks
+
+```gherkin
+GIVEN user đã add ít nhất 1 từ khóa vào tracker
+WHEN  ở /dashboard/seo
+THEN  hiển thị list các từ khóa đang track
+  AND hiển thị Thứ hạng (Rank) hiện tại trên SERP (Search Engine Results Page)
+  AND hiển thị mũi tên lên/xuống (Trend) so với lần audit trước đó
+```
+
+### AC-13: Auto Update Frequency
+
+> 📌 Source: [US-F03-06](../stories/F03-dashboard-stories.md) — AC-3: Auto Update Frequency
+
+```gherkin
+GIVEN hệ thống có danh sách tracking keywords của user
+WHEN  cron job chạy (vd: 1 tuần 1 lần hoặc manual fetch)
+THEN  hệ thống tự động query hạng của website theo từng keyword
+  AND cập nhật kết quả mới nhất vào database
+```
+
+### AC-15: AI Meta sinh ra có chứa từ khoá mục tiêu
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — Công việc 2
+
+```gherkin
+GIVEN người dùng đã nhập từ khoá theo dõi (VD: "bakery KL", "bánh sinh nhật")
+WHEN  nhấn "Fix all with AI" hoặc "Fix" trên metadata issue
+THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu một cách tự nhiên
+  AND không nhồi nhét keyword (keyword density ≤ 2%)
+  AND khi không có từ khoá theo dõi, AI hoạt động giống hệt hiện tại
+```
+
+### AC-16: AI đề xuất chỉnh sửa meta đã có sẵn
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — BR-06
+
+```gherkin
+GIVEN một trang đã có meta title/description do người dùng nhập thủ công
+WHEN  AI sinh meta mới qua user-triggered AI Fix
+THEN  hiển thị so sánh bản cũ vs bản mới
+  AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
+  AND chỉ ghi đè khi người dùng đồng ý
+```
+
+### AC-14: Trải Nghiệm Dashboard trên Mobile (Responsive UI)
+> 📌 Source: [US-F03-07](../stories/F03-dashboard-stories.md)
+
+Khi truy cập màn hình `<768px`, 4 Stat Cards ở Overview tự động quy hoạch thành lưới `2x2 CSS Grid` giúp nắm bắt cùng lúc 4 chỉ số mà KHÔNG CẦN cuộn sâu. Biểu đồ trong Analytics sẽ giản lược các nhãn ngày tháng (e.g., nhảy cách 3-5 ngày hiển thị 1 nhãn) để không tràn chữ, cho phép scrub/chạm để xem chi tiết. Form tùy chỉnh hiển thị Dashboard thay Drag-and-drop bằng bảng danh sách có thao tác Tap nút `Lên/Xuống` hoặc hiện dưới dạng Bottom Sheet tiện lợi vuốt đóng (swipe-to-close).
+
+---
+
+## 12. Non-Functional Requirements
+
+- **Performance:** Sites visible < 2s sau login. AI Fix All < 15s (SSE streaming). Analytics query cache.
+- **Security:** Requires auth (401). Tenant validation. Anonymized IP for analytics.
+- **Device Support:** Mobile 375px (collapsed sidebar, stat cards 2x2 grid), Desktop 1280px+.
+- **SEO Compliance:** Length enforcement strict.
+
+---
+
+## 13. Technical Architecture
+
+### 13.1 Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| `DashboardRoot` | `app/(dashboard)/dashboard/page.tsx` | Server-rendered dashboard stream |
+| `AtAGlance` | `components/dashboard/revamp/at-a-glance.tsx` | Overview metrics |
+| `TrafficPerformance` | `components/dashboard/revamp/traffic-performance.tsx` | Traffic chart and rankings |
+| `SeoHealth` | `components/dashboard/revamp/seo-health.tsx` | SEO score, issues, and fixes |
+
+### 13.2 API Endpoints
+
+```text
+GET /api/analytics/summary?tenantId=X&period=7d
+POST /api/analytics/track                  → Public tracking
+POST /api/seo/analyze                      → Trigger SEO scan
+POST /api/seo/fix                          → AI fix (SSE stream)
+```
+
+Dashboard overview is rendered by a Server Component and reads through
+`getGlanceData()`, `getTrafficData()`, and `getSeoData()` directly. It does not
+use an internal REST summary endpoint.
+
+### 13.3 Hướng dẫn Tích hợp PostHog Analytics (Dành cho Development)
+
+F03 dùng PostHog cho analytics vì seller chủ yếu chạy trên platform subdomain. Không cần GA4/GSC ownership.
+
+**Client setup**
+1. Add `posthog-js`.
+2. Add `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` to env examples.
+3. Initialize PostHog in Next.js `instrumentation-client.ts` following the official PostHog Next.js guide: https://posthog.com/docs/libraries/next-js.
+
+**Server / dashboard setup**
+1. Use PostHog as the primary source for pageviews, clicks, funnels, and session behavior.
+2. Keep current `/api/analytics/track` + `analytics` collection as fallback/backward compatibility during migration.
+3. If server-side capture/query is needed, add `posthog-node` and call shutdown/flush correctly.
+
+---
+
+## 14. Dependencies
+
+| Dependency | Status | Action Needed |
+|-----------|--------|---------------|
+| F02 Auth | ✅ Done | |
+| F10 Orders | ⬜ Pending | Cần có API đếm số Pending Orders |
+| OpenAI API | ✅ Setup | Phục vụ AI Metadata Fix streaming (Sử dụng SSE) |
+| PostHog Cloud | ⬜ Pending in repo | Primary analytics source for Overview & Analytics Detail |
+| Internal analytics collection | ✅ Exists | Fallback/backward compatibility during PostHog migration |
+
+---
+
+## 15. API Contract
+
+> Full details in SPEC.md §8 or AI_BUILDER_SPEC.md §14
+
+```text
+POST /api/dashboard/preferences
+Request: { tenantId: string, widgetOrder: Array<string>, hiddenWidgets: Array<string> }
+Response: { success: boolean }
+
+GET /api/analytics/summary
+Request: ?tenantId={string}&period={today|7d|30d}
+Response: { success: boolean, data: { chart: Array<{date: string, views: number}>, topPages: Array<object>, topProducts: Array<object>, topBlogs: Array<object>, changes: object } }
+
+POST /api/seo/analyze
+Request: { tenantId: string }
+Response: { success: boolean, data: { score: number, breakdown: object, issues: Array<object> } }
+
+GET /api/seo/keywords
+Request: ?tenantId={string}
+Response: { success: boolean, data: { keywords: Array<{id: string, keyword: string, rank: number, trend: 'up'|'down'|'same'}> } }
+
+POST /api/seo/keywords
+Request: { tenantId: string, keyword: string }
+Response: { success: boolean, data: { ... } }
+
+DELETE /api/seo/keywords/[id]
+Request: { tenantId: string }
+Response: { success: boolean }
+
+POST /api/seo/fix
+Request: { tenantId: string, issueIds?: Array<string> }
+Response: [SSE Stream]
+```
+
+---
+
+## 16. Open Questions
+
+| # | Question | Owner | Status |
+|---|----------|-------|--------|
+| 1 | AI SEO Fix rate limit cho user miễn phí so với có phí là bao nhiêu? | PO | ⬜ Open |
+| 2 | SEO Data lưu cache bao lâu để tối ưu performace? | Dev | ⬜ Open |
+| 3 | Có hỗ trợ export báo cáo SEO/Analytics ra PDF không? | BA | ⬜ Open |
+
+---
+
+## 17. 9-Point Done Checklist
+- [ ] Loading State — Skeleton shimmer components
+- [ ] Empty State — Prompt publish/onboard
+- [ ] Error State — Toast on fetch or AI stream fail
+- [ ] Form Validation — N/A
+- [ ] Button States — "Fix All" disabled while streaming
+- [ ] Toast Feedback — Progress & Completion toast for AI tools
+- [ ] Auth Redirect — 401 → /login
+- [ ] Mobile 375px — Responsive layout check
+- [ ] TypeScript Clean — `tsc --noEmit` pass
+
+---
+## 18. Definition of Ready
+- [ ] User Stories approved and grouped.
+- [ ] Auth module ready.
+
+---
+## 19. Definition of Done
+- [ ] All components created and data fetched successfully.
+- [ ] SSE AI streaming operates under 15s.
+- [ ] Mobile UI passes tests.

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F08 — Category Management (interactive mirror)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+<style>
+  /* Dashboard theme tokens from src/app/globals.css (dark) so real utility classes resolve 1:1. */
+  :root {
+    --p-teal-400: 172.46 66.01% 50.39%;
+    --p-gray-400: 217.89 10.61% 64.9%;
+    --p-amber-500: 37.69 92.13% 50.2%;
+    --p-red-500: 0 84.24% 60.2%;
+    --foreground: 0 0% 100%;
+    --card: 220 35.29% 13.33%;
+    --primary: var(--p-teal-400);
+    --info: 204 100% 63%;
+    --level3: 265 85% 68%;
+    --muted: 215 27.91% 16.86%;
+    --secondary: 215 27.91% 16.86%;
+    --muted-foreground: var(--p-gray-400);
+    --border: 213.33 24.32% 21.76%;
+    --input-border: 213.33 24.32% 21.76%;
+    --ring: var(--p-teal-400);
+    --warning: var(--p-amber-500);
+    --destructive: var(--p-red-500);
+    --background: 218 32% 9%;
+    --dash-surface: hsl(var(--card));
+    --dash-surface-hover: hsl(var(--muted));
+    --dash-text: hsl(var(--foreground));
+    --dash-text-muted: hsl(var(--muted-foreground));
+    --dash-border: hsl(var(--border));
+    --dash-secondary-bg: hsl(var(--secondary));
+  }
+  html, body { background: hsl(var(--background)); color: var(--dash-text); }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- Interactive mirror of CategoryManager.tsx. Tree rendered by JS from `CATS` using the
+     exact real row markup. Demonstrates the Add Category L1/L2/L3 flows with a parent-context
+     modal. Chrome (sidebar/topbar) omitted. Behaviors spec: docs/design/F08-products-crud-design.md §6. -->
+
+<div id="app" class="p-4 sm:p-6 md:p-8"></div>
+<div id="modalRoot"></div>
+
+<script>
+/* ---------- icons (lucide, same as real UI) ---------- */
+const I = {
+  arrowLeft:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide h-6 w-6"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>',
+  plus:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-4 h-4"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>',
+  plusSm:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[16px] h-[16px] stroke-[1.5px]"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>',
+  search:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color:var(--dash-text-muted)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>',
+  chevR:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-5 h-5"><path d="m9 18 6-6-6-6"></path></svg>',
+  chevD:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-5 h-5"><path d="m6 9 6 6 6-6"></path></svg>',
+  file:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[18px] h-[18px] shrink-0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>',
+  folder:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[18px] h-[18px] shrink-0"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path></svg>',
+  pen:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[16px] h-[16px] stroke-[1.5px]"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path></svg>',
+  trash:'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide w-[16px] h-[16px] stroke-[1.5px]"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>',
+  layers:'<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide shrink-0"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"></path><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"></path><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"></path></svg>',
+  warn:'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide shrink-0 mt-[1px]"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
+};
+
+/* ---------- data: real page-1 L1 cats + example children under "Fesyen Wanita"
+   so the L1 -> L2 -> L3 add flows are all clickable ---------- */
+let SEQ = 100;
+const CATS = [
+  {id:1,name:'Accessories',products:0,children:[]},
+  {id:2,name:'Beauty',products:6,children:[]},
+  {id:3,name:'Beauty',products:6,children:[]},
+  {id:4,name:'Ecommerce',products:6,children:[]},
+  {id:5,name:'Ecommerce',products:6,children:[]},
+  {id:6,name:'F&amp;B',products:1,children:[]},
+  {id:7,name:'Fashion',products:0,children:[]},
+  {id:8,name:'Fesyen Wanita',products:0,children:[         /* organisational parent: 0 direct products -> deletable, children->top */
+    {id:9,name:'Baju Muslimah',products:0,children:[         /* 0 direct products -> deletable; demo children->top */
+      {id:10,name:'Abaya',products:1,children:[]},           /* L3 (no + button) */
+    ]},
+    {id:11,name:'Blaus &amp; Kemeja',products:2,children:[]}, /* L2 (+ makes L3) */
+  ]},
+  {id:12,name:'Fitness',products:6,children:[]},
+  {id:13,name:'Fnb',products:6,children:[]},
+];
+const expanded = new Set([8,9]); /* expand Fesyen Wanita branch so L2/L3 visible on load */
+
+/* ---------- helpers ---------- */
+function withLevels(nodes, level, parent){
+  nodes.forEach(n=>{ n.level=level; n.parent=parent||null; withLevels(n.children||[], level+1, n); });
+  return nodes;
+}
+function findNode(id, nodes=CATS){
+  for(const n of nodes){ if(n.id===id) return n; const f=findNode(id, n.children||[]); if(f) return f; }
+  return null;
+}
+function flat(nodes=CATS, out=[]){ nodes.forEach(n=>{ out.push(n); flat(n.children||[], out); }); return out; }
+function crumb(node){ const parts=[]; let c=node; while(c){ parts.unshift(c.name); c=c.parent; } return parts.join(' › '); }
+
+/* ---------- tree render (exact real row markup) ---------- */
+const actBtn = (cls,title,svg,on)=>`<button type="button" onclick="event.stopPropagation();${on}" class="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[hsl(var(--${cls}))] hover:bg-[hsl(var(--${cls})/0.1)] hover:border-[hsl(var(--${cls}))] transition-colors bg-transparent cursor-pointer" title="${title}">${svg}</button>`;
+
+function badge(lvl){
+  /* distinct colour per depth: L1 teal, L2 blue, L3 violet */
+  const c = lvl===1 ? 'primary' : lvl===2 ? 'info' : 'level3';
+  return `<div class="inline-flex items-center gap-1.5 rounded-md border border-solid px-2.5 py-0.5 text-[11px] font-semibold tracking-tight" style="color:hsl(var(--${c}));border-color:hsl(var(--${c})/0.4);background:hsl(var(--${c})/0.12)">L${lvl}</div>`;
+}
+
+function rowHtml(node){
+  const hasKids = node.children && node.children.length>0;
+  const isOpen = expanded.has(node.id);
+  const lvl = node.level;
+  const indent = lvl===2 ? ' pl-[52px]' : lvl===3 ? ' pl-[84px]' : '';
+  const chevCls = hasKids ? '' : ' opacity-0 pointer-events-none';
+  const chevSvg = isOpen ? I.chevD : I.chevR;
+  const icon = hasKids ? I.folder : I.file;
+  const canSub = lvl < 3;
+  const actions =
+    (canSub ? actBtn('primary','Add Subcategory', I.plusSm, `openAdd(${node.id})`) : '') +
+    actBtn('primary','Edit', I.pen, `openEdit(${node.id})`) +
+    actBtn('destructive','Delete', I.trash, `openDelete(${node.id})`);
+  let html = `<div class="w-full">`+
+    `<div class="flex flex-col sm:flex-row sm:items-center py-[14px] px-[20px]${indent} group transition-colors ${isOpen?'bg-[var(--dash-surface-hover)]':'hover:bg-[var(--dash-surface-hover)]'}" style="border-bottom:1px solid var(--dash-border)">`+
+      `<div class="flex items-center flex-1 min-w-0 pr-4">`+
+        `<button type="button" onclick="toggle(${node.id})" class="w-6 h-6 shrink-0 flex items-center justify-center text-[var(--dash-text-muted)] cursor-pointer border-none bg-transparent p-0${chevCls}">${chevSvg}</button>`+
+        `<div class="flex items-center justify-center pt-0.5 pr-2 pl-1 text-[var(--dash-text-muted)]">${icon}</div>`+
+        `<span class="text-[14px] font-medium text-[var(--dash-text)] truncate">${node.name}</span>`+
+      `</div>`+
+      `<div class="flex flex-row items-center gap-0 mt-3 sm:mt-0 pl-14 sm:pl-0 sm:w-auto w-full justify-between sm:justify-end">`+
+        `<div class="w-[80px] hidden sm:flex justify-center">${badge(lvl)}</div>`+
+        `<div class="w-[100px] text-[12px] text-[var(--dash-text-muted)] text-left hidden sm:flex items-center">${node.products} products</div>`+
+        `<div class="w-auto sm:w-[120px] flex items-center justify-end gap-1 opacity-100">${actions}</div>`+
+      `</div>`+
+    `</div>`;
+  if(isOpen){
+    (node.children||[]).forEach(c=>{ html += rowHtml(c); });
+    /* No inline "+ Add subcategory" row: the row-level "+" icon (title "Add Subcategory")
+       is the single, consistent affordance for adding a child to any node at level < 3.
+       A category with zero children is just a normal category (leaf), not a special state. */
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderTree(){
+  withLevels(CATS,1,null);
+  document.getElementById('treeBody').innerHTML = CATS.map(rowHtml).join('');
+}
+
+function toggle(id){ if(expanded.has(id)) expanded.delete(id); else expanded.add(id); renderTree(); }
+
+/* ---------- app shell (header + search + card + pager) ---------- */
+function shell(){
+  return `<div class="w-full pb-12">`+
+    `<div class="flex flex-col gap-4 mb-6"><div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">`+
+      `<div class="flex items-center gap-4 min-w-0"><a class="flex shrink-0 items-center justify-center text-foreground" title="Products" href="/products">${I.arrowLeft}</a>`+
+      `<div class="flex flex-col"><h1 class="text-[24px] font-bold text-[var(--dash-text)] m-0 tracking-tight">Category Management</h1>`+
+      `<p class="text-[14px] text-[var(--dash-text-muted)] mt-1 m-0">Manage product categories (up to 3 levels deep)</p></div></div>`+
+      `<button onclick="openAdd(null)" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg transition-all duration-200 active:scale-[0.98] bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold hover:opacity-90 h-9 px-4 text-[13px] w-full sm:w-auto justify-center">${I.plus}Add Category</button>`+
+    `</div></div>`+
+    `<div class="mb-6"><div class="relative flex-1 min-w-[200px] max-w-full">${I.search}<input class="flex w-full rounded-lg border border-[hsl(var(--input-border))] px-3 py-2 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus-visible:outline-none focus-visible:border-[hsl(var(--ring))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] transition-colors h-9 pl-9 pr-3 text-[13px] bg-[hsl(var(--card))]" placeholder="Search categories..." type="text"></div></div>`+
+    `<div class="bg-[var(--dash-surface)] rounded-[16px] overflow-hidden" style="border:1px solid var(--dash-border)"><div class="flex flex-col min-h-[300px]">`+
+      `<div class="hidden sm:flex items-center px-[20px] py-[16px] bg-[var(--dash-surface-hover)]" style="border-bottom:1px solid var(--dash-border)">`+
+        `<span class="flex-1 text-[13px] font-semibold text-[var(--dash-text-muted)] uppercase tracking-[0.038em]">Category Name</span>`+
+        `<div class="flex items-center"><span class="w-[80px] text-center text-[13px] font-semibold text-[var(--dash-text-muted)] uppercase tracking-[0.038em]">LEVEL</span>`+
+        `<span class="w-[100px] text-left text-[13px] font-semibold text-[var(--dash-text-muted)] uppercase tracking-[0.038em]">PRODUCTS</span>`+
+        `<span class="w-[120px] text-right text-[13px] font-semibold text-[var(--dash-text-muted)] uppercase tracking-[0.038em]">ACTIONS</span></div></div>`+
+      `<div id="treeBody" class="flex flex-col w-full"></div>`+
+      `<div class="p-[16px]" style="border-top:1px solid var(--dash-border)"><div class="flex items-center justify-between gap-4 flex-wrap text-[13px]" style="color:var(--dash-text-muted)">`+
+        `<span>Showing <strong style="color:var(--dash-text)">1&ndash;10</strong> of <strong style="color:var(--dash-text)">18</strong> categories</span>`+
+        `<div class="flex items-center gap-2"><span>Rows per page:</span><select class="h-[32px] rounded-[8px] px-2 text-[13px] outline-none" style="background:var(--dash-surface);border:1px solid var(--dash-border);color:var(--dash-text)"><option>10</option><option>25</option><option>50</option><option>100</option></select></div>`+
+      `</div></div>`+
+    `</div></div></div>`;
+}
+
+/* ---------- modal: Add / Edit with clear parent-context banner ---------- */
+let editingId = null;
+
+function parentSelectHtml(selectedId, locked){
+  let opts = `<option value="">— None (top level, L1) —</option>`;
+  flat().forEach(n=>{
+    const pad = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat((n.level-1));
+    const dis = n.level>=3 ? ' disabled' : '';
+    const sel = n.id===selectedId ? ' selected' : '';
+    const tag = n.level>=3 ? ' (L3 — max depth)' : '';
+    opts += `<option value="${n.id}"${dis}${sel}>${pad}${n.name}${tag}</option>`;
+  });
+  const dstyle = locked ? 'opacity:.6;cursor:not-allowed;' : '';
+  return `<select id="fParent" ${locked?'disabled':''} onchange="onParentChange()" class="flex w-full rounded-lg border border-[hsl(var(--input-border))] px-3 h-9 text-[13px] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus-visible:border-[hsl(var(--ring))]" style="${dstyle}">${opts}</select>`;
+}
+
+function bannerHtml(parentNode){
+  if(!parentNode){
+    return `<div class="rounded-lg px-3 py-2.5 text-[13px] flex items-center gap-2 mb-1" style="background:hsl(var(--primary)/0.1);color:hsl(var(--primary));border:1px solid hsl(var(--primary)/0.3)">`+
+      `${I.layers}<span>Creating a <b>top-level</b> category &rarr; this will be <b>Level 1</b>.</span></div>`;
+  }
+  const newLvl = parentNode.level + 1;
+  return `<div class="rounded-lg px-3 py-2.5 text-[13px] flex items-center gap-2 mb-1" style="background:hsl(var(--info)/0.12);color:hsl(var(--info));border:1px solid hsl(var(--info)/0.35)">`+
+    `${I.layers}<span>Adding a subcategory under <b>${crumb(parentNode)}</b> (L${parentNode.level}) &rarr; new category will be <b>Level ${newLvl}</b>.</span></div>`;
+}
+
+function field(label, inner, optional){
+  const opt = optional ? ` <span class="text-[hsl(var(--muted-foreground))]">(Optional)</span>` : '';
+  const req = optional===false ? ` <span class="text-[hsl(var(--destructive))]">*</span>` : '';
+  return `<div class="flex flex-col gap-2"><label class="text-[13px] font-medium">${label}${req}${opt}</label>${inner}</div>`;
+}
+const inputCls = 'flex w-full rounded-lg border border-[hsl(var(--input-border))] px-3 h-9 text-[13px] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] outline-none focus-visible:border-[hsl(var(--ring))]';
+
+function openAdd(parentId){
+  editingId = null;
+  const parent = parentId==null ? null : findNode(parentId);
+  const isSub = !!parent;
+  const title = isSub ? 'Add Subcategory' : 'Add New Category';
+  showModal(title, parent, {name:'', slug:'', desc:''}, isSub);
+}
+function openEdit(id){
+  editingId = id;
+  const node = findNode(id);
+  showModal('Edit Category', node.parent, {name:node.name, slug:slugify(node.name), desc:''}, true, node);
+}
+
+function showModal(title, parentNode, vals, lockParent, editNode){
+  const selectedParentId = parentNode ? parentNode.id : '';
+  const nameInput = `<input id="fName" value="${vals.name.replace(/&amp;/g,'&')}" oninput="onNameInput()" placeholder="e.g. Women's Fashion" class="${inputCls}">`;
+  const slugInput = `<input id="fSlug" value="${vals.slug}" placeholder="category-url" class="${inputCls}">`;
+  const descInput = `<textarea id="fDesc" placeholder="Short description for SEO (optional)" class="${inputCls.replace('h-9','h-[80px]')} py-2">${vals.desc||''}</textarea>`;
+  const html = `<div class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(0,0,0,.6);backdrop-filter:blur(2px)" onclick="if(event.target===this)closeModal()">`+
+    `<div class="w-full max-w-[448px] flex flex-col max-h-[90vh] rounded-[16px]" style="background:var(--dash-secondary-bg);border:1px solid var(--dash-border)">`+
+      `<div class="px-6 py-5" style="border-bottom:1px solid var(--dash-border)"><h2 class="text-[22px] font-bold m-0 leading-tight">${title}</h2></div>`+
+      `<div class="p-6 overflow-y-auto flex flex-col gap-5">`+
+        `<div id="ctxBanner">${bannerHtml(lockParent?parentNode:parentNode)}</div>`+
+        field(`Category Name`, nameInput, false)+
+        field(`Parent Category`, parentSelectHtml(selectedParentId, lockParent), true)+
+        (lockParent && parentNode ? `<p class="-mt-3 text-[12px] text-[hsl(var(--muted-foreground))]">Locked — you are adding under this category.</p>` : '')+
+        field(`Description`, descInput, true)+
+        field(`URL Slug`, slugInput, false)+
+      `</div>`+
+      `<div class="px-6 py-4 flex justify-end gap-3 rounded-b-[16px] shrink-0" style="border-top:1px solid var(--dash-border);background:var(--dash-secondary-bg)">`+
+        `<button onclick="closeModal()" class="h-9 px-4 rounded-lg text-[13px] font-medium" style="border:1px solid var(--dash-border);color:var(--dash-text)">Cancel</button>`+
+        `<button onclick="saveCat('${selectedParentId}')" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:linear-gradient(90deg,#3b82f6,#2dd4bf)">Save Category</button>`+
+      `</div>`+
+    `</div></div>`;
+  document.getElementById('modalRoot').innerHTML = html;
+}
+
+function onNameInput(){
+  if(editingId!==null) return; /* only auto-slug on create */
+  const n = document.getElementById('fName').value;
+  document.getElementById('fSlug').value = slugify(n);
+}
+function onParentChange(){
+  const v = document.getElementById('fParent').value;
+  const parent = v ? findNode(parseInt(v)) : null;
+  document.getElementById('ctxBanner').innerHTML = bannerHtml(parent);
+}
+function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+function saveCat(){
+  const name = (document.getElementById('fName').value||'').trim();
+  if(!name){ document.getElementById('fName').focus(); return; }
+  const pv = document.getElementById('fParent').value;
+  const parent = pv ? findNode(parseInt(pv)) : null;
+  if(editingId!==null){
+    findNode(editingId).name = name;
+  } else {
+    const node = {id:++SEQ, name, products:0, children:[]};
+    if(parent){ parent.children.push(node); expanded.add(parent.id); } else { CATS.push(node); }
+  }
+  closeModal(); renderTree();
+}
+
+/* ---------- delete modal (hard-block if products>0, else children -> top-level) ---------- */
+function openDelete(id){
+  const node = findNode(id);
+  const blocked = node.products > 0;         /* hard-block: DIRECT products assigned */
+  const kids = (node.children||[]).length;
+  const cancelBtn = `<button onclick="closeModal()" class="h-9 px-4 rounded-lg text-[13px] font-medium" style="border:1px solid var(--dash-border);color:var(--dash-text)">Cancel</button>`;
+  let body, footer;
+  if(blocked){
+    /* CASE 1 — category is assigned to products: block + explain + offer reassign */
+    body = `<div class="rounded-lg px-3 py-3 text-[13px] flex items-start gap-2.5" style="background:hsl(var(--destructive)/0.1);color:hsl(var(--destructive));border:1px solid hsl(var(--destructive)/0.3)">`+
+      `${I.warn}<span><b>Can&rsquo;t delete &ldquo;${node.name}&rdquo;.</b><br>It&rsquo;s still assigned to <b>${node.products} product${node.products>1?'s':''}</b>. Reassign or remove those products first, then delete.</span></div>`;
+    footer = cancelBtn +
+      `<button onclick="closeModal()" title="Go to Products filtered by this category" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:linear-gradient(90deg,#3b82f6,#2dd4bf)">Reassign products &rarr;</button>`+
+      `<button disabled class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive));opacity:.4;cursor:not-allowed">Delete</button>`;
+  } else {
+    /* CASE 2 — no products assigned: allow; if it has children, they move to top level */
+    body = `<p class="text-[13px]" style="color:var(--dash-text-muted)">Are you sure you want to delete <b style="color:var(--dash-text)">${node.name}</b>? This can&rsquo;t be undone.</p>`+
+      (kids?`<div class="rounded-lg px-3 py-2.5 text-[13px] flex items-start gap-2.5 mt-3" style="background:hsl(var(--warning)/0.1);color:hsl(var(--warning));border:1px solid hsl(var(--warning)/0.25)">`+
+        `${I.warn}<span>Its <b>${kids}</b> direct subcategor${kids>1?'ies':'y'} will be <b>moved to the top level</b> (not deleted).</span></div>`:'');
+    footer = cancelBtn + `<button onclick="confirmDelete(${id})" class="h-9 px-4 rounded-lg text-[13px] font-semibold !text-white" style="background:hsl(var(--destructive))">Delete</button>`;
+  }
+  document.getElementById('modalRoot').innerHTML =
+    `<div class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(0,0,0,.6);backdrop-filter:blur(2px)" onclick="if(event.target===this)closeModal()">`+
+    `<div class="w-full max-w-[440px] rounded-[16px]" style="background:var(--dash-secondary-bg);border:1px solid var(--dash-border)">`+
+      `<div class="px-6 py-5" style="border-bottom:1px solid var(--dash-border)"><h2 class="text-[20px] font-bold m-0">Delete Category</h2></div>`+
+      `<div class="p-6">${body}</div>`+
+      `<div class="px-6 py-4 flex justify-end gap-3 flex-wrap" style="border-top:1px solid var(--dash-border)">${footer}</div>`+
+    `</div></div>`;
+}
+function confirmDelete(id){
+  const node = findNode(id);
+  const parentArr = node.parent ? node.parent.children : CATS;
+  const idx = parentArr.indexOf(node);
+  if(idx>-1) parentArr.splice(idx,1);
+  (node.children||[]).forEach(c=>{ c.parent=null; CATS.push(c); }); /* children -> top level */
+  closeModal(); renderTree();
+}
+
+/* ---------- boot ---------- */
+document.getElementById('app').innerHTML = shell();
+renderTree();
+</script>
+
+</body>
+</html>

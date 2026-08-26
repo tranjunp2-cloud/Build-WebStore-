@@ -1,0 +1,875 @@
+name: Targeted Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      dispatch_id:
+        description: Server-created targeted Smoke dispatch ID
+        required: true
+        type: string
+      commit_sha:
+        description: Exact staging commit to test
+        required: true
+        type: string
+      pack_id:
+        description: Allow-listed targeted Smoke pack
+        required: true
+        type: string
+      workflow_nonce:
+        description: Server-issued one-time workflow claim nonce
+        required: true
+        type: string
+      run_profile:
+        description: Server-selected QA run provenance
+        required: true
+        type: choice
+        options:
+          - targeted-smoke
+          - manual-retest
+          - manual-smoke
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-smoke:
+    name: Targeted critical-flow Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate immutable dispatch inputs
+        shell: bash
+        run: |
+          [[ '${{ inputs.dispatch_id }}' =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
+          [[ '${{ inputs.commit_sha }}' =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
+          [[ '${{ inputs.workflow_nonce }}' =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
+          [[ '${{ inputs.run_profile }}' =~ ^(targeted-smoke|manual-retest|manual-smoke)$ ]] || { echo 'Invalid run profile for a Smoke contract'; exit 1; }
+          case '${{ inputs.pack_id }}' in
+            identity-login-otp-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=identity-login-otp' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/otp/otp-generate.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F01.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F01\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            identity-password-recovery-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=identity-password-recovery' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/profile/api-users-me-password.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F01.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F01\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            identity-sso-session-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=identity-sso-session' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/otp/qc-bypass-guard.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F01.05' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F01\.05' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            identity-staff-invitation-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=identity-staff-invitation' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/profile/role-guard.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F01.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F01\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            builder-generate-site-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=builder-generate-site' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/builder/ai-variety-composer.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F01-V.22' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F01-V\.22' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            builder-draft-recovery-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=builder-draft-recovery' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/builderStore.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F02.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F02\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            builder-preview-completion-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=builder-preview-completion' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/preview.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F02.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F02\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            builder-variety-template-apply-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=builder-variety-template-apply' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/templates/template-composer.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F02.05' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F02\.05' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            builder-url-scraper-import-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=builder-url-scraper-import' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/ai.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F02.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F02\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            editor-load-and-tenant-access-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-load-and-tenant-access' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/editor-store.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F04.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F04\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            editor-block-content-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-block-content' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/editor-store-structural-fields.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F04.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F04\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            editor-pages-navigation-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-pages-navigation' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/editorStore-pages-header.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F04.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F04\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            editor-publish-lifecycle-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-publish-lifecycle' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/editorStore.undoRedo.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F04.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F04\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            editor-product-grid-variants-smoke)
+              echo 'runner=smoke' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-productgrid-variants' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=tests/targeted-smoke/editor-product-grid-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F40-04-02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F40-04-02' >> "$GITHUB_OUTPUT"
+              echo 'fixture=smoke-e2e-targeted-tenant' >> "$GITHUB_OUTPUT"
+              ;;
+            editor-seo-local-business-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=editor-seo-local-business' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/validations/sites-local-business.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F04.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F04\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            products-list-search-filter-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=products-list-search-filter' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/dashboard-products.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.61' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.61' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            products-crud-publish-guard-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=products-crud-publish-guard' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/products/publish-guard.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.62' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.62' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            product-variants-critical-flow)
+              echo 'runner=smoke' >> "$GITHUB_OUTPUT"
+              echo 'target_id=products-variants-inventory' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=tests/targeted-smoke/product-variants.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.64' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.64' >> "$GITHUB_OUTPUT"
+              echo 'fixture=smoke-e2e-targeted-tenant' >> "$GITHUB_OUTPUT"
+              ;;
+            products-bulk-create-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=products-bulk-create' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/products/bulk-create-draft-verification.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.65' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.65' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            product-categories-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=product-categories' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payload/category-row-lock.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.66' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.66' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            products-ai-description-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=products-ai-description' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/products/build-product-alt.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.67' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.67' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            orders-list-search-metrics-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=orders-list-search-metrics' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/orders-list.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            order-payment-verification-critical-flow)
+              echo 'runner=smoke' >> "$GITHUB_OUTPUT"
+              echo 'target_id=order-payment-verification' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=tests/targeted-smoke/order-payment-verification.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10-06-41' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10-06-41' >> "$GITHUB_OUTPUT"
+              echo 'fixture=smoke-e2e-targeted-tenant' >> "$GITHUB_OUTPUT"
+              ;;
+            order-refund-cancel-retry-contract)
+              echo 'runner=smoke' >> "$GITHUB_OUTPUT"
+              echo 'target_id=order-refund-cancel-retry' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=tests/targeted-smoke/order-cancel-restock.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10-03-01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10-03-01' >> "$GITHUB_OUTPUT"
+              echo 'fixture=smoke-e2e-targeted-tenant' >> "$GITHUB_OUTPUT"
+              ;;
+            order-fulfilment-self-delivery-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=order-fulfilment-self-delivery' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/orders/fulfillment-zone-state.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            order-shipping-label-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=order-shipping-label' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/resolve-collection-method.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10.05' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10\.05' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            order-tracking-stream-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=order-tracking-stream' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/tracking-history.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F10.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F10\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            payment-settings-manual-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=payment-settings-manual' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payment/payment-method-types.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            stripe-connect-lifecycle-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=stripe-connect-lifecycle' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payment/stripe-connect.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            xendit-connect-checkout-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=xendit-connect-checkout' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payment/reconcile-order-paid.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            shipping-rates-pickup-config-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=shipping-rates-pickup-config' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/pickup-schedule.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            easyparcel-oauth-lifecycle-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=easyparcel-oauth-lifecycle' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/easyparcel-oauth-start.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.05' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.05' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            domains-custom-domain-primary-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=domains-custom-domain-primary' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/domain-primary.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            email-template-management-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=email-template-management' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/notifications/notify-tenant-owners.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.07' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.07' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            staff-rbac-management-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=staff-rbac-management' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/profile/role-guard.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F13.08' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F13\.08' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            public-page-routing-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=public-page-routing' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/site-renderer/apply-global-system-blocks.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            storefront-product-discovery-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=storefront-product-discovery' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/storefront/resolve-product-line.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            storefront-cart-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=storefront-cart' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/stores/cartStore.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            storefront-checkout-critical-flow)
+              echo 'runner=smoke' >> "$GITHUB_OUTPUT"
+              echo 'target_id=storefront-discount-checkout' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=tests/targeted-smoke/storefront-checkout.smoke.spec.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.32,TC-F09.30' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.32|TC-F09\.30' >> "$GITHUB_OUTPUT"
+              echo 'fixture=smoke-e2e-targeted-tenant' >> "$GITHUB_OUTPUT"
+              ;;
+            storefront-order-confirm-track-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=storefront-order-confirm-track' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/storefront/checkout.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.05' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.05' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            storefront-blog-contact-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=storefront-blog-contact' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/blogs-route.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.06' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.06' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            public-seo-discovery-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=public-seo-discovery' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/seo/public-discovery-middleware.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.07' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.07' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            tenant-domain-routing-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=tenant-domain-routing' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/storefront/custom-domain-detail-routes.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F09.08' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F09\.08' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            seo-tools-automation-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=seo-tools-automation' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/seo/seo-infrastructure.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F37.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F37\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            local-seo-gbp-map-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=local-seo-gbp-map' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/seo/local-business-json-ld.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F37.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F37\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            seo-rank-keyword-density-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=seo-rank-keyword-density' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/seo/keyword-density.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F37.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F37\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            tracking-analytics-config-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=tracking-analytics-config' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/storefront/track-event.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F37.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F37\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            project-content-localization-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=project-content-localization' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/localization/issue-1701-approved-copy.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F21.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F21\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            locale-switching-routing-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=locale-switching-routing' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/localization/f36-easyparcel-settings-i18n.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F21.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F21\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            ai-translate-workflow-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=ai-translate-workflow' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/ai-translate.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F21.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F21\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            easyparcel-shipment-booking-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=easyparcel-shipment-booking' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/ep-ready.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F36.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F36\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            shipping-rate-calculator-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=shipping-rate-calculator' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/get-rates.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F36.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F36\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            easyparcel-tracking-webhooks-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=easyparcel-tracking-webhooks' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/status-map.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F36.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F36\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            cod-eligibility-check-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=cod-eligibility-check' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/shipping/cod-eligibility.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F36.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F36\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            shop-customers-directory-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=shop-customers-directory' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/notifications.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F11.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F11\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            contact-lead-submissions-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=contact-lead-submissions' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/notifications/notification-store.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F11.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F11\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            newsletter-subscription-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=newsletter-subscription' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/notifications/notification-triggers.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F11.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F11\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            blog-post-management-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=blog-post-management' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/blogs-detail.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F12.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F12\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            blog-category-management-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=blog-category-management' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/blog-categories.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F12.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F12\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            discount-rules-coupons-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=discount-rules-coupons' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/discounts-get-by-id.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F12.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F12\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            broadcast-announcement-banner-contract)
+              echo 'runner=api' >> "$GITHUB_OUTPUT"
+              echo 'target_id=broadcast-announcement-banner' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/api/broadcasts.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F12.04' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F12\.04' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            plan-subscription-billing-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=plan-subscription-billing' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/subscriptions/plan-subscription.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F39.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F39\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            feature-guard-enforcement-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=feature-guard-enforcement' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/subscriptions/plan-features.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F39.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F39\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            payment-expiry-cron-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=payment-expiry-cron' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/notifications/notification-cleanup-cron.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F39.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F39\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            webhook-contracts-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=webhook-contracts' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payment/disconnect-stripe.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F14.01' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F14\.01' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            media-library-upload-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=media-library-upload' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/api/media-presign.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F14.02' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F14\.02' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            tenant-row-locking-contract)
+              echo 'runner=unit' >> "$GITHUB_OUTPUT"
+              echo 'target_id=tenant-row-locking' >> "$GITHUB_OUTPUT"
+              echo 'pack_version=1' >> "$GITHUB_OUTPUT"
+              echo 'spec=src/__tests__/unit/payload/tenant-row-lock.test.ts' >> "$GITHUB_OUTPUT"
+              echo 'tc_ids=TC-F14.03' >> "$GITHUB_OUTPUT"
+              echo 'grep=TC-F14\.03' >> "$GITHUB_OUTPUT"
+              
+              ;;
+            *) echo 'Pack is not allow-listed'; exit 1 ;;
+          esac
+        id: contract
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+      - if: steps.contract.outputs.runner == 'smoke'
+        run: npx playwright install --with-deps chromium
+
+      - name: Claim the fixture dispatch once
+        id: claim
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('crypto')
+          const fs = require('fs')
+          const body = JSON.stringify({
+            dispatchId: Number(process.env.DISPATCH_ID), workflowNonce: process.env.WORKFLOW_NONCE,
+            workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+          })
+          const timestamp = Date.now().toString()
+          const signature = crypto.createHmac('sha256', process.env.QA_INGEST_SECRET).update(`${timestamp}.${body}`).digest('hex')
+          fs.writeFileSync('/tmp/targeted-start-body.json', body)
+          fs.writeFileSync('/tmp/targeted-start-headers.txt', `${timestamp}\n${signature}`)
+          NODE
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/targeted-start-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/targeted-start-headers.txt)
+          STATUS=$(curl --silent --show-error --output /tmp/targeted-start-response.json --write-out '%{http_code}' -X POST "${BASE_URL}/api/admin/qa/targeted-start" \
+            -H 'Content-Type: application/json' \
+            -H "x-qa-timestamp: $QA_TIMESTAMP" \
+            -H "x-qa-signature: sha256=$QA_SIGNATURE" \
+            --data-binary @/tmp/targeted-start-body.json)
+          if [[ "$STATUS" != "200" ]]; then
+            cat /tmp/targeted-start-response.json
+            exit 1
+          fi
+          if grep -q '"cancelled":true' /tmp/targeted-start-response.json; then
+            echo 'cancelled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'cancelled=false' >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
+          DISPATCH_ID: ${{ inputs.dispatch_id }}
+          WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
+
+      - name: Provision isolated targeted-Smoke tenant
+        if: steps.claim.outputs.cancelled != 'true' && steps.contract.outputs.runner == 'smoke'
+        shell: bash
+        run: |
+          curl --fail-with-body -X POST "${BASE_URL}/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${E2E_SETUP_SECRET}" \
+            -H 'Content-Type: application/json' \
+            --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
+      - name: Execute exactly one registered contract
+        if: steps.claim.outputs.cancelled != 'true'
+        id: playwright
+        shell: bash
+        run: |
+          set +e
+          if [[ '${{ steps.contract.outputs.runner }}' == 'smoke' ]]; then
+            npx playwright test '${{ steps.contract.outputs.spec }}' \
+              --project=f40-targeted-smoke \
+              --grep '${{ steps.contract.outputs.grep }}' \
+              --reporter=json > /tmp/targeted-contract-report.json
+          else
+            npx vitest run '${{ steps.contract.outputs.spec }}' \
+              --testNamePattern '${{ steps.contract.outputs.grep }}' \
+              --reporter=json > /tmp/targeted-contract-report.json
+          fi
+          EXIT_CODE=$?
+          export EXIT_CODE
+          node <<'NODE'
+          const fs = require('fs')
+          const ids = process.env.TC_IDS.split(',')
+          const report = JSON.parse(fs.readFileSync('/tmp/targeted-contract-report.json', 'utf8'))
+          let observations = {}
+          try { observations = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-observations.json', 'utf8')) } catch {}
+          const observed = new Map()
+          const metadata = process.env.RUNNER === 'smoke'
+            ? { fixtureReference: process.env.FIXTURE_REFERENCE, classification: 'product', evidenceKind: 'report' }
+            : { classification: 'product', evidenceKind: 'report' }
+          // Stable contract identity is emitted for both pass and failure so a
+          // later required-pack pass can verify the exact finding it retests.
+          const assertionCodeFor = id => `TARGETED_SMOKE_${id.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`
+          const hasExactTcId = (value, id) => {
+            const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            return new RegExp(`(^|[^A-Za-z0-9_.-])${escaped}($|[^A-Za-z0-9_.-])`).test(value || '')
+          }
+          function mark(id, status) {
+            if (observed.has(id) && observed.get(id).status === 'failed') return
+            observed.set(id, { testCaseId: id, status, assertionCode: assertionCodeFor(id), ...metadata })
+          }
+          function walk(suite) {
+            for (const spec of suite.specs || []) {
+              for (const id of ids) {
+                if (!hasExactTcId(spec.title, id)) continue
+                const test = (spec.tests || []).find(test => Array.isArray(test.results) && test.results.length > 0)
+                const last = test?.results.at(-1)
+                const status = last?.status === 'passed' ? 'passed' : 'failed'
+                if (process.env.RUNNER !== 'smoke') { mark(id, status); continue }
+                const observation = observations[id]
+                const fallbackEvidence = process.env.EXPECTED_COUNT
+                  ? { expectedCount: Number(process.env.EXPECTED_COUNT), expectedSummary: process.env.EXPECTED_SUMMARY, actualSummary: 'Measurement unavailable because the test flow stopped before observation.' }
+                  : {}
+                const measuredEvidence = observation && Number.isInteger(observation.expectedCount) && Number.isInteger(observation.actualCount)
+                  ? {
+                      fixtureReference: observation.fixtureReference || metadata.fixtureReference,
+                      expectedCount: observation.expectedCount,
+                      actualCount: observation.actualCount,
+                      expectedSummary: observation.expectedSummary,
+                      actualSummary: observation.actualSummary,
+                      classification: observation.classification || metadata.classification,
+                      evidenceKind: observation.evidenceKind || metadata.evidenceKind,
+                    }
+                  : { ...fallbackEvidence, ...observation }
+                observed.set(id, { testCaseId: id, status, assertionCode: assertionCodeFor(id), ...metadata, ...measuredEvidence })
+              }
+            }
+            for (const child of suite.suites || []) walk(child)
+          }
+          for (const suite of report.suites || []) walk(suite)
+          for (const result of report.testResults || []) {
+            for (const assertion of result.assertionResults || []) {
+              for (const id of ids) {
+                if (hasExactTcId(assertion.fullName, id) || hasExactTcId(assertion.title, id))
+                  mark(id, assertion.status === 'passed' ? 'passed' : 'failed')
+              }
+            }
+          }
+          const results = ids.map(id => observed.get(id) || { testCaseId: id, status: 'failed', assertionCode: assertionCodeFor(id) })
+          if (process.env.EXIT_CODE !== '0') {
+            for (const result of results) result.status = 'failed'
+          }
+          fs.writeFileSync('/tmp/targeted-smoke-results.json', JSON.stringify(results))
+          if (results.length !== ids.length || results.some(result => result.status !== 'passed')) process.exitCode = 1
+          NODE
+          if [ "$?" != '0' ]; then EXIT_CODE=1; fi
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
+          RUNNER: ${{ steps.contract.outputs.runner }}
+          TC_IDS: ${{ steps.contract.outputs.tc_ids }}
+          FIXTURE_REFERENCE: ${{ steps.contract.outputs.fixture }}
+          EXPECTED_COUNT: ${{ steps.contract.outputs.expected_count }}
+          EXPECTED_SUMMARY: ${{ steps.contract.outputs.expected_summary }}
+
+      - name: Ingest signed results back into QA Control Center
+        if: always() && steps.claim.outputs.cancelled != 'true'
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('crypto')
+          const fs = require('fs')
+          let results = []
+          try {
+            results = JSON.parse(fs.readFileSync('/tmp/targeted-smoke-results.json', 'utf8'))
+          } catch {
+            const rawIds = (process.env.TC_IDS || '').split(',').filter(Boolean)
+            results = rawIds.map(id => ({
+              testCaseId: id,
+              status: 'failed',
+              assertionCode: `TARGETED_SMOKE_${id.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}`,
+            }))
+          }
+          const body = JSON.stringify({
+            dispatchId: Number(process.env.DISPATCH_ID),
+            workflowNonce: process.env.WORKFLOW_NONCE,
+            workflowRunId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            targetId: process.env.TARGET_ID,
+            packId: process.env.PACK_ID,
+            packVersion: Number(process.env.PACK_VERSION),
+            commitSha: process.env.COMMIT_SHA,
+            results,
+          })
+          const timestamp = Date.now().toString()
+          const signature = crypto.createHmac('sha256', process.env.QA_INGEST_SECRET).update(`${timestamp}.${body}`).digest('hex')
+          fs.writeFileSync('/tmp/targeted-ingest-body.json', body)
+          fs.writeFileSync('/tmp/targeted-ingest-headers.txt', `${timestamp}\n${signature}`)
+          NODE
+          QA_TIMESTAMP=$(sed -n '1p' /tmp/targeted-ingest-headers.txt)
+          QA_SIGNATURE=$(sed -n '2p' /tmp/targeted-ingest-headers.txt)
+          curl --fail-with-body -X POST "${BASE_URL}/api/admin/qa/ingest" \
+            -H 'Content-Type: application/json' \
+            -H "x-qa-timestamp: $QA_TIMESTAMP" \
+            -H "x-qa-signature: sha256=$QA_SIGNATURE" \
+            --data-binary @/tmp/targeted-ingest-body.json
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
+          DISPATCH_ID: ${{ inputs.dispatch_id }}
+          WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
+          TARGET_ID: ${{ steps.contract.outputs.target_id }}
+          PACK_ID: ${{ inputs.pack_id }}
+          PACK_VERSION: ${{ steps.contract.outputs.pack_version }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          TC_IDS: ${{ steps.contract.outputs.tc_ids }}
+
+      - name: Fail workflow if test step failed
+        if: steps.claim.outputs.cancelled != 'true'
+        shell: bash
+        run: |
+          if [[ "${{ steps.playwright.outputs.exit_code }}" != "0" ]]; then
+            echo "Targeted contract test failed with exit code ${{ steps.playwright.outputs.exit_code }}"
+            exit ${{ steps.playwright.outputs.exit_code }}
+          fi
